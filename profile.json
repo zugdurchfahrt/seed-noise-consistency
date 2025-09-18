@@ -1,0 +1,115 @@
+{
+  "profile": {
+    "platform": "Win32",
+    "os_info": "Windows NT 10.0; Win64; x64",
+    "os_name": "Windows 11 64-bit",
+    "platform_version": "15.0.0",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+    "browser_version": "136.0.7103.48",
+    "screen_width": 1920,
+    "screen_height": 1080,
+    "device_dpr_value": 1.0,
+    "orientation": "landscape",
+    "webgl_vendor": "WebKit",
+    "webgl_renderer": "WebKit WebGL",
+    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
+    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x2486) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "gpu_type": "discrete",
+    "gpu_architecture": "ampere",
+    "gpu_vendor": "nvidia",
+    "devices_conf": {
+      "audioinput": "AKG C214",
+      "videoinput": "Logitech C310",
+      "audiooutput": "Audio-Technica ATH-AD700x"
+    },
+    "vendor_value": "Google Inc.",
+    "languages": [
+      "ro-RO",
+      "ro",
+      "en-GB",
+      "en"
+    ],
+    "language": "ro-RO",
+    "deviceMemory": 8,
+    "hardwareConcurrency": 4,
+    "plugins": [
+      {
+        "name": "Chrome PDF Viewer",
+        "filename": "internal-pdf-viewer",
+        "description": "",
+        "mimeTypes": [
+          {
+            "type": "application/pdf",
+            "suffixes": "pdf",
+            "description": "PDF document"
+          }
+        ]
+      }
+    ],
+    "mimeTypes": [
+      {
+        "type": "application/pdf",
+        "suffixes": "pdf",
+        "description": "PDF document"
+      }
+    ],
+    "accept_language": "ro-RO,ro;q=0.9,en-GB;q=0.8,en;q=0.7"
+  },
+  "expected_client_hints": {
+    "platform": "Windows",
+    "brands": [
+      {
+        "brand": "Not)A;Brand",
+        "version": "8"
+      },
+      {
+        "brand": "Chromium",
+        "version": "136"
+      },
+      {
+        "brand": "Google Chrome",
+        "version": "136"
+      }
+    ],
+    "mobile": false,
+    "architecture": "x86",
+    "bitness": "64",
+    "model": "",
+    "platformVersion": "15.0.0",
+    "fullVersionList": [
+      {
+        "brand": "Not)A;Brand",
+        "version": "8.0.0.0"
+      },
+      {
+        "brand": "Chromium",
+        "version": "136.0.7103.48"
+      },
+      {
+        "brand": "Google Chrome",
+        "version": "136.0.7103.48"
+      }
+    ],
+    "uaFullVersion": "136.0.7103.48",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"136\", \"Google Chrome\";v=\"136\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"136.0.7103.48\", \"Google Chrome\";v=\"136.0.7103.48\"",
+    "sec_ch_ua_model": "",
+    "sec_ch_ua_form_factors": [
+      "Desktop"
+    ],
+    "deviceMemory": 8,
+    "hardwareConcurrency": 4,
+    "wow64": false,
+    "languages": [
+      "ro-RO",
+      "ro",
+      "en-GB",
+      "en"
+    ],
+    "language": "ro-RO",
+    "formFactors": [
+      "Desktop"
+    ],
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/webp,image/avif,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+  }
+}

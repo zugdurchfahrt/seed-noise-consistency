@@ -1,0 +1,27 @@
+* text=auto
+
+# Windows-скрипты: только CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Unix-скрипты/код: LF
+*.sh   text eol=lf
+*.py   text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+
+* text=auto
+
+# Windows-скрипты: только CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Unix-скрипты/код: LF
+*.sh   text eol=lf
+*.py   text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
