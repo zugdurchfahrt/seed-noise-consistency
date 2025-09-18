@@ -3,10 +3,10 @@ Browser Anti-Fingerprinting pipeline (Python + JavaScript) based on seed-based p
 Русская версия: см. Readme_RUS.md
 
 What this project is about
-The system has been designed to evaluate and mitigate modern browser fingerprinting surfaces (Canvas, WebGL, Fonts, Client Hints, Headers, etc.).
+The system has been designed to evaluate and mitigate modern browser fingerprinting surfaces (Canvas 2D/OffscreenCanvas, WebGL/WebGPU, Fonts, UA-CH/Headers).
 
 Architecture
-Python (Selenium + undetected_chromedriver) + JavaScript patches (modules) injection via CDP to control fingerprint surfaces (Canvas 2D/OffscreenCanvas, WebGL/WebGPU, Fonts, UA-CH/Headers), a proxy application is available as a switchable option.
+Python (Selenium + undetected_chromedriver) + JavaScript patches (modules) injection via CDP to control fingerprint surfaces, proxy application is available as a switchable option.
 
 Ethics & scope
 

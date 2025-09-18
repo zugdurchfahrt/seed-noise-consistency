@@ -33,15 +33,14 @@ PN_PROCESSES = {
 
 # === Constants and Settings ====
 # Paths to VPN Directory and Data
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parent
-USER_DATA_DIR = PROJECT_ROOT / 'user_data'
-CONFIG_DIR = PROJECT_ROOT / 'configs'
-CRASHPAD_DIR    = PROJECT_ROOT /'crashpad'
-TEMP_AUTH_FILE  = os.path.join(CONFIG_DIR, "temp_auth.txt")
-OPENVPN_PATH    = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
-POLL_INTERVAL = 0.25         # poll Interval in seconds
-MAX_ATTEMPTS = 6             # Connecting attempts
-TIMEOUT_SECONDS = 120        # VPN  initialization Timesout 
+PROJECT_ROOT        = pathlib.Path(__file__).resolve().parent
+USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
+CONFIG_DIR          = PROJECT_ROOT / 'configs'
+TEMP_AUTH_FILE      = os.path.join(CONFIG_DIR, "temp_auth.txt")
+OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
+POLL_INTERVAL       = 0.25          # poll Interval in seconds
+MAX_ATTEMPTS        = 6             # Connecting attempts
+TIMEOUT_SECONDS     = 120           # VPN  initialization Timesout 
 API_TIMEOUT_SECONDS = 5
 
 
@@ -112,7 +111,7 @@ class VPNClient:
             "--dhcp-option", "DNS", "1.1.1.1",
             "--dhcp-option", "DNS", "1.0.0.1",
             "--block-outside-dns",
-            "--pull-filter", "ignore", "route-ipv6",    # Ignore IPv6 push from server side.
+            "--pull-filter", "ignore", "route-ipv6",    # Ignore IPv6 push from server side
             "--pull-filter", "ignore", "ifconfig-ipv6",
         ]
         logger.debug("[VPN] Launch command: %s", ' '.join(cmd))
@@ -242,7 +241,7 @@ class VPNClient:
                     logger.debug("Killed VPN process %s (PID %d)", name, proc.pid)
                 except Exception as e:
                     logger.warning("Error killing %s (PID %d): %s", name, proc.pid, e)
-        #We also terminate our OpenVPN process if it is still active
+        # also terminates OpenVPN process if it is still active
         if hasattr(self, 'openvpn_process') and getattr(self, 'openvpn_process'):
             try:
                 op = self.openvpn_process
@@ -257,7 +256,6 @@ class VPNClient:
         """
         Wipes browser USER_DATA_DIR (always) and CRASHPAD_DIR.
         """
-        shutil.rmtree(CRASHPAD_DIR, ignore_errors=True)
         shutil.rmtree(USER_DATA_DIR, ignore_errors=True)
         os.makedirs(USER_DATA_DIR, exist_ok=True)
     
@@ -335,11 +333,11 @@ def get_language_for_timezone(timezone, return_country=False):
     languages = data.get("languages", ["en-GB"])
     domain = data.get("domain", "com")
 
-    # # Strictly convert to a list (if it's a string)
+    # Strictly convert to a list (if it's a string)
     if isinstance(languages, str):
         languages = [languages]
 
-    # # country: if not set - try with pytz
+    # country: if not set - try with pytz
     country = None
     if not country:
         try:
@@ -352,7 +350,7 @@ def get_language_for_timezone(timezone, return_country=False):
     if not country:
         country = "UNKNOWN"
 
-    # # UTC offset (minutes) — (aware, DST-safe)
+    # UTC offset (minutes) — (aware, DST-safe)
     try:
         tz = pytz.timezone(timezone)
         now_utc = datetime.now(pytz.utc)
@@ -361,7 +359,7 @@ def get_language_for_timezone(timezone, return_country=False):
     except Exception:
         offset_minutes = 0
 
-    # # final contract for return
+    # final contract for return
     if return_country:
         return country, languages, domain, offset_minutes
     return languages, domain

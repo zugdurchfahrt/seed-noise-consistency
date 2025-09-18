@@ -1,14 +1,12 @@
 from __future__ import annotations
-import random
 from typing import Iterable, Tuple, List
+import random
 import logging
 
 from headers_adapter import generate_accept_header
 from overseer import logger
 logger = logging.getLogger(__name__)
-
 FALLBACK_EN = "en-GB" 
-
 
 def build_device_metrics(profile: dict) -> dict:
     """
@@ -183,10 +181,6 @@ def override_user_agent_data(driver, browser_brand: str) -> None:
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
     logger.info("[UA-soft] JS getter overrides applied for %s (no deletion)", browser_brand)
 
-
-
-
-
 def choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac):
     """
     Selects device memory and CPU concurrency values based on platform and weighted options.
@@ -227,7 +221,6 @@ def choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac):
     else:
         hardware_concurrency = cpu_opts[0][0]
     return device_memory, hardware_concurrency
-
 
 # === browser_brand и brouser version definition ===
 def determine_browser_brand_and_versions(user_agent, profile):
@@ -363,9 +356,6 @@ def format_full_version_list(full_version_list):
         f'"{item["brand"]}";v="{item["version"]}"'
         for item in full_version_list
     )
-    # === File: tools.py — soft, non-destructive UA handling ===
-    # Replace the whole function `override_user_agent_data` with this no-op version.
-    # Do not delete/override navigator properties; rely on headers policy instead.
 
 # ===== Override the User-Agent and User-Agent Metadata=====
 def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand):
