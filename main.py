@@ -216,7 +216,7 @@ def init_driver(
             "mobile": False,
             "screenWidth": 1920,
             "screenHeight": 1080,
-            "screenOrientation": {"type": "landscape-primary", "angle": 0}
+            "screenOrientation": {"type": "landscapePrimary", "angle": 0}
         }
     )
     # --- Initial fonts patch ---
