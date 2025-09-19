@@ -41,14 +41,14 @@ setup_logger(child_levels={
     "plugins_dict": logging.DEBUG, 
 })
 # -----------------------CONSTANT VARIABLES-----------------------
-OPENVPN_PATH = r"C:\\Program Files\\OpenVPN\\bin\\openvpn.exe"
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parent
-USER_DATA_DIR = PROJECT_ROOT / 'user_data'
-CONFIG_DIR = PROJECT_ROOT / 'configs'
-ASSETS_DIR = PROJECT_ROOT / 'assets'
-SCRIPTS_DIR = ASSETS_DIR / 'scripts'
-MANIFEST_PATH = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
-PATCH_OUT = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
+OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
+PROJECT_ROOT        = pathlib.Path(__file__).resolve().parent
+USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
+CONFIG_DIR          = PROJECT_ROOT / 'configs'
+ASSETS_DIR          = PROJECT_ROOT / 'assets'
+SCRIPTS_DIR         = ASSETS_DIR / 'scripts'
+MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
+PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
 # ----------------------- PROFILE FUNCTION -----------------------
@@ -216,7 +216,7 @@ def init_driver(
             "mobile": False,
             "screenWidth": 1920,
             "screenHeight": 1080,
-            "screenOrientation": {"type": "landscape-primary", "angle": 0}
+            "screenOrientation": {"type": "landscapePrimary", "angle": 0}
         }
     )
     # --- Initial fonts patch ---
@@ -568,7 +568,7 @@ def main():
 
         client.verify()
         client.prepare()
-        logger.info("preparation completed: %s", client.prepare)
+        logger.info("preparation completed")
         client.connect()
         client.post()
         # -------- Getting country_data from VPN module -------------------
@@ -847,7 +847,7 @@ def main():
             json.dump(data, f, ensure_ascii=False, indent=2)
         logger.info("new profile.json created for mitmproxy") 
         
-        # --- mitmproxy starts ---
+        # --- mitmproxy start ---
         mitmproxy_proc = subprocess.Popen([
             "mitmproxy", "-s", "handle_cors_addon.py"
         ])

@@ -38,14 +38,14 @@ setup_logger(child_levels={
     "plugins_dict": logging.DEBUG, 
 })
 # -----------------------CONSTANT VARIABLES-----------------------
-OPENVPN_PATH = r"C:\\Program Files\\OpenVPN\\bin\\openvpn.exe"
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parent
-USER_DATA_DIR = PROJECT_ROOT / 'user_data'
-CONFIG_DIR = PROJECT_ROOT / 'configs'
-ASSETS_DIR = PROJECT_ROOT / 'assets'
-SCRIPTS_DIR = ASSETS_DIR / 'scripts'
-MANIFEST_PATH = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
-PATCH_OUT = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
+OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
+PROJECT_ROOT        = pathlib.Path(__file__).resolve().parent
+USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
+CONFIG_DIR          = PROJECT_ROOT / 'configs'
+ASSETS_DIR          = PROJECT_ROOT / 'assets'
+SCRIPTS_DIR         = ASSETS_DIR / 'scripts'
+MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
+PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
 # ----------------------- PROFILE FUNCTION -----------------------
@@ -559,7 +559,7 @@ def main():
 
         client.verify()
         client.prepare()
-        logger.info("preparation completed: %s", client.prepare)
+        logger.info("preparation completed")
         client.connect()
         client.post()
         # -------- Getting country_data from VPN module -------------------

@@ -533,10 +533,7 @@ function ContextPatchModule(window) {
     // 4) Registration Canvas 2D
     if (C.registerHtmlCanvasToDataURLHook)    C.registerHtmlCanvasToDataURLHook(H.masterToDataURLHook);
     if (C.registerHtmlCanvasToBlobHook)       C.registerHtmlCanvasToBlobHook(H.patchToBlobInjectNoise);
-    if (C.registerOffscreenConvertToBlobHook) {
-        C.registerOffscreenConvertToBlobHook(H.patchToBlobInjectNoise);
-        C.registerOffscreenConvertToBlobHook(H.patchConvertToBlobInjectNoise);
-    }
+    if (C.registerOffscreenConvertToBlobHook) C.registerOffscreenConvertToBlobHook(H.patchConvertToBlobInjectNoise);
     if (C.registerCtx2DMeasureTextHook)       C.registerCtx2DMeasureTextHook(H.measureTextNoiseHook);
     if (C.registerCtx2DFillTextHook)          C.registerCtx2DFillTextHook(H.fillTextNoiseHook);
     if (C.registerCtx2DStrokeTextHook)        C.registerCtx2DStrokeTextHook(H.strokeTextNoiseHook);

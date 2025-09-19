@@ -91,7 +91,7 @@ class VPNClient:
         
     def connect(self) -> bool:
 
-        # 1) Checking the presence of .OVPN files
+        # 1) Checking the availability of .OVPN files
         configs = [f for f in os.listdir(self.config_dir) if f.endswith('.ovpn')]
         if not configs:
             logger.error(f"[VPN] we have no .ovpn-files in {self.config_dir}")
@@ -105,14 +105,13 @@ class VPNClient:
             self.openvpn_path,
             "--config", config_path,
             "--auth-user-pass", self.temp_auth,
-            "--redirect-gateway", "def1",          
+            "--tun-ipv6",
+            "--redirect-gateway", "def1", "ipv6",       
             # "--route-nopull",                         # AN OPTION TO SWITCH OPERATING MODE TO MANUAL step-by-step onroute-nopull
             "--auth-nocache",
             "--dhcp-option", "DNS", "1.1.1.1",
             "--dhcp-option", "DNS", "1.0.0.1",
             "--block-outside-dns",
-            "--pull-filter", "ignore", "route-ipv6",    # Ignore IPv6 push from server side
-            "--pull-filter", "ignore", "ifconfig-ipv6",
         ]
         logger.debug("[VPN] Launch command: %s", ' '.join(cmd))
 
@@ -124,14 +123,14 @@ class VPNClient:
             logger.debug(f"[VPN] {line.strip()}")
             if "Initialization Sequence Completed" in line:
                 logger.info("VPN is successfully connected(stdout)")
-                # Stabilization of routes/DNS
-                time.sleep(2.0)
+                # routes stabilization - Check by IP not to wait for DNS
+                time.sleep(1.0)
                 try:
-                    # sanity-check external network without system proxy
-                    requests.get("http://ip-api.com/json/", timeout=3, proxies={'http': None, 'https': None})
+                    requests.get("http://1.1.1.1", timeout=2, proxies={'http': None, 'https': None})
                 except Exception:
-                    logger.warning("[VPN] VPN tunnel is up, network is not ready yet - waiting 3 sec more")
-                    time.sleep(3.0)
+                    logger.warning("[VPN] tunnel up, network not ready yet (IP probe) — wait 2s")
+                    time.sleep(2.0)
+                # DNS Could be replaced by a server - we will unconditionally flush
                 subprocess.run(["ipconfig", "/flushdns"], check=False)
                 try:
                     os.remove(self.temp_auth)
@@ -227,24 +226,34 @@ class VPNClient:
                 logger.debug(f"temp auth file deleted during cleanup: {self.temp_auth}")
         except Exception as e:
                 logger.warning(f"Failed to delete temp auth file in cleanup: {e}")
-    
+
     def _terminate_vpn_processes(self):
-        for proc in psutil.process_iter(['pid', 'name']):
-            name = proc.info.get('name')
-            if name and name.lower() in PN_PROCESSES:
-                try:
-                    proc.terminate()
-                    proc.wait(2)
-                    logger.debug("Terminated VPN process %s (PID %d)", name, proc.pid)
-                except psutil.TimeoutExpired:
-                    proc.kill()
-                    logger.debug("Killed VPN process %s (PID %d)", name, proc.pid)
-                except Exception as e:
-                    logger.warning("Error killing %s (PID %d): %s", name, proc.pid, e)
-        # also terminates OpenVPN process if it is still active
-        if hasattr(self, 'openvpn_process') and getattr(self, 'openvpn_process'):
+        for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
             try:
-                op = self.openvpn_process
+                name = (proc.info.get('name') or '').lower()
+                # работаем только с целевыми процессами
+                if name in PN_PROCESSES or 'openvpn' in name or 'protonvpn' in name:
+                    logger.debug(
+                        "[cleanup] terminate PID=%s name=%s exe=%s cmd=%s",
+                        proc.pid, name, proc.info.get('exe'),
+                        ' '.join(proc.info.get('cmdline') or [])[:200]
+                    )
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2)
+                        logger.debug("Terminated VPN process %s (PID %d)", name, proc.pid)
+                    except psutil.TimeoutExpired:
+                        logger.debug("[cleanup] kill PID=%s (timeout on terminate)", proc.pid)
+                        proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+            except Exception as e:
+                logger.debug("[cleanup] error on PID=%s: %s", getattr(proc, "pid", "?"), e)
+
+        # локальный OpenVPN-процесс, если ещё жив
+        op = getattr(self, 'openvpn_process', None)
+        if op:
+            try:
                 if op.poll() is None:
                     op.terminate()
                     op.wait(timeout=2)
@@ -254,21 +263,27 @@ class VPNClient:
 
     def _clean_directories(self):
         """
-        Wipes browser USER_DATA_DIR (always) and CRASHPAD_DIR.
+        Wipes browser USER_DATA_DIR
         """
-        shutil.rmtree(USER_DATA_DIR, ignore_errors=True)
+        try:
+            shutil.rmtree(USER_DATA_DIR, ignore_errors=True)
+            logger.debug("[cleanup] removed dir: %s", USER_DATA_DIR)
+        except Exception as e:
+            logger.debug("[cleanup] skip removing %s: %s", USER_DATA_DIR, e)
+
         os.makedirs(USER_DATA_DIR, exist_ok=True)
-    
+        logger.debug("[cleanup] created dir: %s", USER_DATA_DIR)
+
     def _kill_old_processes(self):
-        now = time.time()
-        for proc in psutil.process_iter(['pid', 'name', 'create_time']):
-            name = proc.info.get('name')
-            if not name:
-                continue
-            if now - proc.info.get('create_time', now) > 300 and name.lower() in (
-                'chrome.exe', 'chromedriver.exe', 'tor.exe', 'cmd.exe'):
-                proc.terminate()
-        
+            now = time.time()
+            for proc in psutil.process_iter(['pid', 'name', 'create_time']):
+                name = proc.info.get('name')
+                if not name:
+                    continue
+                if now - proc.info.get('create_time', now) > 300 and name.lower() in (
+                    'chrome.exe', 'chromedriver.exe', 'tor.exe', 'cmd.exe'):
+                    proc.terminate()
+                    
 def get_language_for_timezone(timezone, return_country=False):
     """Sets the country (by Timezone map), languages, domain and offset for the given timezone.
     Contract:
@@ -350,7 +365,7 @@ def get_language_for_timezone(timezone, return_country=False):
     if not country:
         country = "UNKNOWN"
 
-    # UTC offset (minutes) — (aware, DST-safe)
+    #  UTC offset (minutes) — (aware, DST-safe)
     try:
         tz = pytz.timezone(timezone)
         now_utc = datetime.now(pytz.utc)
@@ -359,7 +374,7 @@ def get_language_for_timezone(timezone, return_country=False):
     except Exception:
         offset_minutes = 0
 
-    # final contract for return
+    #  final contract for return
     if return_country:
         return country, languages, domain, offset_minutes
     return languages, domain
