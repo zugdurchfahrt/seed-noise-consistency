@@ -559,9 +559,8 @@ function ContextPatchModule(window) {
     });
 
     // 6) WebGL-hooks regisgration
-    if (C.registerWebGLGetParameterHook) {
-      C.registerWebGLGetParameterHook(webglHooks.webglGetParameterMask);
-      C.registerWebGLGetParameterHook(webglHooks.webglWhitelistParameterHook);
+    if (C.registerWebGLGetParameterHook) {          C.registerWebGLGetParameterHook(webglHooks.webglGetParameterMask);
+                                                    C.registerWebGLGetParameterHook(webglHooks.webglWhitelistParameterHook);
     }
     if (C.registerWebGLGetSupportedExtensionsHook)   C.registerWebGLGetSupportedExtensionsHook(webglHooks.webglGetSupportedExtensionsPatch);
     if (C.registerWebGLGetExtensionHook)             C.registerWebGLGetExtensionHook(webglHooks.webglGetExtensionPatch);

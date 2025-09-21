@@ -127,7 +127,7 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
             base = {k: v for k, v in (req.get("headers") or {}).items() if not _is_blocked(k)}
             # Deciding what to add: extra_headers_fn usually only gives safelisted.
             extra = (extra_headers_fn or (lambda *_: {}))(url, method, ev.get("resourceType"))
-            # # If the host is not in allow - just in case, we do not allow anything except what is already allowed by the _is_blocked set (safelisted will pass)
+            # If the host is not in allow - just in case, we do not allow anything except what is already allowed by the _is_blocked set (safelisted will pass)
             if not _matches_suffix(host, allow):
                 # Inject only safelisted, so that the script behavior coincides with JS
                 for k, v in (extra or {}).items():
@@ -221,7 +221,8 @@ def init_driver(
     )
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
-    
+    # --- Workers Initial patch reading ---
+    core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
         parts = [
@@ -243,7 +244,7 @@ def init_driver(
             Path(SCRIPTS_DIR / "audiocontext.js").read_text("utf-8"),
             Path(SCRIPTS_DIR / "context.js").read_text("utf-8"),
             Path(SCRIPTS_DIR / "headers_interceptor.js").read_text("utf-8"),
-            # --- Launching modules in window ---
+            # --- Launch modules in window ---
             """
             try { LOGGingModule(window); } catch(_) {}
             try { RtcpeerconnectionPatchModule(window); } catch(_) {}
@@ -260,7 +261,7 @@ def init_driver(
             try { AudioContextModule(window); } catch(_) {}
             try { ContextPatchModule(window); } catch(_) {}
             try { HeadersInterceptor(window); } catch(_) {}
-            // ——— Register all hooks here ———
+           // —————— Register all hooks here ——————//
             try { if (typeof registerAllHooks === 'function') registerAllHooks(); } catch(_) {}
             (function applyAllPatchesCustomOrder(win) {
             try {
@@ -270,6 +271,8 @@ def init_driver(
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             } catch(_) {}
+            // ——— Worker env diagnostics ———//
+            console.info('[DIAG]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             })(window);
             """
         ]
@@ -313,14 +316,13 @@ def init_driver(
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
     # ---  CDP PROCESSING STAGE---
-    # --- userAgent и userAgentMetadata CDP ---
+    # --- patch userAgent and userAgentMetadata via CDP ---
     driver.execute_cdp_cmd('Network.setUserAgentOverride', {
         'userAgent': profile['user_agent'],
         'userAgentMetadata': expected_client_hints
     })
 
     # --- prepare worker_bootstrap_js ---
-    core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     worker_bootstrap_js = f"""
     (() => {{
     const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
@@ -343,7 +345,6 @@ def init_driver(
         try {{
         if (window.WorkerPatchHooks && window.WorkerPatchHooks.initAll) {{
             window.WorkerPatchHooks.initAll({{ publishHE: true }});
-            console.info('[DIAG]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
         }}
         }} catch (_) {{}}
     }}

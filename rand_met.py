@@ -176,7 +176,7 @@ def ensure_platform_index(platform: str) -> dict:
     files_map: dict = idx["files"]
     changed: list = []
 
-    # remove the obsolete field 'data' (reduce file size and RAM used)
+    # removes the obsolete field 'data' (reduce file size and RAM used)
     removed_inline = False
     for _n, _rec in list(files_map.items()):
         if isinstance(_rec, dict) and "data" in _rec:
@@ -185,7 +185,7 @@ def ensure_platform_index(platform: str) -> dict:
     if removed_inline:
         _atomic_write_json(idx_path, idx)
     fs_files = {p.name: p for p in plat_dir.glob("*.woff2") if p.is_file()}
-    # Removed - remove from the index
+    # removes from the index
     for name in list(files_map.keys()):
         if name not in fs_files:
             files_map.pop(name, None)

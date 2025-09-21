@@ -213,7 +213,8 @@ def init_driver(
     )
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
-    
+    # --- Workers Initial patch reading ---
+    core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
         parts = [
@@ -252,7 +253,7 @@ def init_driver(
             try { AudioContextModule(window); } catch(_) {}
             try { ContextPatchModule(window); } catch(_) {}
             try { HeadersInterceptor(window); } catch(_) {}
-            // ——— Register all hooks here ———
+            // —————— Register all hooks here ——————//
             try { if (typeof registerAllHooks === 'function') registerAllHooks(); } catch(_) {}
             (function applyAllPatchesCustomOrder(win) {
             try {
@@ -262,6 +263,8 @@ def init_driver(
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             } catch(_) {}
+            // ——— Worker env diagnostics ———//
+            console.info('[DIAG]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             })(window);
             """
         ]
@@ -311,7 +314,6 @@ def init_driver(
     })
 
     # --- prepare worker_bootstrap_js ---
-    core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     worker_bootstrap_js = f"""
     (() => {{
     const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
@@ -334,7 +336,6 @@ def init_driver(
         try {{
         if (window.WorkerPatchHooks && window.WorkerPatchHooks.initAll) {{
             window.WorkerPatchHooks.initAll({{ publishHE: true }});
-            console.info('[DIAG]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
         }}
         }} catch (_) {{}}
     }}

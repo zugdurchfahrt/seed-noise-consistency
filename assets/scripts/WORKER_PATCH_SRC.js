@@ -1,5 +1,10 @@
 // WORKER_PATCH_SRC.js
 (() => {
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+      || (typeof self       !== 'undefined' && self)
+      || (typeof window     !== 'undefined' && window)
+      || (typeof global     !== 'undefined' && global)
+      || {};
   if (typeof self==='undefined' || typeof WorkerGlobalScope==='undefined' || !(self instanceof WorkerGlobalScope)) return;
   if (self.installWorkerUACHMirror) return;
 
@@ -20,7 +25,7 @@
       Object.defineProperty(self, 'devicePixelRatio', {
         configurable: true,
         enumerable: false,
-        get(){ return Number(cache.snap?.dpr ?? 1); }
+        get(){ return Number(cache.snap?.dpr); }
       });
     } catch(_) {}
 
@@ -54,26 +59,29 @@
     def(proto,'userAgentData',()=>uad);
     // Толерантные HC/DM: новые имена или старые cpu/mem, иначе натив
     def(proto,'hardwareConcurrency',()=>Number(
-      cache.snap?.hardwareConcurrency ?? cache.snap?.cpu ?? callOrig(ORIG.hardwareConcurrency, nav.hardwareConcurrency ?? 4)
+      cache.snap?.hardwareConcurrency ?? cache.snap?.cpu ?? callOrig(ORIG.hardwareConcurrency, nav.hardwareConcurrency)
     ));
     def(proto,'deviceMemory',()=>Number(
-      cache.snap?.deviceMemory ?? cache.snap?.mem ?? callOrig(ORIG.deviceMemory, nav.deviceMemory ?? 8)
+      cache.snap?.deviceMemory ?? cache.snap?.mem ?? callOrig(ORIG.deviceMemory, nav.deviceMemory)
     ));
 
-    def(proto,'language',           ()=>String(cache.snap?.language           ?? callOrig(ORIG.language,            'en-GB')));
-    def(proto,'languages',          ()=>{ if (Array.isArray(cache.snap?.languages)) return cache.snap.languages.slice();
-                                         const o=callOrig(ORIG.languages,['en-GB','en']); return Array.isArray(o)? o.slice():['en-GB','en']; });
-
+    def(proto,'language', ()=>String(cache.snap?.language ?? callOrig(ORIG.language)));
+  
+    def(proto,'languages', ()=>{
+        if (Array.isArray(cache.snap?.languages))
+            return cache.snap.languages.slice();
+        const o = callOrig(ORIG.languages);
+        return Array.isArray(o) ? o.slice() : [];
+    });
 
     const prev = self.__applyEnvSnapshot__;
     self.__applyEnvSnapshot__ = s => {
       if (s) cache.snap = s;
-      if (s && s.seed != null) self.__GLOBAL_SEED = String(s.seed); // ← [ADD #1]
+      if (s && s.seed != null) self.__GLOBAL_SEED = String(s.seed); 
       if (typeof prev==='function') try{ prev.call(self,s); }catch(_){}
     };
     try{ if (self.__lastSnap__ && typeof self.__lastSnap__==='object') cache.snap = self.__lastSnap__; }catch(_){}
     try{ if (self.__lastSnap__ && self.__lastSnap__.seed != null) self.__GLOBAL_SEED = String(self.__lastSnap__.seed); }catch(_){}
-    // ← [ADD #2] отдельным try-блоком, ничего не трогая выше
     try{
       const bc = new BroadcastChannel('__ENV_SYNC__');
       bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
@@ -86,7 +94,6 @@
       scope: !!self.__SCOPE_CONSISTENCY_PATCHED__
     });
   };
-
 })();
 
 

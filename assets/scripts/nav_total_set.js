@@ -3,8 +3,12 @@ function NavTotalSetPatchModule() {
     window.__PATCH_NAVTOTALSET__ = true;
 
     const C = window.CanvasPatchContext;
-    if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
-    
+      if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
+    const G = (typeof globalThis !== 'undefined' && globalThis)
+      || (typeof self !== 'undefined' && self)
+      || (typeof window !== 'undefined' && window)
+      || {};
+      
     // basic random from the existing seed initialization
     const R = window.rand.use('nav');
     if (typeof R !== 'function') {
@@ -26,6 +30,7 @@ function NavTotalSetPatchModule() {
     const devicesLabels = window.__DEVICES_LABELS;
     const colorDepth    = Number(window.__COLOR_DEPTH);
     const orientationDom = window.__ORIENTATION ?? ((height >= width) ? 'portrait-primary' : 'landscape-primary')
+    
     // strictness & diagnostics
     const STRICT        = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
     const DEBUG         = !!window.__NAV_PATCH_DEBUG__;
@@ -512,6 +517,7 @@ function NavTotalSetPatchModule() {
     });
 
     //  ——— Debug information to console ———
+  if (G.__DEBUG__) {
     console.group("Client Hints Debug");
     console.log("meta:", meta);
     console.log("navigator.userAgentData:", navigator.userAgentData);
@@ -526,5 +532,6 @@ function NavTotalSetPatchModule() {
     }
     console.groupEnd();
     console.info('Client Hints and Navigator setting applied in JS');
-}
+  }
+  }
 }

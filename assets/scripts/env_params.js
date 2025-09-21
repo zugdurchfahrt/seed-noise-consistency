@@ -129,7 +129,7 @@
     try { console.log('[ENV] EnvParamsPatchModule ready'); } catch (_) {}
   }
 
-  // Function export
+  // Function export*
   const G = (typeof globalThis !== 'undefined' && globalThis)
         || (typeof self       !== 'undefined' && self)
         || (typeof window     !== 'undefined' && window)
@@ -149,3 +149,8 @@
     }
   }
 })();
+
+// *A global property is made unchangable to prevent other code from accidentally/intentionally overwriting the function.
+// This isn't "patching your function," but rather protecting it from changes after it's declared.
+// Adding a function to the global object once makes it protected, allowing any other code or module to access it without risk of being accidentally overwritten.
+// This is the standard approach for modules that can run in different environments (window/worker/).

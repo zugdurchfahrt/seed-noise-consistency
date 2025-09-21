@@ -6,10 +6,14 @@ function EnvBus(G){
       if (typeof langs === 'string') langs = [langs];
       else langs = []; 
     }
-    const lang     = (typeof G.__primaryLanguage === 'string') ? G.__primaryLanguage : (langs[0] || 'en-US');
+    const lang     = (typeof G.__primaryLanguage === 'string') ? G.__primaryLanguage : (langs[0]);
     const ua       = G.__USER_AGENT;
     const vendor   = G.__VENDOR;
-    const dpr      = (G.__DPR != null) ? Number(G.__DPR) : (typeof G.devicePixelRatio !== 'undefined' ? G.devicePixelRatio : 1);
+    const dpr      = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
+      ? +devicePixelRatio
+      : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
+          ? +globalThis.__DPR
+          : undefined);
     const cpu      = G.__cpu;
     const mem      = G.__memory;
     const timeZone = G.__TIMEZONE__ ?? (G.Intl?.DateTimeFormat?.().resolvedOptions().timeZone);
@@ -36,7 +40,7 @@ function EnvBus(G){
       mobile: !!ch.mobile
     } : null;
 
-    // высокоэнтропийные — ровно «две переменные» + прочее, в один объект he
+    // высокоэнтропийные + прочее, в один объект he
     const he = {};
     const put = (k,v)=>{ if (v !== undefined && v !== null) he[k] = v; };
 
@@ -97,7 +101,7 @@ function EnvHubPatchModule(G){
   } catch(_){}
 }
 
-// 3) Установка оверрайдов (Worker/Shared/SW). Никаких дублей — используем твой SafeWorkerOverride.
+// 3) Установка оверрайдов (Worker/Shared/SW).Используем SafeWorkerOverride.
 function WorkerOverrides_install(G, hub) {
   try {
     const already = G.Worker && (G.Worker.__ENV_WRAPPED__ === true || String(G.Worker).includes('WrappedWorker'));
@@ -124,8 +128,6 @@ function EnvPublishSnapshotModule(G){
     G.__ENV_HUB__ && typeof G.__ENV_HUB__.publish === 'function' && G.__ENV_HUB__.publish(snap);
   } catch(_){}
 }
-
-
 
 
 // === env-worker-bridge (главный бандл) ===
@@ -238,7 +240,7 @@ G.Worker = function WrappedWorker(url, opts) {
     return new NativeWorker(url, opts); // или NativeWorker(url, opts)
   }
   const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
-  // подготовь PATCH_* перед этим блоком (см. выше)
+
   const src = workerType === 'module'
     ? bridge.mkModuleWorkerSource(snap, abs)
     : bridge.mkClassicWorkerSource(snap, abs);
@@ -256,7 +258,9 @@ G.Worker = function WrappedWorker(url, opts) {
 
   G.Worker.__ENV_WRAPPED__ = true;
     // маркер для диагностики
-  try { G.__PATCHED_SAFE_WORKER__ = true; console.info('SafeWorker installed'); } catch(_){}
+  if (G.__DEBUG__) {  
+    try { G.__PATCHED_SAFE_WORKER__ = true; console.info('SafeWorker installed'); } catch(_){}
+}
 }
 window.SafeWorkerOverride = SafeWorkerOverride;
 
@@ -275,7 +279,6 @@ function SafeSharedWorkerOverride(G){
     }
     const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
     const src = bridge.mkClassicWorkerSource(snap, abs);
-
     const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 
     try {
@@ -288,7 +291,9 @@ function SafeSharedWorkerOverride(G){
     }
   };
   G.SharedWorker.__ENV_WRAPPED__ = true;
-  try { G.__PATCHED_SHARED_WORKER__ = true; console.info('SharedWorker installed'); } catch(_){}
+  if (G.__DEBUG__) {
+    try { G.__PATCHED_SHARED_WORKER__ = true; console.info('SharedWorker installed'); } catch(_){}
+}
 }
 window.SafeSharedWorkerOverride = SafeSharedWorkerOverride;
 
@@ -304,7 +309,7 @@ function ServiceWorkerOverride(G){
     const sw    = G.navigator.serviceWorker;
     const proto = Object.getPrototypeOf(sw) || sw;
     const fn    = proto && proto.register;
-    // [PATCH] проверяем сразу три метода
+    // Check three methods at once
     const already =
       (typeof fn === 'function' &&
        (fn.__ENV_WRAPPED__ === true || /\bWrappedServiceWorkerRegister\b/.test(String(fn)))) &&
@@ -324,7 +329,7 @@ function ServiceWorkerOverride(G){
     getRegistrations: proto.getRegistrations,
   };
 
-  // ---- режим/политика (как у вас)
+  // ---- режим/политика 
   const MODE       = (G.__SW_FILTER_MODE__ ?? 'off');
   const ALLOW_SELF = !!G.__SW_ALLOW_SELF__;
   const EXTRA      = Array.isArray(G.__SW_ALLOW_HOSTS__) ? G.__SW_ALLOW_HOSTS__ : [];
@@ -414,8 +419,8 @@ function ServiceWorkerOverride(G){
       return out;
     }
     try { Object.defineProperty(WrappedSWGetRegistrations, 'name', { value: 'WrappedSWGetRegistrations' }); } catch(_){}
-    WrappedSWGetRegistrations.__ENV_WRAPPED__ = true;                    // [PATCH]
-    Object.defineProperty(proto, 'getRegistrations', {                   // [PATCH]
+    WrappedSWGetRegistrations.__ENV_WRAPPED__ = true;                  
+    Object.defineProperty(proto, 'getRegistrations', {                 
       configurable: true, writable: true, value: WrappedSWGetRegistrations
     });
   }
@@ -438,14 +443,16 @@ function ServiceWorkerOverride(G){
       return wantFake() ? makeFakeRegistration({ scope: sc }, url) : undefined;
     }
     try { Object.defineProperty(WrappedSWGetRegistration, 'name', { value: 'WrappedSWGetRegistration' }); } catch(_){}
-    WrappedSWGetRegistration.__ENV_WRAPPED__ = true;                     // [PATCH]
-    Object.defineProperty(proto, 'getRegistration', {                    // [PATCH]
+    WrappedSWGetRegistration.__ENV_WRAPPED__ = true;                    
+    Object.defineProperty(proto, 'getRegistration', {                  
       configurable: true, writable: true, value: WrappedSWGetRegistration
     });
   }
 
-  // маркер для диагностики
-  try { G.__PATCHED_SERVICE_WORKER__ = true; console.info('ServiceWorker installed'); } catch(_){}
+  //Diagnostics
+  if (G.__DEBUG__) {  
+    try { G.__PATCHED_SERVICE_WORKER__ = true; console.info('ServiceWorker installed'); } catch(_){}
+}
 }
 window.ServiceWorkerOverride = ServiceWorkerOverride;
 
@@ -453,14 +460,15 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 
 // --- mirror fonts readiness to worker/globalThis (Offscreen/Worker) ---
 (function mirrorFontsReadyOnce() {
-  const G = (typeof globalThis !== 'undefined') ? globalThis
-        : (typeof self !== 'undefined') ? self
-        : (typeof window !== 'undefined') ? window
-        : null;
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+    || (typeof self       !== 'undefined' && self)
+    || (typeof window     !== 'undefined' && window)
+    || (typeof global     !== 'undefined' && global)
+    || {};
   if (!G) return;
 
   const p = G.__fontsReady || G.awaitFontsReady;
-  if (G.__FONTS_READY__) return; // уже отмечено
+  if (G.__FONTS_READY__) return; 
   if (p && typeof p.then === 'function') {
     p.then(() => {
       if (G.__FONTS_READY__) return;
@@ -475,8 +483,8 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 })();
 
 
-// === WorkerPatchHooks: оркестратор без логики (как Canvas) ===
-(function exposeWorkerPatchHooks(G){
+// === WorkerPatchHooks: оркестратор ===
+(function WorkerPatchHooks(G){
   if (!G || G.WorkerPatchHooks) return;
 
   // 1) Hub (идемпотентно, без сайд-эффектов)
@@ -496,7 +504,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     return hub;
   }
 
-  // 3) Первый снапшот (LE) из текущего состояния (как у тебя)
+  // 3) Первый снапшот (LE) из текущего состояния
   function snapshotOnce(){
     try {
       const snap = EnvBus(G).envSnapshot();
@@ -530,8 +538,9 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     if (o.publishHE) snapshotHE(o.heKeys); // HE-догонка
   }
 
-  // 6) Диагностика состояния
+  // 6) Diagnostics
   function diag(){
+    if (!G.__DEBUG__) return {};
     const BR = G.__ENV_BRIDGE__ || {};
     return {
       hasHub:        !!G.__ENV_HUB__,
@@ -546,10 +555,14 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
       }
     };
   }
-
   G.WorkerPatchHooks = { initHub, installOverrides, snapshotOnce, snapshotHE, initAll, diag };
-  console.info('[WorkerInit] WorkerPatchHooks ready');
+  window.WorkerPatchHooks = G.WorkerPatchHooks;
+  if (G.__DEBUG__) { 
+    console.info('[WorkerInit] WorkerPatchHooks ready');
+  } 
 })(window);
+
+
 
 
 

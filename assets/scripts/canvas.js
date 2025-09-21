@@ -1,17 +1,20 @@
 function CanvasPatchModule(window) {
   const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
-  if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+    if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+    || (typeof self !== 'undefined' && self)
+    || (typeof window !== 'undefined' && window)
+    || {};
       
   // === MODULE INITIALIZATION ===
   // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
   // Состояние модуля (общий контекст)
   C.state = C.state || { domReady: false, offscreenReady: false };
 
-  // Только один раз создаём скрытый HTML-canvas в окне
+  // создаём скрытый HTML-canvas в окне
   function _ensureDomOnce() {
     if (C.state.domReady) return;
     if (typeof document === 'undefined' || !document.body) return; // нет DOM — выходим
-    // Если уже есть ранее созданные узлы, не создаём повторно
     if (window.canvas && window.canvas.parentNode) {
       C.state.domReady = true;
       return;
@@ -48,7 +51,7 @@ function CanvasPatchModule(window) {
     C.state.domReady = true;
   }
 
-  // Только один раз создаём OffscreenCanvas (и в окне, и в воркере)
+  // создаём OffscreenCanvas (и в окне, и в воркере)
   function _ensureOffscreenOnce() {
     if (C.state.offscreenReady) return;
     if (typeof window.OffscreenCanvas === 'undefined') return;
@@ -81,7 +84,7 @@ function CanvasPatchModule(window) {
 
     // ===== stable noise helper (module-scope) =====
   function __stableNoise__(key, a, b){
-    // ЕДИНСТВЕННЫЙ источник: __GLOBAL_SEED + key -> mulberry32(strToSeed(...))
+    //The ONLY source: __GLOBAL_SEED + key -> mulberry32(strToSeed(...))
     const G = (typeof globalThis !== 'undefined' && globalThis)
           || (typeof self !== 'undefined' && self)
           || (typeof window !== 'undefined' && window)
@@ -92,7 +95,7 @@ function CanvasPatchModule(window) {
       throw new Error('[PRNG] strToSeed/mulberry32 are required');
     const base = 'seed:' + G.__GLOBAL_SEED + '|key:' + String(key);
     const seed = G.strToSeed(base) >>> 0;
-    const u    = G.mulberry32(seed)();   // детерминированно и порядок-независимо
+    const u  = G.mulberry32(seed)();   // deterministical and order-independently
     return a + (b - a) * u;
   }
 
@@ -172,7 +175,15 @@ function CanvasPatchModule(window) {
         : new Map());
 
   function __getJitter__(op, w, h, dpr, cfg = __CNV_CFG__) {
-    w |= 0; h |= 0; dpr = (typeof dpr === 'number' && dpr > 0) ? dpr : 1;
+    w |= 0;
+    h |= 0;
+    dpr = (typeof dpr === 'number' && dpr > 0) ? +dpr
+      : (typeof devicePixelRatio === 'number' && devicePixelRatio > 0) ? +devicePixelRatio
+      : (typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0) ? +globalThis.__DPR
+      : undefined;
+    if (!(typeof dpr === 'number' && dpr > 0)) {
+      throw new TypeError('__getJitter__: DPR is undefined or invalid');
+    }
     const key = `${op}:${w}x${h}@${Math.round((dpr) * 1024)}`;
 
     const cached = JIT_CACHE.get(key); if (cached) return cached;
@@ -188,6 +199,7 @@ function CanvasPatchModule(window) {
     JIT_CACHE.set(key, v);
     return v;
   }
+
   function boxBlurMask(m, w, h) {
     const tmp = new Float32Array(m.length);
     for (let y = 0; y < h; y++) {
@@ -211,8 +223,11 @@ function CanvasPatchModule(window) {
   function __resampleWithJitter__(img, label, cfg = __CNV_CFG__) {
     if (!img || !img.data || !img.width || !img.height) return img;
     const w = img.width | 0, h = img.height | 0; if (!w || !h) return img;
-
-    const dpr = (+devicePixelRatio > 0 ? +devicePixelRatio : +window.__DPR);
+    const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
+      ? +devicePixelRatio
+      : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
+          ? +globalThis.__DPR
+          : undefined);
     const { epsX, epsY } = __getJitter__(label, w, h, dpr);
 
     const C1 = makeCanvas(w, h), C2 = makeCanvas(w, h);
@@ -275,7 +290,11 @@ function CanvasPatchModule(window) {
     const cfg = (typeof globalThis !== 'undefined' && globalThis.CanvasPatchHooks && globalThis.CanvasPatchHooks.resampleCfg)
             || (typeof __CNV_CFG__ !== 'undefined' ? __CNV_CFG__ : {})
             || {};
-    const dpr = (+devicePixelRatio > 0 ? +devicePixelRatio : +window.__DPR);
+    const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
+      ? +devicePixelRatio
+      : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
+          ? +globalThis.__DPR
+          : undefined);
     const { epsX, epsY } = __getJitter__('img:2d', w, h, dpr);
 
     const C1 = makeCanvas(w, h), C2 = makeCanvas(w, h);
@@ -333,11 +352,10 @@ function CanvasPatchModule(window) {
 
   //  addCanvasNoise()
   function addCanvasNoise(imageData, dx = 0, dy = 0) {
-    const G = (typeof globalThis !== 'undefined') ? globalThis
-          : (typeof self !== 'undefined') ? self
-          : (typeof window !== 'undefined') ? window
-          : this;
-
+    const G = (typeof globalThis !== 'undefined' && globalThis)
+      || (typeof self !== 'undefined' && self)
+      || (typeof window !== 'undefined' && window)
+      || {};
     try {
       const cfg = (G.CanvasPatchHooks && G.CanvasPatchHooks.noiseCfg) || {};
       const density  = Number.isFinite(cfg.density)  ? cfg.density  : 0.08;
@@ -350,7 +368,12 @@ function CanvasPatchModule(window) {
       if (!w || !h) return;
 
       const data = imageData.data;
-      const dpr = (+devicePixelRatio > 0 ? +devicePixelRatio : +window.__DPR);
+      const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
+        ? +devicePixelRatio
+        : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
+            ? +globalThis.__DPR
+            : undefined);
+            
       const cnv  = (this && this.canvas) ? this.canvas : null;
       const cid  = (() => {
         try { const cw = cnv && cnv.width, ch = cnv && cnv.height; return `cnv@${cw}x${ch}@${(Math.round(dpr * 1024))}`; }
@@ -407,14 +430,19 @@ function CanvasPatchModule(window) {
       fDescent:0.2 * px
     };
 
-    // не шумим здесть, иначе width порушит консистетность
-    const dpr = (+devicePixelRatio > 0 ? +devicePixelRatio : +window.__DPR);
+    // Don't make any noise here, otherwise  "width" will ruin the consistency
+    const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
+      ? +devicePixelRatio
+      : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
+          ? +globalThis.__DPR
+          : undefined);
+
     const key = `${fStr}\u241F${txt}\u241F${dpr}`;
     const widthNoise = 0;
     return { key, approx, widthNoise };
   }
 
-  //  Proxy(TextMetrics)
+  //  Proxy TextMetrics
   function applyMeasureTextHook(nativeMetrics, text, font) {
     try {
       const info = measureTextNoiseHook.call(this, nativeMetrics, text, font);
@@ -560,32 +588,71 @@ function CanvasPatchModule(window) {
     }
   }
 
-  // IHDR-патч PNG для Offscreen/HTML toBlob (Promise-ветка)
+  // IHDR-патч PNG для Offscreen/HTML convertToBlob (Promise-ветка) + выравнивание шума с toBlob/toDataURL
   async function patchConvertToBlobInjectNoise(blob, options) {
     try {
-      // 0) если нет blob – ничего не делаем
       if (!blob) return;
 
-      // 1) тип интересует только PNG
       const reqType = (options && options.type) || blob.type || 'image/png';
-      if (!/^image\/png$/i.test(String(reqType))) return;
+      const mime = String(reqType).toLowerCase();
 
-      // 2) целевые размеры: из глобалов или из canvas (this = OffscreenCanvas | HTMLCanvasElement)
+      // 1) Сначала попытаемся сделать decode → __resampleWithJitter__('encode') → re-encode,
+      //    чтобы Offscreen дал тот же результат, что toBlob/toDataURL.
+      try {
+        let bmp;
+        if (typeof createImageBitmap === 'function') {
+          try {
+            bmp = await createImageBitmap(blob, {
+              colorSpaceConversion: 'none',
+              premultiplyAlpha: 'premultiply',
+            });
+          } catch {
+            bmp = await createImageBitmap(blob);
+          }
+        }
+
+        if (bmp) {
+          const w = (bmp.width || bmp.naturalWidth || 0) | 0;
+          const h = (bmp.height || bmp.naturalHeight || 0) | 0;
+          if (w && h) {
+            const sc = makeCanvas(w, h);
+            if (sc) {
+              const sctx = sc.getContext('2d', { willReadFrequently: true });
+              if (sctx) {
+                try { sctx.imageSmoothingEnabled = false; } catch {}
+                sctx.drawImage(bmp, 0, 0);
+                const img = sctx.getImageData(0, 0, w, h);
+                const j   = __resampleWithJitter__(img, 'encode', __CNV_CFG__); // тот же label, что у toBlob/toDataURL
+                sctx.putImageData(j, 0, 0);
+
+                // Ре-энкодим в тот же форм-фактор (PNG предпочтительно; другие как есть)
+                if (typeof sc.convertToBlob === 'function') {
+                  return await sc.convertToBlob({ type: mime });
+                }
+                return await new Promise(r => sc.toBlob(r, mime));
+              }
+            }
+          }
+        }
+      } catch {
+        // если decode/ресэмпл не удался — молча падаем на IHDR-путь ниже
+      }
+
+      // 2) Старый IHDR-путь (PNG only) — сохраняем как fallback, чтобы не ломать совместимость
+      if (!/^image\/png$/i.test(mime)) return;
       const MAX_DIM = 0x7fffffff;
-      const targetW = clampInt((typeof window !== 'undefined' ? window._NEW_WIDTH  : undefined) ?? this?.width,  1, MAX_DIM);
-      const targetH = clampInt((typeof window !== 'undefined' ? window._NEW_HEIGHT : undefined) ?? this?.height, 1, MAX_DIM);
-      if (!targetW || !targetH) return; // нечего патчить
+      const targetW = clampInt((typeof globalThis !== 'undefined' ? globalThis._NEW_WIDTH  : undefined) ?? this?.width,  1, MAX_DIM);
+      const targetH = clampInt((typeof globalThis !== 'undefined' ? globalThis._NEW_HEIGHT : undefined) ?? this?.height, 1, MAX_DIM);
+      if (!targetW || !targetH) return;
 
-      // 3) читаем байты PNG
       const u8 = new Uint8Array(await blob.arrayBuffer());
 
       // 4) валидация PNG + IHDR(len=13)
       if (!isPngWithIhdr(u8)) return;
 
-      // 5) width/height (big-endian) → IHDR.data + пересчёт CRC
       writeBE(u8, 16, targetW >>> 0);
       writeBE(u8, 20, targetH >>> 0);
-      const crc = crc32(u8, 12, 12 + 4 + 13); // CRC по type('IHDR')+data(13)
+      const crc = crc32(u8, 12, 12 + 4 + 13);
       writeBE(u8, 12 + 4 + 13, crc >>> 0);
 
       // 6) возвращаем новый Blob с тем же типом
@@ -599,15 +666,12 @@ function CanvasPatchModule(window) {
     // --- helpers ---
     function clampInt(v, min, max) {
       v = Number.isFinite(v) ? Math.floor(v) : min;
-      if (v < min) v = min;
-      if (v > max) v = max;
-      return v | 0;
+      if (v < min) v = min; if (v > max) v = max; return v | 0;
     }
     function isPngWithIhdr(bytes) {
       // сигнатура PNG
       const sig = [137,80,78,71,13,10,26,10];
-      for (let i = 0; i < 8; i++) if (bytes[i] !== sig[i]) return false;
-      // первый chunk: length(4)=13, type='IHDR'
+      for (let i=0;i<8;i++) if (bytes[i]!==sig[i]) return false;
       const len = (bytes[8]<<24)|(bytes[9]<<16)|(bytes[10]<<8)|bytes[11];
       if (len !== 13) return false;
       if (String.fromCharCode(bytes[12],bytes[13],bytes[14],bytes[15]) !== 'IHDR') return false;
@@ -620,7 +684,10 @@ function CanvasPatchModule(window) {
       a[off+3] = (v >>>  0) & 255;
     }
     function getCrcTable() {
-      const G = (typeof globalThis !== 'undefined') ? globalThis : (typeof window !== 'undefined' ? window : self);
+      const G = (typeof globalThis !== 'undefined' && globalThis)
+        || (typeof self !== 'undefined' && self)
+        || (typeof window !== 'undefined' && window)
+        || {};
       if (G._crcTable) return G._crcTable;
       const t = new Uint32Array(256);
       for (let n = 0; n < 256; n++) {
@@ -634,12 +701,11 @@ function CanvasPatchModule(window) {
     function crc32(arr, from, toExcl) {
       const tab = getCrcTable();
       let crc = ~0 >>> 0;
-      for (let i = from; i < toExcl; i++) {
-        crc = (tab[(crc ^ arr[i]) & 0xFF] ^ (crc >>> 8)) >>> 0;
-      }
+      for (let i = from; i < toExcl; i++) crc = (tab[(crc ^ arr[i]) & 0xFF] ^ (crc >>> 8)) >>> 0;
       return (~crc) >>> 0;
     }
   }
+
 
 // --- IHDR patch (для masterToDataURLHook) ---
 /**
@@ -655,7 +721,10 @@ function CanvasPatchModule(window) {
     if (typeof input === 'string' && input.startsWith('data:image/png')) {
       base64 = input.split(',')[1];
     } else if (typeof HTMLCanvasElement !== 'undefined' && input instanceof HTMLCanvasElement) {
-      const G = (typeof globalThis !== 'undefined') ? globalThis : window;
+      const G = (typeof globalThis !== 'undefined' && globalThis)
+        || (typeof self !== 'undefined' && self)
+        || (typeof window !== 'undefined' && window)
+        || {};
       const safeInvoke = (typeof G.__canvasSafeInvoke__ === 'function')
         ? G.__canvasSafeInvoke__
         : ((fn, tgt, args) => fn.apply(tgt, args));
@@ -686,7 +755,11 @@ function CanvasPatchModule(window) {
     buf.set([ (H>>>24)&255,(H>>>16)&255,(H>>>8)&255,(H)&255 ], 20);
 
     // CRC
-    const G = (typeof globalThis !== 'undefined') ? globalThis : window;
+    const G = (typeof globalThis !== 'undefined' && globalThis)
+      || (typeof self !== 'undefined' && self)
+      || (typeof window !== 'undefined' && window)
+      || {};
+
     const tab = (function(){ if (G._crcTable) return G._crcTable;
       const t=new Uint32Array(256); for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0;} return (G._crcTable=t);
     })();
@@ -703,28 +776,40 @@ function CanvasPatchModule(window) {
 
   // Шумим ДО кодирования: снимаем пиксели, добавляем детерминированный микрошум,
   // кодируем на временном canvas, оригинал canvas не мутируем.
-  // canvas.js — fixed patchToDataURLInjectNoise with correct HTMLCanvasElement vs OffscreenCanvas branching
   function patchToDataURLInjectNoise(res, type, quality) {
     const mime = type || 'image/png';
     if (type && !/^image\//i.test(type)) return res;
     const canvas = this;
-    const isCanvas = typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement || typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
+    const isCanvas =
+      (typeof HTMLCanvasElement   !== 'undefined' && canvas instanceof HTMLCanvasElement) ||
+      (typeof OffscreenCanvas     !== 'undefined' && canvas instanceof OffscreenCanvas);
+
     if (!isCanvas) return res;
-    const w = canvas.width >>> 0,
-      h = canvas.height >>> 0;
+
+    const w = canvas.width >>> 0;
+    const h = canvas.height >>> 0;
     if (!w || !h) return res;
+
     function get2dRF(cnv) {
       if (!cnv || !cnv.getContext) return null;
       if (cnv.__tduCtx2dRF && cnv.__tduCtx2dRF.canvas === cnv) return cnv.__tduCtx2dRF;
       let ctx = null;
-      ctx = cnv.getContext('2d', {
-        willReadFrequently: true
-      });
-      cnv.__tduCtx2dRF = ctx || null;
-      return cnv.__tduCtx2dRF;
+      ctx = cnv.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return null;
+      try { Object.defineProperty(cnv, '__tduCtx2dRF', { value: ctx }); } catch(_) {}
+      return ctx;
     }
+
+    // 1) Снимаем пиксели, добавляем детерминированный микрошум, кладём обратно
     const ctx = get2dRF(canvas);
     if (!ctx) return res;
+    try {
+      const img = ctx.getImageData(0, 0, w, h);
+      const j   = __resampleWithJitter__(img, 'encode', __CNV_CFG__);
+      if (j && j.data && j.width === w && j.height === h) {
+        ctx.putImageData(j, 0, 0);
+      }
+    } catch(_) { /* тихий фолбэк на исходный res */ }
 
     // Снимок без мутаций
     const snap = ctx.getImageData(0, 0, w, h);
@@ -879,7 +964,7 @@ function CanvasPatchModule(window) {
   }
 
 
-// --- финальный экспорт (строго литерал, без H, без Object.assign) ---
+// --- final export ---
 window.CanvasPatchHooks = {
   patch2DNoise,
   patchToDataURLInjectNoise,
@@ -895,4 +980,4 @@ window.CanvasPatchHooks = {
   addCanvasNoise,
   applyDrawImageHook
 };
-}// ← конец CanvasPatchModule
+}

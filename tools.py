@@ -6,7 +6,6 @@ import logging
 from headers_adapter import generate_accept_header
 from overseer import logger
 logger = logging.getLogger(__name__)
-FALLBACK_EN = "en-GB" 
 
 def build_device_metrics(profile: dict) -> dict:
     """
@@ -31,7 +30,7 @@ def build_device_metrics(profile: dict) -> dict:
 
 def _canonical_bcp47(tag: str) -> str:
     """Leads a linguistic tag to the canonical appearance BCP47 by register.
-    As browsers return `es-ES`, `en-US`, not `es-es`.
+    As browsers return `es-ES`, not `es-es`.
     """
     if not tag:
         return ""
@@ -70,14 +69,12 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
     - If the primary has a region (for example, `es-ES`) - we add the base (`es`).
     - We add the rest of the entries in the order they appear, canonizing the register.
     - For tags with a region, we also add their base (if it is not the base of the primary).
-    - At the end, we ensure the presence of English fallbacks: `en-GB`, then `en`.
-
     Returns: `(language, languages)`.
     """
     items = [t for t in (base_languages or []) if t]
     if not items:
         logger.warning("[LANG] Empty or invalid base_languages: %r", base_languages)
-        return FALLBACK_EN, [FALLBACK_EN, "en"]
+        return "en-GB", ["en-GB"] # en-GB set here on a purpuse to check the language distinction success, you can change it to "en-US" or whatever
 
     # We canonize all input
     canon = [_canonical_bcp47(x) for x in items]
@@ -109,29 +106,19 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
         if "-" in tag and b != base_primary:
             _add(b)
 
-    # 3) Fallbacks on English
-    if "en" not in seen:
-        _add(FALLBACK_EN)
-        _add("en")
-    else:
-        # If there is EN (without a region), but there is no regional English.By default - add it
-        if FALLBACK_EN not in seen:
-            _add(FALLBACK_EN)
-
     logger.info("[LANG] Languages after normalisation: %s", result)
     return language, result
     
-
 
 def override_user_agent_data(driver, browser_brand: str) -> None:
     """Soft patch for Safari:
     - Soft patch via Getters:
     - We do not delete anything and do not create again.
-    - If the prototype already has Getter for usoragent / usoragentdata -
+    - If the prototype already has Getter for userAgent /userAgentData -
     - Over detectorate only Getter (configurable: true) to return
     - agreed values ​​from Window .__ User_agent and Window .__ Expected_Client_Hints.
     - If there are no properties (Safari/Firefox for usoragentdata) - we do nothing at all.
-    - Completely wrapped in Try/Catch, without syntactic traps for Safari.
+    - Completely wrapped in try/catch, without  traps for Safari.
     """
     script = (
         "(function(){\n"

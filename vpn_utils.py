@@ -91,7 +91,7 @@ class VPNClient:
         
     def connect(self) -> bool:
 
-        # 1) Checking the availability of .OVPN files
+        # 1) Checking for .OVPN files
         configs = [f for f in os.listdir(self.config_dir) if f.endswith('.ovpn')]
         if not configs:
             logger.error(f"[VPN] we have no .ovpn-files in {self.config_dir}")
@@ -123,7 +123,7 @@ class VPNClient:
             logger.debug(f"[VPN] {line.strip()}")
             if "Initialization Sequence Completed" in line:
                 logger.info("VPN is successfully connected(stdout)")
-                # routes stabilization - Check by IP not to wait for DNS
+                # routes stabilization - IP does not wait for DNS
                 time.sleep(1.0)
                 try:
                     requests.get("http://1.1.1.1", timeout=2, proxies={'http': None, 'https': None})
@@ -182,7 +182,7 @@ class VPNClient:
         country_api = (data.get('countryCode') or '').upper()
         result = get_language_for_timezone(timezone, return_country=True)
         if not result or len(result) < 4:
-            raise RuntimeError("get_language_for_timezone returned an invalid tuple")
+            raise RuntimeError("get_language_for_timezone returned an invalid turple")
         tz_country, languages, domain, offset_minutes = result
         country = country_api or tz_country
         if not country:
@@ -199,7 +199,7 @@ class VPNClient:
         }
 
         return {
-            "data":      data,
+            "data": data,
             "country_data": country_data,
         }
 
@@ -218,8 +218,8 @@ class VPNClient:
         logger.debug("temp auth file created: %s", self.temp_auth)
     
     def _cleanup(self):
-        """Step 4: Removing the Auth file """
-        logger.info("Step 4:Removing the Auth file")
+        """Step 4: Removing  auth file """
+        logger.info("Step 4:Removing the auth file")
         try:
             if os.path.exists(self.temp_auth):
                 os.remove(self.temp_auth)
@@ -231,7 +231,6 @@ class VPNClient:
         for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
             try:
                 name = (proc.info.get('name') or '').lower()
-                # работаем только с целевыми процессами
                 if name in PN_PROCESSES or 'openvpn' in name or 'protonvpn' in name:
                     logger.debug(
                         "[cleanup] terminate PID=%s name=%s exe=%s cmd=%s",
@@ -250,7 +249,7 @@ class VPNClient:
             except Exception as e:
                 logger.debug("[cleanup] error on PID=%s: %s", getattr(proc, "pid", "?"), e)
 
-        # локальный OpenVPN-процесс, если ещё жив
+        # local OpenVPN process, if still alive
         op = getattr(self, 'openvpn_process', None)
         if op:
             try:
@@ -345,7 +344,7 @@ def get_language_for_timezone(timezone, return_country=False):
     # Default сountry_data and list of languages
     default_data = {"languages": ["en-GB"], "domain": "com"}
     data = language_map.get(timezone, default_data)
-    languages = data.get("languages", ["en-GB"])
+    languages = data.get("languages")
     domain = data.get("domain", "com")
 
     # Strictly convert to a list (if it's a string)
