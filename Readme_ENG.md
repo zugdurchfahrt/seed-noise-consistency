@@ -66,6 +66,20 @@ All Python deps are pinned in `requirements.txt`.
 ✖ CORS limitations hinder the effectiveness for real browsing; nevertheless, the model is advantageous as a "pure API/JS" paradigm.  
 Note: VPN usage is enforced in both modes; the script was not run/tested without VPN.
 
+### Using without a built-in VPN client
+The script can be run without controlling OpenVPN. In this case, you can:
+✔ Use any other VPN client (including one controlled via a graphical interface).  
+✔ Or work without VPN at all.
+To accomplish this, just comment calls to the VPNClient instance methods responsible for VPN authentication, setup, and connection in def main(): 
+        # client.verify()
+        # client.prepare()
+        # logger.info("Preparation completed")
+        # client.connect()
+        client.post()
+In this mode, the script works exactly as before, performing all subsequent steps without stopping or starting OpenVPN processes. If you already have a VPN set up in any other way, the script will simply use the current network environment.
+
+
+
 ## Repository structure
 ```text
 ├── assets/
