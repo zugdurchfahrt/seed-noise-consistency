@@ -204,6 +204,8 @@ function mkClassicWorkerSource(snapshot, absUrl){
         } else {
           console.warn('[UACHPatch] installWorkerUACHMirror missing');
         }
+        // Применяем снимок СЕЙЧАС, уже через реализацию патча:
+        if (self.__applyEnvSnapshot__ && self.__lastSnap__) self.__applyEnvSnapshot__(self.__lastSnap__);
       }catch(e){ try{ console.warn('[UACHPatch] classic importScripts failed', e && (e.message||e)); }catch(_){}}    
       try{ importScripts(${USER}); }catch(_){}
     })();
@@ -561,7 +563,6 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     console.info('[WorkerInit] WorkerPatchHooks ready');
   } 
 })(window);
-
 
 
 
