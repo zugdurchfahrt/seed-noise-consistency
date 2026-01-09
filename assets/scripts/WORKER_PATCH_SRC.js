@@ -18,14 +18,23 @@
       hardwareConcurrency: Object.getOwnPropertyDescriptor(proto,'hardwareConcurrency'),
       deviceMemory: Object.getOwnPropertyDescriptor(proto,'deviceMemory'),
     };
-    const callOrig = (d, def) => (d && typeof d.get==='function') ? d.get.call(nav) : def;
+    const ORIG_DPR = Object.getOwnPropertyDescriptor(self,'devicePixelRatio');
+    const callOrig = (d, def) => {
+      try { return (d && typeof d.get==='function') ? d.get.call(nav) : def; } catch(_) { return def; }
+    };
     const cache = { snap:null };
+    const validDpr = v => Number.isFinite(v) && v > 0;
 
     try {
       Object.defineProperty(self, 'devicePixelRatio', {
         configurable: true,
         enumerable: false,
-        get(){ return Number(cache.snap?.dpr); }
+        get(){
+          const snapVal = Number(cache.snap?.dpr);
+          if (validDpr(snapVal)) return snapVal;
+          const origVal = Number(callOrig(ORIG_DPR, 1));
+          return validDpr(origVal) ? origVal : 1;
+        }
       });
     } catch(_) {}
 
@@ -65,12 +74,15 @@
       cache.snap?.deviceMemory ?? cache.snap?.mem ?? callOrig(ORIG.deviceMemory, nav.deviceMemory)
     ));
 
-    def(proto,'language', ()=>String(cache.snap?.language ?? callOrig(ORIG.language)));
+    def(proto,'language', ()=>{
+      const v = cache.snap?.language ?? callOrig(ORIG.language, '');
+      return v == null ? '' : String(v);
+    });
   
     def(proto,'languages', ()=>{
         if (Array.isArray(cache.snap?.languages))
             return cache.snap.languages.slice();
-        const o = callOrig(ORIG.languages);
+        const o = callOrig(ORIG.languages, []);
         return Array.isArray(o) ? o.slice() : [];
     });
 
@@ -83,9 +95,41 @@
     try{ if (self.__lastSnap__ && typeof self.__lastSnap__==='object') cache.snap = self.__lastSnap__; }catch(_){}
     try{ if (self.__lastSnap__ && self.__lastSnap__.seed != null) self.__GLOBAL_SEED = String(self.__lastSnap__.seed); }catch(_){}
     try{
-      const bc = new BroadcastChannel('__ENV_SYNC__');
-      bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+      if (!self.__ENV_SYNC_BC_INSTALLED__) {
+        self.__ENV_SYNC_BC_INSTALLED__ = true;
+        const bc = new BroadcastChannel('__ENV_SYNC__');
+        bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+      }
     }catch(_){}
+    try {
+      if (self.Worker && !self.Worker.__ENV_WRAPPED__) {
+        const NativeWorker = self.Worker;
+        self.Worker = function WrappedWorker(url, opts){
+          try {
+            const abs = new URL(url, self.location && self.location.href || undefined).href;
+            const workerType = (opts && opts.type) === 'module' ? 'module' : 'classic';
+            const snap = self.__lastSnap__ || null;
+            const SNAP = JSON.stringify(snap || null);
+            const USER = JSON.stringify(String(abs));
+            const src = workerType === 'module'
+              ? `(async function(){'use strict';try{self.__GW_BOOTSTRAP__=true;}catch(_){}self.__applyEnvSnapshot__=s=>{try{self.__lastSnap__=s;}catch(_){}};try{if(${SNAP})self.__applyEnvSnapshot__(${SNAP});}catch(_){}try{if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}}catch(_){}try{const USER=${USER};if(USER&&typeof USER==='string')await import(USER);}catch(_){}})();export {};`
+              : `(function(){'use strict';try{self.__GW_BOOTSTRAP__=true;}catch(_){}self.__applyEnvSnapshot__=function(s){try{self.__lastSnap__=s;}catch(_){}};try{if(${SNAP})self.__applyEnvSnapshot__(${SNAP});}catch(_){}try{if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}}catch(_){}try{importScripts(${USER});}catch(_){}})();`;
+            const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+            try {
+              const w = new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
+              try { URL.revokeObjectURL(blobURL); } catch (_) {}
+              return w;
+            } catch (_) {
+              try { URL.revokeObjectURL(blobURL); } catch (_) {}
+              return new NativeWorker(url, opts);
+            }
+          } catch (_) {
+            return new NativeWorker(url, opts);
+          }
+        };
+        self.Worker.__ENV_WRAPPED__ = true;
+      }
+    } catch(_) {}
     try { self.__SCOPE_CONSISTENCY_PATCHED__ = true; } catch(_){}
 
     console.info('[UACHPatch] installed', {
@@ -95,7 +139,6 @@
     });
   };
 })();
-
 
 
 

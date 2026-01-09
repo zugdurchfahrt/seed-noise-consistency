@@ -1,12 +1,14 @@
 // 1) Источник снапшотов 
 function EnvBus(G){
   function envSnapshot(){
+    const nav = G.navigator;
     let langs = G.__normalizedLanguages;
     if (!Array.isArray(langs)) {
       if (typeof langs === 'string') langs = [langs];
-      else langs = []; 
+      else if (Array.isArray(nav && nav.languages)) langs = nav.languages.slice();
+      else langs = [];
     }
-    const lang     = (typeof G.__primaryLanguage === 'string') ? G.__primaryLanguage : (langs[0]);
+    const lang     = (typeof G.__primaryLanguage === 'string') ? G.__primaryLanguage : (langs[0] || (nav && nav.language));
     const ua       = G.__USER_AGENT;
     const vendor   = G.__VENDOR;
     const dpr      = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
@@ -14,14 +16,16 @@ function EnvBus(G){
       : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
           ? +globalThis.__DPR
           : undefined);
-    const cpu      = G.__cpu;
-    const mem      = G.__memory;
+    const cpu      = (G.__cpu != null) ? G.__cpu : (nav && nav.hardwareConcurrency);
+    const mem      = (G.__memory != null) ? G.__memory : (nav && nav.deviceMemory);
     const timeZone = G.__TIMEZONE__ ?? (G.Intl?.DateTimeFormat?.().resolvedOptions().timeZone);
 
     // ЕДИНЫЙ источник CH: сначала берем подготовленный (__EXPECTED_CLIENT_HINTS), иначе — low-entropy из navigator
     let ch = null;
     if (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object') {
       ch = G.__EXPECTED_CLIENT_HINTS;
+    } else if (nav && nav.userAgentData) {
+      ch = nav.userAgentData;
     } else {
       ch = { platform: "unknown", brands: [], mobile: false };
     }
@@ -43,18 +47,20 @@ function EnvBus(G){
     // высокоэнтропийные + прочее, в один объект he
     const he = {};
     const put = (k,v)=>{ if (v !== undefined && v !== null) he[k] = v; };
+    const heSrc = (G.__LAST_UACH_HE__ && typeof G.__LAST_UACH_HE__ === 'object') ? G.__LAST_UACH_HE__ : (ch && ch.highEntropy);
 
     // ← интеграция тех самых двух переменных под уже существующими именами
-    put('uaFullVersion',   ch && ch.uaFullVersion);
-    put('fullVersionList', ch && ch.fullVersionList);
+    put('uaFullVersion',   (heSrc && heSrc.uaFullVersion) ?? (ch && ch.uaFullVersion));
+    put('fullVersionList', (heSrc && heSrc.fullVersionList) ?? (ch && ch.fullVersionList));
 
     // остальные (если есть в __EXPECTED_CLIENT_HINTS)
-    put('architecture',    ch && ch.architecture);
-    put('bitness',         ch && ch.bitness);
-    put('model',           ch && ch.model);
-    put('platformVersion', ch && ch.platformVersion);
-    put('formFactors',     ch && ch.formFactors);
-    put('wow64',           (ch && ch.wow64 !== undefined) ? !!ch.wow64 : undefined);
+    put('architecture',    (heSrc && heSrc.architecture) ?? (ch && ch.architecture));
+    put('bitness',         (heSrc && heSrc.bitness) ?? (ch && ch.bitness));
+    put('model',           (heSrc && heSrc.model) ?? (ch && ch.model));
+    put('platformVersion', (heSrc && heSrc.platformVersion) ?? (ch && ch.platformVersion));
+    put('formFactors',     (heSrc && heSrc.formFactors) ?? (ch && ch.formFactors));
+    put('wow64',           (heSrc && heSrc.wow64 !== undefined) ? !!heSrc.wow64
+                         : (ch && ch.wow64 !== undefined) ? !!ch.wow64 : undefined);
 
     const seed = String(G && G.__GLOBAL_SEED);
     // Алиасы для совместимости с воркер-патчем
@@ -145,8 +151,11 @@ function mkModuleWorkerSource(snapshot, absUrl){
       self.__applyEnvSnapshot__ = s => { try{ self.__lastSnap__ = s; }catch(_){} };
       try{ if (${SNAP}) self.__applyEnvSnapshot__(${SNAP}); }catch(_){}
       try{
-        const bc = new BroadcastChannel('__ENV_SYNC__');
-        bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+        if (!self.__ENV_SYNC_BC_INSTALLED__) {
+          self.__ENV_SYNC_BC_INSTALLED__ = true;
+          const bc = new BroadcastChannel('__ENV_SYNC__');
+          bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+        }
       }catch(_){}
       // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
       const PATCH_URL = ${JSON.stringify(global.__ENV_BRIDGE__.urls.workerPatchModule || "")};
@@ -162,10 +171,12 @@ function mkModuleWorkerSource(snapshot, absUrl){
         else console.warn('[UACHPatch] installWorkerUACHMirror missing');
         // Применяем снимок СЕЙЧАС, уже через реализацию патча:
         if (self.__applyEnvSnapshot__ && self.__lastSnap__) self.__applyEnvSnapshot__(self.__lastSnap__);
+      }catch(e){ try{ console.warn('[UACHPatch] module import failed', e && (e.message||e)); }catch(_){}}    
+      try{
         // Только ПОСЛЕ зеркала грузим пользовательский код:
         const USER = ${USER};
         if (USER && typeof USER === 'string') await import(USER);
-      }catch(e){ try{ console.warn('[UACHPatch] module import failed', e && (e.message||e)); }catch(_){}}    
+      }catch(e){ try{ console.warn('[UACHPatch] module user import failed', e && (e.message||e)); }catch(_){}}    
     })();
     export {};
     //# sourceURL=worker_module_bootstrap.js
@@ -185,8 +196,11 @@ function mkClassicWorkerSource(snapshot, absUrl){
       self.__applyEnvSnapshot__ = function(s){ try{ self.__lastSnap__ = s; }catch(_){} };
       try{ if (${SNAP}) self.__applyEnvSnapshot__(${SNAP}); }catch(_){}
       try{
-        const bc = new BroadcastChannel('__ENV_SYNC__');
-        bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+        if (!self.__ENV_SYNC_BC_INSTALLED__) {
+          self.__ENV_SYNC_BC_INSTALLED__ = true;
+          const bc = new BroadcastChannel('__ENV_SYNC__');
+          bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+        }
       }catch(_){}
       // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
       const PATCH_URL = ${JSON.stringify(global.__ENV_BRIDGE__.urls.workerPatchClassic || "")};
@@ -234,27 +248,31 @@ function SafeWorkerOverride(G){
   const NativeWorker = G.Worker;
 
 G.Worker = function WrappedWorker(url, opts) {
-  const abs = new URL(url, location.href).href;
-  const workerType = (opts && opts.type) === 'module' ? 'module' : 'classic';
-  const bridge = G.__ENV_BRIDGE__;
-  if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
-    console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, fallback');
-    return new NativeWorker(url, opts); // или NativeWorker(url, opts)
-  }
-  const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
-
-  const src = workerType === 'module'
-    ? bridge.mkModuleWorkerSource(snap, abs)
-    : bridge.mkClassicWorkerSource(snap, abs);
-
-  const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
   try {
-    const w = new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
-    try { URL.revokeObjectURL(blobURL); } catch (_) {}
-    return w;
-  } catch (e) {
-    try { URL.revokeObjectURL(blobURL); } catch (_) {}
-    return new NativeWorker(url, opts); // CSP fallback
+    const abs = new URL(url, location.href).href;
+    const workerType = (opts && opts.type) === 'module' ? 'module' : 'classic';
+    const bridge = G.__ENV_BRIDGE__;
+    if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
+      console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, fallback');
+      return new NativeWorker(url, opts); // или NativeWorker(url, opts)
+    }
+    const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
+
+    const src = workerType === 'module'
+      ? bridge.mkModuleWorkerSource(snap, abs)
+      : bridge.mkClassicWorkerSource(snap, abs);
+
+    const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    try {
+      const w = new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
+      try { URL.revokeObjectURL(blobURL); } catch (_) {}
+      return w;
+    } catch (e) {
+      try { URL.revokeObjectURL(blobURL); } catch (_) {}
+      return new NativeWorker(url, opts); // CSP fallback
+    }
+  } catch (_) {
+    return new NativeWorker(url, opts);
   }
 };
 
@@ -273,22 +291,26 @@ function SafeSharedWorkerOverride(G){
   const NativeShared = G.SharedWorker;
 
   G.SharedWorker = function WrappedSharedWorker(url, name) {
-    const abs = new URL(url, location.href).href;
-    const bridge = G.__ENV_BRIDGE__;
-    if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
-      console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, fallback');
-      return new NativeShared(url, name); // или NativeWorker(url, opts)
-    }
-    const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
-    const src = bridge.mkClassicWorkerSource(snap, abs);
-    const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-
     try {
-      const w = new NativeShared(blobURL, name);
-      try { URL.revokeObjectURL(blobURL); } catch(_) {}
-      return w;
-    } catch (e) {
-      try { URL.revokeObjectURL(blobURL); } catch(_) {}
+      const abs = new URL(url, location.href).href;
+      const bridge = G.__ENV_BRIDGE__;
+      if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
+        console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, fallback');
+        return new NativeShared(url, name); // или NativeWorker(url, opts)
+      }
+      const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
+      const src = bridge.mkClassicWorkerSource(snap, abs);
+      const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+
+      try {
+        const w = new NativeShared(blobURL, name);
+        try { URL.revokeObjectURL(blobURL); } catch(_) {}
+        return w;
+      } catch (e) {
+        try { URL.revokeObjectURL(blobURL); } catch(_) {}
+        return new NativeShared(url, name);
+      }
+    } catch (_) {
       return new NativeShared(url, name);
     }
   };
@@ -563,7 +585,6 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     console.info('[WorkerInit] WorkerPatchHooks ready');
   } 
 })(window);
-
 
 
 
