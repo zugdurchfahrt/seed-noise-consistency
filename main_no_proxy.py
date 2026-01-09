@@ -46,6 +46,8 @@ ASSETS_DIR          = PROJECT_ROOT / 'assets'
 SCRIPTS_DIR         = ASSETS_DIR / 'scripts'
 MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
+CHROME_BINARY       = os.getenv("CHROME_BINARY")
+CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH")
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
 # ----------------------- PROFILE FUNCTION -----------------------
@@ -166,9 +168,11 @@ def init_driver(
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
     chrome_options.add_argument("--start-maximized")
-    chrome_options.binary_location = r"C:\\YOUR\\FOLDER\\PATH\\chrome-win64\\chrome.exe"
+    if not CHROME_BINARY or not CHROMEDRIVER_PATH:
+        raise FileNotFoundError("Set CHROME_BINARY and CHROMEDRIVER_PATH environment variables to valid paths.")
+    chrome_options.binary_location = CHROME_BINARY
     driver = uc.Chrome(
-        driver_executable_path=r"C:\\YOUR\\FOLDER\\PATH\\chromedriver-win64\\chromedriver.exe",
+        driver_executable_path=CHROMEDRIVER_PATH,
         options=chrome_options,
     )
     logger.info("Initiating Webdriver...")
