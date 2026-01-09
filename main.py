@@ -1,5 +1,7 @@
 import os
 import re
+import subprocess
+import socket
 import uuid
 import json
 import time
@@ -9,6 +11,7 @@ import logging
 import pathlib
 from pathlib import Path
 from datetime import datetime
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.chrome.options import Options
 import undetected_chromedriver as uc
 # ----------------------- DICTS-----------------------
@@ -124,7 +127,7 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
                 return
             # ------------------ REQUEST STAGE: clearing prohibited headers ------------------
             base = {k: v for k, v in (req.get("headers") or {}).items() if not _is_blocked(k)}
-            # Decide what to add: extra_headers_fn usually only gives safelisted.
+            # Deciding what to add: extra_headers_fn usually only gives safelisted.
             extra = (extra_headers_fn or (lambda *_: {}))(url, method, ev.get("resourceType"))
             # If the host is not in allow - just in case, we do not allow anything except what is already allowed by the _is_blocked set (safelisted will pass)
             if not _matches_suffix(host, allow):
@@ -158,7 +161,12 @@ def init_driver(
     offset_minutes = country_data["offset_minutes"]
     latitude = country_data["latitude"]
     longitude = country_data["longitude"]
+    proxy = Proxy()
+    proxy.proxy_type = ProxyType.MANUAL
+    proxy.http_proxy = "127.0.0.1:8080"
+    proxy.ssl_proxy = "127.0.0.1:8080"
     chrome_options = Options()
+    chrome_options.proxy = proxy
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
     chrome_options.add_argument(f"--user-agent={user_agent}")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -257,7 +265,7 @@ def init_driver(
             try { AudioContextModule(window); } catch(_) {}
             try { ContextPatchModule(window); } catch(_) {}
             try { HeadersInterceptor(window); } catch(_) {}
-            // —————— Register all hooks here ——————//
+           // —————— Register all hooks here ——————//
             try { if (typeof registerAllHooks === 'function') registerAllHooks(); } catch(_) {}
             (function applyAllPatchesCustomOrder(win) {
             try {
@@ -273,6 +281,7 @@ def init_driver(
             """
         ]
         return "\n;\n".join(parts)
+
     # --- creation of window.__ objects ---
     init_params = f"""
     // ——— Globals Bootstrap ———
@@ -386,7 +395,7 @@ def init_driver(
         }
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers":  safelisted_headers})
 
-    # window.__HEADERS__ — Basic set for JS-Patch. Cross-origin uses only safelisted (accept-language). Keys like sec-ch-* will be ignored by JS (CDP-only).
+    # window.__HEADERS__ — Basic set for JS-paatch. На cross-origin  safelisted (accept-language). Keys like sec-ch-* will be ignored by JS (CDP-only).
     headers_window_js = f"""
     window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
     console.log("[headers_interceptor.js] window.__HEADERS__ injected (safelisted only)");
@@ -394,7 +403,7 @@ def init_driver(
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
     logger.info("window.__HEADERS__ injected (safelisted only)")
 
-    #  Headers interceptor bridge to sync allow/ignore  CDP with Fetch interceptor
+    # Headers interceptor bridge to sync allow/ignore  CDP with Fetch interceptor
     headers_bridge_js = """
     (function () {
       const g = window;
@@ -444,7 +453,7 @@ def init_driver(
       """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
 
-    # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so JS interception is disabled (no-op)
+    # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
     fetch_rules = []
 
     _install_fetch_interceptor(
@@ -457,7 +466,7 @@ def init_driver(
     logger.info("All fingerprint stealth  patches successfully injected into new document")
     logger.info("WebDriver launched successfully")
     return driver
-# ----------------------- Bound zone is over beyond this line------------------------
+# ----------------------- Bound zone is over beyond this line-----------------------
 
 # ----------------------- Function configure_profile --------------------------------
 def configure_profile(driver, primary_language: str, normalized_languages: list[str], country_data: dict):
@@ -545,7 +554,7 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
                 logger.error(f"Error setting Youtube cookies {cookie['name']}: {e}")
         logger.info(f"Regional alignment done: {country_data}")
     except Exception as e:
-        logger.error(f"Error in configure_profile: {e}", exc_info=True)
+        logger.error(f"configure_profile error: {e}", exc_info=True)
 
 # ----------------------- Thr main function -----------------------
 def main():
@@ -562,10 +571,10 @@ def main():
             os.remove(json_path)
             logger.info("Previous profile.json had been deleted")
 
-        client.verify()
-        client.prepare()
-        logger.info("preparation completed")
-        client.connect()
+        # client.verify()
+        # client.prepare()
+        # logger.info("preparation completed")
+        # client.connect()
         client.post()
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()
@@ -588,7 +597,7 @@ def main():
         platform = random.choices(config["enabled_platforms"],
                                 weights=config["platform_weights"], k=1)[0]
         data = data_4_win32 if platform == "Win32" else macintel_data
-        # -------- OS selection  -------------------
+        # -------- OS selection -------------------
         os_opt = random.choice(data["os_options"]) # dict: {os_info, os_name, os_version}
         os_info = os_opt["os_info"]
         os_name = os_opt["os_name"].replace("(", "").replace(")", "").strip()
@@ -600,7 +609,7 @@ def main():
         if platform == "MacIntel" and ("Mac OS X" not in os_info):
             raise ValueError(f"os_info='{os_info}' does not contain 'Mac OS X'")
 
-        # normalize for MAC OS versions>  "15_4" -> "15.4.0"
+        # normalize for MAC OS versions "15_4" -> "15.4.0"
         def _norm_ver(v: str) -> str:
             s = str(v).replace("_", ".")
             parts = [p for p in s.split(".") if p]
@@ -623,13 +632,13 @@ def main():
         logger.debug(
             f"OS: {os_name}, platform={platform}, platform_version={platform_version or 'n/a'}"
         )
+
         # --------BROWSER selection -------------------
         browser_choice = random.choices(
             *config["browser_weights"][platform], k=1
         )[0]
         # as Windows version branches are hard-pinned to kernel browser versions
         CHROMIUM_PREFIX_MAP = {
-
             "10.0.0": ("134.","135."),
             "15.0.0": ("135.", "136.", "137."),
             "19.0.0": ("137.", "138.", "139.", "140."),
@@ -638,7 +647,7 @@ def main():
         def pick_chromium_major(platform_version: str) -> str:
             prefixes = CHROMIUM_PREFIX_MAP.get(platform_version)
             if not prefixes:
-                # for macOS we take a common pool, without being tied to browser kernel version
+                # for macOS use whole pool, without being tied to browser kernel version
                 return random.choice([v.split(".")[0] for v in chrome_versions])
             return random.choice(prefixes).rstrip(".")  # "134" / "135" / "137"
 
@@ -677,21 +686,20 @@ def main():
                 else:  # edge (Windows)
                     version = pick_product_version(edge_versions, chromium_major)
                     version, version_ua = split_version(version)
-                    chrome_ua = f"{chromium_major}.0.0.0"  # Почему: Chrome-part of UA = kernel major
+                    chrome_ua = f"{chromium_major}.0.0.0"  #  as  Chrome-part UA = major core
                     base_ua = (f"Mozilla/5.0 ({os_info}) AppleWebKit/537.36 "
                             f"(KHTML, like Gecko) Chrome/{chrome_ua} Safari/537.36")
                     user_agent = base_ua + f" Edg/{version_ua}"
             else:  # MacIntel
                 if browser_choice == "chrome":
-                    # MacIntel does not have a binding to Windows CHROMIUM_PREFIX_MAP
+                    # macOS does not have binding to Windows CHROMIUM_PREFIX_MAP
                     version = random.choice(chrome_versions)
                     version, version_ua = split_version(version)
-                    os_info_chrome = os_info  # formatted for "Macintosh; Intel Mac OS X 10_15_7"
+                    os_info_chrome = os_info  # formatted for typing like "Macintosh; Intel Mac OS X 10_15_7"
                     user_agent = (
                         f"Mozilla/5.0 ({os_info_chrome}) AppleWebKit/537.36 "
                         f"(KHTML, like Gecko) Chrome/{version_ua} Safari/537.36"
                     )
-
         elif browser_choice == "firefox":
             version = random.choice(firefox_versions)
             user_agent = f"Mozilla/5.0 ({os_info}; rv:{version}) Gecko/20100101 Firefox/{version}"
@@ -738,6 +746,7 @@ def main():
         screen_res = random.choice(gpu["resolution"])
         # screen_res = "1920x1080"
         screen_width, screen_height = map(int, screen_res.split("x"))
+
         # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
         dpr_map = {
             "1920x1080": 1.0,
@@ -843,6 +852,24 @@ def main():
             json.dump(data, f, ensure_ascii=False, indent=2)
         logger.info("new profile.json created for mitmproxy")
 
+        # --- mitmproxy start ---
+        mitmproxy_proc = subprocess.Popen([
+            "mitmproxy", "-s", "handle_cors_addon.py"
+        ])
+
+        def wait_for_port(host, port, timeout=10):
+            start = time.time()
+            while time.time() - start < timeout:
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        return True
+                except OSError:
+                    time.sleep(0.5)
+            return False
+
+        if not wait_for_port("127.0.0.1", 8080):
+            raise RuntimeError("mitmproxy not launched")
+
         driver = init_driver(
             profile, country_data, profile["platform"], profile["user_agent"],
             profile["screen_width"], profile["screen_height"], profile["webgl_vendor"], profile["webgl_renderer"],
@@ -852,7 +879,6 @@ def main():
             profile["deviceMemory"], profile["hardwareConcurrency"], profile["device_dpr_value"],
             profile["plugins"], profile["mimeTypes"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"]
         )
-
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
             override_user_agent_data(driver, browser_brand)
@@ -861,12 +887,11 @@ def main():
         else:
             apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
             logger.info("UA data submitted via CDP")
-
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
 
-        # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP  -----------------------
-        driver.get("https://disney.com")
+        # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
+        driver.get("https://disney.com/")
 
         # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)
@@ -876,5 +901,9 @@ def main():
         logger.error(f"Error in main block: {e}", exc_info=True)
         logger.info(f"Error: {e}")
         # ----------------------- THAT'S ALL, FOLKS!  -----------------------
+    finally:
+        # Wait for mitmproxy to complete, then close the file
+        mitmproxy_proc.terminate()
+        mitmproxy_proc.wait()
 if __name__ == "__main__":
     main()
