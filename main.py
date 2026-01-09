@@ -29,16 +29,16 @@ from tools import (
     build_expected_client_hints,
     apply_ua_overrides,
 )
-from vpn_utils import VPNClient 
+from vpn_utils import VPNClient
 from rand_met import generate_font_manifest
 from overseer import logger, setup_logger
 from headers_adapter import build_accept_language
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
-    "vpn_utils": logging.DEBUG,    
+    "vpn_utils": logging.DEBUG,
     "rand_met": logging.INFO,
-    "plugins_dict": logging.DEBUG, 
+    "plugins_dict": logging.DEBUG,
 })
 # -----------------------CONSTANT VARIABLES-----------------------
 OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
@@ -108,10 +108,10 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
             return allow, ignore
         except Exception:
             return [], []
-        
+
     # SINGLE SAFELISTED POLICY FOR not-allowed (use only safelisted - same keys as in JS SAFE_LISTED)
     SAFE_LISTED = {"accept-language"}
-    
+
     def _on_paused(ev):
         rid = ev.get("requestId")
         try:
@@ -174,9 +174,9 @@ def init_driver(
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
     chrome_options.add_argument("--start-maximized")
-    chrome_options.binary_location = r"C:\\YOUR\\FOLDER\\PATH\\chrome-win64\\chrome.exe"
+    chrome_options.binary_location = r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe"
     driver = uc.Chrome(
-        driver_executable_path=r"C:\\YOUR\\FOLDER\\PATH\\chromedriver-win64\\chromedriver.exe",
+        driver_executable_path=r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe",
         options=chrome_options,
     )
     logger.info("Initiating Webdriver...")
@@ -192,7 +192,7 @@ def init_driver(
         driver.execute_cdp_cmd("Network.enable", {})
         if blocked_urls:
             driver.execute_cdp_cmd("Network.setBlockedURLs", {"urls": blocked_urls})
-        # 2. Timezone, Geolocatioon first setting 
+        # 2. Timezone, Geolocatioon first setting
         driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": timezone})
         driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
             "latitude": latitude,
@@ -277,11 +277,11 @@ def init_driver(
             """
         ]
         return "\n;\n".join(parts)
-    
+
     # --- creation of window.__ objects ---
     init_params = f"""
     // ——— Globals Bootstrap ———
-    window.__GLOBAL_SEED                = {json.dumps(global_seed)};  
+    window.__GLOBAL_SEED                = {json.dumps(global_seed)};
     window.__EXPECTED_CLIENT_HINTS      = {json.dumps(expected_client_hints, ensure_ascii=False)};
     window.__NAV_PLATFORM__             = {json.dumps(profile['platform'], ensure_ascii=False)};
     window.__GENERATED_PLATFORM         = {json.dumps(generated_platform, ensure_ascii=False)};
@@ -314,7 +314,7 @@ def init_driver(
     window.__PLUGIN_MIMETYPES__         = {json.dumps(profile.get("mimeTypes", []), ensure_ascii=False)};
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
-    
+
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     driver.execute_cdp_cmd('Network.setUserAgentOverride', {
@@ -390,7 +390,7 @@ def init_driver(
         # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
         }
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers":  safelisted_headers})
-    
+
     # window.__HEADERS__ — Basic set for JS-paatch. На cross-origin  safelisted (accept-language). Keys like sec-ch-* will be ignored by JS (CDP-only).
     headers_window_js = f"""
     window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
@@ -398,7 +398,7 @@ def init_driver(
     """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
     logger.info("window.__HEADERS__ injected (safelisted only)")
-    
+
     # Headers interceptor bridge to sync allow/ignore  CDP with Fetch interceptor
     headers_bridge_js = """
     (function () {
@@ -449,17 +449,17 @@ def init_driver(
       """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
 
-    # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op) 
+    # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
     fetch_rules = []
-    
+
     _install_fetch_interceptor(
         driver,
         fetch_rules,
         extra_headers_fn=lambda url, method, rtype: safelisted_headers,
         blocked_headers=[]
     )
-    
-    logger.info("All fingerprint stealth  patches successfully injected into new document") 
+
+    logger.info("All fingerprint stealth  patches successfully injected into new document")
     logger.info("WebDriver launched successfully")
     return driver
 # ----------------------- Bound zone is over beyond this line-----------------------
@@ -492,7 +492,7 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         language = primary_language
         normalized_languages = normalized_languages
         # ----------------------- Regional setting setup--------------------------------
-        
+
         # Timezone override
         driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": timezone})
         logger.info(f"[profile] Setting timezone: {timezone}, {offset_minutes}")
@@ -518,10 +518,10 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         }})();
         """
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": lang_js})
-        
+
         device_metrics = build_device_metrics(profile)
         driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
-        
+
         # ----------------------- Regional Cookies setup--------------------------------
         google_url = f"https://www.google.{domain}" if language != "en" else "https://www.google.com"
         youtube_url = f"https://www.youtube.{domain}" if language != "en" else "https://www.youtube.com"
@@ -551,9 +551,9 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         logger.info(f"Regional alignment done: {country_data}")
     except Exception as e:
         logger.error(f"configure_profile error: {e}", exc_info=True)
-        
+
 # ----------------------- Thr main function -----------------------
-def main(): 
+def main():
     global global_seed, profile
     global_seed = uuid.uuid4().hex
     seed_int = int(hashlib.md5(global_seed.encode('utf-8')).hexdigest()[:8], 16)
@@ -567,16 +567,16 @@ def main():
             os.remove(json_path)
             logger.info("Previous profile.json had been deleted")
 
-        client.verify()
-        client.prepare()
-        logger.info("preparation completed")
-        client.connect()
+        # client.verify()
+        # client.prepare()
+        # logger.info("preparation completed")
+        # client.connect()
         client.post()
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()
         country_data = data["country_data"]
         profile = get_random_profile(country_data, None)
-        
+
         # -------- Your PLATFORM and BROWSER preferences for random selection -------------------
         config = {
             # Supported platforms List
@@ -628,7 +628,7 @@ def main():
         logger.debug(
             f"OS: {os_name}, platform={platform}, platform_version={platform_version or 'n/a'}"
         )
-        
+
         # --------BROWSER selection -------------------
         browser_choice = random.choices(
             *config["browser_weights"][platform], k=1
@@ -658,7 +658,7 @@ def main():
                 #  Avoiding incompatible version pairs
                 raise RuntimeError(f"No builds {major}.* in source")
             return random.choice(filt)
-        
+
         def split_version(version: str) -> tuple[str, str]:
             """
             full: 'X.Y.Z.W'
@@ -708,7 +708,7 @@ def main():
         logger.debug(f"Final UA: {user_agent}")
         if not user_agent:
             raise Exception("Did not suceed generatiting user-agent")
-        
+
         # ----------------------- NAVIGATOR OBJECTS SETTING IN PYTHON -----------------------
         # ---------- navigator.vendor  ----------
         vendor_value = "" if "Firefox" in user_agent else "Apple Computer, Inc." if "Safari" in user_agent and "Chrome" not in user_agent and "Edg/" not in user_agent else "Google Inc."
@@ -718,7 +718,7 @@ def main():
         # deviceMemory — real values, identical for win/mac
         mem_mac = [(8, 55), (4, 35), (2, 7), (1, 3)]
         mem_win = [(8, 55), (4, 35), (2, 7), (1, 3)]
-        # hardwareConcurrency 
+        # hardwareConcurrency
         cpu_mac = [(4, 20), (8, 50), (10, 20), (12, 10)]
         cpu_win = [(2, 10), (4, 40), (6, 20), (8, 20), (12, 10)]
         device_memory_value, hardware_concurrency_value = choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac)
@@ -731,18 +731,18 @@ def main():
         videoinput = random.choice(data["videoinput"])['name']
         audiooutput = random.choice(data["headphone"])['name']
         devices_conf = {"audioinput": audioinput, "videoinput": videoinput, "audiooutput": audiooutput}
-    
+
         # ----------------------------Setting up GPU and Screen -----------------------
         gpu = random.choice(data["GPU"])
         gpu_architecture = str(gpu.get("architecture", "")).strip()
         gpu_type = str(gpu.get("type", ""))
         gpu_name = gpu["name"]
         gpu_code = gpu["prod_code"]
-        
+
         screen_res = random.choice(gpu["resolution"])
         # screen_res = "1920x1080"
         screen_width, screen_height = map(int, screen_res.split("x"))
-        
+
         # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
         dpr_map = {
             "1920x1080": 1.0,
@@ -752,8 +752,8 @@ def main():
         }
         device_dpr_value = dpr_map.get(screen_res)
         if device_dpr_value is None:
-            raise ValueError(f"unknown screen resolution: {screen_res!r}")        
-    
+            raise ValueError(f"unknown screen resolution: {screen_res!r}")
+
         # ----------------------- WebGL VENDOR, RENDERER -----------------------
         def get_webgl_vendor_renderer(gpu_name, gpu_code, user_agent, platform, debug_info=False):
             if debug_info:
@@ -774,11 +774,11 @@ def main():
                     webgl_unmasked_vendor = "Apple Inc."
                     webgl_unmasked_renderer = gpu_name
                 return webgl_unmasked_vendor, webgl_unmasked_renderer
-            
+
         gpu_vendor = "amd" if "AMD" in gpu_name or "Radeon" in gpu_name else "nvidia"
         webgl_vendor, webgl_renderer = get_webgl_vendor_renderer(gpu_name, gpu_code, user_agent, platform, debug_info=True)
         webgl_unmasked_vendor, webgl_unmasked_renderer = get_webgl_vendor_renderer(gpu_name, gpu_code, user_agent, platform, debug_info=False)
-        
+
         # ----------------------- Setting up full profile  -----------------------
         profile = {
             "platform": platform,
@@ -812,7 +812,7 @@ def main():
             generated_platform = "Windows"
         elif profile["platform"]  == "MacIntel":
             generated_platform = "macOS"
-        
+
         generated_oscpu = profile["os_info"] if profile["platform"] == "Win32" and "firefox" in user_agent.lower() else f"Intel Mac OS X {profile['platform_version']}" if "firefox" in user_agent.lower() else None
         generated_platform_version = profile["platform_version"]
         generated_version = profile["browser_version"]
@@ -826,7 +826,7 @@ def main():
         logger.info(f"profile: {profile}")
         logger.info("user_agent: %s", profile["user_agent"])
         logger.info("full profile: %s", json.dumps(profile, indent=4))
-        
+
         # ----------------------- Own data collection  -----------------------
         save_dir = "profiles"
         os.makedirs(save_dir, exist_ok=True)
@@ -838,16 +838,16 @@ def main():
         }
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        
-        # collecting data from variables 
+
+        # collecting data from variables
         data = {
-            "profile": profile,  
-            "expected_client_hints": expected_client_hints  
+            "profile": profile,
+            "expected_client_hints": expected_client_hints
         }
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.info("new profile.json created for mitmproxy") 
-        
+        logger.info("new profile.json created for mitmproxy")
+
         # --- mitmproxy start ---
         mitmproxy_proc = subprocess.Popen([
             "mitmproxy", "-s", "handle_cors_addon.py"
@@ -865,11 +865,11 @@ def main():
 
         if not wait_for_port("127.0.0.1", 8080):
             raise RuntimeError("mitmproxy not launched")
-                
+
         driver = init_driver(
             profile, country_data, profile["platform"], profile["user_agent"],
             profile["screen_width"], profile["screen_height"], profile["webgl_vendor"], profile["webgl_renderer"],
-            profile["webgl_unmasked_vendor"], profile["webgl_unmasked_renderer"], 
+            profile["webgl_unmasked_vendor"], profile["webgl_unmasked_renderer"],
             profile["devices_conf"], generated_version, generated_platform, generated_platform_version,
             generated_oscpu, expected_client_hints, profile["vendor_value"], profile["language"], profile["languages"],
             profile["deviceMemory"], profile["hardwareConcurrency"], profile["device_dpr_value"],
@@ -884,15 +884,15 @@ def main():
             apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
             logger.info("UA data submitted via CDP")
         # ----------------------- Call local setting def  -----------------------
-        configure_profile(driver, profile["language"], profile["languages"], country_data)       
+        configure_profile(driver, profile["language"], profile["languages"], country_data)
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://disney.com/") 
-        
+        driver.get("https://disney.com/")
+
         # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)
         input("press Enter for exit...")
-        
+
     except Exception as e:
         logger.error(f"Error in main block: {e}", exc_info=True)
         logger.info(f"Error: {e}")
@@ -903,4 +903,3 @@ def main():
         mitmproxy_proc.wait()
 if __name__ == "__main__":
     main()
-    
