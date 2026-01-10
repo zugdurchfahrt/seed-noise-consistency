@@ -165,7 +165,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
           await import(PATCH_URL);
         } else if (INLINE) {
           const u = URL.createObjectURL(new Blob(["/*module*/\\n", INLINE, "\\nexport{{}};"], {type:'text/javascript'}));
-          try { await import(u); } finally { try{ URL.revokeObjectURL(u);}catch(_){ } }
+          try { await import(u); } finally { URL.revokeObjectURL(u); }
         }
         if (typeof self.installWorkerUACHMirror === 'function') self.installWorkerUACHMirror();
         else console.warn('[UACHPatch] installWorkerUACHMirror missing');
@@ -210,7 +210,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
           importScripts(PATCH_URL);
         } else if (INLINE) {
           const u = URL.createObjectURL(new Blob([INLINE], {type:'text/javascript'}));
-          try { importScripts(u); } finally { try{ URL.revokeObjectURL(u);}catch(_){ } }
+          try { importScripts(u); } finally { URL.revokeObjectURL(u); }
         }
         if (typeof self.installWorkerUACHMirror === 'function') {
           self.installWorkerUACHMirror();
@@ -248,31 +248,24 @@ function SafeWorkerOverride(G){
   const NativeWorker = G.Worker;
 
 G.Worker = function WrappedWorker(url, opts) {
+  const abs = new URL(url, location.href).href;
+  const workerType = (opts && opts.type) === 'module' ? 'module' : 'classic';
+  const bridge = G.__ENV_BRIDGE__;
+  if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
+    console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched Worker');
+    throw new Error('[WorkerOverride] __ENV_BRIDGE__ not ready; refusing to create unpatched Worker');
+  }
+  const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
+
+  const src = workerType === 'module'
+    ? bridge.mkModuleWorkerSource(snap, abs)
+    : bridge.mkClassicWorkerSource(snap, abs);
+
+  const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
   try {
-    const abs = new URL(url, location.href).href;
-    const workerType = (opts && opts.type) === 'module' ? 'module' : 'classic';
-    const bridge = G.__ENV_BRIDGE__;
-    if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
-      console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, fallback');
-      return new NativeWorker(url, opts); // или NativeWorker(url, opts)
-    }
-    const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
-
-    const src = workerType === 'module'
-      ? bridge.mkModuleWorkerSource(snap, abs)
-      : bridge.mkClassicWorkerSource(snap, abs);
-
-    const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-    try {
-      const w = new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
-      try { URL.revokeObjectURL(blobURL); } catch (_) {}
-      return w;
-    } catch (e) {
-      try { URL.revokeObjectURL(blobURL); } catch (_) {}
-      throw e;
-    }
-  } catch (e) {
-    throw e;
+    return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
+  } finally {
+    URL.revokeObjectURL(blobURL);
   }
 };
 
@@ -291,27 +284,20 @@ function SafeSharedWorkerOverride(G){
   const NativeShared = G.SharedWorker;
 
   G.SharedWorker = function WrappedSharedWorker(url, name) {
-    try {
-      const abs = new URL(url, location.href).href;
-      const bridge = G.__ENV_BRIDGE__;
-      if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
-        console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, fallback');
-        return new NativeShared(url, name); // или NativeWorker(url, opts)
-      }
-      const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
-      const src = bridge.mkClassicWorkerSource(snap, abs);
-      const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    const abs = new URL(url, location.href).href;
+    const bridge = G.__ENV_BRIDGE__;
+    if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
+      console.error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched SharedWorker');
+      throw new Error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready; refusing to create unpatched SharedWorker');
+    }
+    const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
+    const src = bridge.mkClassicWorkerSource(snap, abs);
+    const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 
-      try {
-        const w = new NativeShared(blobURL, name);
-        try { URL.revokeObjectURL(blobURL); } catch(_) {}
-        return w;
-      } catch (e) {
-        try { URL.revokeObjectURL(blobURL); } catch(_) {}
-        throw e;
-      }
-    } catch (e) {
-      throw e;
+    try {
+      return new NativeShared(blobURL, name);
+    } finally {
+      URL.revokeObjectURL(blobURL);
     }
   };
   G.SharedWorker.__ENV_WRAPPED__ = true;
@@ -585,8 +571,6 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     console.info('[WorkerInit] WorkerPatchHooks ready');
   } 
 })(window);
-
-
 
 
 
