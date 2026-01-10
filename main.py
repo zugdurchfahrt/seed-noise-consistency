@@ -176,11 +176,9 @@ def init_driver(
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
     chrome_options.add_argument("--start-maximized")
-    if not CHROME_BINARY or not CHROMEDRIVER_PATH:
-        raise FileNotFoundError("Set CHROME_BINARY and CHROMEDRIVER_PATH environment variables to valid paths.")
-    chrome_options.binary_location = CHROME_BINARY
+    chrome_options.binary_location = os.environ.get("CHROME_BINARY", "/usr/bin/google-chrome-stable")
     driver = uc.Chrome(
-        driver_executable_path=CHROMEDRIVER_PATH,
+        driver_executable_path=os.environ.get("CHROMEDRIVER_PATH", "/usr/local/bin/chromedriver"),
         options=chrome_options,
     )
     logger.info("Initiating Webdriver...")
