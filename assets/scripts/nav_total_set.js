@@ -85,13 +85,7 @@ function NavTotalSetPatchModule() {
     function defineAccWithFallback(objOrProto, key, getter, { enumerable = false } = {}) {
       // use for non-critical fields; для E/F/G Do not use(см. ниже)
       if (safeDefineAcc(objOrProto, key, getter, { enumerable })) return true;
-      try {
-        Object.defineProperty(navigator, key, { get: mark(getter, `get ${key}`), configurable: true, enumerable });
-        return true;
-      } catch (e) {
-        console.warn('[nav patch skip]', key, String(e && e.message || e));
-        return false;
-      }
+      throw new TypeError(`[nav_total_set] failed to define ${key}`);
     }
     function redefineAcc(proto, key, getImpl) {
       const d = Object.getOwnPropertyDescriptor(proto, key);
@@ -135,20 +129,17 @@ function NavTotalSetPatchModule() {
     (function () {
       const desc = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
       if (desc && desc.configurable !== false) {
-        try {
-          Object.defineProperty(window, 'devicePixelRatio', { get: mark(() => dpr, 'get devicePixelRatio'), configurable: true });
-          return;
-        } catch (_) {}
+        Object.defineProperty(window, 'devicePixelRatio', { get: mark(() => dpr, 'get devicePixelRatio'), configurable: true });
+        return;
       }
-      try { redefineAcc(Window.prototype, 'devicePixelRatio', () => dpr); } catch (_) {}
+      redefineAcc(Window.prototype, 'devicePixelRatio', () => dpr);
     })();
 
     // screen.* — First try prototype, in case of refuse — own window.screen
     (function () {
       const scrProto = Screen && Screen.prototype;
       const setScreen = (k, get) => {
-        try { redefineAcc(scrProto, k, get); }
-        catch (_) { try { Object.defineProperty(window.screen, k, { get: mark(get, `get screen.${k}`), configurable: true }); } catch (__) {} }
+        redefineAcc(scrProto, k, get);
       };
       setScreen('width',       () => width);
       setScreen('height',      () => height);
@@ -156,16 +147,14 @@ function NavTotalSetPatchModule() {
       setScreen('pixelDepth',  () => colorDepth);
       setScreen('availWidth',  () => width);
       setScreen('availHeight', () => height);
-      try {
-        Object.defineProperty(window.screen, 'orientation', {
-          get: mark(() => ({
-            type: orientationDom,
-            angle: 0,
-            toString: mark(function() { return this.type; }, 'toString')
-          }), 'get screen.orientation'),
-          configurable: true
-        });
-      } catch (_) {}
+      Object.defineProperty(window.screen, 'orientation', {
+        get: mark(() => ({
+          type: orientationDom,
+          angle: 0,
+          toString: mark(function() { return this.type; }, 'toString')
+        }), 'get screen.orientation'),
+        configurable: true
+      });
     })();
 
     // oscpu (только если есть в прототипе)
@@ -250,8 +239,6 @@ function NavTotalSetPatchModule() {
     // ——— I. mediaDevices.enumerateDevices ———
     if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
       navigator.mediaDevices.enumerateDevices = mark(async function enumerateDevices() {
-        try {
-        } catch (_) {}
         const generateHexId = (len = 64) => {
           let s = '';
           for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
@@ -339,7 +326,11 @@ function NavTotalSetPatchModule() {
           // first try patch prototype, if rejected — try own on instance
           redefineAcc(perfProto, 'memory', getMemory);
         } catch (_) {
-          try { Object.defineProperty(performance, 'memory', { get: getMemory, configurable: true }); } catch (__){}
+          try {
+            Object.defineProperty(performance, 'memory', { get: getMemory, configurable: true });
+          } catch (__) {
+            throw _;
+          }
         }
       }
     }
