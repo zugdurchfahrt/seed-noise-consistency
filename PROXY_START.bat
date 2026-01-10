@@ -1,17 +1,17 @@
 @echo off
-cd /d C:\YOUR\FOLDER\PATH
-call C:\YOUR_VENV\PATH\venv\Scripts\activate.bat
+cd /d C:\55555\switch\your_folder
+call C:\55555\switch\venv\Scripts\activate.bat
 
-REM Run mitmproxy in a separate window with a log
+REM Запусти mitmproxy в отдельном окне с логом
 start "mitmproxy" cmd /k "mitmproxy -s handle_cors_addon.py -v > proxy_error_log.txt 2>&1"
 
-REM Wait 2 seconds to ensure proxy starts
-timeout /t 2
+REM Жди 1 секунды для гарантированного запуска прокси
+timeout /t 1
 
-REM Enter the name of the python script to run
-set /p scriptname=Enter script name:
+REM Введи имя python-скрипта для запуска
+set /p scriptname=Введите имя скрипта (например, myscript.py):
 
-REM Run python script
+REM Запусти python-скрипт
 python %scriptname%
 
 pause
