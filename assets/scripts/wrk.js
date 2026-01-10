@@ -122,7 +122,7 @@ function WorkerOverrides_install(G, hub) {
     }
   } catch (_) {}
 
-  try { ServiceWorkerOverride(G); } catch (_) {}
+  ServiceWorkerOverride(G);
 }
 
 
@@ -269,10 +269,10 @@ G.Worker = function WrappedWorker(url, opts) {
       return w;
     } catch (e) {
       try { URL.revokeObjectURL(blobURL); } catch (_) {}
-      return new NativeWorker(url, opts); // CSP fallback
+      throw e;
     }
-  } catch (_) {
-    return new NativeWorker(url, opts);
+  } catch (e) {
+    throw e;
   }
 };
 
@@ -308,10 +308,10 @@ function SafeSharedWorkerOverride(G){
         return w;
       } catch (e) {
         try { URL.revokeObjectURL(blobURL); } catch(_) {}
-        return new NativeShared(url, name);
+        throw e;
       }
-    } catch (_) {
-      return new NativeShared(url, name);
+    } catch (e) {
+      throw e;
     }
   };
   G.SharedWorker.__ENV_WRAPPED__ = true;
@@ -585,7 +585,6 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     console.info('[WorkerInit] WorkerPatchHooks ready');
   } 
 })(window);
-
 
 
 
