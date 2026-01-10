@@ -30,10 +30,11 @@
         configurable: true,
         enumerable: false,
         get(){
-          const snapVal = Number(cache.snap?.dpr);
+          if (!cache.snap) throw new Error('UACHPatch: no snap');
+          if (!('dpr' in cache.snap)) throw new Error('UACHPatch: no dpr');
+          const snapVal = Number(cache.snap.dpr);
           if (validDpr(snapVal)) return snapVal;
-          const origVal = Number(callOrig(ORIG_DPR, 1));
-          return validDpr(origVal) ? origVal : 1;
+          throw new Error('UACHPatch: bad dpr');
         }
       });
     } catch(_) {}
@@ -75,8 +76,11 @@
     ));
 
     def(proto,'language', ()=>{
-      const v = cache.snap?.language ?? callOrig(ORIG.language, '');
-      return v == null ? '' : String(v);
+      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      if (!('language' in cache.snap)) throw new Error('UACHPatch: no language');
+      const v = cache.snap.language;
+      if (typeof v !== 'string' || v.trim() === '') throw new Error('UACHPatch: bad language');
+      return v;
     });
   
     def(proto,'languages', ()=>{
@@ -95,7 +99,7 @@
     try{ if (self.__lastSnap__ && typeof self.__lastSnap__==='object') cache.snap = self.__lastSnap__; }catch(_){}
     try{ if (self.__lastSnap__ && self.__lastSnap__.seed != null) self.__GLOBAL_SEED = String(self.__lastSnap__.seed); }catch(_){}
     try{
-      if (!self.__ENV_SYNC_BC_INSTALLED__) {
+      if (!self.__GW_BOOTSTRAP__ && !self.__ENV_SYNC_BC_INSTALLED__) {
         self.__ENV_SYNC_BC_INSTALLED__ = true;
         const bc = new BroadcastChannel('__ENV_SYNC__');
         bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
@@ -139,6 +143,5 @@
     });
   };
 })();
-
 
 
