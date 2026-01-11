@@ -339,8 +339,12 @@ def init_driver(
     if (!BR.urls || typeof BR.urls !== 'object') throw new Error('WorkerBootstrap: BR.urls missing');
 
     const core = {json.dumps(core)};
-    const classic = URL.createObjectURL(new Blob([core], {{ type: 'text/javascript' }}));
-    const module  = URL.createObjectURL(new Blob(["/*module*/\\n", core, "\\nexport{{}};"], {{ type: 'text/javascript' }}));
+    const toDataUrl = code => {{
+        const encoded = btoa(unescape(encodeURIComponent(code)));
+        return `data:text/javascript;base64,${{encoded}}`;
+    }};
+    const classic = toDataUrl(core);
+    const module  = toDataUrl("/*module*/\\n" + core + "\\nexport{{}};");
     if (BR.urls.workerPatchClassic && BR.urls.workerPatchClassic !== classic) {{
         throw new Error('WorkerBootstrap: workerPatchClassic already set');
     }}

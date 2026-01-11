@@ -178,12 +178,9 @@
         const src = workerType === 'module'
           ? `(async function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=s=>{self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
           : `(function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=function(s){self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}if(!${USER}||typeof ${USER}!=='string') throw new Error('UACHPatch: missing user import');importScripts(${USER});})();`;
-        const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-        try {
-          return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
-        } finally {
-          URL.revokeObjectURL(blobURL);
-        }
+        const encoded = btoa(unescape(encodeURIComponent(src)));
+        const dataUrl = `data:text/javascript;base64,${encoded}`;
+        return new NativeWorker(dataUrl, { ...(opts || {}), type: workerType });
       };
       self.Worker.__ENV_WRAPPED__ = true;
     }
