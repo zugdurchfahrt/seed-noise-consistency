@@ -5,29 +5,29 @@ function EnvBus(G){
     let langs = G.__normalizedLanguages;
     if (!Array.isArray(langs)) {
       if (typeof langs === 'string') langs = [langs];
-      else if (Array.isArray(nav && nav.languages)) langs = nav.languages.slice();
-      else langs = [];
+      else throw new Error('EnvBus: __normalizedLanguages missing');
     }
-    const lang     = (typeof G.__primaryLanguage === 'string') ? G.__primaryLanguage : (langs[0] || (nav && nav.language));
+    const lang     = (typeof G.__primaryLanguage === 'string') ? G.__primaryLanguage : null;
+    if (!lang) throw new Error('EnvBus: __primaryLanguage missing');
     const ua       = G.__USER_AGENT;
     const vendor   = G.__VENDOR;
-    const dpr      = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
-      ? +devicePixelRatio
-      : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
-          ? +globalThis.__DPR
-          : undefined);
-    const cpu      = (G.__cpu != null) ? G.__cpu : (nav && nav.hardwareConcurrency);
-    const mem      = (G.__memory != null) ? G.__memory : (nav && nav.deviceMemory);
-    const timeZone = G.__TIMEZONE__ ?? (G.Intl?.DateTimeFormat?.().resolvedOptions().timeZone);
+    if (typeof ua !== 'string' || !ua) throw new Error('EnvBus: __USER_AGENT missing');
+    if (typeof vendor !== 'string') throw new Error('EnvBus: __VENDOR missing');
+    const dpr      = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null;
+    if (!dpr) throw new Error('EnvBus: __DPR missing');
+    const cpu      = (G.__cpu != null) ? G.__cpu : null;
+    const mem      = (G.__memory != null) ? G.__memory : null;
+    if (cpu == null) throw new Error('EnvBus: __cpu missing');
+    if (mem == null) throw new Error('EnvBus: __memory missing');
+    const timeZone = G.__TIMEZONE__;
+    if (!timeZone) throw new Error('EnvBus: __TIMEZONE__ missing');
 
     // ЕДИНЫЙ источник CH: сначала берем подготовленный (__EXPECTED_CLIENT_HINTS), иначе — low-entropy из navigator
     let ch = null;
     if (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object') {
       ch = G.__EXPECTED_CLIENT_HINTS;
-    } else if (nav && nav.userAgentData) {
-      ch = nav.userAgentData;
     } else {
-      ch = { platform: "unknown", brands: [], mobile: false };
+      throw new Error('EnvBus: __EXPECTED_CLIENT_HINTS missing');
     }
 
     // низкоэнтропийные — ровно как вы уже именуете: uaData
@@ -43,6 +43,7 @@ function EnvBus(G){
               : [],
       mobile: !!ch.mobile
     } : null;
+    if (!uaData) throw new Error('EnvBus: uaData missing');
 
     // высокоэнтропийные + прочее, в один объект he
     const he = {};
@@ -75,14 +76,17 @@ function EnvBus(G){
     };
   }
 
-  function syncShared(port){ const snap = envSnapshot(); try{port.start();}catch(_){} try{ port.postMessage({ __ENV_SYNC__: { envSnapshot: snap } }); }catch(_){} }
-  function syncDedicated(worker){ const snap = envSnapshot(); try{ worker.postMessage({ __ENV_SYNC__: { envSnapshot: snap } }); }catch(_){} }
+  function syncShared(port){ const snap = envSnapshot(); port.start(); port.postMessage({ __ENV_SYNC__: { envSnapshot: snap } }); }
+  function syncDedicated(worker){ const snap = envSnapshot(); worker.postMessage({ __ENV_SYNC__: { envSnapshot: snap } }); }
   return { envSnapshot, syncShared, syncDedicated };
 }
 
 
 // 2) Хаб (инициализация без записи в глобал): вернёт объект hub
 function EnvHub_init(G){
+  if (typeof BroadcastChannel !== 'function') {
+    throw new Error('EnvHub: BroadcastChannel missing');
+  }
   const bc = new BroadcastChannel('__ENV_SYNC__');
   const state = { snap: null };
   const hub = {
@@ -91,9 +95,21 @@ function EnvHub_init(G){
     __OWNS_SHARED__: false,
     __OWNS_SW__:     false,
     getSnapshot(){ return state.snap; },
-    publish(snap){ state.snap = snap; try { bc.postMessage({ __ENV_SYNC__: { envSnapshot: snap } }); } catch(_){ } },
-    subscribe(fn){ const h = ev=>{ try{ fn(ev?.data?.__ENV_SYNC__?.envSnapshot); }catch(_){} }; bc.addEventListener('message',h); return ()=>bc.removeEventListener('message',h); },
-    installWorkerNavMirror(scope){ try{ scope.__ENV_HUB__ = hub; }catch(_){} }
+    publish(snap){
+      if (!snap || typeof snap !== 'object') throw new Error('EnvHub: publish missing snapshot');
+      state.snap = snap;
+      bc.postMessage({ __ENV_SYNC__: { envSnapshot: snap } });
+    },
+    subscribe(fn){
+      if (typeof fn !== 'function') throw new Error('EnvHub: subscribe requires function');
+      const h = ev=>{ fn(ev?.data?.__ENV_SYNC__?.envSnapshot); };
+      bc.addEventListener('message',h);
+      return ()=>bc.removeEventListener('message',h);
+    },
+    installWorkerNavMirror(scope){
+      if (!scope) throw new Error('EnvHub: installWorkerNavMirror missing scope');
+      scope.__ENV_HUB__ = hub;
+    }
   };
   return hub;
 }
@@ -101,38 +117,31 @@ function EnvHub_init(G){
 
 // 2a) Обёртка для вызова из бандла
 function EnvHubPatchModule(G){
-  try {
-    const hub = EnvHub_init(G);
-    G.__ENV_HUB__ = hub;   // здесь фикс: записываем в глобал один раз
-  } catch(_){}
+  const hub = EnvHub_init(G);
+  G.__ENV_HUB__ = hub;   // здесь фикс: записываем в глобал один раз
 }
 
 // 3) Установка оверрайдов (Worker/Shared/SW).Используем SafeWorkerOverride.
 function WorkerOverrides_install(G, hub) {
-  try {
-    const already = G.Worker && (G.Worker.__ENV_WRAPPED__ === true || String(G.Worker).includes('WrappedWorker'));
-    if (!already) SafeWorkerOverride(G);
-  } catch (_) {}
+  const already = G.Worker && (G.Worker.__ENV_WRAPPED__ === true || String(G.Worker).includes('WrappedWorker'));
+  if (!already) SafeWorkerOverride(G);
 
-  try {
-    if (G.SharedWorker) {
-
-      const alreadySW = !!(G.SharedWorker && G.SharedWorker.__ENV_WRAPPED__ === true);
-      if (!alreadySW) SafeSharedWorkerOverride(G);
-    }
-  } catch (_) {}
-
+  if (G.SharedWorker) {
+    const alreadySW = !!(G.SharedWorker && G.SharedWorker.__ENV_WRAPPED__ === true);
+    if (!alreadySW) SafeSharedWorkerOverride(G);
+  }
   ServiceWorkerOverride(G);
 }
 
 
 // 4) Публикация стартового снапшота 
 function EnvPublishSnapshotModule(G){
-  try {
-    const EB = EnvBus(G);
-    const snap = EB.envSnapshot();
-    G.__ENV_HUB__ && typeof G.__ENV_HUB__.publish === 'function' && G.__ENV_HUB__.publish(snap);
-  } catch(_){}
+  const EB = EnvBus(G);
+  const snap = EB.envSnapshot();
+  if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
+    throw new Error('EnvPublish: hub missing');
+  }
+  G.__ENV_HUB__.publish(snap);
 }
 
 
@@ -147,36 +156,39 @@ function mkModuleWorkerSource(snapshot, absUrl){
   return `
     (async function(){
       'use strict';
-      try{ self.__GW_BOOTSTRAP__ = true; }catch(_){}
-      self.__applyEnvSnapshot__ = s => { try{ self.__lastSnap__ = s; }catch(_){} };
-      try{ if (${SNAP}) self.__applyEnvSnapshot__(${SNAP}); }catch(_){}
-      try{
-        if (!self.__ENV_SYNC_BC_INSTALLED__) {
-          self.__ENV_SYNC_BC_INSTALLED__ = true;
-          const bc = new BroadcastChannel('__ENV_SYNC__');
-          bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
-        }
-      }catch(_){}
+      self.__GW_BOOTSTRAP__ = true;
+      const __requireSnap = s => {
+        if (!s || typeof s !== 'object') throw new Error('UACHPatch: no snapshot');
+        if (typeof s.language !== 'string' || !s.language) throw new Error('UACHPatch: bad language');
+        if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
+        if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
+        if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
+        if (!s.uaData && !s.uaCH) throw new Error('UACHPatch: missing userAgentData');
+        return s;
+      };
+      self.__applyEnvSnapshot__ = s => { self.__lastSnap__ = __requireSnap(s); };
+      self.__applyEnvSnapshot__(${SNAP});
+      if (!self.__ENV_SYNC_BC_INSTALLED__) {
+        if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
+        self.__ENV_SYNC_BC_INSTALLED__ = true;
+        const bc = new BroadcastChannel('__ENV_SYNC__');
+        bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+      }
       // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
       const PATCH_URL = ${JSON.stringify(global.__ENV_BRIDGE__.urls.workerPatchModule || "")};
-      const INLINE = ${JSON.stringify((global.__ENV_BRIDGE__||{}).inlinePatch || "")};
-      try{
-        if (PATCH_URL) {
-          await import(PATCH_URL);
-        } else if (INLINE) {
-          const u = URL.createObjectURL(new Blob(["/*module*/\\n", INLINE, "\\nexport{{}};"], {type:'text/javascript'}));
-          try { await import(u); } finally { URL.revokeObjectURL(u); }
-        }
-        if (typeof self.installWorkerUACHMirror === 'function') self.installWorkerUACHMirror();
-        else console.warn('[UACHPatch] installWorkerUACHMirror missing');
-        // Применяем снимок СЕЙЧАС, уже через реализацию патча:
-        if (self.__applyEnvSnapshot__ && self.__lastSnap__) self.__applyEnvSnapshot__(self.__lastSnap__);
-      }catch(e){ try{ console.warn('[UACHPatch] module import failed', e && (e.message||e)); }catch(_){}}    
-      try{
-        // Только ПОСЛЕ зеркала грузим пользовательский код:
-        const USER = ${USER};
-        if (USER && typeof USER === 'string') await import(USER);
-      }catch(e){ try{ console.warn('[UACHPatch] module user import failed', e && (e.message||e)); }catch(_){}}    
+      if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchModule URL');
+      await import(PATCH_URL);
+      if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
+      self.installWorkerUACHMirror();
+      if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
+      if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
+      // Применяем снимок СЕЙЧАС, уже через реализацию патча:
+      if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
+      self.__applyEnvSnapshot__(self.__lastSnap__);
+      // Только ПОСЛЕ зеркала грузим пользовательский код:
+      const USER = ${USER};
+      if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user module URL');
+      await import(USER);
     })();
     export {};
     //# sourceURL=worker_module_bootstrap.js
@@ -192,36 +204,38 @@ function mkClassicWorkerSource(snapshot, absUrl){
   return `
     (function(){
       'use strict';
-      try{ self.__GW_BOOTSTRAP__ = true; }catch(_){}
-      self.__applyEnvSnapshot__ = function(s){ try{ self.__lastSnap__ = s; }catch(_){} };
-      try{ if (${SNAP}) self.__applyEnvSnapshot__(${SNAP}); }catch(_){}
-      try{
-        if (!self.__ENV_SYNC_BC_INSTALLED__) {
-          self.__ENV_SYNC_BC_INSTALLED__ = true;
-          const bc = new BroadcastChannel('__ENV_SYNC__');
-          bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
-        }
-      }catch(_){}
+      self.__GW_BOOTSTRAP__ = true;
+      var __requireSnap = function(s){
+        if (!s || typeof s !== 'object') throw new Error('UACHPatch: no snapshot');
+        if (typeof s.language !== 'string' || !s.language) throw new Error('UACHPatch: bad language');
+        if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
+        if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
+        if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
+        if (!s.uaData && !s.uaCH) throw new Error('UACHPatch: missing userAgentData');
+        return s;
+      };
+      self.__applyEnvSnapshot__ = function(s){ self.__lastSnap__ = __requireSnap(s); };
+      self.__applyEnvSnapshot__(${SNAP});
+      if (!self.__ENV_SYNC_BC_INSTALLED__) {
+        if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
+        self.__ENV_SYNC_BC_INSTALLED__ = true;
+        const bc = new BroadcastChannel('__ENV_SYNC__');
+        bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+      }
       // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
       const PATCH_URL = ${JSON.stringify(global.__ENV_BRIDGE__.urls.workerPatchClassic || "")};
-      const INLINE = ${JSON.stringify((global.__ENV_BRIDGE__||{}).inlinePatch || "")};
-      try{
-        if (PATCH_URL) {
-          importScripts(PATCH_URL);
-        } else if (INLINE) {
-          const u = URL.createObjectURL(new Blob([INLINE], {type:'text/javascript'}));
-          try { importScripts(u); } finally { URL.revokeObjectURL(u); }
-        }
-        if (typeof self.installWorkerUACHMirror === 'function') {
-          self.installWorkerUACHMirror();
-          console.info('[UACHPatch] PATCH_URL inside worker', PATCH_URL);
-        } else {
-          console.warn('[UACHPatch] installWorkerUACHMirror missing');
-        }
-        // Применяем снимок СЕЙЧАС, уже через реализацию патча:
-        if (self.__applyEnvSnapshot__ && self.__lastSnap__) self.__applyEnvSnapshot__(self.__lastSnap__);
-      }catch(e){ try{ console.warn('[UACHPatch] classic importScripts failed', e && (e.message||e)); }catch(_){}}    
-      try{ importScripts(${USER}); }catch(_){}
+      if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchClassic URL');
+      importScripts(PATCH_URL);
+      if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
+      self.installWorkerUACHMirror();
+      if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
+      if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
+      // Применяем снимок СЕЙЧАС, уже через реализацию патча:
+      if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
+      self.__applyEnvSnapshot__(self.__lastSnap__);
+      var USER = ${USER};
+      if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user script URL');
+      importScripts(USER);
     })();
     //# sourceURL=worker_classic_bootstrap.js
   `;
@@ -230,21 +244,46 @@ function mkClassicWorkerSource(snapshot, absUrl){
 
   // Паблик-API для main
   function publishSnapshot(snap){
-    try{
-      const bc = new BroadcastChannel('__ENV_SYNC__');
-      bc.postMessage({ __ENV_SYNC__: { envSnapshot: snap } });
-    }catch(_){}
+    if (typeof BroadcastChannel !== 'function') {
+      throw new Error('EnvPublish: BroadcastChannel missing');
+    }
+    const bc = new BroadcastChannel('__ENV_SYNC__');
+    bc.postMessage({ __ENV_SYNC__: { envSnapshot: snap } });
   }
-  BR.mkModuleWorkerSource  = BR.mkModuleWorkerSource  || mkModuleWorkerSource;
-  BR.mkClassicWorkerSource = BR.mkClassicWorkerSource || mkClassicWorkerSource;
-  BR.publishSnapshot       = BR.publishSnapshot       || publishSnapshot;
-  BR.envSnapshot           = BR.envSnapshot           || EnvBus(global).envSnapshot;
+  if (BR.mkModuleWorkerSource && BR.mkModuleWorkerSource !== mkModuleWorkerSource) {
+    throw new Error('EnvBridge: mkModuleWorkerSource already set');
+  }
+  if (BR.mkClassicWorkerSource && BR.mkClassicWorkerSource !== mkClassicWorkerSource) {
+    throw new Error('EnvBridge: mkClassicWorkerSource already set');
+  }
+  if (BR.publishSnapshot && BR.publishSnapshot !== publishSnapshot) {
+    throw new Error('EnvBridge: publishSnapshot already set');
+  }
+  if (BR.envSnapshot && BR.envSnapshot !== EnvBus(global).envSnapshot) {
+    throw new Error('EnvBridge: envSnapshot already set');
+  }
+  BR.mkModuleWorkerSource  = mkModuleWorkerSource;
+  BR.mkClassicWorkerSource = mkClassicWorkerSource;
+  BR.publishSnapshot       = publishSnapshot;
+  BR.envSnapshot           = EnvBus(global).envSnapshot;
 })(window);
 
 
 // === SafeWorkerOverride (Dedicated) ===
+function requireWorkerSnapshot(snap, label){
+  if (!snap || typeof snap !== 'object') throw new Error(`[WorkerOverride] missing snapshot${label ? ` (${label})` : ''}`);
+  if (typeof snap.language !== 'string' || !snap.language) throw new Error('[WorkerOverride] snapshot.language missing');
+  if (!Array.isArray(snap.languages)) throw new Error('[WorkerOverride] snapshot.languages missing');
+  if (!Number.isFinite(Number(snap.deviceMemory))) throw new Error('[WorkerOverride] snapshot.deviceMemory missing');
+  if (!Number.isFinite(Number(snap.hardwareConcurrency))) throw new Error('[WorkerOverride] snapshot.hardwareConcurrency missing');
+  if (!Number.isFinite(Number(snap.dpr))) throw new Error('[WorkerOverride] snapshot.dpr missing');
+  if (!snap.uaData && !snap.uaCH) throw new Error('[WorkerOverride] snapshot.uaData missing');
+  return snap;
+}
+
 function SafeWorkerOverride(G){
-  if (!G || !G.Worker || G.Worker.__ENV_WRAPPED__) return;
+  if (!G || !G.Worker) throw new Error('[WorkerOverride] Worker missing');
+  if (G.Worker.__ENV_WRAPPED__) return;
   const NativeWorker = G.Worker;
 
 G.Worker = function WrappedWorker(url, opts) {
@@ -255,7 +294,18 @@ G.Worker = function WrappedWorker(url, opts) {
     console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched Worker');
     throw new Error('[WorkerOverride] __ENV_BRIDGE__ not ready; refusing to create unpatched Worker');
   }
-  const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
+  if (typeof bridge.mkModuleWorkerSource !== 'function') {
+    throw new Error('[WorkerOverride] mkModuleWorkerSource missing');
+  }
+  if (typeof bridge.publishSnapshot !== 'function') {
+    throw new Error('[WorkerOverride] publishSnapshot missing');
+  }
+  if (typeof bridge.envSnapshot !== 'function') {
+    throw new Error('[WorkerOverride] envSnapshot missing');
+  }
+  const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
+  G.__lastSnap__ = snap;
+  bridge.publishSnapshot(snap);
 
   const src = workerType === 'module'
     ? bridge.mkModuleWorkerSource(snap, abs)
@@ -280,7 +330,8 @@ window.SafeWorkerOverride = SafeWorkerOverride;
 
 // === SafeSharedWorkerOverride (Shared) ===
 function SafeSharedWorkerOverride(G){
-  if (!G || !G.SharedWorker || G.SharedWorker.__ENV_WRAPPED__) return;
+  if (!G || !G.SharedWorker) throw new Error('[SharedWorkerOverride] SharedWorker missing');
+  if (G.SharedWorker.__ENV_WRAPPED__) return;
   const NativeShared = G.SharedWorker;
 
   G.SharedWorker = function WrappedSharedWorker(url, name) {
@@ -290,7 +341,15 @@ function SafeSharedWorkerOverride(G){
       console.error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched SharedWorker');
       throw new Error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready; refusing to create unpatched SharedWorker');
     }
-    const snap = typeof bridge.envSnapshot === 'function' ? bridge.envSnapshot() : null;
+    if (typeof bridge.publishSnapshot !== 'function') {
+      throw new Error('[SharedWorkerOverride] publishSnapshot missing');
+    }
+    if (typeof bridge.envSnapshot !== 'function') {
+      throw new Error('[SharedWorkerOverride] envSnapshot missing');
+    }
+    const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
+    G.__lastSnap__ = snap;
+    bridge.publishSnapshot(snap);
     const src = bridge.mkClassicWorkerSource(snap, abs);
     const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 
@@ -499,45 +558,46 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 
   // 1) Hub (идемпотентно, без сайд-эффектов)
   function initHub(){
-    try {
-      return G.__ENV_HUB__ || EnvHubPatchModule(G) || G.__ENV_HUB__;
-    } catch(e) {
-      console.warn('[WorkerInit] initHub:', e);
-      return G.__ENV_HUB__ || null;
-    }
+    const hub = G.__ENV_HUB__ || EnvHubPatchModule(G) || G.__ENV_HUB__;
+    if (!hub) throw new Error('[WorkerInit] EnvHub missing');
+    return hub;
   }
 
   // 2) Overrides (Worker/Shared/SW) — после Hub
   function installOverrides(){
     const hub = initHub();
-    try { WorkerOverrides_install(G, hub); } catch(e){ console.warn('[WorkerInit] overrides:', e); }
+    WorkerOverrides_install(G, hub);
     return hub;
   }
 
   // 3) Первый снапшот (LE) из текущего состояния
   function snapshotOnce(){
-    try {
-      const snap = EnvBus(G).envSnapshot();
-      if (G.__ENV_HUB__ && typeof G.__ENV_HUB__.publish === 'function') G.__ENV_HUB__.publish(snap);
-      return snap;
-    } catch(e){ console.warn('[WorkerInit] snapshotOnce:', e); return null; }
+    const snap = EnvBus(G).envSnapshot();
+    if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
+      throw new Error('[WorkerInit] hub missing');
+    }
+    G.__ENV_HUB__.publish(snap);
+    return snap;
   }
 
   // 4) HE-догонка (не блокирует загрузку, без «N»/«Nav»)
   function snapshotHE(keys){
-    try {
-      const UAD = G.navigator && G.navigator.userAgentData;
-      if (!UAD || typeof UAD.getHighEntropyValues !== 'function') return null;
-      const KEYS = Array.isArray(keys) && keys.length
-        ? keys
-        : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
-      return UAD.getHighEntropyValues(KEYS).then(he => {
-        G.__LAST_UACH_HE__ = he || {};
-        const snap = EnvBus(G).envSnapshot();
-        if (G.__ENV_HUB__ && typeof G.__ENV_HUB__.publish === 'function') G.__ENV_HUB__.publish(snap);
-        return he;
-      }).catch(() => null);
-    } catch { return null; }
+    const UAD = G.navigator && G.navigator.userAgentData;
+    if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
+      throw new Error('[WorkerInit] userAgentData missing');
+    }
+    const KEYS = Array.isArray(keys) && keys.length
+      ? keys
+      : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
+    return UAD.getHighEntropyValues(KEYS).then(he => {
+      G.__LAST_UACH_HE__ = he || {};
+      const snap = EnvBus(G).envSnapshot();
+      if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
+        throw new Error('[WorkerInit] hub missing');
+      }
+      G.__ENV_HUB__.publish(snap);
+      return he;
+    });
   }
 
   // 5) Полный сценарий
@@ -571,9 +631,3 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     console.info('[WorkerInit] WorkerPatchHooks ready');
   } 
 })(window);
-
-
-
-
-
-

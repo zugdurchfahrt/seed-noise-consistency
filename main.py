@@ -332,27 +332,34 @@ def init_driver(
     worker_bootstrap_js = f"""
     (() => {{
     const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
+    if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
     if (!Object.prototype.hasOwnProperty.call(BR, 'urls')) {{
         Object.defineProperty(BR, 'urls', {{ value: {{}}, writable: false, configurable: false }});
     }}
+    if (!BR.urls || typeof BR.urls !== 'object') throw new Error('WorkerBootstrap: BR.urls missing');
 
     const core = {json.dumps(core)};
-    try {{
-        const classic = URL.createObjectURL(new Blob([core], {{ type: 'text/javascript' }}));
-        const module  = URL.createObjectURL(new Blob(["/*module*/\\n", core, "\\nexport{{}};"], {{ type: 'text/javascript' }}));
-        BR.urls.workerPatchClassic = BR.urls.workerPatchClassic || classic;
-        BR.urls.workerPatchModule  = BR.urls.workerPatchModule  || module;
-    }} catch (_e) {{}}
-
-    BR.inlinePatch = BR.inlinePatch || core;
-    try {{ Object.freeze(BR.urls); }} catch(_) {{}}
+    const classic = URL.createObjectURL(new Blob([core], {{ type: 'text/javascript' }}));
+    const module  = URL.createObjectURL(new Blob(["/*module*/\\n", core, "\\nexport{{}};"], {{ type: 'text/javascript' }}));
+    if (BR.urls.workerPatchClassic && BR.urls.workerPatchClassic !== classic) {{
+        throw new Error('WorkerBootstrap: workerPatchClassic already set');
+    }}
+    if (BR.urls.workerPatchModule && BR.urls.workerPatchModule !== module) {{
+        throw new Error('WorkerBootstrap: workerPatchModule already set');
+    }}
+    BR.urls.workerPatchClassic = classic;
+    BR.urls.workerPatchModule  = module;
+    if (BR.inlinePatch && BR.inlinePatch !== core) {{
+        throw new Error('WorkerBootstrap: inlinePatch already set');
+    }}
+    BR.inlinePatch = core;
+    Object.freeze(BR.urls);
 
     function boot() {{
-        try {{
-        if (window.WorkerPatchHooks && window.WorkerPatchHooks.initAll) {{
-            window.WorkerPatchHooks.initAll({{ publishHE: true }});
+        if (!window.WorkerPatchHooks || typeof window.WorkerPatchHooks.initAll !== 'function') {{
+            throw new Error('WorkerBootstrap: WorkerPatchHooks missing');
         }}
-        }} catch (_) {{}}
+        window.WorkerPatchHooks.initAll({{ publishHE: true }});
     }}
 
     if ('WorkerPatchHooks' in window && window.WorkerPatchHooks) {{
@@ -362,7 +369,7 @@ def init_driver(
         Object.defineProperty(window, 'WorkerPatchHooks', {{
         configurable: true,
         get() {{ return _h; }},
-        set(v) {{ _h = v; try {{ boot(); }} catch(_) {{}} }}
+        set(v) {{ _h = v; boot(); }}
         }});
     }}
     }})();
