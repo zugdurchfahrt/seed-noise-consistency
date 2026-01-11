@@ -1,4 +1,4 @@
-// 1) Источник снапшотов 
+// 1) Источник снапшотов
 function EnvBus(G){
   function envSnapshot(){
     const nav = G.navigator;
@@ -155,7 +155,7 @@ function WorkerOverrides_install(G, hub) {
 }
 
 
-// 4) Публикация стартового снапшота 
+// 4) Публикация стартового снапшота
 function EnvPublishSnapshotModule(G){
   const EB = EnvBus(G);
   const snap = EB.envSnapshot();
@@ -168,7 +168,7 @@ function EnvPublishSnapshotModule(G){
 
 // === env-worker-bridge (главный бандл) ===
 (function setupEnvBridge(global){
-  global.__ENV_BRIDGE__ = global.__ENV_BRIDGE__ || {};
+  global.__ENV_BRIDGE__ = global.__ENV_BRIDGE__;
   const BR = global.__ENV_BRIDGE__;
 
 function mkModuleWorkerSource(snapshot, absUrl){
@@ -301,8 +301,14 @@ function mkClassicWorkerSource(snapshot, absUrl){
 
 
 // === SafeWorkerOverride (Dedicated) ===
-function requireWorkerSnapshot(snap, label){
-  if (!snap || typeof snap !== 'object') throw new Error(`[WorkerOverride] missing snapshot${label ? ` (${label})` : ''}`);
+function requireWorkerSnapshot(snap, label) {
+  if (!snap || typeof snap !== 'object') {
+    throw new Error(
+      label
+        ? `[WorkerOverride] missing snapshot (${label})`
+        : `[WorkerOverride] missing snapshot`
+    );
+  }
   if (typeof snap.language !== 'string' || !snap.language) throw new Error('[WorkerOverride] snapshot.language missing');
   if (!Array.isArray(snap.languages)) throw new Error('[WorkerOverride] snapshot.languages missing');
   if (!Number.isFinite(Number(snap.deviceMemory))) throw new Error('[WorkerOverride] snapshot.deviceMemory missing');
@@ -311,6 +317,7 @@ function requireWorkerSnapshot(snap, label){
   if (!snap.uaData && !snap.uaCH) throw new Error('[WorkerOverride] snapshot.uaData missing');
   return snap;
 }
+
 
 function SafeWorkerOverride(G){
   if (!G || !G.Worker) throw new Error('[WorkerOverride] Worker missing');
@@ -344,7 +351,7 @@ G.Worker = function WrappedWorker(url, opts) {
 
   const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
   try {
-    return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
+    return new NativeWorker(blobURL, { ...(opts), type: workerType });
   } finally {
     URL.revokeObjectURL(blobURL);
   }
@@ -352,7 +359,7 @@ G.Worker = function WrappedWorker(url, opts) {
 
   G.Worker.__ENV_WRAPPED__ = true;
     // маркер для диагностики
-  if (G.__DEBUG__) {  
+  if (G.__DEBUG__) {
     try { G.__PATCHED_SAFE_WORKER__ = true; console.info('SafeWorker installed'); } catch(_){}
 }
 }
@@ -429,7 +436,7 @@ function ServiceWorkerOverride(G){
     getRegistrations: proto.getRegistrations,
   };
 
-  // ---- режим/политика 
+  // ---- режим/политика
   const MODE       = (G.__SW_FILTER_MODE__ ?? 'off');
   const ALLOW_SELF = !!G.__SW_ALLOW_SELF__;
   const EXTRA      = Array.isArray(G.__SW_ALLOW_HOSTS__) ? G.__SW_ALLOW_HOSTS__ : [];
@@ -448,8 +455,20 @@ function ServiceWorkerOverride(G){
   const wantClean  = () => MODE === 'clean';
   const wantFake   = () => MODE === 'fake' || FAKE_ON_BLOCK;
 
-  const hostOf  = (u, base) => { try { return new URL(u, base || G.location.href).hostname.toLowerCase(); } catch { return ''; } };
-  const isSelf  = (h) => !!h && (h === (G.location.hostname||'').toLowerCase());
+
+  const hostOf = (u, base) => {
+    try {
+      return new URL(u, base || G.location.href).hostname.toLowerCase();
+    } catch (e) {
+      const emsg =
+        (e && typeof e === 'object' && 'message' in e) ? e.message : String(e);
+      throw new Error(
+        `THW: hostOf failed (u=${String(u)}, base=${String(base)}): ${emsg}`
+      );
+    }
+  };
+
+  const isSelf  = (h) => !!h && (h === (G.location.hostname).toLowerCase());
   const inList  = (h, arr) => arr.some(x => x instanceof RegExp ? x.test(h)
                                                                 : (h === String(x).toLowerCase()) ||
                                                                   h.endsWith('.' + String(x).toLowerCase()));
@@ -464,27 +483,53 @@ function ServiceWorkerOverride(G){
 
   // ---- безопасные заглушки
   const CLEANED = new Set();
-  function makeFakeServiceWorker(scriptURL, scope){
-    return { scriptURL: scriptURL || ((scope || '/') + '__blocked_sw__.js'),
-             state: 'activated', onstatechange: null,
-             postMessage(){}, addEventListener(){}, removeEventListener(){} };
+
+  function makeFakeServiceWorker(scriptURL, scope) {
+    if (typeof scriptURL !== 'string' || !scriptURL) {
+      throw new Error('THW: makeFakeServiceWorker missing scriptURL');
+    }
+    if (typeof scope !== 'string' || !scope) {
+      throw new Error('THW: makeFakeServiceWorker missing scope');
+    }
+    return {
+      scriptURL,
+      state: 'activated',
+      onstatechange: null,
+      postMessage() { throw new Error('THW: ServiceWorker.postMessage'); },
+      addEventListener() { throw new Error('THW: ServiceWorker.addEventListener'); },
+      removeEventListener() { throw new Error('THW: ServiceWorker.removeEventListener'); }
+    };
   }
-  function makeFakeRegistration(options, scriptURL){
-    const scope = (options && options.scope) || '/';
+
+  function makeFakeRegistration(options, scriptURL) {
+    if (!options || typeof options !== 'object') {
+      throw new Error('THW: makeFakeRegistration missing options');
+    }
+    const scope = options.scope;
+    if (typeof scope !== 'string' || !scope) {
+      throw new Error('THW: makeFakeRegistration missing options.scope');
+    }
     const active = makeFakeServiceWorker(scriptURL, scope);
     return {
       scope, installing: null, waiting: null, active,
-      navigationPreload: { enable:async()=>{}, disable:async()=>{}, getState:async()=>({enabled:false, headerValue:''}) },
-      addEventListener(){}, removeEventListener(){},
-      update:async()=>{}, unregister:async()=>true
+      navigationPreload: {
+        enable: async () => { throw new Error('THW: navigationPreload.enable'); },
+        disable: async () => { throw new Error('THW: navigationPreload.disable'); },
+        getState: async () => { throw new Error('THW: navigationPreload.getState'); }
+      },
+      addEventListener() { throw new Error('THW: registration.addEventListener'); },
+      removeEventListener() { throw new Error('THW: registration.removeEventListener'); },
+      update: async () => { throw new Error('THW: registration.update'); },
+      unregister: async () => { throw new Error('THW: registration.unregister'); }
     };
   }
+
 
   // ---- register ----
   if (typeof Native.register === 'function') {
     function WrappedServiceWorkerRegister(url, opts){
       if (!isAllowed(url, (opts && opts.scope))) {
-        if (wantFake()) return Promise.resolve(makeFakeRegistration(opts, String(url||'')));
+        if (wantFake()) return Promise.resolve(makeFakeRegistration(opts, String(url)));
         const Err = (typeof DOMException === 'function')
           ? new DOMException('ServiceWorker register blocked by policy', 'SecurityError')
           : new Error('ServiceWorker register blocked by policy');
@@ -519,8 +564,8 @@ function ServiceWorkerOverride(G){
       return out;
     }
     try { Object.defineProperty(WrappedSWGetRegistrations, 'name', { value: 'WrappedSWGetRegistrations' }); } catch(_){}
-    WrappedSWGetRegistrations.__ENV_WRAPPED__ = true;                  
-    Object.defineProperty(proto, 'getRegistrations', {                 
+    WrappedSWGetRegistrations.__ENV_WRAPPED__ = true;
+    Object.defineProperty(proto, 'getRegistrations', {
       configurable: true, writable: true, value: WrappedSWGetRegistrations
     });
   }
@@ -543,14 +588,14 @@ function ServiceWorkerOverride(G){
       return wantFake() ? makeFakeRegistration({ scope: sc }, url) : undefined;
     }
     try { Object.defineProperty(WrappedSWGetRegistration, 'name', { value: 'WrappedSWGetRegistration' }); } catch(_){}
-    WrappedSWGetRegistration.__ENV_WRAPPED__ = true;                    
-    Object.defineProperty(proto, 'getRegistration', {                  
+    WrappedSWGetRegistration.__ENV_WRAPPED__ = true;
+    Object.defineProperty(proto, 'getRegistration', {
       configurable: true, writable: true, value: WrappedSWGetRegistration
     });
   }
 
   //Diagnostics
-  if (G.__DEBUG__) {  
+  if (G.__DEBUG__) {
     try { G.__PATCHED_SERVICE_WORKER__ = true; console.info('ServiceWorker installed'); } catch(_){}
 }
 }
@@ -568,7 +613,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
   if (!G) return;
 
   const p = G.__fontsReady || G.awaitFontsReady;
-  if (G.__FONTS_READY__) return; 
+  if (G.__FONTS_READY__) return;
   if (p && typeof p.then === 'function') {
     p.then(() => {
       if (G.__FONTS_READY__) return;
@@ -621,7 +666,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
       ? keys
       : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
     return UAD.getHighEntropyValues(KEYS).then(he => {
-      G.__LAST_UACH_HE__ = he || {};
+      G.__LAST_UACH_HE__ = he;
       const snap = EnvBus(G).envSnapshot();
       if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
         throw new Error('[WorkerInit] hub missing');
@@ -633,7 +678,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 
   // 5) Полный сценарий
   function initAll(opts){
-    const o = Object.assign({ publishHE: true, heKeys: null }, opts||{});
+    const o = Object.assign({ publishHE: true, heKeys: null }, opts);
     installOverrides();        // Hub → Overrides
     snapshotOnce();            // первый снап
     if (o.publishHE) snapshotHE(o.heKeys); // HE-догонка
@@ -642,7 +687,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
   // 6) Diagnostics
   function diag(){
     if (!G.__DEBUG__) return {};
-    const BR = G.__ENV_BRIDGE__ || {};
+    const BR = G.__ENV_BRIDGE__;
     return {
       hasHub:        !!G.__ENV_HUB__,
       workerWrapped: !!(G.Worker && (G.Worker.__ENV_WRAPPED__ || /WrappedWorker/.test(String(G.Worker)))),
@@ -658,7 +703,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
   }
   G.WorkerPatchHooks = { initHub, installOverrides, snapshotOnce, snapshotHE, initAll, diag };
   window.WorkerPatchHooks = G.WorkerPatchHooks;
-  if (G.__DEBUG__) { 
+  if (G.__DEBUG__) {
     console.info('[WorkerInit] WorkerPatchHooks ready');
-  } 
+  }
 })(window);
