@@ -76,7 +76,7 @@ function EnvBus(G){
       if (!(k in G.__LAST_UACH_HE__)) throw new Error(`EnvBus: high entropy missing ${k}`);
       const v = G.__LAST_UACH_HE__[k];
       if (v === undefined || v === null) throw new Error(`EnvBus: high entropy bad ${k}`);
-      if (typeof v === 'string' && !v) throw new Error(`EnvBus: high entropy bad ${k}`);
+      if (typeof v === 'string' && !v && k !== 'model') throw new Error(`EnvBus: high entropy bad ${k}`);
       if (Array.isArray(v) && !v.length) throw new Error(`EnvBus: high entropy bad ${k}`);
       he[k] = v;
     }
@@ -195,7 +195,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
           if (!(k in he)) throw new Error('UACHPatch: missing highEntropy.' + k);
           const v = he[k];
           if (v === undefined || v === null) throw new Error('UACHPatch: bad highEntropy.' + k);
-          if (typeof v === 'string' && !v) throw new Error('UACHPatch: bad highEntropy.' + k);
+          if (typeof v === 'string' && !v && k !== 'model') throw new Error('UACHPatch: bad highEntropy.' + k);
           if (Array.isArray(v) && !v.length) throw new Error('UACHPatch: bad highEntropy.' + k);
         }
         return s;
@@ -262,7 +262,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
           if (!(k in he)) throw new Error('UACHPatch: missing highEntropy.' + k);
           const v = he[k];
           if (v === undefined || v === null) throw new Error('UACHPatch: bad highEntropy.' + k);
-          if (typeof v === 'string' && !v) throw new Error('UACHPatch: bad highEntropy.' + k);
+          if (typeof v === 'string' && !v && k !== 'model') throw new Error('UACHPatch: bad highEntropy.' + k);
           if (Array.isArray(v) && !v.length) throw new Error('UACHPatch: bad highEntropy.' + k);
         }
         return s;
@@ -347,7 +347,7 @@ function requireWorkerSnapshot(snap, label) {
     if (!(k in he)) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
     const v = he[k];
     if (v === undefined || v === null) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
-    if (typeof v === 'string' && !v) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
+    if (typeof v === 'string' && !v && k !== 'model') throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
     if (Array.isArray(v) && !v.length) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
   }
   return snap;
@@ -730,7 +730,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
         if (!(k in he)) throw new Error(`[WorkerInit] high entropy missing ${k}`);
         const v = he[k];
         if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
-        if (typeof v === 'string' && !v) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+        if (typeof v === 'string' && !v && k !== 'model') throw new Error(`[WorkerInit] high entropy bad ${k}`);
         if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
       }
       G.__LAST_UACH_HE__ = he;
