@@ -179,7 +179,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
   const PATCH_URL = JSON.stringify(patchUrl);
-  const src = `
+  return `
     (async function(){
       'use strict';
       self.__GW_BOOTSTRAP__ = true;
@@ -219,8 +219,6 @@ function mkModuleWorkerSource(snapshot, absUrl){
     export {};
     //# sourceURL=worker_module_bootstrap.js
   `;
-  const encoded = btoa(unescape(encodeURIComponent(src)));
-  return `data:text/javascript;base64,${encoded}`;
 }
 
 
@@ -234,7 +232,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
   const PATCH_URL = JSON.stringify(patchUrl);
-  const src = `
+  return `
     (function(){
       'use strict';
       self.__GW_BOOTSTRAP__ = true;
@@ -272,8 +270,6 @@ function mkClassicWorkerSource(snapshot, absUrl){
     })();
     //# sourceURL=worker_classic_bootstrap.js
   `;
-  const encoded = btoa(unescape(encodeURIComponent(src)));
-  return `data:text/javascript;base64,${encoded}`;
 }
 
 
@@ -353,7 +349,12 @@ G.Worker = function WrappedWorker(url, opts) {
     ? bridge.mkModuleWorkerSource(snap, abs)
     : bridge.mkClassicWorkerSource(snap, abs);
 
-  return new NativeWorker(src, { ...(opts), type: workerType });
+  const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+  try {
+    return new NativeWorker(blobURL, { ...(opts), type: workerType });
+  } finally {
+    URL.revokeObjectURL(blobURL);
+  }
 };
 
   G.Worker.__ENV_WRAPPED__ = true;
@@ -388,7 +389,13 @@ function SafeSharedWorkerOverride(G){
     G.__lastSnap__ = snap;
     bridge.publishSnapshot(snap);
     const src = bridge.mkClassicWorkerSource(snap, abs);
-    return new NativeShared(src, name);
+    const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+
+    try {
+      return new NativeShared(blobURL, name);
+    } finally {
+      URL.revokeObjectURL(blobURL);
+    }
   };
   G.SharedWorker.__ENV_WRAPPED__ = true;
   if (G.__DEBUG__) {
