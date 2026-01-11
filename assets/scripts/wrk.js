@@ -22,7 +22,7 @@ function EnvBus(G){
     const timeZone = G.__TIMEZONE__;
     if (!timeZone) throw new Error('EnvBus: __TIMEZONE__ missing');
 
-    // ЕДИНЫЙ источник CH: сначала берем подготовленный (__EXPECTED_CLIENT_HINTS), иначе — low-entropy из navigator
+    // ЕДИНЫЙ источник CH: берем подготовленный (__EXPECTED_CLIENT_HINTS)
     let ch = null;
     if (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object') {
       ch = G.__EXPECTED_CLIENT_HINTS;
@@ -66,23 +66,21 @@ function EnvBus(G){
     })() : null;
     if (!uaData) throw new Error('EnvBus: uaData missing');
 
-    // высокоэнтропийные + прочее, в один объект he
+    if (!G.__UACH_HE_READY__) throw new Error('EnvBus: high entropy not ready');
+    if (!G.__LAST_UACH_HE__ || typeof G.__LAST_UACH_HE__ !== 'object') {
+      throw new Error('EnvBus: high entropy missing');
+    }
+    const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
     const he = {};
-    const put = (k,v)=>{ if (v !== undefined && v !== null) he[k] = v; };
-    const heSrc = (G.__LAST_UACH_HE__ && typeof G.__LAST_UACH_HE__ === 'object') ? G.__LAST_UACH_HE__ : (ch && ch.highEntropy);
-
-    // ← интеграция тех самых двух переменных под уже существующими именами
-    put('uaFullVersion',   (heSrc && heSrc.uaFullVersion) ?? (ch && ch.uaFullVersion));
-    put('fullVersionList', (heSrc && heSrc.fullVersionList) ?? (ch && ch.fullVersionList));
-
-    // остальные (если есть в __EXPECTED_CLIENT_HINTS)
-    put('architecture',    (heSrc && heSrc.architecture) ?? (ch && ch.architecture));
-    put('bitness',         (heSrc && heSrc.bitness) ?? (ch && ch.bitness));
-    put('model',           (heSrc && heSrc.model) ?? (ch && ch.model));
-    put('platformVersion', (heSrc && heSrc.platformVersion) ?? (ch && ch.platformVersion));
-    put('formFactors',     (heSrc && heSrc.formFactors) ?? (ch && ch.formFactors));
-    put('wow64',           (heSrc && heSrc.wow64 !== undefined) ? !!heSrc.wow64
-                         : (ch && ch.wow64 !== undefined) ? !!ch.wow64 : undefined);
+    for (const k of HE_KEYS) {
+      if (!(k in G.__LAST_UACH_HE__)) throw new Error(`EnvBus: high entropy missing ${k}`);
+      const v = G.__LAST_UACH_HE__[k];
+      if (v === undefined || v === null) throw new Error(`EnvBus: high entropy bad ${k}`);
+      if (typeof v === 'string' && !v) throw new Error(`EnvBus: high entropy bad ${k}`);
+      if (Array.isArray(v) && !v.length) throw new Error(`EnvBus: high entropy bad ${k}`);
+      he[k] = v;
+    }
+    uaData.he = he;
 
     const seed = String(G && G.__GLOBAL_SEED);
     // Алиасы для совместимости с воркер-патчем
@@ -190,9 +188,23 @@ function mkModuleWorkerSource(snapshot, absUrl){
         if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
         if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
         if (!s.uaData && !s.uaCH) throw new Error('UACHPatch: missing userAgentData');
+        const he = (s.uaData && s.uaData.he) || (s.uaCH && s.uaCH.he) || s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+        if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
+        const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+        for (const k of KEYS) {
+          if (!(k in he)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
+          const v = he[k];
+          if (v === undefined || v === null) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+          if (typeof v === 'string' && !v) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+          if (Array.isArray(v) && !v.length) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+        }
         return s;
       };
-      self.__applyEnvSnapshot__ = s => { self.__lastSnap__ = __requireSnap(s); };
+      self.__applyEnvSnapshot__ = s => {
+        if (self.__ENV_SNAP_APPLIED__ === s) return;
+        self.__lastSnap__ = __requireSnap(s);
+        self.__ENV_SNAP_APPLIED__ = s;
+      };
       self.__applyEnvSnapshot__(${SNAP});
       if (!self.__ENV_SYNC_BC_INSTALLED__) {
         if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
@@ -243,9 +255,23 @@ function mkClassicWorkerSource(snapshot, absUrl){
         if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
         if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
         if (!s.uaData && !s.uaCH) throw new Error('UACHPatch: missing userAgentData');
+        const he = (s.uaData && s.uaData.he) || (s.uaCH && s.uaCH.he) || s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+        if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
+        const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+        for (const k of KEYS) {
+          if (!(k in he)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
+          const v = he[k];
+          if (v === undefined || v === null) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+          if (typeof v === 'string' && !v) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+          if (Array.isArray(v) && !v.length) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+        }
         return s;
       };
-      self.__applyEnvSnapshot__ = function(s){ self.__lastSnap__ = __requireSnap(s); };
+      self.__applyEnvSnapshot__ = function(s){
+        if (self.__ENV_SNAP_APPLIED__ === s) return;
+        self.__lastSnap__ = __requireSnap(s);
+        self.__ENV_SNAP_APPLIED__ = s;
+      };
       self.__applyEnvSnapshot__(${SNAP});
       if (!self.__ENV_SYNC_BC_INSTALLED__) {
         if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
@@ -303,11 +329,10 @@ function mkClassicWorkerSource(snapshot, absUrl){
 // === SafeWorkerOverride (Dedicated) ===
 function requireWorkerSnapshot(snap, label) {
   if (!snap || typeof snap !== 'object') {
-    throw new Error(
-      label
-        ? `[WorkerOverride] missing snapshot (${label})`
-        : `[WorkerOverride] missing snapshot`
-    );
+    if (label) {
+      throw new Error(`[WorkerOverride] missing snapshot (${label})`);
+    }
+    throw new Error('[WorkerOverride] missing snapshot');
   }
   if (typeof snap.language !== 'string' || !snap.language) throw new Error('[WorkerOverride] snapshot.language missing');
   if (!Array.isArray(snap.languages)) throw new Error('[WorkerOverride] snapshot.languages missing');
@@ -315,6 +340,16 @@ function requireWorkerSnapshot(snap, label) {
   if (!Number.isFinite(Number(snap.hardwareConcurrency))) throw new Error('[WorkerOverride] snapshot.hardwareConcurrency missing');
   if (!Number.isFinite(Number(snap.dpr))) throw new Error('[WorkerOverride] snapshot.dpr missing');
   if (!snap.uaData && !snap.uaCH) throw new Error('[WorkerOverride] snapshot.uaData missing');
+  const he = (snap.uaData && snap.uaData.he) || (snap.uaCH && snap.uaCH.he) || snap.highEntropy || (snap.uaCH && snap.uaCH.highEntropy);
+  if (!he || typeof he !== 'object') throw new Error('[WorkerOverride] snapshot.highEntropy missing');
+  const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+  for (const k of KEYS) {
+    if (!(k in he)) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
+    const v = he[k];
+    if (v === undefined || v === null) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
+    if (typeof v === 'string' && !v) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
+    if (Array.isArray(v) && !v.length) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
+  }
   return snap;
 }
 
@@ -409,7 +444,13 @@ window.SafeSharedWorkerOverride = SafeSharedWorkerOverride;
 // ===== ServiceWorker override (allow self/infra; block others; hub-friendly) =====
 function ServiceWorkerOverride(G){
   'use strict';
-  try { if (!G || !G.navigator || !('serviceWorker' in G.navigator)) return; } catch(_) { return; }
+  if (!G || !G.navigator) throw new Error('ServiceWorkerOverride: navigator missing');
+  if (!('serviceWorker' in G.navigator)) {
+    throw new Error('ServiceWorkerOverride: navigator.serviceWorker missing');
+  }
+  if (!G.navigator.serviceWorker) {
+    throw new Error('ServiceWorkerOverride: navigator.serviceWorker unavailable');
+  }
 
   // --- Идемпотентная проверка: если уже обёрнуто — выходим (без HUB-флагов)
   try {
@@ -424,7 +465,12 @@ function ServiceWorkerOverride(G){
        (proto.getRegistrations.__ENV_WRAPPED__ === true || /\bWrappedSWGetRegistrations\b/.test(String(proto.getRegistrations)))) &&
       (typeof (proto && proto.getRegistration) === 'function' &&
        (proto.getRegistration.__ENV_WRAPPED__ === true || /\bWrappedSWGetRegistration\b/.test(String(proto.getRegistration))));
-    if (already) return;
+    if (already) {
+      if (G.__DEBUG__) {
+        try { G.__PATCHED_SERVICE_WORKER__ = true; console.info('ServiceWorker already installed'); } catch(_){}
+      }
+      return;
+    }
   } catch(_) {}
 
   const SWC   = G.navigator.serviceWorker;
@@ -527,6 +573,10 @@ function ServiceWorkerOverride(G){
 
   // ---- register ----
   if (typeof Native.register === 'function') {
+    const desc = Object.getOwnPropertyDescriptor(proto, 'register');
+    if (!desc || desc.configurable === false || desc.writable === false) {
+      throw new Error(`[ServiceWorkerOverride] register not configurable: ${JSON.stringify(desc)}`);
+    }
     function WrappedServiceWorkerRegister(url, opts){
       if (!isAllowed(url, (opts && opts.scope))) {
         if (wantFake()) return Promise.resolve(makeFakeRegistration(opts, String(url)));
@@ -544,6 +594,10 @@ function ServiceWorkerOverride(G){
 
   // ---- getRegistrations ----
   if (typeof Native.getRegistrations === 'function') {
+    const desc = Object.getOwnPropertyDescriptor(proto, 'getRegistrations');
+    if (!desc || desc.configurable === false || desc.writable === false) {
+      throw new Error(`[ServiceWorkerOverride] getRegistrations not configurable: ${JSON.stringify(desc)}`);
+    }
     async function WrappedSWGetRegistrations(){
       const regs = await Native.getRegistrations.apply(this, arguments);
       if (!wantFilter()) return regs;
@@ -572,6 +626,10 @@ function ServiceWorkerOverride(G){
 
   // ---- getRegistration ----
   if (typeof Native.getRegistration === 'function') {
+    const desc = Object.getOwnPropertyDescriptor(proto, 'getRegistration');
+    if (!desc || desc.configurable === false || desc.writable === false) {
+      throw new Error(`[ServiceWorkerOverride] getRegistration not configurable: ${JSON.stringify(desc)}`);
+    }
     async function WrappedSWGetRegistration(scope){
       const r = await Native.getRegistration.apply(this, arguments);
       if (!r) return wantFake() && wantFilter() ? makeFakeRegistration({ scope }) : r;
@@ -658,6 +716,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 
   // 4) HE-догонка (не блокирует загрузку, без «N»/«Nav»)
   function snapshotHE(keys){
+    if (G.__UACH_HE_PROMISE__) return G.__UACH_HE_PROMISE__;
     const UAD = G.navigator && G.navigator.userAgentData;
     if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
       throw new Error('[WorkerInit] userAgentData missing');
@@ -665,23 +724,31 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
-    return UAD.getHighEntropyValues(KEYS).then(he => {
-      G.__LAST_UACH_HE__ = he;
-      const snap = EnvBus(G).envSnapshot();
-      if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
-        throw new Error('[WorkerInit] hub missing');
+    const p = UAD.getHighEntropyValues(KEYS).then(he => {
+      if (!he || typeof he !== 'object') throw new Error('[WorkerInit] high entropy missing');
+      for (const k of KEYS) {
+        if (!(k in he)) throw new Error(`[WorkerInit] high entropy missing ${k}`);
+        const v = he[k];
+        if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+        if (typeof v === 'string' && !v) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+        if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
       }
-      G.__ENV_HUB__.publish(snap);
+      G.__LAST_UACH_HE__ = he;
+      G.__UACH_HE_READY__ = true;
       return he;
     });
+    G.__UACH_HE_PROMISE__ = p;
+    return p;
   }
 
   // 5) Полный сценарий
   function initAll(opts){
     const o = Object.assign({ publishHE: true, heKeys: null }, opts);
     installOverrides();        // Hub → Overrides
-    snapshotOnce();            // первый снап
-    if (o.publishHE) snapshotHE(o.heKeys); // HE-догонка
+    if (o.publishHE) {
+      return snapshotHE(o.heKeys).then(() => snapshotOnce());
+    }
+    return snapshotOnce();
   }
 
   // 6) Diagnostics

@@ -31,27 +31,72 @@
     }
     const cache = { snap:null };
     const validDpr = v => Number.isFinite(v) && v > 0;
+    const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
     const requireSnap = (s, where) => {
-      if (!s || typeof s !== 'object') throw new Error(`UACHPatch: no snapshot${where ? ` (${where})` : ''}`);
+      if (!s || typeof s !== 'object') {
+        const msg = where ? `UACHPatch: no snapshot (${where})` : 'UACHPatch: no snapshot';
+        throw new Error(msg);
+      }
       if (typeof s.language !== 'string' || s.language.trim() === '') throw new Error('UACHPatch: bad language');
       if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
       if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
       if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
       if (!s.uaData && !s.uaCH) throw new Error('UACHPatch: missing userAgentData');
+      const he = (s.uaData && s.uaData.he) || (s.uaCH && s.uaCH.he) || s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+      if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
+      for (const k of HE_KEYS) {
+        if (!(k in he)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
+        const v = he[k];
+        if (v === undefined || v === null) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+        if (typeof v === 'string' && !v) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+        if (Array.isArray(v) && !v.length) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+      }
       return s;
     };
     cache.snap = requireSnap(self.__lastSnap__, 'init');
 
+    const nativeToString = Function.prototype.toString;
+    if (typeof nativeToString !== 'function') {
+      throw new Error('UACHPatch: Function.prototype.toString missing');
+    }
+    if (self.__NativeToStringMap && !(self.__NativeToStringMap instanceof WeakMap)) {
+      throw new Error('UACHPatch: NativeToStringMap invalid');
+    }
+    const toStringMap = self.__NativeToStringMap || new WeakMap();
+    self.__NativeToStringMap = toStringMap;
+    const markAsNative = (func, name) => {
+      if (typeof func !== 'function') throw new Error('UACHPatch: markAsNative requires function');
+      const n = name || func.name;
+      if (n) {
+        toStringMap.set(func, `function ${n}() { [native code] }`);
+      } else {
+        toStringMap.set(func, 'function () { [native code] }');
+      }
+      return func;
+    };
+    if (!self.__TOSTRING_PROXY_INSTALLED__) {
+      if (typeof Proxy !== 'function') throw new Error('UACHPatch: Proxy missing');
+      Function.prototype.toString = new Proxy(nativeToString, {
+        apply(target, thisArg, args) {
+          if (toStringMap.has(thisArg)) return toStringMap.get(thisArg);
+          return target.apply(thisArg, args);
+        }
+      });
+      self.__TOSTRING_PROXY_INSTALLED__ = true;
+    }
+    if (!self.markAsNative) self.markAsNative = markAsNative;
+
+    const getDevicePixelRatio = markAsNative(function getDevicePixelRatio(){
+      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      if (!('dpr' in cache.snap)) throw new Error('UACHPatch: no dpr');
+      const snapVal = Number(cache.snap.dpr);
+      if (validDpr(snapVal)) return snapVal;
+      throw new Error('UACHPatch: bad dpr');
+    }, 'get devicePixelRatio');
     Object.defineProperty(self, 'devicePixelRatio', {
       configurable: true,
       enumerable: false,
-      get(){
-        if (!cache.snap) throw new Error('UACHPatch: no snap');
-        if (!('dpr' in cache.snap)) throw new Error('UACHPatch: no dpr');
-        const snapVal = Number(cache.snap.dpr);
-        if (validDpr(snapVal)) return snapVal;
-        throw new Error('UACHPatch: bad dpr');
-      }
+      get: getDevicePixelRatio
     });
 
     const deep = v => v==null ? v : JSON.parse(JSON.stringify(v));
@@ -77,22 +122,22 @@
         return { brand: String(brand), version: String(major) };
       });
     };
-    const HE = new Set(['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64']);
+    const HE = new Set(HE_KEYS);
     const uad = {};
     Object.defineProperties(uad, {
-    brands:   { get(){
+    brands:   { get: markAsNative(function getBrands(){
                       if (!cache.snap) throw new Error('UACHPatch: no snap');
                       const le=cache.snap.uaData||cache.snap.uaCH||null;
                       if (!le) throw new Error('UACHPatch: missing userAgentData');
                       return toBrands(le && le.brands);
-                    }, enumerable:true },
-    mobile:   { get(){
+                    }, 'get brands'), enumerable:true },
+    mobile:   { get: markAsNative(function getMobile(){
                       if (!cache.snap) throw new Error('UACHPatch: no snap');
                       const le=cache.snap.uaData||cache.snap.uaCH||null;
                       if (!le) throw new Error('UACHPatch: missing userAgentData');
                       return !!(le && le.mobile);
-                    },       enumerable:true },
-    platform: { get(){
+                    }, 'get mobile'),       enumerable:true },
+    platform: { get: markAsNative(function getPlatform(){
                       if (!cache.snap) throw new Error('UACHPatch: no snap');
                       const le=cache.snap.uaData||cache.snap.uaCH||null;
                       if (!le) throw new Error('UACHPatch: missing userAgentData');
@@ -100,19 +145,27 @@
                         throw new Error('THW: uaData.platform missing');
                       }
                       return le.platform;
-                    }, enumerable:true },
+                    }, 'get platform'), enumerable:true },
     });
-    uad.toJSON = function(){ return {brands:this.brands, mobile:this.mobile, platform:this.platform}; };
-    uad.getHighEntropyValues = keys => {
+    uad.toJSON = markAsNative(function toJSON(){
+      return {brands:this.brands, mobile:this.mobile, platform:this.platform};
+    }, 'toJSON');
+    uad.getHighEntropyValues = markAsNative(function getHighEntropyValues(keys){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
-      const ks = Array.isArray(keys) ? keys.filter(k=>HE.has(k)) : null;
-      if (!ks) throw new Error('UACHPatch: bad keys');
+      if (!Array.isArray(keys)) throw new Error('UACHPatch: bad keys');
+      const unknown = keys.filter(k => !HE.has(k));
+      if (unknown.length) throw new Error(`UACHPatch: unknown highEntropy ${unknown.join(',')}`);
+      const ks = keys;
       const s = cache.snap;
-      const src = s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
-      if (!src) throw new Error('UACHPatch: missing highEntropy');
-      const out = {}; for (const k of ks) if (k in src) out[k]=deep(src[k]);
+      const src = (s.uaData && s.uaData.he) || (s.uaCH && s.uaCH.he) || s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+      if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
+      const out = {};
+      for (const k of ks) {
+        if (!(k in src)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
+        out[k] = deep(src[k]);
+      }
       return Promise.resolve(out);
-    };
+    }, 'getHighEntropyValues');
 
     const def = (obj,k,getter,enumerable=true)=>{
       if (obj) {
@@ -126,33 +179,39 @@
       throw new Error(`UACHPatch: cannot define ${k}`);
     };
 
-    def(proto,'userAgentData',()=>uad);
-    def(proto,'hardwareConcurrency',()=> {
+    const getUserAgentData = markAsNative(function getUserAgentData(){ return uad; }, 'get userAgentData');
+    def(proto,'userAgentData',getUserAgentData, true);
+    const getHardwareConcurrency = markAsNative(function getHardwareConcurrency(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!Number.isFinite(Number(cache.snap.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
       return Number(cache.snap.hardwareConcurrency);
-    });
-    def(proto,'deviceMemory',()=> {
+    }, 'get hardwareConcurrency');
+    def(proto,'hardwareConcurrency',getHardwareConcurrency, true);
+    const getDeviceMemory = markAsNative(function getDeviceMemory(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!Number.isFinite(Number(cache.snap.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
       return Number(cache.snap.deviceMemory);
-    });
+    }, 'get deviceMemory');
+    def(proto,'deviceMemory',getDeviceMemory, true);
 
-    def(proto,'language', ()=>{
+    const getLanguage = markAsNative(function getLanguage(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (typeof cache.snap.language !== 'string' || cache.snap.language.trim() === '') throw new Error('UACHPatch: bad language');
       return cache.snap.language;
-    });
+    }, 'get language');
+    def(proto,'language', getLanguage, true);
   
-    def(proto,'languages', ()=>{
+    const getLanguages = markAsNative(function getLanguages(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!Array.isArray(cache.snap.languages)) throw new Error('UACHPatch: bad languages');
       return cache.snap.languages.slice();
-    });
+    }, 'get languages');
+    def(proto,'languages', getLanguages, true);
 
     const prev = self.__applyEnvSnapshot__;
     self.__applyEnvSnapshot__ = s => {
       if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
+      if (cache.snap === s) return;
       cache.snap = requireSnap(s, 'apply');
       if (s.seed != null) self.__GLOBAL_SEED = String(s.seed);
       if (typeof prev==='function') prev.call(self,s);
