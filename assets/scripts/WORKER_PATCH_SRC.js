@@ -55,7 +55,28 @@
     });
 
     const deep = v => v==null ? v : JSON.parse(JSON.stringify(v));
-    const toBrands = a => Array.isArray(a) ? a.map(x=>({brand:String(x.brand??x.name??''),version:String(String(x.version??'').split('.')[0])})) : [];
+    const toBrands = a => {
+      if (!Array.isArray(a)) throw new Error('THW: uaData.brands missing');
+      return a.map(x => {
+        if (!x || typeof x !== 'object') throw new Error('THW: uaData.brand entry');
+        const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
+                    : (typeof x.name === 'string' && x.name) ? x.name
+                    : null;
+        if (!brand) throw new Error('THW: uaData.brand missing');
+        let versionRaw = null;
+        if (typeof x.version === 'string') {
+          if (!x.version) throw new Error('THW: uaData.brand version missing');
+          versionRaw = x.version;
+        } else if (typeof x.version === 'number' && Number.isFinite(x.version)) {
+          versionRaw = String(x.version);
+        } else {
+          throw new Error('THW: uaData.brand version missing');
+        }
+        const major = String(versionRaw).split('.')[0];
+        if (!major) throw new Error('THW: uaData.brand version missing');
+        return { brand: String(brand), version: String(major) };
+      });
+    };
     const HE = new Set(['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64']);
     const uad = {};
     Object.defineProperties(uad, {
@@ -75,7 +96,10 @@
                       if (!cache.snap) throw new Error('UACHPatch: no snap');
                       const le=cache.snap.uaData||cache.snap.uaCH||null;
                       if (!le) throw new Error('UACHPatch: missing userAgentData');
-                      return String((le && le.platform) || '');
+                      if (typeof le.platform !== 'string' || !le.platform) {
+                        throw new Error('THW: uaData.platform missing');
+                      }
+                      return le.platform;
                     }, enumerable:true },
     });
     uad.toJSON = function(){ return {brands:this.brands, mobile:this.mobile, platform:this.platform}; };
@@ -185,4 +209,3 @@
     });
   };
 })();
-

@@ -31,18 +31,39 @@ function EnvBus(G){
     }
 
     // низкоэнтропийные — ровно как вы уже именуете: uaData
-    const uaData = ch ? {
-      platform: typeof ch.platform === 'string' ? ch.platform : '',
-      brands: Array.isArray(ch.brands) ? ch.brands.slice()
-            : Array.isArray(ch.fullVersionList)
-              ? ch.fullVersionList.map(x => ({
-                  brand: String(x && x.brand || ''),
-                  // low-entropy требование: только major
-                  version: String(x && x.version || '').split('.')[0]
-                }))
-              : [],
-      mobile: !!ch.mobile
-    } : null;
+    const uaData = ch ? (() => {
+      if (typeof ch.platform !== 'string' || !ch.platform) {
+        throw new Error('THW: uaData.platform missing');
+      }
+      let brandsSrc = null;
+      if (Array.isArray(ch.brands)) {
+        brandsSrc = ch.brands;
+      } else if (Array.isArray(ch.fullVersionList)) {
+        brandsSrc = ch.fullVersionList;
+      } else {
+        throw new Error('THW: uaData.brands missing');
+      }
+      const brands = brandsSrc.map(x => {
+        if (!x || typeof x !== 'object') throw new Error('THW: uaData.brand entry');
+        const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
+                    : (typeof x.name === 'string' && x.name) ? x.name
+                    : null;
+        if (!brand) throw new Error('THW: uaData.brand missing');
+        let versionRaw = null;
+        if (typeof x.version === 'string') {
+          if (!x.version) throw new Error('THW: uaData.brand version missing');
+          versionRaw = x.version;
+        } else if (typeof x.version === 'number' && Number.isFinite(x.version)) {
+          versionRaw = String(x.version);
+        } else {
+          throw new Error('THW: uaData.brand version missing');
+        }
+        const major = String(versionRaw).split('.')[0];
+        if (!major) throw new Error('THW: uaData.brand version missing');
+        return { brand, version: major };
+      });
+      return { platform: ch.platform, brands, mobile: !!ch.mobile };
+    })() : null;
     if (!uaData) throw new Error('EnvBus: uaData missing');
 
     // высокоэнтропийные + прочее, в один объект he
@@ -151,8 +172,13 @@ function EnvPublishSnapshotModule(G){
   const BR = global.__ENV_BRIDGE__;
 
 function mkModuleWorkerSource(snapshot, absUrl){
-  const SNAP = JSON.stringify(snapshot || null);
-  const USER = JSON.stringify(String(absUrl));
+  if (!snapshot || typeof snapshot !== 'object') throw new Error('THW: mkModuleWorkerSource bad snapshot');
+  if (typeof absUrl !== 'string' || !absUrl) throw new Error('THW: mkModuleWorkerSource bad absUrl');
+  const patchUrl = global.__ENV_BRIDGE__ && global.__ENV_BRIDGE__.urls && global.__ENV_BRIDGE__.urls.workerPatchModule;
+  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('THW: mkModuleWorkerSource bad workerPatchModule url');
+  const SNAP = JSON.stringify(snapshot);
+  const USER = JSON.stringify(absUrl);
+  const PATCH_URL = JSON.stringify(patchUrl);
   return `
     (async function(){
       'use strict';
@@ -175,7 +201,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
         bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
       }
       // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
-      const PATCH_URL = ${JSON.stringify(global.__ENV_BRIDGE__.urls.workerPatchModule || "")};
+      const PATCH_URL = ${PATCH_URL};
       if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchModule URL');
       await import(PATCH_URL);
       if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
@@ -199,8 +225,13 @@ function mkModuleWorkerSource(snapshot, absUrl){
 
 
 function mkClassicWorkerSource(snapshot, absUrl){
-  const SNAP = JSON.stringify(snapshot || null);
-  const USER = JSON.stringify(String(absUrl));
+  if (!snapshot || typeof snapshot !== 'object') throw new Error('THW: mkClassicWorkerSource bad snapshot');
+  if (typeof absUrl !== 'string' || !absUrl) throw new Error('THW: mkClassicWorkerSource bad absUrl');
+  const patchUrl = global.__ENV_BRIDGE__ && global.__ENV_BRIDGE__.urls && global.__ENV_BRIDGE__.urls.workerPatchClassic;
+  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('THW: mkClassicWorkerSource bad workerPatchClassic url');
+  const SNAP = JSON.stringify(snapshot);
+  const USER = JSON.stringify(absUrl);
+  const PATCH_URL = JSON.stringify(patchUrl);
   return `
     (function(){
       'use strict';
@@ -223,7 +254,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
         bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
       }
       // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
-      const PATCH_URL = ${JSON.stringify(global.__ENV_BRIDGE__.urls.workerPatchClassic || "")};
+      const PATCH_URL = ${PATCH_URL};
       if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchClassic URL');
       importScripts(PATCH_URL);
       if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
