@@ -637,9 +637,15 @@ def main():
                     platform_version = "19.0.0" if "19" in os_name else "15.0.0"
             elif platform == "MacIntel":
                 m = re.search(r"Mac OS X\s+([\d_\.]+)", os_info)
-                platform_version = _norm_ver(m.group(1)) if m else None
+                if not m:
+                    raise RuntimeError(
+                        f"THW: failed to extract Mac OS X version from os_info={os_info!r} "
+                        f"(platform={platform!r}, os_name={os_name!r})"
+                    )
+                platform_version = _norm_ver(m.group(1))
+
         logger.debug(
-            f"OS: {os_name}, platform={platform}, platform_version={platform_version or 'n/a'}"
+            f"OS: {os_name}, platform={platform}, platform_version={platform_version!r}"
         )
 
         # --------BROWSER selection -------------------
@@ -900,7 +906,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://disney.com/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)
