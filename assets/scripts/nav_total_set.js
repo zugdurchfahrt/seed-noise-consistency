@@ -178,13 +178,39 @@ function NavTotalSetPatchModule() {
     }
     // ——— E. userAgentData (low + high entropy) ———
     if ('userAgentData' in navigator) {
-      const overrideUaData = {
-        platform: chPlatform,
-        brands:   meta.brands,
-        mobile:   meta.mobile
-      };
-      Object.defineProperty(overrideUaData, 'getHighEntropyValues', {
-        value: mark(async function (hints) {
+      const nativeUAD = navigator.userAgentData;
+      if (!nativeUAD) throw new Error('THW: window navigator.userAgentData missing');
+      const uadProto = Object.getPrototypeOf(nativeUAD);
+      if (!uadProto) throw new Error('THW: window navigator.userAgentData proto missing');
+      Object.defineProperties(uadProto, {
+        brands: {
+          get: mark(function getBrands(){
+            if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: uaData.brands missing');
+            return meta.brands;
+          }, 'get brands'),
+          enumerable: true,
+          configurable: true
+        },
+        mobile: {
+          get: mark(function getMobile(){
+            if (typeof meta.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
+            return meta.mobile;
+          }, 'get mobile'),
+          enumerable: true,
+          configurable: true
+        },
+        platform: {
+          get: mark(function getPlatform(){
+            if (typeof chPlatform !== 'string' || !chPlatform) throw new Error('THW: uaData.platform missing');
+            return chPlatform;
+          }, 'get platform'),
+          enumerable: true,
+          configurable: true
+        }
+      });
+      Object.defineProperty(uadProto, 'getHighEntropyValues', {
+        value: mark(function getHighEntropyValues(keys) {
+          if (!Array.isArray(keys)) throw new Error('THW: bad keys');
           const map = {
             architecture:        meta.architecture,
             bitness:             meta.bitness,
@@ -194,30 +220,40 @@ function NavTotalSetPatchModule() {
             fullVersionList:     meta.fullVersionList,
             deviceMemory:        mem,
             hardwareConcurrency: cpu,
-            wow64:               meta.wow64 ?? false,
+            wow64:               meta.wow64,
             formFactors:         meta.formFactors
           };
           const result = {};
-          for (const hint of hints || []) {
-            if (map[hint] !== undefined) result[hint] = map[hint];
+          for (const hint of keys) {
+            if (typeof hint !== 'string' || !hint) throw new Error('THW: bad keys');
+            if (!(hint in map)) throw new Error(`THW: missing highEntropy.${hint}`);
+            const val = map[hint];
+            if (val === undefined || val === null) throw new Error(`THW: missing highEntropy.${hint}`);
+            if (typeof val === 'string' && !val) throw new Error(`THW: missing highEntropy.${hint}`);
+            if (Array.isArray(val) && !val.length) throw new Error(`THW: missing highEntropy.${hint}`);
+            result[hint] = val;
           }
-          return result;
+          return Promise.resolve(result);
         }, 'getHighEntropyValues'),
         configurable: true,
         enumerable: false
       });
 
-    Object.defineProperty(overrideUaData, 'toJSON', {
-      value: mark(function () {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON'),
-      configurable: true,
-      enumerable: false
-    });
+      Object.defineProperty(uadProto, 'toJSON', {
+        value: mark(function toJSON() {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON'),
+        configurable: true,
+        enumerable: false
+      });
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
     const okUaData = (Object.getOwnPropertyDescriptor(navProto, 'userAgentData') ?
-      (redefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return overrideUaData; }, { enumerable: false }), true) :
-      safeDefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return overrideUaData; }, { enumerable: false }));
+      (redefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return nativeUAD; }, { enumerable: false }), true) :
+      safeDefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return nativeUAD; }, { enumerable: false }));
     if (okUaData === false) throw new TypeError('[nav_total_set] failed to define userAgentData');
+    const uadTag = Object.prototype.toString.call(nativeUAD);
+    if (uadTag === '[object Object]') throw new Error('THW: window navigator.userAgentData tag');
+    const uadCtor = Object.getPrototypeOf(nativeUAD) && Object.getPrototypeOf(nativeUAD).constructor;
+    if (!uadCtor || uadCtor.name === 'Object') throw new Error('THW: window navigator.userAgentData proto');
     console.info('userAgentData.toJSON correctly implemented');
     }
 

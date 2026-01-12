@@ -130,37 +130,37 @@
     Object.defineProperties(uadProto, {
       brands:   { get: markAsNative(function getBrands(){
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le=cache.snap.uaData||cache.snap.uaCH||null;
+                        const le = cache.snap.uaData || cache.snap.uaCH;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
                         return toBrands(le && le.brands);
-                      }, 'get brands'), enumerable:true },
+                      }, 'get brands'), enumerable:true, configurable:true },
       mobile:   { get: markAsNative(function getMobile(){
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le=cache.snap.uaData||cache.snap.uaCH||null;
+                        const le = cache.snap.uaData || cache.snap.uaCH;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
                         if (typeof le.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
                         return le.mobile;
-                      }, 'get mobile'),       enumerable:true },
+                      }, 'get mobile'),       enumerable:true, configurable:true },
       platform: { get: markAsNative(function getPlatform(){
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le=cache.snap.uaData||cache.snap.uaCH||null;
+                        const le = cache.snap.uaData || cache.snap.uaCH;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
                         if (typeof le.platform !== 'string' || !le.platform) {
                           throw new Error('THW: uaData.platform missing');
                         }
                         return le.platform;
-                      }, 'get platform'), enumerable:true },
+                      }, 'get platform'), enumerable:true, configurable:true },
     });
     Object.defineProperty(uadProto, 'toJSON', {
       configurable: true,
-      enumerable: true,
+      enumerable: false,
       value: markAsNative(function toJSON(){
         return {brands:this.brands, mobile:this.mobile, platform:this.platform};
       }, 'toJSON')
     });
     Object.defineProperty(uadProto, 'getHighEntropyValues', {
       configurable: true,
-      enumerable: true,
+      enumerable: false,
       value: markAsNative(function getHighEntropyValues(keys){
         if (!cache.snap) throw new Error('UACHPatch: no snap');
         if (!Array.isArray(keys)) throw new Error('THW: bad keys');
