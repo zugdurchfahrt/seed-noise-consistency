@@ -13,11 +13,17 @@ function ContextPatchModule(window) {
   // === 0. Utilities ===
   const NOP = () => {};
 
-  function markAsNative(fn, name){
-    try { Object.defineProperty(fn, 'name', {value: name, configurable: true}); } catch {}
-    try { Object.defineProperty(fn, 'CanvasGlobal', {value: true}); } catch {}
-    return fn;
-  }
+  const markAsNative = (global && typeof global.markAsNative === 'function')
+    ? function(fn, name) {
+        const out = global.markAsNative(fn, name);
+        try { Object.defineProperty(out, 'CanvasGlobal', {value: true}); } catch {}
+        return out;
+      }
+    : function markAsNative(fn, name){
+        try { Object.defineProperty(fn, 'name', {value: name, configurable: true}); } catch {}
+        try { Object.defineProperty(fn, 'CanvasGlobal', {value: true}); } catch {}
+        return fn;
+      };
 
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
@@ -38,6 +44,16 @@ function ContextPatchModule(window) {
 
   function getHooks(){
     return (typeof global !== 'undefined' && global.CanvasPatchHooks) ? global.CanvasPatchHooks : null;
+  }
+
+  function definePatchedMethod(proto, method, value) {
+    const d = Object.getOwnPropertyDescriptor(proto, method);
+    Object.defineProperty(proto, method, {
+      value,
+      configurable: d ? !!d.configurable : true,
+      enumerable: d ? !!d.enumerable : false,
+      writable: d ? !!d.writable : true
+    });
   }
 
   // === 1.Hook registries (Initialization of arrays) ===
@@ -130,7 +146,7 @@ function ContextPatchModule(window) {
       }
     };
 
-    proto[method] = markAsNative(wrapped, method);
+    definePatchedMethod(proto, method, markAsNative(wrapped, method));
     return true;
   }
 
@@ -142,7 +158,7 @@ function ContextPatchModule(window) {
       if (!hooks?.length)                      { console.warn(`[patchMethod] no hooks: ${method}`); return false; }
 
       const orig = proto[method], flag = '__isPatch_' + method;
-      proto[method] = markAsNative(function(...args){
+      const wrapped = markAsNative(function(...args){
           if (this[flag]) return orig.apply(this, args);
           this[flag] = true;
           try {
@@ -179,6 +195,8 @@ function ContextPatchModule(window) {
           }
       }, method);
 
+      definePatchedMethod(proto, method, wrapped);
+
       return true;
     }
 
@@ -187,48 +205,69 @@ function ContextPatchModule(window) {
     const orig = proto[method];
     if (orig.CanvasGlobal) return false;
 
-    const wrapped = function(...args){
-      const safe = safeInvoke.bind(null, orig);
-      if (method === 'toBlob'){
-        if (typeof args[0] === 'function'){
-          // сall-back-branch: Do not touch not to break the semantics
-          return safe(this, args, proto, method);
+    const getHooksList = () => (typeof hooksGetter === 'function') ? hooksGetter() : [];
+    const applyHooks = (self, blob, args) => {
+      let b = blob;
+      const hooks = getHooksList();
+      if (hooks && hooks.length) {
+        for (const hook of hooks) {
+          const r = hook.call(self, b, ...args);
+          if (r instanceof Blob) b = r;
         }
-        // Promise-branch: wrap call-back-API in Promise
+      }
+      return b;
+    };
+
+    if (method === 'toBlob') {
+      const wrapped = function toBlob(callback, type, quality) {
+        if (new.target) throw new TypeError('Illegal invocation');
+        if (typeof HTMLCanvasElement === 'undefined' || !(this instanceof HTMLCanvasElement)) {
+          throw new TypeError('Illegal invocation');
+        }
+        const args = arguments;
+        if (typeof callback === 'function') {
+          const done = (blob) => callback(applyHooks(this, blob, args));
+          return orig.call(this, done, type, quality);
+        }
         return new Promise((resolve, reject) => {
           try {
             const done = (blob) => {
-              try {
-                const hooks = (typeof hooksGetter === 'function') ? hooksGetter() : [];
-                let b = blob;
-                if (hooks && hooks.length){
-                  for (const hook of hooks){
-                    try { const r = hook.call(this, b, ...args); if (r instanceof Blob) b = r; } catch {}
-                  }
-                }
-                resolve(b);
-              } catch (e) { reject(e); }
+              try { resolve(applyHooks(this, blob, args)); }
+              catch (e) { reject(e); }
             };
-            safe(this, [done, ...args], proto, method);
+            orig.call(this, done, type, quality);
           } catch (e) { reject(e); }
         });
-      }
+      };
+      definePatchedMethod(proto, method, markAsNative(wrapped, method));
+      return true;
+    }
 
-      // General: Methods returning Promise (For example, OffscreenCanvas.convertToBlob)
-      const p = safe(this, args, proto, method);
-      if (!(p && typeof p.then === 'function')) return p;
-      const hooks = (typeof hooksGetter === 'function') ? hooksGetter() : [];
-      if (!(hooks && hooks.length)) return p;
-      return p.then((blob) => {
-        let b = blob;
-        for (const hook of hooks){
-          try { const r = hook.call(this, b, ...args); if (r instanceof Blob) b = r; } catch {}
+    if (method === 'convertToBlob') {
+      const wrapped = function convertToBlob(options) {
+        if (new.target) throw new TypeError('Illegal invocation');
+        if (typeof OffscreenCanvas === 'undefined' || !(this instanceof OffscreenCanvas)) {
+          throw new TypeError('Illegal invocation');
         }
-        return b;
-      });
-    };
+        const args = arguments;
+        const p = orig.call(this, options);
+        if (!(p && typeof p.then === 'function')) return p;
+        const hooks = getHooksList();
+        if (!(hooks && hooks.length)) return p;
+        return p.then((blob) => applyHooks(this, blob, args));
+      };
+      definePatchedMethod(proto, method, markAsNative(wrapped, method));
+      return true;
+    }
 
-    proto[method] = markAsNative(wrapped, method);
+    const wrapped = function(...args){
+      const p = safeInvoke(orig, this, args, proto, method);
+      if (!(p && typeof p.then === 'function')) return p;
+      const hooks = getHooksList();
+      if (!(hooks && hooks.length)) return p;
+      return p.then((blob) => applyHooks(this, blob, args));
+    };
+    definePatchedMethod(proto, method, markAsNative(wrapped, method));
     return true;
   }
 

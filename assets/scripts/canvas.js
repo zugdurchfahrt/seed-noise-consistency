@@ -510,9 +510,8 @@ function CanvasPatchModule(window) {
 
   // --- toBlob noise injection hook (HTMLCanvasElement) ---
   async function patchToBlobInjectNoise(blob, ...args) {
-    try {
-      // 1) Ничего не делать, если blob пустой или не image/*
-      if (!blob || !(blob instanceof Blob)) return;
+    // 1) Ничего не делать, если blob пустой или не image/*
+    if (!blob || !(blob instanceof Blob)) return;
 
       const typeArg = (typeof args[0] === 'string')
         ? args[0]
@@ -579,19 +578,14 @@ function CanvasPatchModule(window) {
           return await sc.convertToBlob({ type: mime, quality: q });
         }
         return await new Promise(r => sc.toBlob(r, mime, q));
-      } finally {
-        try { bmp && bmp.close && bmp.close(); } catch {}
-      }
-    } catch {
-      // на любой ошибке — пропустить (вернуть undefined)
-      return;
+    } finally {
+      try { bmp && bmp.close && bmp.close(); } catch {}
     }
   }
 
   // IHDR-патч PNG для Offscreen/HTML convertToBlob (Promise-ветка) + выравнивание шума с toBlob/toDataURL
   async function patchConvertToBlobInjectNoise(blob, options) {
-    try {
-      if (!blob) return;
+    if (!blob) return;
 
       const reqType = (options && options.type) || blob.type || 'image/png';
       const mime = String(reqType).toLowerCase();
@@ -634,8 +628,6 @@ function CanvasPatchModule(window) {
             }
           }
         }
-      } catch {
-        // если decode/ресэмпл не удался — молча падаем на IHDR-путь ниже
       }
 
       // 2) Старый IHDR-путь (PNG only) — сохраняем как fallback, чтобы не ломать совместимость
@@ -656,12 +648,7 @@ function CanvasPatchModule(window) {
       writeBE(u8, 12 + 4 + 13, crc >>> 0);
 
       // 6) возвращаем новый Blob с тем же типом
-      return new Blob([u8], { type: 'image/png' });
-
-    } catch {
-      // На любой ошибке не ломаем цепочку — просто пропускаем дальше исходный blob
-      return;
-    }
+    return new Blob([u8], { type: 'image/png' });
 
     // --- helpers ---
     function clampInt(v, min, max) {
