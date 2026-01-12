@@ -123,49 +123,64 @@
       });
     };
     const HE = new Set(HE_KEYS);
-    const uad = {};
-    Object.defineProperties(uad, {
-    brands:   { get: markAsNative(function getBrands(){
-                      if (!cache.snap) throw new Error('UACHPatch: no snap');
-                      const le=cache.snap.uaData||cache.snap.uaCH||null;
-                      if (!le) throw new Error('UACHPatch: missing userAgentData');
-                      return toBrands(le && le.brands);
-                    }, 'get brands'), enumerable:true },
-    mobile:   { get: markAsNative(function getMobile(){
-                      if (!cache.snap) throw new Error('UACHPatch: no snap');
-                      const le=cache.snap.uaData||cache.snap.uaCH||null;
-                      if (!le) throw new Error('UACHPatch: missing userAgentData');
-                      return !!(le && le.mobile);
-                    }, 'get mobile'),       enumerable:true },
-    platform: { get: markAsNative(function getPlatform(){
-                      if (!cache.snap) throw new Error('UACHPatch: no snap');
-                      const le=cache.snap.uaData||cache.snap.uaCH||null;
-                      if (!le) throw new Error('UACHPatch: missing userAgentData');
-                      if (typeof le.platform !== 'string' || !le.platform) {
-                        throw new Error('THW: uaData.platform missing');
-                      }
-                      return le.platform;
-                    }, 'get platform'), enumerable:true },
+    const nativeUAD = nav && nav.userAgentData;
+    if (!nativeUAD) throw new Error('THW: worker navigator.userAgentData missing');
+    const uadProto = Object.getPrototypeOf(nativeUAD);
+    if (!uadProto) throw new Error('THW: worker navigator.userAgentData proto missing');
+    Object.defineProperties(uadProto, {
+      brands:   { get: markAsNative(function getBrands(){
+                        if (!cache.snap) throw new Error('UACHPatch: no snap');
+                        const le=cache.snap.uaData||cache.snap.uaCH||null;
+                        if (!le) throw new Error('UACHPatch: missing userAgentData');
+                        return toBrands(le && le.brands);
+                      }, 'get brands'), enumerable:true },
+      mobile:   { get: markAsNative(function getMobile(){
+                        if (!cache.snap) throw new Error('UACHPatch: no snap');
+                        const le=cache.snap.uaData||cache.snap.uaCH||null;
+                        if (!le) throw new Error('UACHPatch: missing userAgentData');
+                        if (typeof le.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
+                        return le.mobile;
+                      }, 'get mobile'),       enumerable:true },
+      platform: { get: markAsNative(function getPlatform(){
+                        if (!cache.snap) throw new Error('UACHPatch: no snap');
+                        const le=cache.snap.uaData||cache.snap.uaCH||null;
+                        if (!le) throw new Error('UACHPatch: missing userAgentData');
+                        if (typeof le.platform !== 'string' || !le.platform) {
+                          throw new Error('THW: uaData.platform missing');
+                        }
+                        return le.platform;
+                      }, 'get platform'), enumerable:true },
     });
-    uad.toJSON = markAsNative(function toJSON(){
-      return {brands:this.brands, mobile:this.mobile, platform:this.platform};
-    }, 'toJSON');
-    uad.getHighEntropyValues = markAsNative(function getHighEntropyValues(keys){
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
-      if (!Array.isArray(keys)) throw new Error('UACHPatch: bad keys');
-      const unknown = keys.filter(k => !HE.has(k));
-      if (unknown.length) throw new Error(`UACHPatch: unknown highEntropy ${unknown.join(',')}`);
-      const ks = keys;
-      const s = cache.snap;
-      const src = (s.uaData && s.uaData.he) || (s.uaCH && s.uaCH.he) || s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
-      if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
-      const out = {};
-      for (const k of ks) {
-        if (!(k in src)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
-        out[k] = deep(src[k]);
-      }
-      return Promise.resolve(out);
-    }, 'getHighEntropyValues');
+    Object.defineProperty(uadProto, 'toJSON', {
+      configurable: true,
+      enumerable: true,
+      value: markAsNative(function toJSON(){
+        return {brands:this.brands, mobile:this.mobile, platform:this.platform};
+      }, 'toJSON')
+    });
+    Object.defineProperty(uadProto, 'getHighEntropyValues', {
+      configurable: true,
+      enumerable: true,
+      value: markAsNative(function getHighEntropyValues(keys){
+        if (!cache.snap) throw new Error('UACHPatch: no snap');
+        if (!Array.isArray(keys)) throw new Error('THW: bad keys');
+        for (const k of keys) {
+          if (typeof k !== 'string' || !k) throw new Error('THW: bad keys');
+        }
+        const unknown = keys.filter(k => !HE.has(k));
+        if (unknown.length) throw new Error(`UACHPatch: unknown highEntropy ${unknown.join(',')}`);
+        const ks = keys;
+        const s = cache.snap;
+        const src = s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+        if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
+        const out = {};
+        for (const k of ks) {
+          if (!(k in src)) throw new Error(`THW: missing highEntropy.${k}`);
+          out[k] = deep(src[k]);
+        }
+        return Promise.resolve(out);
+      }, 'getHighEntropyValues')
+    });
 
     const def = (obj,k,getter,enumerable=true)=>{
       if (obj) {
@@ -179,7 +194,7 @@
       throw new Error(`UACHPatch: cannot define ${k}`);
     };
 
-    const getUserAgentData = markAsNative(function getUserAgentData(){ return uad; }, 'get userAgentData');
+    const getUserAgentData = markAsNative(function getUserAgentData(){ return nativeUAD; }, 'get userAgentData');
     def(proto,'userAgentData',getUserAgentData, true);
     const getHardwareConcurrency = markAsNative(function getHardwareConcurrency(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
