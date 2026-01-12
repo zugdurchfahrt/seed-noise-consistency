@@ -212,17 +212,17 @@ function NavTotalSetPatchModule() {
         value: mark(function getHighEntropyValues(keys) {
           if (!Array.isArray(keys)) throw new Error('THW: bad keys');
           const map = {
-            architecture:        meta.architecture,
-            bitness:             meta.bitness,
-            model:               meta.model,
-            platform:            chPlatform,
-            platformVersion:     meta.platformVersion,
-            uaFullVersion:       meta.uaFullVersion,
-            fullVersionList:     meta.fullVersionList,
-            deviceMemory:        mem,
+            architecture: meta.architecture,
+            bitness: meta.bitness,
+            model: meta.model,
+            platform: chPlatform,
+            platformVersion: meta.platformVersion,
+            uaFullVersion: meta.uaFullVersion,
+            fullVersionList: meta.fullVersionList,
+            deviceMemory: mem,
             hardwareConcurrency: cpu,
-            wow64:               meta.wow64,
-            formFactors:         meta.formFactors
+            wow64: meta.wow64,
+            formFactors: meta.formFactors
           };
           const result = {};
           for (const hint of keys) {
@@ -230,7 +230,7 @@ function NavTotalSetPatchModule() {
             if (!(hint in map)) throw new Error(`THW: missing highEntropy.${hint}`);
             const val = map[hint];
             if (val === undefined || val === null) throw new Error(`THW: missing highEntropy.${hint}`);
-            if (typeof val === 'string' && !val) throw new Error(`THW: missing highEntropy.${hint}`);
+            if (typeof val === 'string' && !val && hint !== 'model') throw new Error(`THW: missing highEntropy.${hint}`);
             if (Array.isArray(val) && !val.length) throw new Error(`THW: missing highEntropy.${hint}`);
             result[hint] = val;
           }
@@ -239,6 +239,7 @@ function NavTotalSetPatchModule() {
         configurable: true,
         enumerable: false
       });
+
 
       Object.defineProperty(uadProto, 'toJSON', {
         value: mark(function toJSON() {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON'),
