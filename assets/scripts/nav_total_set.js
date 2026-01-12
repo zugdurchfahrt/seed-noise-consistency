@@ -8,7 +8,7 @@ function NavTotalSetPatchModule() {
       || (typeof self !== 'undefined' && self)
       || (typeof window !== 'undefined' && window)
       || {};
-      
+
     // basic random from the existing seed initialization
     const R = window.rand.use('nav');
     if (typeof R !== 'function') {
@@ -30,11 +30,11 @@ function NavTotalSetPatchModule() {
     const devicesLabels = window.__DEVICES_LABELS;
     const colorDepth    = Number(window.__COLOR_DEPTH);
     const orientationDom = window.__ORIENTATION ?? ((height >= width) ? 'portrait-primary' : 'landscape-primary')
-    
+
     // strictness & diagnostics
     const STRICT        = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
     const DEBUG         = !!window.__NAV_PATCH_DEBUG__;
-    
+
     // mapping helpers (OS <-> DOM)
     const asDom = (os) => os === 'Windows' ? 'Win32' : (os === 'macOS' ? 'MacIntel' : os);
     const asOS  = (dom) => dom === 'Win32' ? 'Windows' : (dom === 'MacIntel' ? 'macOS' : dom);
@@ -45,7 +45,7 @@ function NavTotalSetPatchModule() {
     if (!navPlat)        throw new Error('[nav_total_set] NAV_PLATFORM__ missing');
 
     // normalize/validate CH.platform (must be OS-string)
-    let chPlatform = meta.platform || gen || '';
+    let chPlatform = meta.platform || gen;
     if (looksDom(chPlatform)) {
       const normalized = asOS(chPlatform);
       if (STRICT) {
@@ -63,7 +63,7 @@ function NavTotalSetPatchModule() {
     }
     const navPlatformOut = STRICT ? navPlat : expectedNavPlat;
     if (!window.__COLOR_DEPTH) console.warn("[uaData] Color_Depth is not defined, set by default", colorDepth);
-    
+
     // ——— B. Safe helpers ———
     const navProto = Object.getPrototypeOf(navigator);
     function safeDefineAcc(target, key, getter, { enumerable = false } = {}) {
@@ -81,7 +81,7 @@ function NavTotalSetPatchModule() {
         return false;
       }
     }
-    
+
     function defineAccWithFallback(objOrProto, key, getter, { enumerable = false } = {}) {
       // use for non-critical fields; для E/F/G Do not use(см. ниже)
       if (safeDefineAcc(objOrProto, key, getter, { enumerable })) return true;
@@ -108,7 +108,7 @@ function NavTotalSetPatchModule() {
       patch('userAgent', () => userAgent);
       patch('platform',  () => navPlatformOut);
       patch('vendor',    () => vendor);
-      patch('appVersion',() => (userAgent.split("Mozilla/")[1] || ""));
+      patch('appVersion', () => (userAgent.split("Mozilla/")[1] ?? ""));
     })();
 
     // rest
@@ -209,16 +209,16 @@ function NavTotalSetPatchModule() {
     (Object.getOwnPropertyDescriptor(navProto,'deviceMemory') ? redefineAcc
       : (p,k,g,o)=>safeDefineAcc(p,k,g,o))
     (navProto, 'deviceMemory', () => mem, { enumerable: true });
-    
+
     (Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency') ? redefineAcc
       : (p,k,g,o)=>safeDefineAcc(p,k,g,o))
     (navProto, 'hardwareConcurrency', () => cpu, { enumerable: true });
-    
+
     // ——— G. language(s) ———
     (Object.getOwnPropertyDescriptor(navProto,'language') ? redefineAcc
       : (p,k,g,o)=>safeDefineAcc(p,k,g,o))
     (navProto, 'language', () => window.__primaryLanguage,  { enumerable: true });
-    
+
     (Object.getOwnPropertyDescriptor(navProto,'languages') ? redefineAcc
       : (p,k,g,o)=>safeDefineAcc(p,k,g,o))
     (navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true });
@@ -370,8 +370,8 @@ function NavTotalSetPatchModule() {
           const d = (typeof mt === 'string') ? { type: mt, suffixes: '', description: '' } : mt;
           fakeMimeTypes.push({
             type:        safeString(d.type),
-            suffixes:    safeString(d.suffixes || ''),
-            description: safeString(d.description || ''),
+            suffixes: safeString(d.suffixes ?? ''),
+            description: safeString(d.description ?? ''),
             pluginIndex: pi
           });
         })
@@ -420,11 +420,11 @@ function NavTotalSetPatchModule() {
           const m = p.mimeTypes[j];
           const mimeObj = Object.create(MimeType.prototype, {
             type:         { value: String(m.type),        enumerable: true, configurable: true },
-            suffixes:     { value: String(m.suffixes||''),enumerable: true, configurable: true },
-            description:  { value: String(m.description||''), enumerable: true, configurable: true },
+            suffixes: { value: String(m.suffixes ?? ''),enumerable: true, configurable: true },
+            description: { value: String(m.description ?? ''), enumerable: true, configurable: true },
             enabledPlugin:{ value: pluginObj,             enumerable: true, configurable: true }
           });
-          // index on the plugin itself — enumerable 
+          // index on the plugin itself — enumerable
           Object.defineProperty(pluginObj, String(j), { value: mimeObj, enumerable: true, configurable: true });
         }
 
@@ -470,8 +470,8 @@ function NavTotalSetPatchModule() {
         for (const m of p.mimeTypes) {
           const mimeObj = Object.create(MimeType.prototype, {
             type:         { value: String(m.type),        enumerable: true, configurable: true },
-            suffixes:     { value: String(m.suffixes||''),enumerable: true, configurable: true },
-            description:  { value: String(m.description||''), enumerable: true, configurable: true },
+            suffixes: { value: String(m.suffixes ?? ''),enumerable: true, configurable: true },
+            description: { value: String(m.description ?? ''), enumerable: true, configurable: true },
             enabledPlugin:{ value: null,                    enumerable: true, configurable: true }
           });
           const idx = (mimeArray.length);
@@ -495,7 +495,7 @@ function NavTotalSetPatchModule() {
       return mimeArray;
     }
 
-    // Getters - like in ORIG: enumerable: true 
+    // Getters - like in ORIG: enumerable: true
     Object.defineProperty(navigator, 'plugins', {
       get: mark(() => createPluginArray(fakePlugins), 'get plugins'),
       configurable: true,
