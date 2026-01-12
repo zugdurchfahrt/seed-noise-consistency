@@ -123,7 +123,7 @@ function NavTotalSetPatchModule() {
       patch('userAgent', () => userAgent);
       patch('platform',  () => navPlatformOut);
       patch('vendor',    () => vendor);
-      patch('appVersion', () => (userAgent.split("Mozilla/")[1] ?? ""));
+      patch('appVersion', () => (userAgent.split("Mozilla/")[1]));
     })();
 
     // rest
@@ -215,6 +215,7 @@ function NavTotalSetPatchModule() {
             architecture:        meta.architecture,
             bitness:             meta.bitness,
             model:               meta.model,
+            platform:            chPlatform,
             platformVersion:     meta.platformVersion,
             uaFullVersion:       meta.uaFullVersion,
             fullVersionList:     meta.fullVersionList,
