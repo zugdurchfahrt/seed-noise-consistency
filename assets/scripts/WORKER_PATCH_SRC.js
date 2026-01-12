@@ -48,7 +48,7 @@
         if (!(k in he)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
         const v = he[k];
         if (v === undefined || v === null) throw new Error(`UACHPatch: bad highEntropy.${k}`);
-        if (typeof v === 'string' && !v) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+        if (typeof v === 'string');
         if (Array.isArray(v) && !v.length) throw new Error(`UACHPatch: bad highEntropy.${k}`);
       }
       return s;
