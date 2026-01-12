@@ -444,12 +444,23 @@ window.SafeSharedWorkerOverride = SafeSharedWorkerOverride;
 // ===== ServiceWorker override (allow self/infra; block others; hub-friendly) =====
 function ServiceWorkerOverride(G){
   'use strict';
-  if (!G || !G.navigator) throw new Error('ServiceWorkerOverride: navigator missing');
+  if (!G || !G.navigator) {
+    if (G && G.__DEBUG__) {
+      try { console.info('ServiceWorkerOverride: navigator missing'); } catch(_){}
+    }
+    return;
+  }
   if (!('serviceWorker' in G.navigator)) {
-    throw new Error('ServiceWorkerOverride: navigator.serviceWorker missing');
+    if (G.__DEBUG__) {
+      try { console.info('ServiceWorkerOverride: navigator.serviceWorker missing'); } catch(_){}
+    }
+    return;
   }
   if (!G.navigator.serviceWorker) {
-    throw new Error('ServiceWorkerOverride: navigator.serviceWorker unavailable');
+    if (G.__DEBUG__) {
+      try { console.info('ServiceWorkerOverride: navigator.serviceWorker unavailable'); } catch(_){}
+    }
+    return;
   }
 
   // --- Идемпотентная проверка: если уже обёрнуто — выходим (без HUB-флагов)
