@@ -256,7 +256,7 @@ def init_driver(
             try { RtcpeerconnectionPatchModule(window); } catch(_) {}
             try { HideWebdriverPatchModule(window); } catch(_) {}
             try { EnvParamsPatchModule(window); } catch(_) {}
-            try { NavTotalSetPatchModule(window); } catch(_) {}
+            try { NavTotalSetPatchModule(window); } catch(e) { if (window.__NAV_PATCH_DEBUG__) console.error(e); throw e; }
             try { ScreenPatchModule(window); } catch(_) {}
             try { FontPatchModule(window); } catch(_) {}
             try { CanvasPatchModule(window); } catch(_) {}

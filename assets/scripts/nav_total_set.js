@@ -67,18 +67,31 @@ function NavTotalSetPatchModule() {
     // ——— B. Safe helpers ———
     const navProto = Object.getPrototypeOf(navigator);
     function safeDefineAcc(target, key, getter, { enumerable = false } = {}) {
+      const warnOrThrow = (err) => {
+        if (STRICT) throw err;
+        if (DEBUG) console.warn(err);
+        return false;
+      };
       try {
         const d = Object.getOwnPropertyDescriptor(target, key);
-        if (d && d.configurable === false) throw new TypeError('non-configurable');
+        if (d && d.configurable === false) {
+          return warnOrThrow(new TypeError(`[nav_total_set] ${key}: non-configurable`));
+        }
+        let getFn = getter;
+        if (typeof getter === 'function' && getter.name === '') {
+          const acc = ({ get [key]() { return getter.call(this); } });
+          getFn = Object.getOwnPropertyDescriptor(acc, key).get;
+        }
         Object.defineProperty(target, key, {
-          get: mark(getter, `get ${key}`),
+          get: mark(getFn, `get ${key}`),
           set: d && d.set,
           configurable: true,
           enumerable: d ? !!d.enumerable : !!enumerable
         });
         return true;
       } catch (e) {
-        return false;
+        const reason = (e && e.message) ? e.message : String(e);
+        return warnOrThrow(new TypeError(`[nav_total_set] failed to define ${key}: ${reason}`));
       }
     }
 
@@ -103,7 +116,9 @@ function NavTotalSetPatchModule() {
       const patch = (key, getter) => {
         const has = !!Object.getOwnPropertyDescriptor(navProto, key);
       // Important: like native - not enumerable
-      (has ? redefineAcc : safeDefineAcc)(navProto, key, getter, { enumerable: false });
+      const ok = has ? (redefineAcc(navProto, key, getter, { enumerable: false }), true)
+        : safeDefineAcc(navProto, key, getter, { enumerable: false });
+      if (ok === false) throw new TypeError(`[nav_total_set] failed to define ${key}`);
       };
       patch('userAgent', () => userAgent);
       patch('platform',  () => navPlatformOut);
@@ -199,29 +214,34 @@ function NavTotalSetPatchModule() {
     });
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
-    (Object.getOwnPropertyDescriptor(navProto, 'userAgentData') ? redefineAcc
-      : (p,k,g)=>safeDefineAcc(p,k,g,{ enumerable: false }))
-    (navProto, 'userAgentData', mark(function get_userAgentData(){ return overrideUaData; }, 'get userAgentData'));
+    const okUaData = (Object.getOwnPropertyDescriptor(navProto, 'userAgentData') ?
+      (redefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return overrideUaData; }, { enumerable: false }), true) :
+      safeDefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return overrideUaData; }, { enumerable: false }));
+    if (okUaData === false) throw new TypeError('[nav_total_set] failed to define userAgentData');
     console.info('userAgentData.toJSON correctly implemented');
     }
 
     // ——— F. deviceMemory/hardwareConcurrency ———
-    (Object.getOwnPropertyDescriptor(navProto,'deviceMemory') ? redefineAcc
-      : (p,k,g,o)=>safeDefineAcc(p,k,g,o))
-    (navProto, 'deviceMemory', () => mem, { enumerable: true });
+    const okDeviceMemory = (Object.getOwnPropertyDescriptor(navProto,'deviceMemory') ?
+      (redefineAcc(navProto, 'deviceMemory', () => mem, { enumerable: true }), true) :
+      safeDefineAcc(navProto, 'deviceMemory', () => mem, { enumerable: true }));
+    if (okDeviceMemory === false) throw new TypeError('[nav_total_set] failed to define deviceMemory');
 
-    (Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency') ? redefineAcc
-      : (p,k,g,o)=>safeDefineAcc(p,k,g,o))
-    (navProto, 'hardwareConcurrency', () => cpu, { enumerable: true });
+    const okHardwareConcurrency = (Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency') ?
+      (redefineAcc(navProto, 'hardwareConcurrency', () => cpu, { enumerable: true }), true) :
+      safeDefineAcc(navProto, 'hardwareConcurrency', () => cpu, { enumerable: true }));
+    if (okHardwareConcurrency === false) throw new TypeError('[nav_total_set] failed to define hardwareConcurrency');
 
     // ——— G. language(s) ———
-    (Object.getOwnPropertyDescriptor(navProto,'language') ? redefineAcc
-      : (p,k,g,o)=>safeDefineAcc(p,k,g,o))
-    (navProto, 'language', () => window.__primaryLanguage,  { enumerable: true });
+    const okLanguage = (Object.getOwnPropertyDescriptor(navProto,'language') ?
+      (redefineAcc(navProto, 'language', () => window.__primaryLanguage, { enumerable: true }), true) :
+      safeDefineAcc(navProto, 'language', () => window.__primaryLanguage,  { enumerable: true }));
+    if (okLanguage === false) throw new TypeError('[nav_total_set] failed to define language');
 
-    (Object.getOwnPropertyDescriptor(navProto,'languages') ? redefineAcc
-      : (p,k,g,o)=>safeDefineAcc(p,k,g,o))
-    (navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true });
+    const okLanguages = (Object.getOwnPropertyDescriptor(navProto,'languages') ?
+      (redefineAcc(navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true }), true) :
+      safeDefineAcc(navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true }));
+    if (okLanguages === false) throw new TypeError('[nav_total_set] failed to define languages');
 
     // ——— H. permissions.query ———
     if ('permissions' in navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
