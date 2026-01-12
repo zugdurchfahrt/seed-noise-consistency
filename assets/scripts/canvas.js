@@ -592,8 +592,8 @@ function CanvasPatchModule(window) {
 
       // 1) Сначала попытаемся сделать decode → __resampleWithJitter__('encode') → re-encode,
       //    чтобы Offscreen дал тот же результат, что toBlob/toDataURL.
+      let bmp;
       try {
-        let bmp;
         if (typeof createImageBitmap === 'function') {
           try {
             bmp = await createImageBitmap(blob, {
@@ -628,6 +628,8 @@ function CanvasPatchModule(window) {
             }
           }
         }
+      } finally {
+        try { bmp && bmp.close && bmp.close(); } catch {}
       }
 
       // 2) Старый IHDR-путь (PNG only) — сохраняем как fallback, чтобы не ломать совместимость
