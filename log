@@ -1,0 +1,95 @@
+VM133:1 undetected chromedriver 1337!
+page_bundle.js:75 [✔]RTC protection set
+page_bundle.js:75 [ENV] EnvParamsPatchModule ready
+page_bundle.js:75 userAgentData.toJSON correctly implemented
+page_bundle.js:75 Web Auth API mock applied
+page_bundle.js:1220 Client Hints Debug
+page_bundle.js:75 meta: {platform: 'macOS', brands: Array(3), mobile: false, architecture: 'x86', bitness: '64', …}
+page_bundle.js:75 navigator.userAgentData: NavigatorUAData {}
+page_bundle.js:75 navigator.language(s): de-DE (2) ['de-DE', 'de']
+page_bundle.js:75 navigator.deviceMemory: 4
+page_bundle.js:75 navigator.hardwareConcurrency: 8
+page_bundle.js:75 navigator.connection: {saveData: false, effectiveType: '4g'}
+page_bundle.js:75 Client Hints and Navigator setting applied in JS
+page_bundle.js:75 [Screen] patches applied
+page_bundle.js:75 [FontPatch] filtered fonts = 15 for MacIntel
+page_bundle.js:75 [WebGLPatchModule] Whitelist loaded
+page_bundle.js:75 [WebGLPatchModule] WebglPatchModule applied
+page_bundle.js:75 [WebGPUPatchModule] WL ready & snapshot installed
+page_bundle.js:75 [WebGPU] Patched requestAdapter/requestDevice for browser: chrome
+page_bundle.js:75 [AudioContextPatch] Patched createBuffer on AudioContext
+page_bundle.js:75 [AudioContextPatch] Patched createBuffer on AudioContext
+page_bundle.js:75 [headers_interceptor.js] patch loaded. Header profile: min
+page_bundle.js:75 [CanvasPatch] Canvas element patches: applied 3 из 3
+page_bundle.js:75 [CanvasPatch] Offscreen patches: applied 2 из 2
+page_bundle.js:75 [CanvasPatch] WebGL context patches: applied 14 из 14
+page_bundle.js:75 [DIAG] {hasHub: true, workerWrapped: true, sharedWrapped: true, swWrapped: false, bridge: {…}}bridge: envSnap: truemkClassic: truemkModule: truepublish: true[[Prototype]]: ObjecthasHub: truesharedWrapped: trueswWrapped: falseworkerWrapped: true[[Prototype]]: Object
+page_bundle.js:75 [headers_interceptor.js] window.__HEADERS__ injected (safelisted only)
+page_bundle.js:75 languages override applied: de-DE (2) ['de-DE', 'de']
+page_bundle.js:75 [FontPatch] window: 15 loaded, 0 failed
+page_bundle.js:5633 [Intervention] Noise was added to a canvas readback. If this has caused breakage, please file a bug at https://issues.chromium.org/issues/new?component=1456351&title=Canvas%20noise%20breakage. This feature can be disabled through chrome://flags/#enable-canvas-noise
+page_bundle.js:75 [patchMethod override] getExtension webglGetExtensionPatch WebGLDebugRendererInfo {WebGLInstance_DebugInfoPatched__: true}
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:5557
+getGpu @ workers.js:102
+getWorkerData @ workers.js:246
+(anonymous) @ workers.js:485
+(anonymous) @ workers.js:684
+page_bundle.js:75 [patchMethod override] getExtension webglGetExtensionPatch WebGLDebugRendererInfo {WebGLInstance_DebugInfoPatched__: true}
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:5557
+webglGetParameterMask @ page_bundle.js:4490
+(anonymous) @ page_bundle.js:5552
+getGpu @ workers.js:104
+getWorkerData @ workers.js:246
+(anonymous) @ workers.js:485
+(anonymous) @ workers.js:684
+page_bundle.js:75 [patchMethod override] getParameter webglGetParameterMask AMD Radeon(TM) RX 6750 XT
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:5557
+getGpu @ workers.js:104
+getWorkerData @ workers.js:246
+(anonymous) @ workers.js:485
+(anonymous) @ workers.js:684
+page_bundle.js:75 undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ workers.js:488
+Promise.catch
+(anonymous) @ workers.js:487
+(anonymous) @ workers.js:684
+page_bundle.js:75 [UnhandledPromiseRejection] TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+    at workers.js:483:2
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:212
+workers.js:483 Uncaught (in promise) TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+    at workers.js:483:2
+(anonymous) @ workers.js:483
+await in (anonymous)
+(anonymous) @ workers.js:684
+page_bundle.js:75 [Screen] patched screen/viewport: {html: {…}, window: {…}, screen: {…}}
+page_bundle.js:75 [Screen] document & div client sizes → {html: {…}, div: {…}}
+page_bundle.js:75 [FontPatch] DOM override style applied for MacIntel → NeoMono
+page_bundle.js:75 [CanvasPatchModule] realInit done, window.canvas set: <canvas width=​"3840" height=​"2160" style=​"width:​ 3840px;​ height:​ 2160px;​ display:​ block;​ background:​ transparent;​">​
+page_bundle.js:75 [headers_interceptor.js] CDP bridge ready
+b33228f6-a44c-4cf2-82cf-88acd70e7545:281 [UACHPatch] installed {core: true, mirror: true, scope: true}
+42cbe6a5-30ef-4177-b78d-2aac3d0b64cb:219 Uncaught (in promise) TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+    at getWorkerData (42cbe6a5-30ef-4177-b78d-2aac3d0b64cb:219:3)
+    at async 42cbe6a5-30ef-4177-b78d-2aac3d0b64cb:6:46
+getWorkerData @ 42cbe6a5-30ef-4177-b78d-2aac3d0b64cb:219
+await in getWorkerData
+(anonymous) @ 42cbe6a5-30ef-4177-b78d-2aac3d0b64cb:284
+(anonymous) @ 42cbe6a5-30ef-4177-b78d-2aac3d0b64cb:284
+(anonymous) @ 42cbe6a5-30ef-4177-b78d-2aac3d0b64cb:295
+(anonymous) @ worker_classic_bootstrap.js:49
+(anonymous) @ worker_classic_bootstrap.js:50
+b33228f6-a44c-4cf2-82cf-88acd70e7545:1 Uncaught null
+(anonymous) @ worker_classic_bootstrap.js:1
+(anonymous) @ worker_classic_bootstrap.js:1
+page_bundle.js:75 [UncaughtError] Uncaught SyntaxError: Failed to execute 'importScripts' on 'WorkerGlobalScope': Unexpected identifier 'Promise' null
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:206
+8530ab1c-7d88-43de-8a97-bf5a95b6d909:1 Uncaught SyntaxError: Failed to execute 'importScripts' on 'WorkerGlobalScope': Unexpected identifier 'Promise' (at 8530ab1c-7d88-43de-8a97-bf5a95b6d909:1:9)
+    at 310c619b-3028-4d36-9c81-b91d2a5685ad:1:2314
+    at 310c619b-3028-4d36-9c81-b91d2a5685ad:1:2407
+(anonymous) @ 310c619b-3028-4d36-9c81-b91d2a5685ad:1
+(anonymous) @ 310c619b-3028-4d36-9c81-b91d2a5685ad:1
