@@ -151,17 +151,15 @@
                         return le.platform;
                       }, 'get platform'), enumerable:true, configurable:true },
     });
+    const toJSON = markAsNative(function toJSON(){
+      return {brands:this.brands, mobile:this.mobile, platform:this.platform};
+    }, 'toJSON');
     Object.defineProperty(uadProto, 'toJSON', {
       configurable: true,
       enumerable: false,
-      value: markAsNative(function toJSON(){
-        return {brands:this.brands, mobile:this.mobile, platform:this.platform};
-      }, 'toJSON')
+      get: markAsNative(function get_toJSON(){ return toJSON; }, 'get toJSON')
     });
-    Object.defineProperty(uadProto, 'getHighEntropyValues', {
-      configurable: true,
-      enumerable: false,
-      value: markAsNative(function getHighEntropyValues(keys){
+    const getHighEntropyValues = markAsNative(function getHighEntropyValues(keys){
         if (!cache.snap) throw new Error('UACHPatch: no snap');
         if (!Array.isArray(keys)) throw new Error('THW: bad keys');
         for (const k of keys) {
@@ -179,7 +177,11 @@
           out[k] = deep(src[k]);
         }
         return Promise.resolve(out);
-      }, 'getHighEntropyValues')
+      }, 'getHighEntropyValues');
+    Object.defineProperty(uadProto, 'getHighEntropyValues', {
+      configurable: true,
+      enumerable: false,
+      get: markAsNative(function get_getHighEntropyValues(){ return getHighEntropyValues; }, 'get getHighEntropyValues')
     });
 
     const def = (obj,k,getter,enumerable=true)=>{
@@ -195,7 +197,7 @@
     };
 
     const getUserAgentData = markAsNative(function getUserAgentData(){ return nativeUAD; }, 'get userAgentData');
-    def(proto,'userAgentData',getUserAgentData, true);
+    def(proto,'userAgentData',getUserAgentData, false);
     const getHardwareConcurrency = markAsNative(function getHardwareConcurrency(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!Number.isFinite(Number(cache.snap.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');

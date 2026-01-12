@@ -208,8 +208,7 @@ function NavTotalSetPatchModule() {
           configurable: true
         }
       });
-      Object.defineProperty(uadProto, 'getHighEntropyValues', {
-        value: mark(function getHighEntropyValues(keys) {
+      const getHighEntropyValues = mark(function getHighEntropyValues(keys) {
           if (!Array.isArray(keys)) throw new Error('THW: bad keys');
           const map = {
             architecture: meta.architecture,
@@ -235,14 +234,17 @@ function NavTotalSetPatchModule() {
             result[hint] = val;
           }
           return Promise.resolve(result);
-        }, 'getHighEntropyValues'),
+        }, 'getHighEntropyValues');
+      Object.defineProperty(uadProto, 'getHighEntropyValues', {
+        get: mark(function get_getHighEntropyValues() { return getHighEntropyValues; }, 'get getHighEntropyValues'),
         configurable: true,
         enumerable: false
       });
 
 
+      const toJSON = mark(function toJSON() {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON');
       Object.defineProperty(uadProto, 'toJSON', {
-        value: mark(function toJSON() {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON'),
+        get: mark(function get_toJSON() { return toJSON; }, 'get toJSON'),
         configurable: true,
         enumerable: false
       });
