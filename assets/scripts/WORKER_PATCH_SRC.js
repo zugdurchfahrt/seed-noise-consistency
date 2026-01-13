@@ -151,6 +151,32 @@
                         return le.platform;
                       }, 'get platform'), enumerable:true, configurable:true },
     });
+    const getFullVersionList = markAsNative(function getFullVersionList(){
+      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      const le = cache.snap.uaData || cache.snap.uaCH;
+      if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
+      if (!Array.isArray(le.he.fullVersionList)) throw new Error('UACHPatch: bad highEntropy.fullVersionList');
+      return deep(le.he.fullVersionList);
+    }, 'get fullVersionList');
+    Object.defineProperty(uadProto, 'fullVersionList', {
+      configurable: true,
+      enumerable: false,
+      get: getFullVersionList
+    });
+    const getUaFullVersion = markAsNative(function getUaFullVersion(){
+      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      const le = cache.snap.uaData || cache.snap.uaCH;
+      if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
+      if (typeof le.he.uaFullVersion !== 'string' || !le.he.uaFullVersion) {
+        throw new Error('UACHPatch: bad highEntropy.uaFullVersion');
+      }
+      return le.he.uaFullVersion;
+    }, 'get uaFullVersion');
+    Object.defineProperty(uadProto, 'uaFullVersion', {
+      configurable: true,
+      enumerable: false,
+      get: getUaFullVersion
+    });
     const toJSON = markAsNative(function toJSON(){
       return {brands:this.brands, mobile:this.mobile, platform:this.platform};
     }, 'toJSON');
@@ -225,6 +251,30 @@
     }, 'get languages');
     def(proto,'languages', getLanguages, true);
 
+    const isProbablyModuleWorkerURL = absUrl => {
+      if (typeof absUrl !== 'string' || !absUrl) return false;
+      if (/\.mjs(?:$|[?#])/i.test(absUrl)) return true;
+      if (/[?&]type=module(?:&|$)/i.test(absUrl)) return true;
+      if (/[?&]module(?:&|$)/i.test(absUrl)) return true;
+      if (/#module\\b/i.test(absUrl)) return true;
+      if (absUrl.slice(0, 5) === 'data:') {
+        return /;module\\b/i.test(absUrl) || /\\bmodule\\b/i.test(absUrl.slice(0, 80));
+      }
+      return false;
+    };
+    const resolveWorkerType = (absUrl, opts) => {
+      const hasType = !!(opts && typeof opts === 'object' && Object.prototype.hasOwnProperty.call(opts, 'type'));
+      const t = hasType ? opts.type : undefined;
+      if (hasType && t !== 'module' && t !== 'classic') {
+        throw new Error('UACHPatch: invalid worker type');
+      }
+      const isModuleURL = isProbablyModuleWorkerURL(absUrl);
+      if (t === 'classic' && isModuleURL) {
+        throw new Error('UACHPatch: module worker URL with classic type');
+      }
+      return (t === 'module' || (!hasType && isModuleURL)) ? 'module' : 'classic';
+    };
+
     const prev = self.__applyEnvSnapshot__;
     self.__applyEnvSnapshot__ = s => {
       if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
@@ -247,13 +297,13 @@
       const NativeWorker = self.Worker;
       self.Worker = function WrappedWorker(url, opts){
         const abs = new URL(url, self.location && self.location.href || undefined).href;
-        const workerType = (opts && opts.type) === 'module' ? 'module' : 'classic';
+        const workerType = resolveWorkerType(abs, opts);
         const snap = requireSnap(self.__lastSnap__, 'nested');
         const SNAP = JSON.stringify(snap);
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'
           ? `(async function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=s=>{self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
-          : `(function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=function(s){self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}if(!${USER}||typeof ${USER}!=='string') throw new Error('UACHPatch: missing user import');importScripts(${USER});})();`;
+          : `(function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=function(s){self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) throw new Error('UACHPatch: module worker URL in classic loader'); importScripts(USER);})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
         try {
           return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });

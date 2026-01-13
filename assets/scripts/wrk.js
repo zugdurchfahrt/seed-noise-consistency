@@ -76,6 +76,9 @@ function EnvBus(G){
       if (!(k in G.__LAST_UACH_HE__)) throw new Error(`EnvBus: high entropy missing ${k}`);
       const v = G.__LAST_UACH_HE__[k];
       if (v === undefined || v === null) throw new Error(`EnvBus: high entropy bad ${k}`);
+      if (k === 'fullVersionList' && !Array.isArray(v)) {
+        throw new Error('EnvBus: high entropy bad fullVersionList');
+      }
       if (typeof v === 'string');
       if (Array.isArray(v) && !v.length) throw new Error(`EnvBus: high entropy bad ${k}`);
       he[k] = v;
@@ -290,8 +293,20 @@ function mkClassicWorkerSource(snapshot, absUrl){
       // Применяем снимок СЕЙЧАС, уже через реализацию патча:
       if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
       self.__applyEnvSnapshot__(self.__lastSnap__);
+      var __isModuleURL = function(u){
+        if (typeof u !== 'string' || !u) return false;
+        if (/\\.mjs(?:$|[?#])/i.test(u)) return true;
+        if (/[?&]type=module(?:&|$)/i.test(u)) return true;
+        if (/[?&]module(?:&|$)/i.test(u)) return true;
+        if (/#module\\b/i.test(u)) return true;
+        if (u.slice(0, 5) === 'data:') {
+          return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0, 80));
+        }
+        return false;
+      };
       var USER = ${USER};
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user script URL');
+      if (__isModuleURL(USER)) throw new Error('UACHPatch: module worker URL in classic loader');
       importScripts(USER);
     })();
     //# sourceURL=worker_classic_bootstrap.js
@@ -353,6 +368,33 @@ function requireWorkerSnapshot(snap, label) {
   return snap;
 }
 
+function isProbablyModuleWorkerURL(absUrl) {
+  if (typeof absUrl !== 'string' || !absUrl) return false;
+  if (/\.mjs(?:$|[?#])/i.test(absUrl)) return true;
+  if (/[?&]type=module(?:&|$)/i.test(absUrl)) return true;
+  if (/[?&]module(?:&|$)/i.test(absUrl)) return true;
+  if (/#module\\b/i.test(absUrl)) return true;
+  if (absUrl.slice(0, 5) === 'data:') {
+    return /;module\\b/i.test(absUrl) || /\\bmodule\\b/i.test(absUrl.slice(0, 80));
+  }
+  return false;
+}
+
+function resolveWorkerType(absUrl, opts, label) {
+  const hasType = !!(opts && typeof opts === 'object' && Object.prototype.hasOwnProperty.call(opts, 'type'));
+  const t = hasType ? opts.type : undefined;
+  if (hasType && t !== 'module' && t !== 'classic') {
+    const l = label ? ` (${label})` : '';
+    throw new Error(`[WorkerOverride] invalid worker type${l}`);
+  }
+  const isModuleURL = isProbablyModuleWorkerURL(absUrl);
+  if (t === 'classic' && isModuleURL) {
+    const l = label ? ` (${label})` : '';
+    throw new Error(`[WorkerOverride] module worker URL with classic type${l}`);
+  }
+  return (t === 'module' || (!hasType && isModuleURL)) ? 'module' : 'classic';
+}
+
 
 function SafeWorkerOverride(G){
   if (!G || !G.Worker) throw new Error('[WorkerOverride] Worker missing');
@@ -361,7 +403,7 @@ function SafeWorkerOverride(G){
 
 G.Worker = function WrappedWorker(url, opts) {
   const abs = new URL(url, location.href).href;
-  const workerType = (opts && opts.type) === 'module' ? 'module' : 'classic';
+  const workerType = resolveWorkerType(abs, opts, 'Worker');
   const bridge = G.__ENV_BRIDGE__;
   if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
     console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched Worker');
