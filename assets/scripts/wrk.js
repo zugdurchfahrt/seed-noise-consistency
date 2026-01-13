@@ -368,6 +368,48 @@ function requireWorkerSnapshot(snap, label) {
   return snap;
 }
 
+function installBlobURLStore(G) {
+  if (!G || !G.URL || typeof G.URL.createObjectURL !== 'function') return;
+  if (G.__BLOB_URL_STORE__) return;
+  const store = new Map();
+  Object.defineProperty(G, '__BLOB_URL_STORE__', { value: store, configurable: false, writable: false });
+  const mark = (typeof G.markAsNative === 'function') ? G.markAsNative : (f) => f;
+  const nativeCreate = G.URL.createObjectURL;
+  const nativeRevoke = G.URL.revokeObjectURL;
+  const createWrapped = mark(function createObjectURL(obj){
+    const url = nativeCreate.call(G.URL, obj);
+    if (obj && typeof obj === 'object') store.set(url, obj);
+    return url;
+  }, 'createObjectURL');
+  const revokeWrapped = mark(function revokeObjectURL(url){
+    if (store.has(url)) store.delete(url);
+    return nativeRevoke.call(G.URL, url);
+  }, 'revokeObjectURL');
+  const dCreate = Object.getOwnPropertyDescriptor(G.URL, 'createObjectURL');
+  const dRevoke = Object.getOwnPropertyDescriptor(G.URL, 'revokeObjectURL');
+  if (dCreate && dCreate.configurable === false && dCreate.writable === false) {
+    throw new Error('[WorkerOverride] URL.createObjectURL not writable');
+  }
+  if (dRevoke && dRevoke.configurable === false && dRevoke.writable === false) {
+    throw new Error('[WorkerOverride] URL.revokeObjectURL not writable');
+  }
+  Object.defineProperty(G.URL, 'createObjectURL', Object.assign({}, dCreate, { value: createWrapped }));
+  Object.defineProperty(G.URL, 'revokeObjectURL', Object.assign({}, dRevoke, { value: revokeWrapped }));
+}
+
+function resolveUserScriptURL(G, absUrl, label) {
+  if (typeof absUrl !== 'string' || !absUrl) return absUrl;
+  if (absUrl.slice(0, 5) !== 'blob:') return absUrl;
+  const store = G && G.__BLOB_URL_STORE__;
+  if (!store || !store.has(absUrl)) {
+    const l = label ? ` (${label})` : '';
+    throw new Error(`[WorkerOverride] blob URL missing from store${l}`);
+  }
+  const blob = store.get(absUrl);
+  const fresh = G.URL.createObjectURL(blob);
+  return fresh;
+}
+
 function isProbablyModuleWorkerURL(absUrl) {
   if (typeof absUrl !== 'string' || !absUrl) return false;
   if (/\.mjs(?:$|[?#])/i.test(absUrl)) return true;
@@ -399,6 +441,7 @@ function resolveWorkerType(absUrl, opts, label) {
 function SafeWorkerOverride(G){
   if (!G || !G.Worker) throw new Error('[WorkerOverride] Worker missing');
   if (G.Worker.__ENV_WRAPPED__) return;
+  installBlobURLStore(G);
   const NativeWorker = G.Worker;
 
 G.Worker = function WrappedWorker(url, opts) {
@@ -422,15 +465,17 @@ G.Worker = function WrappedWorker(url, opts) {
   G.__lastSnap__ = snap;
   bridge.publishSnapshot(snap);
 
+  const userURL = resolveUserScriptURL(G, abs, 'Worker');
   const src = workerType === 'module'
-    ? bridge.mkModuleWorkerSource(snap, abs)
-    : bridge.mkClassicWorkerSource(snap, abs);
+    ? bridge.mkModuleWorkerSource(snap, userURL)
+    : bridge.mkClassicWorkerSource(snap, userURL);
 
   const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
   try {
     return new NativeWorker(blobURL, { ...(opts), type: workerType });
   } finally {
     URL.revokeObjectURL(blobURL);
+    if (userURL !== abs) URL.revokeObjectURL(userURL);
   }
 };
 
@@ -447,14 +492,19 @@ window.SafeWorkerOverride = SafeWorkerOverride;
 function SafeSharedWorkerOverride(G){
   if (!G || !G.SharedWorker) throw new Error('[SharedWorkerOverride] SharedWorker missing');
   if (G.SharedWorker.__ENV_WRAPPED__) return;
+  installBlobURLStore(G);
   const NativeShared = G.SharedWorker;
 
-  G.SharedWorker = function WrappedSharedWorker(url, name) {
+  G.SharedWorker = function WrappedSharedWorker(url, nameOrOpts) {
     const abs = new URL(url, location.href).href;
+    const hasOpts = !!(nameOrOpts && (typeof nameOrOpts === 'object' || typeof nameOrOpts === 'function'));
     const bridge = G.__ENV_BRIDGE__;
     if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
       console.error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched SharedWorker');
       throw new Error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready; refusing to create unpatched SharedWorker');
+    }
+    if (typeof bridge.mkModuleWorkerSource !== 'function') {
+      throw new Error('[SharedWorkerOverride] mkModuleWorkerSource missing');
     }
     if (typeof bridge.publishSnapshot !== 'function') {
       throw new Error('[SharedWorkerOverride] publishSnapshot missing');
@@ -465,13 +515,21 @@ function SafeSharedWorkerOverride(G){
     const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
     G.__lastSnap__ = snap;
     bridge.publishSnapshot(snap);
-    const src = bridge.mkClassicWorkerSource(snap, abs);
+    const workerType = resolveWorkerType(abs, hasOpts ? nameOrOpts : null, 'SharedWorker');
+    const userURL = resolveUserScriptURL(G, abs, 'SharedWorker');
+    const src = workerType === 'module'
+      ? bridge.mkModuleWorkerSource(snap, userURL)
+      : bridge.mkClassicWorkerSource(snap, userURL);
     const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 
     try {
-      return new NativeShared(blobURL, name);
+      if (hasOpts) {
+        return new NativeShared(blobURL, { ...(nameOrOpts || {}), type: workerType });
+      }
+      return new NativeShared(blobURL, nameOrOpts);
     } finally {
       URL.revokeObjectURL(blobURL);
+      if (userURL !== abs) URL.revokeObjectURL(userURL);
     }
   };
   G.SharedWorker.__ENV_WRAPPED__ = true;
