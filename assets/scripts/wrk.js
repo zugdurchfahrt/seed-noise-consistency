@@ -230,6 +230,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
       const USER = ${USER};
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user module URL');
       await import(USER);
+      if (typeof self.postMessage === 'function') {
+        self.postMessage({ __ENV_USER_URL_LOADED__: USER });
+      }
     })();
     export {};
     //# sourceURL=worker_module_bootstrap.js
@@ -308,6 +311,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user script URL');
       if (__isModuleURL(USER)) throw new Error('UACHPatch: module worker URL in classic loader');
       importScripts(USER);
+      if (typeof self.postMessage === 'function') {
+        self.postMessage({ __ENV_USER_URL_LOADED__: USER });
+      }
     })();
     //# sourceURL=worker_classic_bootstrap.js
   `;
@@ -471,12 +477,23 @@ G.Worker = function WrappedWorker(url, opts) {
     : bridge.mkClassicWorkerSource(snap, userURL);
 
   const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+  let w;
   try {
-    return new NativeWorker(blobURL, { ...(opts), type: workerType });
+    w = new NativeWorker(blobURL, { ...(opts), type: workerType });
   } finally {
     URL.revokeObjectURL(blobURL);
-    if (userURL !== abs) URL.revokeObjectURL(userURL);
   }
+  if (userURL !== abs && w && typeof w.addEventListener === 'function') {
+    const onMsg = ev => {
+      const data = ev && ev.data;
+      if (data && data.__ENV_USER_URL_LOADED__ === userURL) {
+        w.removeEventListener('message', onMsg);
+        URL.revokeObjectURL(userURL);
+      }
+    };
+    w.addEventListener('message', onMsg);
+  }
+  return w;
 };
 
   G.Worker.__ENV_WRAPPED__ = true;
@@ -529,7 +546,6 @@ function SafeSharedWorkerOverride(G){
       return new NativeShared(blobURL, nameOrOpts);
     } finally {
       URL.revokeObjectURL(blobURL);
-      if (userURL !== abs) URL.revokeObjectURL(userURL);
     }
   };
   G.SharedWorker.__ENV_WRAPPED__ = true;
