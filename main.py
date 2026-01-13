@@ -252,31 +252,29 @@ def init_driver(
             Path(SCRIPTS_DIR / "headers_interceptor.js").read_text("utf-8"),
             # --- Launch modules in window ---
             """
-            try { LOGGingModule(window); } catch(_) {}
-            try { RtcpeerconnectionPatchModule(window); } catch(_) {}
-            try { HideWebdriverPatchModule(window); } catch(_) {}
-            try { EnvParamsPatchModule(window); } catch(_) {}
-            try { NavTotalSetPatchModule(window); } catch(e) { if (window.__NAV_PATCH_DEBUG__) console.error(e); throw e; }
-            try { ScreenPatchModule(window); } catch(_) {}
-            try { FontPatchModule(window); } catch(_) {}
-            try { CanvasPatchModule(window); } catch(_) {}
-            try { WEBglDICKts(window); } catch(_) {}
-            try { WebglPatchModule(window); } catch(_) {}
-            try { WebgpuWLBootstrap(window); } catch(_) {}
-            try { WebGPUPatchModule(window); } catch(_) {}
-            try { AudioContextModule(window); } catch(_) {}
-            try { ContextPatchModule(window); } catch(_) {}
-            try { HeadersInterceptor(window); } catch(_) {}
+            LOGGingModule(window);
+            RtcpeerconnectionPatchModule(window);
+            HideWebdriverPatchModule(window);
+            EnvParamsPatchModule(window);
+            NavTotalSetPatchModule(window);
+            ScreenPatchModule(window);
+            FontPatchModule(window);
+            CanvasPatchModule(window);
+            WEBglDICKts(window);
+            WebglPatchModule(window);
+            WebgpuWLBootstrap(window);
+            WebGPUPatchModule(window);
+            AudioContextModule(window);
+            ContextPatchModule(window);
+            HeadersInterceptor(window);
            // —————— Register all hooks here ——————//
-            try { if (typeof registerAllHooks === 'function') registerAllHooks(); } catch(_) {}
+            if (typeof registerAllHooks === 'function') registerAllHooks();
             (function applyAllPatchesCustomOrder(win) {
-            try {
                 const C = win.CanvasPatchContext; if (!C) return;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
-            } catch(_) {}
             // ——— Worker env diagnostics ———//
             console.info('[DIAG]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             })(window);
