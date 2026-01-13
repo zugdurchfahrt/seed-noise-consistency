@@ -1025,3 +1025,31 @@ a2be470 Patched worker NavigatorUAData prototype
 
 
 
+---
+
+## 2026-01-13 22:03:55 +01:00 — Прочитаны агентские инструкции и включён журнал
+
+### Прочитано
+- `.github/agents/agent-role.agent.md` (роль/ограничения/методология проекта + накопленный линейный лог предыдущих шагов).
+
+### Зафиксировано (как “источник правды” для методологии)
+- Ограничения: без рефактора/архитектурных перестроек, без новых концепций/абстракций/аргументов, без хардкода, fail-fast вместо silent fallback’ов, без предположений вне кода/доков.
+- “Native masking”: единый механизм `window.__NativeToStringMap` + `window.markAsNative` + Proxy на `Function.prototype.toString` (реализован в `assets/scripts/hide_webdriver.js`) — это базовый/общий слой для остальных модулей.
+
+### Что сделано (в рамках текущего дебага native masking / descriptors)
+- Инвентаризация выполнена через `rg` по строкам: `markAsNative|__NativeToStringMap|nativeToString|Function.prototype.toString` для файлов из задания.
+- Применены точечные правки в коде (до получения/принятия запрета на “не править код” из agent-role):
+  - `assets/scripts/context.js`: убран локальный fallback `markAsNative`, добавлен fail-fast при отсутствии глобального `markAsNative` и при отсутствии дескриптора в `definePatchedMethod`; заменено прямое присваивание `proto[method] = ...` на `definePatchedMethod(...)`.
+  - `assets/scripts/nav_total_set.js`: убран fallback `markAsNative`; добавлены fail-fast проверки наличия исходных дескрипторов для UAData и ряда патчей; замены методов на объектах (permissions/mediaDevices/storage/credentials/webkitTemporaryStorage) переведены на `Object.defineProperty` с сохранением исходных флагов.
+  - `assets/scripts/webgpu.js`: убран fallback `markAsNative`; присваивания `adapter.requestDevice` и `navigator.gpu.requestAdapter` переведены на `Object.defineProperty` с сохранением дескриптора.
+  - `assets/scripts/WORKER_PATCH_SRC.js`: `markAsNative` теперь всегда регистрирует в `__NativeToStringMap` и при наличии использует ранее установленный `self.markAsNative`; nested override `Worker` переведён на `Object.defineProperty` с сохранением дескриптора.
+  - `assets/scripts/wrk.js`: устранён fallback `markAsNative` в `installBlobURLStore`; `Worker/SharedWorker` overrides сделаны через `Object.defineProperty` с сохранением дескриптора и маркировкой через `markAsNative`; `ServiceWorkerOverride` — сохранение дескрипторов и маркировка функций через `markAsNative`.
+- Не изменялись (в рамках этого шага): `assets/scripts/hide_webdriver.js`, `assets/scripts/set_log.js`.
+
+### Решения / гипотезы
+- Гипотеза: основной детект/несоответствие “нативности” в этих модулях идёт из (1) прямых присваиваний в прототипы/объекты (меняют дескрипторы), (2) локальных/неинтегрированных `markAsNative` (не пишут в `__NativeToStringMap`), (3) неполного покрытия `Function.prototype.toString`.
+- Решение: считать `assets/scripts/hide_webdriver.js` единым источником механизма `markAsNative`/`__NativeToStringMap`; во всех остальных указанных файлах — требовать глобальный `markAsNative` (fail-fast если отсутствует) и заменять “прямые присваивания” на `defineProperty` с сохранением исходного дескриптора.
+
+### Следование agent-role дальше
+- С этого момента: все дальнейшие изменения (кроме явно запрошенных пользователем) не вношу; при конфликте “нужно править код” vs “agent-role запрещает правки” — запрашиваю явное подтверждение/override.
+- Внутренний поток рассуждений (chain-of-thought) не сохраняю; в журнал пишу только внешний ход работ/фиксируемые факты/решения/гипотезы.
