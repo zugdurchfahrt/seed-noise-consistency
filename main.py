@@ -374,12 +374,13 @@ def init_driver(
     //# sourceURL=worker_bootstrap_init.js
     """
 
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": worker_bootstrap_js, "awaitPromise": False})
-
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     driver.execute_cdp_cmd("Runtime.evaluate", {"expression": page_js, "awaitPromise": False})
+
+    # Connect worker_bootstrap_js (after page_js)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
+    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": worker_bootstrap_js, "awaitPromise": False})
 
     #--- Setting up Client hints ---
     is_safari = "Safari" in user_agent and ("Chrome" not in user_agent and "Edg/" not in user_agent)
