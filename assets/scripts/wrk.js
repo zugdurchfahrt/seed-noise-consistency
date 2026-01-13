@@ -381,7 +381,7 @@ function isProbablyModuleWorkerURL(absUrl) {
 }
 
 function resolveWorkerType(absUrl, opts, label) {
-  const hasType = !!(opts && typeof opts === 'object' && Object.prototype.hasOwnProperty.call(opts, 'type'));
+  const hasType = !!(opts && (typeof opts === 'object' || typeof opts === 'function') && ('type' in opts));
   const t = hasType ? opts.type : undefined;
   if (hasType && t !== 'module' && t !== 'classic') {
     const l = label ? ` (${label})` : '';

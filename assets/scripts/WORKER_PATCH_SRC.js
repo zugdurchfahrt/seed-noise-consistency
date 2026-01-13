@@ -263,7 +263,7 @@
       return false;
     };
     const resolveWorkerType = (absUrl, opts) => {
-      const hasType = !!(opts && typeof opts === 'object' && Object.prototype.hasOwnProperty.call(opts, 'type'));
+      const hasType = !!(opts && (typeof opts === 'object' || typeof opts === 'function') && ('type' in opts));
       const t = hasType ? opts.type : undefined;
       if (hasType && t !== 'module' && t !== 'classic') {
         throw new Error('UACHPatch: invalid worker type');

@@ -208,6 +208,29 @@ function NavTotalSetPatchModule() {
           configurable: true
         }
       });
+      const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
+      const getFullVersionList = mark(function getFullVersionList(){
+        if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) {
+          throw new Error('THW: uaData.fullVersionList missing');
+        }
+        return deep(meta.fullVersionList);
+      }, 'get fullVersionList');
+      Object.defineProperty(uadProto, 'fullVersionList', {
+        get: getFullVersionList,
+        enumerable: false,
+        configurable: true
+      });
+      const getUaFullVersion = mark(function getUaFullVersion(){
+        if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) {
+          throw new Error('THW: uaData.uaFullVersion missing');
+        }
+        return meta.uaFullVersion;
+      }, 'get uaFullVersion');
+      Object.defineProperty(uadProto, 'uaFullVersion', {
+        get: getUaFullVersion,
+        enumerable: false,
+        configurable: true
+      });
       const getHighEntropyValues = mark(function getHighEntropyValues(keys) {
           if (!Array.isArray(keys)) throw new Error('THW: bad keys');
           const map = {
