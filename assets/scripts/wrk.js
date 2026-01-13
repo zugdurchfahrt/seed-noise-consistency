@@ -169,8 +169,7 @@ function EnvPublishSnapshotModule(G){
 
 // === env-worker-bridge (главный бандл) ===
 (function setupEnvBridge(global){
-  global.__ENV_BRIDGE__ = global.__ENV_BRIDGE__;
-  const BR = global.__ENV_BRIDGE__;
+  const BR = (global.__ENV_BRIDGE__ = global.__ENV_BRIDGE__ || {});
 
 function mkModuleWorkerSource(snapshot, absUrl){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('THW: mkModuleWorkerSource bad snapshot');
