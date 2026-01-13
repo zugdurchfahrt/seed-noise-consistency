@@ -237,6 +237,8 @@ function NavTotalSetPatchModule() {
             architecture: meta.architecture,
             bitness: meta.bitness,
             model: meta.model,
+            brands: meta.brands,
+            mobile: meta.mobile,
             platform: chPlatform,
             platformVersion: meta.platformVersion,
             uaFullVersion: meta.uaFullVersion,

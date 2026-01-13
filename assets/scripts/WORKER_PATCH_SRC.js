@@ -32,6 +32,8 @@
     const cache = { snap:null };
     const validDpr = v => Number.isFinite(v) && v > 0;
     const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+    const LE_KEYS = ['brands','mobile','platform'];
+    const ALL_KEYS = new Set(HE_KEYS.concat(LE_KEYS));
     const requireSnap = (s, where) => {
       if (!s || typeof s !== 'object') {
         const msg = where ? `UACHPatch: no snapshot (${where})` : 'UACHPatch: no snapshot';
@@ -122,7 +124,6 @@
         return { brand: String(brand), version: String(major) };
       });
     };
-    const HE = new Set(HE_KEYS);
     const nativeUAD = nav && nav.userAgentData;
     if (!nativeUAD) throw new Error('THW: worker navigator.userAgentData missing');
     const uadProto = Object.getPrototypeOf(nativeUAD);
@@ -191,16 +192,34 @@
         for (const k of keys) {
           if (typeof k !== 'string' || !k) throw new Error('THW: bad keys');
         }
-        const unknown = keys.filter(k => !HE.has(k));
+        const unknown = keys.filter(k => !ALL_KEYS.has(k));
         if (unknown.length) throw new Error(`UACHPatch: unknown highEntropy ${unknown.join(',')}`);
-        const ks = keys;
         const s = cache.snap;
+        const le = s.uaData || s.uaCH;
+        if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
         const src = s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
         if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
+        const map = {
+          brands: le.brands,
+          mobile: le.mobile,
+          platform: le.platform,
+          architecture: src.architecture,
+          bitness: src.bitness,
+          model: src.model,
+          platformVersion: src.platformVersion,
+          uaFullVersion: src.uaFullVersion,
+          fullVersionList: src.fullVersionList,
+          wow64: src.wow64,
+          formFactors: src.formFactors
+        };
         const out = {};
-        for (const k of ks) {
-          if (!(k in src)) throw new Error(`THW: missing highEntropy.${k}`);
-          out[k] = deep(src[k]);
+        for (const k of keys) {
+          if (!(k in map)) throw new Error(`THW: missing highEntropy.${k}`);
+          const v = map[k];
+          if (v === undefined || v === null) throw new Error(`THW: missing highEntropy.${k}`);
+          if (typeof v === 'string' && !v && k !== 'model') throw new Error(`THW: missing highEntropy.${k}`);
+          if (Array.isArray(v) && !v.length) throw new Error(`THW: missing highEntropy.${k}`);
+          out[k] = deep(v);
         }
         return Promise.resolve(out);
       }, 'getHighEntropyValues');
