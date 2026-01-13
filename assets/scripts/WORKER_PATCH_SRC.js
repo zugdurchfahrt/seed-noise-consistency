@@ -66,15 +66,17 @@
     }
     const toStringMap = self.__NativeToStringMap || new WeakMap();
     self.__NativeToStringMap = toStringMap;
+    const existingMarkAsNative = (typeof self.markAsNative === 'function') ? self.markAsNative : null;
     const markAsNative = (func, name) => {
       if (typeof func !== 'function') throw new Error('UACHPatch: markAsNative requires function');
+      const out = existingMarkAsNative ? existingMarkAsNative(func, name) : func;
       const n = name || func.name;
       if (n) {
         toStringMap.set(func, `function ${n}() { [native code] }`);
       } else {
         toStringMap.set(func, 'function () { [native code] }');
       }
-      return func;
+      return out;
     };
     if (!self.__TOSTRING_PROXY_INSTALLED__) {
       if (typeof Proxy !== 'function') throw new Error('UACHPatch: Proxy missing');
@@ -86,7 +88,7 @@
       });
       self.__TOSTRING_PROXY_INSTALLED__ = true;
     }
-    if (!self.markAsNative) self.markAsNative = markAsNative;
+    self.markAsNative = markAsNative;
 
     const getDevicePixelRatio = markAsNative(function getDevicePixelRatio(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
@@ -314,7 +316,9 @@
     }
     if (self.Worker && !self.Worker.__ENV_WRAPPED__) {
       const NativeWorker = self.Worker;
-      self.Worker = function WrappedWorker(url, opts){
+      const dWorker = Object.getOwnPropertyDescriptor(self, 'Worker');
+      if (!dWorker) throw new Error('UACHPatch: Worker descriptor missing');
+      const WrappedWorker = markAsNative(function Worker(url, opts){
         const abs = new URL(url, self.location && self.location.href || undefined).href;
         const workerType = resolveWorkerType(abs, opts);
         const snap = requireSnap(self.__lastSnap__, 'nested');
@@ -329,7 +333,13 @@
         } finally {
           URL.revokeObjectURL(blobURL);
         }
-      };
+      }, 'Worker');
+      Object.defineProperty(self, 'Worker', {
+        configurable: dWorker.configurable,
+        enumerable: dWorker.enumerable,
+        writable: dWorker.writable,
+        value: WrappedWorker
+      });
       self.Worker.__ENV_WRAPPED__ = true;
     }
     self.__SCOPE_CONSISTENCY_PATCHED__ = true;

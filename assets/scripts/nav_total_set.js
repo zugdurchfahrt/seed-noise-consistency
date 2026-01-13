@@ -14,7 +14,12 @@ function NavTotalSetPatchModule() {
     if (typeof R !== 'function') {
       throw new Error('[NavTotalSetPatchModule] "R" is not initialized');
     }
-    const mark = (typeof window.markAsNative === 'function') ? window.markAsNative : (f) => f;
+    const mark = (() => {
+      if (typeof window.markAsNative !== 'function') {
+        throw new Error('[NavTotalSetPatchModule] markAsNative missing');
+      }
+      return window.markAsNative;
+    })();
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
     const meta          = window.__EXPECTED_CLIENT_HINTS || {};
@@ -114,10 +119,10 @@ function NavTotalSetPatchModule() {
     const critical = new Set(['userAgent','platform','vendor','appVersion']);
     (function patchCriticalOnProto(){
       const patch = (key, getter) => {
-        const has = !!Object.getOwnPropertyDescriptor(navProto, key);
+        const d = Object.getOwnPropertyDescriptor(navProto, key);
+        if (!d) throw new TypeError(`[nav_total_set] ${key}: descriptor missing`);
       // Important: like native - not enumerable
-      const ok = has ? (redefineAcc(navProto, key, getter, { enumerable: false }), true)
-        : safeDefineAcc(navProto, key, getter, { enumerable: false });
+      const ok = (redefineAcc(navProto, key, getter, { enumerable: false }), true);
       if (ok === false) throw new TypeError(`[nav_total_set] failed to define ${key}`);
       };
       patch('userAgent', () => userAgent);
@@ -182,6 +187,12 @@ function NavTotalSetPatchModule() {
       if (!nativeUAD) throw new Error('THW: window navigator.userAgentData missing');
       const uadProto = Object.getPrototypeOf(nativeUAD);
       if (!uadProto) throw new Error('THW: window navigator.userAgentData proto missing');
+      const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
+      const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
+      const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
+      if (!dBrands || !dMobile || !dPlatform) {
+        throw new Error('THW: window navigator.userAgentData descriptor missing');
+      }
       Object.defineProperties(uadProto, {
         brands: {
           get: mark(function getBrands(){
@@ -215,6 +226,9 @@ function NavTotalSetPatchModule() {
         }
         return deep(meta.fullVersionList);
       }, 'get fullVersionList');
+      if (!Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')) {
+        throw new Error('THW: uaData.fullVersionList descriptor missing');
+      }
       Object.defineProperty(uadProto, 'fullVersionList', {
         get: getFullVersionList,
         enumerable: false,
@@ -226,6 +240,9 @@ function NavTotalSetPatchModule() {
         }
         return meta.uaFullVersion;
       }, 'get uaFullVersion');
+      if (!Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')) {
+        throw new Error('THW: uaData.uaFullVersion descriptor missing');
+      }
       Object.defineProperty(uadProto, 'uaFullVersion', {
         get: getUaFullVersion,
         enumerable: false,
@@ -260,6 +277,9 @@ function NavTotalSetPatchModule() {
           }
           return Promise.resolve(result);
         }, 'getHighEntropyValues');
+      if (!Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues')) {
+        throw new Error('THW: uaData.getHighEntropyValues descriptor missing');
+      }
       Object.defineProperty(uadProto, 'getHighEntropyValues', {
         get: mark(function get_getHighEntropyValues() { return getHighEntropyValues; }, 'get getHighEntropyValues'),
         configurable: true,
@@ -268,6 +288,9 @@ function NavTotalSetPatchModule() {
 
 
       const toJSON = mark(function toJSON() {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON');
+      if (!Object.getOwnPropertyDescriptor(uadProto, 'toJSON')) {
+        throw new Error('THW: uaData.toJSON descriptor missing');
+      }
       Object.defineProperty(uadProto, 'toJSON', {
         get: mark(function get_toJSON() { return toJSON; }, 'get toJSON'),
         configurable: true,
@@ -275,9 +298,9 @@ function NavTotalSetPatchModule() {
       });
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
-    const okUaData = (Object.getOwnPropertyDescriptor(navProto, 'userAgentData') ?
-      (redefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return nativeUAD; }, { enumerable: false }), true) :
-      safeDefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return nativeUAD; }, { enumerable: false }));
+    const dUaData = Object.getOwnPropertyDescriptor(navProto, 'userAgentData');
+    if (!dUaData) throw new TypeError('[nav_total_set] userAgentData descriptor missing');
+    const okUaData = (redefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return nativeUAD; }, { enumerable: false }), true);
     if (okUaData === false) throw new TypeError('[nav_total_set] failed to define userAgentData');
     const uadTag = Object.prototype.toString.call(nativeUAD);
     if (uadTag === '[object Object]') throw new Error('THW: window navigator.userAgentData tag');
@@ -310,8 +333,12 @@ function NavTotalSetPatchModule() {
 
     // ——— H. permissions.query ———
     if ('permissions' in navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
+      const permProto = Object.getPrototypeOf(navigator.permissions) || navigator.permissions;
+      const permDesc = Object.getOwnPropertyDescriptor(permProto, 'query')
+        || Object.getOwnPropertyDescriptor(navigator.permissions, 'query');
+      if (!permDesc) throw new TypeError('[nav_total_set] permissions.query descriptor missing');
       const origQuery = navigator.permissions.query.bind(navigator.permissions);
-      navigator.permissions.query = mark(function query(parameters) {
+      const patchedQuery = mark(function query(parameters) {
         const name = parameters && parameters.name;
         if (name === 'persistent-storage')
           return Promise.resolve({ state: 'granted', onchange: null });
@@ -319,11 +346,21 @@ function NavTotalSetPatchModule() {
           return Promise.resolve({ state: 'prompt', onchange: null });
         return origQuery ? origQuery(parameters) : Promise.resolve({ state: 'prompt', onchange: null });
       }, 'query');
+      Object.defineProperty(permProto, 'query', {
+        value: patchedQuery,
+        configurable: permDesc.configurable,
+        enumerable: permDesc.enumerable,
+        writable: permDesc.writable
+      });
     }
 
     // ——— I. mediaDevices.enumerateDevices ———
     if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
-      navigator.mediaDevices.enumerateDevices = mark(async function enumerateDevices() {
+      const mediaProto = Object.getPrototypeOf(navigator.mediaDevices) || navigator.mediaDevices;
+      const mediaDesc = Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
+        || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices');
+      if (!mediaDesc) throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices descriptor missing');
+      const patchedEnumerate = mark(async function enumerateDevices() {
         const generateHexId = (len = 64) => {
           let s = '';
           for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
@@ -336,10 +373,20 @@ function NavTotalSetPatchModule() {
           { kind: 'audiooutput', label: devicesLabels.audiooutput, deviceId: generateHexId(64), groupId: generateHexId(64) }
         ];
       }, 'enumerateDevices');
+      Object.defineProperty(mediaProto, 'enumerateDevices', {
+        value: patchedEnumerate,
+        configurable: mediaDesc.configurable,
+        enumerable: mediaDesc.enumerable,
+        writable: mediaDesc.writable
+      });
     }
 
     // ——— J. storage.estimate & webkitTemporaryStorage ———
     if (navigator.storage && typeof navigator.storage.estimate === 'function') {
+      const storageProto = Object.getPrototypeOf(navigator.storage) || navigator.storage;
+      const storageDesc = Object.getOwnPropertyDescriptor(storageProto, 'estimate')
+        || Object.getOwnPropertyDescriptor(navigator.storage, 'estimate');
+      if (!storageDesc) throw new TypeError('[nav_total_set] storage.estimate descriptor missing');
       // Конфигурация: берём из глобалов (как и прочие параметры в модуле), иначе безопасные дефолты
       const QUOTA_MB   = Number(window.__STORAGE_QUOTA_MB   ?? 120);
       const USED_PCT   = Math.max(0, Math.min(100, Number(window.__STORAGE_USED_PCT ?? 3))); // ~3% занято
@@ -351,8 +398,10 @@ function NavTotalSetPatchModule() {
         usageBytes = Math.min(quotaBytes - 4096, usageBytes + Math.floor(R() * 4096));
       }, 'tickUsage');
 
-      Object.defineProperty(navigator.storage, 'estimate', {
-        configurable: true,
+      Object.defineProperty(storageProto, 'estimate', {
+        configurable: storageDesc.configurable,
+        enumerable: storageDesc.enumerable,
+        writable: storageDesc.writable,
         value: mark(() => {
           tickUsage();
           return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
@@ -360,18 +409,44 @@ function NavTotalSetPatchModule() {
       });
 
       if (navigator.webkitTemporaryStorage) {
-        navigator.webkitTemporaryStorage.queryUsageAndQuota = mark(function (success, error) {
+        const tmpProto = Object.getPrototypeOf(navigator.webkitTemporaryStorage) || navigator.webkitTemporaryStorage;
+        const tmpDesc = Object.getOwnPropertyDescriptor(tmpProto, 'queryUsageAndQuota')
+          || Object.getOwnPropertyDescriptor(navigator.webkitTemporaryStorage, 'queryUsageAndQuota');
+        if (!tmpDesc) throw new TypeError('[nav_total_set] webkitTemporaryStorage.queryUsageAndQuota descriptor missing');
+        const patchedQueryUsage = mark(function (success, error) {
           try { tickUsage(); success(usageBytes, quotaBytes); }
           catch (e) { if (typeof error === 'function') error(e); }
         }, 'queryUsageAndQuota');
+        Object.defineProperty(tmpProto, 'queryUsageAndQuota', {
+          configurable: tmpDesc.configurable,
+          enumerable: tmpDesc.enumerable,
+          writable: tmpDesc.writable,
+          value: patchedQueryUsage
+        });
       }
 
       // Consistent “persistence”
       if (typeof navigator.storage.persist   === 'function') {
-        navigator.storage.persist = mark(function persist()   { return Promise.resolve(true); }, 'persist');
+        const persistDesc = Object.getOwnPropertyDescriptor(storageProto, 'persist')
+          || Object.getOwnPropertyDescriptor(navigator.storage, 'persist');
+        if (!persistDesc) throw new TypeError('[nav_total_set] storage.persist descriptor missing');
+        Object.defineProperty(storageProto, 'persist', {
+          configurable: persistDesc.configurable,
+          enumerable: persistDesc.enumerable,
+          writable: persistDesc.writable,
+          value: mark(function persist()   { return Promise.resolve(true); }, 'persist')
+        });
       }
       if (typeof navigator.storage.persisted === 'function') {
-        navigator.storage.persisted = mark(function persisted() { return Promise.resolve(true); }, 'persisted');
+        const persistedDesc = Object.getOwnPropertyDescriptor(storageProto, 'persisted')
+          || Object.getOwnPropertyDescriptor(navigator.storage, 'persisted');
+        if (!persistedDesc) throw new TypeError('[nav_total_set] storage.persisted descriptor missing');
+        Object.defineProperty(storageProto, 'persisted', {
+          configurable: persistedDesc.configurable,
+          enumerable: persistedDesc.enumerable,
+          writable: persistedDesc.writable,
+          value: mark(function persisted() { return Promise.resolve(true); }, 'persisted')
+        });
       }
     }
 
@@ -422,26 +497,49 @@ function NavTotalSetPatchModule() {
 
     // ——— K. WebAuthn (stub) ———
     if (!window.PublicKeyCredential) {
-      window.PublicKeyCredential = function () {};
-      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable =
-        mark(function isUserVerifyingPlatformAuthenticatorAvailable() { return Promise.resolve(true); },
-             'isUserVerifyingPlatformAuthenticatorAvailable');
+      window.PublicKeyCredential = mark(function PublicKeyCredential() {}, 'PublicKeyCredential');
+      Object.defineProperty(PublicKeyCredential, 'isUserVerifyingPlatformAuthenticatorAvailable', {
+        configurable: true,
+        enumerable: false,
+        writable: true,
+        value: mark(function isUserVerifyingPlatformAuthenticatorAvailable() { return Promise.resolve(true); },
+             'isUserVerifyingPlatformAuthenticatorAvailable')
+      });
     }
     if (navigator.credentials) {
       const origCreate = navigator.credentials.create;
       const origGet    = navigator.credentials.get;
-      navigator.credentials.create = mark(function create(options) {
+      const credProto = Object.getPrototypeOf(navigator.credentials) || navigator.credentials;
+      const createDesc = Object.getOwnPropertyDescriptor(credProto, 'create')
+        || Object.getOwnPropertyDescriptor(navigator.credentials, 'create');
+      const getDesc = Object.getOwnPropertyDescriptor(credProto, 'get')
+        || Object.getOwnPropertyDescriptor(navigator.credentials, 'get');
+      if (!createDesc) throw new TypeError('[nav_total_set] credentials.create descriptor missing');
+      if (!getDesc) throw new TypeError('[nav_total_set] credentials.get descriptor missing');
+      const patchedCreate = mark(function create(options) {
         if (options && options.publicKey) {
           return origCreate ? origCreate.call(this, options) : Promise.resolve(new PublicKeyCredential());
         }
         return origCreate ? origCreate.call(this, options) : Promise.resolve(undefined);
       }, 'create');
-      navigator.credentials.get = mark(function get(options) {
+      const patchedGet = mark(function get(options) {
         if (options && options.publicKey) {
           return origGet ? origGet.call(this, options) : Promise.resolve(new PublicKeyCredential());
         }
         return origGet ? origGet.call(this, options) : Promise.resolve(undefined);
       }, 'get');
+      Object.defineProperty(credProto, 'create', {
+        configurable: createDesc.configurable,
+        enumerable: createDesc.enumerable,
+        writable: createDesc.writable,
+        value: patchedCreate
+      });
+      Object.defineProperty(credProto, 'get', {
+        configurable: getDesc.configurable,
+        enumerable: getDesc.enumerable,
+        writable: getDesc.writable,
+        value: patchedGet
+      });
     }
     console.log('Web Auth API mock applied');
 

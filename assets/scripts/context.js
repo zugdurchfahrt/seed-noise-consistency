@@ -13,17 +13,14 @@ function ContextPatchModule(window) {
   // === 0. Utilities ===
   const NOP = () => {};
 
-  const markAsNative = (global && typeof global.markAsNative === 'function')
-    ? function(fn, name) {
-        const out = global.markAsNative(fn, name);
-        try { Object.defineProperty(out, 'CanvasGlobal', {value: true}); } catch {}
-        return out;
-      }
-    : function markAsNative(fn, name){
-        try { Object.defineProperty(fn, 'name', {value: name, configurable: true}); } catch {}
-        try { Object.defineProperty(fn, 'CanvasGlobal', {value: true}); } catch {}
-        return fn;
-      };
+  if (!global || typeof global.markAsNative !== 'function') {
+    throw new Error('[ContextPatch] markAsNative missing');
+  }
+  const markAsNative = function(fn, name) {
+    const out = global.markAsNative(fn, name);
+    try { Object.defineProperty(out, 'CanvasGlobal', {value: true}); } catch {}
+    return out;
+  };
 
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
@@ -48,6 +45,9 @@ function ContextPatchModule(window) {
 
   function definePatchedMethod(proto, method, value) {
     const d = Object.getOwnPropertyDescriptor(proto, method);
+    if (!d) {
+      throw new Error(`[ContextPatch] descriptor missing for ${method}`);
+    }
     Object.defineProperty(proto, method, {
       value,
       configurable: d ? !!d.configurable : true,
@@ -460,7 +460,7 @@ function ContextPatchModule(window) {
       return ctx;
     };
 
-    proto[method] = markAsNative(wrapped, method);
+    definePatchedMethod(proto, method, markAsNative(wrapped, method));
     return true;
   }
 

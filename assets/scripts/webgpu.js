@@ -3,7 +3,21 @@ function WebGPUPatchModule() {
     window.__PATCH_WEBGPU__ = true;
     const C = window.CanvasPatchContext;
       if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module is registration is not available');
-    const markNative = (window.markAsNative || ((f) => f));
+    if (typeof window.markAsNative !== 'function') {
+      throw new Error('[WebGPUPatchModule] markAsNative missing');
+    }
+    const markNative = window.markAsNative;
+    const definePatchedValue = (target, key, value, label) => {
+      const d = Object.getOwnPropertyDescriptor(target, key)
+        || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target) || {}, key);
+      if (!d) throw new Error(`[WebGPU] ${label || key} descriptor missing`);
+      Object.defineProperty(target, key, {
+        value,
+        configurable: d.configurable,
+        enumerable: d.enumerable,
+        writable: d.writable
+      });
+    };
 
      // --- Определение браузера ---
     function getBrowser() {
@@ -311,7 +325,7 @@ function __maskFeatures(nativeFeatures) {
       return dev; // возвращаем нативный GPUDevice (бренд сохраняем)
     };
 
-    adapter.requestDevice = markNative(patchedRequestDevice, 'requestDevice');
+    definePatchedValue(adapter, 'requestDevice', markNative(patchedRequestDevice, 'requestDevice'), 'adapter.requestDevice');
 
 
       // Прокси адаптера
@@ -336,10 +350,9 @@ function __maskFeatures(nativeFeatures) {
 
       return new Proxy(adapter, handler);
     };
-    navigator.gpu.requestAdapter = markNative(patchedRequestAdapter, 'requestAdapter');
+    definePatchedValue(navigator.gpu, 'requestAdapter', markNative(patchedRequestAdapter, 'requestAdapter'), 'navigator.gpu.requestAdapter');
   
 };
 console.log(`[WebGPU] Patched requestAdapter/requestDevice for browser: ${browser}`);
 }
 } // ✅ Эта закрывающая скобка завершает функцию корректно
-
