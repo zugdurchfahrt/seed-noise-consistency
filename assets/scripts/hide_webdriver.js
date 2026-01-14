@@ -22,8 +22,12 @@ function HideWebdriverPatchModule() {
   let toStringDepth = 0;
 
   // general WeakMap, available to all modules
-  const toStringOverrideMap = (window.__NativeToStringMap =
-    window.__NativeToStringMap || new WeakMap());
+  const existingMap = window.__NativeToStringMap;
+  const toStringOverrideMap = (existingMap && typeof existingMap.get === 'function'
+    && typeof existingMap.set === 'function' && typeof existingMap.has === 'function')
+    ? existingMap
+    : new WeakMap();
+  window.__NativeToStringMap = toStringOverrideMap;
 
   // Unified global function-mask
   function markAsNative(func, name = "") {
@@ -39,25 +43,45 @@ function HideWebdriverPatchModule() {
   function fakeNative(func, name = "") { return markAsNative(func, name); }
 
   // Single override for Function.prototype.toString, reading from the general WeakMap
-  if (!window.__TOSTRING_PROXY_INSTALLED__) {
+  {
     if (!toStringDesc) throw new Error('[stealth] Function.prototype.toString descriptor missing');
-    const wrappedToString = markAsNative(({ toString() {
-      if (toStringDepth) return Reflect.apply(nativeToString, this, arguments);
-      toStringDepth++;
+    let needsInstall = true;
+    try {
+      const probe = function __ts_probe__(){};
+      const expected = 'function __ts_probe__() { [native code] }';
+      try { toStringOverrideMap.set(probe, expected); } catch {}
       try {
-        if (toStringOverrideMap.has(this)) return toStringOverrideMap.get(this);
-        return Reflect.apply(nativeToString, this, arguments);
+        const out = Function.prototype.toString.call(probe);
+        if (out === expected) needsInstall = false;
       } finally {
-        toStringDepth--;
+        try { toStringOverrideMap.delete(probe); } catch {}
       }
-    } }).toString, 'toString');
-    Object.defineProperty(Function.prototype, 'toString', {
-      configurable: toStringDesc.configurable,
-      enumerable: toStringDesc.enumerable,
-      writable: toStringDesc.writable,
-      value: wrappedToString
-    });
-    window.__TOSTRING_PROXY_INSTALLED__ = true;
+    } catch {}
+
+    if (needsInstall) {
+      const wrappedToString = markAsNative(({ toString() {
+        if (typeof this !== 'function') {
+          return Reflect.apply(nativeToString, this, arguments);
+        }
+        if (toStringDepth) return Reflect.apply(nativeToString, this, arguments);
+        toStringDepth++;
+        try {
+          try {
+            if (toStringOverrideMap.has(this)) return toStringOverrideMap.get(this);
+          } catch {}
+          return Reflect.apply(nativeToString, this, arguments);
+        } finally {
+          toStringDepth--;
+        }
+      } }).toString, 'toString');
+      Object.defineProperty(Function.prototype, 'toString', {
+        configurable: toStringDesc.configurable,
+        enumerable: toStringDesc.enumerable,
+        writable: toStringDesc.writable,
+        value: wrappedToString
+      });
+      window.__TOSTRING_PROXY_INSTALLED__ = true;
+    }
   }
 
 
