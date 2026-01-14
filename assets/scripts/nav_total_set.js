@@ -227,10 +227,8 @@ function NavTotalSetPatchModule() {
         return deep(meta.fullVersionList);
       }, 'get fullVersionList');
       const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
-        || Object.getOwnPropertyDescriptor(nativeUAD, 'fullVersionList');
-      if (!dFull) {
-        throw new Error('THW: uaData.fullVersionList descriptor missing');
-      }
+        || Object.getOwnPropertyDescriptor(nativeUAD, 'fullVersionList')
+        || { configurable: true, enumerable: false };
       Object.defineProperty(uadProto, 'fullVersionList', {
         get: getFullVersionList,
         enumerable: dFull.enumerable,
@@ -243,10 +241,8 @@ function NavTotalSetPatchModule() {
         return meta.uaFullVersion;
       }, 'get uaFullVersion');
       const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
-        || Object.getOwnPropertyDescriptor(nativeUAD, 'uaFullVersion');
-      if (!dUaFull) {
-        throw new Error('THW: uaData.uaFullVersion descriptor missing');
-      }
+        || Object.getOwnPropertyDescriptor(nativeUAD, 'uaFullVersion')
+        || { configurable: true, enumerable: false };
       Object.defineProperty(uadProto, 'uaFullVersion', {
         get: getUaFullVersion,
         enumerable: dUaFull.enumerable,
