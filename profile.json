@@ -4,22 +4,22 @@
     "os_info": "Windows NT 10.0; Win64; x64",
     "os_name": "Windows 10 64-bit",
     "platform_version": "10.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-    "browser_version": "135.0.7049.114",
-    "screen_width": 7680,
-    "screen_height": 4320,
-    "device_dpr_value": 3.0,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0",
+    "browser_version": "135.0.3179.85",
+    "screen_width": 1920,
+    "screen_height": 1080,
+    "device_dpr_value": 1.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
     "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
-    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x2206) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x2501) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
     "gpu_architecture": "ampere",
     "gpu_vendor": "nvidia",
     "devices_conf": {
-      "audioinput": "Sennheiser e835",
-      "videoinput": "Creative Live! Cam",
-      "audiooutput": "Marshall Monitor II A.N.C."
+      "audioinput": "Fifine K669B",
+      "videoinput": "AVerMedia Live Streamer CAM 313",
+      "audiooutput": "Beyerdynamic DT 990 Pro"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -28,28 +28,9 @@
     ],
     "language": "de-DE",
     "deviceMemory": 4,
-    "hardwareConcurrency": 2,
-    "plugins": [
-      {
-        "name": "Chrome PDF Viewer",
-        "filename": "internal-pdf-viewer",
-        "description": "Portable Document Format",
-        "mimeTypes": [
-          {
-            "type": "application/pdf",
-            "suffixes": "pdf",
-            "description": "PDF document"
-          }
-        ]
-      }
-    ],
-    "mimeTypes": [
-      {
-        "type": "application/pdf",
-        "suffixes": "pdf",
-        "description": "PDF document"
-      }
-    ],
+    "hardwareConcurrency": 6,
+    "plugins": [],
+    "mimeTypes": [],
     "accept_language": "de-DE,de;q=0.9"
   },
   "expected_client_hints": {
@@ -64,7 +45,7 @@
         "version": "135"
       },
       {
-        "brand": "Google Chrome",
+        "brand": "Microsoft Edge",
         "version": "135"
       }
     ],
@@ -80,22 +61,22 @@
       },
       {
         "brand": "Chromium",
-        "version": "135.0.7049.114"
+        "version": "135.0.3179.85"
       },
       {
-        "brand": "Google Chrome",
-        "version": "135.0.7049.114"
+        "brand": "Microsoft Edge",
+        "version": "135.0.3179.85"
       }
     ],
-    "uaFullVersion": "135.0.7049.114",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"135\", \"Google Chrome\";v=\"135\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.114\", \"Google Chrome\";v=\"135.0.7049.114\"",
+    "uaFullVersion": "135.0.3179.85",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"135\", \"Microsoft Edge\";v=\"135\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.3179.85\", \"Microsoft Edge\";v=\"135.0.3179.85\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
     "deviceMemory": 4,
-    "hardwareConcurrency": 2,
+    "hardwareConcurrency": 6,
     "wow64": false,
     "languages": [
       "de-DE",
@@ -105,6 +86,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/webp,image/avif,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/avif,image/webp,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }
