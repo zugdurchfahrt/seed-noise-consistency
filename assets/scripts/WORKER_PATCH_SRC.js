@@ -82,7 +82,9 @@
       if (typeof Proxy !== 'function') throw new Error('UACHPatch: Proxy missing');
       Function.prototype.toString = new Proxy(nativeToString, {
         apply(target, thisArg, args) {
-          if (toStringMap.has(thisArg)) return toStringMap.get(thisArg);
+          if (typeof thisArg === 'function' && toStringMap.has(thisArg)) {
+            return toStringMap.get(thisArg);
+          }
           return target.apply(thisArg, args);
         }
       });

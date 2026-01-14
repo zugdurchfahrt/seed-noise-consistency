@@ -32,6 +32,24 @@ function ScreenPatchModule() {
     });
   }
 
+  const mqlMatches = new WeakMap();
+  const mqlProto = (typeof MediaQueryList !== 'undefined' && MediaQueryList.prototype) ? MediaQueryList.prototype : null;
+  if (mqlProto) {
+    const matchesDesc = Object.getOwnPropertyDescriptor(mqlProto, 'matches');
+    if (matchesDesc && typeof matchesDesc.get === 'function' && matchesDesc.configurable) {
+      const origMatchesGet = matchesDesc.get;
+      Object.defineProperty(mqlProto, 'matches', {
+        get: function matches() {
+          if (mqlMatches.has(this)) return mqlMatches.get(this);
+          return origMatchesGet.call(this);
+        },
+        set: matchesDesc.set,
+        configurable: matchesDesc.configurable,
+        enumerable: matchesDesc.enumerable
+      });
+    }
+  }
+
   const origMatchMedia = window.matchMedia;
   window.matchMedia = function (query) {
     let matches = true;
@@ -94,47 +112,33 @@ function ScreenPatchModule() {
     }
 
     const mql = origMatchMedia.call(this, query);
-    return {
-      matches: matches,
-      media: mql.media,
-      onchange: null,
-      addListener: mql.addListener ? mql.addListener.bind(mql) : () => {},
-      removeListener: mql.removeListener ? mql.removeListener.bind(mql) : () => {},
-      addEventListener: mql.addEventListener ? mql.addEventListener.bind(mql) : () => {},
-      removeEventListener: mql.removeEventListener ? mql.removeEventListener.bind(mql) : () => {},
-      dispatchEvent: mql.dispatchEvent ? mql.dispatchEvent.bind(mql) : () => false
-    };
+    if (mql && (typeof mql === 'object' || typeof mql === 'function')) {
+      try { mqlMatches.set(mql, matches); } catch {}
+    }
+    return mql;
   };
 
   //  screen и orientation ──
-  const orientationObj = {};
-  safeDefine(orientationObj, "type", {
-    get: () => (SCREEN_WIDTH > SCREEN_HEIGHT ? "landscape-primary" : "portrait-primary"),
-    configurable: true,
-    enumerable: true
-  });
-  safeDefine(orientationObj, "angle", {
-    get: () => 0,
-    configurable: true,
-    enumerable: true
-  });
-
-  const screenObj = {
-    width:       SCREEN_WIDTH,
-    height:      SCREEN_HEIGHT,
-    availWidth:  SCREEN_WIDTH,
-    availHeight: SCREEN_HEIGHT,
-    availLeft:   0,
-    availTop:    0,
-    colorDepth:  COLOR_DEPTH,
-    pixelDepth:  COLOR_DEPTH,
-    orientation: orientationObj
-  };
-  safeDefine(window, "screen", {
-    get: () => screenObj,
-    configurable: true,
-    enumerable: true
-  });
+  const screenObj = window.screen;
+  if (screenObj && typeof Screen !== 'undefined' && Screen.prototype) {
+    const screenProto = Screen.prototype;
+    try { redefineAccessor(screenProto, 'width', () => SCREEN_WIDTH); } catch (e) { console.warn('[Screen] width redefine failed:', e); }
+    try { redefineAccessor(screenProto, 'height', () => SCREEN_HEIGHT); } catch (e) { console.warn('[Screen] height redefine failed:', e); }
+    try { redefineAccessor(screenProto, 'availWidth', () => SCREEN_WIDTH); } catch (e) { console.warn('[Screen] availWidth redefine failed:', e); }
+    try { redefineAccessor(screenProto, 'availHeight', () => SCREEN_HEIGHT); } catch (e) { console.warn('[Screen] availHeight redefine failed:', e); }
+    try { redefineAccessor(screenProto, 'colorDepth', () => COLOR_DEPTH); } catch (e) { console.warn('[Screen] colorDepth redefine failed:', e); }
+    try { redefineAccessor(screenProto, 'pixelDepth', () => COLOR_DEPTH); } catch (e) { console.warn('[Screen] pixelDepth redefine failed:', e); }
+    try { redefineAccessor(screenProto, 'availLeft', () => 0); } catch (e) { console.warn('[Screen] availLeft redefine failed:', e); }
+    try { redefineAccessor(screenProto, 'availTop', () => 0); } catch (e) { console.warn('[Screen] availTop redefine failed:', e); }
+  }
+  const orientationObj = screenObj && screenObj.orientation;
+  const orientationProto = orientationObj && Object.getPrototypeOf(orientationObj);
+  if (orientationProto && orientationProto !== Object.prototype) {
+    try { redefineAccessor(orientationProto, 'type', () => (SCREEN_WIDTH > SCREEN_HEIGHT ? "landscape-primary" : "portrait-primary")); }
+    catch (e) { console.warn('[Screen] orientation.type redefine failed:', e); }
+    try { redefineAccessor(orientationProto, 'angle', () => 0); }
+    catch (e) { console.warn('[Screen] orientation.angle redefine failed:', e); }
+  }
 
   // inner/outerWidth/Height
   ["innerWidth", "innerHeight", "outerWidth", "outerHeight"].forEach(prop => {
@@ -219,8 +223,20 @@ function ScreenPatchModule() {
 
 
   // clientWidth / clientHeight for <html> ──
-  redefineAccessor(Element.prototype, 'clientWidth', function clientWidth() { return SCREEN_WIDTH; });
-  redefineAccessor(Element.prototype, 'clientHeight', function clientHeight() { return SCREEN_HEIGHT; });
+  const clientWidthDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'clientWidth');
+  const origClientWidth = clientWidthDesc && clientWidthDesc.get;
+  redefineAccessor(Element.prototype, 'clientWidth', function clientWidth() {
+    if (this === document.documentElement || this === document.body) return SCREEN_WIDTH;
+    if (typeof origClientWidth === 'function') return origClientWidth.call(this);
+    return SCREEN_WIDTH;
+  });
+  const clientHeightDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'clientHeight');
+  const origClientHeight = clientHeightDesc && clientHeightDesc.get;
+  redefineAccessor(Element.prototype, 'clientHeight', function clientHeight() {
+    if (this === document.documentElement || this === document.body) return SCREEN_HEIGHT;
+    if (typeof origClientHeight === 'function') return origClientHeight.call(this);
+    return SCREEN_HEIGHT;
+  });
 
 
 

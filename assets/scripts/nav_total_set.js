@@ -167,14 +167,28 @@ function NavTotalSetPatchModule() {
       setScreen('pixelDepth',  () => colorDepth);
       setScreen('availWidth',  () => width);
       setScreen('availHeight', () => height);
-      Object.defineProperty(window.screen, 'orientation', {
-        get: mark(() => ({
-          type: orientationDom,
-          angle: 0,
-          toString: mark(function() { return this.type; }, 'toString')
-        }), 'get screen.orientation'),
-        configurable: true
-      });
+      const orientationObj = window.screen && window.screen.orientation;
+      const orientationProto = orientationObj && Object.getPrototypeOf(orientationObj);
+      if (orientationProto && orientationProto !== Object.prototype) {
+        const typeDesc = Object.getOwnPropertyDescriptor(orientationProto, 'type');
+        if (typeDesc && typeDesc.configurable) {
+          Object.defineProperty(orientationProto, 'type', {
+            get: mark(() => orientationDom, 'get type'),
+            set: typeDesc.set,
+            configurable: typeDesc.configurable,
+            enumerable: typeDesc.enumerable
+          });
+        }
+        const angleDesc = Object.getOwnPropertyDescriptor(orientationProto, 'angle');
+        if (angleDesc && angleDesc.configurable) {
+          Object.defineProperty(orientationProto, 'angle', {
+            get: mark(() => 0, 'get angle'),
+            set: angleDesc.set,
+            configurable: angleDesc.configurable,
+            enumerable: angleDesc.enumerable
+          });
+        }
+      }
     })();
 
     // oscpu (только если есть в прототипе)
@@ -280,10 +294,12 @@ function NavTotalSetPatchModule() {
       if (!Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues')) {
         throw new Error('THW: uaData.getHighEntropyValues descriptor missing');
       }
+      const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
       Object.defineProperty(uadProto, 'getHighEntropyValues', {
-        get: mark(function get_getHighEntropyValues() { return getHighEntropyValues; }, 'get getHighEntropyValues'),
-        configurable: true,
-        enumerable: false
+        value: getHighEntropyValues,
+        configurable: ghevDesc ? ghevDesc.configurable : true,
+        enumerable: ghevDesc ? ghevDesc.enumerable : false,
+        writable: ghevDesc && Object.prototype.hasOwnProperty.call(ghevDesc, 'writable') ? ghevDesc.writable : true
       });
 
 
@@ -291,10 +307,12 @@ function NavTotalSetPatchModule() {
       if (!Object.getOwnPropertyDescriptor(uadProto, 'toJSON')) {
         throw new Error('THW: uaData.toJSON descriptor missing');
       }
+      const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
       Object.defineProperty(uadProto, 'toJSON', {
-        get: mark(function get_toJSON() { return toJSON; }, 'get toJSON'),
-        configurable: true,
-        enumerable: false
+        value: toJSON,
+        configurable: toJsonDesc ? toJsonDesc.configurable : true,
+        enumerable: toJsonDesc ? toJsonDesc.enumerable : false,
+        writable: toJsonDesc && Object.prototype.hasOwnProperty.call(toJsonDesc, 'writable') ? toJsonDesc.writable : true
       });
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
@@ -340,7 +358,7 @@ function NavTotalSetPatchModule() {
       const origQuery = permDesc.value || navigator.permissions.query;
       const patchedQuery = mark(function query(parameters) {
         if (new.target) {
-          return origQuery.call(this, parameters);
+          throw new TypeError('Illegal constructor');
         }
         const isPermThis = (this === navigator.permissions || this === permProto);
         if (!isPermThis) {
