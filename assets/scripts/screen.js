@@ -19,6 +19,18 @@ function ScreenPatchModule() {
       console.warn(`[Screen] safeDefine failed for ${prop}:`, e);
     }
   }
+  function redefineAccessor(proto, prop, getter) {
+    const d = Object.getOwnPropertyDescriptor(proto, prop);
+    if (!d) throw new Error(`[Screen] ${prop} descriptor missing`);
+    if (d.configurable === false) throw new Error(`[Screen] ${prop} non-configurable`);
+    if (typeof d.get !== 'function') throw new Error(`[Screen] ${prop} getter missing`);
+    Object.defineProperty(proto, prop, {
+      get: getter,
+      set: d.set,
+      configurable: d.configurable,
+      enumerable: d.enumerable
+    });
+  }
 
   const origMatchMedia = window.matchMedia;
   window.matchMedia = function (query) {
@@ -207,16 +219,8 @@ function ScreenPatchModule() {
 
 
   // clientWidth / clientHeight for <html> ──
-  safeDefine(Element.prototype, 'clientWidth', {
-    get: () => SCREEN_WIDTH,
-    configurable: true,
-    enumerable: true
-  });
-  safeDefine(Element.prototype, 'clientHeight', {
-    get: () => SCREEN_HEIGHT,
-    configurable: true,
-    enumerable: true
-  });
+  redefineAccessor(Element.prototype, 'clientWidth', function clientWidth() { return SCREEN_WIDTH; });
+  redefineAccessor(Element.prototype, 'clientHeight', function clientHeight() { return SCREEN_HEIGHT; });
 
 
 
@@ -228,32 +232,7 @@ function ScreenPatchModule() {
     });
   });
 
-  // clientWidth/Height for HTMLElement.prototype
-  safeDefine(HTMLElement.prototype, "clientWidth", {
-    get: () => SCREEN_WIDTH, configurable: true, enumerable: true
-  });
-  safeDefine(HTMLElement.prototype, "clientHeight", {
-    get: () => SCREEN_HEIGHT, configurable: true, enumerable: true
-  });
-
-  // —————— Document/client patch ——————
-  // 1) <html>
-  safeDefine(document.documentElement, "clientWidth", {
-    get: () => SCREEN_WIDTH, configurable: true, enumerable: true
-  });
-  safeDefine(document.documentElement, "clientHeight", {
-    get: () => SCREEN_HEIGHT, configurable: true, enumerable: true
-  });
-
-  // 2) all <div>
-  safeDefine(HTMLDivElement.prototype, "clientWidth", {
-    get: () => SCREEN_WIDTH, configurable: true, enumerable: true
-  });
-  safeDefine(HTMLDivElement.prototype, "clientHeight", {
-    get: () => SCREEN_HEIGHT, configurable: true, enumerable: true
-  });
-
-  // 3) log after DOM ready for document & div
+  // log after DOM ready for document & div
   document.addEventListener("DOMContentLoaded", () => {
     console.log("[Screen] document & div client sizes →", {
       html: {

@@ -16,10 +16,9 @@ function ContextPatchModule(window) {
   if (!global || typeof global.markAsNative !== 'function') {
     throw new Error('[ContextPatch] markAsNative missing');
   }
+  const patchedMethods = new WeakSet();
   const markAsNative = function(fn, name) {
-    const out = global.markAsNative(fn, name);
-    try { Object.defineProperty(out, 'CanvasGlobal', {value: true}); } catch {}
-    return out;
+    return global.markAsNative(fn, name);
   };
 
   function guardInstance(proto, self){
@@ -110,43 +109,63 @@ function ContextPatchModule(window) {
   function chain(proto, method, hooks){
     if (!proto || typeof proto[method] !== 'function' || !(hooks && hooks.length)) return false;
     const orig = proto[method];
-    if (orig.CanvasGlobal) return false;
+    if (patchedMethods.has(orig)) return false;
 
-    const wrapped = function(...args){
-      const flag = '__isChain_' + method;
-      if (this && this[flag]) return orig.apply(this, args);
-      if (this) this[flag] = true;
-      try {
-        let patchedArgs = args;
-        for (const hook of hooks){
-          if (typeof hook !== 'function') continue;
+    const wrapped = (method === 'toDataURL')
+      ? ({ toDataURL() {
+          const flag = '__isChain_' + method;
+          if (this && this[flag]) return Reflect.apply(orig, this, arguments);
+          if (this) this[flag] = true;
           try {
-            const next = hook.apply(this, patchedArgs);
-            if (next && Array.isArray(next)) patchedArgs = next;
-          } catch (e) {
-            if (global.__DEBUG__) console.error(`[CHAIN HOOK ERROR ${method}]`, e);
-          }
-        }
-        const out = orig.apply(this, patchedArgs);
-        if (method === 'toDataURL'){
-          let res = out;
-          for (const hook of hooks){
-            try {
-              const r = hook.call(this, res, ...patchedArgs);
-              if (typeof r === 'string') res = r;
-            } catch (e) {
-              if (global.__DEBUG__) console.error(`[CHAIN POST ERROR ${method}]`, e);
+            let patchedArgs = Array.prototype.slice.call(arguments);
+            for (const hook of hooks){
+              if (typeof hook !== 'function') continue;
+              try {
+                const next = hook.apply(this, patchedArgs);
+                if (next && Array.isArray(next)) patchedArgs = next;
+              } catch (e) {
+                if (global.__DEBUG__) console.error(`[CHAIN HOOK ERROR ${method}]`, e);
+              }
             }
+            const out = Reflect.apply(orig, this, patchedArgs);
+            let res = out;
+            for (const hook of hooks){
+              try {
+                const r = hook.call(this, res, ...patchedArgs);
+                if (typeof r === 'string') res = r;
+              } catch (e) {
+                if (global.__DEBUG__) console.error(`[CHAIN POST ERROR ${method}]`, e);
+              }
+            }
+            return res;
+          } finally {
+            if (this) this[flag] = false;
           }
-          return res;
-        }
-        return out;
-      } finally {
-        if (this) this[flag] = false;
-      }
-    };
+        } }).toDataURL
+      : ({ [method]() {
+          const flag = '__isChain_' + method;
+          if (this && this[flag]) return Reflect.apply(orig, this, arguments);
+          if (this) this[flag] = true;
+          try {
+            let patchedArgs = Array.prototype.slice.call(arguments);
+            for (const hook of hooks){
+              if (typeof hook !== 'function') continue;
+              try {
+                const next = hook.apply(this, patchedArgs);
+                if (next && Array.isArray(next)) patchedArgs = next;
+              } catch (e) {
+                if (global.__DEBUG__) console.error(`[CHAIN HOOK ERROR ${method}]`, e);
+              }
+            }
+            return Reflect.apply(orig, this, patchedArgs);
+          } finally {
+            if (this) this[flag] = false;
+          }
+        } })[method];
 
-    definePatchedMethod(proto, method, markAsNative(wrapped, method));
+    const patched = markAsNative(wrapped, method);
+    definePatchedMethod(proto, method, patched);
+    patchedMethods.add(patched);
     return true;
   }
 
@@ -154,7 +173,7 @@ function ContextPatchModule(window) {
   function patchMethod(proto, method, hooks) {
       if (!proto)                              { console.warn(`[patchMethod] proto is not defined: ${method}`); return false; }
       if (typeof proto[method] !== 'function') { console.warn(`[patchMethod] not a function: ${method}`); return false; }
-      if (proto[method].CanvasGlobal)          { console.warn(`[patchMethod] already patched: ${method}`); return false; }
+      if (patchedMethods.has(proto[method]))  { console.warn(`[patchMethod] already patched: ${method}`); return false; }
       if (!hooks?.length)                      { console.warn(`[patchMethod] no hooks: ${method}`); return false; }
 
       const orig = proto[method], flag = '__isPatch_' + method;
@@ -196,6 +215,7 @@ function ContextPatchModule(window) {
       }, method);
 
       definePatchedMethod(proto, method, wrapped);
+      patchedMethods.add(wrapped);
 
       return true;
     }
@@ -203,7 +223,7 @@ function ContextPatchModule(window) {
   function chainAsync(proto, method, hooksGetter){
     if (!proto || typeof proto[method] !== 'function') return false;
     const orig = proto[method];
-    if (orig.CanvasGlobal) return false;
+    if (patchedMethods.has(orig)) return false;
 
     const getHooksList = () => (typeof hooksGetter === 'function') ? hooksGetter() : [];
     const applyHooks = (self, blob, args) => {
@@ -219,15 +239,11 @@ function ContextPatchModule(window) {
     };
 
     if (method === 'toBlob') {
-      const wrapped = function toBlob(callback, type, quality) {
-        if (new.target) throw new TypeError('Illegal invocation');
-        if (typeof HTMLCanvasElement === 'undefined' || !(this instanceof HTMLCanvasElement)) {
-          throw new TypeError('Illegal invocation');
-        }
+      const wrapped = ({ toBlob(callback) {
         const args = arguments;
         if (typeof callback === 'function') {
           const done = (blob) => callback(applyHooks(this, blob, args));
-          return orig.call(this, done, type, quality);
+          return Reflect.apply(orig, this, [done].concat(Array.prototype.slice.call(args, 1)));
         }
         return new Promise((resolve, reject) => {
           try {
@@ -235,39 +251,42 @@ function ContextPatchModule(window) {
               try { resolve(applyHooks(this, blob, args)); }
               catch (e) { reject(e); }
             };
-            orig.call(this, done, type, quality);
+            Reflect.apply(orig, this, [done].concat(Array.prototype.slice.call(args, 1)));
           } catch (e) { reject(e); }
         });
-      };
-      definePatchedMethod(proto, method, markAsNative(wrapped, method));
+      } }).toBlob;
+      const patched = markAsNative(wrapped, method);
+      definePatchedMethod(proto, method, patched);
+      patchedMethods.add(patched);
       return true;
     }
 
     if (method === 'convertToBlob') {
-      const wrapped = function convertToBlob(options) {
-        if (new.target) throw new TypeError('Illegal invocation');
-        if (typeof OffscreenCanvas === 'undefined' || !(this instanceof OffscreenCanvas)) {
-          throw new TypeError('Illegal invocation');
-        }
+      const wrapped = ({ convertToBlob() {
         const args = arguments;
-        const p = orig.call(this, options);
+        const p = Reflect.apply(orig, this, args);
         if (!(p && typeof p.then === 'function')) return p;
         const hooks = getHooksList();
         if (!(hooks && hooks.length)) return p;
         return p.then((blob) => applyHooks(this, blob, args));
-      };
-      definePatchedMethod(proto, method, markAsNative(wrapped, method));
+      } }).convertToBlob;
+      const patched = markAsNative(wrapped, method);
+      definePatchedMethod(proto, method, patched);
+      patchedMethods.add(patched);
       return true;
     }
 
-    const wrapped = function(...args){
-      const p = safeInvoke(orig, this, args, proto, method);
+    const wrapped = ({ [method]() {
+      const args = arguments;
+      const p = Reflect.apply(orig, this, args);
       if (!(p && typeof p.then === 'function')) return p;
       const hooks = getHooksList();
       if (!(hooks && hooks.length)) return p;
       return p.then((blob) => applyHooks(this, blob, args));
-    };
-    definePatchedMethod(proto, method, markAsNative(wrapped, method));
+    } })[method];
+    const patched = markAsNative(wrapped, method);
+    definePatchedMethod(proto, method, patched);
+    patchedMethods.add(patched);
     return true;
   }
 
@@ -433,10 +452,13 @@ function ContextPatchModule(window) {
   function chainGetContext(proto, method, htmlHooks, ctx2dHooks, webglHooks){
     if (!proto || typeof proto[method] !== 'function') return false;
     const orig = proto[method];
-    if (orig.CanvasGlobal) return false;
+    if (patchedMethods.has(orig)) return false;
 
-    const wrapped = function(type, ...rest){
-      const res = safeInvoke(orig, this, [type, ...rest], proto, method);
+    const wrapped = ({ getContext(contextId) {
+      const args = arguments;
+      const type = args[0];
+      const rest = Array.prototype.slice.call(args, 1);
+      const res = Reflect.apply(orig, this, args);
       let ctx = res;
 
       try {
@@ -458,9 +480,11 @@ function ContextPatchModule(window) {
       } catch {}
 
       return ctx;
-    };
+    } }).getContext;
 
-    definePatchedMethod(proto, method, markAsNative(wrapped, method));
+    const patched = markAsNative(wrapped, method);
+    definePatchedMethod(proto, method, patched);
+    patchedMethods.add(patched);
     return true;
   }
 
