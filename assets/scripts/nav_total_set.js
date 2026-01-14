@@ -337,14 +337,24 @@ function NavTotalSetPatchModule() {
       const permDesc = Object.getOwnPropertyDescriptor(permProto, 'query')
         || Object.getOwnPropertyDescriptor(navigator.permissions, 'query');
       if (!permDesc) throw new TypeError('[nav_total_set] permissions.query descriptor missing');
-      const origQuery = navigator.permissions.query.bind(navigator.permissions);
+      const origQuery = permDesc.value || navigator.permissions.query;
       const patchedQuery = mark(function query(parameters) {
+        if (new.target) {
+          return origQuery.call(this, parameters);
+        }
+        const isPermThis = (this === navigator.permissions || this === permProto);
+        if (!isPermThis) {
+          return origQuery.call(this, parameters);
+        }
+        if (!parameters || typeof parameters !== 'object') {
+          return Promise.resolve({ state: 'prompt', onchange: null });
+        }
         const name = parameters && parameters.name;
         if (name === 'persistent-storage')
           return Promise.resolve({ state: 'granted', onchange: null });
         if (['geolocation', 'camera', 'audiooutput', 'microphone', 'notifications'].includes(name))
           return Promise.resolve({ state: 'prompt', onchange: null });
-        return origQuery ? origQuery(parameters) : Promise.resolve({ state: 'prompt', onchange: null });
+        return origQuery ? origQuery.call(this, parameters) : Promise.resolve({ state: 'prompt', onchange: null });
       }, 'query');
       Object.defineProperty(permProto, 'query', {
         value: patchedQuery,

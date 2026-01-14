@@ -308,8 +308,22 @@ function mkClassicWorkerSource(snapshot, absUrl){
       };
       var USER = ${USER};
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user script URL');
-      if (__isModuleURL(USER)) throw new Error('UACHPatch: module worker URL in classic loader');
-      importScripts(USER);
+      if (__isModuleURL(USER)) {
+        return import(USER).then(function(){
+          if (typeof self.postMessage === 'function') {
+            self.postMessage({ __ENV_USER_URL_LOADED__: USER });
+          }
+        });
+      }
+      try {
+        importScripts(USER);
+      } catch (e) {
+        return import(USER).then(function(){
+          if (typeof self.postMessage === 'function') {
+            self.postMessage({ __ENV_USER_URL_LOADED__: USER });
+          }
+        });
+      }
       if (typeof self.postMessage === 'function') {
         self.postMessage({ __ENV_USER_URL_LOADED__: USER });
       }
@@ -883,12 +897,29 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
   function snapshotHE(keys){
     if (G.__UACH_HE_PROMISE__) return G.__UACH_HE_PROMISE__;
     const UAD = G.navigator && G.navigator.userAgentData;
-    if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
-      throw new Error('[WorkerInit] userAgentData missing');
-    }
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
+    if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
+      const meta = G.__EXPECTED_CLIENT_HINTS;
+      if (!meta || typeof meta !== 'object') {
+        throw new Error('[WorkerInit] userAgentData missing');
+      }
+      const he = {};
+      for (const k of KEYS) {
+        if (!(k in meta)) throw new Error(`[WorkerInit] high entropy missing ${k}`);
+        const v = meta[k];
+        if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+        if (typeof v === 'string');
+        if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+        he[k] = v;
+      }
+      G.__LAST_UACH_HE__ = he;
+      G.__UACH_HE_READY__ = true;
+      const p = Promise.resolve(he);
+      G.__UACH_HE_PROMISE__ = p;
+      return p;
+    }
     const p = UAD.getHighEntropyValues(KEYS).then(he => {
       if (!he || typeof he !== 'object') throw new Error('[WorkerInit] high entropy missing');
       for (const k of KEYS) {
