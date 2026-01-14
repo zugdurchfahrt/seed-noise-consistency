@@ -2,13 +2,13 @@
   "profile": {
     "platform": "Win32",
     "os_info": "Windows NT 10.0; Win64; x64",
-    "os_name": "Windows 11 64-bit",
-    "platform_version": "19.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0",
-    "browser_version": "138.0.3351.55",
-    "screen_width": 1920,
-    "screen_height": 1080,
-    "device_dpr_value": 1.0,
+    "os_name": "Windows 10 64-bit",
+    "platform_version": "10.0.0",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+    "browser_version": "134.0.6998.183",
+    "screen_width": 2560,
+    "screen_height": 1440,
+    "device_dpr_value": 1.25,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
     "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
@@ -17,9 +17,9 @@
     "gpu_architecture": "turing",
     "gpu_vendor": "nvidia",
     "devices_conf": {
-      "audioinput": "JLab Talk Go",
-      "videoinput": "Dell UltraSharp Webcam",
-      "audiooutput": "Sony MDR-7506"
+      "audioinput": "HyperX SoloCast",
+      "videoinput": "Logitech HD Pro Webcam C920",
+      "audiooutput": "Sony WH-1000XM4"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -27,29 +27,10 @@
       "da"
     ],
     "language": "da-DK",
-    "deviceMemory": 4,
+    "deviceMemory": 8,
     "hardwareConcurrency": 4,
-    "plugins": [
-      {
-        "name": "Microsoft Edge PDF Viewer",
-        "filename": "internal-pdf-viewer",
-        "description": "Portable Document Format",
-        "mimeTypes": [
-          {
-            "type": "application/pdf",
-            "suffixes": "pdf",
-            "description": "PDF document"
-          }
-        ]
-      }
-    ],
-    "mimeTypes": [
-      {
-        "type": "application/pdf",
-        "suffixes": "pdf",
-        "description": "PDF document"
-      }
-    ],
+    "plugins": [],
+    "mimeTypes": [],
     "accept_language": "da-DK,da;q=0.9"
   },
   "expected_client_hints": {
@@ -61,18 +42,18 @@
       },
       {
         "brand": "Chromium",
-        "version": "138"
+        "version": "134"
       },
       {
-        "brand": "Microsoft Edge",
-        "version": "138"
+        "brand": "Google Chrome",
+        "version": "134"
       }
     ],
     "mobile": false,
     "architecture": "x86",
     "bitness": "64",
     "model": "",
-    "platformVersion": "19.0.0",
+    "platformVersion": "10.0.0",
     "fullVersionList": [
       {
         "brand": "Not)A;Brand",
@@ -80,21 +61,21 @@
       },
       {
         "brand": "Chromium",
-        "version": "138.0.3351.55"
+        "version": "134.0.6998.183"
       },
       {
-        "brand": "Microsoft Edge",
-        "version": "138.0.3351.55"
+        "brand": "Google Chrome",
+        "version": "134.0.6998.183"
       }
     ],
-    "uaFullVersion": "138.0.3351.55",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"138\", \"Microsoft Edge\";v=\"138\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"138.0.3351.55\", \"Microsoft Edge\";v=\"138.0.3351.55\"",
+    "uaFullVersion": "134.0.6998.183",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"134\", \"Google Chrome\";v=\"134\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"134.0.6998.183\", \"Google Chrome\";v=\"134.0.6998.183\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
-    "deviceMemory": 4,
+    "deviceMemory": 8,
     "hardwareConcurrency": 4,
     "wow64": false,
     "languages": [
@@ -105,6 +86,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/webp,image/avif,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }
