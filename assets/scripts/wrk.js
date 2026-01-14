@@ -609,6 +609,9 @@ function ServiceWorkerOverride(G){
     }
     return;
   }
+  if (G.isSecureContext === false) {
+    return;
+  }
   if (!('serviceWorker' in G.navigator)) {
     if (G.__DEBUG__) {
       try { console.info('ServiceWorkerOverride: navigator.serviceWorker missing'); } catch(_){}

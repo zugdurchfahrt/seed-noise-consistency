@@ -321,10 +321,8 @@ def init_driver(
 
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
-    driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-        'userAgent': profile['user_agent'],
-        'userAgentMetadata': expected_client_hints
-    })
+    browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
+    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
 
     # --- prepare worker_bootstrap_js ---
     worker_bootstrap_js = f"""
@@ -899,8 +897,40 @@ def main():
         elif browser_brand == "Firefox":
             logger.info("UA data submitted via CDP for Firefox/Safari")
         else:
-            apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-            logger.info("UA data submitted via CDP")
+            needs_reapply = False
+            try:
+                current_ua = driver.execute_script("return navigator.userAgent")
+                if current_ua != profile["user_agent"]:
+                    needs_reapply = True
+                else:
+                    current_uad = driver.execute_script(
+                        "const uad = navigator.userAgentData;"
+                        "if (!uad) return null;"
+                        "const brands = Array.isArray(uad.brands) ? "
+                        "uad.brands.map(b => ({brand: b.brand, version: String(b.version)})) : null;"
+                        "return { brands, platform: uad.platform, mobile: uad.mobile };"
+                    )
+                    if current_uad:
+                        exp_brands = expected_client_hints.get("brands") or []
+                        exp_norm = sorted(
+                            [(str(b.get("brand")), str(b.get("version"))) for b in exp_brands if isinstance(b, dict)]
+                        )
+                        cur_brands = current_uad.get("brands") or []
+                        cur_norm = sorted(
+                            [(str(b.get("brand")), str(b.get("version"))) for b in cur_brands if isinstance(b, dict)]
+                        )
+                        if (
+                            exp_norm != cur_norm
+                            or current_uad.get("platform") != expected_client_hints.get("platform")
+                            or current_uad.get("mobile") != expected_client_hints.get("mobile")
+                        ):
+                            needs_reapply = True
+            except Exception as e:
+                logger.warning("UA override reapply check failed: %s", e)
+                needs_reapply = True
+            if needs_reapply:
+                apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+                logger.info("UA data re-applied via CDP (mismatch detected)")
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
 

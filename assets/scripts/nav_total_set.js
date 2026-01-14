@@ -704,7 +704,11 @@ function NavTotalSetPatchModule() {
   if (G.__DEBUG__) {
     console.group("Client Hints Debug");
     console.log("meta:", meta);
-    console.log("navigator.userAgentData:", navigator.userAgentData);
+    const hasUAD = ('userAgentData' in navigator);
+    console.log("navigator.userAgentData:", hasUAD ? navigator.userAgentData : undefined);
+    if (!hasUAD) {
+      console.log("navigator.userAgentData unavailable (secureContext:", G.isSecureContext, ")");
+    }
     console.log("navigator.language(s):", navigator.language, navigator.languages);
     console.log("navigator.deviceMemory:", navigator.deviceMemory);
     console.log("navigator.hardwareConcurrency:", navigator.hardwareConcurrency);
