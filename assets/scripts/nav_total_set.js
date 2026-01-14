@@ -226,13 +226,15 @@ function NavTotalSetPatchModule() {
         }
         return deep(meta.fullVersionList);
       }, 'get fullVersionList');
-      if (!Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')) {
+      const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
+        || Object.getOwnPropertyDescriptor(nativeUAD, 'fullVersionList');
+      if (!dFull) {
         throw new Error('THW: uaData.fullVersionList descriptor missing');
       }
       Object.defineProperty(uadProto, 'fullVersionList', {
         get: getFullVersionList,
-        enumerable: false,
-        configurable: true
+        enumerable: dFull.enumerable,
+        configurable: dFull.configurable
       });
       const getUaFullVersion = mark(function getUaFullVersion(){
         if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) {
@@ -240,13 +242,15 @@ function NavTotalSetPatchModule() {
         }
         return meta.uaFullVersion;
       }, 'get uaFullVersion');
-      if (!Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')) {
+      const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
+        || Object.getOwnPropertyDescriptor(nativeUAD, 'uaFullVersion');
+      if (!dUaFull) {
         throw new Error('THW: uaData.uaFullVersion descriptor missing');
       }
       Object.defineProperty(uadProto, 'uaFullVersion', {
         get: getUaFullVersion,
-        enumerable: false,
-        configurable: true
+        enumerable: dUaFull.enumerable,
+        configurable: dUaFull.configurable
       });
       const getHighEntropyValues = mark(function getHighEntropyValues(keys) {
           if (!Array.isArray(keys)) throw new Error('THW: bad keys');
