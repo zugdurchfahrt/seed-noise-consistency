@@ -112,7 +112,7 @@ function ContextPatchModule(window) {
     if (patchedMethods.has(orig)) return false;
 
     const wrapped = (method === 'toDataURL')
-      ? ({ toDataURL() {
+      ? ({ toDataURL(type, quality) {
           const flag = '__isChain_' + method;
           if (this && this[flag]) return Reflect.apply(orig, this, arguments);
           if (this) this[flag] = true;
@@ -239,7 +239,7 @@ function ContextPatchModule(window) {
     };
 
     if (method === 'toBlob') {
-      const wrapped = ({ toBlob(callback) {
+      const wrapped = ({ toBlob(callback, type, quality) {
         const args = arguments;
         if (typeof callback === 'function') {
           const done = (blob) => callback(applyHooks(this, blob, args));
@@ -262,7 +262,7 @@ function ContextPatchModule(window) {
     }
 
     if (method === 'convertToBlob') {
-      const wrapped = ({ convertToBlob() {
+      const wrapped = ({ convertToBlob(options) {
         const args = arguments;
         const p = Reflect.apply(orig, this, args);
         if (!(p && typeof p.then === 'function')) return p;
@@ -454,7 +454,7 @@ function ContextPatchModule(window) {
     const orig = proto[method];
     if (patchedMethods.has(orig)) return false;
 
-    const wrapped = ({ getContext(contextId) {
+    const wrapped = ({ getContext(contextId, contextAttributes) {
       const args = arguments;
       const type = args[0];
       const rest = Array.prototype.slice.call(args, 1);
