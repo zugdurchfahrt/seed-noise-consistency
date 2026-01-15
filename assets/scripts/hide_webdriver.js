@@ -11,27 +11,46 @@ function HideWebdriverPatchModule() {
   }
 
   // ——— Global mask "native" + general WeakMap ———
-  const nativeToString = Function.prototype.toString;
+  const nativeToString = window.__NativeToString || Function.prototype.toString;
+  window.__NativeToString = nativeToString;
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
 
   // general WeakMap, available to all modules
-  const toStringOverrideMap = (window.__NativeToStringMap =
-    window.__NativeToStringMap || new WeakMap());
+  const toStringOverrideMap = (window.__NativeToStringMap instanceof WeakMap)
+    ? window.__NativeToStringMap
+    : new WeakMap();
+  window.__NativeToStringMap = toStringOverrideMap;
 
   // Unified global function-mask
-  function markAsNative(func, name = "") {
+  function baseMarkAsNative(func, name = "") {
+    if (typeof func !== 'function') return func;
     try {
       const n = name || func.name || "";
-      toStringOverrideMap.set(func, `function ${n}() { [native code] }`);
+      const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
+      toStringOverrideMap.set(func, label);
     } catch (_) {}
     return func;
   }
-  if (!window.markAsNative) window.markAsNative = markAsNative;
+  const markAsNative = (() => {
+    const existing = (typeof window.markAsNative === 'function') ? window.markAsNative : null;
+    if (!existing) {
+      baseMarkAsNative.__TOSTRING_BRIDGE__ = true;
+      return baseMarkAsNative;
+    }
+    if (existing.__TOSTRING_BRIDGE__) return existing;
+    const wrapped = function markAsNative(func, name = "") {
+      const out = existing(func, name);
+      return baseMarkAsNative(out, name);
+    };
+    wrapped.__TOSTRING_BRIDGE__ = true;
+    return wrapped;
+  })();
+  if (!window.markAsNative || window.markAsNative !== markAsNative) window.markAsNative = markAsNative;
 
   // compatibility with the old name (do not change the structure of the calls below)
   function fakeNative(func, name = "") { return markAsNative(func, name); }
 
-  // Single Proxy for Function.prototype.toString, reading from the general WeakMap
+  // Single wrapper for Function.prototype.toString, reading from the general WeakMap
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
     function toString() {
       // IMPORTANT: do not touch WeakMap for primitives/null/undefined

@@ -57,36 +57,50 @@
     };
     cache.snap = requireSnap(self.__lastSnap__, 'init');
 
-    const nativeToString = Function.prototype.toString;
+    const nativeToString = self.__NativeToString || Function.prototype.toString;
     if (typeof nativeToString !== 'function') {
       throw new Error('UACHPatch: Function.prototype.toString missing');
     }
-    if (self.__NativeToStringMap && !(self.__NativeToStringMap instanceof WeakMap)) {
-      throw new Error('UACHPatch: NativeToStringMap invalid');
-    }
-    const toStringMap = self.__NativeToStringMap || new WeakMap();
+    if (!self.__NativeToString) self.__NativeToString = nativeToString;
+
+    const toStringMap = (self.__NativeToStringMap instanceof WeakMap)
+      ? self.__NativeToStringMap
+      : new WeakMap();
     self.__NativeToStringMap = toStringMap;
+
     const existingMarkAsNative = (typeof self.markAsNative === 'function') ? self.markAsNative : null;
     const markAsNative = (func, name) => {
-      if (typeof func !== 'function') throw new Error('UACHPatch: markAsNative requires function');
+      if (typeof func !== 'function') return func;
       const out = existingMarkAsNative ? existingMarkAsNative(func, name) : func;
-      const n = name || func.name;
-      if (n) {
-        toStringMap.set(func, `function ${n}() { [native code] }`);
-      } else {
-        toStringMap.set(func, 'function () { [native code] }');
-      }
+      const target = (typeof out === 'function') ? out : func;
+      try {
+        const n = name || target.name || "";
+        const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
+        toStringMap.set(target, label);
+      } catch (_) {}
       return out;
     };
     if (!self.__TOSTRING_PROXY_INSTALLED__) {
-      if (typeof Proxy !== 'function') throw new Error('UACHPatch: Proxy missing');
-      Function.prototype.toString = new Proxy(nativeToString, {
-        apply(target, thisArg, args) {
-          if (typeof thisArg === 'function' && toStringMap.has(thisArg)) {
-            return toStringMap.get(thisArg);
-          }
-          return target.apply(thisArg, args);
+      function toString() {
+        // IMPORTANT: do not touch WeakMap for primitives/null/undefined
+        const t = typeof this;
+        const isObj = (this !== null) && (t === 'function' || t === 'object');
+
+        if (isObj && toStringMap.has(this)) {
+          return toStringMap.get(this);
         }
+        // preserve native TypeError + semantics
+        return nativeToString.call(this);
+      }
+
+      // make wrapper look native via the same mechanism
+      markAsNative(toString, 'toString');
+
+      Object.defineProperty(Function.prototype, 'toString', {
+        value: toString,
+        writable: true,
+        configurable: true,
+        enumerable: false
       });
       self.__TOSTRING_PROXY_INSTALLED__ = true;
     }
