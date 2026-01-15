@@ -1,0 +1,39 @@
+*** Begin Patch
+*** Update File: assets/scripts/hide_webdriver.js
+@@
+     if (needsInstall) {
+      /**
+       * Замена Function.prototype.toString.
+       * - не является конструктором (new → TypeError)
+       * - защищена от рекурсии
+       * - читает кастомные строки из WeakMap
+       * - в остальных случаях использует Reflect.apply(nativeToString)
+       */
+      const wrappedToString = markAsNative(function toString() {
+        if (new.target) {
+          throw new TypeError('Function is not a constructor');
+        }
+        if (typeof this !== 'function') {
+          return Reflect.apply(nativeToString, this, arguments);
+        }
+        if (toStringDepth) {
+          return Reflect.apply(nativeToString, this, arguments);
+        }
+        toStringDepth++;
+        try {
+          if (toStringOverrideMap.has(this)) {
+            return toStringOverrideMap.get(this);
+          }
+          return Reflect.apply(nativeToString, this, arguments);
+        } finally {
+          toStringDepth--;
+        }
+      }, 'toString');
+      Object.defineProperty(Function.prototype, 'toString', {
+        configurable: toStringDesc.configurable,
+        enumerable: toStringDesc.enumerable,
+        writable: toStringDesc.writable,
+        value: wrappedToString
+      });
+      window.__TOSTRING_PROXY_INSTALLED__ = true;
+    }
