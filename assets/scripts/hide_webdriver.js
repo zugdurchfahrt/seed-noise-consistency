@@ -13,21 +13,10 @@ function HideWebdriverPatchModule() {
   // ——— Global mask "native" + general WeakMap ———
   const nativeToString = Function.prototype.toString;
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
-  const nativeReflectHas = Reflect.has;
-  const nativeHasOwn = Object.hasOwn;
-  const toStringDesc = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');
-  const getOwnPropDesc = Object.getOwnPropertyDescriptor(Object, 'getOwnPropertyDescriptor');
-  const reflectHasDesc = Object.getOwnPropertyDescriptor(Reflect, 'has');
-  const hasOwnDesc = Object.getOwnPropertyDescriptor(Object, 'hasOwn');
-  let toStringDepth = 0;
 
   // general WeakMap, available to all modules
-  const existingMap = window.__NativeToStringMap;
-  const toStringOverrideMap = (existingMap && typeof existingMap.get === 'function'
-    && typeof existingMap.set === 'function' && typeof existingMap.has === 'function')
-    ? existingMap
-    : new WeakMap();
-  window.__NativeToStringMap = toStringOverrideMap;
+  const toStringOverrideMap = (window.__NativeToStringMap =
+    window.__NativeToStringMap || new WeakMap());
 
   // Unified global function-mask
   function markAsNative(func, name = "") {
@@ -42,58 +31,17 @@ function HideWebdriverPatchModule() {
   // compatibility with the old name (do not change the structure of the calls below)
   function fakeNative(func, name = "") { return markAsNative(func, name); }
 
-  // Single override for Function.prototype.toString, reading from the general WeakMap
-  {
-    if (!toStringDesc) throw new Error('[stealth] Function.prototype.toString descriptor missing');
-    let needsInstall = true;
-    try {
-      const probe = function __ts_probe__(){};
-      const expected = 'function __ts_probe__() { [native code] }';
-      try { toStringOverrideMap.set(probe, expected); } catch {}
-      try {
-        const out = Function.prototype.toString.call(probe);
-        if (out === expected) needsInstall = false;
-      } finally {
-        try { toStringOverrideMap.delete(probe); } catch {}
+  // Single Proxy for Function.prototype.toString, reading from the general WeakMap
+  if (!window.__TOSTRING_PROXY_INSTALLED__) {
+    Function.prototype.toString = new Proxy(nativeToString, {
+      apply(target, thisArg, args) {
+        if (toStringOverrideMap.has(thisArg)) {
+          return toStringOverrideMap.get(thisArg);
+        }
+        return target.apply(thisArg, args);
       }
-    } catch {}
-
-    if (needsInstall) {
-      /**
-       * Замена Function.prototype.toString.
-       * - не является конструктором (new → TypeError)
-       * - защищена от рекурсии
-       * - читает кастомные строки из WeakMap
-       * - в остальных случаях использует Reflect.apply(nativeToString)
-       */
-      const wrappedToString = markAsNative(function toString() {
-        if (new.target) {
-          throw new TypeError('Function is not a constructor');
-        }
-        if (typeof this !== 'function') {
-          return Reflect.apply(nativeToString, this, arguments);
-        }
-        if (toStringDepth) {
-          return Reflect.apply(nativeToString, this, arguments);
-        }
-        toStringDepth++;
-        try {
-          if (toStringOverrideMap.has(this)) {
-            return toStringOverrideMap.get(this);
-          }
-          return Reflect.apply(nativeToString, this, arguments);
-        } finally {
-          toStringDepth--;
-        }
-      }, 'toString');
-      Object.defineProperty(Function.prototype, 'toString', {
-        configurable: toStringDesc.configurable,
-        enumerable: toStringDesc.enumerable,
-        writable: toStringDesc.writable,
-        value: wrappedToString
-      });
-      window.__TOSTRING_PROXY_INSTALLED__ = true;
-    }
+    });
+    window.__TOSTRING_PROXY_INSTALLED__ = true;
   }
 
 
@@ -161,39 +109,28 @@ function HideWebdriverPatchModule() {
     enumerable: false
   });
 
-  if (!getOwnPropDesc) throw new Error('[stealth] Object.getOwnPropertyDescriptor descriptor missing');
-  const wrappedGetOwnProp = markAsNative(({ getOwnPropertyDescriptor(target, prop) {
-    if (target === navigator && prop === 'webdriver') return undefined;
-    return Reflect.apply(nativeGetOwnProp, Object, [target, prop]);
-  } }).getOwnPropertyDescriptor, 'getOwnPropertyDescriptor');
-  Object.defineProperty(Object, 'getOwnPropertyDescriptor', {
-    configurable: getOwnPropDesc.configurable,
-    enumerable: getOwnPropDesc.enumerable,
-    writable: getOwnPropDesc.writable,
-    value: wrappedGetOwnProp
+  // Object.getOwnPropertyDescriptor
+  Object.getOwnPropertyDescriptor = new Proxy(nativeGetOwnProp, {
+    apply(target, thisArg, args) {
+      if (args[0] === navigator && args[1] === 'webdriver') return undefined;
+      return target.apply(thisArg, args);
+    }
   });
 
-  if (!reflectHasDesc) throw new Error('[stealth] Reflect.has descriptor missing');
-  const wrappedReflectHas = markAsNative(({ has(target, prop) {
-    if (target === navigator && prop === 'webdriver') return false;
-    return Reflect.apply(nativeReflectHas, Reflect, [target, prop]);
-  } }).has, 'has');
-  Object.defineProperty(Reflect, 'has', {
-    configurable: reflectHasDesc.configurable,
-    enumerable: reflectHasDesc.enumerable,
-    writable: reflectHasDesc.writable,
-    value: wrappedReflectHas
+  // Reflect.has
+  Reflect.has = new Proxy(Reflect.has, {
+    apply(target, thisArg, args) {
+      if (args[0] === navigator && args[1] === 'webdriver') return false;
+      return target.apply(thisArg, args);
+    }
   });
 
-  if (!hasOwnDesc) throw new Error('[stealth] Object.hasOwn descriptor missing');
-  const wrappedHasOwn = markAsNative(({ hasOwn(target, prop) {
-    if (target === navigator && prop === "webdriver") return false;
-    return Reflect.apply(nativeHasOwn, Object, [target, prop]);
-  } }).hasOwn, 'hasOwn');
-  Object.defineProperty(Object, 'hasOwn', {
-    configurable: hasOwnDesc.configurable,
-    enumerable: hasOwnDesc.enumerable,
-    writable: hasOwnDesc.writable,
-    value: wrappedHasOwn
+  // Object.hasOwn
+  const realHasOwn = Object.hasOwn;
+  Object.hasOwn = new Proxy(realHasOwn, {
+    apply(target, thisArg, args) {
+      if (args[0] === navigator && args[1] === "webdriver") return false;
+      return target.apply(thisArg, args);
+    }
   });
 }

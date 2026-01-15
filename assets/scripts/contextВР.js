@@ -21,6 +21,10 @@ function ContextPatchModule(window) {
     return global.markAsNative(fn, name);
   };
 
+  // Кешируем прокси для 2D‑контекстов: повторные getContext('2d')
+  // возвращают один и тот же safe‑proxy и не нарушают инварианты.
+  const __ctx2dProxyCache = new WeakMap();
+
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
     catch { return false; }
@@ -110,12 +114,16 @@ function ContextPatchModule(window) {
     if (!proto || typeof proto[method] !== 'function' || !(hooks && hooks.length)) return false;
     const orig = proto[method];
     if (patchedMethods.has(orig)) return false;
+    const inChain = new WeakSet();
 
     const wrapped = (method === 'toDataURL')
       ? ({ toDataURL(type, quality) {
-          const flag = '__isChain_' + method;
-          if (this && this[flag]) return Reflect.apply(orig, this, arguments);
-          if (this) this[flag] = true;
+          const self = this;
+          const canTrack = self && (typeof self === 'object' || typeof self === 'function');
+          if (canTrack) {
+            if (inChain.has(self)) return Reflect.apply(orig, self, arguments);
+            inChain.add(self);
+          }
           try {
             let patchedArgs = Array.prototype.slice.call(arguments);
             for (const hook of hooks){
@@ -139,13 +147,16 @@ function ContextPatchModule(window) {
             }
             return res;
           } finally {
-            if (this) this[flag] = false;
+            if (canTrack) inChain.delete(self);
           }
         } }).toDataURL
       : ({ [method]() {
-          const flag = '__isChain_' + method;
-          if (this && this[flag]) return Reflect.apply(orig, this, arguments);
-          if (this) this[flag] = true;
+          const self = this;
+          const canTrack = self && (typeof self === 'object' || typeof self === 'function');
+          if (canTrack) {
+            if (inChain.has(self)) return Reflect.apply(orig, self, arguments);
+            inChain.add(self);
+          }
           try {
             let patchedArgs = Array.prototype.slice.call(arguments);
             for (const hook of hooks){
@@ -159,7 +170,7 @@ function ContextPatchModule(window) {
             }
             return Reflect.apply(orig, this, patchedArgs);
           } finally {
-            if (this) this[flag] = false;
+            if (canTrack) inChain.delete(self);
           }
         } })[method];
 
@@ -176,19 +187,24 @@ function ContextPatchModule(window) {
       if (patchedMethods.has(proto[method]))  { console.warn(`[patchMethod] already patched: ${method}`); return false; }
       if (!hooks?.length)                      { console.warn(`[patchMethod] no hooks: ${method}`); return false; }
 
-      const orig = proto[method], flag = '__isPatch_' + method;
-      const wrapped = markAsNative(function(...args){
-          if (this[flag]) return orig.apply(this, args);
-          this[flag] = true;
+      const orig = proto[method];
+      const inPatch = new WeakSet();
+      const wrapped = markAsNative(({ [method](...args){
+          const self = this;
+          const canTrack = self && (typeof self === 'object' || typeof self === 'function');
+          if (canTrack) {
+              if (inPatch.has(self)) return orig.apply(self, args);
+              inPatch.add(self);
+          }
           try {
-              if (typeof guardInstance === "function" && !guardInstance(proto, this))
-                  return orig.apply(this, args);
+              if (typeof guardInstance === "function" && !guardInstance(proto, self))
+                  return orig.apply(self, args);
 
               let patched = args;
               for (const hook of hooks) {
                   if (typeof hook !== 'function') continue;
                   try {
-                      const res = hook.apply(this, [orig, ...patched]);
+                      const res = hook.apply(self, [orig, ...patched]);
 
                       // override console logging
                       if (res !== undefined && !Array.isArray(res)) {
@@ -207,12 +223,12 @@ function ContextPatchModule(window) {
                       console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
                   }
               }
-              return orig.apply(this, patched);
+              return orig.apply(self, patched);
 
           } finally {
-              this[flag] = false;
+              if (canTrack) inPatch.delete(self);
           }
-      }, method);
+      } })[method], method);
 
       definePatchedMethod(proto, method, wrapped);
       patchedMethods.add(wrapped);
@@ -462,11 +478,20 @@ function ContextPatchModule(window) {
       let ctx = res;
 
       try {
-        if (type === '2d' && ctx){
-          ctx = createSafeCtxProxy(ctx);
-          // call hight level hooks
-          for (const hook of (ctx2dHooks || [])){
-            try { ctx = hook.call(this, ctx, type, ...rest) || ctx; } catch {}
+        if (type === '2d' && ctx) {
+          // Берём прокси из кеша или создаём новый
+          let safeCtx = __ctx2dProxyCache.get(ctx);
+          if (!safeCtx) {
+            safeCtx = createSafeCtxProxy(ctx);
+            __ctx2dProxyCache.set(ctx, safeCtx);
+          }
+          ctx = safeCtx;
+          // high‑level hooks работают с этим же объектом
+          for (const hook of (ctx2dHooks || [])) {
+            try {
+              const r = hook.call(this, ctx, type, ...rest);
+              if (r) ctx = r;
+            } catch {}
           }
         }
         if (/^webgl/.test(String(type))){
