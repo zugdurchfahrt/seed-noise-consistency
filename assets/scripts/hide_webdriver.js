@@ -31,10 +31,11 @@ function HideWebdriverPatchModule() {
     } catch (_) {}
     return func;
   }
-  const markAsNative = (() => {
+  function ensureMarkAsNative() {
     const existing = (typeof window.markAsNative === 'function') ? window.markAsNative : null;
     if (!existing) {
       baseMarkAsNative.__TOSTRING_BRIDGE__ = true;
+      window.markAsNative = baseMarkAsNative;
       return baseMarkAsNative;
     }
     if (existing.__TOSTRING_BRIDGE__) return existing;
@@ -43,9 +44,11 @@ function HideWebdriverPatchModule() {
       return baseMarkAsNative(out, name);
     };
     wrapped.__TOSTRING_BRIDGE__ = true;
+    window.markAsNative = wrapped;
     return wrapped;
-  })();
-  if (!window.markAsNative || window.markAsNative !== markAsNative) window.markAsNative = markAsNative;
+  }
+  if (!window.__ensureMarkAsNative) window.__ensureMarkAsNative = ensureMarkAsNative;
+  const markAsNative = ensureMarkAsNative();
 
   // compatibility with the old name (do not change the structure of the calls below)
   function fakeNative(func, name = "") { return markAsNative(func, name); }

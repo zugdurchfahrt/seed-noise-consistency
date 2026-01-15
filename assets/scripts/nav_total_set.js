@@ -15,10 +15,12 @@ function NavTotalSetPatchModule() {
       throw new Error('[NavTotalSetPatchModule] "R" is not initialized');
     }
     const mark = (() => {
-      if (typeof window.markAsNative !== 'function') {
+      const ensure = (typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
+      const fn = ensure ? ensure() : window.markAsNative;
+      if (typeof fn !== 'function') {
         throw new Error('[NavTotalSetPatchModule] markAsNative missing');
       }
-      return window.markAsNative;
+      return fn;
     })();
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———

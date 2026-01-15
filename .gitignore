@@ -220,3 +220,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 PROXY_START.bat
+mitmproxy-ca-cert.p12
+profile.json
+PROXY_START.bat
