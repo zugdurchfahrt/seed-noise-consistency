@@ -179,31 +179,40 @@ function ContextPatchModule(window) {
   function patchMethod(proto, method, hooks) {
       if (!proto)                              { console.warn(`[patchMethod] proto is not defined: ${method}`); return false; }
       if (typeof proto[method] !== 'function') { console.warn(`[patchMethod] not a function: ${method}`); return false; }
-      if (patchedMethods.has(proto[method]))  { console.warn(`[patchMethod] already patched: ${method}`); return false; }
+      if (patchedMethods.has(proto[method]))   { console.warn(`[patchMethod] already patched: ${method}`); return false; }
       if (!hooks?.length)                      { console.warn(`[patchMethod] no hooks: ${method}`); return false; }
 
-      const orig = proto[method], flag = '__isPatch_' + method;
-      const wrapped = markAsNative(function(...args){
-          if (this[flag]) return orig.apply(this, args);
-          this[flag] = true;
+      const orig = proto[method];
+      const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
+
+      function invoke(self, argsLike) {
+          // Preserve native Illegal invocation / brand check errors
+          const isObj = (self !== null) && (typeof self === 'object' || typeof self === 'function');
+          const args = Array.isArray(argsLike) ? argsLike : Array.prototype.slice.call(argsLike);
+
+          if (guard && isObj) {
+              if (guard.has(self)) return orig.apply(self, args);
+              guard.add(self);
+          }
+
           try {
-              if (typeof guardInstance === "function" && !guardInstance(proto, this))
-                  return orig.apply(this, args);
+              if (typeof guardInstance === "function" && !guardInstance(proto, self))
+                  return orig.apply(self, args);
 
               let patched = args;
               for (const hook of hooks) {
                   if (typeof hook !== 'function') continue;
                   try {
-                      const res = hook.apply(this, [orig, ...patched]);
+                      const res = hook.apply(self, [orig, ...patched]);
 
                       // override console logging
                       if (res !== undefined && !Array.isArray(res)) {
-                          if (window.__DEBUG__ && !(window._logConfig && window._logConfig.WEBGLlogger === false))
+                          if (global.__DEBUG__ && !(global._logConfig && global._logConfig.WEBGLlogger === false))
                               console.warn('[patchMethod override]', method, hook.name || 'anon', res);
                           return res; // result substitution
                       }
 
-                      // Подмена аргументов
+                      // argument substitution
                       if (Array.isArray(res)) {
                           patched = res;
                           continue;
@@ -213,12 +222,25 @@ function ContextPatchModule(window) {
                       console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
                   }
               }
-              return orig.apply(this, patched);
+              return orig.apply(self, patched);
 
           } finally {
-              this[flag] = false;
+              if (guard && isObj) guard.delete(self);
           }
-      }, method);
+      }
+
+      // IMPORTANT: use MethodDefinition functions to match native (non-constructible, no "prototype")
+      const wrappedRaw = (function(){
+          switch (orig.length) {
+              case 0: return ({ [method]() { return invoke(this, arguments); } })[method];
+              case 1: return ({ [method](a0) { return invoke(this, arguments); } })[method];
+              case 2: return ({ [method](a0, a1) { return invoke(this, arguments); } })[method];
+              case 7: return ({ [method](a0, a1, a2, a3, a4, a5, a6) { return invoke(this, arguments); } })[method];
+              default: return ({ [method](...a) { return invoke(this, a); } })[method];
+          }
+      })();
+
+      const wrapped = markAsNative(wrappedRaw, method);
 
       definePatchedMethod(proto, method, wrapped);
       patchedMethods.add(wrapped);
