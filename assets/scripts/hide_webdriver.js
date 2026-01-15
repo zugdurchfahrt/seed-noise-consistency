@@ -59,21 +59,33 @@ function HideWebdriverPatchModule() {
     } catch {}
 
     if (needsInstall) {
-      const wrappedToString = markAsNative(({ toString() {
+      /**
+       * Замена Function.prototype.toString.
+       * - не является конструктором (new → TypeError)
+       * - защищена от рекурсии
+       * - читает кастомные строки из WeakMap
+       * - в остальных случаях использует Reflect.apply(nativeToString)
+       */
+      const wrappedToString = markAsNative(function toString() {
+        if (new.target) {
+          throw new TypeError('Function is not a constructor');
+        }
         if (typeof this !== 'function') {
           return Reflect.apply(nativeToString, this, arguments);
         }
-        if (toStringDepth) return Reflect.apply(nativeToString, this, arguments);
+        if (toStringDepth) {
+          return Reflect.apply(nativeToString, this, arguments);
+        }
         toStringDepth++;
         try {
-          try {
-            if (toStringOverrideMap.has(this)) return toStringOverrideMap.get(this);
-          } catch {}
+          if (toStringOverrideMap.has(this)) {
+            return toStringOverrideMap.get(this);
+          }
           return Reflect.apply(nativeToString, this, arguments);
         } finally {
           toStringDepth--;
         }
-      } }).toString, 'toString');
+      }, 'toString');
       Object.defineProperty(Function.prototype, 'toString', {
         configurable: toStringDesc.configurable,
         enumerable: toStringDesc.enumerable,

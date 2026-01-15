@@ -21,6 +21,10 @@ function ContextPatchModule(window) {
     return global.markAsNative(fn, name);
   };
 
+  // Кешируем прокси для 2D‑контекстов: повторные getContext('2d')
+  // возвращают один и тот же safe‑proxy и не нарушают инварианты.
+  const __ctx2dProxyCache = new WeakMap();
+
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
     catch { return false; }
@@ -474,11 +478,20 @@ function ContextPatchModule(window) {
       let ctx = res;
 
       try {
-        if (type === '2d' && ctx){
-          ctx = createSafeCtxProxy(ctx);
-          // call hight level hooks
-          for (const hook of (ctx2dHooks || [])){
-            try { ctx = hook.call(this, ctx, type, ...rest) || ctx; } catch {}
+        if (type === '2d' && ctx) {
+          // Берём прокси из кеша или создаём новый
+          let safeCtx = __ctx2dProxyCache.get(ctx);
+          if (!safeCtx) {
+            safeCtx = createSafeCtxProxy(ctx);
+            __ctx2dProxyCache.set(ctx, safeCtx);
+          }
+          ctx = safeCtx;
+          // high‑level hooks работают с этим же объектом
+          for (const hook of (ctx2dHooks || [])) {
+            try {
+              const r = hook.call(this, ctx, type, ...rest);
+              if (r) ctx = r;
+            } catch {}
           }
         }
         if (/^webgl/.test(String(type))){
