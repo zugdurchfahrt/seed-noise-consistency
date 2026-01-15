@@ -53,25 +53,27 @@ function HideWebdriverPatchModule() {
   // compatibility with the old name (do not change the structure of the calls below)
   function fakeNative(func, name = "") { return markAsNative(func, name); }
 
-  // Single wrapper for Function.prototype.toString, reading from the general WeakMap
+  // Single Proxy for Function.prototype.toString, reading from the general WeakMap
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
-    function toString() {
-      // IMPORTANT: do not touch WeakMap for primitives/null/undefined
-      const t = typeof this;
-      const isObj = (this !== null) && (t === 'function' || t === 'object');
+    const toStringProxy = new Proxy(nativeToString, {
+      apply(target, thisArg, args) {
+        // IMPORTANT: do not touch WeakMap for primitives/null/undefined
+        const t = typeof thisArg;
+        const isObj = (thisArg !== null) && (t === 'function' || t === 'object');
 
-      if (isObj && toStringOverrideMap.has(this)) {
-        return toStringOverrideMap.get(this);
+        if (isObj && toStringOverrideMap.has(thisArg)) {
+          return toStringOverrideMap.get(thisArg);
+        }
+        // preserve native TypeError + semantics
+        return Reflect.apply(target, thisArg, args);
       }
-      // preserve native TypeError + semantics
-      return nativeToString.call(this);
-    }
+    });
 
-    // make wrapper look native via the same mechanism
-    markAsNative(toString, 'toString');
+    // make proxy look native via the same mechanism
+    markAsNative(toStringProxy, 'toString');
 
     Object.defineProperty(Function.prototype, 'toString', {
-      value: toString,
+      value: toStringProxy,
       writable: true,
       configurable: true,
       enumerable: false

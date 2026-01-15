@@ -3,10 +3,16 @@ function WebGPUPatchModule() {
     window.__PATCH_WEBGPU__ = true;
     const C = window.CanvasPatchContext;
       if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module is registration is not available');
-    if (typeof window.markAsNative !== 'function') {
-      throw new Error('[WebGPUPatchModule] markAsNative missing');
-    }
-    const markNative = window.markAsNative;
+    const markNative = (function() {
+      const ensure = typeof window.__ensureMarkAsNative === 'function'
+        ? window.__ensureMarkAsNative
+        : null;
+      const m = ensure ? ensure() : window.markAsNative;
+      if (typeof m !== 'function') {
+        throw new Error('[WebGPUPatchModule] markAsNative missing');
+      }
+      return m;
+    })();
     const definePatchedValue = (target, key, value, label) => {
       const d = Object.getOwnPropertyDescriptor(target, key)
         || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target) || {}, key);

@@ -13,13 +13,19 @@ function ContextPatchModule(window) {
   // === 0. Utilities ===
   const NOP = () => {};
 
-  if (!global || typeof global.markAsNative !== 'function') {
-    throw new Error('[ContextPatch] markAsNative missing');
-  }
   const patchedMethods = new WeakSet();
-  const markAsNative = function(fn, name) {
-    return global.markAsNative(fn, name);
-  };
+  const markAsNative = (function() {
+    const ensure = global && typeof global.__ensureMarkAsNative === 'function'
+      ? global.__ensureMarkAsNative
+      : null;
+    const m = ensure ? ensure() : (global && global.markAsNative);
+    if (typeof m !== 'function') {
+      throw new Error('[ContextPatch] markAsNative missing');
+    }
+    return function(fn, name) {
+      return m(fn, name);
+    };
+  })();
 
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
