@@ -27,6 +27,7 @@ share/python-wheels/
 MANIFEST
 user_data
 \profiles
+GENERATED_FONTS
 generated_fonts
 JS_fonts_patch
 proxy_error_log.txt
@@ -58,7 +59,10 @@ coverage.xml
 cover/
 
 # Execution-flow
-
+intention_entitled.log
+PROXY_START.bat
+profile.json
+generated_fonts
 
 # Translations
 *.mo
