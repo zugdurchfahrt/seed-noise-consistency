@@ -2,7 +2,7 @@ function HideWebdriverPatchModule() {
 
   function safeDefine(obj, prop, descriptor) {
     try {
-      if (!obj || typeof obj !== 'object') return;
+      if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
       if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
       Object.defineProperty(obj, prop, descriptor);
     } catch (e) {
@@ -33,13 +33,26 @@ function HideWebdriverPatchModule() {
 
   // Single Proxy for Function.prototype.toString, reading from the general WeakMap
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
-    Function.prototype.toString = new Proxy(nativeToString, {
-      apply(target, thisArg, args) {
-        if (toStringOverrideMap.has(thisArg)) {
-          return toStringOverrideMap.get(thisArg);
-        }
-        return target.apply(thisArg, args);
+    function toString() {
+      // IMPORTANT: do not touch WeakMap for primitives/null/undefined
+      const t = typeof this;
+      const isObj = (this !== null) && (t === 'function' || t === 'object');
+
+      if (isObj && toStringOverrideMap.has(this)) {
+        return toStringOverrideMap.get(this);
       }
+      // preserve native TypeError + semantics
+      return nativeToString.call(this);
+    }
+
+    // make wrapper look native via the same mechanism
+    markAsNative(toString, 'toString');
+
+    Object.defineProperty(Function.prototype, 'toString', {
+      value: toString,
+      writable: true,
+      configurable: true,
+      enumerable: false
     });
     window.__TOSTRING_PROXY_INSTALLED__ = true;
   }
@@ -110,27 +123,33 @@ function HideWebdriverPatchModule() {
   });
 
   // Object.getOwnPropertyDescriptor
-  Object.getOwnPropertyDescriptor = new Proxy(nativeGetOwnProp, {
-    apply(target, thisArg, args) {
-      if (args[0] === navigator && args[1] === 'webdriver') return undefined;
-      return target.apply(thisArg, args);
+  Object.getOwnPropertyDescriptor = (function(nativeGOPD){
+    function getOwnPropertyDescriptor(obj, prop) {
+      if ((obj === navigator || obj === Navigator.prototype) && prop === 'webdriver') return undefined;
+      return nativeGOPD(obj, prop);
     }
-  });
+    markAsNative(getOwnPropertyDescriptor, 'getOwnPropertyDescriptor');
+    return getOwnPropertyDescriptor;
+  })(nativeGetOwnProp);
 
   // Reflect.has
-  Reflect.has = new Proxy(Reflect.has, {
-    apply(target, thisArg, args) {
-      if (args[0] === navigator && args[1] === 'webdriver') return false;
-      return target.apply(thisArg, args);
+  Reflect.has = (function(nativeHas){
+    function has(target, prop) {
+      if (target === navigator && prop === 'webdriver') return false;
+      return nativeHas(target, prop);
     }
-  });
+    markAsNative(has, 'has');
+    return has;
+  })(Reflect.has);
 
   // Object.hasOwn
   const realHasOwn = Object.hasOwn;
-  Object.hasOwn = new Proxy(realHasOwn, {
-    apply(target, thisArg, args) {
-      if (args[0] === navigator && args[1] === "webdriver") return false;
-      return target.apply(thisArg, args);
+  Object.hasOwn = (function(nativeHasOwn){
+    function hasOwn(obj, prop) {
+      if (obj === navigator && prop === 'webdriver') return false;
+      return nativeHasOwn(obj, prop);
     }
-  });
+    markAsNative(hasOwn, 'hasOwn');
+    return hasOwn;
+  })(realHasOwn);
 }
