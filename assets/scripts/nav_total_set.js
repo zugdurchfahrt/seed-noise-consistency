@@ -84,6 +84,17 @@ function NavTotalSetPatchModule() {
         if (d && d.configurable === false) {
           return warnOrThrow(new TypeError(`[nav_total_set] ${key}: non-configurable`));
         }
+        const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+        if (isData) {
+          const value = (typeof getter === 'function') ? getter.call(target) : getter;
+          Object.defineProperty(target, key, {
+            value,
+            writable: d ? !!d.writable : true,
+            configurable: true,
+            enumerable: d ? !!d.enumerable : !!enumerable
+          });
+          return true;
+        }
         let getFn = getter;
         if (typeof getter === 'function' && getter.name === '') {
           const acc = ({ get [key]() { return getter.call(this); } });
@@ -109,6 +120,17 @@ function NavTotalSetPatchModule() {
     }
     function redefineAcc(proto, key, getImpl) {
       const d = Object.getOwnPropertyDescriptor(proto, key);
+      const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      if (isData) {
+        const value = (typeof getImpl === 'function') ? getImpl.call(proto) : getImpl;
+        Object.defineProperty(proto, key, {
+          value,
+          writable: d ? d.writable : true,
+          configurable: d ? d.configurable : true,
+          enumerable: d ? d.enumerable : false
+        });
+        return;
+      }
       Object.defineProperty(proto, key, {
         get: mark(getImpl, `get ${key}`),
         set: d && d.set,

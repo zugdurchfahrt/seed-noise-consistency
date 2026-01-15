@@ -1,6 +1,6 @@
 @echo off
-cd /d C:\55555\switch\your_folder
-call C:\55555\switch\venv\Scripts\activate.bat
+cd /d C:\55555\switch\sunami
+call C:\55555\switch\sunami\.venv\Scripts\activate.bat
 
 REM Запусти mitmproxy в отдельном окне с логом
 start "mitmproxy" cmd /k "mitmproxy -s handle_cors_addon.py -v > proxy_error_log.txt 2>&1"
