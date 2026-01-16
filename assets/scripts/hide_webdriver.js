@@ -68,6 +68,7 @@ function HideWebdriverPatchModule() {
           }
         }
         // preserve native TypeError + semantics
+        if (!args || args.length === 0) return target.call(thisArg);
         return Reflect.apply(target, thisArg, args);
       }
     });

@@ -1,5 +1,5 @@
 function RtcpeerconnectionPatchModule() {
-  if (!window.__PATCH_RTCPEERCONNECTION__) {
+  if (window.__PATCH_RTCPEERCONNECTION__) return;
   window.__PATCH_RTCPEERCONNECTION__ = true;
 
   function filterSDP(sdp) {
@@ -8,6 +8,7 @@ function RtcpeerconnectionPatchModule() {
       .filter(l => !l.startsWith('a=candidate') || l.includes('relay'))
       .join('\n');
   }
+
   function normalizeIceServers(servers) {
     const out = [];
     for (const s of servers || []) {
@@ -16,15 +17,13 @@ function RtcpeerconnectionPatchModule() {
       const urls = [];
       for (let u of list) {
         if (typeof u !== 'string') continue;
-        u = u.trim().replace(/#.*$/, ''); // Cut fragments
+        u = u.trim().replace(/#.*$/, '');
         if (!/^(stun|stuns|turn|turns):/i.test(u)) continue;
 
         const isStun = /^stuns?:/i.test(u);
         if (isStun) {
-          // STUN: request parameters are not allowed — we cut them off
           u = u.replace(/\?.*$/, '');
         } else {
-          // TURN: Allow only ?transport=udp|tcp|tls
           const q = u.match(/\?transport=([^&]+)/i);
           if (q && !/^(udp|tcp|tls)$/i.test(q[1])) continue;
         }
@@ -41,72 +40,88 @@ function RtcpeerconnectionPatchModule() {
 
   const Orig = window.RTCPeerConnection;
   if (!Orig) return;
-  window.RTCPeerConnection = function(...args) {
+
+  // --- preserve originals (prototype-level)
+  const origCreateOffer = Orig.prototype.createOffer;
+  const origCreateAnswer = Orig.prototype.createAnswer;
+  const origSetLocalDescription = Orig.prototype.setLocalDescription;
+  const origAddIceCandidate = Orig.prototype.addIceCandidate;
+  const origAddEventListener = Orig.prototype.addEventListener;
+
+  // --- patch prototype methods (native invariants preserved)
+  Orig.prototype.createOffer = function(...args) {
+    return origCreateOffer.apply(this, args).then(desc => {
+      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
+      return desc;
+    });
+  };
+
+  Orig.prototype.createAnswer = function(...args) {
+    return origCreateAnswer.apply(this, args).then(desc => {
+      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
+      return desc;
+    });
+  };
+
+  Orig.prototype.setLocalDescription = function(desc, ...rest) {
+    if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
+    return origSetLocalDescription.call(this, desc, ...rest);
+  };
+
+  Orig.prototype.addIceCandidate = function(candidate, ...rest) {
+    if (candidate && candidate.candidate && !candidate.candidate.includes('relay')) {
+      return Promise.resolve();
+    }
+    return origAddIceCandidate.call(this, candidate, ...rest);
+  };
+
+  // --- onicecandidate accessor (prototype-level)
+  try {
+    const d = Object.getOwnPropertyDescriptor(Orig.prototype, 'onicecandidate');
+    if (!d || d.configurable) {
+      Object.defineProperty(Orig.prototype, 'onicecandidate', {
+        set(handler) {
+          this._onicecandidate = e => {
+            if (!e.candidate || (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))) {
+              handler && handler.call(this, e);
+            }
+          };
+        },
+        get() {
+          return this._onicecandidate;
+        },
+        configurable: true,
+      });
+    }
+  } catch (_) {
+    // если нельзя — не ломаемся, но prototype-патчи выше уже работают
+  }
+
+  // --- filter icecandidate listeners
+  Orig.prototype.addEventListener = function(type, handler, options) {
+    if (type === 'icecandidate' && typeof handler === 'function') {
+      const wrapped = e => {
+        if (!e.candidate || (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))) {
+          handler.call(this, e);
+        } else {
+          e.stopImmediatePropagation && e.stopImmediatePropagation();
+        }
+      };
+      return origAddEventListener.call(this, type, wrapped, options);
+    }
+    return origAddEventListener.call(this, type, handler, options);
+  };
+
+  // --- wrapper constructor that preserves prototype chain
+  function PatchedRTCPeerConnection(...args) {
     const opts = args[0] && typeof args[0] === 'object' ? { ...args[0] } : {};
     if (opts.iceServers) opts.iceServers = normalizeIceServers(opts.iceServers);
-    const pc = new Orig(opts, ...args.slice(1));
-
-    // --- PATCH createOffer
-  pc.createOffer = (...offerArgs) =>
-    Orig.prototype.createOffer.apply(pc, offerArgs).then(desc => {
-      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
-      return desc;
-    });
-
-    // --- PATCH createAnswer
-  pc.createAnswer = (...answerArgs) =>
-    Orig.prototype.createAnswer.apply(pc, answerArgs).then(desc => {
-      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
-      return desc;
-    });
-
-    // --- PATCH setLocalDescription (optional, for extra safety)
-    pc.setLocalDescription = function(desc, ...rest) {
-      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
-      return Orig.prototype.setLocalDescription.call(pc, desc, ...rest);
-    };
-
-    // --- PATCH addIceCandidate
-    pc.addIceCandidate = function(candidate, ...rest) {
-      if (candidate && candidate.candidate && !candidate.candidate.includes('relay')) {
-        // We discard non-relay candidates
-        return Promise.resolve();
-      }
-      return Orig.prototype.addIceCandidate.call(pc, candidate, ...rest);
-    };
-
-    // --- PATCH onicecandidate (setter)
-    Object.defineProperty(pc, 'onicecandidate', {
-      set(handler) {
-        this._onicecandidate = e => {
-          if (
-            !e.candidate ||
-            (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))
-          ) {
-            handler && handler(e);
-          }
-        };
-      },
-      get() {
-        return this._onicecandidate;
-      },
-      configurable: true,
-    });
-
-    // --- PATCH icecandidate event (for listeners)
-    pc.addEventListener('icecandidate', e => {
-      if (
-        !e.candidate ||
-        (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))
-      ) {
-        // разрешаем
-      } else {
-        e.stopImmediatePropagation && e.stopImmediatePropagation();
-      }
-    }, true);
-
-    return pc;
-  };
-    console.log('[✔]RTC protection set');
+    return new Orig(opts, ...args.slice(1));
   }
-} 
+
+  PatchedRTCPeerConnection.prototype = Orig.prototype;
+  Object.setPrototypeOf(PatchedRTCPeerConnection, Orig);
+  window.RTCPeerConnection = PatchedRTCPeerConnection;
+
+  console.log('[✔]RTC protection set');
+}
