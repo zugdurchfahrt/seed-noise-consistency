@@ -19,17 +19,41 @@ function ScreenPatchModule() {
       console.warn(`[Screen] safeDefine failed for ${prop}:`, e);
     }
   }
-  function redefineAccessor(proto, prop, getter) {
-    const d = Object.getOwnPropertyDescriptor(proto, prop);
+  function makeNamedGetter(prop, getter) {
+    if (typeof getter === 'function' && getter.name) return getter;
+    const acc = ({ get [prop]() { return getter.call(this); } });
+    return Object.getOwnPropertyDescriptor(acc, prop).get;
+  }
+  function redefineProp(target, prop, getterOrValue) {
+    const d = Object.getOwnPropertyDescriptor(target, prop);
     if (!d) throw new Error(`[Screen] ${prop} descriptor missing`);
     if (d.configurable === false) throw new Error(`[Screen] ${prop} non-configurable`);
+    const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+    if (isData) {
+      const value = (typeof getterOrValue === 'function') ? getterOrValue.call(target) : getterOrValue;
+      Object.defineProperty(target, prop, {
+        value,
+        writable: !!d.writable,
+        configurable: !!d.configurable,
+        enumerable: !!d.enumerable
+      });
+      return;
+    }
     if (typeof d.get !== 'function') throw new Error(`[Screen] ${prop} getter missing`);
-    Object.defineProperty(proto, prop, {
-      get: getter,
+    const getFn = (typeof getterOrValue === 'function')
+      ? makeNamedGetter(prop, getterOrValue)
+      : makeNamedGetter(prop, function(){ return getterOrValue; });
+    Object.defineProperty(target, prop, {
+      get: getFn,
       set: d.set,
       configurable: d.configurable,
       enumerable: d.enumerable
     });
+  }
+  function chooseTarget(obj, proto, prop) {
+    if (obj && Object.getOwnPropertyDescriptor(obj, prop)) return obj;
+    if (proto && Object.getOwnPropertyDescriptor(proto, prop)) return proto;
+    return null;
   }
 
   const mqlMatches = new WeakMap();
@@ -120,23 +144,33 @@ function ScreenPatchModule() {
 
   //  screen и orientation ──
   const screenObj = window.screen;
-  if (screenObj && typeof Screen !== 'undefined' && Screen.prototype) {
-    const screenProto = Screen.prototype;
-    try { redefineAccessor(screenProto, 'width', () => SCREEN_WIDTH); } catch (e) { console.warn('[Screen] width redefine failed:', e); }
-    try { redefineAccessor(screenProto, 'height', () => SCREEN_HEIGHT); } catch (e) { console.warn('[Screen] height redefine failed:', e); }
-    try { redefineAccessor(screenProto, 'availWidth', () => SCREEN_WIDTH); } catch (e) { console.warn('[Screen] availWidth redefine failed:', e); }
-    try { redefineAccessor(screenProto, 'availHeight', () => SCREEN_HEIGHT); } catch (e) { console.warn('[Screen] availHeight redefine failed:', e); }
-    try { redefineAccessor(screenProto, 'colorDepth', () => COLOR_DEPTH); } catch (e) { console.warn('[Screen] colorDepth redefine failed:', e); }
-    try { redefineAccessor(screenProto, 'pixelDepth', () => COLOR_DEPTH); } catch (e) { console.warn('[Screen] pixelDepth redefine failed:', e); }
-    try { redefineAccessor(screenProto, 'availLeft', () => 0); } catch (e) { console.warn('[Screen] availLeft redefine failed:', e); }
-    try { redefineAccessor(screenProto, 'availTop', () => 0); } catch (e) { console.warn('[Screen] availTop redefine failed:', e); }
+  const screenProto = screenObj && Object.getPrototypeOf(screenObj);
+  if (screenObj && screenProto && screenProto !== Object.prototype) {
+    const setScreen = (k, get) => {
+      const target = chooseTarget(screenObj, screenProto, k);
+      if (!target) throw new Error(`[Screen] ${k} descriptor missing`);
+      redefineProp(target, k, get);
+    };
+    try { setScreen('width', () => SCREEN_WIDTH); } catch (e) { console.warn('[Screen] width redefine failed:', e); }
+    try { setScreen('height', () => SCREEN_HEIGHT); } catch (e) { console.warn('[Screen] height redefine failed:', e); }
+    try { setScreen('availWidth', () => SCREEN_WIDTH); } catch (e) { console.warn('[Screen] availWidth redefine failed:', e); }
+    try { setScreen('availHeight', () => SCREEN_HEIGHT); } catch (e) { console.warn('[Screen] availHeight redefine failed:', e); }
+    try { setScreen('colorDepth', () => COLOR_DEPTH); } catch (e) { console.warn('[Screen] colorDepth redefine failed:', e); }
+    try { setScreen('pixelDepth', () => COLOR_DEPTH); } catch (e) { console.warn('[Screen] pixelDepth redefine failed:', e); }
+    try { setScreen('availLeft', () => 0); } catch (e) { console.warn('[Screen] availLeft redefine failed:', e); }
+    try { setScreen('availTop', () => 0); } catch (e) { console.warn('[Screen] availTop redefine failed:', e); }
   }
   const orientationObj = screenObj && screenObj.orientation;
   const orientationProto = orientationObj && Object.getPrototypeOf(orientationObj);
-  if (orientationProto && orientationProto !== Object.prototype) {
-    try { redefineAccessor(orientationProto, 'type', () => (SCREEN_WIDTH > SCREEN_HEIGHT ? "landscape-primary" : "portrait-primary")); }
+  if (orientationObj && orientationProto && orientationProto !== Object.prototype) {
+    const setOrientation = (k, get) => {
+      const target = chooseTarget(orientationObj, orientationProto, k);
+      if (!target) throw new Error(`[Screen] orientation.${k} descriptor missing`);
+      redefineProp(target, k, get);
+    };
+    try { setOrientation('type', () => (SCREEN_WIDTH > SCREEN_HEIGHT ? "landscape-primary" : "portrait-primary")); }
     catch (e) { console.warn('[Screen] orientation.type redefine failed:', e); }
-    try { redefineAccessor(orientationProto, 'angle', () => 0); }
+    try { setOrientation('angle', () => 0); }
     catch (e) { console.warn('[Screen] orientation.angle redefine failed:', e); }
   }
 
@@ -225,14 +259,14 @@ function ScreenPatchModule() {
   // clientWidth / clientHeight for <html> ──
   const clientWidthDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'clientWidth');
   const origClientWidth = clientWidthDesc && clientWidthDesc.get;
-  redefineAccessor(Element.prototype, 'clientWidth', function clientWidth() {
+  redefineProp(Element.prototype, 'clientWidth', function clientWidth() {
     if (this === document.documentElement || this === document.body) return SCREEN_WIDTH;
     if (typeof origClientWidth === 'function') return origClientWidth.call(this);
     return SCREEN_WIDTH;
   });
   const clientHeightDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'clientHeight');
   const origClientHeight = clientHeightDesc && clientHeightDesc.get;
-  redefineAccessor(Element.prototype, 'clientHeight', function clientHeight() {
+  redefineProp(Element.prototype, 'clientHeight', function clientHeight() {
     if (this === document.documentElement || this === document.body) return SCREEN_HEIGHT;
     if (typeof origClientHeight === 'function') return origClientHeight.call(this);
     return SCREEN_HEIGHT;

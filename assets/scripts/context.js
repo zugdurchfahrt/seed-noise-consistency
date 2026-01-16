@@ -660,6 +660,12 @@ function ContextPatchModule(window) {
     if (C.registerWebGLGetShaderPrecisionFormatHook) C.registerWebGLGetShaderPrecisionFormatHook(webglHooks.webglGetShaderPrecisionFormatHook);
     if (C.registerWebGLShaderSourceHook)             C.registerWebGLShaderSourceHook(webglHooks.webglShaderSourceHook);
     if (C.registerWebGLGetUniformHook)               C.registerWebGLGetUniformHook(webglHooks.webglGetUniformHook);
+
+    // 7) Apply context patches after hooks registration
+    // Idempotent: protected by patchedMethods WeakSet inside ContextPatchModule
+    if (typeof C.applyCanvasElementPatches === 'function') C.applyCanvasElementPatches();
+    if (typeof C.applyOffscreenPatches === 'function')     C.applyOffscreenPatches();
+    if (typeof C.applyWebGLContextPatches === 'function')  C.applyWebGLContextPatches();
   }
     // export registerAllHooks for applying in main.py
 window.registerAllHooks = registerAllHooks;
