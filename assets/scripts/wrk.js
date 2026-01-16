@@ -518,12 +518,23 @@ function SafeWorkerOverride(G){
   } finally {
     URL.revokeObjectURL(blobURL);
   }
-  if (userURL !== abs && w && typeof w.addEventListener === 'function') {
+  if (w && typeof w.addEventListener === 'function') {
     const onMsg = ev => {
       const data = ev && ev.data;
-      if (data && data.__ENV_USER_URL_LOADED__ === userURL) {
+      const loaded = data && typeof data === 'object' && typeof data.__ENV_USER_URL_LOADED__ === 'string'
+        ? data.__ENV_USER_URL_LOADED__
+        : null;
+
+      if (loaded) {
+        // скрываем внутренний сигнал от внешних слушателей (важно для creepjs workers.js)
+        try { ev.stopImmediatePropagation(); ev.stopPropagation(); } catch(_) {}
+
+        // revoke нужен только когда мы реально пересоздавали blob-url
+        if (loaded === userURL && userURL !== abs) {
+          try { URL.revokeObjectURL(userURL); } catch(_) {}
+        }
+
         w.removeEventListener('message', onMsg);
-        URL.revokeObjectURL(userURL);
       }
     };
     w.addEventListener('message', onMsg);
