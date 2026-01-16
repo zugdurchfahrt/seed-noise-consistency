@@ -167,8 +167,8 @@ def init_driver(
     longitude = country_data["longitude"]
     proxy = Proxy()
     proxy.proxy_type = ProxyType.MANUAL
-    proxy.http_proxy = "127.0.0.1:8082"
-    proxy.ssl_proxy = "127.0.0.1:8082"
+    proxy.http_proxy = "127.0.0.1:8080"
+    proxy.ssl_proxy = "127.0.0.1:8080"
     chrome_options = Options()
     chrome_options.proxy = proxy
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
@@ -176,7 +176,6 @@ def init_driver(
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
-  # chrome_options.add_argument("--remote-debugging-port=9222")
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
