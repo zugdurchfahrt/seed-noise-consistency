@@ -274,14 +274,70 @@ class VPNClient:
         logger.debug("[cleanup] created dir: %s", USER_DATA_DIR)
 
     def _kill_old_processes(self):
-            now = time.time()
-            for proc in psutil.process_iter(['pid', 'name', 'create_time']):
-                name = proc.info.get('name')
+        """cleanup of stale processes that can interfere with startup.
+
+        Policy:
+        - Never silently assume cleanup succeeded; log what was done.
+        - Be conservative: only terminate browser processes that are clearly tied to this project
+        (e.g. using our USER_DATA_DIR in the command line).
+        """
+        # Processes that are safe to terminate unconditionally if found.
+        always_kill = {
+            'chromedriver.exe',
+            'geckodriver.exe',
+            'tor.exe',
+            'mitmdump.exe',
+            'mitmproxy.exe',
+            'mitmweb.exe',
+        }
+
+        # Browser processes are only terminated if their cmdline points to our USER_DATA_DIR.
+        browser_names = {
+            'chrome.exe',
+        }
+
+        user_data_token = str(USER_DATA_DIR)
+
+        for proc in psutil.process_iter(['pid', 'name', 'create_time', 'cmdline', 'exe']):
+            try:
+                name = (proc.info.get('name') or '').lower()
                 if not name:
                     continue
-                if now - proc.info.get('create_time', now) > 300 and name.lower() in (
-                    'chrome.exe', 'chromedriver.exe', 'tor.exe', 'cmd.exe'):
-                    proc.terminate()
+
+                cmdline = ' '.join(proc.info.get('cmdline') or [])
+
+                should_terminate = False
+                if name in always_kill:
+                    # These helper processes interfere with a clean run.
+                    should_terminate = True
+                elif name in browser_names:
+                    # Be conservative: only terminate if this browser instance is using our project profile.
+                    if user_data_token and (user_data_token in cmdline):
+                        should_terminate = True
+
+                if not should_terminate:
+                    continue
+
+                logger.warning(
+                    "[cleanup] terminating PID=%d name=%s exe=%s cmd=%s",
+                    proc.pid,
+                    name,
+                    proc.info.get('exe'),
+                    cmdline[:300]
+                )
+
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except psutil.TimeoutExpired:
+                    proc.kill()
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+            except Exception as e:
+                # Cleanup is best-effort here; do not crash the whole run from an unrelated PID.
+                logger.debug("[cleanup] error terminating PID=%s: %s", getattr(proc, 'pid', '?'), e)
+
                     
 def get_language_for_timezone(timezone, return_country=False):
     """Sets the country (by Timezone map), languages, domain and offset for the given timezone.

@@ -9,6 +9,9 @@ function WebglPatchModule(window) {
       throw new Error('[WebGLPatchModule] "R" is not initialized');
     }
     
+    
+    // Internal marker: avoid leaving visible properties on native functions/prototypes
+    const __webglShaderSourcePatchedProtos__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
     function noiseAt(x, y, w, h) {
       const mix = (((x*73856093) ^ (y*19349663) ^ (w*83492791) ^ (h*2654435761)) >>> 0);
       const r = R()
@@ -83,15 +86,17 @@ function WebglPatchModule(window) {
 
     const proto = Object.getPrototypeOf(res);
     if (kind && ['webgl', 'experimental-webgl', 'webgl2'].includes(kind)) {
-      if (proto.shaderSource && !proto.shaderSource._isPatchedByStealth) {
+            if (proto && proto.shaderSource && !(__webglShaderSourcePatchedProtos__ && __webglShaderSourcePatchedProtos__.has(proto))) {
         const orig = proto.shaderSource;
         // НИЧЕГО НЕ МЕНЯЕМ ЗДЕСЬ — вся precision-политика уедет в webglShaderSourceHook
-        proto.shaderSource = function (shader, src) {
+        const wrapped = ({ shaderSource(shader, src) {
           return orig.call(this, shader, src);
-        };
-        proto.shaderSource._isPatchedByStealth = true;
+        } }).shaderSource;
+        if (typeof window.markAsNative === 'function') { try { window.markAsNative(wrapped, 'shaderSource'); } catch {} }
+        proto.shaderSource = wrapped;
+        if (__webglShaderSourcePatchedProtos__) __webglShaderSourcePatchedProtos__.add(proto);
       }
-      res.WebGLInstance_GPUPatched__ = true;
+res.WebGLInstance_GPUPatched__ = true;
     }
     return res;
   }
