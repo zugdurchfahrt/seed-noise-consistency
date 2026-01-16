@@ -1,0 +1,78 @@
+ undetected chromedriver 1337!
+page_bundle.js:75 [✔]RTC protection set
+page_bundle.js:75 [ENV] EnvParamsPatchModule ready
+page_bundle.js:75 userAgentData.toJSON correctly implemented
+page_bundle.js:75 Web Auth API mock applied
+page_bundle.js:1220 Client Hints Debug
+page_bundle.js:75 meta: Object
+page_bundle.js:75 navigator.userAgentData: NavigatorUAData
+page_bundle.js:75 navigator.language(s): de-DE Array(2)
+page_bundle.js:75 navigator.deviceMemory: 4
+page_bundle.js:75 navigator.hardwareConcurrency: 6
+page_bundle.js:75 navigator.connection: Object
+page_bundle.js:75 Client Hints and Navigator setting applied in JS
+page_bundle.js:75 [Screen] patches applied
+page_bundle.js:75 [FontPatch] filtered fonts = 16 for Win32
+page_bundle.js:75 [WebGLPatchModule] Whitelist loaded
+page_bundle.js:75 [WebGLPatchModule] WebglPatchModule applied
+page_bundle.js:75 [WebGPUPatchModule] WL ready & snapshot installed
+page_bundle.js:75 [WebGPU] Patched requestAdapter/requestDevice for browser: edge
+page_bundle.js:75 [AudioContextPatch] Patched createBuffer on AudioContext
+page_bundle.js:75 [AudioContextPatch] Patched createBuffer on AudioContext
+page_bundle.js:75 [headers_interceptor.js] patch loaded. Header profile: min
+page_bundle.js:75 [CanvasPatch] Canvas element patches: applied 3 из 3
+page_bundle.js:75 [CanvasPatch] Offscreen patches: applied 2 из 2
+page_bundle.js:75 [CanvasPatch] WebGL context patches: applied 14 из 14
+page_bundle.js:75 [DIAG] Object
+page_bundle.js:75 [headers_interceptor.js] window.__HEADERS__ injected (safelisted only)
+page_bundle.js:75 languages override applied: de-DE Array(2)
+page_bundle.js:5675 [Intervention] Noise was added to a canvas readback. If this has caused breakage, please file a bug at https://issues.chromium.org/issues/new?component=1456351&title=Canvas%20noise%20breakage. This feature can be disabled through chrome://flags/#enable-canvas-noise
+page_bundle.js:75 [patchMethod override] getExtension webglGetExtensionPatch WebGLDebugRendererInfo
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:5599
+getGpu @ workers.js:102
+getWorkerData @ workers.js:246
+(anonymous) @ workers.js:485
+(anonymous) @ workers.js:684
+page_bundle.js:75 [patchMethod override] getExtension webglGetExtensionPatch WebGLDebugRendererInfo
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:5599
+webglGetParameterMask @ page_bundle.js:4532
+(anonymous) @ page_bundle.js:5594
+getGpu @ workers.js:104
+getWorkerData @ workers.js:246
+(anonymous) @ workers.js:485
+(anonymous) @ workers.js:684
+page_bundle.js:75 [patchMethod override] getParameter webglGetParameterMask ANGLE (AMD, AMD Radeon(TM) RX 6900 (0x73BF) Direct3D11 vs_5_0 ps_5_0, D3D11)
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:5599
+getGpu @ workers.js:104
+getWorkerData @ workers.js:246
+(anonymous) @ workers.js:485
+(anonymous) @ workers.js:684
+page_bundle.js:75 undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ workers.js:488
+page_bundle.js:75 [FontPatch] window: 16 loaded, 0 failed
+page_bundle.js:75 [UnhandledPromiseRejection] TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+    at workers.js:483:2
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:212
+workers.js:483 Uncaught (in promise) TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+    at workers.js:483:2
+(anonymous) @ workers.js:483
+page_bundle.js:75 [Screen] patched screen/viewport: Object
+page_bundle.js:75 [Screen] document & div client sizes → Object
+page_bundle.js:75 [CanvasPatchModule] realInit done, window.canvas set: <canvas width=​"2560" height=​"1440" style=​"width:​ 2560px;​ height:​ 1440px;​ display:​ block;​ background:​ transparent;​">​
+page_bundle.js:75 [headers_interceptor.js] CDP bridge ready
+d64a789a-2e94-441a-bb10-ec66d2583436:331 [UACHPatch] installed Object
+5ab6635d-e88b-4713-b5df-65d6008e8c5d:219 Uncaught (in promise) TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+    at getWorkerData (5ab6635d-e88b-4713-b5df-65d6008e8c5d:219:3)
+    at async 5ab6635d-e88b-4713-b5df-65d6008e8c5d:6:46
+d64a789a-2e94-441a-bb10-ec66d2583436:1 Uncaught null
+blob:https://abraham…8804-94c808961716:1 Uncaught SyntaxError: Failed to execute 'importScripts' on 'WorkerGlobalScope': Unexpected identifier 'Promise'
+    at 3f296371-8d00-4bcc-a726-a87eee8cc46f:1:2732
+    at 3f296371-8d00-4bcc-a726-a87eee8cc46f:1:2754
+page_bundle.js:75 [UncaughtError] Uncaught SyntaxError: Failed to execute 'importScripts' on 'WorkerGlobalScope': Unexpected identifier 'Promise' null
+LOGGingModule.console.<computed> @ page_bundle.js:75
+(anonymous) @ page_bundle.js:206

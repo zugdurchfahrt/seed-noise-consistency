@@ -1,37 +1,37 @@
 {
   "profile": {
-    "platform": "Win32",
-    "os_info": "Windows NT 10.0; Win64; x64",
-    "os_name": "Windows 11 64-bit",
-    "platform_version": "15.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0",
-    "browser_version": "137.0.3296.52",
-    "screen_width": 2560,
-    "screen_height": 1440,
-    "device_dpr_value": 1.25,
-    "webgl_vendor": "WebKit",
+    "platform": "MacIntel",
+    "os_info": "Macintosh; Intel Mac OS X 15_4_0",
+    "os_name": "macOS 15.4.0 Sequoia",
+    "platform_version": "15.4.0",
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 15.4.0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+    "browser_version": "18.3",
+    "screen_width": 1920,
+    "screen_height": 1080,
+    "device_dpr_value": 1.0,
+    "webgl_vendor": "Apple Computer, Inc.",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (AMD)",
-    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6800 (0x73BF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Apple Inc.",
+    "webgl_unmasked_renderer": "AMD Radeon(TM) RX 6700 XT",
     "gpu_type": "discrete",
     "gpu_architecture": "rdna2",
     "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "Audio-Technica AT2021",
-      "videoinput": "Ausdom AF640",
-      "audiooutput": "Audio-Technica ATH-M50x"
+      "audioinput": "MXL AC-404",
+      "videoinput": "Built-in FaceTime HD Camera",
+      "audiooutput": "Apple AirPods Pro"
     },
-    "vendor_value": "Google Inc.",
+    "vendor_value": "Apple Computer, Inc.",
     "languages": [
       "de-DE",
       "de"
     ],
     "language": "de-DE",
     "deviceMemory": 8,
-    "hardwareConcurrency": 8,
+    "hardwareConcurrency": 10,
     "plugins": [
       {
-        "name": "Microsoft Edge PDF Viewer",
+        "name": "Default PDF Viewer",
         "filename": "internal-pdf-viewer",
         "description": "",
         "mimeTypes": [
@@ -53,49 +53,33 @@
     "accept_language": "de-DE,de;q=0.9"
   },
   "expected_client_hints": {
-    "platform": "Windows",
+    "platform": "macOS",
     "brands": [
       {
-        "brand": "Not)A;Brand",
-        "version": "8"
-      },
-      {
-        "brand": "Chromium",
-        "version": "137"
-      },
-      {
-        "brand": "Microsoft Edge",
-        "version": "137"
+        "brand": "Safari",
+        "version": "18"
       }
     ],
     "mobile": false,
     "architecture": "x86",
     "bitness": "64",
     "model": "",
-    "platformVersion": "15.0.0",
+    "platformVersion": "15.4.0",
     "fullVersionList": [
       {
-        "brand": "Not)A;Brand",
-        "version": "8.0.0.0"
-      },
-      {
-        "brand": "Chromium",
-        "version": "137.0.3296.52"
-      },
-      {
-        "brand": "Microsoft Edge",
-        "version": "137.0.3296.52"
+        "brand": "Safari",
+        "version": "18.3"
       }
     ],
-    "uaFullVersion": "137.0.3296.52",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"137\", \"Microsoft Edge\";v=\"137\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"137.0.3296.52\", \"Microsoft Edge\";v=\"137.0.3296.52\"",
+    "uaFullVersion": "18.3",
+    "sec_ch_ua": "\"Safari\";v=\"18\"",
+    "sec_ch_ua_full_version_list": "\"Safari\";v=\"18.3\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
     "deviceMemory": 8,
-    "hardwareConcurrency": 8,
+    "hardwareConcurrency": 10,
     "wow64": false,
     "languages": [
       "de-DE",
@@ -105,6 +89,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,image/avif,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
   }
 }
