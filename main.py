@@ -407,8 +407,18 @@ def init_driver(
     window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
     console.log("[headers_interceptor.js] window.__HEADERS__ injected (safelisted only)");
     """
+    # window.__HEADERS__ injected (safelisted only)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
-    logger.info("window.__HEADERS__ injected (safelisted only)")
+
+    # ВАЖНО: применить __HEADERS__ на ТЕКУЩЕЙ странице сразу (иначе будет только на next document)
+    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_window_js, "awaitPromise": False})
+
+    # ВАЖНО: повторно вызвать HeadersInterceptor(window) уже ПОСЛЕ появления __HEADERS__
+    driver.execute_cdp_cmd("Runtime.evaluate", {
+        "expression": "if (typeof HeadersInterceptor === 'function') { HeadersInterceptor(window); }",
+        "awaitPromise": False
+    })
+
 
     # Headers interceptor bridge to sync allow/ignore  CDP with Fetch interceptor
     headers_bridge_js = """
@@ -459,6 +469,9 @@ def init_driver(
       })();
       """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
+
+    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_bridge_js, "awaitPromise": False})
+
 
     # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
     fetch_rules = []
