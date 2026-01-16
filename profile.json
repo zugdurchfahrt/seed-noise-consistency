@@ -17,9 +17,9 @@
     "gpu_architecture": "rdna2",
     "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "Boya BY-M1",
-      "videoinput": "Dell UltraSharp Webcam",
-      "audiooutput": "AKG K371"
+      "audioinput": "Blue Yeti USB Microphone",
+      "videoinput": "Aukey PC-LM1E",
+      "audiooutput": "Sennheiser HD 560S"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -27,7 +27,7 @@
       "de"
     ],
     "language": "de-DE",
-    "deviceMemory": 4,
+    "deviceMemory": 8,
     "hardwareConcurrency": 4,
     "plugins": [
       {
@@ -94,7 +94,7 @@
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
-    "deviceMemory": 4,
+    "deviceMemory": 8,
     "hardwareConcurrency": 4,
     "wow64": false,
     "languages": [
@@ -105,6 +105,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/avif,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/avif,image/webp,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }
