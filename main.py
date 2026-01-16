@@ -606,11 +606,11 @@ def main():
             # Supported platforms List
             "enabled_platforms": ["Win32", "MacIntel"],
             # Setting probabilities (weight) of platform selection when generating a profile
-            "platform_weights": [0.8, 0.2],
+            "platform_weights": [0.96, 0.04],
             # Probabilities of browser selection for each platform:
             "browser_weights": {
                 "Win32": (["chrome", "firefox", "edge"], [0.6, 0.01, 0.39]),
-                "MacIntel": (["chrome", "firefox", "safari"], [0.29, 0.01, 0.7]),
+                "MacIntel": (["chrome", "firefox", "safari"], [0.19, 0.01, 0.8]),
             },
         }
         # --------PLATFORM selection -------------------
