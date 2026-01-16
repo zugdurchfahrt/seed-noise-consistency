@@ -4,22 +4,22 @@
     "os_info": "Windows NT 10.0; Win64; x64",
     "os_name": "Windows 11 64-bit",
     "platform_version": "15.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    "browser_version": "136.0.7103.48",
-    "screen_width": 1920,
-    "screen_height": 1080,
-    "device_dpr_value": 1.0,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0",
+    "browser_version": "137.0.3296.52",
+    "screen_width": 2560,
+    "screen_height": 1440,
+    "device_dpr_value": 1.25,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
     "webgl_unmasked_vendor": "Google Inc. (AMD)",
-    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6600 (0x73FF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6800 (0x73BF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
     "gpu_architecture": "rdna2",
     "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "Blue Yeti USB Microphone",
-      "videoinput": "Aukey PC-LM1E",
-      "audiooutput": "Sennheiser HD 560S"
+      "audioinput": "Audio-Technica AT2021",
+      "videoinput": "Ausdom AF640",
+      "audiooutput": "Audio-Technica ATH-M50x"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -28,10 +28,10 @@
     ],
     "language": "de-DE",
     "deviceMemory": 8,
-    "hardwareConcurrency": 4,
+    "hardwareConcurrency": 8,
     "plugins": [
       {
-        "name": "Chrome PDF Viewer",
+        "name": "Microsoft Edge PDF Viewer",
         "filename": "internal-pdf-viewer",
         "description": "",
         "mimeTypes": [
@@ -61,11 +61,11 @@
       },
       {
         "brand": "Chromium",
-        "version": "136"
+        "version": "137"
       },
       {
-        "brand": "Google Chrome",
-        "version": "136"
+        "brand": "Microsoft Edge",
+        "version": "137"
       }
     ],
     "mobile": false,
@@ -80,22 +80,22 @@
       },
       {
         "brand": "Chromium",
-        "version": "136.0.7103.48"
+        "version": "137.0.3296.52"
       },
       {
-        "brand": "Google Chrome",
-        "version": "136.0.7103.48"
+        "brand": "Microsoft Edge",
+        "version": "137.0.3296.52"
       }
     ],
-    "uaFullVersion": "136.0.7103.48",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"136\", \"Google Chrome\";v=\"136\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"136.0.7103.48\", \"Google Chrome\";v=\"136.0.7103.48\"",
+    "uaFullVersion": "137.0.3296.52",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"137\", \"Microsoft Edge\";v=\"137\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"137.0.3296.52\", \"Microsoft Edge\";v=\"137.0.3296.52\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
     "deviceMemory": 8,
-    "hardwareConcurrency": 4,
+    "hardwareConcurrency": 8,
     "wow64": false,
     "languages": [
       "de-DE",
@@ -105,6 +105,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/avif,image/webp,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,image/avif,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }
