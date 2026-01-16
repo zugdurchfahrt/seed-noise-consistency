@@ -358,10 +358,7 @@ function NavTotalSetPatchModule() {
         || Object.getOwnPropertyDescriptor(navigator.permissions, 'query');
       if (!permDesc) throw new TypeError('[nav_total_set] permissions.query descriptor missing');
       const origQuery = permDesc.value || navigator.permissions.query;
-      const patchedQuery = mark(function query(parameters) {
-        if (new.target) {
-          throw new TypeError('Illegal constructor');
-        }
+      const patchedQueryRaw = ({ query(parameters) {
         const isPermThis = (this === navigator.permissions || this === permProto);
         if (!isPermThis) {
           return origQuery.call(this, parameters);
@@ -375,7 +372,8 @@ function NavTotalSetPatchModule() {
         if (['geolocation', 'camera', 'audiooutput', 'microphone', 'notifications'].includes(name))
           return Promise.resolve({ state: 'prompt', onchange: null });
         return origQuery ? origQuery.call(this, parameters) : Promise.resolve({ state: 'prompt', onchange: null });
-      }, 'query');
+      } }).query;
+      const patchedQuery = mark(patchedQueryRaw, 'query');
       Object.defineProperty(permProto, 'query', {
         value: patchedQuery,
         configurable: permDesc.configurable,
@@ -390,7 +388,12 @@ function NavTotalSetPatchModule() {
       const mediaDesc = Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
         || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices');
       if (!mediaDesc) throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices descriptor missing');
-      const patchedEnumerate = mark(async function enumerateDevices() {
+      const origEnumerate = mediaDesc.value || navigator.mediaDevices.enumerateDevices;
+      const patchedEnumerateRaw = ({ async enumerateDevices() {
+        const isMediaThis = (this === navigator.mediaDevices || this === mediaProto);
+        if (!isMediaThis) {
+          return origEnumerate.call(this);
+        }
         const generateHexId = (len = 64) => {
           let s = '';
           for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
@@ -402,7 +405,8 @@ function NavTotalSetPatchModule() {
           { kind: 'videoinput',  label: devicesLabels.videoinput,  deviceId: generateHexId(64), groupId },
           { kind: 'audiooutput', label: devicesLabels.audiooutput, deviceId: generateHexId(64), groupId: generateHexId(64) }
         ];
-      }, 'enumerateDevices');
+      } }).enumerateDevices;
+      const patchedEnumerate = mark(patchedEnumerateRaw, 'enumerateDevices');
       Object.defineProperty(mediaProto, 'enumerateDevices', {
         value: patchedEnumerate,
         configurable: mediaDesc.configurable,
@@ -428,14 +432,20 @@ function NavTotalSetPatchModule() {
         usageBytes = Math.min(quotaBytes - 4096, usageBytes + Math.floor(R() * 4096));
       }, 'tickUsage');
 
+      const origEstimate = storageDesc.value || navigator.storage.estimate;
+      const patchedEstimateRaw = ({ estimate() {
+        const isStorageThis = (this === navigator.storage || this === storageProto);
+        if (!isStorageThis) {
+          return origEstimate.call(this);
+        }
+        tickUsage();
+        return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
+      } }).estimate;
       Object.defineProperty(storageProto, 'estimate', {
         configurable: storageDesc.configurable,
         enumerable: storageDesc.enumerable,
         writable: storageDesc.writable,
-        value: mark(() => {
-          tickUsage();
-          return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
-        }, 'estimate')
+        value: mark(patchedEstimateRaw, 'estimate')
       });
 
       if (navigator.webkitTemporaryStorage) {
