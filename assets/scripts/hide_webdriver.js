@@ -55,14 +55,17 @@ function HideWebdriverPatchModule() {
 
   // Single Proxy for Function.prototype.toString, reading from the general WeakMap
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
+    const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const toStringProxy = new Proxy(nativeToString, {
       apply(target, thisArg, args) {
         // IMPORTANT: do not touch WeakMap for primitives/null/undefined
-        const t = typeof thisArg;
-        const isObj = (thisArg !== null) && (t === 'function' || t === 'object');
-
-        if (isObj && toStringOverrideMap.has(thisArg)) {
-          return toStringOverrideMap.get(thisArg);
+        if (thisArg !== null) {
+          const t = typeof thisArg;
+          if (t === 'function' || t === 'object') {
+            // Single WeakMap lookup (faster than has()+get())
+            const v = toStringOverrideMap.get(thisArg);
+            if (v !== undefined) return v;
+          }
         }
         // preserve native TypeError + semantics
         return Reflect.apply(target, thisArg, args);
@@ -74,9 +77,9 @@ function HideWebdriverPatchModule() {
 
     Object.defineProperty(Function.prototype, 'toString', {
       value: toStringProxy,
-      writable: true,
-      configurable: true,
-      enumerable: false
+      writable: toStringDesc ? !!toStringDesc.writable : true,
+      configurable: toStringDesc ? !!toStringDesc.configurable : true,
+      enumerable: toStringDesc ? !!toStringDesc.enumerable : false
     });
     window.__TOSTRING_PROXY_INSTALLED__ = true;
   }
