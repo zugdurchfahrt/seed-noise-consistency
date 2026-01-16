@@ -4,22 +4,22 @@
     "os_info": "Windows NT 10.0; Win64; x64",
     "os_name": "Windows 11 64-bit",
     "platform_version": "19.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-    "browser_version": "139.0.7258.66",
-    "screen_width": 7680,
-    "screen_height": 4320,
-    "device_dpr_value": 3.0,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "browser_version": "137.0.7151.56",
+    "screen_width": 1920,
+    "screen_height": 1080,
+    "device_dpr_value": 1.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (AMD)",
-    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6950 (0x73BF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
+    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x2206) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
-    "gpu_architecture": "rdna2",
-    "gpu_vendor": "amd",
+    "gpu_architecture": "ampere",
+    "gpu_vendor": "nvidia",
     "devices_conf": {
-      "audioinput": "Shure SM7B",
-      "videoinput": "AVerMedia Live Streamer CAM 313",
-      "audiooutput": "Bose QuietComfort 35 II"
+      "audioinput": "CAD U37",
+      "videoinput": "Ausdom AF640",
+      "audiooutput": "Bose SoundLink Around-Ear"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -28,9 +28,28 @@
     ],
     "language": "de-DE",
     "deviceMemory": 8,
-    "hardwareConcurrency": 2,
-    "plugins": [],
-    "mimeTypes": [],
+    "hardwareConcurrency": 6,
+    "plugins": [
+      {
+        "name": "Chrome PDF Viewer",
+        "filename": "internal-pdf-viewer",
+        "description": "Portable Document Format",
+        "mimeTypes": [
+          {
+            "type": "application/pdf",
+            "suffixes": "pdf",
+            "description": "PDF document"
+          }
+        ]
+      }
+    ],
+    "mimeTypes": [
+      {
+        "type": "application/pdf",
+        "suffixes": "pdf",
+        "description": "PDF document"
+      }
+    ],
     "accept_language": "de-DE,de;q=0.9"
   },
   "expected_client_hints": {
@@ -42,11 +61,11 @@
       },
       {
         "brand": "Chromium",
-        "version": "139"
+        "version": "137"
       },
       {
         "brand": "Google Chrome",
-        "version": "139"
+        "version": "137"
       }
     ],
     "mobile": false,
@@ -61,22 +80,22 @@
       },
       {
         "brand": "Chromium",
-        "version": "139.0.7258.66"
+        "version": "137.0.7151.56"
       },
       {
         "brand": "Google Chrome",
-        "version": "139.0.7258.66"
+        "version": "137.0.7151.56"
       }
     ],
-    "uaFullVersion": "139.0.7258.66",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"139\", \"Google Chrome\";v=\"139\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"139.0.7258.66\", \"Google Chrome\";v=\"139.0.7258.66\"",
+    "uaFullVersion": "137.0.7151.56",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"137\", \"Google Chrome\";v=\"137\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"137.0.7151.56\", \"Google Chrome\";v=\"137.0.7151.56\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
     "deviceMemory": 8,
-    "hardwareConcurrency": 2,
+    "hardwareConcurrency": 6,
     "wow64": false,
     "languages": [
       "de-DE",
@@ -86,6 +105,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,image/avif,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/avif,image/webp,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }

@@ -26,12 +26,16 @@ share/python-wheels/
 *.egg
 MANIFEST
 user_data
-\profiles
+profiles/
 GENERATED_FONTS
-generated_fonts
+assets/generated_fonts
 JS_fonts_patch
 proxy_error_log.txt
+PROXY_START.txt
+mitmproxy-ca-cert.p12
+proxy_out_log.txt
 profile.json
+
 
 
 # PyInstaller
@@ -200,7 +204,7 @@ cython_debug/
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
 #  and can be added to the global gitignore or merged into this file. However, if you prefer,
 #  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+.vscode/
 
 # Ruff stuff:
 .ruff_cache/
@@ -219,7 +223,3 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-PROXY_START.bat
-mitmproxy-ca-cert.p12
-profile.json
-PROXY_START.bat
