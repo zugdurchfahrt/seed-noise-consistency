@@ -167,8 +167,8 @@ def init_driver(
     longitude = country_data["longitude"]
     proxy = Proxy()
     proxy.proxy_type = ProxyType.MANUAL
-    proxy.http_proxy = "127.0.0.1:8082"
-    proxy.ssl_proxy = "127.0.0.1:8082"
+    proxy.http_proxy = "127.0.0.1:8080"
+    proxy.ssl_proxy = "127.0.0.1:8080"
     chrome_options = Options()
     chrome_options.proxy = proxy
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
@@ -176,7 +176,6 @@ def init_driver(
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
-  # chrome_options.add_argument("--remote-debugging-port=9222")
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
@@ -407,18 +406,8 @@ def init_driver(
     window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
     console.log("[headers_interceptor.js] window.__HEADERS__ injected (safelisted only)");
     """
-    # window.__HEADERS__ injected (safelisted only)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
-
-    # ВАЖНО: применить __HEADERS__ на ТЕКУЩЕЙ странице сразу (иначе будет только на next document)
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_window_js, "awaitPromise": False})
-
-    # ВАЖНО: повторно вызвать HeadersInterceptor(window) уже ПОСЛЕ появления __HEADERS__
-    driver.execute_cdp_cmd("Runtime.evaluate", {
-        "expression": "if (typeof HeadersInterceptor === 'function') { HeadersInterceptor(window); }",
-        "awaitPromise": False
-    })
-
+    logger.info("window.__HEADERS__ injected (safelisted only)")
 
     # Headers interceptor bridge to sync allow/ignore  CDP with Fetch interceptor
     headers_bridge_js = """
@@ -469,9 +458,6 @@ def init_driver(
       })();
       """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
-
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_bridge_js, "awaitPromise": False})
-
 
     # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
     fetch_rules = []

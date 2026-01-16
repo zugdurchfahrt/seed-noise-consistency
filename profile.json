@@ -9,7 +9,7 @@
     "screen_width": 1920,
     "screen_height": 1080,
     "device_dpr_value": 1.0,
-    "webgl_vendor": "WebKit",
+    "webgl_vendor": "Apple Computer, Inc.",
     "webgl_renderer": "WebKit WebGL",
     "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
     "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1650 (0x1F82) Direct3D11 vs_5_0 ps_5_0, D3D11)",
@@ -21,7 +21,7 @@
       "videoinput": "Aukey PC-LM1E",
       "audiooutput": "AKG K702"
     },
-    "vendor_value": "Google Inc.",
+    "vendor_value": "Apple Computer, Inc.",
     "languages": [
       "de-DE",
       "de"
@@ -33,7 +33,7 @@
       {
         "name": "Microsoft Edge PDF Viewer",
         "filename": "internal-pdf-viewer",
-        "description": "Portable Document Format",
+        "description": "",
         "mimeTypes": [
           {
             "type": "application/pdf",
@@ -53,7 +53,7 @@
     "accept_language": "de-DE,de;q=0.9"
   },
   "expected_client_hints": {
-    "platform": "Windows",
+    "platform": "macOS",
     "brands": [
       {
         "brand": "Not)A;Brand",
