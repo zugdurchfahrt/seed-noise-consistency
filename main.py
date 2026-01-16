@@ -167,8 +167,8 @@ def init_driver(
     longitude = country_data["longitude"]
     proxy = Proxy()
     proxy.proxy_type = ProxyType.MANUAL
-    proxy.http_proxy = "127.0.0.1:8080"
-    proxy.ssl_proxy = "127.0.0.1:8080"
+    proxy.http_proxy = "127.0.0.1:8082"
+    proxy.ssl_proxy = "127.0.0.1:8082"
     chrome_options = Options()
     chrome_options.proxy = proxy
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
