@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.vscode/
 *.py[codz]
 *$py.class
 
@@ -61,13 +62,13 @@ coverage.xml
 *.py.cover
 .hypothesis/
 .pytest_cache/
-cover/
+ cover/
 
 # Execution-flow
-intention_entitled.log
-PROXY_START.bat
-profile.json
-generated_fonts
+ intention_entitled.log
+ PROXY_START.bat
+ profile.json
+ generated_fonts
 
 # Translations
 *.mo
@@ -204,7 +205,7 @@ cython_debug/
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
 #  and can be added to the global gitignore or merged into this file. However, if you prefer,
 #  you could uncomment the following to ignore the entire vscode folder
-.vscode/
+ 
 
 # Ruff stuff:
 .ruff_cache/
