@@ -84,6 +84,17 @@ function NavTotalSetPatchModule() {
         if (d && d.configurable === false) {
           return warnOrThrow(new TypeError(`[nav_total_set] ${key}: non-configurable`));
         }
+        const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+        if (isData) {
+          const value = (typeof getter === 'function') ? getter.call(target) : getter;
+          Object.defineProperty(target, key, {
+            value,
+            writable: d ? !!d.writable : true,
+            configurable: true,
+            enumerable: d ? !!d.enumerable : !!enumerable
+          });
+          return true;
+        }
         let getFn = getter;
         if (typeof getter === 'function' && getter.name === '') {
           const acc = ({ get [key]() { return getter.call(this); } });
@@ -109,6 +120,17 @@ function NavTotalSetPatchModule() {
     }
     function redefineAcc(proto, key, getImpl) {
       const d = Object.getOwnPropertyDescriptor(proto, key);
+      const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      if (isData) {
+        const value = (typeof getImpl === 'function') ? getImpl.call(proto) : getImpl;
+        Object.defineProperty(proto, key, {
+          value,
+          writable: d ? d.writable : true,
+          configurable: d ? d.configurable : true,
+          enumerable: d ? d.enumerable : false
+        });
+        return;
+      }
       Object.defineProperty(proto, key, {
         get: mark(getImpl, `get ${key}`),
         set: d && d.set,
@@ -264,6 +286,22 @@ function NavTotalSetPatchModule() {
         enumerable: dUaFull.enumerable,
         configurable: dUaFull.configurable
       });
+      function dropOwnIfConfigurable(obj, key) {
+        const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
+        if (ownDesc && ownDesc.configurable) {
+          try { delete obj[key]; } catch {}
+        }
+      }
+      function defineUadProtoMethod(proto, key, fn, desc) {
+        const d = desc || Object.getOwnPropertyDescriptor(proto, key);
+        Object.defineProperty(proto, key, {
+          value: fn,
+          configurable: d ? d.configurable : true,
+          enumerable: d ? d.enumerable : false,
+          writable: d && Object.prototype.hasOwnProperty.call(d, 'writable') ? d.writable : true
+        });
+      }
+
       const getHighEntropyValues = mark(function getHighEntropyValues(keys) {
           if (!Array.isArray(keys)) throw new Error('THW: bad keys');
           const map = {
@@ -293,29 +331,21 @@ function NavTotalSetPatchModule() {
           }
           return Promise.resolve(result);
         }, 'getHighEntropyValues');
-      if (!Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues')) {
+      const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
+      if (!ghevDesc) {
         throw new Error('THW: uaData.getHighEntropyValues descriptor missing');
       }
-      const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
-      Object.defineProperty(uadProto, 'getHighEntropyValues', {
-        value: getHighEntropyValues,
-        configurable: ghevDesc ? ghevDesc.configurable : true,
-        enumerable: ghevDesc ? ghevDesc.enumerable : false,
-        writable: ghevDesc && Object.prototype.hasOwnProperty.call(ghevDesc, 'writable') ? ghevDesc.writable : true
-      });
+      dropOwnIfConfigurable(nativeUAD, 'getHighEntropyValues');
+      defineUadProtoMethod(uadProto, 'getHighEntropyValues', getHighEntropyValues, ghevDesc);
 
 
       const toJSON = mark(function toJSON() {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON');
-      if (!Object.getOwnPropertyDescriptor(uadProto, 'toJSON')) {
+      const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
+      if (!toJsonDesc) {
         throw new Error('THW: uaData.toJSON descriptor missing');
       }
-      const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
-      Object.defineProperty(uadProto, 'toJSON', {
-        value: toJSON,
-        configurable: toJsonDesc ? toJsonDesc.configurable : true,
-        enumerable: toJsonDesc ? toJsonDesc.enumerable : false,
-        writable: toJsonDesc && Object.prototype.hasOwnProperty.call(toJsonDesc, 'writable') ? toJsonDesc.writable : true
-      });
+      dropOwnIfConfigurable(nativeUAD, 'toJSON');
+      defineUadProtoMethod(uadProto, 'toJSON', toJSON, toJsonDesc);
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
     const dUaData = Object.getOwnPropertyDescriptor(navProto, 'userAgentData');
