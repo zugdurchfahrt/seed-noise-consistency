@@ -1,9 +1,6 @@
 import os
 import re
-import threading, queue
-import requests
-from websocket import WebSocketApp
-
+import threading
 import subprocess
 import socket
 import uuid
@@ -23,7 +20,7 @@ from depo_browser import chrome_versions, edge_versions, safari_versions, firefo
 from datashell_win32 import data_4_win32
 from macintel import macintel_data
 # ----------------------- MODULES-----------------------
-from cdp_caught_logger import run
+import cdp_caught_logger as cdp
 from plugins_dict import build_plugins_profile
 from tools import (
     build_device_metrics,
@@ -56,9 +53,6 @@ MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
 CHROME_BINARY       = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
 CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
-
-
-
 
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
@@ -234,7 +228,27 @@ def init_driver(
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
     
-    threading.Thread(target=run, daemon=True).start()
+    def _get_cdp_port(driver, user_data_dir):
+        # 1) самый надёжный вариант: debuggerAddress от chromedriver
+        opts = driver.capabilities.get("goog:chromeOptions", {})
+        addr = opts.get("debuggerAddress")
+        if addr and ":" in addr:
+            return int(addr.rsplit(":", 1)[1])
+
+        # 2) fallback: DevToolsActivePort в профиле
+        p = Path(user_data_dir) / "DevToolsActivePort"
+        for _ in range(50):  # до ~5 сек
+            if p.exists():
+                return int(p.read_text(encoding="utf-8").splitlines()[0].strip())
+            time.sleep(0.1)
+
+        # 3) fallback: твой желаемый порт
+        return 9222
+
+    cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
+    threading.Thread(target=cdp.run, daemon=True).start()
+    logger.info("CDP logger thread started on port %s", cdp.PORT)
+    
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     
