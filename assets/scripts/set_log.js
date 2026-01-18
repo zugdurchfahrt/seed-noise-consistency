@@ -195,7 +195,18 @@ function LOGGingModule() {
           if (G.__DEBUG__) {
             orig.apply(console, args);
           }
-        } catch (_) {}
+        } catch (e) {
+          try {
+            window._myDebugLog = window._myDebugLog || [];
+            window._myDebugLog.push({
+              type: "logger_internal",
+              where: "console_patch",
+              message: (e && e.message) ? String(e.message) : String(e),
+              stack: (e && e.stack) ? String(e.stack) : null,
+              timestamp: new Date().toISOString()
+            });
+          } catch (_) {}
+        }
       };
     }
 
