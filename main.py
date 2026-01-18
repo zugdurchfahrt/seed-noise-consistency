@@ -246,13 +246,30 @@ def init_driver(
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
     
+    def _get_cdp_port(driver, user_data_dir):
+        # 1) самый надёжный вариант: debuggerAddress от chromedriver
+        opts = driver.capabilities.get("goog:chromeOptions", {})
+        addr = opts.get("debuggerAddress")
+        if addr and ":" in addr:
+            return int(addr.rsplit(":", 1)[1])
 
+        # 2) fallback: DevToolsActivePort в профиле
+        p = Path(user_data_dir) / "DevToolsActivePort"
+        for _ in range(50):  # до ~5 сек
+            if p.exists():
+                return int(p.read_text(encoding="utf-8").splitlines()[0].strip())
+            time.sleep(0.1)
+
+        # 3) fallback: твой желаемый порт
+        return 9222
 
     cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
     threading.Thread(target=cdp.run, daemon=True).start()
     logger.info("CDP logger thread started on port %s", cdp.PORT)
     
+    
     threading.Thread(target=run, daemon=True).start()
+    
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     
