@@ -251,9 +251,6 @@ def init_driver(
     threading.Thread(target=cdp.run, daemon=True).start()
     logger.info("CDP logger thread started on port %s", cdp.PORT)
     
-    
-    threading.Thread(target=run, daemon=True).start()
-    
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     
