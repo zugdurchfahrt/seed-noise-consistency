@@ -84,6 +84,17 @@ function NavTotalSetPatchModule() {
         if (d && d.configurable === false) {
           return warnOrThrow(new TypeError(`[nav_total_set] ${key}: non-configurable`));
         }
+        const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+        if (isData) {
+          const value = (typeof getter === 'function') ? getter.call(target) : getter;
+          Object.defineProperty(target, key, {
+            value,
+            writable: d ? !!d.writable : true,
+            configurable: true,
+            enumerable: d ? !!d.enumerable : !!enumerable
+          });
+          return true;
+        }
         let getFn = getter;
         if (typeof getter === 'function' && getter.name === '') {
           const acc = ({ get [key]() { return getter.call(this); } });
@@ -109,6 +120,17 @@ function NavTotalSetPatchModule() {
     }
     function redefineAcc(proto, key, getImpl) {
       const d = Object.getOwnPropertyDescriptor(proto, key);
+      const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      if (isData) {
+        const value = (typeof getImpl === 'function') ? getImpl.call(proto) : getImpl;
+        Object.defineProperty(proto, key, {
+          value,
+          writable: d ? d.writable : true,
+          configurable: d ? d.configurable : true,
+          enumerable: d ? d.enumerable : false
+        });
+        return;
+      }
       Object.defineProperty(proto, key, {
         get: mark(getImpl, `get ${key}`),
         set: d && d.set,
@@ -264,6 +286,22 @@ function NavTotalSetPatchModule() {
         enumerable: dUaFull.enumerable,
         configurable: dUaFull.configurable
       });
+      function dropOwnIfConfigurable(obj, key) {
+        const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
+        if (ownDesc && ownDesc.configurable) {
+          try { delete obj[key]; } catch {}
+        }
+      }
+      function defineUadProtoMethod(proto, key, fn, desc) {
+        const d = desc || Object.getOwnPropertyDescriptor(proto, key);
+        Object.defineProperty(proto, key, {
+          value: fn,
+          configurable: d ? d.configurable : true,
+          enumerable: d ? d.enumerable : false,
+          writable: d && Object.prototype.hasOwnProperty.call(d, 'writable') ? d.writable : true
+        });
+      }
+
       const getHighEntropyValues = mark(function getHighEntropyValues(keys) {
           if (!Array.isArray(keys)) throw new Error('THW: bad keys');
           const map = {
@@ -293,29 +331,21 @@ function NavTotalSetPatchModule() {
           }
           return Promise.resolve(result);
         }, 'getHighEntropyValues');
-      if (!Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues')) {
+      const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
+      if (!ghevDesc) {
         throw new Error('THW: uaData.getHighEntropyValues descriptor missing');
       }
-      const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
-      Object.defineProperty(uadProto, 'getHighEntropyValues', {
-        value: getHighEntropyValues,
-        configurable: ghevDesc ? ghevDesc.configurable : true,
-        enumerable: ghevDesc ? ghevDesc.enumerable : false,
-        writable: ghevDesc && Object.prototype.hasOwnProperty.call(ghevDesc, 'writable') ? ghevDesc.writable : true
-      });
+      dropOwnIfConfigurable(nativeUAD, 'getHighEntropyValues');
+      defineUadProtoMethod(uadProto, 'getHighEntropyValues', getHighEntropyValues, ghevDesc);
 
 
       const toJSON = mark(function toJSON() {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON');
-      if (!Object.getOwnPropertyDescriptor(uadProto, 'toJSON')) {
+      const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
+      if (!toJsonDesc) {
         throw new Error('THW: uaData.toJSON descriptor missing');
       }
-      const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
-      Object.defineProperty(uadProto, 'toJSON', {
-        value: toJSON,
-        configurable: toJsonDesc ? toJsonDesc.configurable : true,
-        enumerable: toJsonDesc ? toJsonDesc.enumerable : false,
-        writable: toJsonDesc && Object.prototype.hasOwnProperty.call(toJsonDesc, 'writable') ? toJsonDesc.writable : true
-      });
+      dropOwnIfConfigurable(nativeUAD, 'toJSON');
+      defineUadProtoMethod(uadProto, 'toJSON', toJSON, toJsonDesc);
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
     const dUaData = Object.getOwnPropertyDescriptor(navProto, 'userAgentData');
@@ -358,10 +388,7 @@ function NavTotalSetPatchModule() {
         || Object.getOwnPropertyDescriptor(navigator.permissions, 'query');
       if (!permDesc) throw new TypeError('[nav_total_set] permissions.query descriptor missing');
       const origQuery = permDesc.value || navigator.permissions.query;
-      const patchedQuery = mark(function query(parameters) {
-        if (new.target) {
-          throw new TypeError('Illegal constructor');
-        }
+      const patchedQueryRaw = ({ query(parameters) {
         const isPermThis = (this === navigator.permissions || this === permProto);
         if (!isPermThis) {
           return origQuery.call(this, parameters);
@@ -375,7 +402,8 @@ function NavTotalSetPatchModule() {
         if (['geolocation', 'camera', 'audiooutput', 'microphone', 'notifications'].includes(name))
           return Promise.resolve({ state: 'prompt', onchange: null });
         return origQuery ? origQuery.call(this, parameters) : Promise.resolve({ state: 'prompt', onchange: null });
-      }, 'query');
+      } }).query;
+      const patchedQuery = mark(patchedQueryRaw, 'query');
       Object.defineProperty(permProto, 'query', {
         value: patchedQuery,
         configurable: permDesc.configurable,
@@ -390,7 +418,12 @@ function NavTotalSetPatchModule() {
       const mediaDesc = Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
         || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices');
       if (!mediaDesc) throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices descriptor missing');
-      const patchedEnumerate = mark(async function enumerateDevices() {
+      const origEnumerate = mediaDesc.value || navigator.mediaDevices.enumerateDevices;
+      const patchedEnumerateRaw = ({ async enumerateDevices() {
+        const isMediaThis = (this === navigator.mediaDevices || this === mediaProto);
+        if (!isMediaThis) {
+          return origEnumerate.call(this);
+        }
         const generateHexId = (len = 64) => {
           let s = '';
           for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
@@ -402,7 +435,8 @@ function NavTotalSetPatchModule() {
           { kind: 'videoinput',  label: devicesLabels.videoinput,  deviceId: generateHexId(64), groupId },
           { kind: 'audiooutput', label: devicesLabels.audiooutput, deviceId: generateHexId(64), groupId: generateHexId(64) }
         ];
-      }, 'enumerateDevices');
+      } }).enumerateDevices;
+      const patchedEnumerate = mark(patchedEnumerateRaw, 'enumerateDevices');
       Object.defineProperty(mediaProto, 'enumerateDevices', {
         value: patchedEnumerate,
         configurable: mediaDesc.configurable,
@@ -428,14 +462,20 @@ function NavTotalSetPatchModule() {
         usageBytes = Math.min(quotaBytes - 4096, usageBytes + Math.floor(R() * 4096));
       }, 'tickUsage');
 
+      const origEstimate = storageDesc.value || navigator.storage.estimate;
+      const patchedEstimateRaw = ({ estimate() {
+        const isStorageThis = (this === navigator.storage || this === storageProto);
+        if (!isStorageThis) {
+          return origEstimate.call(this);
+        }
+        tickUsage();
+        return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
+      } }).estimate;
       Object.defineProperty(storageProto, 'estimate', {
         configurable: storageDesc.configurable,
         enumerable: storageDesc.enumerable,
         writable: storageDesc.writable,
-        value: mark(() => {
-          tickUsage();
-          return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
-        }, 'estimate')
+        value: mark(patchedEstimateRaw, 'estimate')
       });
 
       if (navigator.webkitTemporaryStorage) {

@@ -4,6 +4,7 @@ function AudioContextModule() {
   const C = window.CanvasPatchContext;
     if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
   const R = window.rand.use('audio');
+  const AUDIO_NOISE_ENABLED = false;
 
   // 1. get original values for sampleRate/baseLatency
   let nativeSampleRate = 44100, nativeBaseLatency = 0.0029;
@@ -54,6 +55,7 @@ function AudioContextModule() {
       const origByte = analyser.getByteFrequencyData.bind(analyser);
       analyser.getByteFrequencyData = function (array) {
         origByte(array);
+        if (!AUDIO_NOISE_ENABLED) return;
         let delta = 0;
         const n = array.length | 0;
         for (let i = 0; i < n; i++) {
@@ -76,6 +78,7 @@ function AudioContextModule() {
       const origFloat = analyser.getFloatFrequencyData.bind(analyser);
       analyser.getFloatFrequencyData = function (array) {
         origFloat(array);
+        if (!AUDIO_NOISE_ENABLED) return;
         const lo = (typeof this.minDecibels === 'number') ? this.minDecibels : -100;
         const hi = (typeof this.maxDecibels === 'number') ? this.maxDecibels : -30;
         const n  = array.length | 0;
@@ -112,6 +115,7 @@ function AudioContextModule() {
       if (typeof origByteTD === 'function') {
         analyser.getByteTimeDomainData = function (array) {
           origByteTD(array);
+          if (!AUDIO_NOISE_ENABLED) return;
           const n = array.length | 0;
           for (let i = 0, j = n - 1; i < j; i++, j--) {
             const vi = array[i], vj = array[j];
@@ -142,6 +146,7 @@ function AudioContextModule() {
       if (typeof origFloatTD === 'function') {
         analyser.getFloatTimeDomainData = function (array) {
           origFloatTD(array);
+          if (!AUDIO_NOISE_ENABLED) return;
           const n = array.length | 0;
           if (!n) return;
 
@@ -191,6 +196,7 @@ function AudioContextModule() {
   // 7. noise in renderBuffer
   function addNoiseToRenderBuffer(buffer) {
       if (!buffer || typeof buffer.getChannelData !== 'function') return buffer;
+      if (!AUDIO_NOISE_ENABLED) return buffer;
       for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
           const data = buffer.getChannelData(ch);
           for (let i = 0; i < data.length; i++) {

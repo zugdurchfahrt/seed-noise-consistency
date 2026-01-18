@@ -1,5 +1,9 @@
 import os
 import re
+import threading, queue
+import requests
+from websocket import WebSocketApp
+
 import subprocess
 import socket
 import uuid
@@ -19,6 +23,7 @@ from depo_browser import chrome_versions, edge_versions, safari_versions, firefo
 from datashell_win32 import data_4_win32
 from macintel import macintel_data
 # ----------------------- MODULES-----------------------
+from cdp_caught_logger import run
 from plugins_dict import build_plugins_profile
 from tools import (
     build_device_metrics,
@@ -176,7 +181,7 @@ def init_driver(
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
-  # chrome_options.add_argument("--remote-debugging-port=9222")
+    chrome_options.add_argument("--remote-debugging-port=9222")
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
@@ -228,8 +233,11 @@ def init_driver(
     )
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
+    
+    threading.Thread(target=run, daemon=True).start()
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
+    
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
         parts = [

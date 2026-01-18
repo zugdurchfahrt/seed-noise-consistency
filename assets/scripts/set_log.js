@@ -35,7 +35,7 @@ function LOGGingModule() {
           if (args.some(a => typeof a === 'string' && a.includes('undetected chromedriver'))) {
               return; //this should work but actually its not
           }
-          pushLog(level, args, level === 'log');
+          pushLog(level, args, level === 'error' || level === 'warn' || level === 'log');
           if (G.__DEBUG__) {
               origConsole[level](...args);
           }

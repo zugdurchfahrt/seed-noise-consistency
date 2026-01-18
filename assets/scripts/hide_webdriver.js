@@ -1,13 +1,13 @@
 function HideWebdriverPatchModule() {
 
   function safeDefine(obj, prop, descriptor) {
-    try {
-      if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
-      if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
-      Object.defineProperty(obj, prop, descriptor);
-    } catch (e) {
-      console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
+    const d = Object.getOwnPropertyDescriptor(obj, prop);
+    if (d && d.configurable === false) {
+      throw new TypeError(`[stealth] ${prop} non-configurable`);
     }
+    if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
+    Object.defineProperty(obj, prop, descriptor);
   }
 
   // ——— Global mask "native" + general WeakMap ———
@@ -53,31 +53,27 @@ function HideWebdriverPatchModule() {
   // compatibility with the old name (do not change the structure of the calls below)
   function fakeNative(func, name = "") { return markAsNative(func, name); }
 
-  // Single Proxy for Function.prototype.toString, reading from the general WeakMap
+  // Single wrapper for Function.prototype.toString, reading from the general WeakMap
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-    const toStringProxy = new Proxy(nativeToString, {
-      apply(target, thisArg, args) {
-        // IMPORTANT: do not touch WeakMap for primitives/null/undefined
-        if (thisArg !== null) {
-          const t = typeof thisArg;
-          if (t === 'function' || t === 'object') {
-            // Single WeakMap lookup (faster than has()+get())
-            const v = toStringOverrideMap.get(thisArg);
-            if (v !== undefined) return v;
-          }
-        }
-        // preserve native TypeError + semantics
-        if (!args || args.length === 0) return target.call(thisArg);
-        return Reflect.apply(target, thisArg, args);
-      }
-    });
+    const toString = ({ toString() {
+      // IMPORTANT: do not touch WeakMap for primitives/null/undefined
+      const t = typeof this;
+      const isObj = (this !== null) && (t === 'function' || t === 'object');
 
-    // make proxy look native via the same mechanism
-    markAsNative(toStringProxy, 'toString');
+      if (isObj) {
+        const v = toStringOverrideMap.get(this);
+        if (v !== undefined) return v;
+      }
+      // preserve native TypeError + semantics
+      return nativeToString.call(this);
+    } }).toString;
+
+    // make wrapper look native via the same mechanism
+    markAsNative(toString, 'toString');
 
     Object.defineProperty(Function.prototype, 'toString', {
-      value: toStringProxy,
+      value: toString,
       writable: toStringDesc ? !!toStringDesc.writable : true,
       configurable: toStringDesc ? !!toStringDesc.configurable : true,
       enumerable: toStringDesc ? !!toStringDesc.enumerable : false
@@ -106,39 +102,33 @@ function HideWebdriverPatchModule() {
   }
 
   //  chrome.runtime protection -may not work in chrome
-  try {
-    const desc = Object.getOwnPropertyDescriptor(window, "chrome");
+  const desc = Object.getOwnPropertyDescriptor(window, "chrome");
 
-    if (!desc) {
-      Object.defineProperty(window, 'chrome', {
-        get: fakeNative(() => ({}), 'get chrome'),
-        configurable: true
-      });
-    } else if (desc.configurable) {
-      const chromeProxy = new Proxy(window.chrome, {
-        get(target, prop) {
-          if (prop === 'runtime' || prop === 'loadTimes') return undefined;
-          return Reflect.get(target, prop);
-        },
-        has(target, prop) {
-          if (prop === 'runtime' || prop === 'loadTimes') return false;
-          return prop in target;
-        },
-        getOwnPropertyDescriptor(target, prop) {
-          if (prop === 'runtime' || prop === 'loadTimes') return undefined;
-          return Object.getOwnPropertyDescriptor(target, prop);
-        }
-      });
+  if (!desc) {
+    Object.defineProperty(window, 'chrome', {
+      get: fakeNative(() => ({}), 'get chrome'),
+      configurable: true
+    });
+  } else if (desc.configurable) {
+    const chromeProxy = new Proxy(window.chrome, {
+      get(target, prop) {
+        if (prop === 'runtime' || prop === 'loadTimes') return undefined;
+        return Reflect.get(target, prop);
+      },
+      has(target, prop) {
+        if (prop === 'runtime' || prop === 'loadTimes') return false;
+        return prop in target;
+      },
+      getOwnPropertyDescriptor(target, prop) {
+        if (prop === 'runtime' || prop === 'loadTimes') return undefined;
+        return Object.getOwnPropertyDescriptor(target, prop);
+      }
+    });
 
-      Object.defineProperty(window, 'chrome', {
-        get: fakeNative(() => chromeProxy, 'get chrome'),
-        configurable: true
-      });
-    } else {
-  //    console.info("[stealth] window.chrome защищён (configurable: false), патч невозможен");
-    }
-  } catch (e) {
-    console.warn("[stealth] chrome.runtime patch failed:", e);
+    Object.defineProperty(window, 'chrome', {
+      get: fakeNative(() => chromeProxy, 'get chrome'),
+      configurable: true
+    });
   }
 
   const proto = Navigator.prototype;

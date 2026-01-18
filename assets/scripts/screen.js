@@ -11,13 +11,13 @@ function ScreenPatchModule() {
   const DPR           = Number(window.__DPR);
   
   function safeDefine(obj, prop, descriptor) {
-    try {
-      if (!obj || typeof obj !== 'object') return;
-      if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
-      Object.defineProperty(obj, prop, descriptor);
-    } catch (e) {
-      console.warn(`[Screen] safeDefine failed for ${prop}:`, e);
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
+    const d = Object.getOwnPropertyDescriptor(obj, prop);
+    if (d && d.configurable === false) {
+      throw new TypeError(`[Screen] ${prop} non-configurable`);
     }
+    if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
+    Object.defineProperty(obj, prop, descriptor);
   }
   function makeNamedGetter(prop, getter) {
     if (typeof getter === 'function' && getter.name) return getter;
@@ -151,14 +151,14 @@ function ScreenPatchModule() {
       if (!target) throw new Error(`[Screen] ${k} descriptor missing`);
       redefineProp(target, k, get);
     };
-    try { setScreen('width', () => SCREEN_WIDTH); } catch (e) { console.warn('[Screen] width redefine failed:', e); }
-    try { setScreen('height', () => SCREEN_HEIGHT); } catch (e) { console.warn('[Screen] height redefine failed:', e); }
-    try { setScreen('availWidth', () => SCREEN_WIDTH); } catch (e) { console.warn('[Screen] availWidth redefine failed:', e); }
-    try { setScreen('availHeight', () => SCREEN_HEIGHT); } catch (e) { console.warn('[Screen] availHeight redefine failed:', e); }
-    try { setScreen('colorDepth', () => COLOR_DEPTH); } catch (e) { console.warn('[Screen] colorDepth redefine failed:', e); }
-    try { setScreen('pixelDepth', () => COLOR_DEPTH); } catch (e) { console.warn('[Screen] pixelDepth redefine failed:', e); }
-    try { setScreen('availLeft', () => 0); } catch (e) { console.warn('[Screen] availLeft redefine failed:', e); }
-    try { setScreen('availTop', () => 0); } catch (e) { console.warn('[Screen] availTop redefine failed:', e); }
+    setScreen('width', () => SCREEN_WIDTH);
+    setScreen('height', () => SCREEN_HEIGHT);
+    setScreen('availWidth', () => SCREEN_WIDTH);
+    setScreen('availHeight', () => SCREEN_HEIGHT);
+    setScreen('colorDepth', () => COLOR_DEPTH);
+    setScreen('pixelDepth', () => COLOR_DEPTH);
+    setScreen('availLeft', () => 0);
+    setScreen('availTop', () => 0);
   }
   const orientationObj = screenObj && screenObj.orientation;
   const orientationProto = orientationObj && Object.getPrototypeOf(orientationObj);

@@ -74,43 +74,36 @@ function NavTotalSetPatchModule() {
     // ——— B. Safe helpers ———
     const navProto = Object.getPrototypeOf(navigator);
     function safeDefineAcc(target, key, getter, { enumerable = false } = {}) {
-      const warnOrThrow = (err) => {
-        if (STRICT) throw err;
-        if (DEBUG) console.warn(err);
-        return false;
-      };
-      try {
-        const d = Object.getOwnPropertyDescriptor(target, key);
-        if (d && d.configurable === false) {
-          return warnOrThrow(new TypeError(`[nav_total_set] ${key}: non-configurable`));
-        }
-        const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
-        if (isData) {
-          const value = (typeof getter === 'function') ? getter.call(target) : getter;
-          Object.defineProperty(target, key, {
-            value,
-            writable: d ? !!d.writable : true,
-            configurable: true,
-            enumerable: d ? !!d.enumerable : !!enumerable
-          });
-          return true;
-        }
-        let getFn = getter;
-        if (typeof getter === 'function' && getter.name === '') {
-          const acc = ({ get [key]() { return getter.call(this); } });
-          getFn = Object.getOwnPropertyDescriptor(acc, key).get;
-        }
+      if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+        throw new TypeError(`[nav_total_set] ${key}: invalid target`);
+      }
+      const d = Object.getOwnPropertyDescriptor(target, key);
+      if (d && d.configurable === false) {
+        throw new TypeError(`[nav_total_set] ${key}: non-configurable`);
+      }
+      const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      if (isData) {
+        const value = (typeof getter === 'function') ? getter.call(target) : getter;
         Object.defineProperty(target, key, {
-          get: mark(getFn, `get ${key}`),
-          set: d && d.set,
+          value,
+          writable: d ? !!d.writable : true,
           configurable: true,
           enumerable: d ? !!d.enumerable : !!enumerable
         });
         return true;
-      } catch (e) {
-        const reason = (e && e.message) ? e.message : String(e);
-        return warnOrThrow(new TypeError(`[nav_total_set] failed to define ${key}: ${reason}`));
       }
+      let getFn = getter;
+      if (typeof getter === 'function' && getter.name === '') {
+        const acc = ({ get [key]() { return getter.call(this); } });
+        getFn = Object.getOwnPropertyDescriptor(acc, key).get;
+      }
+      Object.defineProperty(target, key, {
+        get: mark(getFn, `get ${key}`),
+        set: d && d.set,
+        configurable: true,
+        enumerable: d ? !!d.enumerable : !!enumerable
+      });
+      return true;
     }
 
     function defineAccWithFallback(objOrProto, key, getter, { enumerable = false } = {}) {
@@ -120,6 +113,9 @@ function NavTotalSetPatchModule() {
     }
     function redefineAcc(proto, key, getImpl) {
       const d = Object.getOwnPropertyDescriptor(proto, key);
+      if (d && d.configurable === false) {
+        throw new TypeError(`[nav_total_set] ${key}: non-configurable`);
+      }
       const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
       if (isData) {
         const value = (typeof getImpl === 'function') ? getImpl.call(proto) : getImpl;
@@ -388,6 +384,7 @@ function NavTotalSetPatchModule() {
         || Object.getOwnPropertyDescriptor(navigator.permissions, 'query');
       if (!permDesc) throw new TypeError('[nav_total_set] permissions.query descriptor missing');
       const origQuery = permDesc.value || navigator.permissions.query;
+      if (typeof origQuery !== 'function') throw new TypeError('[nav_total_set] permissions.query original missing');
       const patchedQueryRaw = ({ query(parameters) {
         const isPermThis = (this === navigator.permissions || this === permProto);
         if (!isPermThis) {
@@ -401,7 +398,7 @@ function NavTotalSetPatchModule() {
           return Promise.resolve({ state: 'granted', onchange: null });
         if (['geolocation', 'camera', 'audiooutput', 'microphone', 'notifications'].includes(name))
           return Promise.resolve({ state: 'prompt', onchange: null });
-        return origQuery ? origQuery.call(this, parameters) : Promise.resolve({ state: 'prompt', onchange: null });
+        return origQuery.call(this, parameters);
       } }).query;
       const patchedQuery = mark(patchedQueryRaw, 'query');
       Object.defineProperty(permProto, 'query', {
@@ -419,6 +416,7 @@ function NavTotalSetPatchModule() {
         || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices');
       if (!mediaDesc) throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices descriptor missing');
       const origEnumerate = mediaDesc.value || navigator.mediaDevices.enumerateDevices;
+      if (typeof origEnumerate !== 'function') throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices original missing');
       const patchedEnumerateRaw = ({ async enumerateDevices() {
         const isMediaThis = (this === navigator.mediaDevices || this === mediaProto);
         if (!isMediaThis) {
@@ -463,6 +461,7 @@ function NavTotalSetPatchModule() {
       }, 'tickUsage');
 
       const origEstimate = storageDesc.value || navigator.storage.estimate;
+      if (typeof origEstimate !== 'function') throw new TypeError('[nav_total_set] storage.estimate original missing');
       const patchedEstimateRaw = ({ estimate() {
         const isStorageThis = (this === navigator.storage || this === storageProto);
         if (!isStorageThis) {
@@ -476,8 +475,7 @@ function NavTotalSetPatchModule() {
         enumerable: storageDesc.enumerable,
         writable: storageDesc.writable,
         value: mark(patchedEstimateRaw, 'estimate')
-      });
-
+      });       
       if (navigator.webkitTemporaryStorage) {
         const tmpProto = Object.getPrototypeOf(navigator.webkitTemporaryStorage) || navigator.webkitTemporaryStorage;
         const tmpDesc = Object.getOwnPropertyDescriptor(tmpProto, 'queryUsageAndQuota')
@@ -485,7 +483,9 @@ function NavTotalSetPatchModule() {
         if (!tmpDesc) throw new TypeError('[nav_total_set] webkitTemporaryStorage.queryUsageAndQuota descriptor missing');
         const patchedQueryUsage = mark(function (success, error) {
           try { tickUsage(); success(usageBytes, quotaBytes); }
-          catch (e) { if (typeof error === 'function') error(e); }
+          catch (e) {
+            console.error('[nav_total_set][Caught]', e);
+            if (typeof error === 'function') error(e); }
         }, 'queryUsageAndQuota');
         Object.defineProperty(tmpProto, 'queryUsageAndQuota', {
           configurable: tmpDesc.configurable,
@@ -556,9 +556,11 @@ function NavTotalSetPatchModule() {
           // first try patch prototype, if rejected — try own on instance
           redefineAcc(perfProto, 'memory', getMemory);
         } catch (_) {
+          console.error('[nav_total_set][Caught]', _);
           try {
             Object.defineProperty(performance, 'memory', { get: getMemory, configurable: true });
           } catch (__) {
+            console.error('[nav_total_set][Caught]', __);
             throw _;
           }
         }
@@ -638,127 +640,107 @@ function NavTotalSetPatchModule() {
       }));
 
       // --- Caching (one instance per page) ---
-    let __PLUGIN_ARRAY_SINGLETON__ = null;
-    let __MIMETYPE_ARRAY_SINGLETON__ = null;
+      let __PLUGIN_ARRAY_SINGLETON__ = null;
+      let __MIMETYPE_ARRAY_SINGLETON__ = null;
+      let __MIME_OBJECTS_SINGLETON__ = null;
 
-    // 4.3. PluginArray (enumerable fields, compatible with JSON/assign)
-    function createPluginArray(plugins) {
-      if (__PLUGIN_ARRAY_SINGLETON__) return __PLUGIN_ARRAY_SINGLETON__;
+      // 4.3. PluginArray (enumerable fields, compatible with JSON/assign)
+      function createPluginArray(plugins) {
+        if (__PLUGIN_ARRAY_SINGLETON__) return __PLUGIN_ARRAY_SINGLETON__;
 
-      const arr = [];
-      for (let i = 0; i < plugins.length; i++) {
-        const p = plugins[i];
+        const arr = [];
+        const mimeObjects = [];
+        for (let i = 0; i < plugins.length; i++) {
+          const p = plugins[i];
+          const itemMethod = ({ item(index) { return this[index] || null; } }).item;
+          const namedItemMethod = ({ namedItem(type) {
+            for (let j = 0; j < this.length; j++) if (this[j]?.type === type) return this[j];
+            return null;
+          } }).namedItem;
 
-        // Create a “plugin” with strictly enumerable properties
-        const pluginObj = Object.create(Plugin.prototype, {
-          name:        { value: String(p.name),        enumerable: true,  configurable: true },
-          filename:    { value: String(p.filename),    enumerable: true,  configurable: true },
-          description: { value: String(p.description), enumerable: true,  configurable: true },
-          length:      { value: p.mimeTypes.length,    enumerable: true,  configurable: true },
-          item: {
-            value: mark(function(index){ return this[index] || null; }, 'item'),
-            enumerable: false, configurable: true
-          },
-          namedItem: {
-            value: mark(function(type){
-              for (let j = 0; j < this.length; j++) if (this[j]?.type === type) return this[j];
-              return null;
-            }, 'namedItem'),
-            enumerable: false, configurable: true
+          // Create a ?plugin? with strictly enumerable properties
+          const pluginObj = Object.create(Plugin.prototype, {
+            name:        { value: String(p.name),        enumerable: true,  configurable: true },
+            filename:    { value: String(p.filename),    enumerable: true,  configurable: true },
+            description: { value: String(p.description), enumerable: true,  configurable: true },
+            length:      { value: p.mimeTypes.length,    enumerable: true,  configurable: true },
+            item: {
+              value: mark(itemMethod, 'item'),
+              enumerable: false, configurable: true
+            },
+            namedItem: {
+              value: mark(namedItemMethod, 'namedItem'),
+              enumerable: false, configurable: true
+            }
+          });
+
+          // mime-??????? (enumerable ????, enabledPlugin ? ?? pluginObj)
+          for (let j = 0; j < p.mimeTypes.length; j++) {
+            const m = p.mimeTypes[j];
+            const mimeObj = Object.create(MimeType.prototype, {
+              type:         { value: String(m.type),        enumerable: true, configurable: true },
+              suffixes: { value: String(m.suffixes ?? ''),enumerable: true, configurable: true },
+              description: { value: String(m.description ?? ''), enumerable: true, configurable: true },
+              enabledPlugin:{ value: pluginObj,             enumerable: true, configurable: true }
+            });
+            // index on the plugin itself ? enumerable
+            Object.defineProperty(pluginObj, String(j), { value: mimeObj, enumerable: true, configurable: true });
+            mimeObjects.push(mimeObj);
           }
+
+          arr.push(pluginObj);
+        }
+
+        // array of plugins
+        const pluginArray = Object.create(PluginArray.prototype, {
+          length:    { value: arr.length, enumerable: true, configurable: true },
+          item:      { value: mark(({ item(index) { return pluginArray[String(index)] || null; } }).item, 'item'), enumerable: false, configurable: true },
+          namedItem: { value: mark(({ namedItem(name) { for (let i = 0; i < arr.length; i++) if (pluginArray[String(i)]?.name === name) return pluginArray[String(i)]; return null; } }).namedItem, 'namedItem'), enumerable: false, configurable: true }
         });
 
-        // mime-объекты (enumerable поля, enabledPlugin → на pluginObj)
-        for (let j = 0; j < p.mimeTypes.length; j++) {
-          const m = p.mimeTypes[j];
-          const mimeObj = Object.create(MimeType.prototype, {
-            type:         { value: String(m.type),        enumerable: true, configurable: true },
-            suffixes: { value: String(m.suffixes ?? ''),enumerable: true, configurable: true },
-            description: { value: String(m.description ?? ''), enumerable: true, configurable: true },
-            enabledPlugin:{ value: pluginObj,             enumerable: true, configurable: true }
-          });
-          // index on the plugin itself — enumerable
-          Object.defineProperty(pluginObj, String(j), { value: mimeObj, enumerable: true, configurable: true });
+        // Indexes ? enumerable + named props (non-enumerable)
+        for (let i = 0; i < arr.length; i++) {
+          const pluginObj = arr[i];
+          Object.defineProperty(pluginArray, String(i), { value: pluginObj, enumerable: true, configurable: true });
+          const pname = pluginObj && pluginObj.name;
+          if (pname) {
+            Object.defineProperty(pluginArray, pname, { value: pluginObj, enumerable: false, configurable: true });
+          }
         }
 
-        arr.push(pluginObj);
+        __MIME_OBJECTS_SINGLETON__ = mimeObjects;
+        __PLUGIN_ARRAY_SINGLETON__ = pluginArray;
+        return pluginArray;
       }
 
-      // array of plugins
-      const pluginArray = Object.create(PluginArray.prototype, {
-        length:    { value: arr.length, enumerable: true, configurable: true }, // ORIG делал enumerable
-        item:      { value: mark((i)=>pluginArray[String(i)]||null, 'item'), enumerable: false, configurable: true },
-        namedItem: { value: mark((name)=>{ for (let i=0;i<arr.length;i++) if (pluginArray[String(i)]?.name===name) return pluginArray[String(i)]; return null; }, 'namedItem'), enumerable: false, configurable: true }
-      });
+      // MimeTypeArray (in same time - for case of direct circulation)
+      function createMimeTypeArray(plugins) {
+        if (__MIMETYPE_ARRAY_SINGLETON__) return __MIMETYPE_ARRAY_SINGLETON__;
 
-      // Indexes — enumerable
-      for (let i = 0; i < arr.length; i++) {
-        Object.defineProperty(pluginArray, String(i), { value: arr[i], enumerable: true, configurable: true });
-      }
+        createPluginArray(plugins);
+        const mimes = Array.isArray(__MIME_OBJECTS_SINGLETON__) ? __MIME_OBJECTS_SINGLETON__ : [];
+        const mimeArray = Object.create(MimeTypeArray.prototype, {
+          length:    { value: mimes.length, enumerable: true, configurable: true },
+          item:      { value: mark(({ item(index) { return mimeArray[String(index)] || null; } }).item, 'item'), enumerable: false, configurable: true },
+          namedItem: { value: mark(({ namedItem(type) { return mimeArray[type] || null; } }).namedItem, 'namedItem'), enumerable: false, configurable: true }
+        });
 
-      __PLUGIN_ARRAY_SINGLETON__ = pluginArray;
-      return pluginArray;
-    }
-
-    // MimeTypeArray (in same time - for case of direct circulation)
-    function createMimeTypeArray(plugins) {
-      if (__MIMETYPE_ARRAY_SINGLETON__) return __MIMETYPE_ARRAY_SINGLETON__;
-
-      const mimes = [];
-      const mimeArray = Object.create(MimeTypeArray.prototype, {
-        length:    { value: 0, enumerable: true, configurable: true },
-        item:      { value: mark((i)=>mimeArray[String(i)]||null, 'item'), enumerable: false, configurable: true },
-        namedItem: { value: mark((type)=>{ for (let i=0;i<mimes.length;i++) if (mimeArray[String(i)]?.type===type) return mimeArray[String(i)]; return null; }, 'namedItem'), enumerable: false, configurable: true }
-      });
-
-      // fill and connect enabledPlugin → The nearest plugin (by name)
-      const pluginByType = new Map();
-      for (let i = 0; i < plugins.length; i++) {
-        const p = plugins[i];
-        for (const m of p.mimeTypes) pluginByType.set(m.type, i);
-      }
-
-      for (let i = 0; i < plugins.length; i++) {
-        const p = plugins[i];
-        for (const m of p.mimeTypes) {
-          const mimeObj = Object.create(MimeType.prototype, {
-            type:         { value: String(m.type),        enumerable: true, configurable: true },
-            suffixes: { value: String(m.suffixes ?? ''),enumerable: true, configurable: true },
-            description: { value: String(m.description ?? ''), enumerable: true, configurable: true },
-            enabledPlugin:{ value: null,                    enumerable: true, configurable: true }
-          });
-          const idx = (mimeArray.length);
-          Object.defineProperty(mimeArray, String(idx), { value: mimeObj, enumerable: true, configurable: true });
-          Object.defineProperty(mimeArray, 'length', { value: idx+1, enumerable: true, configurable: true });
-          mimes.push(mimeObj);
+        for (let i = 0; i < mimes.length; i++) {
+          const mimeObj = mimes[i];
+          Object.defineProperty(mimeArray, String(i), { value: mimeObj, enumerable: true, configurable: true });
+          const type = mimeObj && mimeObj.type;
+          if (type) {
+            Object.defineProperty(mimeArray, type, { value: mimeObj, enumerable: false, configurable: true });
+          }
         }
+
+        __MIMETYPE_ARRAY_SINGLETON__ = mimeArray;
+        return mimeArray;
       }
 
-      // enabledPlugin → link to plugin from PluginArray singleton
-      const pluginArr = createPluginArray(plugins);
-      for (let i = 0; i < mimes.length; i++) {
-        const type = mimes[i].type;
-        const pIndex = pluginByType.get(type);
-        if (pIndex != null) {
-          Object.defineProperty(mimes[i], 'enabledPlugin', { value: pluginArr[String(pIndex)], enumerable: true, configurable: true });
-        }
-      }
-
-      __MIMETYPE_ARRAY_SINGLETON__ = mimeArray;
-      return mimeArray;
-    }
-
-    // Getters - like in ORIG: enumerable: true
-    Object.defineProperty(navigator, 'plugins', {
-      get: mark(() => createPluginArray(fakePlugins), 'get plugins'),
-      configurable: true,
-      enumerable: true
-    });
-    Object.defineProperty(navigator, 'mimeTypes', {
-      get: mark(() => createMimeTypeArray(fakePlugins), 'get mimeTypes'),
-      configurable: true,
-      enumerable: true
-    });
+      // Getters - like in ORIG: enumerable: true
+      safeDefineAcc(navProto, 'plugins', () => createPluginArray(fakePlugins), { enumerable: true });
+      safeDefineAcc(navProto, 'mimeTypes', () => createMimeTypeArray(fakePlugins), { enumerable: true });
 
     //  ——— Debug information to console ———
   if (G.__DEBUG__) {
