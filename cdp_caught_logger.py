@@ -41,11 +41,22 @@ logger.info("writer set")
 
 
 def get_ws_url():
-    targets = requests.get(f"http://127.0.0.1:{PORT}/json").json()
-    page = next((t for t in targets if t.get("type") == "page" and t.get("webSocketDebuggerUrl")), None)
-    if not page:
-        raise RuntimeError("No page target found on /json")
-    return page["webSocketDebuggerUrl"]
+    deadline = time.time() + 10.0
+    last_err = None
+
+    while time.time() < deadline:
+        try:
+            r = requests.get(f"http://127.0.0.1:{PORT}/json", timeout=0.5)
+            targets = r.json()
+            page = next((t for t in targets if t.get("type") == "page" and t.get("webSocketDebuggerUrl")), None)
+            if page:
+                return page["webSocketDebuggerUrl"]
+        except Exception as e:
+            last_err = e
+            time.sleep(0.2)
+
+    raise RuntimeError(f"CDP /json not available on 127.0.0.1:{PORT}; last_err={last_err!r}")
+
 
 def run():
     try:
