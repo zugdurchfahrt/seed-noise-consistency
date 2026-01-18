@@ -4,22 +4,22 @@
     "os_info": "Windows NT 10.0; Win64; x64",
     "os_name": "Windows 11 64-bit",
     "platform_version": "15.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    "browser_version": "136.0.7103.48",
-    "screen_width": 1920,
-    "screen_height": 1080,
-    "device_dpr_value": 1.0,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "browser_version": "137.0.7151.119",
+    "screen_width": 2560,
+    "screen_height": 1440,
+    "device_dpr_value": 1.25,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
     "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
-    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1650 (0x1F82) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 (0x2184) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
     "gpu_architecture": "turing",
     "gpu_vendor": "nvidia",
     "devices_conf": {
-      "audioinput": "MXL 990",
+      "audioinput": "Fifine K669B",
       "videoinput": "Razer Kiyo",
-      "audiooutput": "Beyerdynamic DT 990 Pro"
+      "audiooutput": "Grado SR80x"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -28,7 +28,7 @@
     ],
     "language": "de-DE",
     "deviceMemory": 4,
-    "hardwareConcurrency": 2,
+    "hardwareConcurrency": 4,
     "plugins": [
       {
         "name": "Chrome PDF Viewer",
@@ -61,11 +61,11 @@
       },
       {
         "brand": "Chromium",
-        "version": "136"
+        "version": "137"
       },
       {
         "brand": "Google Chrome",
-        "version": "136"
+        "version": "137"
       }
     ],
     "mobile": false,
@@ -80,22 +80,22 @@
       },
       {
         "brand": "Chromium",
-        "version": "136.0.7103.48"
+        "version": "137.0.7151.119"
       },
       {
         "brand": "Google Chrome",
-        "version": "136.0.7103.48"
+        "version": "137.0.7151.119"
       }
     ],
-    "uaFullVersion": "136.0.7103.48",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"136\", \"Google Chrome\";v=\"136\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"136.0.7103.48\", \"Google Chrome\";v=\"136.0.7103.48\"",
+    "uaFullVersion": "137.0.7151.119",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"137\", \"Google Chrome\";v=\"137\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"137.0.7151.119\", \"Google Chrome\";v=\"137.0.7151.119\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
     "deviceMemory": 4,
-    "hardwareConcurrency": 2,
+    "hardwareConcurrency": 4,
     "wow64": false,
     "languages": [
       "de-DE",

@@ -177,6 +177,8 @@ def init_driver(
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--remote-debugging-port=9222")
+    chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
+    chrome_options.add_argument("--remote-allow-origins=*")
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
@@ -247,6 +249,10 @@ def init_driver(
     )
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
+    
+    
+    cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
+
         
     threading.Thread(target=cdp.run, daemon=True).start()
     logger.info("CDP logger thread started on port %s", cdp.PORT)

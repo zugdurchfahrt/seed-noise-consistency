@@ -467,10 +467,10 @@ function ContextPatchModule(window) {
         }
         try { return orig; } catch { return undefined; }
       },
-      set(target, prop, value){ try { return Reflect.set(target, prop, value, target); } catch { return false; } },
-      getOwnPropertyDescriptor(target, prop){ try { return Object.getOwnPropertyDescriptor(target, prop); } catch { return undefined; } },
-      defineProperty(target, prop, desc){ try { return Reflect.defineProperty(target, prop, desc); } catch { return false; } },
-      setPrototypeOf(){ return false; }
+      set(target, prop, value){ return Reflect.set(target, prop, value, target); },
+      getOwnPropertyDescriptor(target, prop){ return Object.getOwnPropertyDescriptor(target, prop); },
+      defineProperty(target, prop, desc){ return Reflect.defineProperty(target, prop, desc); },
+      setPrototypeOf(target, proto){ return Reflect.setPrototypeOf(target, proto); }
     };
 
     return new Proxy(ctx, handler);
