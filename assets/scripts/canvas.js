@@ -14,7 +14,10 @@ function CanvasPatchModule(window) {
   // создаём скрытый HTML-canvas в окне
   function _ensureDomOnce() {
     if (C.state.domReady) return;
-    if (typeof document === 'undefined' || !document.body) return; // нет DOM — выходим
+    if (typeof document === 'undefined' || !document.body) {
+      C.state.domReady = false;
+      return; // нет DOM — выходим
+    }
     if (window.canvas && window.canvas.parentNode) {
       C.state.domReady = true;
       return;
@@ -85,10 +88,6 @@ function CanvasPatchModule(window) {
     // ===== stable noise helper (module-scope) =====
   function __stableNoise__(key, a, b){
     //The ONLY source: __GLOBAL_SEED + key -> mulberry32(strToSeed(...))
-    const G = (typeof globalThis !== 'undefined' && globalThis)
-          || (typeof self !== 'undefined' && self)
-          || (typeof window !== 'undefined' && window)
-          || {};
     if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED)
       throw new Error('[PRNG] __GLOBAL_SEED is required');
     if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function')
@@ -108,7 +107,6 @@ function CanvasPatchModule(window) {
     // 1) предпочитаем OffscreenCanvas, если доступен
     if (typeof OffscreenCanvas !== 'undefined') {
       try { return new OffscreenCanvas(w, h); } catch {}
-    if (typeof document !== 'undefined') { const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
     }
     
     // 2) фолбэк: DOM <canvas>
@@ -124,14 +122,17 @@ function CanvasPatchModule(window) {
 
   function get2DProto(ctx) {
     // pick exact proto for brand-safe native calls
-    if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && ctx instanceof OffscreenCanvasRenderingContext2D) {
+    const p = Object.getPrototypeOf(ctx);
+    const name = p && p.constructor && p.constructor.name;
+
+    if (name === 'OffscreenCanvasRenderingContext2D' && typeof OffscreenCanvasRenderingContext2D !== 'undefined') {
       return OffscreenCanvasRenderingContext2D.prototype;
     }
-    if (typeof CanvasRenderingContext2D !== 'undefined' && ctx instanceof CanvasRenderingContext2D) {
+    if (name === 'CanvasRenderingContext2D' && typeof CanvasRenderingContext2D !== 'undefined') {
       return CanvasRenderingContext2D.prototype;
     }
     // fallback: whatever the engine reports
-    return Object.getPrototypeOf(ctx);
+    return p;
   }
 
   function nativeGetImageData(P, ctx, x, y, w, h) {
@@ -179,6 +180,7 @@ function CanvasPatchModule(window) {
     h |= 0;
     dpr = (typeof dpr === 'number' && dpr > 0) ? +dpr
       : (typeof devicePixelRatio === 'number' && devicePixelRatio > 0) ? +devicePixelRatio
+      : (typeof window !== 'undefined' && typeof window.__DPR === 'number' && window.__DPR > 0) ? +window.__DPR
       : (typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0) ? +globalThis.__DPR
       : undefined;
     if (!(typeof dpr === 'number' && dpr > 0)) {
@@ -789,19 +791,28 @@ function CanvasPatchModule(window) {
       return ctx;
     }
 
-    // 1) Снимаем пиксели, добавляем детерминированный микрошум, кладём обратно
+    // 1) Снимаем пиксели, добавляем детерминированный микрошум, без мутаций исходника
     const ctx = get2dRF(canvas);
     if (!ctx) return res;
+    let img;
+    let snap;
     try {
-      const img = ctx.getImageData(0, 0, w, h);
+      img = ctx.getImageData(0, 0, w, h);
       const j   = __resampleWithJitter__(img, 'encode', __CNV_CFG__);
-      if (j && j.data && j.width === w && j.height === h) {
-        ctx.putImageData(j, 0, 0);
+      const tmpC = makeCanvas(w, h);
+      const tmpX = tmpC && tmpC.getContext && tmpC.getContext('2d', { willReadFrequently: true });
+      if (tmpX && j && j.data && j.width === w && j.height === h) {
+        tmpX.putImageData(j, 0, 0);
+        snap = tmpX.getImageData(0, 0, w, h);
+      } else {
+        snap = img;
       }
     } catch(_) { /* тихий фолбэк на исходный res */ }
 
     // Снимок без мутаций
-    const snap = ctx.getImageData(0, 0, w, h);
+    if (!snap) {
+      snap = img || ctx.getImageData(0, 0, w, h);
+    }
 
     // Усиленная быстрая сигнатура (FNV-1a, выборка с шагом)
     let u8 = snap.data;
@@ -878,13 +889,13 @@ function CanvasPatchModule(window) {
     // perform original draw
     const res = origDrawImage.apply(this, a);
     const ctx = this;
-    const cnv = ctx.canvas || ctx;
+    const cnv = ctx.canvas ? ctx.canvas : ctx;
     if (!cnv || !cnv.width || !cnv.height) return res;
 
     // reentrancy guard per canvas
     const __GUARD__ = Symbol.for('cnv.guard');
-    if (cnv[__GUARD__]) return res;
-    cnv[__GUARD__] = true;
+    if (cnv && cnv[__GUARD__]) return res;
+    if (cnv) cnv[__GUARD__] = true;
 
     try {
       // compute affected region from normalized args
@@ -923,7 +934,7 @@ function CanvasPatchModule(window) {
       }
 
     } finally {
-      cnv[__GUARD__] = false;
+      if (cnv) cnv[__GUARD__] = false;
     }
 
     return res;
