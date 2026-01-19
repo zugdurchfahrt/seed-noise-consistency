@@ -504,7 +504,12 @@ def init_driver(
 
 
     # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
-    fetch_rules = []
+    fetch_rules = [{
+        "urlPattern": "*",
+        "resourceType": "Script",
+        "requestStage": "Response"
+    }]
+
 
     _install_fetch_interceptor(
         driver,
