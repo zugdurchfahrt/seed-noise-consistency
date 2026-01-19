@@ -2,36 +2,55 @@
   "profile": {
     "platform": "Win32",
     "os_info": "Windows NT 10.0; Win64; x64",
-    "os_name": "Windows 10 64-bit",
-    "platform_version": "10.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-    "browser_version": "134.0.6998.205",
+    "os_name": "Windows 11 64-bit",
+    "platform_version": "15.0.0",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+    "browser_version": "135.0.7049.114",
     "screen_width": 1920,
     "screen_height": 1080,
     "device_dpr_value": 1.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
     "webgl_unmasked_vendor": "Google Inc. (AMD)",
-    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6700 (0x73DF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6400 (0x743F) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
     "gpu_architecture": "rdna2",
     "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "Rode Procaster",
-      "videoinput": "HP Webcam 500",
-      "audiooutput": "Grado SR80x"
+      "audioinput": "Samson C01U Pro",
+      "videoinput": "Ausdom AF640",
+      "audiooutput": "Beyerdynamic DT 990 Pro"
     },
     "vendor_value": "Google Inc.",
     "languages": [
-      "ja-JP",
-      "ja"
+      "de-DE",
+      "de"
     ],
-    "language": "ja-JP",
+    "language": "de-DE",
     "deviceMemory": 8,
     "hardwareConcurrency": 6,
-    "plugins": [],
-    "mimeTypes": [],
-    "accept_language": "ja-JP,ja;q=0.9"
+    "plugins": [
+      {
+        "name": "Chrome PDF Viewer",
+        "filename": "internal-pdf-viewer",
+        "description": "",
+        "mimeTypes": [
+          {
+            "type": "application/pdf",
+            "suffixes": "pdf",
+            "description": "PDF document"
+          }
+        ]
+      }
+    ],
+    "mimeTypes": [
+      {
+        "type": "application/pdf",
+        "suffixes": "pdf",
+        "description": "PDF document"
+      }
+    ],
+    "accept_language": "de-DE,de;q=0.9"
   },
   "expected_client_hints": {
     "platform": "Windows",
@@ -42,18 +61,18 @@
       },
       {
         "brand": "Chromium",
-        "version": "134"
+        "version": "135"
       },
       {
         "brand": "Google Chrome",
-        "version": "134"
+        "version": "135"
       }
     ],
     "mobile": false,
     "architecture": "x86",
     "bitness": "64",
     "model": "",
-    "platformVersion": "10.0.0",
+    "platformVersion": "15.0.0",
     "fullVersionList": [
       {
         "brand": "Not)A;Brand",
@@ -61,16 +80,16 @@
       },
       {
         "brand": "Chromium",
-        "version": "134.0.6998.205"
+        "version": "135.0.7049.114"
       },
       {
         "brand": "Google Chrome",
-        "version": "134.0.6998.205"
+        "version": "135.0.7049.114"
       }
     ],
-    "uaFullVersion": "134.0.6998.205",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"134\", \"Google Chrome\";v=\"134\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"134.0.6998.205\", \"Google Chrome\";v=\"134.0.6998.205\"",
+    "uaFullVersion": "135.0.7049.114",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"135\", \"Google Chrome\";v=\"135\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.114\", \"Google Chrome\";v=\"135.0.7049.114\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
@@ -79,13 +98,13 @@
     "hardwareConcurrency": 6,
     "wow64": false,
     "languages": [
-      "ja-JP",
-      "ja"
+      "de-DE",
+      "de"
     ],
-    "language": "ja-JP",
+    "language": "de-DE",
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/webp,image/avif,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }
