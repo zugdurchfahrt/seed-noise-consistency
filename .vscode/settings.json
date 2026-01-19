@@ -3,9 +3,7 @@
   "python-envs.defaultEnvManager": "ms-python.python:venv",
   "python.terminal.activateEnvironment": true,
   "chatgpt.openOnStartup": true,
-  "git.enabled": false,
-
-
+  "git.enabled": true,
 }
 
 

@@ -4,22 +4,22 @@
     "os_info": "Windows NT 10.0; Win64; x64",
     "os_name": "Windows 11 64-bit",
     "platform_version": "15.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-    "browser_version": "137.0.7151.119",
-    "screen_width": 2560,
-    "screen_height": 1440,
-    "device_dpr_value": 1.25,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
+    "browser_version": "136.0.3240.50",
+    "screen_width": 3840,
+    "screen_height": 2160,
+    "device_dpr_value": 2.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
-    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 (0x2184) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Google Inc. (AMD)",
+    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6950 (0x73BF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
-    "gpu_architecture": "turing",
-    "gpu_vendor": "nvidia",
+    "gpu_architecture": "rdna2",
+    "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "Fifine K669B",
-      "videoinput": "Razer Kiyo",
-      "audiooutput": "Grado SR80x"
+      "audioinput": "MXL 990",
+      "videoinput": "Dell UltraSharp Webcam",
+      "audiooutput": "Audio-Technica ATH-AD700x"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -27,29 +27,10 @@
       "de"
     ],
     "language": "de-DE",
-    "deviceMemory": 4,
-    "hardwareConcurrency": 4,
-    "plugins": [
-      {
-        "name": "Chrome PDF Viewer",
-        "filename": "internal-pdf-viewer",
-        "description": "",
-        "mimeTypes": [
-          {
-            "type": "application/pdf",
-            "suffixes": "pdf",
-            "description": "PDF document"
-          }
-        ]
-      }
-    ],
-    "mimeTypes": [
-      {
-        "type": "application/pdf",
-        "suffixes": "pdf",
-        "description": "PDF document"
-      }
-    ],
+    "deviceMemory": 8,
+    "hardwareConcurrency": 6,
+    "plugins": [],
+    "mimeTypes": [],
     "accept_language": "de-DE,de;q=0.9"
   },
   "expected_client_hints": {
@@ -61,11 +42,11 @@
       },
       {
         "brand": "Chromium",
-        "version": "137"
+        "version": "136"
       },
       {
-        "brand": "Google Chrome",
-        "version": "137"
+        "brand": "Microsoft Edge",
+        "version": "136"
       }
     ],
     "mobile": false,
@@ -80,22 +61,22 @@
       },
       {
         "brand": "Chromium",
-        "version": "137.0.7151.119"
+        "version": "136.0.3240.50"
       },
       {
-        "brand": "Google Chrome",
-        "version": "137.0.7151.119"
+        "brand": "Microsoft Edge",
+        "version": "136.0.3240.50"
       }
     ],
-    "uaFullVersion": "137.0.7151.119",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"137\", \"Google Chrome\";v=\"137\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"137.0.7151.119\", \"Google Chrome\";v=\"137.0.7151.119\"",
+    "uaFullVersion": "136.0.3240.50",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"136\", \"Microsoft Edge\";v=\"136\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"136.0.3240.50\", \"Microsoft Edge\";v=\"136.0.3240.50\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
-    "deviceMemory": 4,
-    "hardwareConcurrency": 4,
+    "deviceMemory": 8,
+    "hardwareConcurrency": 6,
     "wow64": false,
     "languages": [
       "de-DE",
@@ -105,6 +86,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/apng,image/webp,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }

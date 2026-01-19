@@ -1,39 +1,98 @@
 (() => {
-  if (window.__GEO_PATCHED) return;
-const latitude = window.__LATITUDE__;
-const longitude = window.__LONGITUDE__;
+  if (window.__GEO_PATCHED__) return;
+
+  const latitude = window.__LATITUDE__;
+  const longitude = window.__LONGITUDE__;
+
   /**
-   * 
-   *Patch geolocation(from script, no direct call from bundle): getCurrentPosition и watchPosition
-   * @param {number} latitude — широта
-   * @param {number} longitude — долгота
+   * Patch geolocation (getCurrentPosition/watchPosition).
+   * lat/lon are taken only from pipeline variables.
    */
-  function patchGeolocation(latitude, longitude) {
+  function patchGeolocation(lat, lon) {
+    if (typeof lat !== "number" || typeof lon !== "number") {
+      throw new Error("THW: geolocation missing latitude/longitude");
+    }
+
+    function makePosition() {
+      return {
+        coords: {
+          latitude: lat,
+          longitude: lon,
+          accuracy: 100,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null
+        },
+        timestamp: Date.now()
+      };
+    }
+
+    function makeError(code, message) {
+      // минимальный объект ошибки, без новых брендов/конструкторов
+      return { code, message };
+    }
+
     const fake = {
-      getCurrentPosition(success) {
+      getCurrentPosition(success, error, options) {
+        if (typeof success !== "function") {
+          throw new TypeError("THW: geolocation.getCurrentPosition requires success callback");
+        }
+        // options игнорируем (как минимум), но сигнатуру поддерживаем
         setTimeout(() => {
-          success({ coords: { latitude, longitude, accuracy: 100 } });
+          try {
+            success(makePosition());
+          } catch (e) {
+            if (typeof error === "function") error(makeError(0, String(e && e.message ? e.message : e)));
+          }
         }, 0);
       },
-      watchPosition(success) {
+
+      watchPosition(success, error, options) {
+        if (typeof success !== "function") {
+          throw new TypeError("THW: geolocation.watchPosition requires success callback");
+        }
         const id = setInterval(() => {
-          success({ coords: { latitude, longitude, accuracy: 100 } });
+          try {
+            success(makePosition());
+          } catch (e) {
+            if (typeof error === "function") error(makeError(0, String(e && e.message ? e.message : e)));
+          }
         }, 1000);
         return id;
       },
+
       clearWatch(id) {
         clearInterval(id);
       }
     };
-    Object.defineProperty(navigator, 'geolocation', {
-      value: fake,
-      writable: false,
-      configurable: true
-    });
-    console.log('Geolocation patched →', latitude, longitude);
+
+    // prefer prototype (readonly WebIDL attribute semantics), fallback to own only if missing
+    const navProto = Object.getPrototypeOf(navigator);
+    const dProto = navProto && Object.getOwnPropertyDescriptor(navProto, "geolocation");
+
+    if (dProto && dProto.configurable === false) {
+      throw new Error("THW: geolocation non-configurable on prototype");
+    }
+
+    if (navProto) {
+      Object.defineProperty(navProto, "geolocation", {
+        get: function get_geolocation() { return fake; },
+        configurable: true,
+        enumerable: dProto ? !!dProto.enumerable : false
+      });
+    } else {
+      Object.defineProperty(navigator, "geolocation", {
+        get: function get_geolocation() { return fake; },
+        configurable: true,
+        enumerable: false
+      });
+    }
+
+    console.log("Geolocation patched →", lat, lon);
   }
 
   window.patchGeolocation = patchGeolocation;
   patchGeolocation(latitude, longitude);
-  window.__GEO_PATCHED = true; 
+  window.__GEO_PATCHED__ = true;
 })();

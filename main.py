@@ -20,8 +20,8 @@ from depo_browser import chrome_versions, edge_versions, safari_versions, firefo
 from datashell_win32 import data_4_win32
 from macintel import macintel_data
 # ----------------------- MODULES-----------------------
-import cdp_caught_logger as cdp
-from cdp_caught_logger import run
+# import cdp_caught_logger as cdp
+# from cdp_caught_logger import run
 from plugins_dict import build_plugins_profile
 from tools import (
     build_device_metrics,
@@ -208,7 +208,7 @@ def init_driver(
         # 3) fallback: твой желаемый порт
         return 9222
     
-    cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
+   # cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
     
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
@@ -251,11 +251,11 @@ def init_driver(
     generate_font_manifest(MANIFEST_PATH, platform)
     
     
-    cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
+  #  cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
 
         
-    threading.Thread(target=cdp.run, daemon=True).start()
-    logger.info("CDP logger thread started on port %s", cdp.PORT)
+  #  threading.Thread(target=cdp.run, daemon=True).start()
+  #  logger.info("CDP logger thread started on port %s", cdp.PORT)
     
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
@@ -558,21 +558,31 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
             {"latitude": latitude, "longitude": longitude, "accuracy": 100}
         )
         # Languages stable final setting
+
         lang_js = f"""
-            (() => {{
-            Object.defineProperty(navigator, 'language', {{
-                get: () => window.__primaryLanguage,
-                configurable: true
-            }});
-            Object.defineProperty(navigator, 'languages', {{
-                get: () => window.__normalizedLanguages,
-                configurable: true
-            }});
-            console.log('languages override applied:', window.__primaryLanguage, window.__normalizedLanguages);
+        (() => {{
+        window.__primaryLanguage = {json.dumps(primary_language, ensure_ascii=False)};
+        window.__normalizedLanguages = {json.dumps(normalized_languages, ensure_ascii=False)};
+
+        // FrozenArray semantics (минимально приближенно): массив заморожен
+        if (Array.isArray(window.__normalizedLanguages)) {{
+            Object.freeze(window.__normalizedLanguages);
+        }}
+
+        // fail-fast: типы и консистентность
+        if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
+            throw new Error('THW: __primaryLanguage invalid');
+        }}
+        if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
+            throw new Error('THW: __normalizedLanguages invalid');
+        }}
+        if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
+            throw new Error('THW: language != languages[0]');
+        }}
         }})();
         """
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": lang_js})
-
+        
         device_metrics = build_device_metrics(profile)
         driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
 
