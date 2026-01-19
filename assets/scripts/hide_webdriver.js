@@ -68,7 +68,7 @@ function HideWebdriverPatchModule() {
           }
         }
         // preserve native TypeError + semantics
-        const argsList = args || [];
+        const argsList = args;
         // fast-path only when receiver is a Function (brand check requirement)
         if (typeof thisArg === 'function' && argsList.length === 0) return target.call(thisArg);
         return Reflect.apply(target, thisArg, argsList);

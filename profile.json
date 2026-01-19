@@ -11,15 +11,15 @@
     "device_dpr_value": 1.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
-    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x2501) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Google Inc. (AMD)",
+    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6700 (0x73DF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
-    "gpu_architecture": "ampere",
-    "gpu_vendor": "nvidia",
+    "gpu_architecture": "rdna2",
+    "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "MXL AC-404",
-      "videoinput": "Logitech HD Pro Webcam C920",
-      "audiooutput": "Bose QuietComfort 35 II"
+      "audioinput": "Rode Procaster",
+      "videoinput": "HP Webcam 500",
+      "audiooutput": "Grado SR80x"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -28,28 +28,9 @@
     ],
     "language": "ja-JP",
     "deviceMemory": 8,
-    "hardwareConcurrency": 4,
-    "plugins": [
-      {
-        "name": "Chrome PDF Viewer",
-        "filename": "internal-pdf-viewer",
-        "description": "Portable Document Format",
-        "mimeTypes": [
-          {
-            "type": "application/pdf",
-            "suffixes": "pdf",
-            "description": "PDF document"
-          }
-        ]
-      }
-    ],
-    "mimeTypes": [
-      {
-        "type": "application/pdf",
-        "suffixes": "pdf",
-        "description": "PDF document"
-      }
-    ],
+    "hardwareConcurrency": 6,
+    "plugins": [],
+    "mimeTypes": [],
     "accept_language": "ja-JP,ja;q=0.9"
   },
   "expected_client_hints": {
@@ -95,7 +76,7 @@
       "Desktop"
     ],
     "deviceMemory": 8,
-    "hardwareConcurrency": 4,
+    "hardwareConcurrency": 6,
     "wow64": false,
     "languages": [
       "ja-JP",
@@ -105,6 +86,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/webp,*/*;q=0.8"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8"
   }
 }

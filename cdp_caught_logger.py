@@ -12,6 +12,65 @@ OUT = "devtools_caught_exceptions.jsonl"
 # фильтр: чтобы не тонуть в шуме
 INCLUDE = ()
 
+
+# --- optional SW prelude injector (no Fetch, no extra files) ---
+SW_INJECT_ENABLED = False
+SW_PRIMARY = None
+SW_LANGS = None
+
+def enable_sw_language_inject(language: str, normalized_languages: list[str]):
+    global SW_INJECT_ENABLED, SW_PRIMARY, SW_LANGS
+    if not isinstance(language, str) or not language.strip():
+        raise ValueError("SW inject: language must be non-empty str")
+    if not isinstance(normalized_languages, list) or not normalized_languages:
+        raise ValueError("SW inject: normalized_languages must be non-empty list")
+    for x in normalized_languages:
+        if not isinstance(x, str) or not x.strip():
+            raise ValueError("SW inject: bad languages entry")
+    SW_INJECT_ENABLED = True
+    SW_PRIMARY = language
+    SW_LANGS = normalized_languages
+
+def _build_sw_prelude(language: str, normalized_languages: list[str]) -> str:
+    # literals are produced here via json.dumps; no placeholders
+    return (f"""
+(() => {{
+  'use strict';
+  const G = globalThis;
+
+  const primary = {json.dumps(language, ensure_ascii=False)};
+  const langs   = {json.dumps(normalized_languages, ensure_ascii=False)};
+
+  if (typeof primary !== 'string' || !primary) throw new Error('THW: SW language invalid');
+  if (!Array.isArray(langs) || !langs.length) throw new Error('THW: SW languages invalid');
+  try {{ Object.freeze(langs); }} catch(e) {{}}
+
+  const nav = G.navigator;
+  if (!nav) throw new Error('THW: SW navigator missing');
+  const proto = Object.getPrototypeOf(nav);
+  if (!proto) throw new Error('THW: SW navigator proto missing');
+
+  function defAcc(key, getter) {{
+    const d = Object.getOwnPropertyDescriptor(proto, key);
+    if (d && d.configurable === false) throw new Error('THW: SW ' + key + ' non-configurable');
+    Object.defineProperty(proto, key, {{
+      get: getter,
+      configurable: true,
+      enumerable: d ? !!d.enumerable : false,
+      set: undefined
+    }});
+  }}
+
+  defAcc('language',  function(){{ return primary; }});
+  defAcc('languages', function(){{ return langs; }});
+
+  if (nav.languages[0] !== nav.language) throw new Error('THW: SW language != languages[0]');
+}})();
+""").strip()
+
+
+
+
 q = queue.Queue(maxsize=20000)
 
 def writer():
@@ -74,6 +133,76 @@ def get_ws_url():
 
 def run():
     try:
+        sess_id = {}          # per-session counters
+        injected = set()      # targetId set
+
+        def send_sess(ws, sessionId, method, params=None):
+            if sessionId not in sess_id:
+                sess_id[sessionId] = 0
+            sess_id[sessionId] += 1
+            inner = {"id": sess_id[sessionId], "method": method, "params": params or {}}
+            send(ws, "Target.sendMessageToTarget", {
+                "sessionId": sessionId,
+                "message": json.dumps(inner)
+            })
+
+        sw_prelude = None
+        if SW_INJECT_ENABLED:
+            sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS)
+
+        def _handle_target_attach(ws, msg):
+            nonlocal sw_prelude
+            p = msg.get("params") or {}
+            sessionId = p.get("sessionId")
+            info = p.get("targetInfo") or {}
+            ttype = info.get("type")
+            tid = info.get("targetId")
+
+            if not sessionId or not tid:
+                return False
+
+            # with waitForDebuggerOnStart=true every attached target is paused;
+            # we MUST resume non-SW targets, иначе подвиснет весь браузер.
+            if ttype != "service_worker":
+                try:
+                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+                except Exception:
+                    pass
+                return True
+
+            if tid in injected:
+                try:
+                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+                except Exception:
+                    pass
+                return True
+
+            injected.add(tid)
+
+            if not sw_prelude:
+                # нет прелюда — нельзя держать SW на паузе
+                try:
+                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+                except Exception:
+                    pass
+                return True
+
+            logger.info("SW attach: injecting prelude into targetId=%s", tid)
+            try:
+                send_sess(ws, sessionId, "Runtime.enable")
+                send_sess(ws, sessionId, "Runtime.evaluate", {
+                    "expression": sw_prelude,
+                    "awaitPromise": True
+                })
+            except Exception:
+                logger.exception("SW prelude injection failed for targetId=%s", tid)
+            finally:
+                try:
+                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+                except Exception:
+                    pass
+            return True
+
         ws_url = get_ws_url()
     except Exception:
         logger.exception("CDP logger failed to get ws url from 127.0.0.1:%s", PORT)
@@ -109,6 +238,18 @@ def run():
             # без паузы
             logger.info("CDP exception logger attached (PAUSE=none): %s", OUT)
 
+        if SW_INJECT_ENABLED:
+            send(ws, "Target.setDiscoverTargets", {"discover": True})
+            send(ws, "Target.setAutoAttach", {
+                "autoAttach": True,
+                "waitForDebuggerOnStart": True,
+                "flatten": True
+            })
+            logger.info("SW injector enabled (autoAttach+waitForDebuggerOnStart)")
+
+
+
+
     def _push(item):
         try:
             q.put_nowait(item)
@@ -122,6 +263,11 @@ def run():
             return
 
         method = msg.get("method")
+        
+        if method == "Target.attachedToTarget":
+            _handle_target_attach(ws, msg)
+            return
+
 
         # --- режим без пауз: Runtime.exceptionThrown ---
         if PAUSE_STATE != "all":

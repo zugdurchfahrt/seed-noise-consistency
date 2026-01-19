@@ -20,8 +20,8 @@ from depo_browser import chrome_versions, edge_versions, safari_versions, firefo
 from datashell_win32 import data_4_win32
 from macintel import macintel_data
 # ----------------------- MODULES-----------------------
-# import cdp_caught_logger as cdp
-# from cdp_caught_logger import run
+import cdp_caught_logger as cdp
+from cdp_caught_logger import run
 from plugins_dict import build_plugins_profile
 from tools import (
     build_device_metrics,
@@ -153,6 +153,7 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
                 driver.execute_cdp_cmd("Fetch.continueRequest", {"requestId": rid})
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
 
+
 # ----------------------- function init_driver -----------------------
 def init_driver(
     profile, country_data, platform, user_agent, screen_width, screen_height,
@@ -208,7 +209,7 @@ def init_driver(
         # 3) fallback: твой желаемый порт
         return 9222
     
-   # cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
+    cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
     
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
@@ -251,11 +252,11 @@ def init_driver(
     generate_font_manifest(MANIFEST_PATH, platform)
     
     
-  #  cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
-
+ #   cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
+    cdp.enable_sw_language_inject(language, normalized_languages)
         
-  #  threading.Thread(target=cdp.run, daemon=True).start()
-  #  logger.info("CDP logger thread started on port %s", cdp.PORT)
+ #   threading.Thread(target=cdp.run, daemon=True).start()
+    logger.info("CDP logger thread started on port %s", cdp.PORT)
     
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
@@ -504,12 +505,7 @@ def init_driver(
 
 
     # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
-    fetch_rules = [{
-        "urlPattern": "*",
-        "resourceType": "Script",
-        "requestStage": "Response"
-    }]
-
+    fetch_rules = []
 
     _install_fetch_interceptor(
         driver,

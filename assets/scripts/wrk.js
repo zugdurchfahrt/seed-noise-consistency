@@ -636,41 +636,6 @@ function ServiceWorkerOverride(G){
     return;
   }
 
-(() => {
-  'use strict';
-  const G = globalThis;
-
-  const primary = G.__primaryLanguage;
-  const langs   = G.__normalizedLanguages;
-
-  if (typeof primary !== 'string' || !primary) throw new Error('THW: SW language invalid');
-  if (!Array.isArray(langs) || !langs.length) throw new Error('THW: SW languages invalid');
-  try { Object.freeze(langs); } catch(e) {}
-
-  const nav = G.navigator;
-  if (!nav) throw new Error('THW: SW navigator missing');
-  const proto = Object.getPrototypeOf(nav);
-  if (!proto) throw new Error('THW: SW navigator proto missing');
-
-  function defAcc(key, getter){
-    const d = Object.getOwnPropertyDescriptor(proto, key);
-    if (d && d.configurable === false) throw new Error('THW: SW ' + key + ' non-configurable');
-    Object.defineProperty(proto, key, {
-      get: getter,
-      configurable: true,
-      enumerable: d ? !!d.enumerable : false
-    });
-  }
-
-  defAcc('language',  function(){ return primary; });
-  defAcc('languages', function(){ return langs; });
-
-  if (nav.languages[0] !== nav.language) throw new Error('THW: SW language != languages[0]');
-})();
-
-
-
-
   // --- Идемпотентная проверка: если уже обёрнуто — выходим (без HUB-флагов)
   try {
     const sw    = G.navigator.serviceWorker;
@@ -808,7 +773,11 @@ function ServiceWorkerOverride(G){
           : new Error('ServiceWorker register blocked by policy');
         return Promise.reject(Err);
       }
-      return Native.register.apply(this, arguments);
+
+      // ServiceWorker.register must stay as network scriptURL (blob/data are unsupported).
+      if (arguments.length >= 2) return Native.register.call(this, url, opts);
+      return Native.register.call(this, url);
+
     }, 'register');
     try { Object.defineProperty(WrappedServiceWorkerRegister, 'name', { value: 'WrappedServiceWorkerRegister' }); } catch(_){}
     WrappedServiceWorkerRegister.__ENV_WRAPPED__ = true;

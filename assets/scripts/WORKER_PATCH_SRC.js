@@ -247,32 +247,44 @@
       get: markAsNative(function get_getHighEntropyValues(){ return getHighEntropyValues; }, 'get getHighEntropyValues')
     });
 
-    const def = (obj,k,getter,enumerable=true)=>{
+    const def = (obj, k, getter, enumerable = true) => {
+      // По методологии: не молчим, если некуда ставить
+      if (!nav) throw new Error(`UACHPatch: cannot define ${k} (no navigator)`);
+
+      // 1) Если свойство уже есть как OWN на navigator — патчим ТУДА.
+      // Иначе прототипный getter никогда не сработает.
+      const own = Object.getOwnPropertyDescriptor(nav, k);
+      if (own) {
+        if (own.configurable === false) {
+          throw new Error(`UACHPatch: ${k} not configurable on navigator`);
+        }
+        Object.defineProperty(nav, k, {
+          configurable: true,
+          enumerable: !!own.enumerable,
+          get: getter,
+          set: undefined
+        });
+        return;
+      }
+
+      // 2) Иначе — патчим на proto (как раньше)
       if (obj) {
-        Object.defineProperty(obj,k,{configurable:true,enumerable,get:getter});
+        const d = Object.getOwnPropertyDescriptor(obj, k);
+        if (d && d.configurable === false) {
+          throw new Error(`UACHPatch: ${k} not configurable on proto`);
+        }
+        Object.defineProperty(obj, k, {
+          configurable: true,
+          enumerable: d ? !!d.enumerable : !!enumerable,
+          get: getter,
+          set: undefined
+        });
         return;
       }
-      if (nav) {
-        Object.defineProperty(nav,k,{configurable:true,enumerable,get:getter});
-        return;
-      }
-      throw new Error(`UACHPatch: cannot define ${k}`);
+
+      throw new Error(`UACHPatch: cannot define ${k} (no proto)`);
     };
 
-    const getUserAgentData = markAsNative(function getUserAgentData(){ return nativeUAD; }, 'get userAgentData');
-    def(proto,'userAgentData',getUserAgentData, false);
-    const getHardwareConcurrency = markAsNative(function getHardwareConcurrency(){
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
-      if (!Number.isFinite(Number(cache.snap.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
-      return Number(cache.snap.hardwareConcurrency);
-    }, 'get hardwareConcurrency');
-    def(proto,'hardwareConcurrency',getHardwareConcurrency, true);
-    const getDeviceMemory = markAsNative(function getDeviceMemory(){
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
-      if (!Number.isFinite(Number(cache.snap.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
-      return Number(cache.snap.deviceMemory);
-    }, 'get deviceMemory');
-    def(proto,'deviceMemory',getDeviceMemory, true);
 
     const getLanguage = markAsNative(function getLanguage(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
@@ -280,13 +292,35 @@
       return cache.snap.language;
     }, 'get language');
     def(proto,'language', getLanguage, true);
-  
+
     const getLanguages = markAsNative(function getLanguages(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!Array.isArray(cache.snap.languages)) throw new Error('UACHPatch: bad languages');
-      return cache.snap.languages.slice();
+      const out = cache.snap.languages.slice();
+      try { Object.freeze(out); } catch(_) {}
+      return out;
     }, 'get languages');
     def(proto,'languages', getLanguages, true);
+
+
+    const getDeviceMemory = markAsNative(function getDeviceMemory(){
+      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      const v = Number(cache.snap.deviceMemory);
+      if (!Number.isFinite(v)) throw new Error('UACHPatch: bad deviceMemory');
+      return v;
+    }, 'get deviceMemory');
+    def(proto, 'deviceMemory', getDeviceMemory, true);
+
+    const getHardwareConcurrency = markAsNative(function getHardwareConcurrency(){
+      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      const v = Number(cache.snap.hardwareConcurrency);
+      if (!Number.isFinite(v)) throw new Error('UACHPatch: bad hardwareConcurrency');
+      return v;
+    }, 'get hardwareConcurrency');
+    def(proto, 'hardwareConcurrency', getHardwareConcurrency, true);
+
+
+
 
     const isProbablyModuleWorkerURL = absUrl => {
       if (typeof absUrl !== 'string' || !absUrl) return false;
