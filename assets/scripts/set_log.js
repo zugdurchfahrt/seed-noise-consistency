@@ -1,5 +1,5 @@
-function LOGGingModule() {
-  if (!window.__PATCH_MYTYPER__) {
+const LOGGingModule = function LOGGingModule() {
+    if (!window.__PATCH_MYTYPER__) {
     window.__PATCH_MYTYPER__ = true;
 
     const global = window;

@@ -1,6 +1,6 @@
 
 // === CONTEXT PATCH MODULE ===
-function ContextPatchModule(window) {
+const ContextPatchModule = function ContextPatchModule(window) {
   const C = window.CanvasPatchContext = window.CanvasPatchContext || {};
   'use strict';
   const global = window;
@@ -25,8 +25,8 @@ function ContextPatchModule(window) {
     return function(fn, name) {
       return m(fn, name);
     };
-  })();
-
+  
+})();
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
     catch { return false; }

@@ -1,5 +1,5 @@
-function CanvasPatchModule(window) {
-  const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
+const CanvasPatchModule = function CanvasPatchModule(window) {
+    const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
     if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   const G = (typeof globalThis !== 'undefined' && globalThis)
     || (typeof self !== 'undefined' && self)

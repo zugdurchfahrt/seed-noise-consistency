@@ -1,4 +1,4 @@
-function HideWebdriverPatchModule() {
+const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   function safeDefine(obj, prop, descriptor) {
     try {

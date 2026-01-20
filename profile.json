@@ -2,24 +2,24 @@
   "profile": {
     "platform": "Win32",
     "os_info": "Windows NT 10.0; Win64; x64",
-    "os_name": "Windows 11 64-bit",
-    "platform_version": "19.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0",
-    "browser_version": "140.0.3485.54",
-    "screen_width": 1920,
-    "screen_height": 1080,
-    "device_dpr_value": 1.0,
+    "os_name": "Windows 10 64-bit",
+    "platform_version": "10.0.0",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+    "browser_version": "135.0.7049.95",
+    "screen_width": 7680,
+    "screen_height": 4320,
+    "device_dpr_value": 3.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (AMD)",
-    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6400 (0x743F) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
+    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x2206) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
-    "gpu_architecture": "rdna2",
-    "gpu_vendor": "amd",
+    "gpu_architecture": "ampere",
+    "gpu_vendor": "nvidia",
     "devices_conf": {
-      "audioinput": "Shure MV5",
-      "videoinput": "Creative Live! Cam Chat HD",
-      "audiooutput": "AKG K371"
+      "audioinput": "Rode Procaster",
+      "videoinput": "Logitech Brio Ultra HD",
+      "audiooutput": "Jabra Elite 85h"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -27,29 +27,10 @@
       "de"
     ],
     "language": "de-DE",
-    "deviceMemory": 4,
-    "hardwareConcurrency": 6,
-    "plugins": [
-      {
-        "name": "Microsoft Edge PDF Viewer",
-        "filename": "internal-pdf-viewer",
-        "description": "",
-        "mimeTypes": [
-          {
-            "type": "application/pdf",
-            "suffixes": "pdf",
-            "description": "PDF document"
-          }
-        ]
-      }
-    ],
-    "mimeTypes": [
-      {
-        "type": "application/pdf",
-        "suffixes": "pdf",
-        "description": "PDF document"
-      }
-    ],
+    "deviceMemory": 8,
+    "hardwareConcurrency": 4,
+    "plugins": [],
+    "mimeTypes": [],
     "accept_language": "de-DE,de;q=0.9"
   },
   "expected_client_hints": {
@@ -61,18 +42,18 @@
       },
       {
         "brand": "Chromium",
-        "version": "140"
+        "version": "135"
       },
       {
-        "brand": "Microsoft Edge",
-        "version": "140"
+        "brand": "Google Chrome",
+        "version": "135"
       }
     ],
     "mobile": false,
     "architecture": "x86",
     "bitness": "64",
     "model": "",
-    "platformVersion": "19.0.0",
+    "platformVersion": "10.0.0",
     "fullVersionList": [
       {
         "brand": "Not)A;Brand",
@@ -80,22 +61,22 @@
       },
       {
         "brand": "Chromium",
-        "version": "140.0.3485.54"
+        "version": "135.0.7049.95"
       },
       {
-        "brand": "Microsoft Edge",
-        "version": "140.0.3485.54"
+        "brand": "Google Chrome",
+        "version": "135.0.7049.95"
       }
     ],
-    "uaFullVersion": "140.0.3485.54",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"140\", \"Microsoft Edge\";v=\"140\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"140.0.3485.54\", \"Microsoft Edge\";v=\"140.0.3485.54\"",
+    "uaFullVersion": "135.0.7049.95",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"135\", \"Google Chrome\";v=\"135\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.95\", \"Google Chrome\";v=\"135.0.7049.95\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
-    "deviceMemory": 4,
-    "hardwareConcurrency": 6,
+    "deviceMemory": 8,
+    "hardwareConcurrency": 4,
     "wow64": false,
     "languages": [
       "de-DE",

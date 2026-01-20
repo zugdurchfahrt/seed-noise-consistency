@@ -1,4 +1,4 @@
-function WebGPUPatchModule() {
+const WebGPUPatchModule = function WebGPUPatchModule(window) {
   if (!window.__PATCH_WEBGPU__) {
     window.__PATCH_WEBGPU__ = true;
     const C = window.CanvasPatchContext;

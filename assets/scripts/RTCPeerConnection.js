@@ -1,4 +1,4 @@
-function RtcpeerconnectionPatchModule() {
+const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(window) {
   if (window.__PATCH_RTCPEERCONNECTION__) return;
   window.__PATCH_RTCPEERCONNECTION__ = true;
 

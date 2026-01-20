@@ -1,4 +1,4 @@
-function NavTotalSetPatchModule() {
+const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
   if (!window.__PATCH_NAVTOTALSET__) {
     window.__PATCH_NAVTOTALSET__ = true;
 

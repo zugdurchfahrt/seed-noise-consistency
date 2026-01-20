@@ -1,4 +1,4 @@
-function WEBglDICKts(window) {
+const WEBglDICKts = function WEBglDICKts(window) {
     if (!window.__PATCH_WEBSTORAGE__) {
     window.__PATCH_WEBSTORAGE__ = true;
     const C = window.CanvasPatchContext;

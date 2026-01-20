@@ -8,7 +8,7 @@
  *  - Повторный вызов HeadersInterceptor(window) безопасен (idempotent guard)
  */
 
-function HeadersInterceptor(window) {
+const HeadersInterceptor = function HeadersInterceptor(window) {
   'use strict';
   const LOG_PREFIX = '[headers_interceptor.js]';
   const DEBUG = !!window.__HEADERS_DEBUG__;

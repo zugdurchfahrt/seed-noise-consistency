@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  function EnvParamsPatchModule() {
+  const EnvParamsPatchModule = function EnvParamsPatchModule(window) {
     'use strict';
     // Global-Alias ​​(reliable in the window and workrs)
     const G = (typeof globalThis !== 'undefined' && globalThis)

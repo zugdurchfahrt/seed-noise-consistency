@@ -1,5 +1,5 @@
 // 1) Источник снапшотов
-function EnvBus(G){
+const EnvBus = function EnvBus(G){
   function envSnapshot(){
     const nav = G.navigator;
     let langs = G.__normalizedLanguages;

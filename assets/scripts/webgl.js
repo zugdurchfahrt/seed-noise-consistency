@@ -1,5 +1,5 @@
-function WebglPatchModule(window) {
-  if (!window.__PATCH_WEBGL__) {
+const WebglPatchModule = function WebglPatchModule(window) {
+    if (!window.__PATCH_WEBGL__) {
     window.__PATCH_WEBGL__ = true;
     const C = window.CanvasPatchContext;
     if (!C) throw new Error(' WebglPatchModule] CanvasPatchContext is undefined — registration is not available');

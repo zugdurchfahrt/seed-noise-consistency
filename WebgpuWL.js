@@ -1,5 +1,5 @@
 // WebgpuWL.js
-function WebgpuWLBootstrap() {
+const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   if (!window.__WEBGPU_WHITELIST__) {
   window.__WEBGPU_WHITELIST__ = true;
 

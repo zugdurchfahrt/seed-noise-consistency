@@ -1,4 +1,4 @@
-function AudioContextModule() {
+const AudioContextModule = function AudioContextModule(window) {
   if (!window.__PATCH_AUDIOCONTEXT__) {
   window.__PATCH_AUDIOCONTEXT__ = true;
   const C = window.CanvasPatchContext;

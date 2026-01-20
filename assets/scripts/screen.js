@@ -1,4 +1,4 @@
-function ScreenPatchModule() {
+const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!window.__PATCH_SCREEN__) {
   window.__PATCH_SCREEN__ = true;
   

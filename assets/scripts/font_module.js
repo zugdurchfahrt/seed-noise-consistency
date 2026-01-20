@@ -38,7 +38,7 @@ function FontPatchModule(window) {
     const readyDesc = Object.getOwnPropertyDescriptor(proto, 'ready');
     if (readyDesc && typeof readyDesc.get === 'function') {
       Object.defineProperty(proto, 'ready', {
-        get() { try { return readyDesc.get.call(this); } catch { return Promise.resolve(this); } },
+        get() { return readyDesc.get.call(this); },
         configurable: true
       });
     }
@@ -133,10 +133,9 @@ function FontPatchModule(window) {
         .then(() => (document && document.fonts && document.fonts.ready) || Promise.resolve())
         .then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
         .finally(() => {
+          if (failed > 0) return; // не объявляем готовность при фейлах
           window.__FONTS_READY__ = true;
-          if (typeof window.awaitFontsReady?.resolve === 'function') {
-            window.awaitFontsReady.resolve();
-          }
+          if (typeof window.awaitFontsReady?.resolve === 'function') window.awaitFontsReady.resolve();
           window.dispatchEvent && window.dispatchEvent(new Event('fontsready'));
         });
       console.log(`[FontPatch] window: ${loaded} loaded, ${failed} failed`);
@@ -257,16 +256,19 @@ function FontPatchModule(window) {
   };
 
   FFS.check = function check(query) {
-    if (throttled()) return false;
-    if (!validFontQuery(query)) return false;
-    try { return origCheck(query); } catch { return false; }
-  };
+    if (throttled()) throw new Error('[FontModule] FFS.check throttled');
+    if (!validFontQuery(query)) return origCheck(query); // не подменяем семантику
+    return origCheck(query); // исключения не глотаем
+};
+
+
+
 
   FFS.load = function load(query, text) {
-    if (throttled()) return Promise.resolve([]);
-    if (!validFontQuery(query)) return Promise.resolve([]);
-    if (text != null && typeof text !== 'string') return Promise.resolve([]);
-    return origLoad(query, text).catch(() => []);
+    if (throttled()) return Promise.reject(new Error('[FontModule] FFS.load throttled'));
+    if (!validFontQuery(query)) return origLoad(query, text); // не подменяем семантику
+    if (text != null && typeof text !== 'string') return origLoad(query, text); // пусть натив решает
+    return origLoad(query, text); // не глотаем reject
   };
 })();
 
