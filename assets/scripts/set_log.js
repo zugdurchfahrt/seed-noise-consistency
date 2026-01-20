@@ -126,6 +126,27 @@ function LOGGingModule() {
       } catch (_) {}
     }
 
+
+    // ===== 2.5) Swallowed/degrade marker (explicit) =====
+    global.__DEGRADE__ = function (code, err, extra) {
+      try {
+        pushEntry({
+          type: "degrade",
+          code: code ? String(code) : "unknown",
+          error: err instanceof Error ? {
+            name: err.name,
+            message: err.message,
+            stack: err.stack || null,
+          } : (err ? safeStringify(err) : null),
+          extra: extra ? normalizeForJSON(extra) : null,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (_) {}
+    };
+
+
+
+
     // ===== 2) Core logger: pushLog (console + errors) =====
     function pushLog(level, args, withStack, module) {
       try {

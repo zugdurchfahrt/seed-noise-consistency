@@ -117,11 +117,22 @@ function ContextPatchModule(window) {
     const orig = proto[method];
     if (patchedMethods.has(orig)) return false;
 
+    // Avoid expando flags on "this" (detectable). Use WeakSet recursion guard.
+    const inProgress =
+      (typeof WeakSet === 'function') ? new WeakSet() : null;
+    const flag = '__isChain_' + method;
+
     const wrapped = (method === 'toDataURL')
       ? ({ toDataURL(type, quality) {
-          const flag = '__isChain_' + method;
-          if (this && this[flag]) return Reflect.apply(orig, this, arguments);
-          if (this) this[flag] = true;
+          const self = this;
+          const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
+          if (self && self[flag]) return Reflect.apply(orig, self, arguments);
+          if (inProgress && isObj) {
+            if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
+            inProgress.add(self);
+          } else {
+            if (self) self[flag] = true;
+          }
           try {
             let patchedArgs = Array.prototype.slice.call(arguments);
             for (const hook of hooks){
@@ -145,13 +156,23 @@ function ContextPatchModule(window) {
             }
             return res;
           } finally {
-            if (this) this[flag] = false;
+            if (inProgress && isObj) {
+              inProgress.delete(self);
+            } else {
+              if (self) self[flag] = false;
+            }
           }
         } }).toDataURL
       : ({ [method]() {
-          const flag = '__isChain_' + method;
-          if (this && this[flag]) return Reflect.apply(orig, this, arguments);
-          if (this) this[flag] = true;
+          const self = this;
+          const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
+          if (self && self[flag]) return Reflect.apply(orig, self, arguments);
+          if (inProgress && isObj) {
+            if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
+            inProgress.add(self);
+          } else {
+            if (self) self[flag] = true;
+          }
           try {
             let patchedArgs = Array.prototype.slice.call(arguments);
             for (const hook of hooks){
@@ -165,7 +186,11 @@ function ContextPatchModule(window) {
             }
             return Reflect.apply(orig, this, patchedArgs);
           } finally {
-            if (this) this[flag] = false;
+            if (inProgress && isObj) {
+              inProgress.delete(self);
+            } else {
+              if (self) self[flag] = false;
+            }
           }
         } })[method];
 
@@ -323,6 +348,8 @@ function ContextPatchModule(window) {
     if (!ctx || typeof CanvasRenderingContext2D === 'undefined' || !(ctx instanceof CanvasRenderingContext2D)) return ctx;
 
     const proto = CanvasRenderingContext2D.prototype;
+    // Cache wrappers per property so ctx[prop] is stable across reads.
+    const fnCache = (typeof Map === 'function') ? new Map() : null;
 
     const ORIG = {
       getImageData: proto.getImageData,
@@ -338,6 +365,8 @@ function ContextPatchModule(window) {
 
     const handler = {
       get(target, prop){
+        if (fnCache && fnCache.has(prop)) return fnCache.get(prop);
+
         // Special methods interception
         if (prop === 'getImageData' && ORIG.getImageData){
           const wrapped = function(...args){
@@ -362,7 +391,9 @@ function ContextPatchModule(window) {
               guard.getImageData = false;
             }
           };
-          return markAsNative(wrapped, 'getImageData');
+          const out = markAsNative(wrapped, 'getImageData');
+          if (fnCache) fnCache.set(prop, out);
+          return out;
         }
 
         if (prop === 'measureText' && ORIG.measureText){
@@ -381,7 +412,9 @@ function ContextPatchModule(window) {
             } catch {}
             return m;
           };
-          return markAsNative(wrapped, 'measureText');
+          const out = markAsNative(wrapped, 'measureText');
+          if (fnCache) fnCache.set(prop, out);
+          return out;
         }
 
         if (prop === 'fillText' && ORIG.fillText){
@@ -390,7 +423,9 @@ function ContextPatchModule(window) {
             const wrapped = function(...args){
               return H.applyFillTextHook.call(this, ORIG.fillText.bind(target), ...args);
             };
-            return markAsNative(wrapped, 'fillText');
+            const out = markAsNative(wrapped, 'fillText');
+            if (fnCache) fnCache.set(prop, out);
+            return out;
           }
           const wrapped = function(text, x, y, ...rest){
             try {
@@ -403,9 +438,11 @@ function ContextPatchModule(window) {
               return safeInvoke(ORIG.fillText, target, [text, x, y, ...rest], proto, 'fillText');
             }
           };
-          return markAsNative(wrapped, 'fillText');
+          const out = markAsNative(wrapped, 'fillText');
+          if (fnCache) fnCache.set(prop, out);
+          return out;
         }
-    
+
         if (prop === 'fillRect' && ORIG.fillRect){
           const H = getHooks();
           const wrapped = function(x, y, w, h){
@@ -417,7 +454,9 @@ function ContextPatchModule(window) {
             } catch {}
             return safeInvoke(ORIG.fillRect, target, [x, y, w, h], proto, 'fillRect');
           };
-          return markAsNative(wrapped, 'fillRect');
+          const out = markAsNative(wrapped, 'fillRect');
+          if (fnCache) fnCache.set(prop, out);
+          return out;
         }
 
         if (prop === 'strokeText' && ORIG.strokeText){
@@ -426,7 +465,9 @@ function ContextPatchModule(window) {
             const wrapped = function(...args){
               return H.applyStrokeTextHook.call(this, ORIG.strokeText.bind(target), ...args);
             };
-            return markAsNative(wrapped, 'strokeText');
+            const out = markAsNative(wrapped, 'strokeText');
+            if (fnCache) fnCache.set(prop, out);
+            return out;
           }
           const wrapped = function(text, x, y, ...rest){
             try {
@@ -439,7 +480,9 @@ function ContextPatchModule(window) {
               return safeInvoke(ORIG.strokeText, target, [text, x, y, ...rest], proto, 'strokeText');
             }
           };
-          return markAsNative(wrapped, 'strokeText');
+          const out = markAsNative(wrapped, 'strokeText');
+          if (fnCache) fnCache.set(prop, out);
+          return out;
         }
 
         if (prop === 'drawImage' && ORIG.drawImage){
@@ -448,12 +491,16 @@ function ContextPatchModule(window) {
             const wrapped = function(...args){
               return H.applyDrawImageHook.call(this, ORIG.drawImage.bind(target), ...args);
             };
-            return markAsNative(wrapped, 'drawImage');
+            const out = markAsNative(wrapped, 'drawImage');
+            if (fnCache) fnCache.set(prop, out);
+            return out;
           }
           const wrapped = function(...args){
             return safeInvoke(ORIG.drawImage, target, args, proto, 'drawImage');
           };
-          return markAsNative(wrapped, 'drawImage');
+          const out = markAsNative(wrapped, 'drawImage');
+          if (fnCache) fnCache.set(prop, out);
+          return out;
         }
 
       // other functions - a safe call; Properties - as is
@@ -463,7 +510,9 @@ function ContextPatchModule(window) {
             try { return safeInvoke(orig, target, args, proto, prop); }
             catch { try { return safeInvoke(orig, target, args, proto, prop); } catch { return undefined; } }
           };
-          return markAsNative(wrapped, String(prop));
+          const out = markAsNative(wrapped, String(prop));
+          if (fnCache) fnCache.set(prop, out);
+          return out;
         }
         try { return orig; } catch { return undefined; }
       },

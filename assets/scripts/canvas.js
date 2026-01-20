@@ -28,11 +28,18 @@ function CanvasPatchModule(window) {
       throw new Error('[CanvasPatch] screenWidth / screenHeight not set');
     }
     const div = document.createElement('div');
-    const u = mulberry32(strToSeed(__GLOBAL_SEED + '|canvasId'))();
-    div.id = 'canvas_01' + u.toString(36).slice(2, 10);
+    const rng = mulberry32(strToSeed(__GLOBAL_SEED + '|canvasId'));
+    const u1 = rng();
+    const u2 = rng();
+
+    div.id = 'canvas_01' + u1.toString(36).slice(2, 10);
+
+    const OFFSCREEN_LEFT_PX =
+      -Math.floor(1000 + u2 * 4002);
+
 
     div.style.position = 'fixed';
-    div.style.left = '-997px';
+    div.style.left = `${OFFSCREEN_LEFT_PX}px`;
     div.style.top = '0';
     div.style.width = '1px';
     div.style.height = '1px';

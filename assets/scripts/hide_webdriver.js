@@ -58,14 +58,14 @@ function HideWebdriverPatchModule() {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const toStringProxy = new Proxy(nativeToString, {
       apply(target, thisArg, args) {
-        // IMPORTANT: do not touch WeakMap for primitives/null/undefined
-        if (thisArg !== null) {
-          const t = typeof thisArg;
-          if (t === 'function' || t === 'object') {
-            // Single WeakMap lookup (faster than has()+get())
-            const v = toStringOverrideMap.get(thisArg);
-            if (v !== undefined) return v;
-          }
+        // IMPORTANT:
+        // - preserve native brand-check semantics:
+        //   Function.prototype.toString MUST throw when receiver is not a Function
+        // - therefore NEVER return overrides for non-functions (objects/proxies/etc)
+        if (typeof thisArg === 'function') {
+          // Single WeakMap lookup (faster than has()+get())
+          const v = toStringOverrideMap.get(thisArg);
+          if (v !== undefined) return v;
         }
         // preserve native TypeError + semantics
         const argsList = args;
@@ -153,34 +153,63 @@ function HideWebdriverPatchModule() {
     enumerable: false
   });
 
-  // Object.getOwnPropertyDescriptor
-  Object.getOwnPropertyDescriptor = (function(nativeGOPD){
-    function getOwnPropertyDescriptor(obj, prop) {
-      if ((obj === navigator || obj === Navigator.prototype) && prop === 'webdriver') return undefined;
+  // --- keep natives once ---
+  const nativeGOPD   = Object.getOwnPropertyDescriptor;
+  const nativeHas    = Reflect.has;
+  const nativeHasOwn = Object.hasOwn;
+
+  // one predicate
+  const isWebdriver = (obj, prop) =>
+    prop === 'webdriver' && (obj === navigator || obj === Navigator.prototype);
+
+  // one wrapper factory
+  function wrapNative(name, nativeFn, implFn) {
+    // не перетирай повторно, если уже ставили (на твоё усмотрение)
+    // if (nativeFn && nativeFn.__patched__) return nativeFn;
+
+    function wrapped() {
+      return implFn.apply(this, arguments);
+    }
+
+    // делай вид "нативности" так, как у тебя принято
+    markAsNative(wrapped, name);
+
+    // (опционально) минимальная совместимость по length/name — если твой markAsNative это не делает
+    try { Object.defineProperty(wrapped, 'length', { value: nativeFn.length }); } catch {}
+    try { Object.defineProperty(wrapped, 'name',   { value: name }); } catch {}
+
+    // (опционально) метка
+    // try { Object.defineProperty(wrapped, '__patched__', { value: true }); } catch {}
+
+    return wrapped;
+  }
+
+  // --- apply patches ---
+  Object.getOwnPropertyDescriptor = wrapNative(
+    'getOwnPropertyDescriptor',
+    nativeGOPD,
+    function (obj, prop) {
+      if (isWebdriver(obj, prop)) return undefined;
       return nativeGOPD(obj, prop);
     }
-    markAsNative(getOwnPropertyDescriptor, 'getOwnPropertyDescriptor');
-    return getOwnPropertyDescriptor;
-  })(nativeGetOwnProp);
+  );
 
-  // Reflect.has
-  Reflect.has = (function(nativeHas){
-    function has(target, prop) {
+  Reflect.has = wrapNative(
+    'has',
+    nativeHas,
+    function (target, prop) {
       if (target === navigator && prop === 'webdriver') return false;
       return nativeHas(target, prop);
     }
-    markAsNative(has, 'has');
-    return has;
-  })(Reflect.has);
+  );
 
-  // Object.hasOwn
-  const realHasOwn = Object.hasOwn;
-  Object.hasOwn = (function(nativeHasOwn){
-    function hasOwn(obj, prop) {
+  Object.hasOwn = wrapNative(
+    'hasOwn',
+    nativeHasOwn,
+    function (obj, prop) {
       if (obj === navigator && prop === 'webdriver') return false;
       return nativeHasOwn(obj, prop);
     }
-    markAsNative(hasOwn, 'hasOwn');
-    return hasOwn;
-  })(realHasOwn);
-}
+  );
+
+} 

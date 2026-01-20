@@ -1,6 +1,7 @@
 import json, time, threading, queue
 import requests
 from websocket import WebSocketApp
+from collections import deque
 import logging
 from overseer import logger
 
@@ -72,6 +73,14 @@ def _build_sw_prelude(language: str, normalized_languages: list[str]) -> str:
 
 
 q = queue.Queue(maxsize=20000)
+
+# --- causality buffers ---
+MAX_CAUSE_EVENTS = 200
+recent_network = deque(maxlen=MAX_CAUSE_EVENTS)
+recent_async = deque(maxlen=MAX_CAUSE_EVENTS)
+
+def now():
+    return time.time()
 
 def writer():
     buf = []
@@ -224,7 +233,7 @@ def run():
 
         if PAUSE_STATE == "all":
             send(ws, "Debugger.enable")
-            send(ws, "Debugger.setAsyncCallStackDepth", {"maxDepth": 0})
+            send(ws, "Debugger.setAsyncCallStackDepth", {"maxDepth": 32})
             send(ws, "Debugger.setPauseOnExceptions", {"state": "all"})
             logger.info("CDP caught logger attached (PAUSE=all): %s", OUT)
 
@@ -237,7 +246,9 @@ def run():
         else:
             # без паузы
             logger.info("CDP exception logger attached (PAUSE=none): %s", OUT)
-
+        
+        send(ws, "Network.enable")
+        
         if SW_INJECT_ENABLED:
             send(ws, "Target.setDiscoverTargets", {"discover": True})
             send(ws, "Target.setAutoAttach", {
@@ -263,6 +274,36 @@ def run():
             return
 
         method = msg.get("method")
+        
+        # -------- Network: request initiators --------
+        if method == "Network.requestWillBeSent":
+            p = msg.get("params") or {}
+            initiator = p.get("initiator") or {}
+            recent_network.append({
+                "ts": now(),
+                "type": initiator.get("type"),
+                "url": (p.get("request") or {}).get("url"),
+                "stack": (initiator.get("stack") or {}).get("callFrames"),
+            })
+            return
+
+        if method == "Network.webSocketFrameReceived":
+            p = msg.get("params") or {}
+            recent_network.append({
+                "ts": now(),
+                "type": "websocket",
+                "payload": (p.get("response") or {}).get("payloadData"),
+            })
+            return
+
+        # -------- Async causality --------
+        if method == "Debugger.paused":
+            p = msg.get("params") or {}
+            if p.get("asyncStackTrace"):
+                recent_async.append({
+                    "ts": now(),
+                    "asyncStack": p.get("asyncStackTrace"),
+                })
         
         if method == "Target.attachedToTarget":
             _handle_target_attach(ws, msg)
@@ -312,6 +353,18 @@ def run():
         except Exception:
             pass
 
+        t_now = now()
+        causality = {
+            "network": [
+                x for x in recent_network
+                if t_now - x["ts"] < 5.0
+            ],
+            "async": [
+                x for x in recent_async
+                if t_now - x["ts"] < 5.0
+            ],
+        }
+
         call_frames = p.get("callFrames") or []
         top = call_frames[0] if call_frames else {}
         url = top.get("url") or ""
@@ -340,6 +393,7 @@ def run():
                 }
                 for f in call_frames[:6]
             ],
+            "causality": causality,
             "mode": "Debugger.paused",
         })
 

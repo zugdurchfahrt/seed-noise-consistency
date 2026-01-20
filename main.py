@@ -252,12 +252,12 @@ def init_driver(
     generate_font_manifest(MANIFEST_PATH, platform)
     
     
- #   cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
-    cdp.enable_sw_language_inject(language, normalized_languages)
+    cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
+    
         
  #   threading.Thread(target=cdp.run, daemon=True).start()
     logger.info("CDP logger thread started on port %s", cdp.PORT)
-    
+    cdp.enable_sw_language_inject(language, normalized_languages)
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     
@@ -313,7 +313,7 @@ def init_driver(
             """
         ]
         return "\n;\n".join(parts)
-
+    
     # --- creation of window.__ objects ---
     init_params = f"""
     // ——— Globals Bootstrap ———
@@ -350,7 +350,8 @@ def init_driver(
     window.__PLUGIN_MIMETYPES__         = {json.dumps(profile.get("mimeTypes", []), ensure_ascii=False)};
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
-
+    
+    
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)

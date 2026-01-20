@@ -3,23 +3,23 @@
     "platform": "Win32",
     "os_info": "Windows NT 10.0; Win64; x64",
     "os_name": "Windows 11 64-bit",
-    "platform_version": "15.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-    "browser_version": "135.0.7049.114",
+    "platform_version": "19.0.0",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "browser_version": "137.0.7151.56",
     "screen_width": 1920,
     "screen_height": 1080,
     "device_dpr_value": 1.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (AMD)",
-    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6400 (0x743F) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
+    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 (0x2184) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
-    "gpu_architecture": "rdna2",
-    "gpu_vendor": "amd",
+    "gpu_architecture": "turing",
+    "gpu_vendor": "nvidia",
     "devices_conf": {
-      "audioinput": "Samson C01U Pro",
-      "videoinput": "Ausdom AF640",
-      "audiooutput": "Beyerdynamic DT 990 Pro"
+      "audioinput": "JLab Talk Go",
+      "videoinput": "Dell UltraSharp Webcam",
+      "audiooutput": "Grado SR80x"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -29,27 +29,8 @@
     "language": "de-DE",
     "deviceMemory": 8,
     "hardwareConcurrency": 6,
-    "plugins": [
-      {
-        "name": "Chrome PDF Viewer",
-        "filename": "internal-pdf-viewer",
-        "description": "",
-        "mimeTypes": [
-          {
-            "type": "application/pdf",
-            "suffixes": "pdf",
-            "description": "PDF document"
-          }
-        ]
-      }
-    ],
-    "mimeTypes": [
-      {
-        "type": "application/pdf",
-        "suffixes": "pdf",
-        "description": "PDF document"
-      }
-    ],
+    "plugins": [],
+    "mimeTypes": [],
     "accept_language": "de-DE,de;q=0.9"
   },
   "expected_client_hints": {
@@ -61,18 +42,18 @@
       },
       {
         "brand": "Chromium",
-        "version": "135"
+        "version": "137"
       },
       {
         "brand": "Google Chrome",
-        "version": "135"
+        "version": "137"
       }
     ],
     "mobile": false,
     "architecture": "x86",
     "bitness": "64",
     "model": "",
-    "platformVersion": "15.0.0",
+    "platformVersion": "19.0.0",
     "fullVersionList": [
       {
         "brand": "Not)A;Brand",
@@ -80,16 +61,16 @@
       },
       {
         "brand": "Chromium",
-        "version": "135.0.7049.114"
+        "version": "137.0.7151.56"
       },
       {
         "brand": "Google Chrome",
-        "version": "135.0.7049.114"
+        "version": "137.0.7151.56"
       }
     ],
-    "uaFullVersion": "135.0.7049.114",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"135\", \"Google Chrome\";v=\"135\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.114\", \"Google Chrome\";v=\"135.0.7049.114\"",
+    "uaFullVersion": "137.0.7151.56",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"137\", \"Google Chrome\";v=\"137\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"137.0.7151.56\", \"Google Chrome\";v=\"137.0.7151.56\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
