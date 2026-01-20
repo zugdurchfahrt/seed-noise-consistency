@@ -302,7 +302,7 @@ def init_driver(
            // —————— Register all hooks here ——————//
             if (typeof registerAllHooks === 'function') registerAllHooks();
             (function applyAllPatchesCustomOrder(win) {
-                const C = win.CanvasPatchContext; if (!C) return;
+                const C = window.CanvasPatchContext; if (!C) return;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();

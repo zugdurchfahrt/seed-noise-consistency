@@ -10,6 +10,9 @@ function LOGGingModule() {
       (typeof window !== "undefined" && window) ||
       {};
 
+
+
+
     // ===== 0) Central store: ONLY window._myDebugLog (no logError / no DB) =====
     global._myDebugLog = global._myDebugLog || [];
     G._myDebugLog = global._myDebugLog;
@@ -123,13 +126,16 @@ function LOGGingModule() {
     function pushEntry(entry) {
       try {
         global._myDebugLog.push(entry);
-      } catch (_) {}
+      } catch (e) {
+        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:pushEntry:push_failed", e);
+      }
     }
 
 
     // ===== 2.5) Swallowed/degrade marker (explicit) =====
-    global.__DEGRADE__ = function (code, err, extra) {
+    G.__DEGRADE__ = function (code, err, extra) {
       try {
+        if (typeof pushEntry !== "function") return;
         pushEntry({
           type: "degrade",
           code: code ? String(code) : "unknown",
@@ -143,6 +149,7 @@ function LOGGingModule() {
         });
       } catch (_) {}
     };
+    global.__DEGRADE__ = G.__DEGRADE__;
 
 
 
@@ -186,7 +193,9 @@ function LOGGingModule() {
         }
 
         pushEntry(e);
-      } catch (_) {}
+      } catch (e) {
+        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:pushLog:log_failed", e);
+      }
     }
 
     // ===== 3) Patch console.* (single source of truth) =====
@@ -226,7 +235,9 @@ function LOGGingModule() {
               stack: (e && e.stack) ? String(e.stack) : null,
               timestamp: new Date().toISOString()
             });
-          } catch (_) {}
+          } catch (e) {
+            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:console_patch:internal_log_failed", e);
+          }
         }
       };
     }
@@ -260,7 +271,9 @@ function LOGGingModule() {
 
         // Store entry
         pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
-      } catch (_) {}
+      } catch (e) {
+        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:global_log:log_failed", e);
+      }
     };
 
     // ===== 5) Uncaught errors + unhandled rejections (consistent, no logError) =====
@@ -277,7 +290,9 @@ function LOGGingModule() {
           stack: error && error.stack ? String(error.stack) : null,
           timestamp: new Date().toISOString(),
         });
-      } catch (_) {}
+      } catch (e) {
+        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:onerror:record_failed", e);
+      }
       return false; // do not swallow (DevTools still shows it)
     };
 
@@ -299,7 +314,9 @@ function LOGGingModule() {
             source: url,
             timestamp: new Date().toISOString(),
           });
-        } catch (_) {}
+        } catch (e) {
+          if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:resource_error:record_failed", e);
+        }
       },
       true
     );
@@ -315,7 +332,9 @@ function LOGGingModule() {
           stack: reason && reason.stack ? String(reason.stack) : null,
           timestamp: new Date().toISOString(),
         });
-      } catch (_) {}
+      } catch (e) {
+        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:unhandledrejection:record_failed", e);
+      }
     });
 
     // 5.4 worker-context only (avoid breaking window.postMessage signature)
@@ -337,7 +356,9 @@ function LOGGingModule() {
               colno: typeof (e && e.colno) === "number" ? e.colno : null,
               timestamp: new Date().toISOString(),
             });
-          } catch (_) {}
+          } catch (e) {
+            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:worker_error:record_failed", e);
+          }
         });
 
         global.addEventListener("unhandledrejection", function (event) {
@@ -350,10 +371,14 @@ function LOGGingModule() {
               stack: reason && reason.stack ? String(reason.stack) : null,
               timestamp: new Date().toISOString(),
             });
-          } catch (_) {}
+          } catch (e) {
+            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:worker_unhandledrejection:record_failed", e);
+          }
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:worker_context:init_failed", e);
+    }
 
     // ===== 6) Export helper (in-session) =====
     global.exportMyDebugLog = function () {
@@ -369,12 +394,18 @@ function LOGGingModule() {
         setTimeout(function () {
           try {
             document.body.removeChild(a);
-          } catch (_) {}
+          } catch (e) {
+            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:export_log:remove_link_failed", e);
+          }
           try {
             URL.revokeObjectURL(url);
-          } catch (_) {}
+          } catch (e) {
+            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:export_log:revoke_url_failed", e);
+          }
         }, 5500);
-      } catch (_) {}
+      } catch (e) {
+        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:export_log:export_failed", e);
+      }
     };
   }
 }

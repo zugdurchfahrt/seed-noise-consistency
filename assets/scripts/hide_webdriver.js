@@ -7,6 +7,7 @@ function HideWebdriverPatchModule() {
       Object.defineProperty(obj, prop, descriptor);
     } catch (e) {
       console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
+      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:safeDefine:define_failed", e);
     }
   }
 
@@ -28,7 +29,9 @@ function HideWebdriverPatchModule() {
       const n = name || func.name || "";
       const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
       toStringOverrideMap.set(func, label);
-    } catch (_) {}
+    } catch (e) {
+      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:baseMarkAsNative:override_set_failed", e);
+    }
     return func;
   }
   function ensureMarkAsNative() {
@@ -106,6 +109,7 @@ function HideWebdriverPatchModule() {
     });
   } catch (e) {
     console.warn("[stealth] external patch failed:", e);
+    if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:external_patch:define_failed", e);
   }
 
   //  chrome.runtime protection -may not work in chrome
@@ -142,6 +146,7 @@ function HideWebdriverPatchModule() {
     }
   } catch (e) {
     console.warn("[stealth] chrome.runtime patch failed:", e);
+    if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:chrome_patch:define_failed", e);
   }
 
   const proto = Navigator.prototype;
@@ -175,8 +180,12 @@ function HideWebdriverPatchModule() {
     markAsNative(wrapped, name);
 
     // (опционально) минимальная совместимость по length/name — если твой markAsNative это не делает
-    try { Object.defineProperty(wrapped, 'length', { value: nativeFn.length }); } catch {}
-    try { Object.defineProperty(wrapped, 'name',   { value: name }); } catch {}
+    try { Object.defineProperty(wrapped, 'length', { value: nativeFn.length }); } catch (e) {
+      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:length_define_failed", e);
+    }
+    try { Object.defineProperty(wrapped, 'name',   { value: name }); } catch (e) {
+      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:name_define_failed", e);
+    }
 
     // (опционально) метка
     // try { Object.defineProperty(wrapped, '__patched__', { value: true }); } catch {}

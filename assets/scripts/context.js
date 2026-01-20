@@ -32,17 +32,6 @@ function ContextPatchModule(window) {
     catch { return false; }
   }
 
-  function safeInvoke(orig, self, args, proto, method){
-    try {
-      return orig.apply(self, args);
-    } catch (e) {
-      // Illegal invocation fallback
-      if (proto && typeof proto[method] === 'function') {
-        try { return proto[method].call(self, ...args); } catch {}
-      }
-      throw e;
-    }
-  }
 
   function getHooks(){
     return (typeof global !== 'undefined' && global.CanvasPatchHooks) ? global.CanvasPatchHooks : null;
@@ -343,186 +332,124 @@ function ContextPatchModule(window) {
     return true;
   }
 
-  // === 4. Proxy foe CanvasRenderingContext2D (Safe wrap) ===
+  // === 4. Brand-safe patching for CanvasRenderingContext2D (no Proxy returned) ===
   function createSafeCtxProxy(ctx){
     if (!ctx || typeof CanvasRenderingContext2D === 'undefined' || !(ctx instanceof CanvasRenderingContext2D)) return ctx;
 
     const proto = CanvasRenderingContext2D.prototype;
-    // Cache wrappers per property so ctx[prop] is stable across reads.
-    const fnCache = (typeof Map === 'function') ? new Map() : null;
 
-    const ORIG = {
-      getImageData: proto.getImageData,
-      putImageData: proto.putImageData,
-      drawImage:    proto.drawImage,
-      measureText:  proto.measureText,
-      fillText:     proto.fillText,
-      strokeText:   proto.strokeText,
-      fillRect:     proto.fillRect
+    // Patch once-per-method: if already patched, do nothing
+    function patchOnce(method, makeWrapped){
+      if (!proto || typeof proto[method] !== 'function') return false;
+      if (patchedMethods.has(proto[method])) return false;
+
+      const orig = proto[method];
+      const wrappedRaw = makeWrapped(orig);
+      const wrapped = markAsNative(wrappedRaw, method);
+
+      definePatchedMethod(proto, method, wrapped);
+      patchedMethods.add(wrapped);
+      return true;
+    }
+
+    const getFontStr = (self) => {
+      try {
+        const f = self && typeof self.font === 'string' && self.font.trim() ? self.font : '16px sans-serif';
+        return f;
+      } catch {
+        return '16px sans-serif';
+      }
     };
 
-    const guard = { getImageData: false };
+    // --- measureText: post-process TextMetrics via CanvasPatchHooks.applyMeasureTextHook ---
+    patchOnce('measureText', (orig) => function(text){
+      const txt = String(text ?? '');
+      const m = Reflect.apply(orig, this, [txt]);
 
-    const handler = {
-      get(target, prop){
-        if (fnCache && fnCache.has(prop)) return fnCache.get(prop);
+      try {
+        const H = getHooks();
+        const fontStr = getFontStr(this);
 
-        // Special methods interception
-        if (prop === 'getImageData' && ORIG.getImageData){
-          const wrapped = function(...args){
-            if (guard.getImageData) return safeInvoke(ORIG.getImageData, target, args, proto, 'getImageData');
-            guard.getImageData = true;
-            try {
-              if (args.length >= 4){
-                let [x, y, w, h] = args;
-                const cw = (this && this.canvas && this.canvas.width)  || 0;
-                const ch = (this && this.canvas && this.canvas.height) || 0;
-                x |= 0; y |= 0; w |= 0; h |= 0;
-                if (x < 0) x = 0; if (y < 0) y = 0;
-                if (x + w > cw) w = Math.max(1, cw - x);
-                if (y + h > ch) h = Math.max(1, ch - y);
-                const img = safeInvoke(ORIG.getImageData, target, [x, y, w, h], proto, 'getImageData');
-                // No post-processing: the equality of ways is guaranteed that
-                // that we are "noisy" only when changing canvas (DRAWIMAGE, etc.)
-                return img;
-              }
-              return safeInvoke(ORIG.getImageData, target, args, proto, 'getImageData');
-            } finally {
-              guard.getImageData = false;
-            }
-          };
-          const out = markAsNative(wrapped, 'getImageData');
-          if (fnCache) fnCache.set(prop, out);
-          return out;
+        if (H && typeof H.applyMeasureTextHook === 'function') {
+          const r = H.applyMeasureTextHook.call(this, m, txt, fontStr);
+          return r ?? m;
         }
 
-        if (prop === 'measureText' && ORIG.measureText){
-          const wrapped = function(text, ...rest){
-            const txt = String(text ?? '');
-            const m = safeInvoke(ORIG.measureText, target, [txt, ...rest], proto, 'measureText');
-            try {
-              const H = getHooks();
-              const fontStr = (typeof this?.font === 'string' && this.font.trim()) ? this.font : '16px sans-serif';
-              if (H && typeof H.applyMeasureTextHook === 'function'){
-                return H.applyMeasureTextHook.call(this, m, txt, fontStr) ?? m;
-              }
-              if (H && typeof H.measureTextNoiseHook === 'function'){
-                return H.measureTextNoiseHook.call(this, m, txt, fontStr) ?? m;
-              }
-            } catch {}
-            return m;
-          };
-          const out = markAsNative(wrapped, 'measureText');
-          if (fnCache) fnCache.set(prop, out);
-          return out;
+        // optional fallback if applyMeasureTextHook absent
+        if (H && typeof H.measureTextNoiseHook === 'function') {
+          // leave native as-is if only info hook exists
+          // (do not change width here to preserve consistency)
+          H.measureTextNoiseHook.call(this, m, txt, fontStr);
+        }
+      } catch { /* silent */ }
+
+      return m;
+    });
+
+    // --- fillText ---
+    patchOnce('fillText', (orig) => function(text, x, y, ...rest){
+      try {
+        const H = getHooks();
+
+        if (H && typeof H.applyFillTextHook === 'function') {
+          const callOrig = function(...a){ return Reflect.apply(orig, this, a); };
+          return H.applyFillTextHook.call(this, callOrig, text, x, y, ...rest);
         }
 
-        if (prop === 'fillText' && ORIG.fillText){
-          const H = getHooks();
-          if (H && typeof H.applyFillTextHook === 'function'){
-            const wrapped = function(...args){
-              return H.applyFillTextHook.call(this, ORIG.fillText.bind(target), ...args);
-            };
-            const out = markAsNative(wrapped, 'fillText');
-            if (fnCache) fnCache.set(prop, out);
-            return out;
-          }
-          const wrapped = function(text, x, y, ...rest){
-            try {
-              let a = [text, x, y, ...rest];
-              const H = getHooks();
-              const hook = H && H.fillTextNoiseHook;
-              if (typeof hook === 'function') a = hook.apply(this, a) || a;
-              return safeInvoke(ORIG.fillText, target, a, proto, 'fillText');
-            } catch {
-              return safeInvoke(ORIG.fillText, target, [text, x, y, ...rest], proto, 'fillText');
-            }
-          };
-          const out = markAsNative(wrapped, 'fillText');
-          if (fnCache) fnCache.set(prop, out);
-          return out;
+        if (H && typeof H.fillTextNoiseHook === 'function') {
+          const a = H.fillTextNoiseHook.apply(this, [text, x, y, ...rest]) || [text, x, y, ...rest];
+          return Reflect.apply(orig, this, a);
+        }
+      } catch { /* silent */ }
+
+      return Reflect.apply(orig, this, [text, x, y, ...rest]);
+    });
+
+    // --- strokeText ---
+    patchOnce('strokeText', (orig) => function(text, x, y, ...rest){
+      try {
+        const H = getHooks();
+
+        if (H && typeof H.applyStrokeTextHook === 'function') {
+          const callOrig = function(...a){ return Reflect.apply(orig, this, a); };
+          return H.applyStrokeTextHook.call(this, callOrig, text, x, y, ...rest);
         }
 
-        if (prop === 'fillRect' && ORIG.fillRect){
-          const H = getHooks();
-          const wrapped = function(x, y, w, h){
-            try {
-              if (H && typeof H.fillRectNoiseHook === 'function') {
-                const a = H.fillRectNoiseHook.call(this, x, y, w, h);
-                if (Array.isArray(a)) return safeInvoke(ORIG.fillRect, target, a, proto, 'fillRect');
-              }
-            } catch {}
-            return safeInvoke(ORIG.fillRect, target, [x, y, w, h], proto, 'fillRect');
-          };
-          const out = markAsNative(wrapped, 'fillRect');
-          if (fnCache) fnCache.set(prop, out);
-          return out;
+        if (H && typeof H.strokeTextNoiseHook === 'function') {
+          const a = H.strokeTextNoiseHook.apply(this, [text, x, y, ...rest]) || [text, x, y, ...rest];
+          return Reflect.apply(orig, this, a);
         }
+      } catch { /* silent */ }
 
-        if (prop === 'strokeText' && ORIG.strokeText){
-          const H = getHooks();
-          if (H && typeof H.applyStrokeTextHook === 'function'){
-            const wrapped = function(...args){
-              return H.applyStrokeTextHook.call(this, ORIG.strokeText.bind(target), ...args);
-            };
-            const out = markAsNative(wrapped, 'strokeText');
-            if (fnCache) fnCache.set(prop, out);
-            return out;
-          }
-          const wrapped = function(text, x, y, ...rest){
-            try {
-              let a = [text, x, y, ...rest];
-              const H = getHooks();
-              const hook = H && H.strokeTextNoiseHook;
-              if (typeof hook === 'function') a = hook.apply(this, a) || a;
-              return safeInvoke(ORIG.strokeText, target, a, proto, 'strokeText');
-            } catch {
-              return safeInvoke(ORIG.strokeText, target, [text, x, y, ...rest], proto, 'strokeText');
-            }
-          };
-          const out = markAsNative(wrapped, 'strokeText');
-          if (fnCache) fnCache.set(prop, out);
-          return out;
+      return Reflect.apply(orig, this, [text, x, y, ...rest]);
+    });
+
+    // --- fillRect ---
+    patchOnce('fillRect', (orig) => function(x, y, w, h){
+      try {
+        const H = getHooks();
+        if (H && typeof H.fillRectNoiseHook === 'function') {
+          const a = H.fillRectNoiseHook.call(this, x, y, w, h);
+          if (Array.isArray(a)) return Reflect.apply(orig, this, a);
         }
+      } catch { /* silent */ }
+      return Reflect.apply(orig, this, [x, y, w, h]);
+    });
 
-        if (prop === 'drawImage' && ORIG.drawImage){
-          const H = getHooks();
-          if (H && typeof H.applyDrawImageHook === 'function'){
-            const wrapped = function(...args){
-              return H.applyDrawImageHook.call(this, ORIG.drawImage.bind(target), ...args);
-            };
-            const out = markAsNative(wrapped, 'drawImage');
-            if (fnCache) fnCache.set(prop, out);
-            return out;
-          }
-          const wrapped = function(...args){
-            return safeInvoke(ORIG.drawImage, target, args, proto, 'drawImage');
-          };
-          const out = markAsNative(wrapped, 'drawImage');
-          if (fnCache) fnCache.set(prop, out);
-          return out;
+    // --- drawImage ---
+    patchOnce('drawImage', (orig) => function(...args){
+      try {
+        const H = getHooks();
+        if (H && typeof H.applyDrawImageHook === 'function') {
+          const callOrig = function(...a){ return Reflect.apply(orig, this, a); };
+          return H.applyDrawImageHook.call(this, callOrig, ...args);
         }
+      } catch { /* silent */ }
+      return Reflect.apply(orig, this, args);
+    });
 
-      // other functions - a safe call; Properties - as is
-        const orig = Reflect.get(target, prop, target);
-        if (typeof orig === 'function'){
-          const wrapped = function(...args){
-            try { return safeInvoke(orig, target, args, proto, prop); }
-            catch { try { return safeInvoke(orig, target, args, proto, prop); } catch { return undefined; } }
-          };
-          const out = markAsNative(wrapped, String(prop));
-          if (fnCache) fnCache.set(prop, out);
-          return out;
-        }
-        try { return orig; } catch { return undefined; }
-      },
-      set(target, prop, value){ return Reflect.set(target, prop, value, target); },
-      getOwnPropertyDescriptor(target, prop){ return Object.getOwnPropertyDescriptor(target, prop); },
-      defineProperty(target, prop, desc){ return Reflect.defineProperty(target, prop, desc); },
-      setPrototypeOf(target, proto){ return Reflect.setPrototypeOf(target, proto); }
-    };
-
-    return new Proxy(ctx, handler);
+    // IMPORTANT: return real ctx (brand-safe). No Proxy.
+    return ctx;
   }
 
   // === 5. getContext interception for HTMLCanvasElement/OffscreenCanvas ===
@@ -710,11 +637,6 @@ function ContextPatchModule(window) {
     if (C.registerWebGLShaderSourceHook)             C.registerWebGLShaderSourceHook(webglHooks.webglShaderSourceHook);
     if (C.registerWebGLGetUniformHook)               C.registerWebGLGetUniformHook(webglHooks.webglGetUniformHook);
 
-    // 7) Apply context patches after hooks registration
-    // Idempotent: protected by patchedMethods WeakSet inside ContextPatchModule
-    if (typeof C.applyCanvasElementPatches === 'function') C.applyCanvasElementPatches();
-    if (typeof C.applyOffscreenPatches === 'function')     C.applyOffscreenPatches();
-    if (typeof C.applyWebGLContextPatches === 'function')  C.applyWebGLContextPatches();
   }
     // export registerAllHooks for applying in main.py
 window.registerAllHooks = registerAllHooks;
