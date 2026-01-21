@@ -55,7 +55,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     };
     wrapped.__TOSTRING_BRIDGE__ = true;
     safeDefine(window, 'markAsNative', {
-      value: baseMarkAsNative,
+      value: wrapped,
       writable: true,
       configurable: true,
       enumerable: false
@@ -72,15 +72,6 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   }
 
   const markAsNative = ensureMarkAsNative();
-
-  // гарантируем, что window.markAsNative тоже не-enumerable (на случай, если ensureMarkAsNative делал прямое присваивание)
-  safeDefine(window, 'markAsNative', {
-    value: markAsNative,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
-
 
 
   // compatibility with the old name (do not change the structure of the calls below)
@@ -100,11 +91,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
           const v = toStringOverrideMap.get(thisArg);
           if (v !== undefined) return v;
         }
-        // preserve native TypeError + semantics
-        const argsList = args;
-        // fast-path only when receiver is a Function (brand check requirement)
-        if (typeof thisArg === 'function' && argsList.length === 0) return target.call(thisArg);
-        return Reflect.apply(target, thisArg, argsList);
+        return Reflect.apply(target, thisArg, args);
       }
     });
 
@@ -189,9 +176,8 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   });
 
   // --- keep natives once ---
-  const nativeGOPD   = Object.getOwnPropertyDescriptor;
+  const nativeGOPD   = nativeGetOwnProp;
   const nativeHas    = Reflect.has;
-  const nativeHasOwn = Object.hasOwn;
 
   // one predicate
   const isWebdriver = (obj, prop) =>
@@ -209,12 +195,18 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     // делай вид "нативности" так, как у тебя принято
     markAsNative(wrapped, name);
 
-    // (опционально) минимальная совместимость по length/name — если твой markAsNative это не делает
-    try { Object.defineProperty(wrapped, 'length', { value: nativeFn.length }); } catch (e) {
-      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:length_define_failed", e);
+    // (опционально) минимальная совместимость по length/name — только если configurable (иначе лишний шум/исключения)
+    const lenDesc = nativeGetOwnProp(wrapped, 'length');
+    if (lenDesc && lenDesc.configurable) {
+      try { Object.defineProperty(wrapped, 'length', { value: nativeFn.length }); } catch (e) {
+        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:length_define_failed", e);
+      }
     }
-    try { Object.defineProperty(wrapped, 'name',   { value: name }); } catch (e) {
-      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:name_define_failed", e);
+    const nameDesc = nativeGetOwnProp(wrapped, 'name');
+    if (nameDesc && nameDesc.configurable) {
+      try { Object.defineProperty(wrapped, 'name', { value: name }); } catch (e) {
+        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:name_define_failed", e);
+      }
     }
 
     // (опционально) метка
@@ -242,13 +234,4 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     }
   );
 
-  Object.hasOwn = wrapNative(
-    'hasOwn',
-    nativeHasOwn,
-    function (obj, prop) {
-      if (obj === navigator && prop === 'webdriver') return false;
-      return nativeHasOwn(obj, prop);
-    }
-  );
-
-} 
+}

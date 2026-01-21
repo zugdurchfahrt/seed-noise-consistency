@@ -106,7 +106,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return true;
     }
 
-    function defineAccWithFallback(objOrProto, key, getter, { enumerable = false } = {}) {
+    function defineAccWithFallback(objOrProto, key, getter, { enumerable } = {}) {
       // use for non-critical fields; для E/F/G Do not use(см. ниже)
       if (safeDefineAcc(objOrProto, key, getter, { enumerable })) return true;
       throw new TypeError(`[nav_total_set] failed to define ${key}`);
@@ -135,21 +135,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       });
     }
 
+
     // Critical - only a prototype (without a phallback)
     const critical = new Set(['userAgent','platform','vendor','appVersion']);
+    // Critical - only a prototype (without a fallback)
     (function patchCriticalOnProto(){
       const patch = (key, getter) => {
         const d = Object.getOwnPropertyDescriptor(navProto, key);
         if (!d) throw new TypeError(`[nav_total_set] ${key}: descriptor missing`);
-      // Important: like native - not enumerable
-      const ok = (redefineAcc(navProto, key, getter, { enumerable: false }), true);
-      if (ok === false) throw new TypeError(`[nav_total_set] failed to define ${key}`);
+        redefineAcc(navProto, key, getter); // redefineAcc сам возьмёт d.enumerable/d.configurable
       };
-      patch('userAgent', () => userAgent);
-      patch('platform',  () => navPlatformOut);
-      patch('vendor',    () => vendor);
-      patch('appVersion', () => (userAgent.split("Mozilla/")[1]));
+
+      patch('userAgent',  () => userAgent);
+      patch('platform',   () => navPlatformOut);
+      patch('vendor',     () => vendor);
+      patch('appVersion', () => {
+        const pfx = "Mozilla/";
+        return (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
+          ? userAgent.slice(pfx.length)
+          : userAgent;
+      });
     })();
+
 
     // rest
     const navigatorPatches = [
@@ -161,6 +168,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     ];
     navigatorPatches.forEach(([prop, getter]) => {
       if (critical.has(prop)) return; // just in case
+      if (!(prop in navProto)) return; // do not introduce non-native props (Chrome/Edge: e.g. buildID)
       defineAccWithFallback(navProto, prop, getter);
     });
 
