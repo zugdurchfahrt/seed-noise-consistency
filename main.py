@@ -251,13 +251,14 @@ def init_driver(
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
     
-    
+    cdp.enable_sw_language_inject(language, normalized_languages)
     cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
     
         
- #   threading.Thread(target=cdp.run, daemon=True).start()
+    threading.Thread(target=cdp.run, daemon=True).start()
+    
     logger.info("CDP logger thread started on port %s", cdp.PORT)
-    cdp.enable_sw_language_inject(language, normalized_languages)
+   
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     
@@ -265,41 +266,74 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
+            # --- set_log ---
             Path(SCRIPTS_DIR / "set_log.js").read_text("utf-8"),
+            "LOGGingModule(window);",
+            # --- RTC ---
             Path(SCRIPTS_DIR / "RTCPeerConnection.js").read_text("utf-8"),
+            "RtcpeerconnectionPatchModule(window);",
+            # --- hide_webdriver (markAsNative provider) ---
             Path(SCRIPTS_DIR / "hide_webdriver.js").read_text("utf-8"),
-            Path(SCRIPTS_DIR / "env_params.js").read_text("utf-8"),
-            Path(SCRIPTS_DIR / "nav_total_set.js").read_text("utf-8"),
+            "HideWebdriverPatchModule(window);",
+
+            
+            # --- workers (bootstrap/hooks). No direct module call here unless you have one.
             Path(SCRIPTS_DIR / "wrk.js").read_text("utf-8"),
+            "WrkModule(window);",
+            
+            # --- env params ---
+            Path(SCRIPTS_DIR / "env_params.js").read_text("utf-8"),
+            "EnvParamsPatchModule(window);",
+
+
+            # --- nav total set ---
+            Path(SCRIPTS_DIR / "nav_total_set.js").read_text("utf-8"),
+            "NavTotalSetPatchModule(window);",
+
+            # --- screen ---
             Path(SCRIPTS_DIR / "screen.js").read_text("utf-8"),
+            "ScreenPatchModule(window);",
+
+            # --- generated patch output ---
             Path(PATCH_OUT).read_text("utf-8"),
+
+            # --- fonts ---
             Path(SCRIPTS_DIR / "font_module.js").read_text("utf-8"),
+            "FontPatchModule(window);",
+
+            # --- canvas ---
             Path(SCRIPTS_DIR / "canvas.js").read_text("utf-8"),
+            "CanvasPatchModule(window);",
+
+            # --- webgl extra ---
             Path(PROJECT_ROOT / "WEBGL_DICKts.js").read_text("utf-8"),
+            "WEBglDICKts(window);",
+
+            # --- webgl ---
             Path(SCRIPTS_DIR / "webgl.js").read_text("utf-8"),
+            "WebglPatchModule(window);",
+
+            # --- webgpu WL ---
             Path(PROJECT_ROOT / "WebgpuWL.js").read_text("utf-8"),
+            "WebgpuWLBootstrap(window);",
+
+            # --- webgpu ---
             Path(SCRIPTS_DIR / "webgpu.js").read_text("utf-8"),
+            "WebGPUPatchModule(window);",
+
+            # --- audiocontext ---
             Path(SCRIPTS_DIR / "audiocontext.js").read_text("utf-8"),
+            "AudioContextModule(window);",
+
+            # --- context ---
             Path(SCRIPTS_DIR / "context.js").read_text("utf-8"),
+            "ContextPatchModule(window);",
+            # --- headers interceptor ---
             Path(SCRIPTS_DIR / "headers_interceptor.js").read_text("utf-8"),
-            # --- Launch modules in window ---
+            "HeadersInterceptor(window);",
+            # --- Register hooks / post-apply ---
             """
-            LOGGingModule(window);
-            RtcpeerconnectionPatchModule(window);
-            HideWebdriverPatchModule(window);
-            EnvParamsPatchModule(window);
-            NavTotalSetPatchModule(window);
-            ScreenPatchModule(window);
-            FontPatchModule(window);
-            CanvasPatchModule(window);
-            WEBglDICKts(window);
-            WebglPatchModule(window);
-            WebgpuWLBootstrap(window);
-            WebGPUPatchModule(window);
-            AudioContextModule(window);
-            ContextPatchModule(window);
-            HeadersInterceptor(window);
-           // —————— Register all hooks here ——————//
+            // —————— Register all hooks here ——————//
             if (typeof registerAllHooks === 'function') registerAllHooks();
             (function applyAllPatchesCustomOrder(win) {
                 const C = window.CanvasPatchContext; if (!C) return;
@@ -307,12 +341,12 @@ def init_driver(
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
-            // ——— Worker env diagnostics ———//
-            console.info('[DIAG]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             })(window);
             """
         ]
         return "\n;\n".join(parts)
+    
+    
     
     # --- creation of window.__ objects ---
     init_params = f"""

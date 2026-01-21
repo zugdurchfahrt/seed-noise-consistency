@@ -1,5 +1,7 @@
 const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
-
+  if (window && window.__HIDE_WEBDRIVER_READY__) return;
+  if (window) window.__HIDE_WEBDRIVER_READY__ = true
+  
   function safeDefine(obj, prop, descriptor) {
     try {
       if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
@@ -38,7 +40,12 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     const existing = (typeof window.markAsNative === 'function') ? window.markAsNative : null;
     if (!existing) {
       baseMarkAsNative.__TOSTRING_BRIDGE__ = true;
-      window.markAsNative = baseMarkAsNative;
+      safeDefine(window, 'markAsNative', {
+        value: baseMarkAsNative,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       return baseMarkAsNative;
     }
     if (existing.__TOSTRING_BRIDGE__) return existing;
@@ -47,11 +54,34 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       return baseMarkAsNative(out, name);
     };
     wrapped.__TOSTRING_BRIDGE__ = true;
-    window.markAsNative = wrapped;
+    safeDefine(window, 'markAsNative', {
+      value: baseMarkAsNative,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
     return wrapped;
   }
-  if (!window.__ensureMarkAsNative) window.__ensureMarkAsNative = ensureMarkAsNative;
+  if (!window.__ensureMarkAsNative) {
+    safeDefine(window, '__ensureMarkAsNative', {
+      value: ensureMarkAsNative,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+
   const markAsNative = ensureMarkAsNative();
+
+  // гарантируем, что window.markAsNative тоже не-enumerable (на случай, если ensureMarkAsNative делал прямое присваивание)
+  safeDefine(window, 'markAsNative', {
+    value: markAsNative,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+
+
 
   // compatibility with the old name (do not change the structure of the calls below)
   function fakeNative(func, name = "") { return markAsNative(func, name); }

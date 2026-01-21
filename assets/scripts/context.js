@@ -18,6 +18,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const ensure = global && typeof global.__ensureMarkAsNative === 'function'
       ? global.__ensureMarkAsNative
       : null;
+
     const m = ensure ? ensure() : (global && global.markAsNative);
     if (typeof m !== 'function') {
       throw new Error('[ContextPatch] markAsNative missing');
@@ -25,8 +26,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return function(fn, name) {
       return m(fn, name);
     };
-  
-})();
+  })();
+
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
     catch { return false; }
@@ -636,9 +637,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (C.registerWebGLGetShaderPrecisionFormatHook) C.registerWebGLGetShaderPrecisionFormatHook(webglHooks.webglGetShaderPrecisionFormatHook);
     if (C.registerWebGLShaderSourceHook)             C.registerWebGLShaderSourceHook(webglHooks.webglShaderSourceHook);
     if (C.registerWebGLGetUniformHook)               C.registerWebGLGetUniformHook(webglHooks.webglGetUniformHook);
-
   }
     // export registerAllHooks for applying in main.py
 window.registerAllHooks = registerAllHooks;
 
-}(typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : globalThis));
+}

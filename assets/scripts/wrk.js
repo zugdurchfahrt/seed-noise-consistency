@@ -1,5 +1,10 @@
+// === WRK MODULE ===
+const WrkModule = function WrkModule(window) {
+  'use strict';
+  const G = window;
+
 // 1) Источник снапшотов
-const EnvBus = function EnvBus(G){
+function EnvBus(G){
   function envSnapshot(){
     const nav = G.navigator;
     let langs = G.__normalizedLanguages;
@@ -155,16 +160,6 @@ function WorkerOverrides_install(G, hub) {
   ServiceWorkerOverride(G);
 }
 
-
-// 4) Публикация стартового снапшота
-function EnvPublishSnapshotModule(G){
-  const EB = EnvBus(G);
-  const snap = EB.envSnapshot();
-  if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
-    throw new Error('EnvPublish: hub missing');
-  }
-  G.__ENV_HUB__.publish(snap);
-}
 
 
 // === env-worker-bridge (главный бандл) ===
@@ -565,9 +560,23 @@ function SafeSharedWorkerOverride(G){
     throw new Error('[SharedWorkerOverride] markAsNative missing');
   }
 
+  // === SharedWorker override wrapper (complete, self-contained) ===
   const WrappedSharedWorker = mark(function SharedWorker(url, nameOrOpts) {
     const abs = new URL(url, location.href).href;
-    const hasOpts = !!(nameOrOpts && (typeof nameOrOpts === 'object' || typeof nameOrOpts === 'function'));
+
+    // Normalize 2nd arg to an options object (always), so `type` is never lost
+    const hasOptsObj =
+      !!(nameOrOpts && (typeof nameOrOpts === 'object' || typeof nameOrOpts === 'function')) &&
+      (typeof nameOrOpts !== 'string');
+
+    const name =
+      (typeof nameOrOpts === 'string')
+        ? nameOrOpts
+        : (hasOptsObj && typeof nameOrOpts.name === 'string' ? nameOrOpts.name : undefined);
+
+    const optsForResolve = hasOptsObj ? nameOrOpts : (name !== undefined ? { name } : null);
+    const workerType = resolveWorkerType(abs, optsForResolve, 'SharedWorker');
+
     const bridge = G.__ENV_BRIDGE__;
     if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
       console.error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched SharedWorker');
@@ -582,25 +591,32 @@ function SafeSharedWorkerOverride(G){
     if (typeof bridge.envSnapshot !== 'function') {
       throw new Error('[SharedWorkerOverride] envSnapshot missing');
     }
+
     const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
     G.__lastSnap__ = snap;
     bridge.publishSnapshot(snap);
-    const workerType = resolveWorkerType(abs, hasOpts ? nameOrOpts : null, 'SharedWorker');
+
     const userURL = resolveUserScriptURL(G, abs, 'SharedWorker');
-    const src = workerType === 'module'
+    const src = (workerType === 'module')
       ? bridge.mkModuleWorkerSource(snap, userURL)
       : bridge.mkClassicWorkerSource(snap, userURL);
+
     const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 
     try {
-      if (hasOpts) {
-        return new NativeShared(blobURL, { ...(nameOrOpts || {}), type: workerType });
-      }
-      return new NativeShared(blobURL, nameOrOpts);
+      // Always pass options-object so `type` definitely reaches the browser.
+      const finalOpts = hasOptsObj ? { ...(nameOrOpts || {}) } : {};
+      if (name !== undefined) finalOpts.name = name;
+      finalOpts.type = workerType;
+
+      return new NativeShared(blobURL, finalOpts);
     } finally {
       URL.revokeObjectURL(blobURL);
     }
   }, 'SharedWorker');
+  
+  
+  
   definePatchedValue(G, 'SharedWorker', WrappedSharedWorker, 'SharedWorker');
   G.SharedWorker.__ENV_WRAPPED__ = true;
   if (G.__DEBUG__) {
@@ -983,8 +999,27 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     };
   }
   G.WorkerPatchHooks = { initHub, installOverrides, snapshotOnce, snapshotHE, initAll, diag };
+
+})(G); // <-- закрыли и СРАЗУ вызвали WorkerPatchHooks(G)
+
+
   window.WorkerPatchHooks = G.WorkerPatchHooks;
   if (G.__DEBUG__) {
     console.info('[WorkerInit] WorkerPatchHooks ready');
   }
-})(window);
+
+
+}; // <-- закрыли WrkModule
+
+// --- export WrkModule globally (stable regardless of load order) ---
+Object.defineProperty(globalThis, 'WrkModule', {
+  value: WrkModule,
+  writable: true,
+  configurable: false,
+  enumerable: false,
+});
+
+
+
+
+
