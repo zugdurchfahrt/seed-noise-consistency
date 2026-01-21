@@ -62,70 +62,70 @@ const LOGGingModule = function LOGGingModule() {
 
 
 
+    // // (function installGOPDTracerForNavigator(G){
     // (function installGOPDTracerForNavigator(G){
-    (function installGOPDTracerForNavigator(G){
-      const nativeGOPD = Object.getOwnPropertyDescriptor;
+    //   const nativeGOPD = Object.getOwnPropertyDescriptor;
 
-      // чтобы не поставить дважды
-      if (nativeGOPD.__gopdTraceInstalled) return;
+    //   // чтобы не поставить дважды
+    //   if (nativeGOPD.__gopdTraceInstalled) return;
 
-      const WATCH = new Set([
-        "language",
-        "languages",
-        "hardwareConcurrency",
-        "deviceMemory",
-        "serviceWorker", // navigator.serviceWorker (ServiceWorkerContainer)
-      ]);
+    //   const WATCH = new Set([
+    //     "language",
+    //     "languages",
+    //     "hardwareConcurrency",
+    //     "deviceMemory",
+    //     "serviceWorker", // navigator.serviceWorker (ServiceWorkerContainer)
+    //   ]);
 
-      function isNavigatorLike(obj) {
-        if (!obj) return false;
+    //   function isNavigatorLike(obj) {
+    //     if (!obj) return false;
 
-        // navigator object
-        if (obj === G.navigator) return true;
+    //     // navigator object
+    //     if (obj === G.navigator) return true;
 
-        // Navigator.prototype
-        const NavProto = (G.Navigator && G.Navigator.prototype) || null;
-        if (NavProto && obj === NavProto) return true;
+    //     // Navigator.prototype
+    //     const NavProto = (G.Navigator && G.Navigator.prototype) || null;
+    //     if (NavProto && obj === NavProto) return true;
 
-        // Любой экземпляр Navigator (на всякий случай)
-        try {
-          const name = obj.constructor && obj.constructor.name;
-          return name === "Navigator";
-        } catch {
-          return false;
-        }
-      }
+    //     // Любой экземпляр Navigator (на всякий случай)
+    //     try {
+    //       const name = obj.constructor && obj.constructor.name;
+    //       return name === "Navigator";
+    //     } catch {
+    //       return false;
+    //     }
+    //   }
 
-      Object.getOwnPropertyDescriptor = function (obj, prop) {
-        const d = nativeGOPD.call(Object, obj, prop);
+    //   Object.getOwnPropertyDescriptor = function (obj, prop) {
+    //     const d = nativeGOPD.call(Object, obj, prop);
 
-        try {
-          if (typeof prop === "string" && WATCH.has(prop) && isNavigatorLike(obj)) {
-            const kind = d ? (("value" in d) ? "data" : (("get" in d || "set" in d) ? "accessor" : "unknown")) : "missing";
-            const summary = d ? {
-              kind,
-              enumerable: !!d.enumerable,
-              configurable: !!d.configurable,
-              writable: "writable" in d ? !!d.writable : undefined,
-              hasValue: "value" in d,
-              valueType: ("value" in d) ? typeof d.value : undefined,
-              hasGet: typeof d.get === "function",
-              hasSet: typeof d.set === "function",
-            } : { kind: "missing" };
+    //     try {
+    //       if (typeof prop === "string" && WATCH.has(prop) && isNavigatorLike(obj)) {
+    //         const kind = d ? (("value" in d) ? "data" : (("get" in d || "set" in d) ? "accessor" : "unknown")) : "missing";
+    //         const summary = d ? {
+    //           kind,
+    //           enumerable: !!d.enumerable,
+    //           configurable: !!d.configurable,
+    //           writable: "writable" in d ? !!d.writable : undefined,
+    //           hasValue: "value" in d,
+    //           valueType: ("value" in d) ? typeof d.value : undefined,
+    //           hasGet: typeof d.get === "function",
+    //           hasSet: typeof d.set === "function",
+    //         } : { kind: "missing" };
 
-            console.warn(`[GOPD TRACE] Navigator.${prop} descriptor requested`);
-            console.warn("[DESC]", summary, d);
-            console.warn("[STACK]", (new Error("gopd-trace")).stack);
-          }
-        } catch (_) {}
+    //         console.warn(`[GOPD TRACE] Navigator.${prop} descriptor requested`);
+    //         console.warn("[DESC]", summary, d);
+    //         console.warn("[STACK]", (new Error("gopd-trace")).stack);
+    //       }
+    //     } catch (_) {}
 
-        return d;
-      };
+    //     return d;
+    //   };
 
-      // пометка на исходной функции, чтобы выше сработал анти-дубль
-      nativeGOPD.__gopdTraceInstalled = true;
-    })(window);
+    //   // пометка на исходной функции, чтобы выше сработал анти-дубль
+    //   nativeGOPD.__gopdTraceInstalled = true;
     // })(window);
+    // // })(window);
 
 
 

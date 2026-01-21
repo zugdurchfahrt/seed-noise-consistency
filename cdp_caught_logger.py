@@ -1,25 +1,27 @@
-import json, time, threading, queue
+# cdp_caught_logger.py  (SW injector only)
+import json
+import time
+import threading
 import requests
 from websocket import WebSocketApp
-from collections import deque
-import logging
-from overseer import logger
-
-logger = logger.getChild("cdp_logger")
 
 PORT = None
-OUT = "devtools_caught_exceptions.jsonl"
 
-# фильтр: чтобы не тонуть в шуме
-INCLUDE = ()
-
-
-# --- optional SW prelude injector (no Fetch, no extra files) ---
+# --- SW prelude injector (ServiceWorkerGlobalScope) ---
 SW_INJECT_ENABLED = False
 SW_PRIMARY = None
 SW_LANGS = None
 
+_RUNNING = False
+
+
 def enable_sw_language_inject(language: str, normalized_languages: list[str]):
+    """
+    Enable ServiceWorker injection for navigator.language / navigator.languages.
+    Call this BEFORE starting run().
+
+    No logging, no writers, no Debugger/Network hooks.
+    """
     global SW_INJECT_ENABLED, SW_PRIMARY, SW_LANGS
     if not isinstance(language, str) or not language.strip():
         raise ValueError("SW inject: language must be non-empty str")
@@ -28,12 +30,14 @@ def enable_sw_language_inject(language: str, normalized_languages: list[str]):
     for x in normalized_languages:
         if not isinstance(x, str) or not x.strip():
             raise ValueError("SW inject: bad languages entry")
+
     SW_INJECT_ENABLED = True
     SW_PRIMARY = language
     SW_LANGS = normalized_languages
 
+
 def _build_sw_prelude(language: str, normalized_languages: list[str]) -> str:
-    # literals are produced here via json.dumps; no placeholders
+    # literals via json.dumps; no placeholders
     return (f"""
 (() => {{
   'use strict';
@@ -70,53 +74,6 @@ def _build_sw_prelude(language: str, normalized_languages: list[str]) -> str:
 """).strip()
 
 
-
-
-q = queue.Queue(maxsize=20000)
-
-# --- causality buffers ---
-MAX_CAUSE_EVENTS = 200
-recent_network = deque(maxlen=MAX_CAUSE_EVENTS)
-recent_async = deque(maxlen=MAX_CAUSE_EVENTS)
-
-def now():
-    return time.time()
-
-def writer():
-    buf = []
-    last = time.time()
-    flush_n = 200
-    flush_t = 0.5
-
-    while True:
-        try:
-            item = q.get(timeout=0.2)
-            buf.append(item)
-        except queue.Empty:
-            pass
-
-        now = time.time()
-        if buf and (len(buf) >= flush_n or (now - last) >= flush_t):
-            try:
-                with open(OUT, "a", encoding="utf-8") as f:
-                    for obj in buf:
-                        f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-                try:
-                    logger.info("CDP writer flushed %d events to %s", len(buf), OUT)
-                except Exception:
-                    pass
-            except Exception:
-                try:
-                    logger.exception("CDP writer failed to write to OUT=%r", OUT)
-                except Exception:
-                    pass
-            buf.clear()
-            last = now
-
-threading.Thread(target=writer, daemon=True).start()
-logger.info("writer set")
-
-
 def get_ws_url():
     port = PORT
     if not port:
@@ -139,133 +96,53 @@ def get_ws_url():
     raise RuntimeError(f"CDP /json not available on 127.0.0.1:{port}; last_err={last_err!r}")
 
 
-
 def run():
+    """
+    Lightweight SW injector loop:
+    - connects to CDP
+    - auto-attaches to targets with waitForDebuggerOnStart=true
+    - resumes non-service_worker targets immediately
+    - for service_worker targets: Runtime.enable + Runtime.evaluate(prelude) + resume
+    """
+    global _RUNNING
+    if _RUNNING:
+        return
+    _RUNNING = True
+
+    if not SW_INJECT_ENABLED:
+        _RUNNING = False
+        return
+
     try:
-        sess_id = {}          # per-session counters
-        injected = set()      # targetId set
-
-        def send_sess(ws, sessionId, method, params=None):
-            if sessionId not in sess_id:
-                sess_id[sessionId] = 0
-            sess_id[sessionId] += 1
-            inner = {"id": sess_id[sessionId], "method": method, "params": params or {}}
-            send(ws, "Target.sendMessageToTarget", {
-                "sessionId": sessionId,
-                "message": json.dumps(inner)
-            })
-
-        sw_prelude = None
-        if SW_INJECT_ENABLED:
-            sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS)
-
-        def _handle_target_attach(ws, msg):
-            nonlocal sw_prelude
-            p = msg.get("params") or {}
-            sessionId = p.get("sessionId")
-            info = p.get("targetInfo") or {}
-            ttype = info.get("type")
-            tid = info.get("targetId")
-
-            if not sessionId or not tid:
-                return False
-
-            # with waitForDebuggerOnStart=true every attached target is paused;
-            # we MUST resume non-SW targets, иначе подвиснет весь браузер.
-            if ttype != "service_worker":
-                try:
-                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-                except Exception:
-                    pass
-                return True
-
-            if tid in injected:
-                try:
-                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-                except Exception:
-                    pass
-                return True
-
-            injected.add(tid)
-
-            if not sw_prelude:
-                # нет прелюда — нельзя держать SW на паузе
-                try:
-                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-                except Exception:
-                    pass
-                return True
-
-            logger.info("SW attach: injecting prelude into targetId=%s", tid)
-            try:
-                send_sess(ws, sessionId, "Runtime.enable")
-                send_sess(ws, sessionId, "Runtime.evaluate", {
-                    "expression": sw_prelude,
-                    "awaitPromise": True
-                })
-            except Exception:
-                logger.exception("SW prelude injection failed for targetId=%s", tid)
-            finally:
-                try:
-                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-                except Exception:
-                    pass
-            return True
-
         ws_url = get_ws_url()
     except Exception:
-        logger.exception("CDP logger failed to get ws url from 127.0.0.1:%s", PORT)
+        _RUNNING = False
         return
 
     msg_id = {"v": 0}
+    sess_id = {}       # per-session counters
+    injected = set()   # targetId set
+    sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS)
 
     def send(ws, method, params=None):
         msg_id["v"] += 1
         ws.send(json.dumps({"id": msg_id["v"], "method": method, "params": params or {}}))
 
-    # --- режимы ---
-    # "all"  = ловит caught+uncaught, НО будет микро-пауза (бывает заметной)
-    # "none" = без паузы, но тогда ловим только Runtime.exceptionThrown (в основном uncaught)
-    PAUSE_STATE = "all"   # <-- поставь "all", если тебе именно caught важнее лагов
+    def send_sess(ws, sessionId, method, params=None):
+        if sessionId not in sess_id:
+            sess_id[sessionId] = 0
+        sess_id[sessionId] += 1
+        inner = {"id": sess_id[sessionId], "method": method, "params": params or {}}
+        send(ws, "Target.sendMessageToTarget", {"sessionId": sessionId, "message": json.dumps(inner)})
 
     def on_open(ws):
-        send(ws, "Runtime.enable")
-
-        if PAUSE_STATE == "all":
-            send(ws, "Debugger.enable")
-            send(ws, "Debugger.setAsyncCallStackDepth", {"maxDepth": 32})
-            send(ws, "Debugger.setPauseOnExceptions", {"state": "all"})
-            logger.info("CDP caught logger attached (PAUSE=all): %s", OUT)
-
-            
-            _push({
-                "ts": time.time(),
-                "mode": "__cdp_attached__",
-                "port": PORT,
-            })
-        else:
-            # без паузы
-            logger.info("CDP exception logger attached (PAUSE=none): %s", OUT)
-        
-        send(ws, "Network.enable")
-        
-        if SW_INJECT_ENABLED:
-            send(ws, "Target.setDiscoverTargets", {"discover": True})
-            send(ws, "Target.setAutoAttach", {
-                "autoAttach": True,
-                "waitForDebuggerOnStart": True,
-                "flatten": True
-            })
-            logger.info("SW injector enabled (autoAttach+waitForDebuggerOnStart)")
-
-
-
-
-    def _push(item):
-        try:
-            q.put_nowait(item)
-        except queue.Full:
-            pass
+        # only what we need for auto-attach
+        send(ws, "Target.setDiscoverTargets", {"discover": True})
+        send(ws, "Target.setAutoAttach", {
+            "autoAttach": True,
+            "waitForDebuggerOnStart": True,
+            "flatten": True
+        })
 
     def on_message(ws, message):
         try:
@@ -273,147 +150,56 @@ def run():
         except Exception:
             return
 
-        method = msg.get("method")
-        
-        # -------- Network: request initiators --------
-        if method == "Network.requestWillBeSent":
-            p = msg.get("params") or {}
-            initiator = p.get("initiator") or {}
-            recent_network.append({
-                "ts": now(),
-                "type": initiator.get("type"),
-                "url": (p.get("request") or {}).get("url"),
-                "stack": (initiator.get("stack") or {}).get("callFrames"),
-            })
-            return
-
-        if method == "Network.webSocketFrameReceived":
-            p = msg.get("params") or {}
-            recent_network.append({
-                "ts": now(),
-                "type": "websocket",
-                "payload": (p.get("response") or {}).get("payloadData"),
-            })
-            return
-
-        # -------- Async causality --------
-        if method == "Debugger.paused":
-            p = msg.get("params") or {}
-            if p.get("asyncStackTrace"):
-                recent_async.append({
-                    "ts": now(),
-                    "asyncStack": p.get("asyncStackTrace"),
-                })
-        
-        if method == "Target.attachedToTarget":
-            _handle_target_attach(ws, msg)
-            return
-
-
-        # --- режим без пауз: Runtime.exceptionThrown ---
-        if PAUSE_STATE != "all":
-            if method != "Runtime.exceptionThrown":
-                return
-            p = msg.get("params") or {}
-            details = p.get("exceptionDetails") or {}
-            ex = details.get("exception") or {}
-            desc = details.get("text") or ex.get("description") or ex.get("value")
-
-            url = (details.get("url") or "")
-            line = details.get("lineNumber")
-            col = details.get("columnNumber")
-
-            if INCLUDE and not any(s in (url or "") for s in INCLUDE):
-                return
-
-            _push({
-                "ts": time.time(),
-                "top": {"function": None, "url": url, "line": line, "column": col},
-                "exception": desc,
-                "frames": [],
-                "mode": "Runtime.exceptionThrown",
-            })
-            return
-
-        # --- режим caught+uncaught: Debugger.paused ---
-        if method != "Debugger.paused":
+        if msg.get("method") != "Target.attachedToTarget":
             return
 
         p = msg.get("params") or {}
-        if p.get("reason") != "exception":
+        sessionId = p.get("sessionId")
+        info = p.get("targetInfo") or {}
+        ttype = info.get("type")
+        tid = info.get("targetId")
+
+        if not sessionId or not tid:
+            return
+
+        # Every attached target is paused (waitForDebuggerOnStart=true).
+        # Always resume non-SW targets immediately to avoid freezes.
+        if ttype != "service_worker":
             try:
-                send(ws, "Debugger.resume")
+                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
             except Exception:
                 pass
             return
 
-        # резюмим сразу
-        try:
-            send(ws, "Debugger.resume")
-        except Exception:
-            pass
-
-        t_now = now()
-        causality = {
-            "network": [
-                x for x in recent_network
-                if t_now - x["ts"] < 5.0
-            ],
-            "async": [
-                x for x in recent_async
-                if t_now - x["ts"] < 5.0
-            ],
-        }
-
-        call_frames = p.get("callFrames") or []
-        top = call_frames[0] if call_frames else {}
-        url = top.get("url") or ""
-        if INCLUDE and not any(s in url for s in INCLUDE):
+        if tid in injected:
+            try:
+                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+            except Exception:
+                pass
             return
 
-        loc = top.get("location") or {}
-        data = p.get("data") or {}
-        desc = data.get("description") or data.get("value")
+        injected.add(tid)
 
-        _push({
-            "ts": time.time(),
-            "top": {
-                "function": top.get("functionName") or None,
-                "url": url,
-                "line": loc.get("lineNumber"),
-                "column": loc.get("columnNumber"),
-            },
-            "exception": desc,
-            "frames": [
-                {
-                    "function": f.get("functionName") or None,
-                    "url": f.get("url") or None,
-                    "line": (f.get("location") or {}).get("lineNumber"),
-                    "column": (f.get("location") or {}).get("columnNumber"),
-                }
-                for f in call_frames[:6]
-            ],
-            "causality": causality,
-            "mode": "Debugger.paused",
-        })
-
-
+        try:
+            send_sess(ws, sessionId, "Runtime.enable")
+            send_sess(ws, sessionId, "Runtime.evaluate", {
+                "expression": sw_prelude,
+                "awaitPromise": True
+            })
+        except Exception:
+            # Intentionally ignore: no logger, no writer
+            pass
+        finally:
+            try:
+                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+            except Exception:
+                pass
 
     def on_error(ws, err):
-        try:
-            logger.exception("CDP websocket error: %r", err)
-        except Exception:
-            pass
+        pass
 
     def on_close(ws, code, msg):
-        try:
-            logger.error("CDP websocket closed: code=%r msg=%r", code, msg)
-        except Exception:
-            pass
-
-
+        pass
 
     ws = WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close)
-    logger.info("CDP websocket starting: %s", ws_url)
     ws.run_forever()
-

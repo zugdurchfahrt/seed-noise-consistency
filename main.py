@@ -54,7 +54,7 @@ MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
 CHROME_BINARY       = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
 CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
-
+ENABLE_SW_INJECTOR = True  # <- ваш флаг (включаете вручную когда нужно)
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
 # ----------------------- PROFILE FUNCTION -----------------------
@@ -251,14 +251,12 @@ def init_driver(
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
     
-    cdp.enable_sw_language_inject(language, normalized_languages)
-    cdp.OUT = str(PROJECT_ROOT / "logs" / "devtools_caught_exceptions.jsonl")
     
-        
-    threading.Thread(target=cdp.run, daemon=True).start()
+    if ENABLE_SW_INJECTOR:
+        cdp.enable_sw_language_inject(language, normalized_languages)
+        threading.Thread(target=cdp.run, daemon=True).start()
     
-    logger.info("CDP logger thread started on port %s", cdp.PORT)
-   
+    logger.info("Service Worker started via CDP on port %s", cdp.PORT)
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     

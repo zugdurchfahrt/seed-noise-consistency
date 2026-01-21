@@ -87,7 +87,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         Object.defineProperty(target, key, {
           value,
           writable: d ? !!d.writable : true,
-          configurable: true,
+          configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable
         });
         return true;
@@ -100,7 +100,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       Object.defineProperty(target, key, {
         get: mark(getFn, `get ${key}`),
         set: d && d.set,
-        configurable: true,
+        configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : !!enumerable
       });
       return true;
@@ -143,8 +143,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const patch = (key, getter) => {
         const d = Object.getOwnPropertyDescriptor(navProto, key);
         if (!d) throw new TypeError(`[nav_total_set] ${key}: descriptor missing`);
-        redefineAcc(navProto, key, getter); // redefineAcc сам возьмёт d.enumerable/d.configurable
-      };
+      // Important: like native - not enumerable
+      const ok = (redefineAcc(navProto, key, getter), true);
+      if (ok === false) throw new TypeError(`[nav_total_set] failed to define ${key}`);
+      };      
 
       patch('userAgent',  () => userAgent);
       patch('platform',   () => navPlatformOut);
@@ -180,7 +182,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         Object.defineProperty(window, 'devicePixelRatio', { get: mark(() => dpr, 'get devicePixelRatio'), configurable: true });
         return;
       }
-      redefineAcc(Window.prototype, 'devicePixelRatio', () => dpr);
+      redefineAcc(Window.prototype, 'devicePixelRatio', function get_devicePixelRatio(){ return dpr; });
     })();
 
     // screen.* — First try prototype, in case of refuse — own window.screen
@@ -354,7 +356,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
     const dUaData = Object.getOwnPropertyDescriptor(navProto, 'userAgentData');
     if (!dUaData) throw new TypeError('[nav_total_set] userAgentData descriptor missing');
-    const okUaData = (redefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return nativeUAD; }, { enumerable: false }), true);
+    const okUaData = (redefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return nativeUAD; }), true);
     if (okUaData === false) throw new TypeError('[nav_total_set] failed to define userAgentData');
     const uadTag = Object.prototype.toString.call(nativeUAD);
     if (uadTag === '[object Object]') throw new Error('THW: window navigator.userAgentData tag');
@@ -365,23 +367,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // ——— F. deviceMemory/hardwareConcurrency ———
     const okDeviceMemory = (Object.getOwnPropertyDescriptor(navProto,'deviceMemory') ?
-      (redefineAcc(navProto, 'deviceMemory', () => mem, { enumerable: true }), true) :
+      (redefineAcc(navProto, 'deviceMemory', () => mem), true) :
       safeDefineAcc(navProto, 'deviceMemory', () => mem, { enumerable: true }));
     if (okDeviceMemory === false) throw new TypeError('[nav_total_set] failed to define deviceMemory');
 
     const okHardwareConcurrency = (Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency') ?
-      (redefineAcc(navProto, 'hardwareConcurrency', () => cpu, { enumerable: true }), true) :
+      (redefineAcc(navProto, 'hardwareConcurrency', () => cpu), true) :
       safeDefineAcc(navProto, 'hardwareConcurrency', () => cpu, { enumerable: true }));
     if (okHardwareConcurrency === false) throw new TypeError('[nav_total_set] failed to define hardwareConcurrency');
 
     // ——— G. language(s) ———
     const okLanguage = (Object.getOwnPropertyDescriptor(navProto,'language') ?
-      (redefineAcc(navProto, 'language', () => window.__primaryLanguage, { enumerable: true }), true) :
+      (redefineAcc(navProto, 'language', () => window.__primaryLanguage), true) :
       safeDefineAcc(navProto, 'language', () => window.__primaryLanguage,  { enumerable: true }));
     if (okLanguage === false) throw new TypeError('[nav_total_set] failed to define language');
 
     const okLanguages = (Object.getOwnPropertyDescriptor(navProto,'languages') ?
-      (redefineAcc(navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true }), true) :
+      (redefineAcc(navProto, 'languages', () => window.__normalizedLanguages), true) :
       safeDefineAcc(navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true }));
     if (okLanguages === false) throw new TypeError('[nav_total_set] failed to define languages');
 
