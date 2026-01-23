@@ -444,14 +444,9 @@ def init_driver(
     
         # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-    # driver.execute_cdp_cmd("Runtime.evaluate", {"expression": page_js, "awaitPromise": False})
     
     # Connect worker_bootstrap_js (after page_js)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
-    # driver.execute_cdp_cmd("Runtime.evaluate", {"expression": worker_bootstrap_js, "awaitPromise": False})
-    
-    
-   
     
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
@@ -538,7 +533,7 @@ def init_driver(
       """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
 
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_bridge_js, "awaitPromise": False})
+   # driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_bridge_js, "awaitPromise": False})
 
 
     # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)

@@ -8,22 +8,22 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         || (typeof window     !== 'undefined' && window)
         || (typeof global     !== 'undefined' && global)
         || {};
-  
-    
-    // --- nativization provider (moved from hide_webdriver.js) ---
+
+
+
+      // --- nativization provider (moved from hide_webdriver.js) ---
   function safeDefine(obj, prop, descriptor) {
-    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
-
-    const d = Object.getOwnPropertyDescriptor(obj, prop);
-    if (d && d.configurable === false) {
-      throw new TypeError(`[stealth] safeDefine refused: "${prop}" is non-configurable`);
+    try {
+      if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
+      if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
+      Object.defineProperty(obj, prop, descriptor);
+    } catch (e) {
+      console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
+      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:safeDefine:define_failed", e);
     }
-    if (d) delete obj[prop];
-
-    Object.defineProperty(obj, prop, descriptor);
   }
 
-  // export for consumers (hide_webdriver.js and others)
+    // export for consumers (hide_webdriver.js and others)
   if (typeof window.__safeDefine !== 'function') {
     safeDefine(window, '__safeDefine', {
       value: safeDefine,
@@ -34,26 +34,19 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   // ——— Global mask "native" + general WeakMap ———
-  if (window.__NativeToString != null && typeof window.__NativeToString !== 'function') {
-    throw new Error('[RtcpeerconnectionPatchModule] __NativeToString must be a function');
-  }
-
-  const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
   const nativeToString = window.__NativeToString || Function.prototype.toString;
+  window.__NativeToString = nativeToString;
+  const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
+  
+ // ——— Global mask "native" + general WeakMap ———
+  // const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
+  // const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
+  // const nativeToString = window.__NativeToString
+  //   || (fpToStringDesc && fpToStringDesc.value)
+  //   || Function.prototype.toString;
+  // if (!window.__NativeToString) window.__NativeToString = nativeToString;
 
-  if (typeof nativeToString !== 'function') {
-    throw new Error('[RtcpeerconnectionPatchModule] Function.prototype.toString missing');
-  }
 
-  // pin once: never overwrite an already captured native anchor
-  if (!window.__NativeToString) {
-    Object.defineProperty(window, '__NativeToString', {
-      value: nativeToString,
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
-  }
 
   // general WeakMap, available to all modules
   const toStringOverrideMap = (window.__NativeToStringMap instanceof WeakMap)
@@ -64,15 +57,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
-    const n = name || func.name || "";
-    const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
-    toStringOverrideMap.set(func, label);
+    try {
+      const n = name || func.name || "";
+      const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
+      toStringOverrideMap.set(func, label);
+    } catch (e) {
+      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:baseMarkAsNative:override_set_failed", e);
+    }
     return func;
   }
 
   function ensureMarkAsNative() {
     const existing = (typeof window.markAsNative === 'function') ? window.markAsNative : null;
-
     if (!existing) {
       baseMarkAsNative.__TOSTRING_BRIDGE__ = true;
       safeDefine(window, 'markAsNative', {
@@ -84,13 +80,11 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       return baseMarkAsNative;
     }
     if (existing.__TOSTRING_BRIDGE__) return existing;
-
     const wrapped = function markAsNative(func, name = "") {
       const out = existing(func, name);
       return baseMarkAsNative(out, name);
     };
     wrapped.__TOSTRING_BRIDGE__ = true;
-
     safeDefine(window, 'markAsNative', {
       value: wrapped,
       writable: true,
@@ -119,24 +113,27 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return m;
   })();
 
-  // Function.prototype.toString override (NON-PROXY, non-constructible) reading from the general WeakMap
+  // Global Function.prototype.toString bridge using the general WeakMap.
+  // NOTE: Avoid a Proxy wrapper here: it leaks extra stack frames (`[as apply]`)
+  // in detectors and can destabilize some analyzers.
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
 
-    // non-constructible “method” wrapper (no .prototype), closer to Chromium built-ins
-    const toStringWrapped = ({ toString() {
-      const receiver = this;
-      if (typeof receiver === 'function') {
-        const v = toStringOverrideMap.get(receiver);
+    const toString = ({ toString() {
+      // Preserve native brand-check semantics:
+      // - Only return overrides for functions
+      // - Let the native implementation throw for non-functions
+      if (typeof this === 'function') {
+        const v = toStringOverrideMap.get(this);
         if (v !== undefined) return v;
       }
-      return Reflect.apply(nativeToString, receiver, arguments);
+      return Reflect.apply(nativeToString, this, arguments);
     }}).toString;
 
-    markAsNative(toStringWrapped, 'toString');
+    markAsNative(toString, 'toString');
 
     Object.defineProperty(Function.prototype, 'toString', {
-      value: toStringWrapped,
+      value: toString,
       writable: toStringDesc ? !!toStringDesc.writable : true,
       configurable: toStringDesc ? !!toStringDesc.configurable : true,
       enumerable: toStringDesc ? !!toStringDesc.enumerable : false
@@ -276,8 +273,6 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   };
   if (markAsNative) { markAsNative(patchedAddEventListener, 'addEventListener'); tryCopyNameLength(patchedAddEventListener, origAddEventListener, 'addEventListener'); }
   Orig.prototype.addEventListener = patchedAddEventListener;
-
-
 
 
 
