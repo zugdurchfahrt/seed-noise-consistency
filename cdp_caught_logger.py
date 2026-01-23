@@ -8,7 +8,7 @@ from websocket import WebSocketApp
 PORT = None
 
 # --- SW prelude injector (ServiceWorkerGlobalScope) ---
-SW_INJECT_ENABLED = True
+SW_INJECT_ENABLED = False
 SW_PRIMARY = None
 SW_LANGS = None
 
