@@ -254,7 +254,7 @@ def init_driver(
     
     
     if ENABLE_SW_INJECTOR:
-        cdp.enable_sw_language_inject(language, normalized_languages)
+        cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
         threading.Thread(target=cdp.run, daemon=True).start()
     logger.info("Service Worker and langs started via CDP on port %s", cdp.PORT)
         

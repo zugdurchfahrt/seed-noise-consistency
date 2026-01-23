@@ -347,8 +347,22 @@
     self.__applyEnvSnapshot__ = s => {
       if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
       if (cache.snap === s) return;
+      const prevSeed = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
+      const nextSeed = (s && s.seed != null) ? String(s.seed) : null;
       cache.snap = requireSnap(s, 'apply');
-      if (s.seed != null) self.__GLOBAL_SEED = String(s.seed);
+      if (nextSeed != null) self.__GLOBAL_SEED = nextSeed;
+      if (prevSeed != null && nextSeed != null && prevSeed !== nextSeed) {
+        const jit = (typeof globalThis !== 'undefined' && globalThis.__JIT_CACHE__ instanceof Map)
+          ? globalThis.__JIT_CACHE__
+          : (self.__JIT_CACHE__ instanceof Map ? self.__JIT_CACHE__ : null);
+        if (jit && typeof jit.clear === 'function') jit.clear();
+        const C = (typeof globalThis !== 'undefined' && globalThis.CanvasPatchContext)
+          ? globalThis.CanvasPatchContext
+          : (self.CanvasPatchContext || null);
+        if (C && C.__TextMetrics__ && C.__TextMetrics__.cache && typeof C.__TextMetrics__.cache.clear === 'function') {
+          C.__TextMetrics__.cache.clear();
+        }
+      }
       if (typeof prev==='function') prev.call(self,s);
     };
     cache.snap = requireSnap(self.__lastSnap__, 'bootstrap');

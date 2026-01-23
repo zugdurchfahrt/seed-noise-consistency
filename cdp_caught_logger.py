@@ -11,18 +11,20 @@ PORT = None
 SW_INJECT_ENABLED = False
 SW_PRIMARY = None
 SW_LANGS = None
+SW_HC = None
+SW_DM = None
 
 _RUNNING = False
 
 
-def enable_sw_language_inject(language: str, normalized_languages: list[str]):
+def enable_sw_language_inject(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float):
     """
     Enable ServiceWorker injection for navigator.language / navigator.languages.
     Call this BEFORE starting run().
 
     No logging, no writers, no Debugger/Network hooks.
     """
-    global SW_INJECT_ENABLED, SW_PRIMARY, SW_LANGS
+    global SW_INJECT_ENABLED, SW_PRIMARY, SW_LANGS, SW_HC, SW_DM
     if not isinstance(language, str) or not language.strip():
         raise ValueError("SW inject: language must be non-empty str")
     if not isinstance(normalized_languages, list) or not normalized_languages:
@@ -33,9 +35,16 @@ def enable_sw_language_inject(language: str, normalized_languages: list[str]):
     
     SW_PRIMARY = language
     SW_LANGS = normalized_languages
+    if not isinstance(hardware_concurrency, (int, float)) or hardware_concurrency <= 0:
+        raise ValueError("SW inject: hardware_concurrency must be positive number")
+    SW_HC = int(hardware_concurrency)
+    if not isinstance(device_memory, (int, float)) or device_memory <= 0:
+        raise ValueError("SW inject: device_memory must be positive number")
+    SW_DM = float(device_memory)
+    SW_INJECT_ENABLED = True
 
 
-def _build_sw_prelude(language: str, normalized_languages: list[str]) -> str:
+def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
     # literals via json.dumps; no placeholders
     return (f"""
 (() => {{
@@ -44,9 +53,13 @@ def _build_sw_prelude(language: str, normalized_languages: list[str]) -> str:
 
   const primary = {json.dumps(language, ensure_ascii=False)};
   const langs   = {json.dumps(normalized_languages, ensure_ascii=False)};
+  const hc      = {json.dumps(hardware_concurrency)};
+  const dm      = {json.dumps(device_memory)};
 
   if (typeof primary !== 'string' || !primary) throw new Error('THW: SW language invalid');
   if (!Array.isArray(langs) || !langs.length) throw new Error('THW: SW languages invalid');
+  if (!Number.isFinite(Number(hc)) || Number(hc) <= 0) throw new Error('THW: SW hardwareConcurrency invalid');
+  if (!Number.isFinite(Number(dm)) || Number(dm) <= 0) throw new Error('THW: SW deviceMemory invalid');
   try {{ Object.freeze(langs); }} catch(e) {{}}
 
   const nav = G.navigator;
@@ -67,6 +80,8 @@ def _build_sw_prelude(language: str, normalized_languages: list[str]) -> str:
 
   defAcc('language',  function(){{ return primary; }});
   defAcc('languages', function(){{ return langs; }});
+  defAcc('hardwareConcurrency', function(){{ return Number(hc); }});
+  defAcc('deviceMemory', function(){{ return Number(dm); }});
 
   if (nav.languages[0] !== nav.language) throw new Error('THW: SW language != languages[0]');
 }})();
@@ -121,7 +136,7 @@ def run():
     msg_id = {"v": 0}
     sess_id = {}       # per-session counters
     injected = set()   # targetId set
-    sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS)
+    sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS, SW_HC, SW_DM)
 
     def send(ws, method, params=None):
         msg_id["v"] += 1

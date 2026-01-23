@@ -607,16 +607,20 @@ function SafeSharedWorkerOverride(G){
 
     const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 
+    let sw;
     try {
       // Always pass options-object so `type` definitely reaches the browser.
       const finalOpts = hasOptsObj ? { ...(nameOrOpts || {}) } : {};
       if (name !== undefined) finalOpts.name = name;
       finalOpts.type = workerType;
 
-      return new NativeShared(blobURL, finalOpts);
+      sw = new NativeShared(blobURL, finalOpts);
     } finally {
       URL.revokeObjectURL(blobURL);
     }
+    // Post-create sync for reused SharedWorker instances
+    try { if (sw && sw.port) EnvBus(G).syncShared(sw.port); } catch(_) {}
+    return sw;
   }, 'SharedWorker');
   
   
@@ -995,7 +999,6 @@ Object.defineProperty(globalThis, 'WrkModule', {
   configurable: false,
   enumerable: false,
 });
-
 
 
 
