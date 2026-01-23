@@ -59,19 +59,19 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
     // Always let core string params through via orig to avoid nulls breaking FP scripts
     // (keep masked vendor/renderer logic in webglGetParameterMask)
-    if (typeof this.VERSION === 'number' && pname === this.VERSION) {
-      return orig.call(this, pname, ...args);
-    }
-    if (typeof this.SHADING_LANGUAGE_VERSION === 'number' && pname === this.SHADING_LANGUAGE_VERSION) {
-      return orig.call(this, pname, ...args);
-    }
+    // if (typeof this.VERSION === 'number' && pname === this.VERSION) {
+    //   return orig.call(this, pname, ...args);
+    // }
+    // if (typeof this.SHADING_LANGUAGE_VERSION === 'number' && pname === this.SHADING_LANGUAGE_VERSION) {
+    //   return orig.call(this, pname, ...args);
+    // }
 
     //Allowed parameters - we let the original (patchMethodThen it will call orig)
-    if (wl.length === 0 || wl.includes(pname)) {
+    if (wl.includes(pname)) {
       return; // undefined → pass-through to orig.apply(this, args)
     }
-    // For non-whitelisted enums: keep standard behavior (call native)
-    return orig.call(this, pname, ...args);
+    // For non-whitelisted enums: deny (driver-like)
+    return;
   }
     // === 2. getSupportedExtensions ===
   function webglGetSupportedExtensionsPatch(orig, ...args) {
@@ -274,4 +274,3 @@ const WebglPatchModule = function WebglPatchModule(window) {
 // patchMethod in the context of WebGL when patching getParameter first takes result = orig(this, args) and passes it to the hook as the first argument.
 // If the hook returns undefined, patchMethod continues the cycle and ultimately returns result (the original response).
 // If the hook returns null or any other value, that value will be substituted for the original.
-

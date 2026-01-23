@@ -618,8 +618,8 @@ function SafeSharedWorkerOverride(G){
     } finally {
       URL.revokeObjectURL(blobURL);
     }
-    // Post-create sync for reused SharedWorker instances
-    try { if (sw && sw.port) EnvBus(G).syncShared(sw.port); } catch(_) {}
+    // Post-create resync via BroadcastChannel (avoids interfering with user port messaging)
+    try { bridge && bridge.publishSnapshot && bridge.publishSnapshot(snap); } catch(_) {}
     return sw;
   }, 'SharedWorker');
   
@@ -999,7 +999,6 @@ Object.defineProperty(globalThis, 'WrkModule', {
   configurable: false,
   enumerable: false,
 });
-
 
 
 
