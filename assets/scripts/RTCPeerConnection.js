@@ -10,18 +10,6 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         || {};
 
 
-  
-      // --- nativization provider (moved from hide_webdriver.js) ---
-  // function safeDefine(obj, prop, descriptor) {
-  //   try {
-  //     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
-  //     if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
-  //     Object.defineProperty(obj, prop, descriptor);
-  //   } catch (e) {
-  //     console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
-  //     if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:safeDefine:define_failed", e);
-  //   }
-  // }
 
       // --- nativization provider (moved from hide_webdriver.js) ---
   function safeDefine(obj, prop, descriptor) {
@@ -123,7 +111,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const toStringProxy = new Proxy(nativeToString, {
-      apply(target, thisArg, args) {
+      apply: function toString(target, thisArg, args) {
         // IMPORTANT:
         // - preserve native brand-check semantics:
         //   Function.prototype.toString MUST throw when receiver is not a Function
@@ -136,6 +124,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       }
     });
 
+    
     markAsNative(toStringProxy, 'toString');
 
     Object.defineProperty(Function.prototype, 'toString', {

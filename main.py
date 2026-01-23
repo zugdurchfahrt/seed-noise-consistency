@@ -443,10 +443,10 @@ def init_driver(
     """
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": page_js, "awaitPromise": False})
+    # driver.execute_cdp_cmd("Runtime.evaluate", {"expression": page_js, "awaitPromise": False})
     # Connect worker_bootstrap_js (after page_js)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": worker_bootstrap_js, "awaitPromise": False})
+    # driver.execute_cdp_cmd("Runtime.evaluate", {"expression": worker_bootstrap_js, "awaitPromise": False})
     
     
     # ---  CDP PROCESSING STAGE---
@@ -481,18 +481,8 @@ def init_driver(
     window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
     console.log("[headers_interceptor.js] window.__HEADERS__ injected (safelisted only)");
     """
-    # window.__HEADERS__ injected (safelisted only)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
-
-    # ВАЖНО: применить __HEADERS__ на ТЕКУЩЕЙ странице сразу (иначе будет только на next document)
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_window_js, "awaitPromise": False})
-
-    # ВАЖНО: повторно вызвать HeadersInterceptor(window) уже ПОСЛЕ появления __HEADERS__
-    driver.execute_cdp_cmd("Runtime.evaluate", {
-        "expression": "if (typeof HeadersInterceptor === 'function') { HeadersInterceptor(window); }",
-        "awaitPromise": False
-    })
-
+    logger.info("window.__HEADERS__ injected (safelisted only)")
 
     # Headers interceptor bridge to sync allow/ignore  CDP with Fetch interceptor
     headers_bridge_js = """
