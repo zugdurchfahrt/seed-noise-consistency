@@ -191,7 +191,15 @@ const CanvasPatchModule = function CanvasPatchModule(window) {
       : (typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0) ? +globalThis.__DPR
       : undefined;
     if (!(typeof dpr === 'number' && dpr > 0)) {
-      throw new TypeError('__getJitter__: DPR is undefined or invalid');
+      if (typeof globalThis !== 'undefined') {
+        if (!globalThis.__JITTER_DPR_WARNED__) {
+          if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
+            console.warn('[CanvasPatch] jitter disabled: DPR missing/invalid');
+          }
+          globalThis.__JITTER_DPR_WARNED__ = true;
+        }
+      }
+      return { epsX: 0, epsY: 0 };
     }
     const key = `${op}:${w}x${h}@${Math.round((dpr) * 1024)}`;
 
