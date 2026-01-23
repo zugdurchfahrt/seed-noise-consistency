@@ -149,8 +149,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
   // === 5) anti‑FP hooks  ===
   function webglReadPixelsHook(orig, x, y, w, h, format, type, buffer) {
-    // orig already executed by patchMethod (post-call path for readPixels)
-    if (!buffer) return;
+    const r = orig.call(this, x, y, w, h, format, type, buffer);
+    if (!buffer) return r;
     for (let row=0, i=0; row<h; row++){
       for (let col=0; col<w; col++, i+=4){
         const v = noiseAt(col,row,w,h);
@@ -159,7 +159,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
         buffer[i+2] += v;
       }
     }
-    return;
+    return r;
   }
 
   function webglGetShaderPrecisionFormatHook(orig, shaderType, precisionType) {
@@ -265,6 +265,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
 // patchMethod in the context of WebGL when patching getParameter first takes result = orig(this, args) and passes it to the hook as the first argument.
 // If the hook returns undefined, patchMethod continues the cycle and ultimately returns result (the original response).
 // If the hook returns null or any other value, that value will be substituted for the original.
+
 
 
 

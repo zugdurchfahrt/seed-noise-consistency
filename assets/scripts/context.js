@@ -221,6 +221,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
               if (typeof guardInstance === "function" && !guardInstance(proto, self))
                   return orig.apply(self, args);
 
+              // readPixels returns undefined; if a hook calls orig itself, patchMethod would call orig again.
+              // For readPixels we do: orig once -> hooks mutate buffer -> return.
+              if (method === 'readPixels') {
+                  const out = orig.apply(self, args);
+                  for (const hook of hooks) {
+                      if (typeof hook !== 'function') continue;
+                      try { hook.apply(self, [orig, ...args]); } catch (e) {
+                          console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
+                      }
+                  }
+                  return out;
+              }
+
               let patched = args;
               for (const hook of hooks) {
                   if (typeof hook !== 'function') continue;
