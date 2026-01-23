@@ -62,7 +62,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
       return; // undefined → pass-through to orig.apply(this, args)
     }
     // We mask prohibited parameters like driver answer (without throw)
-    return; // driver-like: error as null
+    return null; // driver-like: error as null
   }
     // === 2. getSupportedExtensions ===
   function webglGetSupportedExtensionsPatch(orig, ...args) {
@@ -265,7 +265,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
 // patchMethod in the context of WebGL when patching getParameter first takes result = orig(this, args) and passes it to the hook as the first argument.
 // If the hook returns undefined, patchMethod continues the cycle and ultimately returns result (the original response).
 // If the hook returns null or any other value, that value will be substituted for the original.
-
 
 
 

@@ -5,6 +5,8 @@ const WEBglDICKts = function WEBglDICKts(window) {
     if (!C) {
         throw new Error('[CanvasPatch] CanvasPatchContext is undefined — no futher execution');
     }
+    const WebGLRenderingContext = window.WebGLRenderingContext || {};
+    const WebGL2RenderingContext = window.WebGL2RenderingContext || {};
     
     // === WHITELIST (use YOR device specification list)===
     window.__WEBGL_PARAM_WHITELIST__ = [
@@ -907,5 +909,4 @@ const WEBglDICKts = function WEBglDICKts(window) {
     // Object.freeze(window.__EXTENSIONS_WHITELIST__);
     console.log('[WebGLPatchModule] Whitelist loaded');
 }}  
-
 

@@ -267,12 +267,12 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
-            # --- set_log ---
-            Path(SCRIPTS_DIR / "set_log.js").read_text("utf-8"),
-            "LOGGingModule(window);",
             # --- RTC ---
             Path(SCRIPTS_DIR / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
+            # --- set_log ---
+            Path(SCRIPTS_DIR / "set_log.js").read_text("utf-8"),
+            "LOGGingModule(window);",
             # --- hide_webdriver (markAsNative provider) ---
             Path(SCRIPTS_DIR / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
