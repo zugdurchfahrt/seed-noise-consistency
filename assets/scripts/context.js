@@ -1,8 +1,15 @@
 
 // === CONTEXT PATCH MODULE ===
 const ContextPatchModule = function ContextPatchModule(window) {
-  const C = window.CanvasPatchContext = window.CanvasPatchContext || {};
-  'use strict';
+  'use strict';  
+  const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
+    if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+    || (typeof self       !== 'undefined' && self)
+    || (typeof window     !== 'undefined' && window)
+    || (typeof global     !== 'undefined' && global)
+    || {};
+    
   const global = window;
   if (global.CanvasPatchContext && global.CanvasPatchContext.__READY__) {
     return; // in case is already initialized

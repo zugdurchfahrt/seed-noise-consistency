@@ -1,7 +1,11 @@
 // === WRK MODULE ===
 const WrkModule = function WrkModule(window) {
   'use strict';
-  const G = window;
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+    || (typeof self       !== 'undefined' && self)
+    || (typeof window     !== 'undefined' && window)
+    || (typeof global     !== 'undefined' && global)
+    || {};
 
 // 1) Источник снапшотов
 function EnvBus(G){
@@ -871,33 +875,6 @@ function ServiceWorkerOverride(G){
 }
 }
 window.ServiceWorkerOverride = ServiceWorkerOverride;
-
-
-
-// --- mirror fonts readiness to worker/globalThis (Offscreen/Worker) ---
-(function mirrorFontsReadyOnce() {
-  const G = (typeof globalThis !== 'undefined' && globalThis)
-    || (typeof self       !== 'undefined' && self)
-    || (typeof window     !== 'undefined' && window)
-    || (typeof global     !== 'undefined' && global)
-    || {};
-  if (!G) return;
-
-  const p = G.__fontsReady || G.awaitFontsReady;
-  if (G.__FONTS_READY__) return;
-  if (p && typeof p.then === 'function') {
-    p.then(() => {
-      if (G.__FONTS_READY__) return;
-      G.__FONTS_READY__ = true;
-      try { G.dispatchEvent && G.dispatchEvent(new Event('fontsready')); } catch (_) {}
-    }).catch(() => {
-      // даже при ошибке считаем готовым, чтобы не залипли хуки
-      G.__FONTS_READY__ = true;
-      try { G.dispatchEvent && G.dispatchEvent(new Event('fontsready')); } catch (_) {}
-    });
-  }
-})();
-
 
 // === WorkerPatchHooks: оркестратор ===
 (function WorkerPatchHooks(G){

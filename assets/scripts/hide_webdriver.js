@@ -1,121 +1,43 @@
 const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   if (window && window.__HIDE_WEBDRIVER_READY__) return;
   if (window) window.__HIDE_WEBDRIVER_READY__ = true
-  
-  function safeDefine(obj, prop, descriptor) {
-    try {
-      if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
-      if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
-      Object.defineProperty(obj, prop, descriptor);
-    } catch (e) {
-      console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
-      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:safeDefine:define_failed", e);
-    }
-  }
 
-  // ——— Global mask "native" + general WeakMap ———
-  const nativeToString = window.__NativeToString || Function.prototype.toString;
-  window.__NativeToString = nativeToString;
+  const C = window.CanvasPatchContext;
+      if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+        || (typeof self       !== 'undefined' && self)
+        || (typeof window     !== 'undefined' && window)
+        || (typeof global     !== 'undefined' && global)
+        || {};
+
+  // --- nativization provider is initialized in RTCPeerConnection.js ---
+  const safeDefine = (function() {
+    const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
+    if (typeof sd !== 'function') {
+      throw new Error('[HideWebdriverPatchModule] safeDefine missing');
+    }
+    return sd;
+  })();
+
+  const markAsNative = (function() {
+    const ensure = (window && typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
+    const m = ensure ? ensure() : window.markAsNative;
+    if (typeof m !== 'function') {
+      throw new Error('[HideWebdriverPatchModule] markAsNative missing');
+    }
+    return m;
+  })();
+
+  // --- keep natives once ---
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
-
-  // general WeakMap, available to all modules
-  const toStringOverrideMap = (window.__NativeToStringMap instanceof WeakMap)
-    ? window.__NativeToStringMap
-    : new WeakMap();
-  window.__NativeToStringMap = toStringOverrideMap;
-
-  // Unified global function-mask
-  function baseMarkAsNative(func, name = "") {
-    if (typeof func !== 'function') return func;
-    try {
-      const n = name || func.name || "";
-      const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
-      toStringOverrideMap.set(func, label);
-    } catch (e) {
-      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:baseMarkAsNative:override_set_failed", e);
-    }
-    return func;
-  }
-  function ensureMarkAsNative() {
-    const existing = (typeof window.markAsNative === 'function') ? window.markAsNative : null;
-    if (!existing) {
-      baseMarkAsNative.__TOSTRING_BRIDGE__ = true;
-      safeDefine(window, 'markAsNative', {
-        value: baseMarkAsNative,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      return baseMarkAsNative;
-    }
-    if (existing.__TOSTRING_BRIDGE__) return existing;
-    const wrapped = function markAsNative(func, name = "") {
-      const out = existing(func, name);
-      return baseMarkAsNative(out, name);
-    };
-    wrapped.__TOSTRING_BRIDGE__ = true;
-    safeDefine(window, 'markAsNative', {
-      value: wrapped,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-    return wrapped;
-  }
-  if (!window.__ensureMarkAsNative) {
-    safeDefine(window, '__ensureMarkAsNative', {
-      value: ensureMarkAsNative,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
-
-  const markAsNative = ensureMarkAsNative();
-
-
-  // compatibility with the old name (do not change the structure of the calls below)
-  function fakeNative(func, name = "") { return markAsNative(func, name); }
-
-  // Single Proxy for Function.prototype.toString, reading from the general WeakMap
-  if (!window.__TOSTRING_PROXY_INSTALLED__) {
-    const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-    const toStringProxy = new Proxy(nativeToString, {
-      apply(target, thisArg, args) {
-        // IMPORTANT:
-        // - preserve native brand-check semantics:
-        //   Function.prototype.toString MUST throw when receiver is not a Function
-        // - therefore NEVER return overrides for non-functions (objects/proxies/etc)
-        if (typeof thisArg === 'function') {
-          // Single WeakMap lookup (faster than has()+get())
-          const v = toStringOverrideMap.get(thisArg);
-          if (v !== undefined) return v;
-        }
-        return Reflect.apply(target, thisArg, args);
-      }
-    });
-
-
-    // make proxy look native via the same mechanism
-    markAsNative(toStringProxy, 'toString');
-
-    Object.defineProperty(Function.prototype, 'toString', {
-      value: toStringProxy,
-      writable: toStringDesc ? !!toStringDesc.writable : true,
-      configurable: toStringDesc ? !!toStringDesc.configurable : true,
-      enumerable: toStringDesc ? !!toStringDesc.enumerable : false
-    });
-    window.__TOSTRING_PROXY_INSTALLED__ = true;
-  }
-
 
   // window.external protection
   try {
     Object.defineProperty(window, 'external', {
-      get: fakeNative(() => {
+      get: markAsNative(() => {
         const fakeExternal = {};
         Object.defineProperty(fakeExternal, 'toString', {
-          value: fakeNative(() => '[object External]', 'toString'),
+          value: markAsNative(() => '[object External]', 'toString'),
           configurable: true,
           enumerable: false
         });
@@ -135,7 +57,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
     if (!desc) {
       Object.defineProperty(window, 'chrome', {
-        get: fakeNative(() => ({}), 'get chrome'),
+        get: markAsNative(() => ({}), 'get chrome'),
         configurable: true
       });
     } else if (desc.configurable) {
@@ -155,11 +77,11 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       });
 
       Object.defineProperty(window, 'chrome', {
-        get: fakeNative(() => chromeProxy, 'get chrome'),
+        get: markAsNative(() => chromeProxy, 'get chrome'),
         configurable: true
       });
     } else {
-  //    console.info("[stealth] window.chrome защищён (configurable: false), патч невозможен");
+      // console.info("[stealth] window.chrome защищён (configurable: false), патч невозможен");
     }
   } catch (e) {
     console.warn("[stealth] chrome.runtime patch failed:", e);
@@ -170,14 +92,14 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   // navigator.webdriver → undefined
   safeDefine(proto, 'webdriver', {
-    get: fakeNative(() => undefined, "get webdriver"),
+    get: markAsNative(() => undefined, "get webdriver"),
     configurable: true,
     enumerable: false
   });
 
   // --- keep natives once ---
-  const nativeGOPD   = nativeGetOwnProp;
-  const nativeHas    = Reflect.has;
+  const nativeGOPD = nativeGetOwnProp;
+  const nativeHas  = Reflect.has;
 
   // one predicate
   const isWebdriver = (obj, prop) =>
@@ -185,17 +107,12 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   // one wrapper factory
   function wrapNative(name, nativeFn, implFn) {
-    // не перетирай повторно, если уже ставили (на твоё усмотрение)
-    // if (nativeFn && nativeFn.__patched__) return nativeFn;
-
     function wrapped() {
       return implFn.apply(this, arguments);
     }
 
-    // делай вид "нативности" так, как у тебя принято
     markAsNative(wrapped, name);
 
-    // (опционально) минимальная совместимость по length/name — только если configurable (иначе лишний шум/исключения)
     const lenDesc = nativeGetOwnProp(wrapped, 'length');
     if (lenDesc && lenDesc.configurable) {
       try { Object.defineProperty(wrapped, 'length', { value: nativeFn.length }); } catch (e) {
@@ -208,9 +125,6 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:name_define_failed", e);
       }
     }
-
-    // (опционально) метка
-    // try { Object.defineProperty(wrapped, '__patched__', { value: true }); } catch {}
 
     return wrapped;
   }

@@ -1,4 +1,6 @@
 {
+  "editor.maxTokenizationLineLength": 1290000,
+  "editor.stopRenderingLineAfter": 5555,
   "python.defaultInterpreterPath": "C:\\venvs\\myproj\\Scripts\\python.exe",
   "python-envs.defaultEnvManager": "ms-python.python:venv",
   "python.terminal.activateEnvironment": true,

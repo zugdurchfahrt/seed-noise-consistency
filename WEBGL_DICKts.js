@@ -1,6 +1,6 @@
 const WEBglDICKts = function WEBglDICKts(window) {
-    if (!window.__PATCH_WEBSTORAGE__) {
-    window.__PATCH_WEBSTORAGE__ = true;
+    if (!window.__PATCH_WEBGLSTORAGE__) {
+    window.__PATCH_WEBGLSTORAGE__ = true;
     const C = window.CanvasPatchContext;
     if (!C) {
         throw new Error('[CanvasPatch] CanvasPatchContext is undefined — no futher execution');

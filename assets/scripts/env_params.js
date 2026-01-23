@@ -1,5 +1,4 @@
 (function () {
-  'use strict';
   const EnvParamsPatchModule = function EnvParamsPatchModule(window) {
     'use strict';
     // Global-Alias ​​(reliable in the window and workrs)
@@ -111,20 +110,6 @@
         try { console.error('[PRNG] boot failed:', e && e.message); } catch (_) { }
       }
     })();
-
-    // Main‑thread only (Not executed in workerscope)
-    if (typeof window !== 'undefined' && G === window) {
-      const WSProto = window.WebSocket && window.WebSocket.prototype;
-      if (WSProto) {
-        const origClose = WSProto.close;
-        window._myDebugLog = window._myDebugLog || [];
-        WSProto.close = function (code, reason) {
-          // why:Diagnostic closing trace ws
-          window._myDebugLog.push({ type: 'websocket-close', code, reason, timestamp: new Date().toISOString() });
-          return typeof origClose === 'function' ? origClose.call(this, code, reason) : undefined;
-        };
-      }
-    }
 
     try { console.log('[ENV] EnvParamsPatchModule ready'); } catch (_) {}
   }

@@ -1,17 +1,38 @@
 const WebglPatchModule = function WebglPatchModule(window) {
     if (!window.__PATCH_WEBGL__) {
     window.__PATCH_WEBGL__ = true;
+
     const C = window.CanvasPatchContext;
     if (!C) throw new Error(' WebglPatchModule] CanvasPatchContext is undefined — registration is not available');
+    const G = (typeof globalThis !== 'undefined' && globalThis)
+          || (typeof self       !== 'undefined' && self)
+          || (typeof window     !== 'undefined' && window)
+          || (typeof global     !== 'undefined' && global)
+          || {};
+
     // basic random from the existing seed initialization
     const R = window.rand.use('webgl');
     if (typeof R !== 'function') {
       throw new Error('[WebGLPatchModule] "R" is not initialized');
     }
     
-    
-    // Internal marker: avoid leaving visible properties on native functions/prototypes
+    // Internal markers: avoid leaving visible properties on WebGL instances/objects
+    const __webglInstancePatched__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
+    const __webglDebugInfoPatched__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
     const __webglShaderSourcePatchedProtos__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
+
+    const markNative = (function() {
+      const ensure = (typeof window.__ensureMarkAsNative === 'function')
+        ? window.__ensureMarkAsNative
+        : null;
+      const m = ensure ? ensure() : window.markAsNative;
+      if (typeof m !== 'function') {
+        throw new Error('[WebglPatchModule] markAsNative missing');
+      }
+      return m;
+    })();
+
+    
     function noiseAt(x, y, w, h) {
       const mix = (((x*73856093) ^ (y*19349663) ^ (w*83492791) ^ (h*2654435761)) >>> 0);
       const r = R()
@@ -61,8 +82,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const res = orig.call(this, name, ...rest);
     //  WEBGL_debug_renderer_info
     if (name === 'WEBGL_debug_renderer_info' &&
-        res && typeof res === 'object' &&
-        !res.WebGLInstance_DebugInfoPatched__) {
+      res && typeof res === 'object' &&
+      !((__webglDebugInfoPatched__ && __webglDebugInfoPatched__.has(res)) || res.WebGLInstance_DebugInfoPatched__)) {
 
       if (typeof res.getParameter === 'function') {
         const origGetParameter = res.getParameter;
@@ -74,7 +95,16 @@ const WebglPatchModule = function WebglPatchModule(window) {
           return origGetParameter.call(this, pname);
         };
       }
-      res.WebGLInstance_DebugInfoPatched__ = true;
+      if (__webglDebugInfoPatched__) {
+        __webglDebugInfoPatched__.add(res);
+      } else {
+        Object.defineProperty(res, 'WebGLInstance_DebugInfoPatched__', {
+          value: true,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
     }
     return res;
   }
@@ -82,24 +112,37 @@ const WebglPatchModule = function WebglPatchModule(window) {
   // === 4.context patch (shaderSource → selective downgrade) ===
   function webglGetContextPatch(res, kind, ...args) {
     // If already patched or empty, immediately return
-    if (!res || res.WebGLInstance_GPUPatched__) return res;
+    if (!res || ((__webglInstancePatched__ && __webglInstancePatched__.has(res)) || res.WebGLInstance_GPUPatched__)) return res;
 
     const proto = Object.getPrototypeOf(res);
     if (kind && ['webgl', 'experimental-webgl', 'webgl2'].includes(kind)) {
-            if (proto && proto.shaderSource && !(__webglShaderSourcePatchedProtos__ && __webglShaderSourcePatchedProtos__.has(proto))) {
+      if (proto && proto.shaderSource && !(__webglShaderSourcePatchedProtos__ && __webglShaderSourcePatchedProtos__.has(proto))) {
         const orig = proto.shaderSource;
         // НИЧЕГО НЕ МЕНЯЕМ ЗДЕСЬ — вся precision-политика уедет в webglShaderSourceHook
         const wrapped = ({ shaderSource(shader, src) {
           return orig.call(this, shader, src);
         } }).shaderSource;
-        if (typeof window.markAsNative === 'function') { try { window.markAsNative(wrapped, 'shaderSource'); } catch {} }
+
+        markNative(wrapped, 'shaderSource');
         proto.shaderSource = wrapped;
         if (__webglShaderSourcePatchedProtos__) __webglShaderSourcePatchedProtos__.add(proto);
       }
-res.WebGLInstance_GPUPatched__ = true;
+
+      if (__webglInstancePatched__) {
+        __webglInstancePatched__.add(res);
+      } else {
+        Object.defineProperty(res, 'WebGLInstance_GPUPatched__', {
+          value: true,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
     }
     return res;
   }
+
+
 
   // === 5) anti‑FP hooks  ===
   function webglReadPixelsHook(orig, x, y, w, h, format, type, buffer) {

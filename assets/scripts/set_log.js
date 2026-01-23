@@ -10,9 +10,6 @@ const LOGGingModule = function LOGGingModule() {
       (typeof window !== "undefined" && window) ||
       {};
 
-
-
-
     // ===== 0) Central store: ONLY window._myDebugLo  =====
     global._myDebugLog = global._myDebugLog || [];
     G._myDebugLog = global._myDebugLog;
@@ -36,101 +33,6 @@ const LOGGingModule = function LOGGingModule() {
     G._logLevel = global._logLevel || "log";
 
 
-    // (function installGOPDTracerForNavigator(G){
-    //   const nativeGOPD = Object.getOwnPropertyDescriptor;
-
-    //   Object.getOwnPropertyDescriptor = function(obj, prop){
-    //     const d = nativeGOPD.call(Object, obj, prop);
-
-    //     // фильтр: интересуют только Navigator.prototype и только “подозрительные” свойства
-    //     try {
-    //       const p = obj && obj.constructor && obj.constructor.name;
-    //       if (p === "Navigator" && typeof prop === "string") {
-    //         if (d && !("value" in d) && typeof d.get === "function") {
-    //           // это accessor descriptor: value там не бывает
-    //           console.warn("[GOPD TRACE] accessor descriptor (no value) for Navigator." + prop);
-    //           console.warn("[STACK]", (new Error("gopd-trace")).stack);
-    //         }
-    //       }
-    //     } catch (_) {}
-
-    //     return d;
-    //   };
-    // })(window);
-
-
-
-
-
-    // // (function installGOPDTracerForNavigator(G){
-    // (function installGOPDTracerForNavigator(G){
-    //   const nativeGOPD = Object.getOwnPropertyDescriptor;
-
-    //   // чтобы не поставить дважды
-    //   if (nativeGOPD.__gopdTraceInstalled) return;
-
-    //   const WATCH = new Set([
-    //     "language",
-    //     "languages",
-    //     "hardwareConcurrency",
-    //     "deviceMemory",
-    //     "serviceWorker", // navigator.serviceWorker (ServiceWorkerContainer)
-    //   ]);
-
-    //   function isNavigatorLike(obj) {
-    //     if (!obj) return false;
-
-    //     // navigator object
-    //     if (obj === G.navigator) return true;
-
-    //     // Navigator.prototype
-    //     const NavProto = (G.Navigator && G.Navigator.prototype) || null;
-    //     if (NavProto && obj === NavProto) return true;
-
-    //     // Любой экземпляр Navigator (на всякий случай)
-    //     try {
-    //       const name = obj.constructor && obj.constructor.name;
-    //       return name === "Navigator";
-    //     } catch {
-    //       return false;
-    //     }
-    //   }
-
-    //   Object.getOwnPropertyDescriptor = function (obj, prop) {
-    //     const d = nativeGOPD.call(Object, obj, prop);
-
-    //     try {
-    //       if (typeof prop === "string" && WATCH.has(prop) && isNavigatorLike(obj)) {
-    //         const kind = d ? (("value" in d) ? "data" : (("get" in d || "set" in d) ? "accessor" : "unknown")) : "missing";
-    //         const summary = d ? {
-    //           kind,
-    //           enumerable: !!d.enumerable,
-    //           configurable: !!d.configurable,
-    //           writable: "writable" in d ? !!d.writable : undefined,
-    //           hasValue: "value" in d,
-    //           valueType: ("value" in d) ? typeof d.value : undefined,
-    //           hasGet: typeof d.get === "function",
-    //           hasSet: typeof d.set === "function",
-    //         } : { kind: "missing" };
-
-    //         console.warn(`[GOPD TRACE] Navigator.${prop} descriptor requested`);
-    //         console.warn("[DESC]", summary, d);
-    //         console.warn("[STACK]", (new Error("gopd-trace")).stack);
-    //       }
-    //     } catch (_) {}
-
-    //     return d;
-    //   };
-
-    //   // пометка на исходной функции, чтобы выше сработал анти-дубль
-    //   nativeGOPD.__gopdTraceInstalled = true;
-    // })(window);
-    // // })(window);
-
-
-
-
-
 
     function levelAllows(currentLevel, eventLevel) {
       const idx = LOG_LEVELS.indexOf(currentLevel);
@@ -138,6 +40,42 @@ const LOGGingModule = function LOGGingModule() {
       const allowed = LOG_LEVELS.slice(0, safeIdx + 1);
       return allowed.indexOf(eventLevel) !== -1;
     }
+
+
+
+    (function traceFunctionToString(G){
+      const orig = Function.prototype.toString;
+      if (orig.__TRACE__) return;
+
+      Function.prototype.toString = function(...args){
+        // фильтр: интересуют только webgl getParameter/readPixels
+        const name = this && this.name;
+        const src = this;
+
+        let shouldLog = false;
+        try {
+          const isWebGLName = name === "getParameter" || name === "readPixels";
+          // дополнительно: смотрим на наличие WebGL в ctor name thisArg? (не всегда)
+          shouldLog = isWebGLName;
+        } catch {}
+
+        if (shouldLog) {
+          try {
+            console.warn("[toString TRACE] on fn:", src);
+            console.warn("[STACK]", (new Error("toString-trace")).stack);
+          } catch {}
+        }
+
+        return orig.apply(this, args);
+      };
+
+      try { Object.defineProperty(Function.prototype.toString, "__TRACE__", { value: true }); } catch {}
+    })(window);
+
+
+
+
+
 
     // ===== 1) Make everything JSON-serializable =====
     function safeTag(v) {

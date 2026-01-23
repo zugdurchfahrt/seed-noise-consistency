@@ -57,6 +57,7 @@ CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\
 ENABLE_SW_INJECTOR = True  # <- ваш флаг (включаете вручную когда нужно)
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
+
 # ----------------------- PROFILE FUNCTION -----------------------
 def get_random_profile(country_data, platform):
     return {}
@@ -255,10 +256,12 @@ def init_driver(
     if ENABLE_SW_INJECTOR:
         cdp.enable_sw_language_inject(language, normalized_languages)
         threading.Thread(target=cdp.run, daemon=True).start()
-    
-    logger.info("Service Worker started via CDP on port %s", cdp.PORT)
-    # --- Workers Initial patch reading ---
+    logger.info("Service Worker and langs started via CDP on port %s", cdp.PORT)
+        
+
+            # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
+    logger.info("WORKER_PATCH_SRC.initated")
     
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
@@ -273,17 +276,16 @@ def init_driver(
             # --- hide_webdriver (markAsNative provider) ---
             Path(SCRIPTS_DIR / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
-
+            
             
             # --- workers (bootstrap/hooks). No direct module call here unless you have one.
             Path(SCRIPTS_DIR / "wrk.js").read_text("utf-8"),
             "WrkModule(window);",
-            
             # --- env params ---
             Path(SCRIPTS_DIR / "env_params.js").read_text("utf-8"),
             "EnvParamsPatchModule(window);",
 
-
+            
             # --- nav total set ---
             Path(SCRIPTS_DIR / "nav_total_set.js").read_text("utf-8"),
             "NavTotalSetPatchModule(window);",
@@ -345,7 +347,6 @@ def init_driver(
         return "\n;\n".join(parts)
     
     
-    
     # --- creation of window.__ objects ---
     init_params = f"""
     // ——— Globals Bootstrap ———
@@ -383,47 +384,51 @@ def init_driver(
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
-    
-    # ---  CDP PROCESSING STAGE---
-    # --- patch userAgent and userAgentMetadata via CDP ---
-    browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
-    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-
-    # --- prepare worker_bootstrap_js ---
+        # --- prepare worker_bootstrap_js ---
     worker_bootstrap_js = f"""
     (() => {{
     const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
     if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+
     if (!Object.prototype.hasOwnProperty.call(BR, 'urls')) {{
         Object.defineProperty(BR, 'urls', {{ value: {{}}, writable: false, configurable: false }});
     }}
     if (!BR.urls || typeof BR.urls !== 'object') throw new Error('WorkerBootstrap: BR.urls missing');
 
     const core = {json.dumps(core)};
-    const classic = URL.createObjectURL(new Blob([core], {{ type: 'text/javascript' }}));
-    const module  = URL.createObjectURL(new Blob(["/*module*/\\n", core, "\\nexport{{}};"], {{ type: 'text/javascript' }}));
-    if (BR.urls.workerPatchClassic && BR.urls.workerPatchClassic !== classic) {{
-        throw new Error('WorkerBootstrap: workerPatchClassic already set');
+
+    // Create URLs only once (idempotent)
+    if (!BR.urls.workerPatchClassic) {{
+        BR.urls.workerPatchClassic = URL.createObjectURL(new Blob([core], {{ type: 'text/javascript' }}));
     }}
-    if (BR.urls.workerPatchModule && BR.urls.workerPatchModule !== module) {{
-        throw new Error('WorkerBootstrap: workerPatchModule already set');
+    if (!BR.urls.workerPatchModule) {{
+        BR.urls.workerPatchModule = URL.createObjectURL(
+        new Blob(["/*module*/\\n", core, "\\nexport{{}};"], {{ type: 'text/javascript' }})
+        );
     }}
-    BR.urls.workerPatchClassic = classic;
-    BR.urls.workerPatchModule  = module;
-    if (BR.inlinePatch && BR.inlinePatch !== core) {{
+
+    if (typeof BR.urls.workerPatchClassic !== 'string' || !BR.urls.workerPatchClassic) {{
+        throw new Error('WorkerBootstrap: bad workerPatchClassic url');
+    }}
+    if (typeof BR.urls.workerPatchModule !== 'string' || !BR.urls.workerPatchModule) {{
+        throw new Error('WorkerBootstrap: bad workerPatchModule url');
+    }}
+
+    if (!BR.inlinePatch) {{
+        BR.inlinePatch = core;
+    }} else if (BR.inlinePatch !== core) {{
         throw new Error('WorkerBootstrap: inlinePatch already set');
     }}
-    BR.inlinePatch = core;
+
     Object.freeze(BR.urls);
 
     function boot() {{
-        if (!window.WorkerPatchHooks || typeof window.WorkerPatchHooks.initAll !== 'function') {{
-            throw new Error('WorkerBootstrap: WorkerPatchHooks missing');
-        }}
-        window.WorkerPatchHooks.initAll({{ publishHE: true }});
+        const H = window.WorkerPatchHooks;
+        if (!H || typeof H.initAll !== 'function') return; // wait until ready
+        H.initAll({{ publishHE: true }});
     }}
 
-    if ('WorkerPatchHooks' in window && window.WorkerPatchHooks) {{
+    if ('WorkerPatchHooks' in window && window.WorkerPatchHooks && typeof window.WorkerPatchHooks.initAll === 'function') {{
         boot();
     }} else {{
         let _h;
@@ -436,14 +441,19 @@ def init_driver(
     }})();
     //# sourceURL=worker_bootstrap_init.js
     """
-
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     driver.execute_cdp_cmd("Runtime.evaluate", {"expression": page_js, "awaitPromise": False})
-
     # Connect worker_bootstrap_js (after page_js)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
     driver.execute_cdp_cmd("Runtime.evaluate", {"expression": worker_bootstrap_js, "awaitPromise": False})
+    
+    
+    # ---  CDP PROCESSING STAGE---
+    # --- patch userAgent and userAgentMetadata via CDP ---
+    browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
+    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+
 
     #--- Setting up Client hints ---
     is_safari = "Safari" in user_agent and ("Chrome" not in user_agent and "Edg/" not in user_agent)

@@ -1,6 +1,7 @@
 const AudioContextModule = function AudioContextModule(window) {
-  if (!window.__PATCH_AUDIOCONTEXT__) {
-  window.__PATCH_AUDIOCONTEXT__ = true;
+  if (globalThis.__AUDIO_CTX_PATCH_APPLIED__) return;
+  globalThis.__AUDIO_CTX_PATCH_APPLIED__ = true;
+
   const C = window.CanvasPatchContext;
     if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
   const R = window.rand.use('audio');
@@ -208,4 +209,4 @@ const AudioContextModule = function AudioContextModule(window) {
       return buffer;
   }
 }
-}} 
+} 
