@@ -81,30 +81,27 @@
       return out;
     };
     if (!self.__TOSTRING_PROXY_INSTALLED__) {
-      function toString() {
-        // IMPORTANT: do not touch WeakMap for primitives/null/undefined
-        const t = typeof this;
-        const isObj = (this !== null) && (t === 'function' || t === 'object');
+      const d = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');
 
-        if (isObj && toStringMap.has(this)) {
-          return toStringMap.get(this);
+      const toString = ({ toString() {
+        if (typeof this === 'function') {
+          const v = toStringMap.get(this);
+          if (v !== undefined) return v;
         }
-        // preserve native TypeError + semantics
-        return nativeToString.call(this);
-      }
+        return Reflect.apply(nativeToString, this, arguments);
+      }}).toString;
 
-      // make wrapper look native via the same mechanism
       markAsNative(toString, 'toString');
 
       Object.defineProperty(Function.prototype, 'toString', {
         value: toString,
-        writable: true,
-        configurable: true,
-        enumerable: false
+        writable: d ? !!d.writable : true,
+        configurable: d ? !!d.configurable : true,
+        enumerable: d ? !!d.enumerable : false,
       });
+
       self.__TOSTRING_PROXY_INSTALLED__ = true;
     }
-    self.markAsNative = markAsNative;
 
     const getDevicePixelRatio = markAsNative(function getDevicePixelRatio(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');

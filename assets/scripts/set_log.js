@@ -43,34 +43,34 @@ const LOGGingModule = function LOGGingModule() {
 
 
 
-    (function traceFunctionToString(G){
-      const orig = Function.prototype.toString;
-      if (orig.__TRACE__) return;
+    // (function traceFunctionToString(G){
+    //   const orig = Function.prototype.toString;
+    //   if (orig.__TRACE__) return;
 
-      Function.prototype.toString = function(...args){
-        // фильтр: интересуют только webgl getParameter/readPixels
-        const name = this && this.name;
-        const src = this;
+    //   Function.prototype.toString = function(...args){
+    //     // фильтр: интересуют только webgl getParameter/readPixels
+    //     const name = this && this.name;
+    //     const src = this;
 
-        let shouldLog = false;
-        try {
-          const isWebGLName = name === "getParameter" || name === "readPixels";
-          // дополнительно: смотрим на наличие WebGL в ctor name thisArg? (не всегда)
-          shouldLog = isWebGLName;
-        } catch {}
+    //     let shouldLog = false;
+    //     try {
+    //       const isWebGLName = name === "getParameter" || name === "readPixels";
+    //       // дополнительно: смотрим на наличие WebGL в ctor name thisArg? (не всегда)
+    //       shouldLog = isWebGLName;
+    //     } catch {}
 
-        if (shouldLog) {
-          try {
-            console.warn("[toString TRACE] on fn:", src);
-            console.warn("[STACK]", (new Error("toString-trace")).stack);
-          } catch {}
-        }
+    //     if (shouldLog) {
+    //       try {
+    //         console.warn("[toString TRACE] on fn:", src);
+    //         console.warn("[STACK]", (new Error("toString-trace")).stack);
+    //       } catch {}
+    //     }
 
-        return orig.apply(this, args);
-      };
+    //     return orig.apply(this, args);
+    //   };
 
-      try { Object.defineProperty(Function.prototype.toString, "__TRACE__", { value: true }); } catch {}
-    })(window);
+    //   try { Object.defineProperty(Function.prototype.toString, "__TRACE__", { value: true }); } catch {}
+    // })(window);
 
 
 

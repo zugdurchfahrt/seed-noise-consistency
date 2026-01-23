@@ -87,13 +87,16 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
       if (typeof res.getParameter === 'function') {
         const origGetParameter = res.getParameter;
-        res.getParameter = function(pname) {
+        const wrappedGetParameter = ({ getParameter(pname) {
           if (pname === this.UNMASKED_VENDOR_WEBGL)
             return window.__WEBGL_UNMASKED_VENDOR__;
           if (pname === this.UNMASKED_RENDERER_WEBGL)
             return window.__WEBGL_UNMASKED_RENDERER__;
           return origGetParameter.call(this, pname);
-        };
+        }}).getParameter;
+
+        markNative(wrappedGetParameter, 'getParameter');
+        res.getParameter = wrappedGetParameter;
       }
       if (__webglDebugInfoPatched__) {
         __webglDebugInfoPatched__.add(res);

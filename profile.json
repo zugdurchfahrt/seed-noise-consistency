@@ -2,24 +2,24 @@
   "profile": {
     "platform": "Win32",
     "os_info": "Windows NT 10.0; Win64; x64",
-    "os_name": "Windows 10 64-bit",
-    "platform_version": "10.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-    "browser_version": "135.0.7049.95",
-    "screen_width": 7680,
-    "screen_height": 4320,
-    "device_dpr_value": 3.0,
+    "os_name": "Windows 11 64-bit",
+    "platform_version": "19.0.0",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0",
+    "browser_version": "140.0.3485.54",
+    "screen_width": 2560,
+    "screen_height": 1440,
+    "device_dpr_value": 1.25,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
-    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x2206) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Google Inc. (AMD)",
+    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6600 (0x73FF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
-    "gpu_architecture": "ampere",
-    "gpu_vendor": "nvidia",
+    "gpu_architecture": "rdna2",
+    "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "Rode Procaster",
-      "videoinput": "Logitech Brio Ultra HD",
-      "audiooutput": "Jabra Elite 85h"
+      "audioinput": "Behringer C-1U",
+      "videoinput": "AVerMedia Live Streamer CAM 313",
+      "audiooutput": "Sony WH-1000XM4"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -27,8 +27,8 @@
       "de"
     ],
     "language": "de-DE",
-    "deviceMemory": 8,
-    "hardwareConcurrency": 4,
+    "deviceMemory": 4,
+    "hardwareConcurrency": 8,
     "plugins": [],
     "mimeTypes": [],
     "accept_language": "de-DE,de;q=0.9"
@@ -42,18 +42,18 @@
       },
       {
         "brand": "Chromium",
-        "version": "135"
+        "version": "140"
       },
       {
-        "brand": "Google Chrome",
-        "version": "135"
+        "brand": "Microsoft Edge",
+        "version": "140"
       }
     ],
     "mobile": false,
     "architecture": "x86",
     "bitness": "64",
     "model": "",
-    "platformVersion": "10.0.0",
+    "platformVersion": "19.0.0",
     "fullVersionList": [
       {
         "brand": "Not)A;Brand",
@@ -61,22 +61,22 @@
       },
       {
         "brand": "Chromium",
-        "version": "135.0.7049.95"
+        "version": "140.0.3485.54"
       },
       {
-        "brand": "Google Chrome",
-        "version": "135.0.7049.95"
+        "brand": "Microsoft Edge",
+        "version": "140.0.3485.54"
       }
     ],
-    "uaFullVersion": "135.0.7049.95",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"135\", \"Google Chrome\";v=\"135\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.95\", \"Google Chrome\";v=\"135.0.7049.95\"",
+    "uaFullVersion": "140.0.3485.54",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"140\", \"Microsoft Edge\";v=\"140\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"140.0.3485.54\", \"Microsoft Edge\";v=\"140.0.3485.54\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
-    "deviceMemory": 8,
-    "hardwareConcurrency": 4,
+    "deviceMemory": 4,
+    "hardwareConcurrency": 8,
     "wow64": false,
     "languages": [
       "de-DE",
@@ -86,6 +86,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/avif,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/avif,image/webp,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }

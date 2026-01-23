@@ -10,7 +10,13 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         || (typeof global     !== 'undefined' && global)
         || {};
 
-  // --- nativization provider is initialized in RTCPeerConnection.js ---
+  
+
+  
+  
+  
+  
+  // // --- nativization provider is initialized in RTCPeerConnection.js ---
   const safeDefine = (function() {
     const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
     if (typeof sd !== 'function') {
