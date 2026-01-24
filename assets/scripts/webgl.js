@@ -20,6 +20,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const __webglInstancePatched__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
     const __webglDebugInfoPatched__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
     const __webglShaderSourcePatchedProtos__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
+    const __webglDebugInfoCache__ = (typeof WeakMap === 'function') ? new WeakMap() : null;
+    const __WEBGL_DEBUGINFO_CACHE_PROP__ = 'WebGLInstance_DebugInfoCache__';
 
     const markNative = (function() {
       const ensure = (typeof window.__ensureMarkAsNative === 'function')
@@ -41,8 +43,29 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
     // 1) VENDOR/RENDERER replacement
   function webglGetParameterMask(orig, pname, ...args) {
-    let dbg = null;
-    try { dbg = this.getExtension('WEBGL_debug_renderer_info'); } catch(e){}
+    let dbg;
+    if (__webglDebugInfoCache__) {
+      if (__webglDebugInfoCache__.has(this)) dbg = __webglDebugInfoCache__.get(this);
+    } else if (this && Object.prototype.hasOwnProperty.call(this, __WEBGL_DEBUGINFO_CACHE_PROP__)) {
+      dbg = this[__WEBGL_DEBUGINFO_CACHE_PROP__];
+    }
+    if (dbg === undefined) {
+      try { dbg = this.getExtension('WEBGL_debug_renderer_info'); } catch(e){ dbg = null; }
+      if (__webglDebugInfoCache__) {
+        __webglDebugInfoCache__.set(this, dbg);
+      } else if (this) {
+        try {
+          Object.defineProperty(this, __WEBGL_DEBUGINFO_CACHE_PROP__, {
+            value: dbg,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        } catch (_) {
+          try { this[__WEBGL_DEBUGINFO_CACHE_PROP__] = dbg; } catch (_) {}
+        }
+      }
+    }
     if (dbg) {
         if (pname === dbg.UNMASKED_VENDOR_WEBGL)   return window.__WEBGL_UNMASKED_VENDOR__;
         if (pname === dbg.UNMASKED_RENDERER_WEBGL) return window.__WEBGL_UNMASKED_RENDERER__;
@@ -116,6 +139,22 @@ const WebglPatchModule = function WebglPatchModule(window) {
           configurable: true,
           enumerable: false
         });
+      }
+    }
+    if (name === 'WEBGL_debug_renderer_info') {
+      if (__webglDebugInfoCache__) {
+        __webglDebugInfoCache__.set(this, res || null);
+      } else if (this) {
+        try {
+          Object.defineProperty(this, __WEBGL_DEBUGINFO_CACHE_PROP__, {
+            value: res || null,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        } catch (_) {
+          try { this[__WEBGL_DEBUGINFO_CACHE_PROP__] = res || null; } catch (_) {}
+        }
       }
     }
     return res;
