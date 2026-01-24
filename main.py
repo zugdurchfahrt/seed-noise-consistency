@@ -533,9 +533,6 @@ def init_driver(
       """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
 
-   # driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_bridge_js, "awaitPromise": False})
-
-
     # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
     fetch_rules = []
 
@@ -1022,7 +1019,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs")
 
         # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)

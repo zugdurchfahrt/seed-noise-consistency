@@ -6,20 +6,20 @@
     "platform_version": "10.0.0",
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0",
     "browser_version": "134.0.3124.129",
-    "screen_width": 1920,
-    "screen_height": 1080,
-    "device_dpr_value": 1.0,
+    "screen_width": 2560,
+    "screen_height": 1440,
+    "device_dpr_value": 1.25,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (AMD)",
-    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6600 (0x73FF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
+    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x2486) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
-    "gpu_architecture": "rdna2",
-    "gpu_vendor": "amd",
+    "gpu_architecture": "ampere",
+    "gpu_vendor": "nvidia",
     "devices_conf": {
-      "audioinput": "Neumann TLM 102",
-      "videoinput": "Logitech C310",
-      "audiooutput": "AKG K702"
+      "audioinput": "Rode NT-USB",
+      "videoinput": "Logitech HD Pro Webcam C920",
+      "audiooutput": "Jabra Elite 85h"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -29,27 +29,8 @@
     "language": "da-DK",
     "deviceMemory": 4,
     "hardwareConcurrency": 4,
-    "plugins": [
-      {
-        "name": "Microsoft Edge PDF Viewer",
-        "filename": "internal-pdf-viewer",
-        "description": "Portable Document Format",
-        "mimeTypes": [
-          {
-            "type": "application/pdf",
-            "suffixes": "pdf",
-            "description": "PDF document"
-          }
-        ]
-      }
-    ],
-    "mimeTypes": [
-      {
-        "type": "application/pdf",
-        "suffixes": "pdf",
-        "description": "PDF document"
-      }
-    ],
+    "plugins": [],
+    "mimeTypes": [],
     "accept_language": "da-DK,da;q=0.9"
   },
   "expected_client_hints": {
@@ -105,6 +86,6 @@
     "formFactors": [
       "Desktop"
     ],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/apng,image/webp,image/avif,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
   }
 }

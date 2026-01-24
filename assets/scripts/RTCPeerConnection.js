@@ -8,10 +8,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         || (typeof window     !== 'undefined' && window)
         || (typeof global     !== 'undefined' && global)
         || {};
-
-
-
-      // --- nativization provider (moved from hide_webdriver.js) ---
+  // --- nativization provider (moved from hide_webdriver.js) ---
   function safeDefine(obj, prop, descriptor) {
     try {
       if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
@@ -23,7 +20,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     }
   }
 
-    // export for consumers (hide_webdriver.js and others)
+  // export for consumers (hide_webdriver.js and others)
   if (typeof window.__safeDefine !== 'function') {
     safeDefine(window, '__safeDefine', {
       value: safeDefine,
@@ -33,14 +30,10 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     });
   }
 
-  
-  
- // ——— Global mask "native" + general WeakMap ———
+  // ——— Global mask "native" + general WeakMap ———
   const nativeToString = window.__NativeToString || Function.prototype.toString;
   window.__NativeToString = nativeToString;
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
-
-
 
   // general WeakMap, available to all modules
   const toStringOverrideMap = (window.__NativeToStringMap instanceof WeakMap)
@@ -111,7 +104,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const toStringProxy = new Proxy(nativeToString, {
-      apply: function toString(target, thisArg, args) {
+      apply(target, thisArg, args) {
         // IMPORTANT:
         // - preserve native brand-check semantics:
         //   Function.prototype.toString MUST throw when receiver is not a Function
@@ -124,7 +117,6 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       }
     });
 
-    
     markAsNative(toStringProxy, 'toString');
 
     Object.defineProperty(Function.prototype, 'toString', {
@@ -270,17 +262,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   Orig.prototype.addEventListener = patchedAddEventListener;
 
 
-  // // export for consumers (hide_webdriver.js and others)
-  // if (typeof window.__safeDefine !== 'function') {
-  //   safeDefine(window, '__safeDefine', {
-  //     value: safeDefine,
-  //     writable: true,
-  //     configurable: true,
-  //     enumerable: false
-  //   });
-  // }
 
- 
 
 
   // Main-thread only (Not executed in workerscope)
