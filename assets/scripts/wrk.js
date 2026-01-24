@@ -75,15 +75,17 @@ function EnvBus(G){
     })() : null;
     if (!uaData) throw new Error('EnvBus: uaData missing');
 
-    if (!G.__UACH_HE_READY__) throw new Error('EnvBus: high entropy not ready');
-    if (!G.__LAST_UACH_HE__ || typeof G.__LAST_UACH_HE__ !== 'object') {
-      throw new Error('EnvBus: high entropy missing');
-    }
     const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+    const heSource = (G.__UACH_HE_READY__ && G.__LAST_UACH_HE__ && typeof G.__LAST_UACH_HE__ === 'object')
+      ? G.__LAST_UACH_HE__
+      : (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object')
+        ? G.__EXPECTED_CLIENT_HINTS
+        : null;
+    if (!heSource) throw new Error('EnvBus: high entropy missing');
     const he = {};
     for (const k of HE_KEYS) {
-      if (!(k in G.__LAST_UACH_HE__)) throw new Error(`EnvBus: high entropy missing ${k}`);
-      const v = G.__LAST_UACH_HE__[k];
+      if (!(k in heSource)) throw new Error(`EnvBus: high entropy missing ${k}`);
+      const v = heSource[k];
       if (v === undefined || v === null) throw new Error(`EnvBus: high entropy bad ${k}`);
       if (k === 'fullVersionList' && !Array.isArray(v)) {
         throw new Error('EnvBus: high entropy bad fullVersionList');
@@ -999,6 +1001,5 @@ Object.defineProperty(globalThis, 'WrkModule', {
   configurable: false,
   enumerable: false,
 });
-
 
 

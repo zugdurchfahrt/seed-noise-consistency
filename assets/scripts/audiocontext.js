@@ -5,6 +5,14 @@ const AudioContextModule = function AudioContextModule(window) {
   const C = window.CanvasPatchContext;
     if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
   const R = window.rand.use('audio');
+  const markAsNative = (function() {
+    const ensure = (typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
+    const m = ensure ? ensure() : window.markAsNative;
+    if (typeof m !== 'function') {
+      throw new Error('[AudioContextPatch] markAsNative missing');
+    }
+    return m;
+  })();
   const AUDIO_NOISE_ENABLED = false;
 
   // 1. get original values for sampleRate/baseLatency
@@ -26,35 +34,38 @@ const AudioContextModule = function AudioContextModule(window) {
     const proto = CTX.prototype;
 
     // 3. We only patch sampleRate/baseLatency (getter does not break fingerprint)
+    const getSampleRate = markAsNative(function getSampleRate(){ return nativeSampleRate; }, 'get sampleRate');
     Object.defineProperty(proto, 'sampleRate', {
-      get() { return nativeSampleRate; },
+      get: getSampleRate,
       configurable: true
     });
     if ('baseLatency' in proto) {
+      const getBaseLatency = markAsNative(function getBaseLatency(){ return nativeBaseLatency; }, 'get baseLatency');
       Object.defineProperty(proto, 'baseLatency', {
-        get() { return nativeBaseLatency; },
+        get: getBaseLatency,
         configurable: true
       });
     }
 
     // 4. patch createBuffer: We rolled the input and throw the error as in the original
-  if (typeof AudioContext.prototype.createBuffer === 'function') {
-      const origCreateBuffer = AudioContext.prototype.createBuffer;
-      AudioContext.prototype.createBuffer = function(numOfChannels, length, sampleRate) {
-          if (length < 0 || sampleRate <= 0) throw new RangeError('Invalid length or sampleRate for AudioBuffer');
-          return origCreateBuffer.call(this, numOfChannels, length, sampleRate);
-      };
+    if (typeof proto.createBuffer === 'function') {
+      const origCreateBuffer = proto.createBuffer;
+      const patchedCreateBuffer = markAsNative(function createBuffer(numOfChannels, length, sampleRate) {
+        if (length < 0 || sampleRate <= 0) throw new RangeError('Invalid length or sampleRate for AudioBuffer');
+        return origCreateBuffer.call(this, numOfChannels, length, sampleRate);
+      }, 'createBuffer');
+      proto.createBuffer = patchedCreateBuffer;
       console.log('[AudioContextPatch] Patched createBuffer on AudioContext');
-  }
+    }
   // 5. patch AnalyserNode (preserveing invariants)
   if (typeof proto.createAnalyser === 'function') {
     const origCreateAnalyser = proto.createAnalyser;
-    proto.createAnalyser = function () {
+    proto.createAnalyser = markAsNative(function createAnalyser() {
       const analyser = origCreateAnalyser.call(this);
 
       // --- Byte Spectrum: discrete ±1/0 with compensation of the summ ---
       const origByte = analyser.getByteFrequencyData.bind(analyser);
-      analyser.getByteFrequencyData = function (array) {
+      analyser.getByteFrequencyData = markAsNative(function getByteFrequencyData(array) {
         origByte(array);
         if (!AUDIO_NOISE_ENABLED) return;
         let delta = 0;
@@ -73,11 +84,11 @@ const AudioContextModule = function AudioContextModule(window) {
             for (let i = 0; i < n && delta > 0; i++) if (array[i] < 255) { array[i] += 1; delta--; }
           }
         }
-      };
+      }, 'getByteFrequencyData');
 
       // --- Float Spectrum: pair of zero summary noise, without going out for [min,max] ---
       const origFloat = analyser.getFloatFrequencyData.bind(analyser);
-      analyser.getFloatFrequencyData = function (array) {
+      analyser.getFloatFrequencyData = markAsNative(function getFloatFrequencyData(array) {
         origFloat(array);
         if (!AUDIO_NOISE_ENABLED) return;
         const lo = (typeof this.minDecibels === 'number') ? this.minDecibels : -100;
@@ -109,12 +120,12 @@ const AudioContextModule = function AudioContextModule(window) {
           if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
         }
         //The odd middle — without noise (as not to break the zero amount)
-      };
+      }, 'getFloatFrequencyData');
 
       // --- Byte time-domain: paired±1 (The sum preserved) carefully [0..255] ---
       const origByteTD = analyser.getByteTimeDomainData?.bind(analyser);
       if (typeof origByteTD === 'function') {
-        analyser.getByteTimeDomainData = function (array) {
+        analyser.getByteTimeDomainData = markAsNative(function getByteTimeDomainData(array) {
           origByteTD(array);
           if (!AUDIO_NOISE_ENABLED) return;
           const n = array.length | 0;
@@ -139,13 +150,13 @@ const AudioContextModule = function AudioContextModule(window) {
               // If not, we miss a couple
             }
           }
-        };
+        }, 'getByteTimeDomainData');
       }
 
       // --- Float time-domain: pair zero-summary noise within [-1..1] ---
       const origFloatTD = analyser.getFloatTimeDomainData?.bind(analyser);
       if (typeof origFloatTD === 'function') {
-        analyser.getFloatTimeDomainData = function (array) {
+        analyser.getFloatTimeDomainData = markAsNative(function getFloatTimeDomainData(array) {
           origFloatTD(array);
           if (!AUDIO_NOISE_ENABLED) return;
           const n = array.length | 0;
@@ -175,23 +186,23 @@ const AudioContextModule = function AudioContextModule(window) {
             if (array[i] < lo) array[i] = lo; else if (array[i] > hi) array[i] = hi;
             if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
           }
-        };
+        }, 'getFloatTimeDomainData');
       }
 
       return analyser;
-    };
+    }, 'createAnalyser');
   }
 
 
   // 6.Patch OfflineAudioContext (add noise)
   if (typeof OfflineAudioContext.prototype.startRendering === 'function') {
       const origStartRendering = OfflineAudioContext.prototype.startRendering;
-      OfflineAudioContext.prototype.startRendering = function(...args) {
+      OfflineAudioContext.prototype.startRendering = markAsNative(function startRendering(...args) {
           return origStartRendering.apply(this, args).then(buffer => {
               //add Noise, if necessary
               return addNoiseToRenderBuffer(buffer);
           });
-      };
+      }, 'startRendering');
   }
 
   // 7. noise in renderBuffer

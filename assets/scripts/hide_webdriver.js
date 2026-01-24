@@ -9,12 +9,6 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         || (typeof window     !== 'undefined' && window)
         || (typeof global     !== 'undefined' && global)
         || {};
-
-  
-
-  
-  
-  
   
   // // --- nativization provider is initialized in RTCPeerConnection.js ---
   const safeDefine = (function() {
@@ -57,42 +51,6 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:external_patch:define_failed", e);
   }
 
-  //  chrome.runtime protection -may not work in chrome
-  try {
-    const desc = Object.getOwnPropertyDescriptor(window, "chrome");
-
-    if (!desc) {
-      Object.defineProperty(window, 'chrome', {
-        get: markAsNative(() => ({}), 'get chrome'),
-        configurable: true
-      });
-    } else if (desc.configurable) {
-      const chromeProxy = new Proxy(window.chrome, {
-        get(target, prop) {
-          if (prop === 'runtime' || prop === 'loadTimes') return undefined;
-          return Reflect.get(target, prop);
-        },
-        has(target, prop) {
-          if (prop === 'runtime' || prop === 'loadTimes') return false;
-          return prop in target;
-        },
-        getOwnPropertyDescriptor(target, prop) {
-          if (prop === 'runtime' || prop === 'loadTimes') return undefined;
-          return Object.getOwnPropertyDescriptor(target, prop);
-        }
-      });
-
-      Object.defineProperty(window, 'chrome', {
-        get: markAsNative(() => chromeProxy, 'get chrome'),
-        configurable: true
-      });
-    } else {
-      // console.info("[stealth] window.chrome защищён (configurable: false), патч невозможен");
-    }
-  } catch (e) {
-    console.warn("[stealth] chrome.runtime patch failed:", e);
-    if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:chrome_patch:define_failed", e);
-  }
 
   const proto = Navigator.prototype;
 

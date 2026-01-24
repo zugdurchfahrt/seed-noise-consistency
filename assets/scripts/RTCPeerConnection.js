@@ -1,6 +1,5 @@
 const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(window) {
-  if (window.__PATCH_RTCPEERCONNECTION__) return;
-  window.__PATCH_RTCPEERCONNECTION__ = true;
+
   const C = window.CanvasPatchContext;
   // Global-Alias ​​(reliable in the window and workrs)
   const G = (typeof globalThis !== 'undefined' && globalThis)
@@ -31,9 +30,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   // ——— Global mask "native" + general WeakMap ———
-  const nativeToString = window.__NativeToString || Function.prototype.toString;
-  window.__NativeToString = nativeToString;
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
+  const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
+  const nativeToString = window.__NativeToString
+    || (fpToStringDesc && fpToStringDesc.value)
+    || Function.prototype.toString;
+  // Always pin a stable reference to the native implementation (avoid recursion / stale overrides).
+  window.__NativeToString = nativeToString;
 
   // general WeakMap, available to all modules
   const toStringOverrideMap = (window.__NativeToStringMap instanceof WeakMap)
@@ -100,33 +103,32 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return m;
   })();
 
-  // Single Proxy for Function.prototype.toString, reading from the general WeakMap
+  // Global Function.prototype.toString bridge (no Proxy to avoid [as apply] frames)
+        // IMPORTANT:
+      // - preserve native brand-check semantics:
+      //   Function.prototype.toString MUST throw when receiver is not a Function
+      // - therefore NEVER return overrides for non-functions (objects/proxies/etc)
   if (!window.__TOSTRING_PROXY_INSTALLED__) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-    const toStringProxy = new Proxy(nativeToString, {
-      apply(target, thisArg, args) {
-        // IMPORTANT:
-        // - preserve native brand-check semantics:
-        //   Function.prototype.toString MUST throw when receiver is not a Function
-        // - therefore NEVER return overrides for non-functions (objects/proxies/etc)
-        if (typeof thisArg === 'function') {
-          const v = toStringOverrideMap.get(thisArg);
-          if (v !== undefined) return v;
-        }
-        return Reflect.apply(target, thisArg, args);
+    const toString = ({ toString() {
+      if (typeof this === 'function') {
+        const v = toStringOverrideMap.get(this);
+        if (v !== undefined) return v;
       }
-    });
+      return Reflect.apply(nativeToString, this, arguments);
+    }}).toString;
 
-    markAsNative(toStringProxy, 'toString');
+    markAsNative(toString, 'toString');
 
     Object.defineProperty(Function.prototype, 'toString', {
-      value: toStringProxy,
+      value: toString,
       writable: toStringDesc ? !!toStringDesc.writable : true,
       configurable: toStringDesc ? !!toStringDesc.configurable : true,
       enumerable: toStringDesc ? !!toStringDesc.enumerable : false
     });
     window.__TOSTRING_PROXY_INSTALLED__ = true;
   }
+
 
   function tryCopyNameLength(wrapped, nativeFn, name) {
     try {
@@ -141,44 +143,50 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     } catch (_) {}
   }
 
-  function filterSDP(sdp) {
-    return sdp
-      .split('\n')
-      .filter(l => !l.startsWith('a=candidate') || l.includes('relay'))
-      .join('\n');
-  }
-
-  function normalizeIceServers(servers) {
-    const out = [];
-    for (const s of servers || []) {
-      if (!s) continue;
-      const list = Array.isArray(s.urls) ? s.urls : (s.url || s.urls ? [s.url || s.urls] : []);
-      const urls = [];
-      for (let u of list) {
-        if (typeof u !== 'string') continue;
-        u = u.trim().replace(/#.*$/, '');
-        if (!/^(stun|stuns|turn|turns):/i.test(u)) continue;
-
-        const isStun = /^stuns?:/i.test(u);
-        if (isStun) {
-          u = u.replace(/\?.*$/, '');
-        } else {
-          const q = u.match(/\?transport=([^&]+)/i);
-          if (q && !/^(udp|tcp|tls)$/i.test(q[1])) continue;
-        }
-        urls.push(u);
-      }
-      if (!urls.length) continue;
-      const entry = { urls };
-      if (s.username) entry.username = s.username;
-      if (s.credential) entry.credential = s.credential;
-      out.push(entry);
-    }
-    return out;
-  }
-
+ 
   const Orig = window.RTCPeerConnection;
   if (!Orig) return;
+
+  if (window.__PATCH_RTCPEERCONNECTION__) return;
+  window.__PATCH_RTCPEERCONNECTION__ = true;
+
+
+  function filterSDP(sdp) {
+      return sdp
+        .split('\n')
+        .filter(l => !l.startsWith('a=candidate') || l.includes('relay'))
+        .join('\n');
+    }
+
+    function normalizeIceServers(servers) {
+      const out = [];
+      for (const s of servers || []) {
+        if (!s) continue;
+        const list = Array.isArray(s.urls) ? s.urls : (s.url || s.urls ? [s.url || s.urls] : []);
+        const urls = [];
+        for (let u of list) {
+          if (typeof u !== 'string') continue;
+          u = u.trim().replace(/#.*$/, '');
+          if (!/^(stun|stuns|turn|turns):/i.test(u)) continue;
+
+          const isStun = /^stuns?:/i.test(u);
+          if (isStun) {
+            u = u.replace(/\?.*$/, '');
+          } else {
+            const q = u.match(/\?transport=([^&]+)/i);
+            if (q && !/^(udp|tcp|tls)$/i.test(q[1])) continue;
+          }
+          urls.push(u);
+        }
+        if (!urls.length) continue;
+        const entry = { urls };
+        if (s.username) entry.username = s.username;
+        if (s.credential) entry.credential = s.credential;
+        out.push(entry);
+      }
+      return out;
+  }
+
 
   // --- preserve originals (prototype-level)
   const origCreateOffer = Orig.prototype.createOffer;
@@ -194,7 +202,8 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       return desc;
     });
   };
-  if (markAsNative) { markAsNative(patchedCreateOffer, 'createOffer'); tryCopyNameLength(patchedCreateOffer, origCreateOffer, 'createOffer'); }
+  markAsNative(patchedCreateOffer, 'createOffer');
+  tryCopyNameLength(patchedCreateOffer, origCreateOffer, 'createOffer');
   Orig.prototype.createOffer = patchedCreateOffer;
 
   const patchedCreateAnswer = function createAnswer(...args) {
@@ -203,14 +212,16 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       return desc;
     });
   };
-  if (markAsNative) { markAsNative(patchedCreateAnswer, 'createAnswer'); tryCopyNameLength(patchedCreateAnswer, origCreateAnswer, 'createAnswer'); }
+  markAsNative(patchedCreateAnswer, 'createAnswer');
+  tryCopyNameLength(patchedCreateAnswer, origCreateAnswer, 'createAnswer');
   Orig.prototype.createAnswer = patchedCreateAnswer;
 
   const patchedSetLocalDescription = function setLocalDescription(desc, ...rest) {
     if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
     return origSetLocalDescription.call(this, desc, ...rest);
   };
-  if (markAsNative) { markAsNative(patchedSetLocalDescription, 'setLocalDescription'); tryCopyNameLength(patchedSetLocalDescription, origSetLocalDescription, 'setLocalDescription'); }
+  markAsNative(patchedSetLocalDescription, 'setLocalDescription');
+  tryCopyNameLength(patchedSetLocalDescription, origSetLocalDescription, 'setLocalDescription');
   Orig.prototype.setLocalDescription = patchedSetLocalDescription;
 
   const patchedAddIceCandidate = function addIceCandidate(candidate, ...rest) {
@@ -219,7 +230,8 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     }
     return origAddIceCandidate.call(this, candidate, ...rest);
   };
-  if (markAsNative) { markAsNative(patchedAddIceCandidate, 'addIceCandidate'); tryCopyNameLength(patchedAddIceCandidate, origAddIceCandidate, 'addIceCandidate'); }
+  markAsNative(patchedAddIceCandidate, 'addIceCandidate');
+  tryCopyNameLength(patchedAddIceCandidate, origAddIceCandidate, 'addIceCandidate');
   Orig.prototype.addIceCandidate = patchedAddIceCandidate;
 
   // --- onicecandidate accessor (prototype-level)
@@ -258,32 +270,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     }
     return origAddEventListener.call(this, type, handler, options);
   };
-  if (markAsNative) { markAsNative(patchedAddEventListener, 'addEventListener'); tryCopyNameLength(patchedAddEventListener, origAddEventListener, 'addEventListener'); }
+  markAsNative(patchedAddEventListener, 'addEventListener');
+  tryCopyNameLength(patchedAddEventListener, origAddEventListener, 'addEventListener');
   Orig.prototype.addEventListener = patchedAddEventListener;
 
 
 
 
-
-  // Main-thread only (Not executed in workerscope)
-  if (typeof window !== 'undefined' && G === window) {
-    const WSProto = window.WebSocket && window.WebSocket.prototype;
-    if (WSProto) {
-      const origClose = WSProto.close;
-      // idempotent guard (avoid double-wrapping)
-      if (typeof origClose === 'function' && !origClose.__RTCPC_PATCHED__) {
-        window._myDebugLog = window._myDebugLog || [];
-        const patchedClose = function close(code, reason) {
-          // why: Diagnostic closing trace ws
-          window._myDebugLog.push({ type: 'websocket-close', code, reason, timestamp: new Date().toISOString() });
-          return origClose.call(this, code, reason);
-        };
-        try { Object.defineProperty(patchedClose, '__RTCPC_PATCHED__', { value: true }); } catch (_) {}
-        if (markAsNative) { markAsNative(patchedClose, 'close'); tryCopyNameLength(patchedClose, origClose, 'close'); }
-        WSProto.close = patchedClose;
-      }
-    }
-  }
 
   // --- wrapper constructor that preserves prototype chain
   function PatchedRTCPeerConnection(...args) {
@@ -291,7 +284,8 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     if (opts.iceServers) opts.iceServers = normalizeIceServers(opts.iceServers);
     return new Orig(opts, ...args.slice(1));
   }
-  if (markAsNative) { markAsNative(PatchedRTCPeerConnection, 'RTCPeerConnection'); tryCopyNameLength(PatchedRTCPeerConnection, Orig, 'RTCPeerConnection'); }
+  markAsNative(PatchedRTCPeerConnection, 'RTCPeerConnection');
+  tryCopyNameLength(PatchedRTCPeerConnection, Orig, 'RTCPeerConnection');
 
   PatchedRTCPeerConnection.prototype = Orig.prototype;
   Object.setPrototypeOf(PatchedRTCPeerConnection, Orig);
