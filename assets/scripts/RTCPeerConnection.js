@@ -1,12 +1,12 @@
 const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(window) {
 
   const C = window.CanvasPatchContext;
-  // Global-Alias ​​(reliable in the window and workrs)
   const G = (typeof globalThis !== 'undefined' && globalThis)
         || (typeof self       !== 'undefined' && self)
         || (typeof window     !== 'undefined' && window)
         || (typeof global     !== 'undefined' && global)
         || {};
+        
   // --- nativization provider (moved from hide_webdriver.js) ---
   function safeDefine(obj, prop, descriptor) {
     try {

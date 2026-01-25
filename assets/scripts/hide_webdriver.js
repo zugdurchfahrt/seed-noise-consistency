@@ -54,12 +54,19 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   const proto = Navigator.prototype;
 
-  // navigator.webdriver → undefined
-  safeDefine(proto, 'webdriver', {
-    get: markAsNative(() => undefined, "get webdriver"),
-    configurable: true,
-    enumerable: false
-  });
+  // navigator.webdriver → undefined (preserve descriptor layout when present)
+  const wdDesc = Object.getOwnPropertyDescriptor(proto, 'webdriver');
+  if (wdDesc && wdDesc.configurable === false) {
+    throw new TypeError('[HideWebdriverPatchModule] webdriver non-configurable');
+  }
+  if ('webdriver' in navigator || wdDesc) {
+    safeDefine(proto, 'webdriver', {
+      get: markAsNative(() => undefined, "get webdriver"),
+      set: wdDesc && wdDesc.set,
+      configurable: wdDesc ? !!wdDesc.configurable : true,
+      enumerable: false
+    });
+  }
 
   // --- keep natives once ---
   const nativeGOPD = nativeGetOwnProp;

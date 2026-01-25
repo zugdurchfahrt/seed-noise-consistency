@@ -237,32 +237,81 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (!dBrands || !dMobile || !dPlatform) {
         throw new Error('THW: window navigator.userAgentData descriptor missing');
       }
-      Object.defineProperties(uadProto, {
-        brands: {
-          get: mark(function getBrands(){
+      if (dBrands) {
+        const isData = Object.prototype.hasOwnProperty.call(dBrands, 'value') && !dBrands.get && !dBrands.set;
+        if (isData) {
+          const value = (() => {
             if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: uaData.brands missing');
             return meta.brands;
-          }, 'get brands'),
-          enumerable: true,
-          configurable: true
-        },
-        mobile: {
-          get: mark(function getMobile(){
+          })();
+          Object.defineProperty(uadProto, 'brands', {
+            value,
+            writable: !!dBrands.writable,
+            configurable: !!dBrands.configurable,
+            enumerable: !!dBrands.enumerable
+          });
+        } else {
+          Object.defineProperty(uadProto, 'brands', {
+            get: mark(function getBrands(){
+              if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: uaData.brands missing');
+              return meta.brands;
+            }, 'get brands'),
+            set: dBrands.set,
+            configurable: !!dBrands.configurable,
+            enumerable: !!dBrands.enumerable
+          });
+        }
+      }
+      if (dMobile) {
+        const isData = Object.prototype.hasOwnProperty.call(dMobile, 'value') && !dMobile.get && !dMobile.set;
+        if (isData) {
+          const value = (() => {
             if (typeof meta.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
             return meta.mobile;
-          }, 'get mobile'),
-          enumerable: true,
-          configurable: true
-        },
-        platform: {
-          get: mark(function getPlatform(){
+          })();
+          Object.defineProperty(uadProto, 'mobile', {
+            value,
+            writable: !!dMobile.writable,
+            configurable: !!dMobile.configurable,
+            enumerable: !!dMobile.enumerable
+          });
+        } else {
+          Object.defineProperty(uadProto, 'mobile', {
+            get: mark(function getMobile(){
+              if (typeof meta.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
+              return meta.mobile;
+            }, 'get mobile'),
+            set: dMobile.set,
+            configurable: !!dMobile.configurable,
+            enumerable: !!dMobile.enumerable
+          });
+        }
+      }
+      if (dPlatform) {
+        const isData = Object.prototype.hasOwnProperty.call(dPlatform, 'value') && !dPlatform.get && !dPlatform.set;
+        if (isData) {
+          const value = (() => {
             if (typeof chPlatform !== 'string' || !chPlatform) throw new Error('THW: uaData.platform missing');
             return chPlatform;
-          }, 'get platform'),
-          enumerable: true,
-          configurable: true
+          })();
+          Object.defineProperty(uadProto, 'platform', {
+            value,
+            writable: !!dPlatform.writable,
+            configurable: !!dPlatform.configurable,
+            enumerable: !!dPlatform.enumerable
+          });
+        } else {
+          Object.defineProperty(uadProto, 'platform', {
+            get: mark(function getPlatform(){
+              if (typeof chPlatform !== 'string' || !chPlatform) throw new Error('THW: uaData.platform missing');
+              return chPlatform;
+            }, 'get platform'),
+            set: dPlatform.set,
+            configurable: !!dPlatform.configurable,
+            enumerable: !!dPlatform.enumerable
+          });
         }
-      });
+      }
       const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
       const getFullVersionList = mark(function getFullVersionList(){
         if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) {
@@ -366,25 +415,29 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     // ——— F. deviceMemory/hardwareConcurrency ———
-    const okDeviceMemory = (Object.getOwnPropertyDescriptor(navProto,'deviceMemory') ?
+    const hasDeviceMemory = ('deviceMemory' in navigator);
+    const okDeviceMemory = hasDeviceMemory ? (Object.getOwnPropertyDescriptor(navProto,'deviceMemory') ?
       (redefineAcc(navProto, 'deviceMemory', () => mem), true) :
-      safeDefineAcc(navProto, 'deviceMemory', () => mem, { enumerable: true }));
+      safeDefineAcc(navProto, 'deviceMemory', () => mem, { enumerable: true })) : true;
     if (okDeviceMemory === false) throw new TypeError('[nav_total_set] failed to define deviceMemory');
 
-    const okHardwareConcurrency = (Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency') ?
+    const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
+    const okHardwareConcurrency = hasHardwareConcurrency ? (Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency') ?
       (redefineAcc(navProto, 'hardwareConcurrency', () => cpu), true) :
-      safeDefineAcc(navProto, 'hardwareConcurrency', () => cpu, { enumerable: true }));
+      safeDefineAcc(navProto, 'hardwareConcurrency', () => cpu, { enumerable: true })) : true;
     if (okHardwareConcurrency === false) throw new TypeError('[nav_total_set] failed to define hardwareConcurrency');
 
     // ——— G. language(s) ———
-    const okLanguage = (Object.getOwnPropertyDescriptor(navProto,'language') ?
+    const hasLanguage = ('language' in navigator);
+    const okLanguage = hasLanguage ? (Object.getOwnPropertyDescriptor(navProto,'language') ?
       (redefineAcc(navProto, 'language', () => window.__primaryLanguage), true) :
-      safeDefineAcc(navProto, 'language', () => window.__primaryLanguage,  { enumerable: true }));
+      safeDefineAcc(navProto, 'language', () => window.__primaryLanguage,  { enumerable: true })) : true;
     if (okLanguage === false) throw new TypeError('[nav_total_set] failed to define language');
 
-    const okLanguages = (Object.getOwnPropertyDescriptor(navProto,'languages') ?
+    const hasLanguages = ('languages' in navigator);
+    const okLanguages = hasLanguages ? (Object.getOwnPropertyDescriptor(navProto,'languages') ?
       (redefineAcc(navProto, 'languages', () => window.__normalizedLanguages), true) :
-      safeDefineAcc(navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true }));
+      safeDefineAcc(navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true })) : true;
     if (okLanguages === false) throw new TypeError('[nav_total_set] failed to define languages');
 
     // ——— H. permissions.query ———
@@ -749,8 +802,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
 
       // Getters - like in ORIG: enumerable: true
-      safeDefineAcc(navProto, 'plugins', () => createPluginArray(fakePlugins), { enumerable: true });
-      safeDefineAcc(navProto, 'mimeTypes', () => createMimeTypeArray(fakePlugins), { enumerable: true });
+      if ('plugins' in navigator) {
+        safeDefineAcc(navProto, 'plugins', () => createPluginArray(fakePlugins), { enumerable: true });
+      }
+      if ('mimeTypes' in navigator) {
+        safeDefineAcc(navProto, 'mimeTypes', () => createMimeTypeArray(fakePlugins), { enumerable: true });
+      }
 
     //  ——— Debug information to console ———
   if (G.__DEBUG__) {
