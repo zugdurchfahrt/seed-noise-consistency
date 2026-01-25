@@ -54,7 +54,7 @@ MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
 CHROME_BINARY       = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
 CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
-ENABLE_SW_INJECTOR = True  # <- ваш флаг (включаете вручную когда нужно)
+ENABLE_SW_INJECTOR = False  # <- ваш флаг (включаете вручную когда нужно)
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
 
@@ -267,6 +267,7 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
+            lang_js_inline,
             # --- RTC ---
             Path(SCRIPTS_DIR / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
@@ -382,6 +383,28 @@ def init_driver(
     window.__PLUGIN_PROFILES__          = {json.dumps(profile.get("plugins", []), ensure_ascii=False)};
     window.__PLUGIN_MIMETYPES__         = {json.dumps(profile.get("mimeTypes", []), ensure_ascii=False)};
     """
+    lang_js_inline = f"""
+    (() => {{
+    window.__primaryLanguage = {json.dumps(language, ensure_ascii=False)};
+    window.__normalizedLanguages = {json.dumps(normalized_languages, ensure_ascii=False)};
+
+    // FrozenArray semantics (минимально приближенно): массив заморожен
+    if (Array.isArray(window.__normalizedLanguages)) {{
+        Object.freeze(window.__normalizedLanguages);
+    }}
+
+    // fail-fast: типы и консистентность
+    if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
+        throw new Error('THW: __primaryLanguage invalid');
+    }}
+    if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
+        throw new Error('THW: __normalizedLanguages invalid');
+    }}
+    if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
+        throw new Error('THW: language != languages[0]');
+    }}
+    }})();
+    """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
         # --- prepare worker_bootstrap_js ---
@@ -442,11 +465,11 @@ def init_driver(
     //# sourceURL=worker_bootstrap_init.js
     """
     
-        # Connect page_js (wrk.js and so on)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-    
-    # Connect worker_bootstrap_js (after page_js)
+        # Connect worker_bootstrap_js (before page_js)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
+    
+    # Connect page_js (wrk.js and so on)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
@@ -589,30 +612,6 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         )
         # Languages stable final setting
 
-        lang_js = f"""
-        (() => {{
-        window.__primaryLanguage = {json.dumps(primary_language, ensure_ascii=False)};
-        window.__normalizedLanguages = {json.dumps(normalized_languages, ensure_ascii=False)};
-
-        // FrozenArray semantics (минимально приближенно): массив заморожен
-        if (Array.isArray(window.__normalizedLanguages)) {{
-            Object.freeze(window.__normalizedLanguages);
-        }}
-
-        // fail-fast: типы и консистентность
-        if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
-            throw new Error('THW: __primaryLanguage invalid');
-        }}
-        if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
-            throw new Error('THW: __normalizedLanguages invalid');
-        }}
-        if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
-            throw new Error('THW: language != languages[0]');
-        }}
-        }})();
-        """
-        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": lang_js})
-        
         device_metrics = build_device_metrics(profile)
         driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
 

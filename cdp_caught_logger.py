@@ -13,6 +13,8 @@ SW_PRIMARY = None
 SW_LANGS = None
 SW_HC = None
 SW_DM = None
+# Auto-attach strategy: "service_worker_only" avoids pausing non-SW targets.
+SW_AUTOATTACH_MODE = "service_worker_only"  # or "all_targets"
 
 _RUNNING = False
 
@@ -138,9 +140,14 @@ def run():
     injected = set()   # targetId set
     sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS, SW_HC, SW_DM)
 
-    def send(ws, method, params=None):
+    pending = {}
+
+    def send(ws, method, params=None, tag=None):
         msg_id["v"] += 1
-        ws.send(json.dumps({"id": msg_id["v"], "method": method, "params": params or {}}))
+        mid = msg_id["v"]
+        if tag:
+            pending[mid] = tag
+        ws.send(json.dumps({"id": mid, "method": method, "params": params or {}}))
 
     def send_sess(ws, sessionId, method, params=None):
         if sessionId not in sess_id:
@@ -152,16 +159,38 @@ def run():
     def on_open(ws):
         # only what we need for auto-attach
         send(ws, "Target.setDiscoverTargets", {"discover": True})
-        send(ws, "Target.setAutoAttach", {
-            "autoAttach": True,
-            "waitForDebuggerOnStart": True,
-            "flatten": True
-        })
+        if SW_AUTOATTACH_MODE == "service_worker_only":
+            send(ws, "Target.setAutoAttach", {
+                "autoAttach": True,
+                "waitForDebuggerOnStart": True,
+                "flatten": True,
+                "targetFilter": [{"type": "service_worker"}]
+            }, tag="autoattach_sw_only")
+        else:
+            send(ws, "Target.setAutoAttach", {
+                "autoAttach": True,
+                "waitForDebuggerOnStart": True,
+                "flatten": True
+            })
 
     def on_message(ws, message):
         try:
             msg = json.loads(message)
         except Exception:
+            return
+
+        if "id" in msg:
+            tag = pending.pop(msg.get("id"), None)
+            if tag == "autoattach_sw_only" and msg.get("error"):
+                # Fallback to global auto-attach if targetFilter is unsupported.
+                try:
+                    send(ws, "Target.setAutoAttach", {
+                        "autoAttach": True,
+                        "waitForDebuggerOnStart": True,
+                        "flatten": True
+                    })
+                except Exception:
+                    pass
             return
 
         if msg.get("method") != "Target.attachedToTarget":

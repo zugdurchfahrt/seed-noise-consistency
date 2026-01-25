@@ -626,7 +626,9 @@ const CanvasPatchModule = function CanvasPatchModule(window) {
           const w = (bmp.width || bmp.naturalWidth || 0) | 0;
           const h = (bmp.height || bmp.naturalHeight || 0) | 0;
           if (w && h) {
-            const sc = makeCanvas(w, h);
+            const sc = (typeof document !== 'undefined' && typeof document.createElement === 'function')
+              ? (() => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; })()
+              : makeCanvas(w, h);
             if (sc) {
               const sctx = sc.getContext('2d', { willReadFrequently: true });
               if (sctx) {

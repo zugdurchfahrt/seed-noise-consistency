@@ -208,24 +208,45 @@ function mkModuleWorkerSource(snapshot, absUrl){
         self.__lastSnap__ = __requireSnap(s);
         self.__ENV_SNAP_APPLIED__ = s;
       };
-      self.__applyEnvSnapshot__(${SNAP});
-      if (!self.__ENV_SYNC_BC_INSTALLED__) {
-        if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
-        self.__ENV_SYNC_BC_INSTALLED__ = true;
-        const bc = new BroadcastChannel('__ENV_SYNC__');
-        bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+      try {
+        self.__applyEnvSnapshot__(${SNAP});
+      } catch (e) {
+        self.__lastSnap__ = ${SNAP};
+        self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
       }
-      // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
-      const PATCH_URL = ${PATCH_URL};
-      if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchModule URL');
-      await import(PATCH_URL);
-      if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-      self.installWorkerUACHMirror();
-      if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
-      if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
-      // Применяем снимок СЕЙЧАС, уже через реализацию патча:
-      if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
-      self.__applyEnvSnapshot__(self.__lastSnap__);
+      if (!self.__ENV_SYNC_BC_INSTALLED__) {
+        try {
+          if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
+          self.__ENV_SYNC_BC_INSTALLED__ = true;
+          const bc = new BroadcastChannel('__ENV_SYNC__');
+          bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+        } catch (e) {
+          self.__ENV_BC_ERROR__ = String((e && (e.stack || e.message)) || e);
+        }
+      }
+      let __patchOK = false;
+      try {
+        // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
+        const PATCH_URL = ${PATCH_URL};
+        if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchModule URL');
+        await import(PATCH_URL);
+        if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
+        self.installWorkerUACHMirror();
+        if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
+        if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
+        __patchOK = true;
+      } catch (e) {
+        self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
+      }
+      if (__patchOK) {
+        try {
+          // Применяем снимок СЕЙЧАС, уже через реализацию патча:
+          if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
+          self.__applyEnvSnapshot__(self.__lastSnap__);
+        } catch (e) {
+          self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
+        }
+      }
       // Только ПОСЛЕ зеркала грузим пользовательский код:
       const USER = ${USER};
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user module URL');
@@ -278,24 +299,45 @@ function mkClassicWorkerSource(snapshot, absUrl){
         self.__lastSnap__ = __requireSnap(s);
         self.__ENV_SNAP_APPLIED__ = s;
       };
-      self.__applyEnvSnapshot__(${SNAP});
-      if (!self.__ENV_SYNC_BC_INSTALLED__) {
-        if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
-        self.__ENV_SYNC_BC_INSTALLED__ = true;
-        const bc = new BroadcastChannel('__ENV_SYNC__');
-        bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+      try {
+        self.__applyEnvSnapshot__(${SNAP});
+      } catch (e) {
+        self.__lastSnap__ = ${SNAP};
+        self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
       }
-      // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
-      const PATCH_URL = ${PATCH_URL};
-      if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchClassic URL');
-      importScripts(PATCH_URL);
-      if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-      self.installWorkerUACHMirror();
-      if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
-      if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
-      // Применяем снимок СЕЙЧАС, уже через реализацию патча:
-      if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
-      self.__applyEnvSnapshot__(self.__lastSnap__);
+      if (!self.__ENV_SYNC_BC_INSTALLED__) {
+        try {
+          if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
+          self.__ENV_SYNC_BC_INSTALLED__ = true;
+          const bc = new BroadcastChannel('__ENV_SYNC__');
+          bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+        } catch (e) {
+          self.__ENV_BC_ERROR__ = String((e && (e.stack || e.message)) || e);
+        }
+      }
+      let __patchOK = false;
+      try {
+        // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
+        const PATCH_URL = ${PATCH_URL};
+        if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchClassic URL');
+        importScripts(PATCH_URL);
+        if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
+        self.installWorkerUACHMirror();
+        if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
+        if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
+        __patchOK = true;
+      } catch (e) {
+        self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
+      }
+      if (__patchOK) {
+        try {
+          // Применяем снимок СЕЙЧАС, уже через реализацию патча:
+          if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
+          self.__applyEnvSnapshot__(self.__lastSnap__);
+        } catch (e) {
+          self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
+        }
+      }
       var __isModuleURL = function(u){
         if (typeof u !== 'string' || !u) return false;
         if (/\\.mjs(?:$|[?#])/i.test(u)) return true;
@@ -959,7 +1001,11 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     const o = Object.assign({ publishHE: true, heKeys: null }, opts);
     installOverrides();        // Hub → Overrides
     if (o.publishHE) {
-      return snapshotHE(o.heKeys).then(() => snapshotOnce());
+      const first = snapshotOnce();
+      return snapshotHE(o.heKeys).then(() => {
+        snapshotOnce();
+        return first;
+      });
     }
     return snapshotOnce();
   }
@@ -1001,5 +1047,3 @@ Object.defineProperty(globalThis, 'WrkModule', {
   configurable: false,
   enumerable: false,
 });
-
-
