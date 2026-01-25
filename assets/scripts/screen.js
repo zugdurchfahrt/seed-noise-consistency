@@ -75,7 +75,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
 
   const origMatchMedia = window.matchMedia;
-  window.matchMedia = function (query) {
+  const mmTarget = chooseTarget(window, Object.getPrototypeOf(window), 'matchMedia');
+  if (!mmTarget) throw new Error(`[Screen] matchMedia descriptor missing`);
+  const patchedMatchMedia = function matchMedia(query) {
     let matches = true;
 
     
@@ -141,6 +143,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return mql;
   };
+  redefineProp(mmTarget, 'matchMedia', () => patchedMatchMedia);
 
   //  screen и orientation ──
   const screenObj = window.screen;
@@ -176,51 +179,27 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
 
   // inner/outerWidth/Height
   ["innerWidth", "innerHeight", "outerWidth", "outerHeight"].forEach(prop => {
-    safeDefine(window, prop, {
-      get: () => (prop.endsWith("Width") ? SCREEN_WIDTH : SCREEN_HEIGHT),
-      configurable: true,
-      enumerable: true
-    });
+    const target = chooseTarget(window, Object.getPrototypeOf(window), prop);
+    if (!target) throw new Error(`[Screen] ${prop} descriptor missing`);
+    redefineProp(target, prop, () => (prop.endsWith("Width") ? SCREEN_WIDTH : SCREEN_HEIGHT));
   });
 
   //  visualViewport 
   if (window.visualViewport) {
-    safeDefine(window.visualViewport, "width", {
-      get: () => SCREEN_WIDTH,
-      configurable: true,
-      enumerable: true
-    });
-    safeDefine(window.visualViewport, "height", {
-      get: () => SCREEN_HEIGHT,
-      configurable: true,
-      enumerable: true
-    });
-    safeDefine(window.visualViewport, "offsetLeft", {
-      get: () => 0,
-      configurable: true,
-      enumerable: true
-    });
-    safeDefine(window.visualViewport, "offsetTop", {
-      get: () => 0,
-      configurable: true,
-      enumerable: true
-    });
-    //  viewport:
-    safeDefine(window.visualViewport, "scale", {
-      get: () => 1,
-      configurable: true,
-      enumerable: true
-    });
-    safeDefine(window.visualViewport, "pageLeft", {
-      get: () => 0,
-      configurable: true,
-      enumerable: true
-    });
-    safeDefine(window.visualViewport, "pageTop", {
-      get: () => 0,
-      configurable: true,
-      enumerable: true
-    });
+    const vv = window.visualViewport;
+    const vvProto = vv && Object.getPrototypeOf(vv);
+    const setVV = (k, get) => {
+      const t = chooseTarget(vv, vvProto, k);
+      if (!t) throw new Error(`[Screen] visualViewport.${k} descriptor missing`);
+      redefineProp(t, k, get);
+    };
+    setVV('width', () => SCREEN_WIDTH);
+    setVV('height', () => SCREEN_HEIGHT);
+    setVV('offsetLeft', () => 0);
+    setVV('offsetTop', () => 0);
+    setVV('scale', () => 1);
+    setVV('pageLeft', () => 0);
+    setVV('pageTop', () => 0);
   }
 
   // — make screen serializable
