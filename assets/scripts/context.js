@@ -16,6 +16,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
   }
 
   C.__READY__ = true;
+  const patchState = C.__patchState || (C.__patchState = {
+    canvas: false,
+    offscreen: false,
+    webgl: false,
+    hooksRegistered: false,
+  });
 
   // === 0. Utilities ===
   const NOP = () => {};
@@ -83,36 +89,44 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.webglShaderSourceHooks              = C.webglShaderSourceHooks             || [];
   C.webglGetUniformHooks                = C.webglGetUniformHooks               || [];
 
+  function registerOnce(list, fn) {
+    if (!list || typeof fn !== 'function') return false;
+    if (list.indexOf(fn) !== -1) return false;
+    list.push(fn);
+    return true;
+  }
+
   // === 2. Registrars ===
-  C.registerHtmlCanvasGetContextHook          = fn => (typeof fn === 'function') && C.htmlCanvasGetContextHooks.push(fn);
-  C.registerHtmlCanvasToDataURLHook           = fn => (typeof fn === 'function') && C.htmlCanvasToDataURLHooks.push(fn);
-  C.registerHtmlCanvasToBlobHook              = fn => (typeof fn === 'function') && C.htmlCanvasToBlobHooks.push(fn);
+  C.registerHtmlCanvasGetContextHook          = fn => registerOnce(C.htmlCanvasGetContextHooks, fn);
+  C.registerHtmlCanvasToDataURLHook           = fn => registerOnce(C.htmlCanvasToDataURLHooks, fn);
+  C.registerHtmlCanvasToBlobHook              = fn => registerOnce(C.htmlCanvasToBlobHooks, fn);
 
-  C.registerOffscreenGetContextHook           = fn => (typeof fn === 'function') && C.offscreenGetContextHooks.push(fn);
-  C.registerOffscreenConvertToBlobHook        = fn => (typeof fn === 'function') && C.offscreenConvertToBlobHooks.push(fn);
+  C.registerOffscreenGetContextHook           = fn => registerOnce(C.offscreenGetContextHooks, fn);
+  C.registerOffscreenConvertToBlobHook        = fn => registerOnce(C.offscreenConvertToBlobHooks, fn);
 
-  C.registerCtx2DGetContextHook               = fn => (typeof fn === 'function') && C.ctx2DGetContextHooks.push(fn);
-  C.registerCtx2DMeasureTextHook              = fn => (typeof fn === 'function') && C.ctx2DMeasureTextHooks.push(fn);
-  C.registerCtx2DFillTextHook                 = fn => (typeof fn === 'function') && C.ctx2DFillTextHooks.push(fn);
-  C.registerCtx2DStrokeTextHook               = fn => (typeof fn === 'function') && C.ctx2DStrokeTextHooks.push(fn);
-  C.registerCtx2DFillRectHook                 = fn => (typeof fn === 'function') && C.ctx2DFillRectHooks.push(fn);
-  C.registerCtx2DDrawImageHook                = fn => (typeof fn === 'function') && C.ctx2DDrawImageHooks.push(fn);
-  C.registerCtx2DAddNoiseHook                 = fn => (typeof fn === 'function') && C.canvas2DNoiseHooks.push(fn);
+  C.registerCtx2DGetContextHook               = fn => registerOnce(C.ctx2DGetContextHooks, fn);
+  C.registerCtx2DMeasureTextHook              = fn => registerOnce(C.ctx2DMeasureTextHooks, fn);
+  C.registerCtx2DFillTextHook                 = fn => registerOnce(C.ctx2DFillTextHooks, fn);
+  C.registerCtx2DStrokeTextHook               = fn => registerOnce(C.ctx2DStrokeTextHooks, fn);
+  C.registerCtx2DFillRectHook                 = fn => registerOnce(C.ctx2DFillRectHooks, fn);
+  C.registerCtx2DDrawImageHook                = fn => registerOnce(C.ctx2DDrawImageHooks, fn);
+  C.registerCtx2DAddNoiseHook                 = fn => registerOnce(C.canvas2DNoiseHooks, fn);
 
-  C.registerWebGLGetContextHook               = fn => (typeof fn === 'function') && C.webglGetContextHooks.push(fn);
-  C.registerWebGLGetParameterHook             = fn => (typeof fn === 'function') && C.webglGetParameterHooks.push(fn);
-  C.registerWebGLGetSupportedExtensionsHook   = fn => (typeof fn === 'function') && C.webglGetSupportedExtensionsHooks.push(fn);
-  C.registerWebGLGetExtensionHook             = fn => (typeof fn === 'function') && C.webglGetExtensionHooks.push(fn);
-  C.registerWebGLReadPixelsHook               = fn => (typeof fn === 'function') && C.webglReadPixelsHooks.push(fn);
-  C.registerWebGLGetShaderPrecisionFormatHook = fn => (typeof fn === 'function') && C.webglGetShaderPrecisionFormatHooks.push(fn);
-  C.registerWebGLShaderSourceHook             = fn => (typeof fn === 'function') && C.webglShaderSourceHooks.push(fn);
-  C.registerWebGLGetUniformHook               = fn => (typeof fn === 'function') && C.webglGetUniformHooks.push(fn);
+  C.registerWebGLGetContextHook               = fn => registerOnce(C.webglGetContextHooks, fn);
+  C.registerWebGLGetParameterHook             = fn => registerOnce(C.webglGetParameterHooks, fn);
+  C.registerWebGLGetSupportedExtensionsHook   = fn => registerOnce(C.webglGetSupportedExtensionsHooks, fn);
+  C.registerWebGLGetExtensionHook             = fn => registerOnce(C.webglGetExtensionHooks, fn);
+  C.registerWebGLReadPixelsHook               = fn => registerOnce(C.webglReadPixelsHooks, fn);
+  C.registerWebGLGetShaderPrecisionFormatHook = fn => registerOnce(C.webglGetShaderPrecisionFormatHooks, fn);
+  C.registerWebGLShaderSourceHook             = fn => registerOnce(C.webglShaderSourceHooks, fn);
+  C.registerWebGLGetUniformHook               = fn => registerOnce(C.webglGetUniformHooks, fn);
 
   // === 3. Patch utilities ===
   function chain(proto, method, hooks){
-    if (!proto || typeof proto[method] !== 'function' || !(hooks && hooks.length)) return false;
+    if (!proto || typeof proto[method] !== 'function') return false;
     const orig = proto[method];
     if (patchedMethods.has(orig)) return false;
+    const hookList = Array.isArray(hooks) ? hooks : [];
 
     // Avoid expando flags on "this" (detectable). Use WeakSet recursion guard.
     const inProgress =
@@ -132,7 +146,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
           try {
             let patchedArgs = Array.prototype.slice.call(arguments);
-            for (const hook of hooks){
+            for (const hook of hookList){
               if (typeof hook !== 'function') continue;
               try {
                 const next = hook.apply(this, patchedArgs);
@@ -143,7 +157,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
             }
             const out = Reflect.apply(orig, this, patchedArgs);
             let res = out;
-            for (const hook of hooks){
+            for (const hook of hookList){
               try {
                 const r = hook.call(this, res, ...patchedArgs);
                 if (typeof r === 'string') res = r;
@@ -172,7 +186,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
           try {
             let patchedArgs = Array.prototype.slice.call(arguments);
-            for (const hook of hooks){
+            for (const hook of hookList){
               if (typeof hook !== 'function') continue;
               try {
                 const next = hook.apply(this, patchedArgs);
@@ -413,7 +427,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         const H = getHooks();
 
         if (H && typeof H.applyFillTextHook === 'function') {
-          const callOrig = function(...a){ return Reflect.apply(orig, this, a); };
+          const callOrig = (...a) => Reflect.apply(orig, this, a);
           return H.applyFillTextHook.call(this, callOrig, text, x, y, ...rest);
         }
 
@@ -432,7 +446,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         const H = getHooks();
 
         if (H && typeof H.applyStrokeTextHook === 'function') {
-          const callOrig = function(...a){ return Reflect.apply(orig, this, a); };
+          const callOrig = (...a) => Reflect.apply(orig, this, a);
           return H.applyStrokeTextHook.call(this, callOrig, text, x, y, ...rest);
         }
 
@@ -462,7 +476,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       try {
         const H = getHooks();
         if (H && typeof H.applyDrawImageHook === 'function') {
-          const callOrig = function(...a){ return Reflect.apply(orig, this, a); };
+          const callOrig = (...a) => Reflect.apply(orig, this, a);
           return H.applyDrawImageHook.call(this, callOrig, ...args);
         }
       } catch { /* silent */ }
@@ -515,6 +529,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   // === 6. applying of patches===
   C.applyCanvasElementPatches = function(){
+    const state = this.__patchState || (this.__patchState = patchState);
+    if (state.canvas) return 0;
+    if (typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype) return 0;
     let applied = 0, total = 0;
     total++; if (chain(HTMLCanvasElement.prototype, 'toDataURL', this.htmlCanvasToDataURLHooks)) applied++;
     total++; if (chainAsync(HTMLCanvasElement.prototype, 'toBlob', () => this.htmlCanvasToBlobHooks)) applied++;
@@ -525,11 +542,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
       this.ctx2DGetContextHooks,
       this.webglGetContextHooks
     )) applied++;
+    state.canvas = true;
     if (global.__DEBUG__) console.log(`[CanvasPatch] Canvas element patches: applied ${applied} из ${total}`);
     return applied;
   };
 
   C.applyOffscreenPatches = function(){
+    const state = this.__patchState || (this.__patchState = patchState);
+    if (state.offscreen) return 0;
     const Ctx = this;
     let applied = 0, total = 0;
     if (typeof OffscreenCanvas !== 'undefined'){
@@ -541,13 +561,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
         Ctx.ctx2DGetContextHooks,
         Ctx.webglGetContextHooks
       )) applied++;
+      state.offscreen = true;
     }
     if (global.__DEBUG__) console.log(`[CanvasPatch] Offscreen patches: applied ${applied} из ${total}`);
     return applied;
   };
 
   C.applyWebGLContextPatches = function () {
+      const state = this.__patchState || (this.__patchState = patchState);
+      if (state.webgl) return 0;
       let applied = 0, total = 0;
+      let already = 0;
       const list = [
         [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "getParameter", this.webglGetParameterHooks],
         [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "getSupportedExtensions", this.webglGetSupportedExtensionsHooks],
@@ -567,36 +591,40 @@ const ContextPatchModule = function ContextPatchModule(window) {
       for (const [proto, m, hooks] of list) {
         if (!proto) continue;
         total++;
+        if (patchedMethods.has(proto[m])) already++;
         if (patchMethod(proto, m, hooks)) applied++;
       }
+      if (total > 0 && (applied > 0 || already === total)) state.webgl = true;
       console.log(`[CanvasPatch] WebGL context patches: applied ${applied} из ${total}`);
       return applied;
     };
 
   // === 3. REGISTER HOOK FUNCTIONS ===
-  C.registerHtmlCanvasToBlobHook              = fn => typeof fn === 'function' && C.htmlCanvasToBlobHooks.push(fn);
-  C.registerHtmlCanvasToDataURLHook           = fn => typeof fn === 'function' && C.htmlCanvasToDataURLHooks.push(fn);
-  C.registerOffscreenConvertToBlobHook        = fn => typeof fn === 'function' && C.offscreenConvertToBlobHooks.push(fn);
-  C.registerCtx2DGetContextHook               = fn => typeof fn === 'function' && C.ctx2DGetContextHooks.push(fn);
-  C.registerCtx2DMeasureTextHook              = fn => typeof fn === 'function' && C.ctx2DMeasureTextHooks.push(fn);
-  C.registerCtx2DFillTextHook                 = fn => typeof fn === 'function' && C.ctx2DFillTextHooks.push(fn);
-  C.registerCtx2DStrokeTextHook               = fn => typeof fn === 'function' && C.ctx2DStrokeTextHooks.push(fn);
-  C.registerCtx2DFillRectHook                 = fn => typeof fn === 'function' && C.ctx2DFillRectHooks.push(fn);
-  C.registerCtx2DDrawImageHook                = fn => typeof fn === 'function' && C.ctx2DDrawImageHooks.push(fn);
-  C.registerCtx2DAddNoiseHook                 = fn => typeof fn === 'function' && C.canvas2DNoiseHooks.push(fn);
-  C.registerWebGLGetContextHook               = fn => typeof fn === 'function' && C.webglGetContextHooks.push(fn);
-  C.registerWebGLGetParameterHook             = fn => typeof fn === 'function' && C.webglGetParameterHooks.push(fn);
-  C.registerWebGLGetSupportedExtensionsHook   = fn => typeof fn === 'function' && C.webglGetSupportedExtensionsHooks.push(fn);
-  C.registerWebGLGetExtensionHook             = fn => typeof fn === 'function' && C.webglGetExtensionHooks.push(fn);
-  C.registerWebGLReadPixelsHook               = fn => typeof fn === 'function' && C.webglReadPixelsHooks.push(fn);
-  C.registerWebGLGetShaderPrecisionFormatHook = fn => typeof fn === 'function' && C.webglGetShaderPrecisionFormatHooks.push(fn);
-  C.registerWebGLShaderSourceHook             = fn => typeof fn === 'function' && C.webglShaderSourceHooks.push(fn);
-  C.registerWebGLGetUniformHook               = fn => typeof fn === 'function' && C.webglGetUniformHooks.push(fn);
+  C.registerHtmlCanvasToBlobHook              = fn => registerOnce(C.htmlCanvasToBlobHooks, fn);
+  C.registerHtmlCanvasToDataURLHook           = fn => registerOnce(C.htmlCanvasToDataURLHooks, fn);
+  C.registerOffscreenConvertToBlobHook        = fn => registerOnce(C.offscreenConvertToBlobHooks, fn);
+  C.registerCtx2DGetContextHook               = fn => registerOnce(C.ctx2DGetContextHooks, fn);
+  C.registerCtx2DMeasureTextHook              = fn => registerOnce(C.ctx2DMeasureTextHooks, fn);
+  C.registerCtx2DFillTextHook                 = fn => registerOnce(C.ctx2DFillTextHooks, fn);
+  C.registerCtx2DStrokeTextHook               = fn => registerOnce(C.ctx2DStrokeTextHooks, fn);
+  C.registerCtx2DFillRectHook                 = fn => registerOnce(C.ctx2DFillRectHooks, fn);
+  C.registerCtx2DDrawImageHook                = fn => registerOnce(C.ctx2DDrawImageHooks, fn);
+  C.registerCtx2DAddNoiseHook                 = fn => registerOnce(C.canvas2DNoiseHooks, fn);
+  C.registerWebGLGetContextHook               = fn => registerOnce(C.webglGetContextHooks, fn);
+  C.registerWebGLGetParameterHook             = fn => registerOnce(C.webglGetParameterHooks, fn);
+  C.registerWebGLGetSupportedExtensionsHook   = fn => registerOnce(C.webglGetSupportedExtensionsHooks, fn);
+  C.registerWebGLGetExtensionHook             = fn => registerOnce(C.webglGetExtensionHooks, fn);
+  C.registerWebGLReadPixelsHook               = fn => registerOnce(C.webglReadPixelsHooks, fn);
+  C.registerWebGLGetShaderPrecisionFormatHook = fn => registerOnce(C.webglGetShaderPrecisionFormatHooks, fn);
+  C.registerWebGLShaderSourceHook             = fn => registerOnce(C.webglShaderSourceHooks, fn);
+  C.registerWebGLGetUniformHook               = fn => registerOnce(C.webglGetUniformHooks, fn);
 
   // === 4. FINAL REGISTRATION ===
   function registerAllHooks() {
     const C = window.CanvasPatchContext;
     if (!C) return;
+    const state = C.__patchState || (C.__patchState = patchState);
+    if (state.hooksRegistered) return;
 
     // 1) We guarantee the presence of registers
     window.CanvasPatchHooks = window.CanvasPatchHooks || {};
@@ -657,6 +685,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (C.registerWebGLGetShaderPrecisionFormatHook) C.registerWebGLGetShaderPrecisionFormatHook(webglHooks.webglGetShaderPrecisionFormatHook);
     if (C.registerWebGLShaderSourceHook)             C.registerWebGLShaderSourceHook(webglHooks.webglShaderSourceHook);
     if (C.registerWebGLGetUniformHook)               C.registerWebGLGetUniformHook(webglHooks.webglGetUniformHook);
+    state.hooksRegistered = true;
   }
     // export registerAllHooks for applying in main.py
 window.registerAllHooks = registerAllHooks;
