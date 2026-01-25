@@ -15,12 +15,88 @@ const AudioContextModule = function AudioContextModule(window) {
   })();
   const AUDIO_NOISE_ENABLED = false;
 
-  // 1. get original values for sampleRate/baseLatency
+  const GUARD = globalThis.__AUDIO_CTX_GUARD__ || (globalThis.__AUDIO_CTX_GUARD__ = {
+    counts: {},
+    last: null
+  });
+
+  function noteIssue(code, detail) {
+    const key = String(code);
+    GUARD.counts[key] = (GUARD.counts[key] || 0) + 1;
+    GUARD.last = { code: key, detail: detail || null, at: Date.now() };
+    if (Array.isArray(globalThis._myDebugLog)) {
+      globalThis._myDebugLog.push({
+        type: 'audio_guard',
+        code: key,
+        detail: detail || null,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  function canRedefine(proto, prop, ctxName) {
+    if (!proto) { noteIssue(`missing_proto:${prop}`, ctxName); return false; }
+    if (!Object.isExtensible(proto)) { noteIssue(`non_extensible:${prop}`, ctxName); return false; }
+    const d = Object.getOwnPropertyDescriptor(proto, prop);
+    if (d && d.configurable === false) { noteIssue(`non_configurable:${prop}`, ctxName); return false; }
+    return true;
+  }
+
+  function getPropDescriptorDeep(obj, prop) {
+    for (let o = obj; o; o = Object.getPrototypeOf(o)) {
+      const d = Object.getOwnPropertyDescriptor(o, prop);
+      if (d) return d;
+    }
+    return null;
+  }
+
+  // Create non-constructible accessors/methods (match native layout)
+  function makeGetter(prop, impl) {
+    const holder = ({ get [prop]() { return impl.call(this); } });
+    return Object.getOwnPropertyDescriptor(holder, prop).get;
+  }
+  function makeMethod(name, impl) {
+    return ({ [name](...args) { return impl.apply(this, args); } })[name];
+  }
+
+  function canReplaceMethod(proto, method, ctxName) {
+    if (!proto) { noteIssue(`missing_proto:${method}`, ctxName); return false; }
+    if (!Object.isExtensible(proto)) { noteIssue(`non_extensible:${method}`, ctxName); return false; }
+    const own = Object.getOwnPropertyDescriptor(proto, method);
+    if (own) {
+      if (own.writable === false && own.configurable === false) {
+        noteIssue(`non_writable:${method}`, ctxName);
+        return false;
+      }
+      return true;
+    }
+    // not an own property: allow shadowing if method exists on prototype chain
+    const inherited = getPropDescriptorDeep(proto, method);
+    if (!inherited) { noteIssue(`missing_method:${method}`, ctxName); return false; }
+    return true;
+  }
+
+  // 1. lazy native values for sampleRate/baseLatency (avoid eager AudioContext init)
   let nativeSampleRate = 44100, nativeBaseLatency = 0.0029;
-  const ctx = window.AudioContext ? new window.AudioContext() : new window.OfflineAudioContext(1, 1, 44100);
-  nativeSampleRate = ctx.sampleRate;
-  if ('baseLatency' in ctx) nativeBaseLatency = ctx.baseLatency;
-  ctx.close && ctx.close();
+  let sampleRateSource = 0; // 0=default, 1=offline, 2=audio
+  let baseLatencySource = 0;
+
+  function maybeUpdateRates(self, origSampleGet, origBaseGet, priority) {
+    if (typeof origSampleGet === 'function' && priority >= sampleRateSource) {
+      const v = Reflect.apply(origSampleGet, self, []);
+      if (Number.isFinite(v)) {
+        nativeSampleRate = v;
+        sampleRateSource = priority;
+      }
+    }
+    if (typeof origBaseGet === 'function' && priority >= baseLatencySource) {
+      const v = Reflect.apply(origBaseGet, self, []);
+      if (Number.isFinite(v)) {
+        nativeBaseLatency = v;
+        baseLatencySource = priority;
+      }
+    }
+  }
 
   // 2. Actual list of classes for patch (AudioContext + OfflineAudioContext + webkit aliases)
   const CTX_CLASSES = [
@@ -30,42 +106,73 @@ const AudioContextModule = function AudioContextModule(window) {
     window.webkitOfflineAudioContext
   ].filter(Boolean);
 
+  const __seenProtos = new WeakSet();
+
   for (const CTX of CTX_CLASSES) {
     const proto = CTX.prototype;
+    if (__seenProtos.has(proto)) continue;
+    __seenProtos.add(proto);
+    const CTX_NAME = CTX && CTX.name ? CTX.name : 'AudioContext';
+    const priority = (CTX === window.AudioContext || CTX === window.webkitAudioContext) ? 2 : 1;
 
     // 3. We only patch sampleRate/baseLatency (getter does not break fingerprint)
-    const getSampleRate = markAsNative(function getSampleRate(){ return nativeSampleRate; }, 'get sampleRate');
-    Object.defineProperty(proto, 'sampleRate', {
-      get: getSampleRate,
-      configurable: true
-    });
-    if ('baseLatency' in proto) {
-      const getBaseLatency = markAsNative(function getBaseLatency(){ return nativeBaseLatency; }, 'get baseLatency');
-      Object.defineProperty(proto, 'baseLatency', {
-        get: getBaseLatency,
-        configurable: true
+    const sampleRateDesc = Object.getOwnPropertyDescriptor(proto, 'sampleRate');
+    if (canRedefine(proto, 'sampleRate', CTX_NAME)) {
+      const origSampleGet = sampleRateDesc && sampleRateDesc.get;
+      const getSampleRate = markAsNative(
+        makeGetter('sampleRate', function(){
+          maybeUpdateRates(this, origSampleGet, null, priority);
+          return nativeSampleRate;
+        }),
+        'get sampleRate'
+      );
+      Object.defineProperty(proto, 'sampleRate', {
+        get: getSampleRate,
+        configurable: sampleRateDesc ? !!sampleRateDesc.configurable : true,
+        enumerable: sampleRateDesc ? !!sampleRateDesc.enumerable : false
       });
+    }
+    if ('baseLatency' in proto) {
+      const baseLatencyDesc = Object.getOwnPropertyDescriptor(proto, 'baseLatency');
+      if (canRedefine(proto, 'baseLatency', CTX_NAME)) {
+        const origBaseGet = baseLatencyDesc && baseLatencyDesc.get;
+        const getBaseLatency = markAsNative(
+          makeGetter('baseLatency', function(){
+            maybeUpdateRates(this, null, origBaseGet, priority);
+            return nativeBaseLatency;
+          }),
+          'get baseLatency'
+        );
+        Object.defineProperty(proto, 'baseLatency', {
+          get: getBaseLatency,
+          configurable: baseLatencyDesc ? !!baseLatencyDesc.configurable : true,
+          enumerable: baseLatencyDesc ? !!baseLatencyDesc.enumerable : false
+        });
+      }
     }
 
     // 4. patch createBuffer: We rolled the input and throw the error as in the original
-    if (typeof proto.createBuffer === 'function') {
+    if (typeof proto.createBuffer === 'function' && canReplaceMethod(proto, 'createBuffer', CTX_NAME)) {
       const origCreateBuffer = proto.createBuffer;
-      const patchedCreateBuffer = markAsNative(function createBuffer(numOfChannels, length, sampleRate) {
-        if (length < 0 || sampleRate <= 0) throw new RangeError('Invalid length or sampleRate for AudioBuffer');
-        return origCreateBuffer.call(this, numOfChannels, length, sampleRate);
-      }, 'createBuffer');
+      const patchedCreateBuffer = markAsNative(
+        makeMethod('createBuffer', function(numOfChannels, length, sampleRate) {
+          if (length < 0 || sampleRate <= 0) throw new RangeError('Invalid length or sampleRate for AudioBuffer');
+          return origCreateBuffer.call(this, numOfChannels, length, sampleRate);
+        }),
+        'createBuffer'
+      );
       proto.createBuffer = patchedCreateBuffer;
-      console.log('[AudioContextPatch] Patched createBuffer on AudioContext');
+      console.log('[AudioContextPatch] Patched createBuffer on', CTX_NAME);
     }
   // 5. patch AnalyserNode (preserveing invariants)
-  if (typeof proto.createAnalyser === 'function') {
+  if (typeof proto.createAnalyser === 'function' && canReplaceMethod(proto, 'createAnalyser', CTX_NAME)) {
     const origCreateAnalyser = proto.createAnalyser;
-    proto.createAnalyser = markAsNative(function createAnalyser() {
+    proto.createAnalyser = markAsNative(makeMethod('createAnalyser', function() {
       const analyser = origCreateAnalyser.call(this);
 
       // --- Byte Spectrum: discrete ±1/0 with compensation of the summ ---
       const origByte = analyser.getByteFrequencyData.bind(analyser);
-      analyser.getByteFrequencyData = markAsNative(function getByteFrequencyData(array) {
+      analyser.getByteFrequencyData = markAsNative(makeMethod('getByteFrequencyData', function(array) {
         origByte(array);
         if (!AUDIO_NOISE_ENABLED) return;
         let delta = 0;
@@ -84,11 +191,11 @@ const AudioContextModule = function AudioContextModule(window) {
             for (let i = 0; i < n && delta > 0; i++) if (array[i] < 255) { array[i] += 1; delta--; }
           }
         }
-      }, 'getByteFrequencyData');
+      }), 'getByteFrequencyData');
 
       // --- Float Spectrum: pair of zero summary noise, without going out for [min,max] ---
       const origFloat = analyser.getFloatFrequencyData.bind(analyser);
-      analyser.getFloatFrequencyData = markAsNative(function getFloatFrequencyData(array) {
+      analyser.getFloatFrequencyData = markAsNative(makeMethod('getFloatFrequencyData', function(array) {
         origFloat(array);
         if (!AUDIO_NOISE_ENABLED) return;
         const lo = (typeof this.minDecibels === 'number') ? this.minDecibels : -100;
@@ -120,12 +227,12 @@ const AudioContextModule = function AudioContextModule(window) {
           if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
         }
         //The odd middle — without noise (as not to break the zero amount)
-      }, 'getFloatFrequencyData');
+      }), 'getFloatFrequencyData');
 
       // --- Byte time-domain: paired±1 (The sum preserved) carefully [0..255] ---
       const origByteTD = analyser.getByteTimeDomainData?.bind(analyser);
       if (typeof origByteTD === 'function') {
-        analyser.getByteTimeDomainData = markAsNative(function getByteTimeDomainData(array) {
+        analyser.getByteTimeDomainData = markAsNative(makeMethod('getByteTimeDomainData', function(array) {
           origByteTD(array);
           if (!AUDIO_NOISE_ENABLED) return;
           const n = array.length | 0;
@@ -150,13 +257,13 @@ const AudioContextModule = function AudioContextModule(window) {
               // If not, we miss a couple
             }
           }
-        }, 'getByteTimeDomainData');
+        }), 'getByteTimeDomainData');
       }
 
       // --- Float time-domain: pair zero-summary noise within [-1..1] ---
       const origFloatTD = analyser.getFloatTimeDomainData?.bind(analyser);
       if (typeof origFloatTD === 'function') {
-        analyser.getFloatTimeDomainData = markAsNative(function getFloatTimeDomainData(array) {
+        analyser.getFloatTimeDomainData = markAsNative(makeMethod('getFloatTimeDomainData', function(array) {
           origFloatTD(array);
           if (!AUDIO_NOISE_ENABLED) return;
           const n = array.length | 0;
@@ -186,11 +293,11 @@ const AudioContextModule = function AudioContextModule(window) {
             if (array[i] < lo) array[i] = lo; else if (array[i] > hi) array[i] = hi;
             if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
           }
-        }, 'getFloatTimeDomainData');
+        }), 'getFloatTimeDomainData');
       }
 
       return analyser;
-    }, 'createAnalyser');
+    }), 'createAnalyser');
   }
 
 

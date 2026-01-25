@@ -28,6 +28,51 @@ const LOGGingModule = function LOGGingModule() {
       trace: console.trace && console.trace.bind(console),
     };
 
+    function getLoggerGuard() {
+      if (!G.__LOGGER_GUARD__) {
+        G.__LOGGER_GUARD__ = { count: 0, last: null, lastAt: null };
+      }
+      return G.__LOGGER_GUARD__;
+    }
+
+    function recordLoggerError(err, where) {
+      const guard = getLoggerGuard();
+      guard.count++;
+      guard.lastAt = Date.now();
+      guard.last = {
+        where: where ? String(where) : "unknown",
+        message: (err && err.message) ? String(err.message) : String(err),
+        stack: (err && err.stack) ? String(err.stack) : null
+      };
+
+      if (Array.isArray(global._myDebugLog)) {
+        global._myDebugLog.push({
+          type: "logger_guard",
+          where: guard.last.where,
+          message: guard.last.message,
+          stack: guard.last.stack,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
+    function scheduleRethrow(err) {
+      const schedule = (typeof queueMicrotask === "function")
+        ? queueMicrotask
+        : (typeof setTimeout === "function" ? (fn) => setTimeout(fn, 0) : null);
+      if (schedule) schedule(function () { throw err; });
+    }
+
+    function guardedApply(fn, self, args, where) {
+      try {
+        return Reflect.apply(fn, self, args);
+      } catch (err) {
+        recordLoggerError(err, where);
+        scheduleRethrow(err);
+        return undefined;
+      }
+    }
+
     // Supported logging levels
     const LOG_LEVELS = ["error", "warn", "log", "info", "debug", "trace"];
     G._logLevel = global._logLevel || "log";
@@ -239,40 +284,25 @@ const LOGGingModule = function LOGGingModule() {
       if (!orig) continue;
 
       console[level] = function () {
-        try {
-          const args = Array.prototype.slice.call(arguments);
+        const args = Array.prototype.slice.call(arguments);
 
-          // keep your existing filter
-          for (let i = 0; i < args.length; i++) {
-            const a = args[i];
-            if (typeof a === "string" && a.indexOf("undetected chromedriver") !== -1) {
-              return;
-            }
+        // keep your existing filter
+        for (let i = 0; i < args.length; i++) {
+          const a = args[i];
+          if (typeof a === "string" && a.indexOf("undetected chromedriver") !== -1) {
+            return;
           }
+        }
 
-          pushLog(
-            level,
-            args,
-            level === "error" || level === "warn" || level === "log",
-            "console"
-          );
+        pushLog(
+          level,
+          args,
+          level === "error" || level === "warn" || level === "log",
+          "console"
+        );
 
-          if (G.__DEBUG__) {
-            orig.apply(console, args);
-          }
-        } catch (e) {
-          try {
-            window._myDebugLog = window._myDebugLog || [];
-            window._myDebugLog.push({
-              type: "logger_internal",
-              where: "console_patch",
-              message: (e && e.message) ? String(e.message) : String(e),
-              stack: (e && e.stack) ? String(e.stack) : null,
-              timestamp: new Date().toISOString()
-            });
-          } catch (e) {
-            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:console_patch:internal_log_failed", e);
-          }
+        if (G.__DEBUG__) {
+          guardedApply(orig, console, args, "console." + level);
         }
       };
     }
@@ -288,27 +318,23 @@ const LOGGingModule = function LOGGingModule() {
     };
 
     global.log = function (module, level) {
-      try {
-        const args = Array.prototype.slice.call(arguments, 2);
-        const config = global._logConfig[module] || global._logConfig.global;
-        if (!config || !config.enabled) return;
-        if (!levelAllows(config.level, level)) return;
+      const args = Array.prototype.slice.call(arguments, 2);
+      const config = global._logConfig[module] || global._logConfig.global;
+      if (!config || !config.enabled) return;
+      if (!levelAllows(config.level, level)) return;
 
-        // Output to DevTools without recursion through patched console
-        const prefix = "%c[" + module + "]%c";
-        const style1 =
-          "color:#fff;background:#0070f3;border-radius:2px;padding:2px 4px;";
-        const style2 = "color:inherit;";
-        const callArgs = [prefix, style1, style2].concat(args);
+      // Output to DevTools without recursion through patched console
+      const prefix = "%c[" + module + "]%c";
+      const style1 =
+        "color:#fff;background:#0070f3;border-radius:2px;padding:2px 4px;";
+      const style2 = "color:inherit;";
+      const callArgs = [prefix, style1, style2].concat(args);
 
-        const orig = origConsole[level] || origConsole.log;
-        if (orig) orig.apply(console, callArgs);
+      const orig = origConsole[level] || origConsole.log;
+      if (orig) guardedApply(orig, console, callArgs, "log." + level);
 
-        // Store entry
-        pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
-      } catch (e) {
-        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:global_log:log_failed", e);
-      }
+      // Store entry
+      pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
     };
 
     // ===== 5) Uncaught errors + unhandled rejections (consistent, no logError) =====

@@ -110,11 +110,30 @@
       if (validDpr(snapVal)) return snapVal;
       throw new Error('UACHPatch: bad dpr');
     }, 'get devicePixelRatio');
-    Object.defineProperty(self, 'devicePixelRatio', {
-      configurable: true,
-      enumerable: false,
-      get: getDevicePixelRatio
-    });
+    const dprOwn = Object.getOwnPropertyDescriptor(self, 'devicePixelRatio');
+    const dprProto = (!dprOwn && Object.getPrototypeOf(self))
+      ? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(self), 'devicePixelRatio')
+      : null;
+    const dprTarget = dprOwn ? self : (dprProto ? Object.getPrototypeOf(self) : null);
+    const dprDesc = dprOwn || dprProto;
+    if (dprTarget && !(dprDesc && dprDesc.configurable === false)) {
+      const isData = dprDesc && Object.prototype.hasOwnProperty.call(dprDesc, 'value') && !dprDesc.get && !dprDesc.set;
+      if (isData) {
+        Object.defineProperty(dprTarget, 'devicePixelRatio', {
+          value: getDevicePixelRatio(),
+          writable: !!dprDesc.writable,
+          configurable: !!dprDesc.configurable,
+          enumerable: !!dprDesc.enumerable
+        });
+      } else {
+        Object.defineProperty(dprTarget, 'devicePixelRatio', {
+          configurable: dprDesc ? !!dprDesc.configurable : true,
+          enumerable: dprDesc ? !!dprDesc.enumerable : false,
+          get: getDevicePixelRatio,
+          set: dprDesc && dprDesc.set
+        });
+      }
+    }
 
     const deep = v => v==null ? v : JSON.parse(JSON.stringify(v));
     const toBrands = a => {

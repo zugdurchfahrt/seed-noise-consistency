@@ -31,21 +31,42 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   // --- keep natives once ---
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
 
-  // window.external protection
+  // window.external protection (only if it exists in the chain; keep descriptor kind)
   try {
-    Object.defineProperty(window, 'external', {
-      get: markAsNative(() => {
-        const fakeExternal = {};
-        Object.defineProperty(fakeExternal, 'toString', {
-          value: markAsNative(() => '[object External]', 'toString'),
-          configurable: true,
-          enumerable: false
-        });
-        return fakeExternal;
-      }, "get external"),
-      configurable: true,
-      enumerable: false
-    });
+    if ('external' in window) {
+      const ownDesc = Object.getOwnPropertyDescriptor(window, 'external');
+      const proto = (typeof Window !== 'undefined' && Window.prototype) || Object.getPrototypeOf(window);
+      const protoDesc = (!ownDesc && proto) ? Object.getOwnPropertyDescriptor(proto, 'external') : null;
+      const target = ownDesc ? window : (protoDesc ? proto : null);
+      const desc = ownDesc || protoDesc;
+      if (target && !(desc && desc.configurable === false)) {
+        const externalObj = (() => {
+          const fakeExternal = {};
+          Object.defineProperty(fakeExternal, 'toString', {
+            value: markAsNative(() => '[object External]', 'toString'),
+            configurable: true,
+            enumerable: false
+          });
+          return fakeExternal;
+        })();
+        const isData = desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
+        if (isData) {
+          Object.defineProperty(target, 'external', {
+            value: externalObj,
+            writable: !!desc.writable,
+            configurable: !!desc.configurable,
+            enumerable: !!desc.enumerable
+          });
+        } else {
+          Object.defineProperty(target, 'external', {
+            get: markAsNative(() => externalObj, "get external"),
+            set: desc && desc.set,
+            configurable: desc ? !!desc.configurable : true,
+            enumerable: desc ? !!desc.enumerable : false
+          });
+        }
+      }
+    }
   } catch (e) {
     console.warn("[stealth] external patch failed:", e);
     if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:external_patch:define_failed", e);
