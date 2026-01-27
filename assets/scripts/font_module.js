@@ -1,6 +1,14 @@
-function FontPatchModule(window) {
+const FontPatchModule = function FontPatchModule(window) {
   const C = window.CanvasPatchContext;
   if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registration is not allowed');
+
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+        || (typeof self       !== 'undefined' && self)
+        || (typeof window     !== 'undefined' && window)
+        || (typeof global     !== 'undefined' && global)
+        || {};
+
+
   // === Fonts module local guard (window & worker) ===
   if (!Array.isArray(window.fontPatchConfigs))
     throw new Error('[FontPatch] fontPatchConfigs must be an array (from Python)');
@@ -8,20 +16,25 @@ function FontPatchModule(window) {
 
   // expose awaitFontsReady in window and in the Worker env
   (function exposeFontsReady(){
-    if (typeof document === 'object' && document && document.fonts) {
-      window.awaitFontsReady = document.fonts.ready;
-    } else if (typeof window.fonts !== 'undefined' && window.fonts && window.fonts.ready) {
+    const hasDocFonts = (typeof document === 'object' && document && document.fonts && document.fonts.ready);
+
+    // В window-ветке нам нужна "внешне резолвимая" точка (её реально резолвим ниже после загрузки)
+    if (hasDocFonts) {
+      if (!window.awaitFontsReady || typeof window.awaitFontsReady.then !== 'function' || !window.awaitFontsReady.__owned_by_fontpatch) {
+        let resolveFn;
+        const p = new Promise(res => (resolveFn = res));
+        p.resolve = resolveFn;
+        Object.defineProperty(p, '__owned_by_fontpatch', { value: true });
+        window.awaitFontsReady = p;
+      }
+      return;
+    }
+
+    // В non-window (worker) НЕ подменяем нативный ready на pending-промис, который никто не резолвит
+    if (window.fonts && window.fonts.ready && typeof window.fonts.ready.then === 'function') {
       window.awaitFontsReady = window.fonts.ready;
     } else {
       window.awaitFontsReady = Promise.resolve();
-    }
-    // Единая «внешне резолвимая» точка; не плодим разные промисы по ходу
-    if (!window.awaitFontsReady || typeof window.awaitFontsReady.then !== 'function' || !window.awaitFontsReady.__owned_by_fontpatch) {
-      let resolveFn;
-      const p = new Promise(res => (resolveFn = res));
-      p.resolve = resolveFn;
-      Object.defineProperty(p, '__owned_by_fontpatch', { value: true });
-      window.awaitFontsReady = p;
     }
   })();
 
@@ -189,13 +202,10 @@ function FontPatchModule(window) {
   // FontFaceSet в текущем окружении (window/worker)
   const FFS = (G.document && G.document.fonts) || G.fonts || null;
   if (!FFS) {
-    throw new Error("[FontModule] FontFaceSet API not available in this environment");
+    return;
   }
   if (FFS.__FONT_GUARD__) return;
   Object.defineProperty(FFS, '__FONT_GUARD__', { value: true, configurable: false });
-
-  const origCheck = FFS.check.bind(FFS);
-  const origLoad  = FFS.load.bind(FFS);
 
   const now = (G.performance && typeof G.performance.now === 'function')
     ? () => G.performance.now.call(G.performance)
@@ -255,21 +265,43 @@ function FontPatchModule(window) {
     return getAllowedFamilies().has(fam);           // и только те, что реально есть в fontPatchConfigs
   };
 
-  FFS.check = function check(query) {
-    if (throttled()) throw new Error('[FontModule] FFS.check throttled');
-    if (!validFontQuery(query)) return origCheck(query); // не подменяем семантику
-    return origCheck(query); // исключения не глотаем
-};
+  const proto = Object.getPrototypeOf(FFS);
+  if (!proto) return;
 
+  const dCheck = Object.getOwnPropertyDescriptor(proto, 'check');
+  const dLoad  = Object.getOwnPropertyDescriptor(proto, 'load');
+  if (!dCheck || typeof dCheck.value !== 'function') return;
+  if (!dLoad  || typeof dLoad.value  !== 'function') return;
 
+  const origCheck = dCheck.value;
+  const origLoad  = dLoad.value;
 
+  const mark = (typeof G.markAsNative === 'function') ? G.markAsNative : null;
 
-  FFS.load = function load(query, text) {
-    if (throttled()) return Promise.reject(new Error('[FontModule] FFS.load throttled'));
-    if (!validFontQuery(query)) return origLoad(query, text); // не подменяем семантику
-    if (text != null && typeof text !== 'string') return origLoad(query, text); // пусть натив решает
-    return origLoad(query, text); // не глотаем reject
-  };
+  const wrappedCheck = (mark ? mark(function check(query) {
+    if (throttled()) return false;
+    if (!validFontQuery(query)) return origCheck.call(this, query);
+    return origCheck.call(this, query);
+  }, 'check') : function check(query) {
+    if (throttled()) return false;
+    if (!validFontQuery(query)) return origCheck.call(this, query);
+    return origCheck.call(this, query);
+  });
+
+  const wrappedLoad = (mark ? mark(function load(query, text) {
+    if (throttled()) return Promise.resolve([]);
+    if (!validFontQuery(query)) return origLoad.call(this, query, text);
+    if (text != null && typeof text !== 'string') return origLoad.call(this, query, text);
+    return origLoad.call(this, query, text);
+  }, 'load') : function load(query, text) {
+    if (throttled()) return Promise.resolve([]);
+    if (!validFontQuery(query)) return origLoad.call(this, query, text);
+    if (text != null && typeof text !== 'string') return origLoad.call(this, query, text);
+    return origLoad.call(this, query, text);
+  });
+
+  Object.defineProperty(proto, 'check', Object.assign({}, dCheck, { value: wrappedCheck }));
+  Object.defineProperty(proto, 'load',  Object.assign({}, dLoad,  { value: wrappedLoad }));
 })();
 
 

@@ -46,6 +46,7 @@ setup_logger(child_levels={
 # -----------------------CONSTANT VARIABLES-----------------------
 OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
 PROJECT_ROOT        = pathlib.Path(__file__).resolve().parent
+CORS_ADDON          = PROJECT_ROOT / 'handle_cors_addon.py'
 USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
 CONFIG_DIR          = PROJECT_ROOT / 'configs'
 ASSETS_DIR          = PROJECT_ROOT / 'assets'
@@ -252,7 +253,12 @@ def init_driver(
     generate_font_manifest(MANIFEST_PATH, platform)
       
      
+    cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
+    logger.info("SW-HW-CDP injector started on port %s", cdp.PORT)
+    
 
+    threading.Thread(target=cdp.run, daemon=True).start() 
+    logger.info("Thread started on port %s", cdp.PORT)
 
 
     # --- Workers Initial patch reading ---
@@ -461,21 +467,23 @@ def init_driver(
     //# sourceURL=worker_early_bootstrap.js
     """
 
-  
-
 
     # Connect worker_early_js (marker + early init if hooks already exist)
-    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_early_js})
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": worker_early_js, "awaitPromise": False})
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_early_js})
+
+    # Connect page_js (wrk.js and so on)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
+
+        # Connect worker_bootstrap_js (before page_js)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
 
-
-    cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
-    logger.info("SW-HW-CDP injector started on port %s", cdp.PORT)
     
 
-    threading.Thread(target=cdp.run, daemon=True).start() 
-    logger.info("Thread started on port %s", cdp.PORT)
+
+
+
+
   
 
 
@@ -509,11 +517,6 @@ def init_driver(
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
 
 
-    # Connect page_js (wrk.js and so on)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-
-    # Connect worker_bootstrap_js (after page_js)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
 
 
@@ -712,6 +715,7 @@ def main():
         # client.prepare()
         # logger.info("preparation completed")
         # client.connect()
+        client._clean_directories()
         client.post()
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()
@@ -996,9 +1000,10 @@ def main():
         logger.info("new profile.json created for mitmproxy")
 
         # --- mitmproxy start ---
-        mitmproxy_proc = subprocess.Popen([
-            "mitmproxy", "-s", "handle_cors_addon.py"
-        ])
+        mitmproxy_proc = subprocess.Popen(
+            ["mitmproxy", "-s", str(CORS_ADDON)],
+            cwd=str(PROJECT_ROOT)
+        )
 
         def wait_for_port(host, port, timeout=10):
             start = time.time()

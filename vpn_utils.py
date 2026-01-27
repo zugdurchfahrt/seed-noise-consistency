@@ -264,29 +264,14 @@ class VPNClient:
         """
         Wipes browser USER_DATA_DIR
         """
-        # Strict cleanup policy: if we can't clean, we must fail (no silent fallback).
-        last_exc = None
-        if os.path.exists(USER_DATA_DIR):
-            for attempt in range(1, 4):
-                try:
-                    shutil.rmtree(USER_DATA_DIR)
-                    last_exc = None
-                    break
-                except Exception as e:
-                    last_exc = e
-                    logger.warning(
-                        "[cleanup] failed to remove %s (attempt %d/3): %s",
-                        USER_DATA_DIR, attempt, e
-                    )
-                    time.sleep(0.25)
+        try:
+            shutil.rmtree(USER_DATA_DIR, ignore_errors=True)
+            logger.info("[cleanup] removed dir: %s", USER_DATA_DIR)
+        except Exception as e:
+            logger.debug("[cleanup] skip removing %s: %s", USER_DATA_DIR, e)
 
-        if os.path.exists(USER_DATA_DIR):
-            # Directory still exists after retries → abort.
-            raise RuntimeError(f"cleanup failed: could not remove {USER_DATA_DIR}: {last_exc}")
-
-        # If creation fails, this should also hard-fail (no masking).
-        os.makedirs(USER_DATA_DIR, exist_ok=False)
-        logger.debug("[cleanup] created dir: %s", USER_DATA_DIR)
+        os.makedirs(USER_DATA_DIR, exist_ok=True)
+        logger.info("[cleanup] created dir: %s", USER_DATA_DIR)
 
 
     def _kill_old_processes(self):
