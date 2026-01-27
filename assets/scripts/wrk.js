@@ -184,6 +184,12 @@ function mkModuleWorkerSource(snapshot, absUrl){
     (async function(){
       'use strict';
       self.__GW_BOOTSTRAP__ = true;
+      // Buffer early messages sent before user code installs its handler(s).
+      // Without this, callers that postMessage immediately after Worker() may time out.
+      const __MSG_Q__ = [];
+      let __MSG_BUF__ = true;
+      const __onEarlyMsg__ = ev => { if (__MSG_BUF__) __MSG_Q__.push(ev && ev.data); };
+      try { self.addEventListener('message', __onEarlyMsg__); } catch(_e) {}
       const __requireSnap = s => {
         if (!s || typeof s !== 'object') throw new Error('UACHPatch: no snapshot');
         if (typeof s.language !== 'string' || !s.language) throw new Error('UACHPatch: bad language');
@@ -236,6 +242,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
         if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
       } catch (e) {
+        try {
+          self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+        } catch (_e) {}
         self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
       }
       if (__patchOK) {
@@ -244,6 +253,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
         } catch (e) {
+          try {
+            self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+          } catch (_e) {}
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
         }
       }
@@ -251,6 +263,14 @@ function mkModuleWorkerSource(snapshot, absUrl){
       const USER = ${USER};
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user module URL');
       await import(USER);
+      // Replay any early messages after user code is loaded.
+      __MSG_BUF__ = false;
+      try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) {}
+      try {
+        if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
+          for (const d of __MSG_Q__) self.dispatchEvent(new MessageEvent('message', { data: d }));
+        }
+      } catch(_e) {}
       if (typeof self.postMessage === 'function') {
         self.postMessage({ __ENV_USER_URL_LOADED__: USER });
       }
@@ -275,6 +295,11 @@ function mkClassicWorkerSource(snapshot, absUrl){
     (function(){
       'use strict';
       self.__GW_BOOTSTRAP__ = true;
+      // Buffer early messages sent before user code installs its handler(s).
+      var __MSG_Q__ = [];
+      var __MSG_BUF__ = true;
+      var __onEarlyMsg__ = function(ev){ if (__MSG_BUF__) __MSG_Q__.push(ev && ev.data); };
+      try { self.addEventListener('message', __onEarlyMsg__); } catch(_e) {}
       var __requireSnap = function(s){
         if (!s || typeof s !== 'object') throw new Error('UACHPatch: no snapshot');
         if (typeof s.language !== 'string' || !s.language) throw new Error('UACHPatch: bad language');
@@ -327,6 +352,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
         if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
       } catch (e) {
+        try {
+          self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+        } catch (_e) {}
         self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
       }
       if (__patchOK) {
@@ -335,6 +363,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
         } catch (e) {
+          try {
+            self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+          } catch (_e) {}
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
         }
       }
@@ -362,11 +393,27 @@ function mkClassicWorkerSource(snapshot, absUrl){
         importScripts(USER);
       } catch (e) {
         return import(USER).then(function(){
+          // Replay any early messages after user code is loaded.
+          __MSG_BUF__ = false;
+          try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) {}
+          try {
+            if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
+              for (var i = 0; i < __MSG_Q__.length; i++) self.dispatchEvent(new MessageEvent('message', { data: __MSG_Q__[i] }));
+            }
+          } catch(_e) {}
           if (typeof self.postMessage === 'function') {
             self.postMessage({ __ENV_USER_URL_LOADED__: USER });
           }
         });
       }
+      // Replay any early messages after user code is loaded.
+      __MSG_BUF__ = false;
+      try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) {}
+      try {
+        if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
+          for (var i = 0; i < __MSG_Q__.length; i++) self.dispatchEvent(new MessageEvent('message', { data: __MSG_Q__[i] }));
+        }
+      } catch(_e) {}
       if (typeof self.postMessage === 'function') {
         self.postMessage({ __ENV_USER_URL_LOADED__: USER });
       }
@@ -564,11 +611,16 @@ function SafeWorkerOverride(G){
   if (w && typeof w.addEventListener === 'function') {
     const onMsg = ev => {
       const data = ev && ev.data;
+      const bootErr = data && typeof data === 'object' && data.__ENV_BOOTSTRAP_ERROR__;
+      if (bootErr) {
+        try { G.__LAST_WORKER_BOOTSTRAP_ERROR__ = bootErr; } catch(_) {}
+      }
       const loaded = data && typeof data === 'object' && typeof data.__ENV_USER_URL_LOADED__ === 'string'
         ? data.__ENV_USER_URL_LOADED__
         : null;
 
       if (loaded) {
+        try { G.__LAST_WORKER_USER_URL_LOADED__ = loaded; } catch(_) {}
         // скрываем внутренний сигнал от внешних слушателей (важно для creepjs workers.js)
         try { ev.stopImmediatePropagation(); ev.stopPropagation(); } catch(_) {}
 

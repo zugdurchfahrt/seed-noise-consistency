@@ -178,7 +178,7 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
 
   const RAW_H = (window.__HEADERS__ && typeof window.__HEADERS__ === 'object') ? window.__HEADERS__ : null;
   if (!RAW_H) {
-    console.warn(`${LOG_PREFIX} window.__HEADERS__ is missing/invalid — skipping headers patch for now`);
+    console.log(`${LOG_PREFIX} window.__HEADERS__ is missing/invalid — skipping headers patch for now`);
     return; // API уже экспортирован; main.py вызовет HeadersInterceptor(window) повторно после инжекта
   }
 

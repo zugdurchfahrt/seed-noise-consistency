@@ -1,7 +1,6 @@
 # cdp_caught_logger.py  (SW injector only)
 import json
 import time
-import threading
 import requests
 from websocket import WebSocketApp
 
@@ -13,6 +12,8 @@ SW_PRIMARY = None
 SW_LANGS = None
 SW_HC = None
 SW_DM = None
+# Injection mode: "both" | "worker_only" | "prelude_only"
+SW_INJECT_MODE = "both"
 # Auto-attach strategy: "service_worker_only" avoids pausing non-SW targets.
 SW_AUTOATTACH_MODE = "service_worker_only"  # or "all_targets"
 
@@ -100,14 +101,24 @@ def get_ws_url():
 
     while time.time() < deadline:
         try:
-            r = requests.get(f"http://127.0.0.1:{port}/json", timeout=0.5)
-            targets = r.json()
-            page = next((t for t in targets if t.get("type") == "page" and t.get("webSocketDebuggerUrl")), None)
-            if page:
-                return page["webSocketDebuggerUrl"]
+            r = requests.get(f"http://127.0.0.1:{port}/json/version", timeout=0.5)
+            info = r.json()
+            ws = info.get("webSocketDebuggerUrl")
+            if ws:
+                return ws
         except Exception as e:
             last_err = e
-            time.sleep(0.2)
+
+        try:
+            r = requests.get(f"http://127.0.0.1:{port}/json", timeout=0.5)
+            targets = r.json()
+            browser = next((t for t in targets if t.get("type") == "browser" and t.get("webSocketDebuggerUrl")), None)
+            if browser:
+                return browser["webSocketDebuggerUrl"]
+        except Exception as e:
+            last_err = e
+
+        time.sleep(0.2)
 
     raise RuntimeError(f"CDP /json not available on 127.0.0.1:{port}; last_err={last_err!r}")
 
@@ -128,6 +139,12 @@ def run():
     if not SW_INJECT_ENABLED:
         _RUNNING = False
         return
+    if SW_INJECT_MODE not in ("both", "worker_only", "prelude_only"):
+        _RUNNING = False
+        return
+
+    do_prelude = SW_INJECT_MODE in ("both", "prelude_only")
+    do_resume = SW_INJECT_MODE in ("both", "worker_only")
 
     try:
         ws_url = get_ws_url()
@@ -138,7 +155,9 @@ def run():
     msg_id = {"v": 0}
     sess_id = {}       # per-session counters
     injected = set()   # targetId set
-    sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS, SW_HC, SW_DM)
+    sw_prelude = None
+    if do_prelude:
+        sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS, SW_HC, SW_DM)
 
     pending = {}
 
@@ -157,22 +176,26 @@ def run():
         send(ws, "Target.sendMessageToTarget", {"sessionId": sessionId, "message": json.dumps(inner)})
 
     def on_open(ws):
-        # only what we need for auto-attach
         send(ws, "Target.setDiscoverTargets", {"discover": True})
-        if SW_AUTOATTACH_MODE == "service_worker_only":
-            send(ws, "Target.setAutoAttach", {
-                "autoAttach": True,
-                "waitForDebuggerOnStart": True,
-                "flatten": True,
-                "targetFilter": [{"type": "service_worker"}]
-            }, tag="autoattach_sw_only")
-        else:
-            send(ws, "Target.setAutoAttach", {
-                "autoAttach": True,
-                "waitForDebuggerOnStart": True,
-                "flatten": True
-            })
 
+        params = {
+            "autoAttach": True,
+            # Pause SW on start for controlled injection/diagnostics.
+            "waitForDebuggerOnStart": True,
+            "flatten": True,
+        }
+
+        if SW_AUTOATTACH_MODE == "service_worker_only":
+            params["filter"] = [{"type": "service_worker", "exclude": False}]
+
+        # важно: ставим tag, иначе обработка ошибки фильтра не сработает
+        tag = "autoattach_sw_only" if SW_AUTOATTACH_MODE == "service_worker_only" else None
+        send(ws, "Target.setAutoAttach", params, tag=tag)
+
+
+ 
+
+        
     def on_message(ws, message):
         try:
             msg = json.loads(message)
@@ -182,13 +205,14 @@ def run():
         if "id" in msg:
             tag = pending.pop(msg.get("id"), None)
             if tag == "autoattach_sw_only" and msg.get("error"):
-                # Fallback to global auto-attach if targetFilter is unsupported.
+                # Filter unsupported: disable module to avoid all-targets fallback.
                 try:
-                    send(ws, "Target.setAutoAttach", {
-                        "autoAttach": True,
-                        "waitForDebuggerOnStart": True,
-                        "flatten": True
-                    })
+                    global SW_INJECT_ENABLED
+                    SW_INJECT_ENABLED = False
+                except Exception:
+                    pass
+                try:
+                    ws.close()
                 except Exception:
                     pass
             return
@@ -205,34 +229,32 @@ def run():
         if not sessionId or not tid:
             return
 
-        # Every attached target is paused (waitForDebuggerOnStart=true).
-        # Always resume non-SW targets immediately to avoid freezes.
+        # Hard isolation: this module must never touch non-SW targets.
         if ttype != "service_worker":
-            try:
-                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-            except Exception:
-                pass
             return
 
         if tid in injected:
-            try:
-                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-            except Exception:
-                pass
+            if do_resume:
+                try:
+                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+                except Exception:
+                    pass
             return
 
         injected.add(tid)
 
-        try:
-            send_sess(ws, sessionId, "Runtime.enable")
-            send_sess(ws, sessionId, "Runtime.evaluate", {
-                "expression": sw_prelude,
-                "awaitPromise": True
-            })
-        except Exception:
-            # Intentionally ignore: no logger, no writer
-            pass
-        finally:
+        if do_prelude:
+            try:
+                send_sess(ws, sessionId, "Runtime.enable")
+                send_sess(ws, sessionId, "Runtime.evaluate", {
+                    "expression": sw_prelude,
+                    "awaitPromise": True
+                })
+            except Exception:
+                # Intentionally ignore: no logger, no writer
+                pass
+
+        if do_resume:
             try:
                 send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
             except Exception:
@@ -242,7 +264,8 @@ def run():
         pass
 
     def on_close(ws, code, msg):
-        pass
+        global _RUNNING
+        _RUNNING = False
 
     ws = WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close)
     ws.run_forever()

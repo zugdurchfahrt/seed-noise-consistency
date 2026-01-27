@@ -21,7 +21,7 @@ from datashell_win32 import data_4_win32
 from macintel import macintel_data
 # ----------------------- MODULES-----------------------
 import cdp_caught_logger as cdp
-from cdp_caught_logger import run
+# from cdp_caught_logger import enable_sw_language_inject
 from plugins_dict import build_plugins_profile
 from tools import (
     build_device_metrics,
@@ -54,10 +54,9 @@ MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
 CHROME_BINARY       = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
 CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
-ENABLE_SW_INJECTOR = False  # <- ваш флаг (включаете вручную когда нужно)
+
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
-
 # ----------------------- PROFILE FUNCTION -----------------------
 def get_random_profile(country_data, platform):
     return {}
@@ -251,23 +250,20 @@ def init_driver(
     )
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
-    
-    
-    if ENABLE_SW_INJECTOR:
-        cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
-        threading.Thread(target=cdp.run, daemon=True).start()
-    logger.info("Service Worker and langs started via CDP on port %s", cdp.PORT)
-        
+      
+     
 
-            # --- Workers Initial patch reading ---
+
+
+    # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     logger.info("WORKER_PATCH_SRC.initated")
-    
+
+
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
-            lang_js_inline,
             # --- RTC ---
             Path(SCRIPTS_DIR / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
@@ -342,11 +338,14 @@ def init_driver(
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
+                // ——— Worker env diagnostics ———//
+            console.info('[DIAG]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             })(window);
             """
         ]
         return "\n;\n".join(parts)
     
+ 
     
     # --- creation of window.__ objects ---
     init_params = f"""
@@ -383,30 +382,14 @@ def init_driver(
     window.__PLUGIN_PROFILES__          = {json.dumps(profile.get("plugins", []), ensure_ascii=False)};
     window.__PLUGIN_MIMETYPES__         = {json.dumps(profile.get("mimeTypes", []), ensure_ascii=False)};
     """
-    lang_js_inline = f"""
-    (() => {{
-    window.__primaryLanguage = {json.dumps(language, ensure_ascii=False)};
-    window.__normalizedLanguages = {json.dumps(normalized_languages, ensure_ascii=False)};
-
-    // FrozenArray semantics (минимально приближенно): массив заморожен
-    if (Array.isArray(window.__normalizedLanguages)) {{
-        Object.freeze(window.__normalizedLanguages);
-    }}
-
-    // fail-fast: типы и консистентность
-    if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
-        throw new Error('THW: __primaryLanguage invalid');
-    }}
-    if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
-        throw new Error('THW: __normalizedLanguages invalid');
-    }}
-    if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
-        throw new Error('THW: language != languages[0]');
-    }}
-    }})();
-    """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
+    
+    # ---  CDP PROCESSING STAGE---
+    # --- patch userAgent and userAgentMetadata via CDP ---
+    browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
+    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+
         # --- prepare worker_bootstrap_js ---
     worker_bootstrap_js = f"""
     (() => {{
@@ -464,17 +447,36 @@ def init_driver(
     }})();
     //# sourceURL=worker_bootstrap_init.js
     """
+
+    worker_early_js = """
+    (() => {
+      try {
+        window.__WORKER_BOOTSTRAP_READY__ = true;
+        const H = window.WorkerPatchHooks;
+        if (H && typeof H.initAll === 'function') {
+          H.initAll({ publishHE: true });
+        }
+      } catch (e) {}
+    })();
+    //# sourceURL=worker_early_bootstrap.js
+    """
+
+  
+
+
+    # Connect worker_early_js (marker + early init if hooks already exist)
+    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_early_js})
+    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": worker_early_js, "awaitPromise": False})
+
+
+
+    cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
+    logger.info("SW-HW-CDP injector started on port %s", cdp.PORT)
     
-        # Connect worker_bootstrap_js (before page_js)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
-    
-    # Connect page_js (wrk.js and so on)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-    
-    # ---  CDP PROCESSING STAGE---
-    # --- patch userAgent and userAgentMetadata via CDP ---
-    browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
-    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+
+    threading.Thread(target=cdp.run, daemon=True).start() 
+    logger.info("Thread started on port %s", cdp.PORT)
+  
 
 
     #--- Setting up Client hints ---
@@ -503,8 +505,27 @@ def init_driver(
     window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
     console.log("[headers_interceptor.js] window.__HEADERS__ injected (safelisted only)");
     """
+    # window.__HEADERS__ injected (safelisted only)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
-    logger.info("window.__HEADERS__ injected (safelisted only)")
+
+
+    # Connect page_js (wrk.js and so on)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
+
+    # Connect worker_bootstrap_js (after page_js)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
+
+
+
+    # ВАЖНО: применить __HEADERS__ на ТЕКУЩЕЙ странице сразу (иначе будет только на next document)
+    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_window_js, "awaitPromise": False})
+
+    # ВАЖНО: повторно вызвать HeadersInterceptor(window) уже ПОСЛЕ появления __HEADERS__
+    driver.execute_cdp_cmd("Runtime.evaluate", {
+        "expression": "if (typeof HeadersInterceptor === 'function') { HeadersInterceptor(window); }",
+        "awaitPromise": False
+    })
+
 
     # Headers interceptor bridge to sync allow/ignore  CDP with Fetch interceptor
     headers_bridge_js = """
@@ -555,6 +576,9 @@ def init_driver(
       })();
       """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
+
+    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_bridge_js, "awaitPromise": False})
+
 
     # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
     fetch_rules = []
@@ -612,6 +636,30 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         )
         # Languages stable final setting
 
+        lang_js = f"""
+        (() => {{
+        window.__primaryLanguage = {json.dumps(language, ensure_ascii=False)};
+        window.__normalizedLanguages = {json.dumps(normalized_languages, ensure_ascii=False)};
+
+        // FrozenArray semantics (минимально приближенно): массив заморожен
+        if (Array.isArray(window.__normalizedLanguages)) {{
+            Object.freeze(window.__normalizedLanguages);
+        }}
+
+        // fail-fast: типы и консистентность
+        if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
+            throw new Error('THW: __primaryLanguage invalid');
+        }}
+        if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
+            throw new Error('THW: __normalizedLanguages invalid');
+        }}
+        if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
+            throw new Error('THW: language != languages[0]');
+        }}
+        }})();
+        """
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": lang_js})
+        
         device_metrics = build_device_metrics(profile)
         driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
 
@@ -1018,7 +1066,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)
