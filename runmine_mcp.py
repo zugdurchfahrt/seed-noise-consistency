@@ -13,12 +13,12 @@ def run_main() -> dict:
         [
             r"C:\venvs\myproj\Scripts\python.exe",
             "-u",
-            r"C:\55555\switch\sunami\main.py",
+            r"C:\55555\switch\Evensteam\sunami\main.py",
         ],
         env=env,
         capture_output=True,
         text=True,
-        cwd=r"C:\55555\switch\sunami",
+        cwd=r"C:\55555\Evensteam\sunami",
     )
     return {"returncode": p.returncode, "stdout": p.stdout, "stderr": p.stderr}
 

@@ -119,8 +119,6 @@ data_4_win32 = {
     {"id": 12, "name": "AMD Radeon(TM) RX 6800",        "architecture": "rdna2",    "type": "discrete", "platform": "Win32", "resolution": ["1920x1080","2560x1440","3840x2160"],               "release_year": 2025, "prod_code": "0x73BF"},
     {"id": 13, "name": "NVIDIA GeForce RTX 3070",       "architecture": "ampere",   "type": "discrete", "platform": "Win32", "resolution": ["1920x1080","2560x1440","3840x2160"],               "release_year": 2023, "prod_code": "0x2484"},
     {"id": 14, "name": "AMD Radeon(TM) RX 6900",        "architecture": "rdna2",    "type": "discrete", "platform": "Win32", "resolution": ["1920x1080","2560x1440","3840x2160"],               "release_year": 2024, "prod_code": "0x73BF"},
-    {"id": 15, "name": "NVIDIA GeForce RTX 3080",       "architecture": "ampere",   "type": "discrete", "platform": "Win32", "resolution": ["1920x1080","2560x1440","3840x2160","7680x4320"],   "release_year": 2025, "prod_code": "0x2206"},
-    {"id": 16, "name": "AMD Radeon(TM) RX 6950",        "architecture": "rdna2",    "type": "discrete", "platform": "Win32", "resolution": ["1920x1080","2560x1440","3840x2160","7680x4320"],   "release_year": 2023, "prod_code": "0x73BF"},
     ]
 
 }

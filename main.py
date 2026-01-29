@@ -178,13 +178,27 @@ def init_driver(
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--remote-debugging-port=9222")
+    vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
+    if vscode_cdp_debug:
+        chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
+        if chrome_debug_port_raw.lower() in {"0", "auto"}:
+            chrome_debug_port = 0
+        else:
+            try:
+                chrome_debug_port = int(chrome_debug_port_raw)
+            except ValueError:
+                chrome_debug_port = 9222
+    else:
+        chrome_debug_port = 9222
+    chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
     chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
     chrome_options.add_argument("--remote-allow-origins=*")
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
     chrome_options.add_argument("--start-maximized")
+    if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
+        chrome_options.add_argument("--auto-open-devtools-for-tabs")
     chrome_options.binary_location = CHROME_BINARY
     driver = uc.Chrome(
         driver_executable_path=CHROMEDRIVER_PATH,
@@ -208,9 +222,11 @@ def init_driver(
             time.sleep(0.1)
 
         # 3) fallback: твой желаемый порт
-        return 9222
+        return chrome_debug_port
     
     cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
+    if vscode_cdp_debug:
+        logger.info("Chrome DevTools port: %s", cdp.PORT)
     
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
@@ -466,25 +482,18 @@ def init_driver(
     })();
     //# sourceURL=worker_early_bootstrap.js
     """
-
+    # Connect page_js (wrk.js and so on)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
 
     # Connect worker_early_js (marker + early init if hooks already exist)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_early_js})
 
-    # Connect page_js (wrk.js and so on)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-
-        # Connect worker_bootstrap_js (before page_js)
+    # Connect worker_bootstrap_js BEFORE page_js:
+    # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
 
-    
-
-
-
-
-
-  
+ 
 
 
     #--- Setting up Client hints ---
@@ -999,24 +1008,24 @@ def main():
             json.dump(data, f, ensure_ascii=False, indent=2)
         logger.info("new profile.json created for mitmproxy")
 
-        # --- mitmproxy start ---
-        mitmproxy_proc = subprocess.Popen(
-            ["mitmproxy", "-s", str(CORS_ADDON)],
-            cwd=str(PROJECT_ROOT)
-        )
+        # # --- mitmproxy start ---
+        # mitmproxy_proc = subprocess.Popen(
+        #     ["mitmproxy", "-s", str(CORS_ADDON)],
+        #     cwd=str(PROJECT_ROOT)
+        # )
 
-        def wait_for_port(host, port, timeout=10):
-            start = time.time()
-            while time.time() - start < timeout:
-                try:
-                    with socket.create_connection((host, port), timeout=1):
-                        return True
-                except OSError:
-                    time.sleep(0.5)
-            return False
+        # def wait_for_port(host, port, timeout=10):
+        #     start = time.time()
+        #     while time.time() - start < timeout:
+        #         try:
+        #             with socket.create_connection((host, port), timeout=1):
+        #                 return True
+        #         except OSError:
+        #             time.sleep(0.5)
+        #     return False
 
-        if not wait_for_port("127.0.0.1", 8080):
-            raise RuntimeError("mitmproxy not launched")
+        # if not wait_for_port("127.0.0.1", 8080):
+        #     raise RuntimeError("mitmproxy not launched")
 
         driver = init_driver(
             profile, country_data, profile["platform"], profile["user_agent"],
@@ -1081,9 +1090,9 @@ def main():
         logger.error(f"Error in main block: {e}", exc_info=True)
         logger.info(f"Error: {e}")
         # ----------------------- THAT'S ALL, FOLKS!  -----------------------
-    finally:
-        # Wait for mitmproxy to complete, then close the file
-        mitmproxy_proc.terminate()
-        mitmproxy_proc.wait()
+    # finally:
+    #     # Wait for mitmproxy to complete, then close the file
+    #     mitmproxy_proc.terminate()
+    #     mitmproxy_proc.wait()
 if __name__ == "__main__":
     main()

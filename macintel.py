@@ -111,11 +111,8 @@ macintel_data = {
     {"id": 3,  "name": "AMD Radeon(TM) RX 570",      "architecture": "polaris", "type": "discrete", "platform": "MacIntel", "resolution": ["1920x1080","2560x1440"],                         "prod_code": "0x67DF"},
     {"id": 4,  "name": "AMD Radeon(TM) RX 580",      "architecture": "polaris", "type": "discrete", "platform": "MacIntel", "resolution": ["1920x1080","2560x1440"],                         "prod_code": "0x67DF"},
     {"id": 5,  "name": "AMD Radeon(TM) Pro WX 7100", "architecture": "polaris", "type": "discrete", "platform": "MacIntel", "resolution": ["1920x1080","2560x1440"],                         "prod_code": "0x67C4"},
-    {"id": 6,  "name": "AMD Radeon(TM) RX 6700 XT",  "architecture": "rdna2",   "type": "discrete", "platform": "MacIntel", "resolution": ["1920x1080","2560x1440","3840x2160","7680x4320"], "prod_code": "0x73DF"},
-    {"id": 7,  "name": "AMD Radeon(TM) RX 6750 XT",  "architecture": "rdna2",   "type": "discrete", "platform": "MacIntel", "resolution": ["1920x1080","2560x1440","3840x2160","7680x4320"], "prod_code": "0x73DF"},
     {"id": 8,  "name": "AMD Radeon(TM) RX 5700",     "architecture": "navi",    "type": "discrete", "platform": "MacIntel", "resolution": ["1920x1080","2560x1440","3840x2160"],             "prod_code": "0x731F"},
     {"id": 9,  "name": "AMD Radeon(TM) RX 5700 XT",  "architecture": "navi",    "type": "discrete", "platform": "MacIntel", "resolution": ["1920x1080","2560x1440","3840x2160"],             "prod_code": "0x731F"},
-    {"id": 10, "name": "AMD Radeon(TM) RX 6800",     "architecture": "rdna2",   "type": "discrete", "platform": "MacIntel", "resolution": ["1920x1080","2560x1440","3840x2160","7680x4320"], "prod_code": "0x73BF"}
     ]
 
 }
