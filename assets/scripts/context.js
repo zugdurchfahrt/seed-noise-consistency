@@ -153,6 +153,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 if (next && Array.isArray(next)) patchedArgs = next;
               } catch (e) {
                 if (global.__DEBUG__) console.error(`[CHAIN HOOK ERROR ${method}]`, e);
+                throw e;
               }
             }
             const out = Reflect.apply(orig, this, patchedArgs);
@@ -163,6 +164,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 if (typeof r === 'string') res = r;
               } catch (e) {
                 if (global.__DEBUG__) console.error(`[CHAIN POST ERROR ${method}]`, e);
+                throw e;
               }
             }
             return res;
@@ -193,6 +195,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 if (next && Array.isArray(next)) patchedArgs = next;
               } catch (e) {
                 if (global.__DEBUG__) console.error(`[CHAIN HOOK ERROR ${method}]`, e);
+                throw e;
               }
             }
             return Reflect.apply(orig, this, patchedArgs);
@@ -240,13 +243,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
               if (method === 'readPixels') {
                   const out = orig.apply(self, args);
                   for (const hook of hooks) {
-                      if (typeof hook !== 'function') continue;
-                      try { hook.apply(self, [orig, ...args]); } catch (e) {
-                          console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
-                      }
-                  }
-                  return out;
-              }
+                       if (typeof hook !== 'function') continue;
+                       try { hook.apply(self, [orig, ...args]); } catch (e) {
+                           console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
+                           throw e;
+                       }
+                   }
+                   return out;
+               }
 
               let patched = args;
               for (const hook of hooks) {
@@ -267,10 +271,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
                           continue;
                       }
 
-                  } catch (e) {
-                      console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
-                  }
-              }
+                   } catch (e) {
+                       console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
+                       throw e;
+                   }
+               }
               return orig.apply(self, patched);
 
           } finally {

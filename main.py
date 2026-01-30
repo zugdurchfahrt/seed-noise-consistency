@@ -182,12 +182,11 @@ def init_driver(
     if vscode_cdp_debug:
         chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
         if chrome_debug_port_raw.lower() in {"0", "auto"}:
-            chrome_debug_port = 0
-        else:
-            try:
-                chrome_debug_port = int(chrome_debug_port_raw)
-            except ValueError:
-                chrome_debug_port = 9222
+            raise ValueError("CHROME_DEBUG_PORT must be fixed when VSCODE_CDP_DEBUG=1")
+        try:
+            chrome_debug_port = int(chrome_debug_port_raw)
+        except ValueError as exc:
+            raise ValueError("CHROME_DEBUG_PORT must be an integer when VSCODE_CDP_DEBUG=1") from exc
     else:
         chrome_debug_port = 9222
     chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
@@ -203,6 +202,7 @@ def init_driver(
     driver = uc.Chrome(
         driver_executable_path=CHROMEDRIVER_PATH,
         options=chrome_options,
+        port=chrome_debug_port,
     )
     logger.info("Initiating Webdriver...")
     driver._stealth_seed = global_seed
@@ -225,6 +225,8 @@ def init_driver(
         return chrome_debug_port
     
     cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
+    if vscode_cdp_debug and cdp.PORT != chrome_debug_port:
+        raise RuntimeError(f"CDP port mismatch: requested {chrome_debug_port}, got {cdp.PORT}")
     if vscode_cdp_debug:
         logger.info("Chrome DevTools port: %s", cdp.PORT)
     
@@ -360,8 +362,8 @@ def init_driver(
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
-                // ——— Worker env diagnostics ———//
-            console.info('[DIAG]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
+                // ——— Worker env diagnostics (pre-bootstrap) ———//
+            console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             })(window);
             """
         ]
@@ -454,6 +456,8 @@ def init_driver(
         const H = window.WorkerPatchHooks;
         if (!H || typeof H.initAll !== 'function') return; // wait until ready
         H.initAll({{ publishHE: true }});
+        // Post-bootstrap diagnostics: confirm wrappers are installed after initAll().
+        console.info('[DIAG.postBoot]', H.diag && H.diag());
     }}
 
     if ('WorkerPatchHooks' in window && window.WorkerPatchHooks && typeof window.WorkerPatchHooks.initAll === 'function') {{
@@ -470,25 +474,10 @@ def init_driver(
     //# sourceURL=worker_bootstrap_init.js
     """
 
-    worker_early_js = """
-    (() => {
-      try {
-        window.__WORKER_BOOTSTRAP_READY__ = true;
-        const H = window.WorkerPatchHooks;
-        if (H && typeof H.initAll === 'function') {
-          H.initAll({ publishHE: true });
-        }
-      } catch (e) {}
-    })();
-    //# sourceURL=worker_early_bootstrap.js
-    """
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
 
-    # Connect worker_early_js (marker + early init if hooks already exist)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_early_js})
-
-    # Connect worker_bootstrap_js BEFORE page_js:
+    # Connect worker_bootstrap_js AFTER page_js:
     # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
@@ -899,16 +888,16 @@ def main():
         gpu_name = gpu["name"]
         gpu_code = gpu["prod_code"]
 
-        screen_res = random.choice(gpu["resolution"])
-        # screen_res = "1920x1080"
+      #  screen_res = random.choice(gpu["resolution"])
+        screen_res = "1920x1080"
         screen_width, screen_height = map(int, screen_res.split("x"))
 
         # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
         dpr_map = {
             "1920x1080": 1.0,
-            "2560x1440": 1.25,
-            "3840x2160": 2.0,
-            "7680x4320": 3.0,
+            # "2560x1440": 1.25,
+            # "3840x2160": 2.0,
+            # "7680x4320": 3.0,
         }
         device_dpr_value = dpr_map.get(screen_res)
         if device_dpr_value is None:
@@ -1080,7 +1069,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
 
         # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)

@@ -68,8 +68,7 @@ const LOGGingModule = function LOGGingModule() {
         return Reflect.apply(fn, self, args);
       } catch (err) {
         recordLoggerError(err, where);
-        scheduleRethrow(err);
-        return undefined;
+        throw err;
       }
     }
 
@@ -87,35 +86,6 @@ const LOGGingModule = function LOGGingModule() {
     }
 
 
-
-    // (function traceFunctionToString(G){
-    //   const orig = Function.prototype.toString;
-    //   if (orig.__TRACE__) return;
-
-    //   Function.prototype.toString = function(...args){
-    //     // фильтр: интересуют только webgl getParameter/readPixels
-    //     const name = this && this.name;
-    //     const src = this;
-
-    //     let shouldLog = false;
-    //     try {
-    //       const isWebGLName = name === "getParameter" || name === "readPixels";
-    //       // дополнительно: смотрим на наличие WebGL в ctor name thisArg? (не всегда)
-    //       shouldLog = isWebGLName;
-    //     } catch {}
-
-    //     if (shouldLog) {
-    //       try {
-    //         console.warn("[toString TRACE] on fn:", src);
-    //         console.warn("[STACK]", (new Error("toString-trace")).stack);
-    //       } catch {}
-    //     }
-
-    //     return orig.apply(this, args);
-    //   };
-
-    //   try { Object.defineProperty(Function.prototype.toString, "__TRACE__", { value: true }); } catch {}
-    // })(window);
 
 
 
@@ -142,7 +112,13 @@ const LOGGingModule = function LOGGingModule() {
         if (value === null || typeof value === "undefined") return value;
         const t = typeof value;
 
-        if (t === "string" || t === "number" || t === "boolean") return value;
+        if (t === "string") {
+          // Avoid huge "data:" payloads (canvas/audio/etc) in logs: they bloat JSON and skew perf timings.
+          if (value.indexOf("data:") === 0) return "[DataURL len=" + value.length + "]";
+          if (value.indexOf("blob:") === 0) return "[BlobURL]";
+          return value;
+        }
+        if (t === "number" || t === "boolean") return value;
 
         if (t === "function") {
           return "[Function " + (value.name || "anonymous") + "]";
@@ -246,7 +222,12 @@ const LOGGingModule = function LOGGingModule() {
             // keep message readable but safe
             try {
               const a = args[i];
-              if (typeof a === "string") msgParts.push(a);
+              if (typeof a === "string") {
+                // Same rationale as normalizeForJSON(): do not dump megabyte-sized payloads into message.
+                if (a.indexOf("data:") === 0) msgParts.push("[DataURL len=" + a.length + "]");
+                else if (a.indexOf("blob:") === 0) msgParts.push("[BlobURL]");
+                else msgParts.push(a);
+              }
               else msgParts.push(safeTag(a));
             } catch (_) {
               msgParts.push("[Unserializable]");

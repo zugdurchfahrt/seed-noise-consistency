@@ -16,6 +16,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     } catch (e) {
       console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
       if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:safeDefine:define_failed", e);
+      throw e;
     }
   }
 
