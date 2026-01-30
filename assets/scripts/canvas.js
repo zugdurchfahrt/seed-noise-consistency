@@ -736,6 +736,9 @@ const CanvasPatchModule = function CanvasPatchModule(window) {
       const safeInvoke = (typeof G.__canvasSafeInvoke__ === 'function')
         ? G.__canvasSafeInvoke__
         : ((fn, tgt, args) => fn.apply(tgt, args));
+      if (!HTMLCanvasElement.prototype || typeof HTMLCanvasElement.prototype.toDataURL !== 'function') {
+        throw new TypeError('[patchCanvasIHDRSync] Unsupported input type for sync path');
+      }
       const GUARD='__isChain_toDataURL';
       const prev = input[GUARD]; input[GUARD] = true;
       try {

@@ -396,6 +396,8 @@ def get_language_for_timezone(timezone, return_country=False):
     "America/Vancouver":       {"languages": ["en-CA"], "domain": "ca"},
     "America/Montreal":        {"languages": ["fr-CA"], "domain": "ca"},
     "America/Edmonton":        {"languages": ["en-CA"], "domain": "ca"},
+    "Europe/Moscow":           {"languages": ["ru-RU"], "domain": "ru"},
+    "Europe/Volgograd":        {"languages": ["ru-RU"], "domain": "ru"},
     }
 
     # Default сountry_data and list of languages

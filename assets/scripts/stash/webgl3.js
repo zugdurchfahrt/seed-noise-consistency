@@ -22,8 +22,14 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const __webglShaderSourcePatchedProtos__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
     const __webglDebugInfoCache__ = (typeof WeakMap === 'function') ? new WeakMap() : null;
     const __WEBGL_DEBUGINFO_CACHE_PROP__ = 'WebGLInstance_DebugInfoCache__';
-    if (!__webglInstancePatched__ || !__webglDebugInfoPatched__ || !__webglShaderSourcePatchedProtos__ || !__webglDebugInfoCache__) {
-      throw new Error('[WebGLPatchModule] WeakMap/WeakSet are required');
+
+    // Fail-fast: if WeakMap/WeakSet are not available, do not fall back to expando properties on WebGL objects.
+    // In Chromium these exist; if they are missing/broken, the environment is already inconsistent.
+    if (!__webglInstancePatched__ || !__webglDebugInfoPatched__ || !__webglShaderSourcePatchedProtos__) {
+      throw new Error('[WebglPatchModule] WeakSet is unavailable — refusing to write expando markers');
+    }
+    if (!__webglDebugInfoCache__) {
+      throw new Error('[WebglPatchModule] WeakMap is unavailable — refusing to write expando cache');
     }
 
     const markNative = (function() {
@@ -47,43 +53,39 @@ const WebglPatchModule = function WebglPatchModule(window) {
     // 1) VENDOR/RENDERER replacement
   function webglGetParameterMask(orig, pname, ...args) {
     let dbg;
-    if (__webglDebugInfoCache__) {
-      if (__webglDebugInfoCache__.has(this)) dbg = __webglDebugInfoCache__.get(this);
-    } else if (this && Object.prototype.hasOwnProperty.call(this, __WEBGL_DEBUGINFO_CACHE_PROP__)) {
-      dbg = this[__WEBGL_DEBUGINFO_CACHE_PROP__];
-    }
+    if (__webglDebugInfoCache__.has(this)) dbg = __webglDebugInfoCache__.get(this);
     if (dbg === undefined) {
       try { dbg = this.getExtension('WEBGL_debug_renderer_info'); } catch(e){ dbg = null; }
-      if (__webglDebugInfoCache__) {
-        __webglDebugInfoCache__.set(this, dbg);
-      } else if (this) {
-        try {
-          Object.defineProperty(this, __WEBGL_DEBUGINFO_CACHE_PROP__, {
-            value: dbg,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-        } catch (_) {
-          try { this[__WEBGL_DEBUGINFO_CACHE_PROP__] = dbg; } catch (_) {}
-        }
+      __webglDebugInfoCache__.set(this, dbg);
+    }
+
+    if (dbg) {
+      if (pname === dbg.UNMASKED_VENDOR_WEBGL) {
+        if (typeof window.__WEBGL_UNMASKED_VENDOR__ === 'string') return window.__WEBGL_UNMASKED_VENDOR__;
+        return orig.call(this, pname, ...args);
+      }
+      if (pname === dbg.UNMASKED_RENDERER_WEBGL) {
+        if (typeof window.__WEBGL_UNMASKED_RENDERER__ === 'string') return window.__WEBGL_UNMASKED_RENDERER__;
+        return orig.call(this, pname, ...args);
       }
     }
-    if (dbg) {
-        if (pname === dbg.UNMASKED_VENDOR_WEBGL)   return window.__WEBGL_UNMASKED_VENDOR__;
-        if (pname === dbg.UNMASKED_RENDERER_WEBGL) return window.__WEBGL_UNMASKED_RENDERER__;
+
+    if (pname === this.VENDOR) {
+      if (typeof window.__WEBGL_VENDOR__ === 'string') return window.__WEBGL_VENDOR__;
+      return orig.call(this, pname, ...args);
     }
-    if (pname === this.VENDOR   || pname === 0x1F00) return window.__WEBGL_VENDOR__;
-    if (pname === this.RENDERER || pname === 0x1F01) return window.__WEBGL_RENDERER__;
-    //others - do not touch
-    return;  // undefined → The original will work out
+    if (pname === this.RENDERER) {
+      if (typeof window.__WEBGL_RENDERER__ === 'string') return window.__WEBGL_RENDERER__;
+      return orig.call(this, pname, ...args);
+    }
+
+    // others - do not touch
+    return;  // undefined → patchMethod continues and calls orig
     }
   // 2) Хук «whitelist-фильтра»
   function webglWhitelistParameterHook(orig, pname, ...args) {
-    const wl = window.__WEBGL_PARAM_WHITELIST__;
-    if (!Array.isArray(wl)) {
-      throw new Error('[WebGLPatchModule] __WEBGL_PARAM_WHITELIST__ missing/invalid');
-    }
+    const wl = Array.isArray(window.__WEBGL_PARAM_WHITELIST__)
+      ? window.__WEBGL_PARAM_WHITELIST__ : [];
 
     // Always let core string params through via orig to avoid nulls breaking FP scripts
     // (keep masked vendor/renderer logic in webglGetParameterMask)
@@ -98,11 +100,13 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (wl.includes(pname)) {
       return; // undefined → pass-through to orig.apply(this, args)
     }
-    // For non-whitelisted enums: safe fallback to native (avoid breaking callers).
-    if (typeof window.__DEGRADE__ === 'function') {
-      try { window.__DEGRADE__('webgl:param_whitelist_miss', null, { pname: pname }); } catch (_) {}
+    // For non-whitelisted enums: deny (driver-like)
+    // Return `null` (WebGL commonly returns null for invalid enum) instead of leaking real values.
+    // Only enforce when pname is a finite number and the whitelist is non-empty.
+    if (wl.length && typeof pname === 'number' && Number.isFinite(pname)) {
+      return null;
     }
-    return; // undefined → pass-through to orig.apply(this, args)
+    return;
   }
     // === 2. getSupportedExtensions ===
   function webglGetSupportedExtensionsPatch(orig, ...args) {
@@ -128,42 +132,24 @@ const WebglPatchModule = function WebglPatchModule(window) {
       if (typeof res.getParameter === 'function') {
         const origGetParameter = res.getParameter;
         const wrappedGetParameter = ({ getParameter(pname) {
-          if (pname === this.UNMASKED_VENDOR_WEBGL)
-            return window.__WEBGL_UNMASKED_VENDOR__;
-          if (pname === this.UNMASKED_RENDERER_WEBGL)
-            return window.__WEBGL_UNMASKED_RENDERER__;
+          if (pname === this.UNMASKED_VENDOR_WEBGL) {
+            if (typeof window.__WEBGL_UNMASKED_VENDOR__ === 'string') return window.__WEBGL_UNMASKED_VENDOR__;
+            return origGetParameter.call(this, pname);
+          }
+          if (pname === this.UNMASKED_RENDERER_WEBGL) {
+            if (typeof window.__WEBGL_UNMASKED_RENDERER__ === 'string') return window.__WEBGL_UNMASKED_RENDERER__;
+            return origGetParameter.call(this, pname);
+          }
           return origGetParameter.call(this, pname);
         }}).getParameter;
 
         markNative(wrappedGetParameter, 'getParameter');
         res.getParameter = wrappedGetParameter;
       }
-      if (__webglDebugInfoPatched__) {
-        __webglDebugInfoPatched__.add(res);
-      } else {
-        Object.defineProperty(res, 'WebGLInstance_DebugInfoPatched__', {
-          value: true,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      }
+      __webglDebugInfoPatched__.add(res);
     }
     if (name === 'WEBGL_debug_renderer_info') {
-      if (__webglDebugInfoCache__) {
-        __webglDebugInfoCache__.set(this, res || null);
-      } else if (this) {
-        try {
-          Object.defineProperty(this, __WEBGL_DEBUGINFO_CACHE_PROP__, {
-            value: res || null,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-        } catch (_) {
-          try { this[__WEBGL_DEBUGINFO_CACHE_PROP__] = res || null; } catch (_) {}
-        }
-      }
+      __webglDebugInfoCache__.set(this, res || null);
     }
     return res;
   }
@@ -175,30 +161,10 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
     const proto = Object.getPrototypeOf(res);
     if (kind && ['webgl', 'experimental-webgl', 'webgl2'].includes(kind)) {
-    const state = C && C.__patchState;
-    const skipProtoWrap = !!(state && state.webgl);
-    if (proto && proto.shaderSource && !skipProtoWrap && !(__webglShaderSourcePatchedProtos__ && __webglShaderSourcePatchedProtos__.has(proto))) {
-      const orig = proto.shaderSource;
-        // НИЧЕГО НЕ МЕНЯЕМ ЗДЕСЬ — вся precision-политика уедет в webglShaderSourceHook
-        const wrapped = ({ shaderSource(shader, src) {
-          return orig.call(this, shader, src);
-        } }).shaderSource;
+      // Do not patch proto.shaderSource here: ContextPatchModule.patchMethod("shaderSource") does it centrally.
+      // Double-wrapping breaks identity/descriptor expectations.
 
-        markNative(wrapped, 'shaderSource');
-        proto.shaderSource = wrapped;
-        if (__webglShaderSourcePatchedProtos__) __webglShaderSourcePatchedProtos__.add(proto);
-      }
-
-      if (__webglInstancePatched__) {
-        __webglInstancePatched__.add(res);
-      } else {
-        Object.defineProperty(res, 'WebGLInstance_GPUPatched__', {
-          value: true,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      }
+      __webglInstancePatched__.add(res);
     }
     return res;
   }
@@ -221,25 +187,9 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
 
   function webglGetShaderPrecisionFormatHook(orig, shaderType, precisionType) {
-    const res = orig.call(this, shaderType, precisionType);
-    if (!res) return res;
-    const v = (R() - 0.5);
-    const rangeMin = Math.round(res.rangeMin + v);
-    const rangeMax = Math.round(res.rangeMax + v);
-    const precision = Math.round(res.precision + v);
-    const proto = Object.getPrototypeOf(res);
-    const dMin = Object.getOwnPropertyDescriptor(res, 'rangeMin');
-    const dMax = Object.getOwnPropertyDescriptor(res, 'rangeMax');
-    const dPrec = Object.getOwnPropertyDescriptor(res, 'precision');
-    if (dMin && dMax && dPrec && ('value' in dMin) && ('value' in dMax) && ('value' in dPrec)) {
-      const out = Object.create(proto);
-      Object.defineProperty(out, 'rangeMin', Object.assign({}, dMin, { value: rangeMin }));
-      Object.defineProperty(out, 'rangeMax', Object.assign({}, dMax, { value: rangeMax }));
-      Object.defineProperty(out, 'precision', Object.assign({}, dPrec, { value: precision }));
-      return out;
-    }
-    // If we cannot preserve descriptors/prototype safely, keep native result.
-    return res;
+    // IMPORTANT: keep native return value (WebGLShaderPrecisionFormat) to preserve prototype invariants.
+    // patchMethod is pre-call for this method; returning undefined lets the original execute.
+    return;
   }
 
   function webglShaderSourceHook(orig, shader, src) {

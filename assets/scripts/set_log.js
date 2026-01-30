@@ -56,12 +56,6 @@ const LOGGingModule = function LOGGingModule() {
       }
     }
 
-    function scheduleRethrow(err) {
-      const schedule = (typeof queueMicrotask === "function")
-        ? queueMicrotask
-        : (typeof setTimeout === "function" ? (fn) => setTimeout(fn, 0) : null);
-      if (schedule) schedule(function () { throw err; });
-    }
 
     function guardedApply(fn, self, args, where) {
       try {
@@ -84,6 +78,7 @@ const LOGGingModule = function LOGGingModule() {
       const allowed = LOG_LEVELS.slice(0, safeIdx + 1);
       return allowed.indexOf(eventLevel) !== -1;
     }
+
 
 
 
@@ -422,6 +417,14 @@ const LOGGingModule = function LOGGingModule() {
       if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:worker_context:init_failed", e);
     }
 
+
+
+
+
+
+
+
+
     // ===== 6) Export helper (in-session) =====
     global.exportMyDebugLog = function () {
       try {
@@ -449,5 +452,49 @@ const LOGGingModule = function LOGGingModule() {
         if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:export_log:export_failed", e);
       }
     };
+
+    // ===== 7) One-click toggles (no markers) =====
+    global.DEBUG_ALL_ON = function () {
+      try {
+        global.__DEBUG__ = true;
+        global._logLevel = "trace";
+        if (global._logConfig) {
+          for (const k in global._logConfig) {
+            global._logConfig[k].enabled = true;
+            global._logConfig[k].level = "trace";
+          }
+        }
+        if (typeof global.__DEGRADE__ === "function") {
+          global.__DEGRADE__("DEBUG_ALL_ON", null);
+        }
+      } catch (_) {}
+    };
+
+    global.DEBUG_ALL_OFF = function () {
+      try {
+        global.__DEBUG__ = false;
+        global._logLevel = "error";
+        if (global._logConfig) {
+          for (const k in global._logConfig) {
+            global._logConfig[k].enabled = false;
+          }
+        }
+        if (typeof global.__DEGRADE__ === "function") {
+          global.__DEGRADE__("DEBUG_ALL_OFF", null);
+        }
+      } catch (_) {}
+    };
+
+    global.DEBUG_ALL_TOGGLE = function () {
+      try {
+        if (global.__DEBUG__) global.DEBUG_ALL_OFF();
+        else global.DEBUG_ALL_ON();
+      } catch (_) {}
+    };
+
+
+
+
+
   }
 }

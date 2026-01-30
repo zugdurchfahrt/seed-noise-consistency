@@ -22,9 +22,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const __webglShaderSourcePatchedProtos__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
     const __webglDebugInfoCache__ = (typeof WeakMap === 'function') ? new WeakMap() : null;
     const __WEBGL_DEBUGINFO_CACHE_PROP__ = 'WebGLInstance_DebugInfoCache__';
-    if (!__webglInstancePatched__ || !__webglDebugInfoPatched__ || !__webglShaderSourcePatchedProtos__ || !__webglDebugInfoCache__) {
-      throw new Error('[WebGLPatchModule] WeakMap/WeakSet are required');
-    }
 
     const markNative = (function() {
       const ensure = (typeof window.__ensureMarkAsNative === 'function')
@@ -80,10 +77,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
   // 2) Хук «whitelist-фильтра»
   function webglWhitelistParameterHook(orig, pname, ...args) {
-    const wl = window.__WEBGL_PARAM_WHITELIST__;
-    if (!Array.isArray(wl)) {
-      throw new Error('[WebGLPatchModule] __WEBGL_PARAM_WHITELIST__ missing/invalid');
-    }
+    const wl = Array.isArray(window.__WEBGL_PARAM_WHITELIST__)
+      ? window.__WEBGL_PARAM_WHITELIST__ : [];
 
     // Always let core string params through via orig to avoid nulls breaking FP scripts
     // (keep masked vendor/renderer logic in webglGetParameterMask)
@@ -98,11 +93,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (wl.includes(pname)) {
       return; // undefined → pass-through to orig.apply(this, args)
     }
-    // For non-whitelisted enums: safe fallback to native (avoid breaking callers).
-    if (typeof window.__DEGRADE__ === 'function') {
-      try { window.__DEGRADE__('webgl:param_whitelist_miss', null, { pname: pname }); } catch (_) {}
-    }
-    return; // undefined → pass-through to orig.apply(this, args)
+    // For non-whitelisted enums: deny (driver-like)
+    return;
   }
     // === 2. getSupportedExtensions ===
   function webglGetSupportedExtensionsPatch(orig, ...args) {
@@ -175,10 +167,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
     const proto = Object.getPrototypeOf(res);
     if (kind && ['webgl', 'experimental-webgl', 'webgl2'].includes(kind)) {
-    const state = C && C.__patchState;
-    const skipProtoWrap = !!(state && state.webgl);
-    if (proto && proto.shaderSource && !skipProtoWrap && !(__webglShaderSourcePatchedProtos__ && __webglShaderSourcePatchedProtos__.has(proto))) {
-      const orig = proto.shaderSource;
+      if (proto && proto.shaderSource && !(__webglShaderSourcePatchedProtos__ && __webglShaderSourcePatchedProtos__.has(proto))) {
+        const orig = proto.shaderSource;
         // НИЧЕГО НЕ МЕНЯЕМ ЗДЕСЬ — вся precision-политика уедет в webglShaderSourceHook
         const wrapped = ({ shaderSource(shader, src) {
           return orig.call(this, shader, src);
@@ -224,22 +214,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const res = orig.call(this, shaderType, precisionType);
     if (!res) return res;
     const v = (R() - 0.5);
-    const rangeMin = Math.round(res.rangeMin + v);
-    const rangeMax = Math.round(res.rangeMax + v);
-    const precision = Math.round(res.precision + v);
-    const proto = Object.getPrototypeOf(res);
-    const dMin = Object.getOwnPropertyDescriptor(res, 'rangeMin');
-    const dMax = Object.getOwnPropertyDescriptor(res, 'rangeMax');
-    const dPrec = Object.getOwnPropertyDescriptor(res, 'precision');
-    if (dMin && dMax && dPrec && ('value' in dMin) && ('value' in dMax) && ('value' in dPrec)) {
-      const out = Object.create(proto);
-      Object.defineProperty(out, 'rangeMin', Object.assign({}, dMin, { value: rangeMin }));
-      Object.defineProperty(out, 'rangeMax', Object.assign({}, dMax, { value: rangeMax }));
-      Object.defineProperty(out, 'precision', Object.assign({}, dPrec, { value: precision }));
-      return out;
-    }
-    // If we cannot preserve descriptors/prototype safely, keep native result.
-    return res;
+    return {
+      rangeMin: Math.round(res.rangeMin + v),
+      rangeMax: Math.round(res.rangeMax + v),
+      precision: Math.round(res.precision + v)
+    };
   }
 
   function webglShaderSourceHook(orig, shader, src) {
