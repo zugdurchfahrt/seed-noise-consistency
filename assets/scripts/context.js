@@ -411,7 +411,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
         const fontStr = getFontStr(this);
 
         if (H && typeof H.applyMeasureTextHook === 'function') {
-          const r = H.applyMeasureTextHook.call(this, m, txt, fontStr);
+          // const r = H.applyMeasureTextHook.call(this, m, txt, fontStr);
+          const r = Reflect.apply(H.applyMeasureTextHook, H, [m, txt, fontStr]);
+
           return r ?? m;
         }
 

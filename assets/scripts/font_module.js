@@ -1,13 +1,18 @@
 const FontPatchModule = function FontPatchModule(window) {
+const G = (typeof globalThis !== 'undefined' && globalThis)
+      || (typeof self       !== 'undefined' && self)
+      || (typeof window     !== 'undefined' && window)
+      || (typeof global     !== 'undefined' && global)
+      || {};
+
+  if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
+    // если модуль оказался в worker-среде и его вызвали как FontPatchModule(window) где window=undefined
+    window = G;
+  }
+
   const C = window.CanvasPatchContext;
   if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registration is not allowed');
-
-  const G = (typeof globalThis !== 'undefined' && globalThis)
-        || (typeof self       !== 'undefined' && self)
-        || (typeof window     !== 'undefined' && window)
-        || (typeof global     !== 'undefined' && global)
-        || {};
-
+  
 
   // === Fonts module local guard (window & worker) ===
   if (!Array.isArray(window.fontPatchConfigs))
@@ -18,18 +23,18 @@ const FontPatchModule = function FontPatchModule(window) {
   (function exposeFontsReady(){
     const hasDocFonts = (typeof document === 'object' && document && document.fonts && document.fonts.ready);
 
-    // В window-ветке нам нужна "внешне резолвимая" точка (её реально резолвим ниже после загрузки)
+    // В window-ветке нам нужна "внешне резолвимая" точка
     if (hasDocFonts) {
       if (!window.awaitFontsReady || typeof window.awaitFontsReady.then !== 'function' || !window.awaitFontsReady.__owned_by_fontpatch) {
-        let resolveFn;
-        const p = new Promise(res => (resolveFn = res));
+        let resolveFn, rejectFn;
+        const p = new Promise((res, rej) => { resolveFn = res; rejectFn = rej; });
         p.resolve = resolveFn;
+        p.reject  = rejectFn;
         Object.defineProperty(p, '__owned_by_fontpatch', { value: true });
         window.awaitFontsReady = p;
       }
       return;
     }
-
     // В non-window (worker) НЕ подменяем нативный ready на pending-промис, который никто не резолвит
     if (window.fonts && window.fonts.ready && typeof window.fonts.ready.then === 'function') {
       window.awaitFontsReady = window.fonts.ready;
@@ -128,32 +133,65 @@ const FontPatchModule = function FontPatchModule(window) {
 
   // ===  window branch (DOM exist here) ====
   if (typeof document === 'object' && document) {
-    // load and register in document.fonts
-    Promise.allSettled(fonts.map(f => {
-      const fam = (f.cssFamily || f.family);
-      const ff  = new FontFace(fam, `url("${f.url}") format("woff2")`, {
-        weight: f.weight || 'normal',
-        style:  f.style  || 'normal',
-        display: 'swap'
-      });
-      return ff.load().then(loaded => { document.fonts.add(loaded); return fam; });
-    })).then(results => {
-      const loaded = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
+    Promise.allSettled(
+      fonts.map((f) => {
+        try {
+          if (!f || typeof f !== 'object') {
+            throw new TypeError('[FontPatch] font entry must be object');
+          }
+          const fam = (f.cssFamily || f.family);
+          if (!fam || typeof fam !== 'string') {
+            throw new TypeError('[FontPatch] font.family missing/invalid');
+          }
+          const url = f.url;
+          if (!url || typeof url !== 'string') {
+            throw new TypeError('[FontPatch] font.url missing/invalid');
+          }
 
-      // Дожидаемся document.fonts.ready + двойной RAF, затем единый resolve()
-      Promise.resolve()
-        .then(() => (document && document.fonts && document.fonts.ready) || Promise.resolve())
-        .then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
+          const src = `url(${JSON.stringify(url)}) format("woff2")`;
+
+          const ff = new FontFace(fam, src, {
+            weight: f.weight || 'normal',
+            style:  f.style  || 'normal',
+            display: 'swap',
+          });
+
+          return ff.load().then((loaded) => {
+            document.fonts.add(loaded);
+            return fam;
+          });
+        } catch (e) {
+          return Promise.reject(e);
+        }
+      })
+    ).then((results) => {
+      const loaded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.filter((r) => r.status === 'rejected').length;
+
+      // Дожидаемся document.fonts.ready + двойной RAF, затем единый settle()
+      return Promise.resolve()
+        .then(() => (document.fonts && document.fonts.ready) || Promise.resolve())
+        .then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
         .finally(() => {
-          if (failed > 0) return; // не объявляем готовность при фейлах
+          if (failed > 0) {
+            const first = results.find((r) => r.status === 'rejected');
+            const err = first && ('reason' in first) ? first.reason : new Error('[FontPatch] font load failed');
+
+            window.__FONTS_READY__ = false;
+            try { window.__FONTS_ERROR__ = String((err && (err.stack || err.message)) || err); } catch (_) {}
+
+            if (typeof window.awaitFontsReady?.reject === 'function') window.awaitFontsReady.reject(err);
+            console.log(`[FontPatch] window: ${loaded} loaded, ${failed} failed`);
+            return;
+          }
+
           window.__FONTS_READY__ = true;
           if (typeof window.awaitFontsReady?.resolve === 'function') window.awaitFontsReady.resolve();
-          window.dispatchEvent && window.dispatchEvent(new Event('fontsready'));
+          try { window.dispatchEvent && window.dispatchEvent(new Event('fontsready')); } catch (_) {}
+          console.log(`[FontPatch] window: ${loaded} loaded, ${failed} failed`);
         });
-      console.log(`[FontPatch] window: ${loaded} loaded, ${failed} failed`);
     });
-
+  
       // CSS @font-face →Only in the window
   (function injectCss(){
     let css = '';

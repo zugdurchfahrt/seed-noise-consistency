@@ -247,6 +247,7 @@ def init_driver(
             "longitude": longitude,
             "accuracy": accuracy,
         })
+        
         # 3. Device Metrics (screen scales, including navigator.mobile)
         if device_metrics:
             driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
@@ -272,12 +273,10 @@ def init_driver(
       
      
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
-    logger.info("SW-HW-CDP injector started on port %s", cdp.PORT)
+     
     
-
-    threading.Thread(target=cdp.run, daemon=True).start() 
+    threading.Thread(target=cdp.run, daemon=True).start()  
     logger.info("Thread started on port %s", cdp.PORT)
-
 
     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
@@ -728,8 +727,8 @@ def main():
             "platform_weights": [0.96, 0.04],
             # Probabilities of browser selection for each platform:
             "browser_weights": {
-                "Win32": (["chrome", "firefox", "edge"], [0.6, 0.01, 0.39]),
-                "MacIntel": (["chrome", "firefox", "safari"], [0.19, 0.01, 0.8]),
+                "Win32": (["chrome", "firefox", "edge"], [0.8, 0.01, 0.19]),
+                "MacIntel": (["chrome", "firefox", "safari"], [0.8, 0.01, 0.19]),
             },
         }
         # --------PLATFORM selection -------------------
@@ -1068,8 +1067,209 @@ def main():
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
 
+
+
+
+
+
+
+
+
+
+        dump_table_js = """
+            (() => {
+            const g = window;
+
+            const isArr = (v) => Array.isArray(v);
+            function safe(fn, fallback) { try { return fn(); } catch (e) { return fallback; } }
+
+            // === редактируемая таблица: добавляешь строки сюда ===
+            const SNAPSHOT_TABLE = [
+                // ───── core ─────
+                ["core", "__GLOBAL_SEED", () => g.__GLOBAL_SEED],
+                ["core", "__DPR",         () => g.__DPR],
+                ["core", "__DEBUG__",     () => g.__DEBUG__],
+                ["core", "_logLevel",     () => g._logLevel],
+                ["core", "__cpu",         () => g.__cpu],
+                ["core", "__memory",      () => g.__memory],
+                ["core", "__primaryLanguage",     () => g.__primaryLanguage],
+                ["core", "__normalizedLanguages", () => g.__normalizedLanguages],
+
+                // ───── navigator (page) ─────
+                ["nav", "navigator.language",            () => g.navigator && g.navigator.language],
+                ["nav", "navigator.languages",           () => g.navigator && g.navigator.languages],
+                ["nav", "navigator.hardwareConcurrency", () => g.navigator && g.navigator.hardwareConcurrency],
+                ["nav", "navigator.deviceMemory",        () => g.navigator && g.navigator.deviceMemory],
+
+                // ───── workers ─────
+                ["worker", "WorkerPatchHooks.exists", () => !!g.WorkerPatchHooks],
+                ["worker", "WorkerPatchHooks.diag",   () => g.WorkerPatchHooks?.diag?.() ?? null],
+                ["worker", "Worker.__ENV_WRAPPED__",  () => !!(g.Worker && g.Worker.__ENV_WRAPPED__)],
+                ["worker", "SharedWorker.__ENV_WRAPPED__", () => !!(g.SharedWorker && g.SharedWorker.__ENV_WRAPPED__)],
+                ["worker", "worker.safeWorker",       () => !!(g.__PATCHED_SAFE_WORKER__ || (g.Worker && g.Worker.__ENV_WRAPPED__))],
+                ["worker", "__lastSnap.language",     () => g.__lastSnap__ && g.__lastSnap__.language],
+                ["worker", "__lastSnap.languages",    () => g.__lastSnap__ && g.__lastSnap__.languages],
+                ["worker", "__lastSnap.hardwareConcurrency", () => g.__lastSnap__ && g.__lastSnap__.hardwareConcurrency],
+                ["worker", "__lastSnap.deviceMemory",       () => g.__lastSnap__ && g.__lastSnap__.deviceMemory],
+                ["worker", "__ENV_HUB__.snapshot.language", () => g.__ENV_HUB__?.getSnapshot?.()?.language],
+                ["worker", "__ENV_HUB__.snapshot.languages", () => g.__ENV_HUB__?.getSnapshot?.()?.languages],
+                ["worker", "__ENV_HUB__.snapshot.hardwareConcurrency", () => g.__ENV_HUB__?.getSnapshot?.()?.hardwareConcurrency],
+                ["worker", "__ENV_HUB__.snapshot.deviceMemory",        () => g.__ENV_HUB__?.getSnapshot?.()?.deviceMemory],
+                
+                // ───── env bridge ─────
+                ["bridge", "__ENV_BRIDGE__.exists",  () => !!g.__ENV_BRIDGE__],
+                ["bridge", "__ENV_BRIDGE__.urlKeys", () => Object.keys(g.__ENV_BRIDGE__?.urls || {})],
+
+                // ───── canvas/webgl: existence + patchState ─────
+                ["canvas", "CanvasPatchContext.exists",     () => !!g.CanvasPatchContext],
+                ["canvas", "CanvasPatchContext.__patchState", () => g.CanvasPatchContext?.__patchState || null],
+                ["canvas", "CanvasPatchContext.hooksRegistered", () =>
+                (g.CanvasPatchContext?.__patchState && g.CanvasPatchContext.__patchState.hooksRegistered) || null
+                ],
+
+                // ───── hook counts (по одной строке на счётчик) ─────
+                ["hooks", "htmlCanvasGetContextHooks.length",      () => (g.CanvasPatchContext?.htmlCanvasGetContextHooks || []).length],
+                ["hooks", "htmlCanvasToDataURLHooks.length",       () => (g.CanvasPatchContext?.htmlCanvasToDataURLHooks || []).length],
+                ["hooks", "htmlCanvasToBlobHooks.length",          () => (g.CanvasPatchContext?.htmlCanvasToBlobHooks || []).length],
+                ["hooks", "offscreenGetContextHooks.length",       () => (g.CanvasPatchContext?.offscreenGetContextHooks || []).length],
+                ["hooks", "offscreenConvertToBlobHooks.length",    () => (g.CanvasPatchContext?.offscreenConvertToBlobHooks || []).length],
+
+                ["hooks", "ctx2DGetContextHooks.length",           () => (g.CanvasPatchContext?.ctx2DGetContextHooks || []).length],
+                ["hooks", "ctx2DMeasureTextHooks.length",          () => (g.CanvasPatchContext?.ctx2DMeasureTextHooks || []).length],
+                ["hooks", "ctx2DFillTextHooks.length",             () => (g.CanvasPatchContext?.ctx2DFillTextHooks || []).length],
+                ["hooks", "ctx2DStrokeTextHooks.length",           () => (g.CanvasPatchContext?.ctx2DStrokeTextHooks || []).length],
+                ["hooks", "ctx2DFillRectHooks.length",             () => (g.CanvasPatchContext?.ctx2DFillRectHooks || []).length],
+                ["hooks", "ctx2DDrawImageHooks.length",            () => (g.CanvasPatchContext?.ctx2DDrawImageHooks || []).length],
+                ["hooks", "canvas2DNoiseHooks.length",             () => (g.CanvasPatchContext?.canvas2DNoiseHooks || []).length],
+
+                ["hooks", "webglGetParameterHooks.length",         () => (g.CanvasPatchContext?.webglGetParameterHooks || []).length],
+                ["hooks", "webglGetSupportedExtensionsHooks.length", () => (g.CanvasPatchContext?.webglGetSupportedExtensionsHooks || []).length],
+                ["hooks", "webglGetExtensionHooks.length",         () => (g.CanvasPatchContext?.webglGetExtensionHooks || []).length],
+                ["hooks", "webglGetContextHooks.length",           () => (g.CanvasPatchContext?.webglGetContextHooks || []).length],
+                ["hooks", "webglReadPixelsHooks.length",           () => (g.CanvasPatchContext?.webglReadPixelsHooks || []).length],
+                ["hooks", "webglGetShaderPrecisionFormatHooks.length", () => (g.CanvasPatchContext?.webglGetShaderPrecisionFormatHooks || []).length],
+                ["hooks", "webglShaderSourceHooks.length",         () => (g.CanvasPatchContext?.webglShaderSourceHooks || []).length],
+                ["hooks", "webglGetUniformHooks.length",           () => (g.CanvasPatchContext?.webglGetUniformHooks || []).length],
+
+                // ───── headers interceptor (таблично) ─────
+                ["headers", "HeadersInterceptor.exists", () => !!g.HeadersInterceptor],
+                ["headers", "HeadersInterceptor.hasAPI", () => {
+                const H = g.HeadersInterceptor;
+                return !!H && (typeof H === "function" || typeof H === "object");
+                }],
+                ["headers", "__HEADERS_BRIDGE_READY__", () => !!g.__HEADERS_BRIDGE_READY__],
+                ["headers", "HeadersInterceptor.allow", () => {
+                const H = g.HeadersInterceptor;
+                return (H && H.listAllow && H.listAllow()) || g.__CDP_ALLOW_SUFFIXES || null;
+                }],
+                ["headers", "HeadersInterceptor.ignore", () => {
+                const H = g.HeadersInterceptor;
+                return (H && H.listIgnore && H.listIgnore()) || g.__CDP_IGNORED_SUFFIXES || null;
+                }],
+
+                // ───── errors ─────
+                ["errors", "__ENV_BOOTSTRAP_ERROR__", () => g.__ENV_BOOTSTRAP_ERROR__ ?? null],
+                ["errors", "__ENV_BC_ERROR__",        () => g.__ENV_BC_ERROR__ ?? null],
+
+                // ───── self-checks (коротко и fail-fast-смысл: тут только диагностика, не throw) ─────
+                ["self", "self.canvas.patchStateShape", () => {
+                const C = g.CanvasPatchContext;
+                if (!C) return "SKIP: no CanvasPatchContext";
+                const ps = C.__patchState;
+                if (!ps || typeof ps !== "object") return "FAIL: __patchState missing/not object";
+                return "OK";
+                }],
+                ["self", "self.canvas.hooksRegistered", () => {
+                const C = g.CanvasPatchContext;
+                if (!C) return "SKIP: no CanvasPatchContext";
+                const v = C.__patchState && C.__patchState.hooksRegistered;
+                if (v === true) return "OK";
+                if (v === false) return "FAIL: hooksRegistered=false";
+                return "FAIL: hooksRegistered missing";
+                }],
+                ["self", "self.canvas.hookArraysAreArrays", () => {
+                const C = g.CanvasPatchContext;
+                if (!C) return "SKIP: no CanvasPatchContext";
+                const keys = [
+                    "htmlCanvasGetContextHooks","htmlCanvasToDataURLHooks","htmlCanvasToBlobHooks",
+                    "offscreenGetContextHooks","offscreenConvertToBlobHooks",
+                    "ctx2DGetContextHooks","ctx2DMeasureTextHooks","ctx2DFillTextHooks","ctx2DStrokeTextHooks",
+                    "ctx2DFillRectHooks","ctx2DDrawImageHooks","canvas2DNoiseHooks",
+                    "webglGetParameterHooks","webglGetSupportedExtensionsHooks","webglGetExtensionHooks",
+                    "webglGetContextHooks","webglReadPixelsHooks","webglGetShaderPrecisionFormatHooks",
+                    "webglShaderSourceHooks","webglGetUniformHooks",
+                ];
+                for (const k of keys) {
+                    const v = C[k];
+                    if (v == null) continue; // допустимо: ещё не инициализировано
+                    if (!isArr(v)) return "FAIL: " + k + " not array";
+                }
+                return "OK";
+                }],
+            ];
+
+            function takeTableSnapshot(tag = "manual") {
+                const rows = [];
+                for (const [group, key, getter] of SNAPSHOT_TABLE) {
+                let value;
+                try { value = getter(); } catch (e) { value = "❌ " + (e && e.message ? e.message : String(e)); }
+                rows.push({ tag, group, key, value, t: Date.now() });
+                }
+                console.table(rows);
+                return rows;
+            }
+
+            // экспорт: доступно в консоли в любой момент после загрузки документа
+            g.__TABLE_SNAPSHOT__ = takeTableSnapshot;
+
+            // опционально: автоснимок после каждого reload
+            function auto() {
+                //  включаениеть логера тут идщ set_log
+                safe(() => { if (typeof g.DEBUG_ALL_ON === "function") g.DEBUG_ALL_ON(); }, null);
+                takeTableSnapshot("after_reload");
+            }
+
+            if (document.readyState === "interactive" || document.readyState === "complete") auto();
+            else addEventListener("DOMContentLoaded", auto, { once: true });
+            })();
+            """
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": dump_table_js})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)

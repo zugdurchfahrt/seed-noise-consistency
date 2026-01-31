@@ -1,10 +1,17 @@
 const CanvasPatchModule = function CanvasPatchModule(window) {
-    const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
-    if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
-  const G = (typeof globalThis !== 'undefined' && globalThis)
-    || (typeof self !== 'undefined' && self)
-    || (typeof window !== 'undefined' && window)
-    || {};
+const G = (typeof globalThis !== 'undefined' && globalThis)
+  || (typeof self !== 'undefined' && self)
+  || (typeof window !== 'undefined' && window)
+  || {};
+
+if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
+  window = G;
+}
+
+const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
+if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+
+
       
   // === MODULE INITIALIZATION ===
   // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
@@ -28,7 +35,13 @@ const CanvasPatchModule = function CanvasPatchModule(window) {
       throw new Error('[CanvasPatch] screenWidth / screenHeight not set');
     }
     const div = document.createElement('div');
-    const rng = mulberry32(strToSeed(__GLOBAL_SEED + '|canvasId'));
+    if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED) {
+      throw new Error('[CanvasPatch] __GLOBAL_SEED missing');
+    }
+    if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function') {
+      throw new Error('[CanvasPatch] strToSeed/mulberry32 missing');
+    }
+    const rng = G.mulberry32(G.strToSeed(G.__GLOBAL_SEED + '|canvasId'));
     const u1 = rng();
     const u2 = rng();
 

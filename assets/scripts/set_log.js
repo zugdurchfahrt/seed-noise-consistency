@@ -18,6 +18,12 @@ const LOGGingModule = function LOGGingModule() {
     G.__DEBUG__ =
       typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
 
+
+    window.env = window.env || {};
+    window.env.DEBUG_DEGRADES = false;  
+
+
+
     // Save original console methods
     const origConsole = {
       log: console.log && console.log.bind(console),
@@ -78,14 +84,6 @@ const LOGGingModule = function LOGGingModule() {
       const allowed = LOG_LEVELS.slice(0, safeIdx + 1);
       return allowed.indexOf(eventLevel) !== -1;
     }
-
-
-
-
-
-
-
-
 
     // ===== 1) Make everything JSON-serializable =====
     function safeTag(v) {

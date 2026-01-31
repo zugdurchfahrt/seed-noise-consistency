@@ -90,13 +90,23 @@ function EnvBus(G){
       if (k === 'fullVersionList' && !Array.isArray(v)) {
         throw new Error('EnvBus: high entropy bad fullVersionList');
       }
-      if (typeof v === 'string');
       if (Array.isArray(v) && !v.length) throw new Error(`EnvBus: high entropy bad ${k}`);
       he[k] = v;
     }
     uaData.he = he;
 
     const seed = String(G && G.__GLOBAL_SEED);
+    const windowKeys = (() => {
+      try {
+        const keys = Object.getOwnPropertyNames(G);
+        if (!Array.isArray(keys) || keys.length === 0) {
+          throw new Error('EnvBus: windowKeys missing');
+        }
+        return keys;
+      } catch (e) {
+        throw new Error('EnvBus: windowKeys missing');
+      }
+    })();
     // Алиасы для совместимости с воркер-патчем
     return {
       ua, vendor, language: lang, languages: langs, dpr, cpu, mem, timeZone,
@@ -105,7 +115,8 @@ function EnvBus(G){
       highEntropy: he,
       hardwareConcurrency: cpu,
       deviceMemory: mem,
-      seed
+      seed,
+      windowKeys
     };
   }
 
@@ -243,7 +254,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
         __patchOK = true;
       } catch (e) {
         try {
-          self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+          if (typeof self.postMessage === 'function') {
+            self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+          }
         } catch (_e) {}
         self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
       }
@@ -254,7 +267,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
           self.__applyEnvSnapshot__(self.__lastSnap__);
         } catch (e) {
           try {
-            self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+            if (typeof self.postMessage === 'function') {
+              self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+            }
           } catch (_e) {}
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
         }
@@ -353,7 +368,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
         __patchOK = true;
       } catch (e) {
         try {
-          self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+          if (typeof self.postMessage === 'function') {
+            self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+          }
         } catch (_e) {}
         self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
       }
@@ -364,7 +381,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
           self.__applyEnvSnapshot__(self.__lastSnap__);
         } catch (e) {
           try {
-            self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+            if (typeof self.postMessage === 'function') {
+              self.postMessage({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
+            }
           } catch (_e) {}
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
         }
@@ -579,62 +598,78 @@ function SafeWorkerOverride(G){
   const abs = new URL(url, location.href).href;
   const workerType = resolveWorkerType(abs, opts, 'Worker');
   const bridge = G.__ENV_BRIDGE__;
-  if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
-    console.error('[WorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched Worker');
-    throw new Error('[WorkerOverride] __ENV_BRIDGE__ not ready; refusing to create unpatched Worker');
-  }
-  if (typeof bridge.mkModuleWorkerSource !== 'function') {
-    throw new Error('[WorkerOverride] mkModuleWorkerSource missing');
-  }
-  if (typeof bridge.publishSnapshot !== 'function') {
-    throw new Error('[WorkerOverride] publishSnapshot missing');
-  }
-  if (typeof bridge.envSnapshot !== 'function') {
-    throw new Error('[WorkerOverride] envSnapshot missing');
+  if (!bridge
+      || typeof bridge.mkClassicWorkerSource !== 'function'
+      || typeof bridge.mkModuleWorkerSource !== 'function'
+      || typeof bridge.publishSnapshot !== 'function'
+      || typeof bridge.envSnapshot !== 'function') {
+    // Safe fallback: do not break the page if the bridge isn't ready yet.
+    // Observability: this shows up in set_log.js console capture.
+    try { console.warn('[WorkerOverride] PATCH_SKIPPED: __ENV_BRIDGE__ not ready; creating native Worker'); } catch(_){}
+    return new NativeWorker(url, opts);
   }
   const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
   G.__lastSnap__ = snap;
   bridge.publishSnapshot(snap);
 
-  const userURL = resolveUserScriptURL(G, abs, 'Worker');
+  // Important: for module workers, do not "clone" blob: URLs.
+  // Some real-world bundles embed the original blob URL string for follow-up dynamic imports.
+  // If we mint a fresh blob URL, those imports can later fail (original blob gets revoked).
+  const userURL = (typeof abs === 'string' && abs.slice(0, 5) === 'blob:' && workerType === 'module')
+    ? abs
+    : resolveUserScriptURL(G, abs, 'Worker');
   const src = workerType === 'module'
     ? bridge.mkModuleWorkerSource(snap, userURL)
     : bridge.mkClassicWorkerSource(snap, userURL);
 
   const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-  let w;
-  try {
-    w = new NativeWorker(blobURL, { ...(opts), type: workerType });
-  } finally {
-    URL.revokeObjectURL(blobURL);
-  }
+  const w = new NativeWorker(blobURL, { ...(opts), type: workerType });
+
   if (w && typeof w.addEventListener === 'function') {
-    const onMsg = ev => {
+    const cleanup = () => {
+      try { URL.revokeObjectURL(blobURL); } catch(_) {}
+      try { w.removeEventListener('message', onMsg); } catch(_) {}
+      try { w.removeEventListener('error', onErr); } catch(_) {}
+    };
+
+    const onErr = () => {
+      cleanup();
+    };
+
+    const onMsg = (ev) => {
       const data = ev && ev.data;
+
       const bootErr = data && typeof data === 'object' && data.__ENV_BOOTSTRAP_ERROR__;
       if (bootErr) {
         try { G.__LAST_WORKER_BOOTSTRAP_ERROR__ = bootErr; } catch(_) {}
+        cleanup();
+        return;
       }
-      const loaded = data && typeof data === 'object' && typeof data.__ENV_USER_URL_LOADED__ === 'string'
-        ? data.__ENV_USER_URL_LOADED__
-        : null;
+
+      const loaded =
+        data && typeof data === 'object' && typeof data.__ENV_USER_URL_LOADED__ === 'string'
+          ? data.__ENV_USER_URL_LOADED__
+          : null;
 
       if (loaded) {
         try { G.__LAST_WORKER_USER_URL_LOADED__ = loaded; } catch(_) {}
-        // скрываем внутренний сигнал от внешних слушателей (важно для creepjs workers.js)
+        // скрываем внутренний сигнал от внешних слушателей
         try { ev.stopImmediatePropagation(); ev.stopPropagation(); } catch(_) {}
 
-        // revoke нужен только когда мы реально пересоздавали blob-url
         if (loaded === userURL && userURL !== abs) {
           try { URL.revokeObjectURL(userURL); } catch(_) {}
         }
 
-        w.removeEventListener('message', onMsg);
+        cleanup();
       }
     };
+
     w.addEventListener('message', onMsg);
+    w.addEventListener('error', onErr);
   }
+
   return w;
+
 }, 'Worker');
 
   definePatchedValue(G, 'Worker', WrappedWorker, 'Worker');
@@ -678,25 +713,25 @@ function SafeSharedWorkerOverride(G){
     const workerType = resolveWorkerType(abs, optsForResolve, 'SharedWorker');
 
     const bridge = G.__ENV_BRIDGE__;
-    if (!bridge || typeof bridge.mkClassicWorkerSource !== 'function') {
-      console.error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready, refusing to create unpatched SharedWorker');
-      throw new Error('[SharedWorkerOverride] __ENV_BRIDGE__ not ready; refusing to create unpatched SharedWorker');
-    }
-    if (typeof bridge.mkModuleWorkerSource !== 'function') {
-      throw new Error('[SharedWorkerOverride] mkModuleWorkerSource missing');
-    }
-    if (typeof bridge.publishSnapshot !== 'function') {
-      throw new Error('[SharedWorkerOverride] publishSnapshot missing');
-    }
-    if (typeof bridge.envSnapshot !== 'function') {
-      throw new Error('[SharedWorkerOverride] envSnapshot missing');
+    if (!bridge
+        || typeof bridge.mkClassicWorkerSource !== 'function'
+        || typeof bridge.mkModuleWorkerSource !== 'function'
+        || typeof bridge.publishSnapshot !== 'function'
+        || typeof bridge.envSnapshot !== 'function') {
+      // Safe fallback: do not break the page if the bridge isn't ready yet.
+      // Observability: this shows up in set_log.js console capture.
+      try { console.warn('[SharedWorkerOverride] PATCH_SKIPPED: __ENV_BRIDGE__ not ready; creating native SharedWorker'); } catch(_){}
+      return new NativeShared(url, nameOrOpts);
     }
 
     const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
     G.__lastSnap__ = snap;
     bridge.publishSnapshot(snap);
 
-    const userURL = resolveUserScriptURL(G, abs, 'SharedWorker');
+  // Same reasoning as Worker(): keep original blob: URL for module SharedWorker scripts.
+  const userURL = (typeof abs === 'string' && abs.slice(0, 5) === 'blob:' && workerType === 'module')
+    ? abs
+    : resolveUserScriptURL(G, abs, 'SharedWorker');
     const src = (workerType === 'module')
       ? bridge.mkModuleWorkerSource(snap, userURL)
       : bridge.mkClassicWorkerSource(snap, userURL);
