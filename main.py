@@ -1070,11 +1070,7 @@ def main():
 
 
 
-
-
-
-
-
+  
 
         dump_table_js = """
             (() => {
@@ -1208,23 +1204,62 @@ def main():
                 }],
             ];
 
+
             function takeTableSnapshot(tag = "manual") {
-                const rows = [];
-                for (const [group, key, getter] of SNAPSHOT_TABLE) {
+            const rows = [];
+            for (const [group, key, getter] of SNAPSHOT_TABLE) {
                 let value;
                 try { value = getter(); } catch (e) { value = "❌ " + (e && e.message ? e.message : String(e)); }
                 rows.push({ tag, group, key, value, t: Date.now() });
-                }
-                console.table(rows);
-                return rows;
             }
+
+            // ВАЖНО: это лёгкое, не строит дерево в DevTools:
+            (function emitSnapToMyLogger(rows) {
+            // 1) если set_log уже стоит — самый правильный путь
+            const hadDebug = (typeof g.__DEBUG__ !== "undefined") ? g.__DEBUG__ : undefined;
+            try {
+                // подавляем реальный вывод в DevTools, но запись в _myDebugLog останется
+                try { g.__DEBUG__ = false; } catch (_) {}
+
+                if (console && typeof console.debug === "function") {
+                console.debug("[SNAP_TABLE]", rows);
+                return;
+                }
+            } finally {
+                // восстановить флаг (не оставлять частично-переключенное состояние)
+                try {
+                if (typeof hadDebug !== "undefined") g.__DEBUG__ = hadDebug;
+                } catch (_) {}
+            }
+
+            // 2) fallback: если console.debug почему-то недоступен, пишем безопасной строкой
+            try {
+                if (console && typeof console.log === "function") {
+                console.log("[SNAP_TABLE] " + JSON.stringify(rows));
+                }
+            } catch (_) {}
+            })(rows);
+
+            
+            
+            
+            
+
+            // Опционально: если хочешь видеть таблицу руками — оставь, но можно выключить навсегда
+            // console.table(rows);
+
+            return rows;
+            }
+
+
+
 
             // экспорт: доступно в консоли в любой момент после загрузки документа
             g.__TABLE_SNAPSHOT__ = takeTableSnapshot;
 
             // опционально: автоснимок после каждого reload
             function auto() {
-                //  включаениеть логера тут идщ set_log
+                //  включаениеть логера тут их set_log
                 safe(() => { if (typeof g.DEBUG_ALL_ON === "function") g.DEBUG_ALL_ON(); }, null);
                 takeTableSnapshot("after_reload");
             }
@@ -1235,43 +1270,13 @@ def main():
             """
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": dump_table_js})
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-        # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
+         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
+       # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)
         input("press Enter for exit...")
 
