@@ -1111,6 +1111,9 @@ def main():
                 ["worker", "__ENV_HUB__.snapshot.languages", () => g.__ENV_HUB__?.getSnapshot?.()?.languages],
                 ["worker", "__ENV_HUB__.snapshot.hardwareConcurrency", () => g.__ENV_HUB__?.getSnapshot?.()?.hardwareConcurrency],
                 ["worker", "__ENV_HUB__.snapshot.deviceMemory",        () => g.__ENV_HUB__?.getSnapshot?.()?.deviceMemory],
+                ["worker", "__LAST_SHARED_WORKER_PATCH_OK__",          () => g.__LAST_SHARED_WORKER_PATCH_OK__ ?? null],
+                ["worker", "__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__",   () => g.__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__ ?? null],
+                ["worker", "__LAST_SHARED_WORKER_USER_URL_LOADED__",   () => g.__LAST_SHARED_WORKER_USER_URL_LOADED__ ?? null],
                 
                 // ───── env bridge ─────
                 ["bridge", "__ENV_BRIDGE__.exists",  () => !!g.__ENV_BRIDGE__],
@@ -1240,9 +1243,7 @@ def main():
             } catch (_) {}
             })(rows);
 
-            
-            
-            
+                      
             
 
             // Опционально: если хочешь видеть таблицу руками — оставь, но можно выключить навсегда
@@ -1259,7 +1260,7 @@ def main():
 
             // опционально: автоснимок после каждого reload
             function auto() {
-                //  включаениеть логера тут их set_log
+                //  включаениеть логера тут из set_log
                 safe(() => { if (typeof g.DEBUG_ALL_ON === "function") g.DEBUG_ALL_ON(); }, null);
                 takeTableSnapshot("after_reload");
             }
