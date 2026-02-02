@@ -23,7 +23,6 @@
     if (!self.__lastSnap__ || typeof self.__lastSnap__ !== 'object') {
       throw new Error('UACHPatch: no snapshot');
     }
-    self.__UACH_MIRROR_INSTALLED__ = true;
     const nav = self.navigator;
     const proto = (typeof WorkerNavigator!=='undefined' && WorkerNavigator.prototype) || Object.getPrototypeOf(nav);
     if (!proto && !nav) {
@@ -162,21 +161,41 @@
     if (!nativeUAD) throw new Error('THW: worker navigator.userAgentData missing');
     const uadProto = Object.getPrototypeOf(nativeUAD);
     if (!uadProto) throw new Error('THW: worker navigator.userAgentData proto missing');
+    const isUadThis = (self) => (self === nativeUAD);
+    const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
+    const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
+    const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
+    if (!dBrands || !dMobile || !dPlatform) throw new Error('THW: worker navigator.userAgentData descriptor missing');
+    const origBrandsGet = dBrands && dBrands.get;
+    const origMobileGet = dMobile && dMobile.get;
+    const origPlatformGet = dPlatform && dPlatform.get;
     Object.defineProperties(uadProto, {
       brands:   { get: markAsNative(function getBrands(){
+                        if (!isUadThis(this)) {
+                          if (typeof origBrandsGet === 'function') return origBrandsGet.call(this);
+                          throw new TypeError('Illegal invocation');
+                        }
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
                         const le = cache.snap.uaData || cache.snap.uaCH;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
                         return toBrands(le && le.brands);
-                      }, 'get brands'), enumerable:true, configurable:true },
+                      }, 'get brands'), enumerable: !!dBrands.enumerable, configurable: !!dBrands.configurable, set: dBrands.set },
       mobile:   { get: markAsNative(function getMobile(){
+                        if (!isUadThis(this)) {
+                          if (typeof origMobileGet === 'function') return origMobileGet.call(this);
+                          throw new TypeError('Illegal invocation');
+                        }
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
                         const le = cache.snap.uaData || cache.snap.uaCH;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
                         if (typeof le.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
                         return le.mobile;
-                      }, 'get mobile'),       enumerable:true, configurable:true },
+                      }, 'get mobile'),       enumerable: !!dMobile.enumerable, configurable: !!dMobile.configurable, set: dMobile.set },
       platform: { get: markAsNative(function getPlatform(){
+                        if (!isUadThis(this)) {
+                          if (typeof origPlatformGet === 'function') return origPlatformGet.call(this);
+                          throw new TypeError('Illegal invocation');
+                        }
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
                         const le = cache.snap.uaData || cache.snap.uaCH;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
@@ -184,21 +203,36 @@
                           throw new Error('THW: uaData.platform missing');
                         }
                         return le.platform;
-                      }, 'get platform'), enumerable:true, configurable:true },
+                      }, 'get platform'), enumerable: !!dPlatform.enumerable, configurable: !!dPlatform.configurable, set: dPlatform.set },
     });
+    const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList');
+    const origFullGet = dFull && dFull.get;
     const getFullVersionList = markAsNative(function getFullVersionList(){
+      if (!isUadThis(this)) {
+        if (typeof origFullGet === 'function') return origFullGet.call(this);
+        throw new TypeError('Illegal invocation');
+      }
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       const le = cache.snap.uaData || cache.snap.uaCH;
       if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
       if (!Array.isArray(le.he.fullVersionList)) throw new Error('UACHPatch: bad highEntropy.fullVersionList');
       return deep(le.he.fullVersionList);
     }, 'get fullVersionList');
-    Object.defineProperty(uadProto, 'fullVersionList', {
-      configurable: true,
-      enumerable: false,
-      get: getFullVersionList
-    });
+    if (dFull) {
+      Object.defineProperty(uadProto, 'fullVersionList', {
+        configurable: !!dFull.configurable,
+        enumerable: !!dFull.enumerable,
+        get: getFullVersionList,
+        set: dFull.set
+      });
+    }
+    const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion');
+    const origUaFullGet = dUaFull && dUaFull.get;
     const getUaFullVersion = markAsNative(function getUaFullVersion(){
+      if (!isUadThis(this)) {
+        if (typeof origUaFullGet === 'function') return origUaFullGet.call(this);
+        throw new TypeError('Illegal invocation');
+      }
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       const le = cache.snap.uaData || cache.snap.uaCH;
       if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
@@ -207,27 +241,41 @@
       }
       return le.he.uaFullVersion;
     }, 'get uaFullVersion');
-    Object.defineProperty(uadProto, 'uaFullVersion', {
-      configurable: true,
-      enumerable: false,
-      get: getUaFullVersion
-    });
+    if (dUaFull) {
+      Object.defineProperty(uadProto, 'uaFullVersion', {
+        configurable: !!dUaFull.configurable,
+        enumerable: !!dUaFull.enumerable,
+        get: getUaFullVersion,
+        set: dUaFull.set
+      });
+    }
+    const dToJSON = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
+    const origToJSON = dToJSON && dToJSON.value;
     const toJSON = markAsNative(function toJSON(){
+      if (!isUadThis(this)) {
+        if (typeof origToJSON === 'function') return origToJSON.call(this);
+        throw new TypeError('Illegal invocation');
+      }
       return {brands:this.brands, mobile:this.mobile, platform:this.platform};
     }, 'toJSON');
     Object.defineProperty(uadProto, 'toJSON', {
-      configurable: true,
-      enumerable: false,
-      get: markAsNative(function get_toJSON(){ return toJSON; }, 'get toJSON')
+      configurable: dToJSON ? !!dToJSON.configurable : true,
+      enumerable: dToJSON ? !!dToJSON.enumerable : false,
+      writable: dToJSON && Object.prototype.hasOwnProperty.call(dToJSON, 'writable') ? dToJSON.writable : true,
+      value: toJSON
     });
+    const dGHEV = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
+    const origGHEV = dGHEV && dGHEV.value;
     const getHighEntropyValues = markAsNative(function getHighEntropyValues(keys){
+        if (!isUadThis(this)) {
+          if (typeof origGHEV === 'function') return origGHEV.call(this, keys);
+          throw new TypeError('Illegal invocation');
+        }
         if (!cache.snap) throw new Error('UACHPatch: no snap');
         if (!Array.isArray(keys)) throw new Error('THW: bad keys');
         for (const k of keys) {
           if (typeof k !== 'string' || !k) throw new Error('THW: bad keys');
         }
-        const unknown = keys.filter(k => !ALL_KEYS.has(k));
-        if (unknown.length) throw new Error(`UACHPatch: unknown highEntropy ${unknown.join(',')}`);
         const s = cache.snap;
         const le = s.uaData || s.uaCH;
         if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
@@ -248,7 +296,7 @@
         };
         const out = {};
         for (const k of keys) {
-          if (!(k in map)) throw new Error(`THW: missing highEntropy.${k}`);
+          if (!(k in map)) continue;
           const v = map[k];
           if (v === undefined || v === null) throw new Error(`THW: missing highEntropy.${k}`);
           if (typeof v === 'string' && !v && k !== 'model') throw new Error(`THW: missing highEntropy.${k}`);
@@ -258,10 +306,22 @@
         return Promise.resolve(out);
       }, 'getHighEntropyValues');
     Object.defineProperty(uadProto, 'getHighEntropyValues', {
-      configurable: true,
-      enumerable: false,
-      get: markAsNative(function get_getHighEntropyValues(){ return getHighEntropyValues; }, 'get getHighEntropyValues')
+      configurable: dGHEV ? !!dGHEV.configurable : true,
+      enumerable: dGHEV ? !!dGHEV.enumerable : false,
+      writable: dGHEV && Object.prototype.hasOwnProperty.call(dGHEV, 'writable') ? dGHEV.writable : true,
+      value: getHighEntropyValues
     });
+
+    const makeGuardedGetter = (k, owner, patchedGet, origGet) => markAsNative(function(){
+      const recv = this;
+      if (recv === nav || (owner && recv === owner)) {
+        return Reflect.apply(patchedGet, recv, []);
+      }
+      if (typeof origGet === 'function') {
+        return Reflect.apply(origGet, recv, []);
+      }
+      throw new TypeError('Illegal invocation');
+    }, `get ${k}`);
 
     const def = (obj, k, getter, enumerable = true) => {
       // По методологии: не молчим, если некуда ставить
@@ -274,11 +334,13 @@
         if (own.configurable === false) {
           throw new Error(`UACHPatch: ${k} not configurable on navigator`);
         }
+        const ownOrigGet = (typeof own.get === 'function') ? own.get : null;
+        const ownGuardedGet = makeGuardedGetter(k, nav, getter, ownOrigGet);
         Object.defineProperty(nav, k, {
-          configurable: true,
+          configurable: !!own.configurable,
           enumerable: !!own.enumerable,
-          get: getter,
-          set: undefined
+          get: ownGuardedGet,
+          set: own && Object.prototype.hasOwnProperty.call(own, 'set') ? own.set : undefined
         });
         return;
       }
@@ -289,11 +351,13 @@
         if (d && d.configurable === false) {
           throw new Error(`UACHPatch: ${k} not configurable on proto`);
         }
+        const protoOrigGet = d && (typeof d.get === 'function') ? d.get : null;
+        const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet);
         Object.defineProperty(obj, k, {
-          configurable: true,
+          configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable,
-          get: getter,
-          set: undefined
+          get: protoGuardedGet,
+          set: d && Object.prototype.hasOwnProperty.call(d, 'set') ? d.set : undefined
         });
         return;
       }
@@ -436,11 +500,16 @@
     }
     if (Number(sanity.deviceMemory) !== Number(cache.snap.deviceMemory)) throw new Error('UACHPatch: deviceMemory mismatch');
     if (Number(sanity.hardwareConcurrency) !== Number(cache.snap.hardwareConcurrency)) throw new Error('UACHPatch: hardwareConcurrency mismatch');
+    self.__UACH_MIRROR_INSTALLED__ = true;
 
-    console.info('[UACHPatch] installed', {
-      core: true,
-      mirror: !!self.__UACH_MIRROR_INSTALLED__,
-      scope: !!self.__SCOPE_CONSISTENCY_PATCHED__
-    });
+    if (Array.isArray(self._myDebugLog)) {
+      self._myDebugLog.push({
+        type: "worker_patch",
+        core: true,
+        mirror: !!self.__UACH_MIRROR_INSTALLED__,
+        scope: !!self.__SCOPE_CONSISTENCY_PATCHED__,
+        timestamp: new Date().toISOString()
+      });
+    }
   };
 })();

@@ -21,7 +21,6 @@ from datashell_win32 import data_4_win32
 from macintel import macintel_data
 # ----------------------- MODULES-----------------------
 import cdp_caught_logger as cdp
-# from cdp_caught_logger import enable_sw_language_inject
 from plugins_dict import build_plugins_profile
 from tools import (
     build_device_metrics,
@@ -31,6 +30,7 @@ from tools import (
     determine_browser_brand_and_versions,
     build_expected_client_hints,
     apply_ua_overrides,
+    inject_uach_strip_window,
 )
 from vpn_utils import VPNClient
 from rand_met import generate_font_manifest
@@ -272,6 +272,7 @@ def init_driver(
     generate_font_manifest(MANIFEST_PATH, platform)
       
      
+    cdp.SW_META = expected_client_hints
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
      
     
@@ -412,6 +413,7 @@ def init_driver(
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+    inject_uach_strip_window(driver, user_agent)
 
         # --- prepare worker_bootstrap_js ---
     worker_bootstrap_js = f"""
@@ -1097,12 +1099,26 @@ def main():
                 ["nav", "navigator.hardwareConcurrency", () => g.navigator && g.navigator.hardwareConcurrency],
                 ["nav", "navigator.deviceMemory",        () => g.navigator && g.navigator.deviceMemory],
 
+                // ───── UA / UAD (page) ─────
+                ["uad", "navigator.userAgent",                 () => g.navigator && g.navigator.userAgent],
+                ["uad", "navigator.userAgentData.platform",    () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.platform],
+                ["uad", "navigator.userAgentData.mobile",      () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.mobile],
+                ["uad", "navigator.userAgentData.brands",      () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.brands],
+                ["uad", "navigator.userAgentData.uaFullVersion", () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.uaFullVersion],
+                ["uad", "navigator.userAgentData.fullVersionList", () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.fullVersionList],
+                ["uad", "__EXPECTED_CLIENT_HINTS.platform",    () => g.__EXPECTED_CLIENT_HINTS && g.__EXPECTED_CLIENT_HINTS.platform],
+                ["uad", "__EXPECTED_CLIENT_HINTS.uaFullVersion", () => g.__EXPECTED_CLIENT_HINTS && g.__EXPECTED_CLIENT_HINTS.uaFullVersion],
+                ["uad", "__EXPECTED_CLIENT_HINTS.fullVersionList", () => g.__EXPECTED_CLIENT_HINTS && g.__EXPECTED_CLIENT_HINTS.fullVersionList],
+                ["uad", "__LAST_UACH_HE__",                    () => g.__LAST_UACH_HE__ ?? null],
+                ["uad", "__UACH_HE_READY__",                   () => g.__UACH_HE_READY__ ?? null],
+
                 // ───── workers ─────
                 ["worker", "WorkerPatchHooks.exists", () => !!g.WorkerPatchHooks],
                 ["worker", "WorkerPatchHooks.diag",   () => g.WorkerPatchHooks?.diag?.() ?? null],
                 ["worker", "Worker.__ENV_WRAPPED__",  () => !!(g.Worker && g.Worker.__ENV_WRAPPED__)],
                 ["worker", "SharedWorker.__ENV_WRAPPED__", () => !!(g.SharedWorker && g.SharedWorker.__ENV_WRAPPED__)],
                 ["worker", "worker.safeWorker",       () => !!(g.__PATCHED_SAFE_WORKER__ || (g.Worker && g.Worker.__ENV_WRAPPED__))],
+                ["worker", "__PATCHED_SERVICE_WORKER__", () => !!g.__PATCHED_SERVICE_WORKER__],
                 ["worker", "__lastSnap.language",     () => g.__lastSnap__ && g.__lastSnap__.language],
                 ["worker", "__lastSnap.languages",    () => g.__lastSnap__ && g.__lastSnap__.languages],
                 ["worker", "__lastSnap.hardwareConcurrency", () => g.__lastSnap__ && g.__lastSnap__.hardwareConcurrency],
@@ -1247,23 +1263,21 @@ def main():
             
 
             // Опционально: если хочешь видеть таблицу руками — оставь, но можно выключить навсегда
-            // console.table(rows);
-
-            return rows;
+             console.table(rows);
+            
+             return rows;
             }
 
 
 
 
             // экспорт: доступно в консоли в любой момент после загрузки документа
-            g.__TABLE_SNAPSHOT__ = takeTableSnapshot;
-
-            // опционально: автоснимок после каждого reload
-            function auto() {
-                //  включаениеть логера тут из set_log
-                safe(() => { if (typeof g.DEBUG_ALL_ON === "function") g.DEBUG_ALL_ON(); }, null);
-                takeTableSnapshot("after_reload");
-            }
+             // опционально: автоснимок после каждого reload
+             function auto() {
+                 //  включаениеть логера тут из set_log
+                 safe(() => { if (typeof g.DEBUG_ALL_ON === "function") g.DEBUG_ALL_ON(); }, null);
+                 takeTableSnapshot("after_reload");
+             }
 
             if (document.readyState === "interactive" || document.readyState === "complete") auto();
             else addEventListener("DOMContentLoaded", auto, { once: true });
@@ -1272,7 +1286,7 @@ def main():
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": dump_table_js})
 
          # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs")
 
 
 

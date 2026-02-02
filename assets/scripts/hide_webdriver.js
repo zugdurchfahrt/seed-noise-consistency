@@ -68,8 +68,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       }
     }
   } catch (e) {
-    console.warn("[stealth] external patch failed:", e);
-    if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:external_patch:define_failed", e);
+    if (typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:external_patch:define_failed", e);
   }
 
 

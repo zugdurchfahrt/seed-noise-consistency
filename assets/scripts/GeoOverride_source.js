@@ -3,6 +3,25 @@
 
   const latitude = window.__LATITUDE__;
   const longitude = window.__LONGITUDE__;
+  const __geoDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __geoLogArr = Array.isArray(window._myDebugLog) ? window._myDebugLog : null;
+  function __geoDiag(level, code, extra, err) {
+    if ((level === 'warn' || level === 'error') && typeof __geoDegrade === 'function') {
+      __geoDegrade(code || 'geo', err || null, extra || null);
+      return;
+    }
+    try {
+      if (__geoLogArr) {
+        __geoLogArr.push({
+          type: 'geo_' + level,
+          code: code || null,
+          extra: extra || null,
+          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack || null } : null,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (_) {}
+  }
 
   /**
    * Patch geolocation (getCurrentPosition/watchPosition).
@@ -35,6 +54,7 @@
 
     const fake = {
       getCurrentPosition(success, error, options) {
+        if (this !== fake) throw new TypeError("Illegal invocation");
         if (typeof success !== "function") {
           throw new TypeError("THW: geolocation.getCurrentPosition requires success callback");
         }
@@ -49,6 +69,7 @@
       },
 
       watchPosition(success, error, options) {
+        if (this !== fake) throw new TypeError("Illegal invocation");
         if (typeof success !== "function") {
           throw new TypeError("THW: geolocation.watchPosition requires success callback");
         }
@@ -63,6 +84,7 @@
       },
 
       clearWatch(id) {
+        if (this !== fake) throw new TypeError("Illegal invocation");
         clearInterval(id);
       }
     };
@@ -89,7 +111,7 @@
       });
     }
 
-    console.log("Geolocation patched →", lat, lon);
+    __geoDiag('info', 'geo:patched', { latitude: lat, longitude: lon });
   }
 
   window.patchGeolocation = patchGeolocation;

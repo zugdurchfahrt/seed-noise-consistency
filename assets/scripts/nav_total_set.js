@@ -1,6 +1,5 @@
 const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
   if (!window.__PATCH_NAVTOTALSET__) {
-    window.__PATCH_NAVTOTALSET__ = true;
 
     const C = window.CanvasPatchContext;
       if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
@@ -42,6 +41,67 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const STRICT        = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
     const DEBUG         = !!window.__NAV_PATCH_DEBUG__;
 
+    // --- Navigator patch registry + logging (filter noise) ---
+    const __navPatchedFns = (typeof WeakSet === 'function') ? new WeakSet() : null;
+    const __navPatchedKeys = new Set();
+    const __navSeen = new Set();
+    const __navLogPush = (function () {
+      const logArr = Array.isArray(window._myDebugLog) ? window._myDebugLog : null;
+      return function (entry) {
+        try { if (logArr) logArr.push(entry); } catch (_) {}
+      };
+    })();
+    const __navDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+    function __navDiag(level, code, extra, err) {
+      if ((level === 'warn' || level === 'error') && typeof __navDegrade === 'function') {
+        __navDegrade(code || 'nav_total_set', err || null, extra || null);
+        return;
+      }
+      const entry = { type: 'nav_' + level, code: code || null, extra: extra || null, timestamp: new Date().toISOString() };
+      if (err instanceof Error) {
+        entry.error = { name: err.name, message: err.message, stack: err.stack || null };
+      }
+      __navLogPush(entry);
+    }
+    function __navRegisterKey(key) {
+      if (key != null) __navPatchedKeys.add(String(key));
+    }
+    function __navRegisterFn(fn) {
+      if (__navPatchedFns && typeof fn === 'function') __navPatchedFns.add(fn);
+    }
+    function __navLogAccess(key, fn, extra) {
+      const k = key != null ? String(key) : null;
+      const keyOk = k && __navPatchedKeys.has(k);
+      const fnOk = fn && __navPatchedFns && __navPatchedFns.has(fn);
+      if (!keyOk && !fnOk) return;
+      const token = keyOk ? k : fn;
+      if (__navSeen.has(token)) return;
+      __navSeen.add(token);
+      __navLogPush({ type: 'nav_access', key: k || null, extra: extra || null, timestamp: new Date().toISOString() });
+    }
+    const __isNavigatorThis = (self) => {
+      try {
+        return self === navigator || self === navProto || (typeof Navigator === 'function' && self instanceof Navigator);
+      } catch (_) {
+        return false;
+      }
+    };
+    function __wrapGetter(key, getter, desc, validThis) {
+      const isData = desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
+      __navRegisterKey(key);
+      if (isData) return getter;
+      const origGet = desc && desc.get;
+      const wrapped = function () {
+        __navLogAccess(key, wrapped);
+        if (typeof validThis === 'function' && !validThis(this)) {
+          if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
+        }
+        return (typeof getter === 'function') ? getter.call(this) : getter;
+      };
+      __navRegisterFn(wrapped);
+      return wrapped;
+    }
+
     // mapping helpers (OS <-> DOM)
     const asDom = (os) => os === 'Windows' ? 'Win32' : (os === 'macOS' ? 'MacIntel' : os);
     const asOS  = (dom) => dom === 'Win32' ? 'Windows' : (dom === 'MacIntel' ? 'macOS' : dom);
@@ -58,7 +118,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (STRICT) {
         throw new Error(`[nav_total_set] CH.platform '${chPlatform}' is DOM-like; expected OS-string (e.g. 'Windows'/'macOS')`);
       } else {
-        console.warn(`[nav_total_set] normalizing CH.platform '${chPlatform}' → '${normalized}'`);
+        __navDiag('warn', 'nav_total_set:ch_platform_normalized', { from: chPlatform, to: normalized });
         chPlatform = normalized;
       }
     }
@@ -66,10 +126,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const expectedNavPlat = asDom(gen);
     if (navPlat !== expectedNavPlat) {
       const msg = `[nav_total_set] NAV_PLATFORM__ (${navPlat}) inconsistent with ${gen} (expected ${expectedNavPlat})`;
-      if (STRICT) throw new Error(msg); else console.warn(msg);
+      if (STRICT) throw new Error(msg); else __navDiag('warn', 'nav_total_set:nav_platform_inconsistent', { message: msg });
     }
     const navPlatformOut = STRICT ? navPlat : expectedNavPlat;
-    if (!window.__COLOR_DEPTH) console.warn("[uaData] Color_Depth is not defined, set by default", colorDepth);
+    if (!window.__COLOR_DEPTH) __navDiag('warn', 'nav_total_set:color_depth_missing', { colorDepth });
 
     // ——— B. Safe helpers ———
     const navProto = Object.getPrototypeOf(navigator);
@@ -144,7 +204,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const d = Object.getOwnPropertyDescriptor(navProto, key);
         if (!d) throw new TypeError(`[nav_total_set] ${key}: descriptor missing`);
       // Important: like native - not enumerable
-      const ok = (redefineAcc(navProto, key, getter), true);
+      const wrapped = __wrapGetter(key, getter, d, __isNavigatorThis);
+      const ok = (redefineAcc(navProto, key, wrapped), true);
       if (ok === false) throw new TypeError(`[nav_total_set] failed to define ${key}`);
       };      
 
@@ -171,7 +232,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     navigatorPatches.forEach(([prop, getter]) => {
       if (critical.has(prop)) return; // just in case
       if (!(prop in navProto)) return; // do not introduce non-native props (Chrome/Edge: e.g. buildID)
-      defineAccWithFallback(navProto, prop, getter);
+      const d = Object.getOwnPropertyDescriptor(navProto, prop);
+      const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
+      defineAccWithFallback(navProto, prop, wrapped);
     });
 
     // ——— D. devicePixelRatio & screen.* ———
@@ -223,7 +286,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // oscpu (только если есть в прототипе)
     if ('oscpu' in navProto) {
-      defineAccWithFallback(navProto, 'oscpu', () => undefined);
+      const dOscpu = Object.getOwnPropertyDescriptor(navProto, 'oscpu');
+      const wrappedOscpu = __wrapGetter('oscpu', () => undefined, dOscpu, __isNavigatorThis);
+      defineAccWithFallback(navProto, 'oscpu', wrappedOscpu);
     }
     // ——— E. userAgentData (low + high entropy) ———
     if ('userAgentData' in navigator) {
@@ -231,6 +296,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (!nativeUAD) throw new Error('THW: window navigator.userAgentData missing');
       const uadProto = Object.getPrototypeOf(nativeUAD);
       if (!uadProto) throw new Error('THW: window navigator.userAgentData proto missing');
+      const isUadThis = (self) => (self === nativeUAD || self === uadProto);
       const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
       const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
       const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
@@ -238,6 +304,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         throw new Error('THW: window navigator.userAgentData descriptor missing');
       }
       if (dBrands) {
+        __navRegisterKey('userAgentData.brands');
         const isData = Object.prototype.hasOwnProperty.call(dBrands, 'value') && !dBrands.get && !dBrands.set;
         if (isData) {
           const value = (() => {
@@ -252,10 +319,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           });
         } else {
           Object.defineProperty(uadProto, 'brands', {
-            get: mark(function getBrands(){
+            get: mark(__wrapGetter('userAgentData.brands', function getBrands(){
               if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: uaData.brands missing');
               return meta.brands;
-            }, 'get brands'),
+            }, dBrands, isUadThis), 'get brands'),
             set: dBrands.set,
             configurable: !!dBrands.configurable,
             enumerable: !!dBrands.enumerable
@@ -263,6 +330,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       }
       if (dMobile) {
+        __navRegisterKey('userAgentData.mobile');
         const isData = Object.prototype.hasOwnProperty.call(dMobile, 'value') && !dMobile.get && !dMobile.set;
         if (isData) {
           const value = (() => {
@@ -277,10 +345,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           });
         } else {
           Object.defineProperty(uadProto, 'mobile', {
-            get: mark(function getMobile(){
+            get: mark(__wrapGetter('userAgentData.mobile', function getMobile(){
               if (typeof meta.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
               return meta.mobile;
-            }, 'get mobile'),
+            }, dMobile, isUadThis), 'get mobile'),
             set: dMobile.set,
             configurable: !!dMobile.configurable,
             enumerable: !!dMobile.enumerable
@@ -288,6 +356,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       }
       if (dPlatform) {
+        __navRegisterKey('userAgentData.platform');
         const isData = Object.prototype.hasOwnProperty.call(dPlatform, 'value') && !dPlatform.get && !dPlatform.set;
         if (isData) {
           const value = (() => {
@@ -302,10 +371,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           });
         } else {
           Object.defineProperty(uadProto, 'platform', {
-            get: mark(function getPlatform(){
+            get: mark(__wrapGetter('userAgentData.platform', function getPlatform(){
               if (typeof chPlatform !== 'string' || !chPlatform) throw new Error('THW: uaData.platform missing');
               return chPlatform;
-            }, 'get platform'),
+            }, dPlatform, isUadThis), 'get platform'),
             set: dPlatform.set,
             configurable: !!dPlatform.configurable,
             enumerable: !!dPlatform.enumerable
@@ -313,29 +382,29 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       }
       const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
-      const getFullVersionList = mark(function getFullVersionList(){
+      const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
+        || Object.getOwnPropertyDescriptor(nativeUAD, 'fullVersionList')
+        || { configurable: true, enumerable: false };
+      const getFullVersionList = mark(__wrapGetter('userAgentData.fullVersionList', function getFullVersionList(){
         if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) {
           throw new Error('THW: uaData.fullVersionList missing');
         }
         return deep(meta.fullVersionList);
-      }, 'get fullVersionList');
-      const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
-        || Object.getOwnPropertyDescriptor(nativeUAD, 'fullVersionList')
-        || { configurable: true, enumerable: false };
+      }, dFull, isUadThis), 'get fullVersionList');
       Object.defineProperty(uadProto, 'fullVersionList', {
         get: getFullVersionList,
         enumerable: dFull.enumerable,
         configurable: dFull.configurable
       });
-      const getUaFullVersion = mark(function getUaFullVersion(){
+      const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
+        || Object.getOwnPropertyDescriptor(nativeUAD, 'uaFullVersion')
+        || { configurable: true, enumerable: false };
+      const getUaFullVersion = mark(__wrapGetter('userAgentData.uaFullVersion', function getUaFullVersion(){
         if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) {
           throw new Error('THW: uaData.uaFullVersion missing');
         }
         return meta.uaFullVersion;
-      }, 'get uaFullVersion');
-      const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
-        || Object.getOwnPropertyDescriptor(nativeUAD, 'uaFullVersion')
-        || { configurable: true, enumerable: false };
+      }, dUaFull, isUadThis), 'get uaFullVersion');
       Object.defineProperty(uadProto, 'uaFullVersion', {
         get: getUaFullVersion,
         enumerable: dUaFull.enumerable,
@@ -357,7 +426,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
       }
 
+      const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
+      if (!ghevDesc) {
+        throw new Error('THW: uaData.getHighEntropyValues descriptor missing');
+      }
+      const origGHEV = ghevDesc && ghevDesc.value;
+      if (typeof origGHEV !== 'function') throw new TypeError('[nav_total_set] uaData.getHighEntropyValues original missing');
       const getHighEntropyValues = mark(function getHighEntropyValues(keys) {
+          __navLogAccess('userAgentData.getHighEntropyValues', getHighEntropyValues);
+          if (!isUadThis(this)) {
+            return origGHEV.call(this, keys);
+          }
           if (!Array.isArray(keys)) throw new Error('THW: bad keys');
           const map = {
             architecture: meta.architecture,
@@ -386,58 +465,70 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           }
           return Promise.resolve(result);
         }, 'getHighEntropyValues');
-      const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
-      if (!ghevDesc) {
-        throw new Error('THW: uaData.getHighEntropyValues descriptor missing');
-      }
+      __navRegisterKey('userAgentData.getHighEntropyValues');
+      __navRegisterFn(getHighEntropyValues);
       dropOwnIfConfigurable(nativeUAD, 'getHighEntropyValues');
       defineUadProtoMethod(uadProto, 'getHighEntropyValues', getHighEntropyValues, ghevDesc);
 
 
-      const toJSON = mark(function toJSON() {return { platform: this.platform, brands: this.brands, mobile: this.mobile };}, 'toJSON');
       const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
       if (!toJsonDesc) {
         throw new Error('THW: uaData.toJSON descriptor missing');
       }
+      const origToJSON = toJsonDesc && toJsonDesc.value;
+      if (typeof origToJSON !== 'function') throw new TypeError('[nav_total_set] uaData.toJSON original missing');
+      const toJSON = mark(function toJSON() {
+        __navLogAccess('userAgentData.toJSON', toJSON);
+        if (!isUadThis(this)) {
+          return origToJSON.call(this);
+        }
+        return { platform: this.platform, brands: this.brands, mobile: this.mobile };
+      }, 'toJSON');
+      __navRegisterKey('userAgentData.toJSON');
+      __navRegisterFn(toJSON);
       dropOwnIfConfigurable(nativeUAD, 'toJSON');
       defineUadProtoMethod(uadProto, 'toJSON', toJSON, toJsonDesc);
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
     const dUaData = Object.getOwnPropertyDescriptor(navProto, 'userAgentData');
     if (!dUaData) throw new TypeError('[nav_total_set] userAgentData descriptor missing');
-    const okUaData = (redefineAcc(navProto, 'userAgentData', function get_userAgentData(){ return nativeUAD; }), true);
+    const okUaData = (redefineAcc(navProto, 'userAgentData', __wrapGetter('userAgentData', function get_userAgentData(){ return nativeUAD; }, dUaData, __isNavigatorThis)), true);
     if (okUaData === false) throw new TypeError('[nav_total_set] failed to define userAgentData');
     const uadTag = Object.prototype.toString.call(nativeUAD);
     if (uadTag === '[object Object]') throw new Error('THW: window navigator.userAgentData tag');
     const uadCtor = Object.getPrototypeOf(nativeUAD) && Object.getPrototypeOf(nativeUAD).constructor;
     if (!uadCtor || uadCtor.name === 'Object') throw new Error('THW: window navigator.userAgentData proto');
-    console.info('userAgentData.toJSON correctly implemented');
+    __navDiag('info', 'nav_total_set:uaData_toJSON_ok');
     }
 
     // ——— F. deviceMemory/hardwareConcurrency ———
     const hasDeviceMemory = ('deviceMemory' in navigator);
-    const okDeviceMemory = hasDeviceMemory ? (Object.getOwnPropertyDescriptor(navProto,'deviceMemory') ?
-      (redefineAcc(navProto, 'deviceMemory', () => mem), true) :
-      safeDefineAcc(navProto, 'deviceMemory', () => mem, { enumerable: true })) : true;
+    const dDeviceMemory = Object.getOwnPropertyDescriptor(navProto,'deviceMemory');
+    const okDeviceMemory = hasDeviceMemory ? (dDeviceMemory ?
+      (redefineAcc(navProto, 'deviceMemory', __wrapGetter('deviceMemory', () => mem, dDeviceMemory, __isNavigatorThis)), true) :
+      safeDefineAcc(navProto, 'deviceMemory', __wrapGetter('deviceMemory', () => mem, dDeviceMemory, __isNavigatorThis), { enumerable: true })) : true;
     if (okDeviceMemory === false) throw new TypeError('[nav_total_set] failed to define deviceMemory');
 
     const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
-    const okHardwareConcurrency = hasHardwareConcurrency ? (Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency') ?
-      (redefineAcc(navProto, 'hardwareConcurrency', () => cpu), true) :
-      safeDefineAcc(navProto, 'hardwareConcurrency', () => cpu, { enumerable: true })) : true;
+    const dHardwareConcurrency = Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency');
+    const okHardwareConcurrency = hasHardwareConcurrency ? (dHardwareConcurrency ?
+      (redefineAcc(navProto, 'hardwareConcurrency', __wrapGetter('hardwareConcurrency', () => cpu, dHardwareConcurrency, __isNavigatorThis)), true) :
+      safeDefineAcc(navProto, 'hardwareConcurrency', __wrapGetter('hardwareConcurrency', () => cpu, dHardwareConcurrency, __isNavigatorThis), { enumerable: true })) : true;
     if (okHardwareConcurrency === false) throw new TypeError('[nav_total_set] failed to define hardwareConcurrency');
 
     // ——— G. language(s) ———
     const hasLanguage = ('language' in navigator);
-    const okLanguage = hasLanguage ? (Object.getOwnPropertyDescriptor(navProto,'language') ?
-      (redefineAcc(navProto, 'language', () => window.__primaryLanguage), true) :
-      safeDefineAcc(navProto, 'language', () => window.__primaryLanguage,  { enumerable: true })) : true;
+    const dLanguage = Object.getOwnPropertyDescriptor(navProto,'language');
+    const okLanguage = hasLanguage ? (dLanguage ?
+      (redefineAcc(navProto, 'language', __wrapGetter('language', () => window.__primaryLanguage, dLanguage, __isNavigatorThis)), true) :
+      safeDefineAcc(navProto, 'language', __wrapGetter('language', () => window.__primaryLanguage, dLanguage, __isNavigatorThis),  { enumerable: true })) : true;
     if (okLanguage === false) throw new TypeError('[nav_total_set] failed to define language');
 
     const hasLanguages = ('languages' in navigator);
-    const okLanguages = hasLanguages ? (Object.getOwnPropertyDescriptor(navProto,'languages') ?
-      (redefineAcc(navProto, 'languages', () => window.__normalizedLanguages), true) :
-      safeDefineAcc(navProto, 'languages', () => window.__normalizedLanguages, { enumerable: true })) : true;
+    const dLanguages = Object.getOwnPropertyDescriptor(navProto,'languages');
+    const okLanguages = hasLanguages ? (dLanguages ?
+      (redefineAcc(navProto, 'languages', __wrapGetter('languages', () => window.__normalizedLanguages, dLanguages, __isNavigatorThis)), true) :
+      safeDefineAcc(navProto, 'languages', __wrapGetter('languages', () => window.__normalizedLanguages, dLanguages, __isNavigatorThis), { enumerable: true })) : true;
     if (okLanguages === false) throw new TypeError('[nav_total_set] failed to define languages');
 
     // ——— H. permissions.query ———
@@ -448,7 +539,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (!permDesc) throw new TypeError('[nav_total_set] permissions.query descriptor missing');
       const origQuery = permDesc.value || navigator.permissions.query;
       if (typeof origQuery !== 'function') throw new TypeError('[nav_total_set] permissions.query original missing');
+      __navRegisterKey('permissions.query');
       const patchedQueryRaw = ({ query(parameters) {
+        __navLogAccess('permissions.query', patchedQueryRaw);
         const isPermThis = (this === navigator.permissions || this === permProto);
         if (!isPermThis) {
           return origQuery.call(this, parameters);
@@ -464,6 +557,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         return origQuery.call(this, parameters);
       } }).query;
       const patchedQuery = mark(patchedQueryRaw, 'query');
+      __navRegisterFn(patchedQuery);
       Object.defineProperty(permProto, 'query', {
         value: patchedQuery,
         configurable: permDesc.configurable,
@@ -480,7 +574,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (!mediaDesc) throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices descriptor missing');
       const origEnumerate = mediaDesc.value || navigator.mediaDevices.enumerateDevices;
       if (typeof origEnumerate !== 'function') throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices original missing');
+      __navRegisterKey('mediaDevices.enumerateDevices');
       const patchedEnumerateRaw = ({ async enumerateDevices() {
+        __navLogAccess('mediaDevices.enumerateDevices', patchedEnumerateRaw);
         const isMediaThis = (this === navigator.mediaDevices || this === mediaProto);
         if (!isMediaThis) {
           return origEnumerate.call(this);
@@ -498,6 +594,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         ];
       } }).enumerateDevices;
       const patchedEnumerate = mark(patchedEnumerateRaw, 'enumerateDevices');
+      __navRegisterFn(patchedEnumerate);
       Object.defineProperty(mediaProto, 'enumerateDevices', {
         value: patchedEnumerate,
         configurable: mediaDesc.configurable,
@@ -525,7 +622,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
       const origEstimate = storageDesc.value || navigator.storage.estimate;
       if (typeof origEstimate !== 'function') throw new TypeError('[nav_total_set] storage.estimate original missing');
+      __navRegisterKey('storage.estimate');
       const patchedEstimateRaw = ({ estimate() {
+        __navLogAccess('storage.estimate', patchedEstimateRaw);
         const isStorageThis = (this === navigator.storage || this === storageProto);
         if (!isStorageThis) {
           return origEstimate.call(this);
@@ -537,19 +636,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         configurable: storageDesc.configurable,
         enumerable: storageDesc.enumerable,
         writable: storageDesc.writable,
-        value: mark(patchedEstimateRaw, 'estimate')
+        value: (function(){
+          const fn = mark(patchedEstimateRaw, 'estimate');
+          __navRegisterFn(fn);
+          return fn;
+        })()
       });       
       if (navigator.webkitTemporaryStorage) {
         const tmpProto = Object.getPrototypeOf(navigator.webkitTemporaryStorage) || navigator.webkitTemporaryStorage;
         const tmpDesc = Object.getOwnPropertyDescriptor(tmpProto, 'queryUsageAndQuota')
           || Object.getOwnPropertyDescriptor(navigator.webkitTemporaryStorage, 'queryUsageAndQuota');
         if (!tmpDesc) throw new TypeError('[nav_total_set] webkitTemporaryStorage.queryUsageAndQuota descriptor missing');
+        __navRegisterKey('webkitTemporaryStorage.queryUsageAndQuota');
         const patchedQueryUsage = mark(function (success, error) {
+          __navLogAccess('webkitTemporaryStorage.queryUsageAndQuota', patchedQueryUsage);
           try { tickUsage(); success(usageBytes, quotaBytes); }
           catch (e) {
-            console.error('[nav_total_set][Caught]', e);
+            __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota', null, e);
             if (typeof error === 'function') error(e); }
         }, 'queryUsageAndQuota');
+        __navRegisterFn(patchedQueryUsage);
         Object.defineProperty(tmpProto, 'queryUsageAndQuota', {
           configurable: tmpDesc.configurable,
           enumerable: tmpDesc.enumerable,
@@ -563,22 +669,44 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const persistDesc = Object.getOwnPropertyDescriptor(storageProto, 'persist')
           || Object.getOwnPropertyDescriptor(navigator.storage, 'persist');
         if (!persistDesc) throw new TypeError('[nav_total_set] storage.persist descriptor missing');
+        const origPersist = persistDesc.value || navigator.storage.persist;
+        __navRegisterKey('storage.persist');
         Object.defineProperty(storageProto, 'persist', {
           configurable: persistDesc.configurable,
           enumerable: persistDesc.enumerable,
           writable: persistDesc.writable,
-          value: mark(function persist()   { return Promise.resolve(true); }, 'persist')
+          value: (function(){
+            const fn = mark(function persist() {
+              __navLogAccess('storage.persist', fn);
+              const isStorageThis = (this === navigator.storage || this === storageProto);
+              if (!isStorageThis && typeof origPersist === 'function') return origPersist.call(this);
+              return Promise.resolve(true);
+            }, 'persist');
+            __navRegisterFn(fn);
+            return fn;
+          })()
         });
       }
       if (typeof navigator.storage.persisted === 'function') {
         const persistedDesc = Object.getOwnPropertyDescriptor(storageProto, 'persisted')
           || Object.getOwnPropertyDescriptor(navigator.storage, 'persisted');
         if (!persistedDesc) throw new TypeError('[nav_total_set] storage.persisted descriptor missing');
+        const origPersisted = persistedDesc.value || navigator.storage.persisted;
+        __navRegisterKey('storage.persisted');
         Object.defineProperty(storageProto, 'persisted', {
           configurable: persistedDesc.configurable,
           enumerable: persistedDesc.enumerable,
           writable: persistedDesc.writable,
-          value: mark(function persisted() { return Promise.resolve(true); }, 'persisted')
+          value: (function(){
+            const fn = mark(function persisted() {
+              __navLogAccess('storage.persisted', fn);
+              const isStorageThis = (this === navigator.storage || this === storageProto);
+              if (!isStorageThis && typeof origPersisted === 'function') return origPersisted.call(this);
+              return Promise.resolve(true);
+            }, 'persisted');
+            __navRegisterFn(fn);
+            return fn;
+          })()
         });
       }
     }
@@ -619,11 +747,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           // first try patch prototype, if rejected — try own on instance
           redefineAcc(perfProto, 'memory', getMemory);
         } catch (_) {
-          console.error('[nav_total_set][Caught]', _);
+          __navDiag('error', 'nav_total_set:performance_memory_proto', null, _);
           try {
             Object.defineProperty(performance, 'memory', { get: getMemory, configurable: true });
           } catch (__) {
-            console.error('[nav_total_set][Caught]', __);
+            __navDiag('error', 'nav_total_set:performance_memory_own', null, __);
             throw _;
           }
         }
@@ -651,18 +779,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         || Object.getOwnPropertyDescriptor(navigator.credentials, 'get');
       if (!createDesc) throw new TypeError('[nav_total_set] credentials.create descriptor missing');
       if (!getDesc) throw new TypeError('[nav_total_set] credentials.get descriptor missing');
+      __navRegisterKey('credentials.create');
       const patchedCreate = mark(function create(options) {
+        __navLogAccess('credentials.create', patchedCreate);
+        const isCredThis = (this === navigator.credentials || this === credProto);
+        if (!isCredThis) return origCreate ? origCreate.call(this, options) : Promise.resolve(undefined);
         if (options && options.publicKey) {
           return origCreate ? origCreate.call(this, options) : Promise.resolve(new PublicKeyCredential());
         }
         return origCreate ? origCreate.call(this, options) : Promise.resolve(undefined);
       }, 'create');
+      __navRegisterKey('credentials.get');
       const patchedGet = mark(function get(options) {
+        __navLogAccess('credentials.get', patchedGet);
+        const isCredThis = (this === navigator.credentials || this === credProto);
+        if (!isCredThis) return origGet ? origGet.call(this, options) : Promise.resolve(undefined);
         if (options && options.publicKey) {
           return origGet ? origGet.call(this, options) : Promise.resolve(new PublicKeyCredential());
         }
         return origGet ? origGet.call(this, options) : Promise.resolve(undefined);
       }, 'get');
+      __navRegisterFn(patchedCreate);
+      __navRegisterFn(patchedGet);
       Object.defineProperty(credProto, 'create', {
         configurable: createDesc.configurable,
         enumerable: createDesc.enumerable,
@@ -676,7 +814,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         value: patchedGet
       });
     }
-    console.log('Web Auth API mock applied');
+    __navDiag('info', 'nav_total_set:webauthn_mock_applied');
 
     // ——— L. Plugins & MimeTypes ———
     const profiles = Array.isArray(window.__PLUGIN_PROFILES__) ? window.__PLUGIN_PROFILES__ : [];
@@ -803,32 +941,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
       // Getters - like in ORIG: enumerable: true
       if ('plugins' in navigator) {
-        safeDefineAcc(navProto, 'plugins', () => createPluginArray(fakePlugins), { enumerable: true });
+        const dPlugins = Object.getOwnPropertyDescriptor(navProto, 'plugins');
+        safeDefineAcc(navProto, 'plugins', __wrapGetter('plugins', () => createPluginArray(fakePlugins), dPlugins, __isNavigatorThis), { enumerable: true });
       }
       if ('mimeTypes' in navigator) {
-        safeDefineAcc(navProto, 'mimeTypes', () => createMimeTypeArray(fakePlugins), { enumerable: true });
+        const dMimeTypes = Object.getOwnPropertyDescriptor(navProto, 'mimeTypes');
+        safeDefineAcc(navProto, 'mimeTypes', __wrapGetter('mimeTypes', () => createMimeTypeArray(fakePlugins), dMimeTypes, __isNavigatorThis), { enumerable: true });
       }
 
-    //  ——— Debug information to console ———
+    window.__PATCH_NAVTOTALSET__ = true;
+
+    //  ——— Debug information (unified log) ———
   if (G.__DEBUG__) {
-    console.group("Client Hints Debug");
-    console.log("meta:", meta);
     const hasUAD = ('userAgentData' in navigator);
-    console.log("navigator.userAgentData:", hasUAD ? navigator.userAgentData : undefined);
-    if (!hasUAD) {
-      console.log("navigator.userAgentData unavailable (secureContext:", G.isSecureContext, ")");
-    }
-    console.log("navigator.language(s):", navigator.language, navigator.languages);
-    console.log("navigator.deviceMemory:", navigator.deviceMemory);
-    console.log("navigator.hardwareConcurrency:", navigator.hardwareConcurrency);
-    if (navigator.connection) {
-      console.log("navigator.connection:", {
-        saveData: navigator.connection.saveData,
-        effectiveType: navigator.connection.effectiveType
-      });
-    }
-    console.groupEnd();
-    console.info('Client Hints and Navigator setting applied in JS');
+    __navDiag('debug', 'nav_total_set:debug', {
+      meta: meta,
+      hasUAD,
+      secureContext: G.isSecureContext
+    });
+    __navDiag('info', 'nav_total_set:applied');
   }
   }
 }

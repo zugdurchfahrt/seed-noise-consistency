@@ -17,6 +17,7 @@ SW_PRIMARY = None
 SW_LANGS = None
 SW_HC = None
 SW_DM = None
+SW_META = None
 _RUNNING = False
 
 
@@ -49,6 +50,8 @@ def enable_sw_language_inject(language: str, normalized_languages: list[str], ha
 
 
 def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
+    if not isinstance(SW_META, dict) or not SW_META:
+        raise ValueError("SW inject: expected_client_hints missing")
     # literals via json.dumps; no placeholders
     return (f"""
 (() => {{
@@ -59,11 +62,13 @@ def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_c
   const langs   = {json.dumps(normalized_languages, ensure_ascii=False)};
   const hc      = {json.dumps(hardware_concurrency)};
   const dm      = {json.dumps(device_memory)};
+  const meta    = {json.dumps(SW_META, ensure_ascii=False)};
 
   if (typeof primary !== 'string' || !primary) throw new Error('THW: SW language invalid');
   if (!Array.isArray(langs) || !langs.length) throw new Error('THW: SW languages invalid');
   if (!Number.isFinite(Number(hc)) || Number(hc) <= 0) throw new Error('THW: SW hardwareConcurrency invalid');
   if (!Number.isFinite(Number(dm)) || Number(dm) <= 0) throw new Error('THW: SW deviceMemory invalid');
+  if (!meta || typeof meta !== 'object') throw new Error('THW: SW uaData meta invalid');
   try {{ Object.freeze(langs); }} catch(e) {{}}
 
   const nav = G.navigator;
@@ -74,13 +79,196 @@ def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_c
   function defAcc(key, getter) {{
     const d = Object.getOwnPropertyDescriptor(proto, key);
     if (d && d.configurable === false) throw new Error('THW: SW ' + key + ' non-configurable');
+    const origGet = d && (typeof d.get === 'function') ? d.get : null;
+    const guardedGet = function() {{
+      const recv = this;
+      if (recv === nav || recv === proto) return getter.call(recv);
+      if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
+      throw new TypeError('Illegal invocation');
+    }};
     Object.defineProperty(proto, key, {{
-      get: getter,
-      configurable: true,
+      get: guardedGet,
+      configurable: d ? !!d.configurable : true,
       enumerable: d ? !!d.enumerable : false,
-      set: undefined
+      set: d && Object.prototype.hasOwnProperty.call(d, 'set') ? d.set : undefined
     }});
   }}
+
+  const uad = nav.userAgentData;
+  if (!uad) throw new Error('THW: SW navigator.userAgentData missing');
+  const uadProto = Object.getPrototypeOf(uad);
+  if (!uadProto) throw new Error('THW: SW uaData proto missing');
+  const isUadThis = (self) => (self === uad || self === uadProto);
+
+  const chPlatform = meta.platform;
+  if (typeof chPlatform !== 'string' || !chPlatform) throw new Error('THW: SW uaData.platform missing');
+  if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: SW uaData.brands missing');
+  if (typeof meta.mobile !== 'boolean') throw new Error('THW: SW uaData.mobile missing');
+  if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) throw new Error('THW: SW uaData.fullVersionList missing');
+  if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) throw new Error('THW: SW uaData.uaFullVersion missing');
+
+  const dUad = Object.getOwnPropertyDescriptor(proto, 'userAgentData');
+  if (!dUad) throw new Error('THW: SW userAgentData descriptor missing');
+  if (dUad.configurable === false) throw new Error('THW: SW userAgentData non-configurable');
+
+  const dBrands   = Object.getOwnPropertyDescriptor(uadProto, 'brands') || Object.getOwnPropertyDescriptor(uad, 'brands');
+  const dMobile   = Object.getOwnPropertyDescriptor(uadProto, 'mobile') || Object.getOwnPropertyDescriptor(uad, 'mobile');
+  const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform') || Object.getOwnPropertyDescriptor(uad, 'platform');
+  if (!dBrands || !dMobile || !dPlatform) throw new Error('THW: SW uaData descriptor missing');
+  if (dBrands.configurable === false || dMobile.configurable === false || dPlatform.configurable === false) throw new Error('THW: SW uaData non-configurable');
+
+  const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
+    || Object.getOwnPropertyDescriptor(uad, 'fullVersionList')
+    || {{ configurable: true, enumerable: false }};
+  if (dFull.configurable === false) throw new Error('THW: SW uaData fullVersionList non-configurable');
+
+  const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
+    || Object.getOwnPropertyDescriptor(uad, 'uaFullVersion')
+    || {{ configurable: true, enumerable: false }};
+  if (dUaFull.configurable === false) throw new Error('THW: SW uaData uaFullVersion non-configurable');
+
+  const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
+  if (!ghevDesc) throw new Error('THW: SW uaData.getHighEntropyValues descriptor missing');
+  if (ghevDesc.configurable === false) throw new Error('THW: SW uaData.getHighEntropyValues non-configurable');
+  const origGHEV = ghevDesc && ghevDesc.value;
+  if (typeof origGHEV !== 'function') throw new TypeError('THW: SW uaData.getHighEntropyValues original missing');
+
+  const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
+  if (!toJsonDesc) throw new Error('THW: SW uaData.toJSON descriptor missing');
+  if (toJsonDesc.configurable === false) throw new Error('THW: SW uaData.toJSON non-configurable');
+  const origToJSON = toJsonDesc && toJsonDesc.value;
+  if (typeof origToJSON !== 'function') throw new TypeError('THW: SW uaData.toJSON original missing');
+
+  function dropOwnIfConfigurable(obj, key) {{
+    const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
+    if (ownDesc && ownDesc.configurable) {{
+      try {{ delete obj[key]; }} catch (e) {{}}
+    }}
+  }}
+  function defineUadProtoMethod(proto, key, fn, desc) {{
+    const d = desc || Object.getOwnPropertyDescriptor(proto, key);
+    Object.defineProperty(proto, key, {{
+      value: fn,
+      configurable: d ? d.configurable : true,
+      enumerable: d ? d.enumerable : false,
+      writable: d && Object.prototype.hasOwnProperty.call(d, 'writable') ? d.writable : true
+    }});
+  }}
+  function guardedUadGetter(value, origGet, origValue) {{
+    return function() {{
+      const recv = this;
+      if (isUadThis(recv)) return value;
+      if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
+      if (origValue !== undefined) return origValue;
+      throw new TypeError('Illegal invocation');
+    }};
+  }}
+
+  const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
+  const brandsValue = deep(meta.brands);
+  const mobileValue = meta.mobile;
+  const platformValue = chPlatform;
+
+  if (Object.prototype.hasOwnProperty.call(dBrands, 'value') && !dBrands.get && !dBrands.set) {{
+    Object.defineProperty(uadProto, 'brands', {{
+      value: brandsValue,
+      writable: !!dBrands.writable,
+      configurable: !!dBrands.configurable,
+      enumerable: !!dBrands.enumerable
+    }});
+  }} else {{
+    Object.defineProperty(uadProto, 'brands', {{
+      get: guardedUadGetter(brandsValue, dBrands.get, dBrands.value),
+      set: dBrands.set,
+      configurable: !!dBrands.configurable,
+      enumerable: !!dBrands.enumerable
+    }});
+  }}
+  if (Object.prototype.hasOwnProperty.call(dMobile, 'value') && !dMobile.get && !dMobile.set) {{
+    Object.defineProperty(uadProto, 'mobile', {{
+      value: mobileValue,
+      writable: !!dMobile.writable,
+      configurable: !!dMobile.configurable,
+      enumerable: !!dMobile.enumerable
+    }});
+  }} else {{
+    Object.defineProperty(uadProto, 'mobile', {{
+      get: guardedUadGetter(mobileValue, dMobile.get, dMobile.value),
+      set: dMobile.set,
+      configurable: !!dMobile.configurable,
+      enumerable: !!dMobile.enumerable
+    }});
+  }}
+  if (Object.prototype.hasOwnProperty.call(dPlatform, 'value') && !dPlatform.get && !dPlatform.set) {{
+    Object.defineProperty(uadProto, 'platform', {{
+      value: platformValue,
+      writable: !!dPlatform.writable,
+      configurable: !!dPlatform.configurable,
+      enumerable: !!dPlatform.enumerable
+    }});
+  }} else {{
+    Object.defineProperty(uadProto, 'platform', {{
+      get: guardedUadGetter(platformValue, dPlatform.get, dPlatform.value),
+      set: dPlatform.set,
+      configurable: !!dPlatform.configurable,
+      enumerable: !!dPlatform.enumerable
+    }});
+  }}
+
+  Object.defineProperty(uadProto, 'fullVersionList', {{
+    get: guardedUadGetter(deep(meta.fullVersionList), dFull.get, dFull.value),
+    enumerable: dFull.enumerable,
+    configurable: dFull.configurable
+  }});
+  Object.defineProperty(uadProto, 'uaFullVersion', {{
+    get: guardedUadGetter(meta.uaFullVersion, dUaFull.get, dUaFull.value),
+    enumerable: dUaFull.enumerable,
+    configurable: dUaFull.configurable
+  }});
+
+  const getHighEntropyValues = function(keys) {{
+    if (!isUadThis(this)) {{
+      return origGHEV.call(this, keys);
+    }}
+    if (!Array.isArray(keys)) throw new Error('THW: SW uaData bad keys');
+    const map = {{
+      architecture: meta.architecture,
+      bitness: meta.bitness,
+      model: meta.model,
+      brands: brandsValue,
+      mobile: mobileValue,
+      platform: platformValue,
+      platformVersion: meta.platformVersion,
+      uaFullVersion: meta.uaFullVersion,
+      fullVersionList: deep(meta.fullVersionList),
+      deviceMemory: Number(dm),
+      hardwareConcurrency: Number(hc),
+      wow64: meta.wow64,
+      formFactors: meta.formFactors
+    }};
+    const result = {{}};
+    for (const hint of keys) {{
+      if (typeof hint !== 'string' || !hint) throw new Error('THW: SW uaData bad keys');
+      if (!(hint in map)) throw new Error('THW: SW uaData missing ' + hint);
+      const val = map[hint];
+      if (val === undefined || val === null) throw new Error('THW: SW uaData missing ' + hint);
+      if (typeof val === 'string' && !val && hint !== 'model') throw new Error('THW: SW uaData missing ' + hint);
+      if (Array.isArray(val) && !val.length) throw new Error('THW: SW uaData missing ' + hint);
+      result[hint] = val;
+    }}
+    return Promise.resolve(result);
+  }};
+  dropOwnIfConfigurable(uad, 'getHighEntropyValues');
+  defineUadProtoMethod(uadProto, 'getHighEntropyValues', getHighEntropyValues, ghevDesc);
+
+  const toJSON = function() {{
+    if (!isUadThis(this)) return origToJSON.call(this);
+    return {{ platform: this.platform, brands: this.brands, mobile: this.mobile }};
+  }};
+  dropOwnIfConfigurable(uad, 'toJSON');
+  defineUadProtoMethod(uadProto, 'toJSON', toJSON, toJsonDesc);
+
+  defAcc('userAgentData', function(){{ return uad; }});
 
   defAcc('language',  function(){{ return primary; }});
   defAcc('languages', function(){{ return langs; }});
@@ -181,7 +369,14 @@ def run():
             "  language: nav.language,"
             "  languages: nav.languages,"
             "  hardwareConcurrency: nav.hardwareConcurrency,"
-            "  deviceMemory: nav.deviceMemory"
+            "  deviceMemory: nav.deviceMemory,"
+            "  uad: nav.userAgentData ? {"
+            "    platform: nav.userAgentData.platform,"
+            "    mobile: nav.userAgentData.mobile,"
+            "    brands: nav.userAgentData.brands,"
+            "    uaFullVersion: nav.userAgentData.uaFullVersion,"
+            "    fullVersionList: nav.userAgentData.fullVersionList"
+            "  } : null"
             " };"
             "})()"
         )
@@ -279,6 +474,8 @@ def run():
                 if exc:
                     _fatal(ws, "sw prelude Runtime.evaluate exceptionDetails", exc)
                     return
+                if tag == "Runtime.evaluate:sw_prelude":
+                    logger.info("SW inject: prelude applied (UAD branch)")
                 if tag == "Runtime.evaluate:sw_sanity":
                     try:
                         out = (res.get("result") or {}).get("value")
@@ -287,6 +484,7 @@ def run():
                             "languages": SW_LANGS,
                             "hardwareConcurrency": SW_HC,
                             "deviceMemory": SW_DM,
+                            "uad": SW_META,
                         }
                         if not isinstance(out, dict):
                             _fatal(ws, "sw sanity: bad result type", out)
@@ -299,6 +497,25 @@ def run():
                             return
                         if float(out.get("deviceMemory") or 0.0) != float(exp["deviceMemory"]):
                             _fatal(ws, "sw sanity: deviceMemory mismatch", {"expected": exp, "got": out})
+                            return
+                        uad = out.get("uad") or {}
+                        if not isinstance(uad, dict):
+                            _fatal(ws, "sw sanity: uad bad result type", {"expected": exp, "got": out})
+                            return
+                        if uad.get("platform") != exp["uad"].get("platform"):
+                            _fatal(ws, "sw sanity: uad platform mismatch", {"expected": exp, "got": out})
+                            return
+                        if uad.get("mobile") != exp["uad"].get("mobile"):
+                            _fatal(ws, "sw sanity: uad mobile mismatch", {"expected": exp, "got": out})
+                            return
+                        if list(uad.get("brands") or []) != list(exp["uad"].get("brands") or []):
+                            _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
+                            return
+                        if uad.get("uaFullVersion") != exp["uad"].get("uaFullVersion"):
+                            _fatal(ws, "sw sanity: uad uaFullVersion mismatch", {"expected": exp, "got": out})
+                            return
+                        if list(uad.get("fullVersionList") or []) != list(exp["uad"].get("fullVersionList") or []):
+                            _fatal(ws, "sw sanity: uad fullVersionList mismatch", {"expected": exp, "got": out})
                             return
                         logger.info("SW inject: sanity OK target values match profile")
                     except Exception as e:

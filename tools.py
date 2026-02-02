@@ -386,3 +386,63 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand):
     logger.info("userAgent and userAgentMetadata submitted via CDP")
 
 
+def _ua_looks_like_firefox(user_agent: str) -> bool:
+    ua = str(user_agent or "")
+    ual = ua.lower()
+    return ("firefox" in ual) and ("chrome" not in ual) and ("edg/" not in ual)
+
+
+def _ua_looks_like_safari(user_agent: str) -> bool:
+    ua = str(user_agent or "")
+    ual = ua.lower()
+    # Chrome UA contains "safari/..." as a token, so require "chrome" absent.
+    return ("safari" in ual) and ("chrome" not in ual) and ("edg/" not in ual)
+
+
+def should_strip_uach_window(user_agent: str) -> bool:
+    # When running Chromium but forcing a Firefox/Safari UA string, UA-CH JS surface becomes a hard mismatch.
+    return _ua_looks_like_firefox(user_agent) or _ua_looks_like_safari(user_agent)
+
+
+def inject_uach_strip_window(driver, user_agent: str) -> bool:
+    """
+    For Firefox/Safari UA profiles running on Chromium, remove UA-CH JS surface in window:
+      - delete Navigator.prototype.userAgentData
+      - delete window.NavigatorUAData
+    Workers are intentionally out of scope here.
+
+    Fail-fast if properties exist but are non-configurable (cannot be removed -> inconsistent surface).
+    """
+    if not should_strip_uach_window(user_agent):
+        return False
+
+    js = """
+    (() => {
+        'use strict';
+        const proto = (typeof Navigator !== 'undefined' && Navigator && Navigator.prototype) ? Navigator.prototype : null;
+        if (!proto) throw new Error('THW: Navigator.prototype missing');
+
+        const d = Object.getOwnPropertyDescriptor(proto, 'userAgentData');
+        if (d) {
+            if (d.configurable === false) throw new Error('THW: Navigator.prototype.userAgentData non-configurable');
+            const ok = delete proto.userAgentData;
+            if (!ok) throw new Error('THW: failed to delete Navigator.prototype.userAgentData');
+        }
+
+        if ('NavigatorUAData' in globalThis) {
+            const d2 = Object.getOwnPropertyDescriptor(globalThis, 'NavigatorUAData');
+            if (d2 && d2.configurable === false) throw new Error('THW: globalThis.NavigatorUAData non-configurable');
+            const ok2 = delete globalThis.NavigatorUAData;
+            if (!ok2) throw new Error('THW: failed to delete globalThis.NavigatorUAData');
+        }
+    })();
+    """
+
+    # Ensure this runs before any page script on every new document.
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": js})
+
+    # Also apply immediately to the current document to catch non-configurable cases (fail-fast).
+    res = driver.execute_cdp_cmd("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True})
+    if isinstance(res, dict) and res.get("exceptionDetails"):
+        raise RuntimeError(f"UACH strip failed: {res.get('exceptionDetails')}")
+    return True

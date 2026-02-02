@@ -296,6 +296,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
       } catch (e) {
         try { __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) }); } catch (_e) {}
         self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
+        throw e;
       }
       if (__patchOK) {
         try {
@@ -441,6 +442,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
       } catch (e) {
         try { __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) }); } catch (_e) {}
         self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
+        throw e;
       }
       if (__patchOK) {
         try {

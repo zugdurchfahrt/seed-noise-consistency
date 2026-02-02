@@ -1,14 +1,43 @@
 const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!window.__PATCH_SCREEN__) {
-  window.__PATCH_SCREEN__ = true;
   
   const C = window.CanvasPatchContext;
   if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
     
-  const SCREEN_WIDTH  = window.__WIDTH;
-  const SCREEN_HEIGHT = window.__HEIGHT;
-  const COLOR_DEPTH   = window.__COLOR_DEPTH;
+  const SCREEN_WIDTH  = Number(window.__WIDTH);
+  const SCREEN_HEIGHT = Number(window.__HEIGHT);
+  const COLOR_DEPTH   = Number(window.__COLOR_DEPTH);
   const DPR           = Number(window.__DPR);
+
+  const __screenDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __screenLogArr = Array.isArray(window._myDebugLog) ? window._myDebugLog : null;
+  function __screenDiag(level, code, extra, err) {
+    if ((level === 'warn' || level === 'error') && typeof __screenDegrade === 'function') {
+      __screenDegrade(code || 'screen', err || null, extra || null);
+      return;
+    }
+    try {
+      if (__screenLogArr) {
+        __screenLogArr.push({
+          type: 'screen_' + level,
+          code: code || null,
+          extra: extra || null,
+          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack || null } : null,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (_) {}
+  }
+
+  if (!Number.isFinite(SCREEN_WIDTH) || !Number.isFinite(SCREEN_HEIGHT)) {
+    throw new Error('[Screen] bad width/height');
+  }
+  if (!Number.isFinite(COLOR_DEPTH)) {
+    throw new Error('[Screen] bad colorDepth');
+  }
+  if (!Number.isFinite(DPR) || DPR <= 0) {
+    throw new Error('[Screen] bad dpr');
+  }
   
   function safeDefine(obj, prop, descriptor) {
     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
@@ -77,7 +106,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const origMatchMedia = window.matchMedia;
   const mmTarget = chooseTarget(window, Object.getPrototypeOf(window), 'matchMedia');
   if (!mmTarget) throw new Error(`[Screen] matchMedia descriptor missing`);
+  const isWindowThis = (self) => {
+    try { return self === window || (typeof Window === 'function' && self instanceof Window); }
+    catch (_) { return false; }
+  };
   const patchedMatchMedia = function matchMedia(query) {
+    if (!isWindowThis(this)) return origMatchMedia.call(this, query);
     let matches = true;
 
     
@@ -172,9 +206,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       redefineProp(target, k, get);
     };
     try { setOrientation('type', () => (SCREEN_WIDTH > SCREEN_HEIGHT ? "landscape-primary" : "portrait-primary")); }
-    catch (e) { console.warn('[Screen] orientation.type redefine failed:', e); }
+    catch (e) { __screenDiag('warn', 'screen:orientation_type_redefine_failed', null, e); }
     try { setOrientation('angle', () => 0); }
-    catch (e) { console.warn('[Screen] orientation.angle redefine failed:', e); }
+    catch (e) { __screenDiag('warn', 'screen:orientation_angle_redefine_failed', null, e); }
   }
 
   // inner/outerWidth/Height
@@ -254,7 +288,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
 
 
   document.addEventListener("DOMContentLoaded", () => {
-    console.log("[Screen] patched screen/viewport:", {
+    __screenDiag('debug', 'screen:patched_viewport', {
       html:   { width:  document.documentElement.clientWidth,  height: document.documentElement.clientHeight },
       window: { width:  window.innerWidth,  height: window.innerHeight },
       screen: { width:  window.screen.width,  height: window.screen.height }
@@ -263,7 +297,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
 
   // log after DOM ready for document & div
   document.addEventListener("DOMContentLoaded", () => {
-    console.log("[Screen] document & div client sizes →", {
+    __screenDiag('debug', 'screen:document_div_client_sizes', {
       html: {
         width:  document.documentElement.clientWidth,
         height: document.documentElement.clientHeight
@@ -275,7 +309,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     });
   });
   
-  console.log('[Screen] patches applied');
+  __screenDiag('info', 'screen:patches_applied');
+  window.__PATCH_SCREEN__ = true;
   } 
 }
   
