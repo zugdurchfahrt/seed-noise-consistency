@@ -33,17 +33,21 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   // ——— Global mask "native" + general WeakMap ———
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
   const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-  const nativeToString = window.__NativeToString
-    || (fpToStringDesc && fpToStringDesc.value)
-    || Function.prototype.toString;
-  // Always pin a stable reference to the native implementation (avoid recursion / stale overrides).
-  window.__NativeToString = nativeToString;
+  const nativeToString = (fpToStringDesc && fpToStringDesc.value) || Function.prototype.toString;
 
-  // general WeakMap, available to all modules
-  const toStringOverrideMap = (window.__NativeToStringMap instanceof WeakMap)
+  const existingToStringMap = (window.__NativeToStringMap instanceof WeakMap)
     ? window.__NativeToStringMap
-    : new WeakMap();
-  window.__NativeToStringMap = toStringOverrideMap;
+    : null;
+  const toStringOverrideMap = existingToStringMap || new WeakMap();
+  try {
+    if (Object.prototype.hasOwnProperty.call(window, '__NativeToString')) delete window.__NativeToString;
+  } catch (_) {}
+  try {
+    if (Object.prototype.hasOwnProperty.call(window, '__NativeToStringMap')) delete window.__NativeToStringMap;
+  } catch (_) {}
+  try {
+    if (Object.prototype.hasOwnProperty.call(window, '__TOSTRING_PROXY_INSTALLED__')) delete window.__TOSTRING_PROXY_INSTALLED__;
+  } catch (_) {}
 
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
@@ -109,25 +113,30 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       // - preserve native brand-check semantics:
       //   Function.prototype.toString MUST throw when receiver is not a Function
       // - therefore NEVER return overrides for non-functions (objects/proxies/etc)
-  if (!window.__TOSTRING_PROXY_INSTALLED__) {
+  {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-    const toString = ({ toString() {
-      if (typeof this === 'function') {
+    const existingToString = toStringDesc && toStringDesc.value;
+    if (!existingToString || !existingToString.__TOSTRING_BRIDGE__) {
+      const nativeApply = Function.prototype.apply;
+      const toString = ({ toString() {
+        if (typeof this !== 'function') {
+          return nativeApply.call(nativeToString, this, arguments);
+        }
         const v = toStringOverrideMap.get(this);
         if (v !== undefined) return v;
-      }
-      return Reflect.apply(nativeToString, this, arguments);
-    }}).toString;
+        return nativeApply.call(nativeToString, this, arguments);
+      }}).toString;
 
-    markAsNative(toString, 'toString');
+      toString.__TOSTRING_BRIDGE__ = true;
+      markAsNative(toString, 'toString');
 
-    Object.defineProperty(Function.prototype, 'toString', {
-      value: toString,
-      writable: toStringDesc ? !!toStringDesc.writable : true,
-      configurable: toStringDesc ? !!toStringDesc.configurable : true,
-      enumerable: toStringDesc ? !!toStringDesc.enumerable : false
-    });
-    window.__TOSTRING_PROXY_INSTALLED__ = true;
+      Object.defineProperty(Function.prototype, 'toString', {
+        value: toString,
+        writable: toStringDesc ? !!toStringDesc.writable : true,
+        configurable: toStringDesc ? !!toStringDesc.configurable : true,
+        enumerable: toStringDesc ? !!toStringDesc.enumerable : false
+      });
+    }
   }
 
 
@@ -148,8 +157,16 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const Orig = window.RTCPeerConnection;
   if (!Orig) return;
 
-  if (window.__PATCH_RTCPEERCONNECTION__) return;
-  window.__PATCH_RTCPEERCONNECTION__ = true;
+  if (Orig.__PATCH_RTCPEERCONNECTION__) return;
+  safeDefine(Orig, '__PATCH_RTCPEERCONNECTION__', {
+    value: true,
+    writable: false,
+    configurable: true,
+    enumerable: false
+  });
+  try {
+    if (Object.prototype.hasOwnProperty.call(window, '__PATCH_RTCPEERCONNECTION__')) delete window.__PATCH_RTCPEERCONNECTION__;
+  } catch (_) {}
 
 
   function filterSDP(sdp) {
@@ -198,8 +215,14 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
 
   // --- patch prototype methods (native invariants preserved)
   const patchedCreateOffer = function createOffer(...args) {
-    return origCreateOffer.apply(this, args).then(desc => {
-      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
+    const p = origCreateOffer.apply(this, args);
+    return p.then(function(desc) {
+      if (desc && desc.sdp) {
+        desc.sdp = desc.sdp
+          .split('\n')
+          .filter(l => !l.startsWith('a=candidate') || l.includes('relay'))
+          .join('\n');
+      }
       return desc;
     });
   };
@@ -208,8 +231,14 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   Orig.prototype.createOffer = patchedCreateOffer;
 
   const patchedCreateAnswer = function createAnswer(...args) {
-    return origCreateAnswer.apply(this, args).then(desc => {
-      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
+    const p = origCreateAnswer.apply(this, args);
+    return p.then(function(desc) {
+      if (desc && desc.sdp) {
+        desc.sdp = desc.sdp
+          .split('\n')
+          .filter(l => !l.startsWith('a=candidate') || l.includes('relay'))
+          .join('\n');
+      }
       return desc;
     });
   };
@@ -281,9 +310,12 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
 
   // --- wrapper constructor that preserves prototype chain
   function PatchedRTCPeerConnection(...args) {
+    if (!new.target) {
+      return Orig.apply(this, args);
+    }
     const opts = args[0] && typeof args[0] === 'object' ? { ...args[0] } : {};
     if (opts.iceServers) opts.iceServers = normalizeIceServers(opts.iceServers);
-    return new Orig(opts, ...args.slice(1));
+    return Reflect.construct(Orig, [opts, ...args.slice(1)], new.target);
   }
   markAsNative(PatchedRTCPeerConnection, 'RTCPeerConnection');
   tryCopyNameLength(PatchedRTCPeerConnection, Orig, 'RTCPeerConnection');
