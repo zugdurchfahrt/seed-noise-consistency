@@ -1,4 +1,4 @@
-# cdp_caught_logger.py  (SW injector only)
+# cdp_catapult.py  (SW injector only)
 import json
 import time
 import requests
@@ -6,7 +6,7 @@ from websocket import WebSocketApp
 from overseer import logger
 
 # Use the project's existing logging pipeline (overseer.setup_logger -> intention_entitled.log).
-logger = logger.getChild("cdp_logger")
+logger = logger.getChild("cdp_catapult")
 
 
 PORT = None

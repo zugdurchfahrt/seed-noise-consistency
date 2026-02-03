@@ -20,8 +20,8 @@ const LOGGingModule = function LOGGingModule() {
       // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
 
     window.env = window.env || {};
-    window.env.DEBUG_DEGRADES = true;   // включить
-    // window.env.DEBUG_DEGRADES = false; // выключить
+    // window.env.DEBUG_DEGRADES = true;   // включить
+    window.env.DEBUG_DEGRADES = false; // выключить
 
 
 
@@ -416,14 +416,6 @@ const LOGGingModule = function LOGGingModule() {
       if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:worker_context:init_failed", e);
     }
 
-
-
-
-
-
-
-
-
     // ===== 6) Export helper (in-session) =====
     global.exportMyDebugLog = function () {
       try {
@@ -490,10 +482,6 @@ const LOGGingModule = function LOGGingModule() {
         else global.DEBUG_ALL_ON();
       } catch (_) {}
     };
-
-
-
-
 
   }
 }

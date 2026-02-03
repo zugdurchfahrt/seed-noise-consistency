@@ -319,16 +319,18 @@
       value: getHighEntropyValues
     });
 
-    const makeGuardedGetter = (k, owner, patchedGet, origGet) => markAsNative(function(){
-      const recv = this;
-      if (recv === nav || (owner && recv === owner)) {
-        return Reflect.apply(patchedGet, recv, []);
+    const makeGuardedGetter = (k, owner, patchedGet, origGet) => {
+      if (typeof origGet !== 'function') {
+        throw new Error(`UACHPatch: ${k} native getter missing`);
       }
-      if (typeof origGet === 'function') {
+      return markAsNative(function(){
+        const recv = this;
+        if (recv === nav) {
+          return Reflect.apply(patchedGet, recv, []);
+        }
         return Reflect.apply(origGet, recv, []);
-      }
-      throw new TypeError('Illegal invocation');
-    }, `get ${k}`);
+      }, `get ${k}`);
+    };
 
     const def = (obj, k, getter, enumerable = true) => {
       // По методологии: не молчим, если некуда ставить
@@ -341,8 +343,10 @@
         if (own.configurable === false) {
           throw new Error(`UACHPatch: ${k} not configurable on navigator`);
         }
-        const ownOrigGet = (typeof own.get === 'function') ? own.get : null;
-        const ownGuardedGet = makeGuardedGetter(k, nav, getter, ownOrigGet);
+        if (typeof own.get !== 'function') {
+          throw new Error(`UACHPatch: ${k} missing native getter on navigator`);
+        }
+        const ownGuardedGet = makeGuardedGetter(k, nav, getter, own.get);
         Object.defineProperty(nav, k, {
           configurable: !!own.configurable,
           enumerable: !!own.enumerable,
@@ -355,11 +359,16 @@
       // 2) Иначе — патчим на proto (как раньше)
       if (obj) {
         const d = Object.getOwnPropertyDescriptor(obj, k);
+        if (!d) {
+          throw new Error(`UACHPatch: ${k} native descriptor missing on proto`);
+        }
         if (d && d.configurable === false) {
           throw new Error(`UACHPatch: ${k} not configurable on proto`);
         }
-        const protoOrigGet = d && (typeof d.get === 'function') ? d.get : null;
-        const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet);
+        if (typeof d.get !== 'function') {
+          throw new Error(`UACHPatch: ${k} missing native getter on proto`);
+        }
+        const protoGuardedGet = makeGuardedGetter(k, obj, getter, d.get);
         Object.defineProperty(obj, k, {
           configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable,

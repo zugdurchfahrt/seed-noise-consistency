@@ -53,7 +53,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
       dbg = this[__WEBGL_DEBUGINFO_CACHE_PROP__];
     }
     if (dbg === undefined) {
-      try { dbg = this.getExtension('WEBGL_debug_renderer_info'); } catch(e){ dbg = null; }
+      try { dbg = this.getExtension('WEBGL_debug_renderer_info'); } catch(e){
+        dbg = null;
+        if (typeof window.__DEGRADE__ === 'function') {
+          try { window.__DEGRADE__('webgl:getExtension:debug_renderer_info_throw', e); } catch (_) {}
+        }
+      }
       if (__webglDebugInfoCache__) {
         __webglDebugInfoCache__.set(this, dbg);
       } else if (this) {
@@ -177,16 +182,40 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (kind && ['webgl', 'experimental-webgl', 'webgl2'].includes(kind)) {
     const state = C && C.__patchState;
     const skipProtoWrap = !!(state && state.webgl);
-    if (proto && proto.shaderSource && !skipProtoWrap && !(__webglShaderSourcePatchedProtos__ && __webglShaderSourcePatchedProtos__.has(proto))) {
-      const orig = proto.shaderSource;
+    if (proto && proto.shaderSource && !skipProtoWrap) {
+      let owner = proto;
+      let d = null;
+      while (owner) {
+        d = Object.getOwnPropertyDescriptor(owner, 'shaderSource');
+        if (d) break;
+        owner = Object.getPrototypeOf(owner);
+      }
+      const already = (__webglShaderSourcePatchedProtos__ && owner && __webglShaderSourcePatchedProtos__.has(owner));
+      if (!already) {
+        if (!d || typeof d.value !== 'function') {
+          if (typeof window.__DEGRADE__ === 'function') {
+            try { window.__DEGRADE__('webgl:shaderSource:missing_descriptor', null); } catch (_) {}
+          }
+        } else if (d && d.configurable === false) {
+          if (typeof window.__DEGRADE__ === 'function') {
+            try { window.__DEGRADE__('webgl:shaderSource:non_configurable', null); } catch (_) {}
+          }
+        } else {
+          const orig = d.value;
         // НИЧЕГО НЕ МЕНЯЕМ ЗДЕСЬ — вся precision-политика уедет в webglShaderSourceHook
         const wrapped = ({ shaderSource(shader, src) {
           return orig.call(this, shader, src);
         } }).shaderSource;
 
         markNative(wrapped, 'shaderSource');
-        proto.shaderSource = wrapped;
-        if (__webglShaderSourcePatchedProtos__) __webglShaderSourcePatchedProtos__.add(proto);
+          Object.defineProperty(owner, 'shaderSource', {
+            value: wrapped,
+            writable: d ? !!d.writable : true,
+            configurable: d ? !!d.configurable : true,
+            enumerable: d ? !!d.enumerable : false
+          });
+          if (__webglShaderSourcePatchedProtos__) __webglShaderSourcePatchedProtos__.add(owner);
+        }
       }
 
       if (__webglInstancePatched__) {
@@ -199,6 +228,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
           enumerable: false
         });
       }
+    }
     }
     return res;
   }
@@ -244,7 +274,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
   function webglShaderSourceHook(orig, shader, src) {
     if (typeof src !== 'string') return; // undefined → patchMethod Calls orig(shader, src)
-
+ 
     try {
       // Unified precision policy by default: vertex="mediump", fragment="highp"
       // You can redefine through window._precisionPolicy = { vertex, fragment, mode }
@@ -285,8 +315,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
       // Other types - unchanged
       return;
-
-    } catch (_) {
+ 
+    } catch (e) {
+      if (typeof window.__DEGRADE__ === 'function') {
+        try { window.__DEGRADE__('webgl:shaderSourceHook:error', e); } catch (_) {}
+      }
       // for any malfunction case - return the original without modifications
       return;
     }
@@ -301,17 +334,43 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
 
   // === 6.export hooks to context.js ===
-  window.webglHooks = {
-    webglGetParameterMask,
-    webglWhitelistParameterHook,
-    webglGetSupportedExtensionsPatch,
-    webglGetExtensionPatch,
-    webglGetContextPatch,
-    webglReadPixelsHook,
-    webglGetShaderPrecisionFormatHook,
-    webglShaderSourceHook,
-    webglGetUniformHook
-  };
+  try {
+    Object.defineProperty(window, 'webglHooks', {
+      value: {
+        webglGetParameterMask,
+        webglWhitelistParameterHook,
+        webglGetSupportedExtensionsPatch,
+        webglGetExtensionPatch,
+        webglGetContextPatch,
+        webglReadPixelsHook,
+        webglGetShaderPrecisionFormatHook,
+        webglShaderSourceHook,
+        webglGetUniformHook
+      },
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  } catch (e) {
+    if (typeof window.__DEGRADE__ === 'function') {
+      try { window.__DEGRADE__('webgl:webglHooks:define_failed', e); } catch (_) {}
+    }
+    window.webglHooks = {
+      webglGetParameterMask,
+      webglWhitelistParameterHook,
+      webglGetSupportedExtensionsPatch,
+      webglGetExtensionPatch,
+      webglGetContextPatch,
+      webglReadPixelsHook,
+      webglGetShaderPrecisionFormatHook,
+      webglShaderSourceHook,
+      webglGetUniformHook
+    };
+    const h = window.webglHooks;
+    if (!h || typeof h !== 'object' || typeof h.webglGetParameterMask !== 'function') {
+      throw e;
+    }
+  }
     console.log('[WebGLPatchModule] WebglPatchModule applied');
 }
 }

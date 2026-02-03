@@ -131,37 +131,26 @@ const ContextPatchModule = function ContextPatchModule(window) {
     // Avoid expando flags on "this" (detectable). Use WeakSet recursion guard.
     const inProgress =
       (typeof WeakSet === 'function') ? new WeakSet() : null;
-    const flag = '__isChain_' + method;
-
     const wrapped = (method === 'toDataURL')
       ? ({ toDataURL(type, quality) {
-          const self = this;
-          const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
-          if (self && self[flag]) return Reflect.apply(orig, self, arguments);
-          if (inProgress && isObj) {
-            if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
-            inProgress.add(self);
-          } else {
-            if (self) self[flag] = true;
-          }
-          try {
-            let patchedArgs = Array.prototype.slice.call(arguments);
-            for (const hook of hookList){
-              if (typeof hook !== 'function') continue;
-              try {
-                const next = hook.apply(this, patchedArgs);
-                if (next && Array.isArray(next)) patchedArgs = next;
-              } catch (e) {
-                if (global.__DEBUG__) console.error(`[CHAIN HOOK ERROR ${method}]`, e);
-                throw e;
-              }
-            }
-            const out = Reflect.apply(orig, this, patchedArgs);
-            let res = out;
-            for (const hook of hookList){
-              try {
-                const r = hook.call(this, res, ...patchedArgs);
-                if (typeof r === 'string') res = r;
+           const self = this;
+           const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
+           // Internal encode paths (temporary canvases) mark the instance to avoid re-entering the hook chain.
+           // Preserve native brand-check semantics by only reading the flag on objects/functions.
+           const __CHAIN_GUARD__ = '__isChain_toDataURL';
+           if (isObj && self[__CHAIN_GUARD__]) return Reflect.apply(orig, self, arguments);
+           if (inProgress && isObj) {
+             if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
+             inProgress.add(self);
+           }
+           try {
+             const patchedArgs = Array.prototype.slice.call(arguments);
+             const out = Reflect.apply(orig, this, patchedArgs);
+             let res = out;
+             for (const hook of hookList){
+               try {
+                 const r = hook.call(this, res, ...patchedArgs);
+                 if (typeof r === 'string') res = r;
               } catch (e) {
                 if (global.__DEBUG__) console.error(`[CHAIN POST ERROR ${method}]`, e);
                 throw e;
@@ -171,20 +160,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
           } finally {
             if (inProgress && isObj) {
               inProgress.delete(self);
-            } else {
-              if (self) self[flag] = false;
             }
           }
         } }).toDataURL
       : ({ [method]() {
           const self = this;
           const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
-          if (self && self[flag]) return Reflect.apply(orig, self, arguments);
           if (inProgress && isObj) {
             if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
             inProgress.add(self);
-          } else {
-            if (self) self[flag] = true;
           }
           try {
             let patchedArgs = Array.prototype.slice.call(arguments);
@@ -202,8 +186,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
           } finally {
             if (inProgress && isObj) {
               inProgress.delete(self);
-            } else {
-              if (self) self[flag] = false;
             }
           }
         } })[method];
@@ -403,7 +385,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
     // --- measureText: post-process TextMetrics via CanvasPatchHooks.applyMeasureTextHook ---
     patchOnce('measureText', (orig) => function(text){
-      const txt = String(text ?? '');
+      const txt = ''.concat(text);
       const m = Reflect.apply(orig, this, [txt]);
 
       try {
@@ -411,8 +393,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         const fontStr = getFontStr(this);
 
         if (H && typeof H.applyMeasureTextHook === 'function') {
-          // const r = H.applyMeasureTextHook.call(this, m, txt, fontStr);
-          const r = Reflect.apply(H.applyMeasureTextHook, H, [m, txt, fontStr]);
+          const r = Reflect.apply(H.applyMeasureTextHook, this, [m, txt, fontStr]);
 
           return r ?? m;
         }

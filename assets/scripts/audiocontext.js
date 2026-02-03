@@ -56,7 +56,15 @@ const AudioContextModule = function AudioContextModule(window) {
     return Object.getOwnPropertyDescriptor(holder, prop).get;
   }
   function makeMethod(name, impl) {
-    return ({ [name](...args) { return impl.apply(this, args); } })[name];
+    return (function() {
+      switch (impl.length) {
+        case 0: return ({ [name]() { return impl.apply(this, arguments); } })[name];
+        case 1: return ({ [name](a0) { return impl.apply(this, arguments); } })[name];
+        case 2: return ({ [name](a0, a1) { return impl.apply(this, arguments); } })[name];
+        case 3: return ({ [name](a0, a1, a2) { return impl.apply(this, arguments); } })[name];
+        default: return ({ [name](...args) { return impl.apply(this, args); } })[name];
+      }
+    })();
   }
 
   function canReplaceMethod(proto, method, ctxName) {
@@ -151,12 +159,11 @@ const AudioContextModule = function AudioContextModule(window) {
       }
     }
 
-    // 4. patch createBuffer: We rolled the input and throw the error as in the original
+    // 4. patch createBuffer: delegate to native (preserve brand-check semantics)
     if (typeof proto.createBuffer === 'function' && canReplaceMethod(proto, 'createBuffer', CTX_NAME)) {
       const origCreateBuffer = proto.createBuffer;
       const patchedCreateBuffer = markAsNative(
         makeMethod('createBuffer', function(numOfChannels, length, sampleRate) {
-          if (length < 0 || sampleRate <= 0) throw new RangeError('Invalid length or sampleRate for AudioBuffer');
           return origCreateBuffer.call(this, numOfChannels, length, sampleRate);
         }),
         'createBuffer'

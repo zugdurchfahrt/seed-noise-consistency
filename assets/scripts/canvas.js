@@ -498,7 +498,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
             else if (p === 'actualBoundingBoxRight')    v = a.right   ?? 0;
             else if (p === 'emHeightAscent')            v = a.ascent  ?? 0;
             else if (p === 'emHeightDescent')           v = a.descent ?? 0;
-            else v = 0;
+            else return v;
           }
           const out = (p === 'width') ? (v + (info.widthNoise || 0)) : v;
           if (key && typeof out === 'number' && isFinite(out)) {
