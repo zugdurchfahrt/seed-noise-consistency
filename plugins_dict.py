@@ -15,7 +15,7 @@ logger = logger.getChild("plugins_dict")
 
 PLUGIN_DICT: Dict[str, List]  = {
     "chromium-viewer": [
-        [],  # V1 — empty
+        # [],  # V1 — empty
         [    # V2 — Classic Chrome: only one PDF Viewer
             {
                 "name": "Chrome PDF Viewer",
@@ -39,7 +39,7 @@ PLUGIN_DICT: Dict[str, List]  = {
     ],
 
     "edge-viewer": [
-        [],  # V1 — empty
+        # [],  # V1 — empty
         [    # V2 — Classic Edge: only one PDF Viewer
             {
                 "name": "Microsoft Edge PDF Viewer",
@@ -63,7 +63,7 @@ PLUGIN_DICT: Dict[str, List]  = {
     ],
 
     "webkit-viewer": [
-        [],  # W1 — empty (in fact Safari has a native viewer, but as a plugin it is not exist)
+        # [],  # W1 — empty (in fact Safari has a native viewer, but as a plugin it is not exist)
         [   # W2 — Minimum stub profile
             {
                 "name": "Default PDF Viewer",

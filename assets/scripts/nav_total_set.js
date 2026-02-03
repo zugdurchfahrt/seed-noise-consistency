@@ -81,7 +81,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     const __isNavigatorThis = (self) => {
       try {
-        return self === navigator || self === navProto || (typeof Navigator === 'function' && self instanceof Navigator);
+        return self === navigator || (typeof Navigator === 'function' && self instanceof Navigator);
       } catch (_) {
         return false;
       }
@@ -90,14 +90,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const isData = desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
       __navRegisterKey(key);
       if (isData) return getter;
+
       const origGet = desc && desc.get;
+
       const wrapped = function () {
         __navLogAccess(key, wrapped);
+
         if (typeof validThis === 'function' && !validThis(this)) {
           if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
+          throw new TypeError(); // если ты это оставляешь — обязательно иметь return ниже
         }
+
         return (typeof getter === 'function') ? getter.call(this) : getter;
       };
+
       __navRegisterFn(wrapped);
       return wrapped;
     }
@@ -296,7 +302,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (!nativeUAD) throw new Error('THW: window navigator.userAgentData missing');
       const uadProto = Object.getPrototypeOf(nativeUAD);
       if (!uadProto) throw new Error('THW: window navigator.userAgentData proto missing');
-      const isUadThis = (self) => (self === nativeUAD || self === uadProto);
+      const isUadThis = (self) => (self === nativeUAD);
+
       const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
       const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
       const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
