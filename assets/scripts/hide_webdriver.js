@@ -21,7 +21,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   const markAsNative = (function() {
     const ensure = (window && typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
-    const m = ensure ? ensure() : window.markAsNative;
+    const m = ensure ? ensure() : null;
     if (typeof m !== 'function') {
       throw new Error('[HideWebdriverPatchModule] markAsNative missing');
     }

@@ -314,7 +314,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   const origCheck = dCheck.value;
   const origLoad  = dLoad.value;
 
-  const mark = (typeof G.markAsNative === 'function') ? G.markAsNative : null;
+  const ensure = (G && typeof G.__ensureMarkAsNative === 'function') ? G.__ensureMarkAsNative : null;
+  const mark = ensure ? ensure() : null;
 
   const wrappedCheck = (mark ? mark(function check(query) {
     if (throttled()) return false;

@@ -7,6 +7,15 @@ const WrkModule = function WrkModule(window) {
     || (typeof global     !== 'undefined' && global)
     || {};
 
+  const mark = (function() {
+    const ensure = (G && typeof G.__ensureMarkAsNative === 'function') ? G.__ensureMarkAsNative : null;
+    const m = ensure ? ensure() : null;
+    if (typeof m !== 'function') {
+      throw new Error('[WrkModule] markAsNative missing');
+    }
+    return m;
+  })();
+
 // 1) Источник снапшотов
 function EnvBus(G){
   function envSnapshot(){
@@ -561,10 +570,9 @@ function installBlobURLStore(G) {
   if (G.__BLOB_URL_STORE__) return;
   const store = new Map();
   Object.defineProperty(G, '__BLOB_URL_STORE__', { value: store, configurable: false, writable: false });
-  if (typeof G.markAsNative !== 'function') {
+  if (typeof mark !== 'function') {
     throw new Error('[WorkerOverride] markAsNative missing');
   }
-  const mark = G.markAsNative;
   const nativeCreate = G.URL.createObjectURL;
   const nativeRevoke = G.URL.revokeObjectURL;
   const createWrapped = mark(function createObjectURL(obj){
@@ -649,7 +657,6 @@ function SafeWorkerOverride(G){
   installBlobURLStore(G);
   const NativeWorker = G.Worker;
 
-  const mark = G.markAsNative;
   if (typeof mark !== 'function') {
     throw new Error('[WorkerOverride] markAsNative missing');
   }
@@ -750,7 +757,6 @@ function SafeSharedWorkerOverride(G){
   installBlobURLStore(G);
   const NativeShared = G.SharedWorker;
 
-  const mark = G.markAsNative;
   if (typeof mark !== 'function') {
     throw new Error('[SharedWorkerOverride] markAsNative missing');
   }
@@ -901,7 +907,6 @@ function ServiceWorkerOverride(G){
 
   const SWC   = G.navigator.serviceWorker;
   const proto = Object.getPrototypeOf(SWC) || SWC;
-  const mark = G.markAsNative;
   if (typeof mark !== 'function') {
     throw new Error('[ServiceWorkerOverride] markAsNative missing');
   }

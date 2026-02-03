@@ -56,16 +56,15 @@
     };
     cache.snap = requireSnap(self.__lastSnap__, 'init');
 
-    const nativeToString = self.__NativeToString || Function.prototype.toString;
+    const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
+    const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
+    const existingToString = toStringDesc && toStringDesc.value;
+    const nativeToString = existingToString || Function.prototype.toString;
     if (typeof nativeToString !== 'function') {
       throw new Error('UACHPatch: Function.prototype.toString missing');
     }
-    if (!self.__NativeToString) self.__NativeToString = nativeToString;
 
-    const toStringMap = (self.__NativeToStringMap instanceof WeakMap)
-      ? self.__NativeToStringMap
-      : new WeakMap();
-    self.__NativeToStringMap = toStringMap;
+    const toStringMap = new WeakMap();
 
     const existingMarkAsNative = (typeof self.markAsNative === 'function') ? self.markAsNative : null;
     const markAsNative = (func, name) => {
@@ -79,7 +78,7 @@
       } catch (_) {}
       return out;
     };
-    if (!self.__TOSTRING_PROXY_INSTALLED__) {
+    if (!existingToString || !existingToString.__TOSTRING_BRIDGE__) {
       const d = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');
 
       const toString = ({ toString() {
@@ -90,6 +89,16 @@
         return Reflect.apply(nativeToString, this, arguments);
       }}).toString;
 
+      try {
+        Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
+          value: true,
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      } catch (_) {
+        toString.__TOSTRING_BRIDGE__ = true;
+      }
       markAsNative(toString, 'toString');
 
       Object.defineProperty(Function.prototype, 'toString', {
@@ -98,8 +107,6 @@
         configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : false,
       });
-
-      self.__TOSTRING_PROXY_INSTALLED__ = true;
     }
 
     const getDevicePixelRatio = markAsNative(function getDevicePixelRatio(){

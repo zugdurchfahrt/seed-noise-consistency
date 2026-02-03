@@ -30,7 +30,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
       const ensure = (typeof window.__ensureMarkAsNative === 'function')
         ? window.__ensureMarkAsNative
         : null;
-      const m = ensure ? ensure() : window.markAsNative;
+      const m = ensure ? ensure() : null;
       if (typeof m !== 'function') {
         throw new Error('[WebglPatchModule] markAsNative missing');
       }

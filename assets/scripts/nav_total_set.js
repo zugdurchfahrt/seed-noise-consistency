@@ -15,7 +15,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     const mark = (() => {
       const ensure = (typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
-      const fn = ensure ? ensure() : window.markAsNative;
+      const fn = ensure ? ensure() : null;
       if (typeof fn !== 'function') {
         throw new Error('[NavTotalSetPatchModule] markAsNative missing');
       }

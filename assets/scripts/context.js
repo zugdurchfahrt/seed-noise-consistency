@@ -32,7 +32,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       ? global.__ensureMarkAsNative
       : null;
 
-    const m = ensure ? ensure() : (global && global.markAsNative);
+    const m = ensure ? ensure() : null;
     if (typeof m !== 'function') {
       throw new Error('[ContextPatch] markAsNative missing');
     }

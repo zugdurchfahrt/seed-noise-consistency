@@ -288,12 +288,16 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
-            # --- RTC ---
-            Path(SCRIPTS_DIR / "RTCPeerConnection.js").read_text("utf-8"),
-            "RtcpeerconnectionPatchModule(window);",
             # --- set_log ---
             Path(SCRIPTS_DIR / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
+            # --- core window ---
+            Path(SCRIPTS_DIR / "core_window.js").read_text("utf-8"),
+            "CoreWindowModule(window);",
+            # --- RTC ---
+            Path(SCRIPTS_DIR / "RTCPeerConnection.js").read_text("utf-8"),
+            "RtcpeerconnectionPatchModule(window);",
+
             # --- hide_webdriver (markAsNative provider) ---
             Path(SCRIPTS_DIR / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
@@ -364,6 +368,25 @@ def init_driver(
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
                 // ——— Worker env diagnostics (pre-bootstrap) ———//
             console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
+            })(window);
+            """
+            ,
+            """
+            // ——— Cleanup public markAsNative ———//
+            (function cleanupMarkAsNative(G){
+                try {
+                    if (G && Object.prototype.hasOwnProperty.call(G, 'markAsNative')) delete G.markAsNative;
+                    if (typeof globalThis !== 'undefined' && Object.prototype.hasOwnProperty.call(globalThis, 'markAsNative')) delete globalThis.markAsNative;
+                    if (G && Object.prototype.hasOwnProperty.call(G, 'markAsNative')) {
+                        throw new Error('cleanupMarkAsNative: delete failed (window)');
+                    }
+                    if (typeof globalThis !== 'undefined' && Object.prototype.hasOwnProperty.call(globalThis, 'markAsNative')) {
+                        throw new Error('cleanupMarkAsNative: delete failed (globalThis)');
+                    }
+                } catch (e) {
+                    if (typeof __DEGRADE__ === 'function') __DEGRADE__('core_window:cleanup_markAsNative_failed', e);
+                    throw e;
+                }
             })(window);
             """
         ]
@@ -1068,222 +1091,6 @@ def main():
                 logger.info("UA data re-applied via CDP (mismatch detected)")
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
-
-
-
-
-  
-
-        dump_table_js = """
-            (() => {
-            const g = window;
-
-            const isArr = (v) => Array.isArray(v);
-            function safe(fn, fallback) { try { return fn(); } catch (e) { return fallback; } }
-
-            // === редактируемая таблица: добавляешь строки сюда ===
-            const SNAPSHOT_TABLE = [
-                // ───── core ─────
-                ["core", "__GLOBAL_SEED", () => g.__GLOBAL_SEED],
-                ["core", "__DPR",         () => g.__DPR],
-                ["core", "__DEBUG__",     () => g.__DEBUG__],
-                ["core", "_logLevel",     () => g._logLevel],
-                ["core", "__cpu",         () => g.__cpu],
-                ["core", "__memory",      () => g.__memory],
-                ["core", "__primaryLanguage",     () => g.__primaryLanguage],
-                ["core", "__normalizedLanguages", () => g.__normalizedLanguages],
-
-                // ───── navigator (page) ─────
-                ["nav", "navigator.language",            () => g.navigator && g.navigator.language],
-                ["nav", "navigator.languages",           () => g.navigator && g.navigator.languages],
-                ["nav", "navigator.hardwareConcurrency", () => g.navigator && g.navigator.hardwareConcurrency],
-                ["nav", "navigator.deviceMemory",        () => g.navigator && g.navigator.deviceMemory],
-
-                // ───── UA / UAD (page) ─────
-                ["uad", "navigator.userAgent",                 () => g.navigator && g.navigator.userAgent],
-                ["uad", "navigator.userAgentData.platform",    () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.platform],
-                ["uad", "navigator.userAgentData.mobile",      () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.mobile],
-                ["uad", "navigator.userAgentData.brands",      () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.brands],
-                ["uad", "navigator.userAgentData.uaFullVersion", () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.uaFullVersion],
-                ["uad", "navigator.userAgentData.fullVersionList", () => g.navigator && g.navigator.userAgentData && g.navigator.userAgentData.fullVersionList],
-                ["uad", "__EXPECTED_CLIENT_HINTS.platform",    () => g.__EXPECTED_CLIENT_HINTS && g.__EXPECTED_CLIENT_HINTS.platform],
-                ["uad", "__EXPECTED_CLIENT_HINTS.uaFullVersion", () => g.__EXPECTED_CLIENT_HINTS && g.__EXPECTED_CLIENT_HINTS.uaFullVersion],
-                ["uad", "__EXPECTED_CLIENT_HINTS.fullVersionList", () => g.__EXPECTED_CLIENT_HINTS && g.__EXPECTED_CLIENT_HINTS.fullVersionList],
-                ["uad", "__LAST_UACH_HE__",                    () => g.__LAST_UACH_HE__ ?? null],
-                ["uad", "__UACH_HE_READY__",                   () => g.__UACH_HE_READY__ ?? null],
-
-                // ───── workers ─────
-                ["worker", "WorkerPatchHooks.exists", () => !!g.WorkerPatchHooks],
-                ["worker", "WorkerPatchHooks.diag",   () => g.WorkerPatchHooks?.diag?.() ?? null],
-                ["worker", "Worker.__ENV_WRAPPED__",  () => !!(g.Worker && g.Worker.__ENV_WRAPPED__)],
-                ["worker", "SharedWorker.__ENV_WRAPPED__", () => !!(g.SharedWorker && g.SharedWorker.__ENV_WRAPPED__)],
-                ["worker", "worker.safeWorker",       () => !!(g.__PATCHED_SAFE_WORKER__ || (g.Worker && g.Worker.__ENV_WRAPPED__))],
-                ["worker", "__PATCHED_SERVICE_WORKER__", () => !!g.__PATCHED_SERVICE_WORKER__],
-                ["worker", "__lastSnap.language",     () => g.__lastSnap__ && g.__lastSnap__.language],
-                ["worker", "__lastSnap.languages",    () => g.__lastSnap__ && g.__lastSnap__.languages],
-                ["worker", "__lastSnap.hardwareConcurrency", () => g.__lastSnap__ && g.__lastSnap__.hardwareConcurrency],
-                ["worker", "__lastSnap.deviceMemory",       () => g.__lastSnap__ && g.__lastSnap__.deviceMemory],
-                ["worker", "__ENV_HUB__.snapshot.language", () => g.__ENV_HUB__?.getSnapshot?.()?.language],
-                ["worker", "__ENV_HUB__.snapshot.languages", () => g.__ENV_HUB__?.getSnapshot?.()?.languages],
-                ["worker", "__ENV_HUB__.snapshot.hardwareConcurrency", () => g.__ENV_HUB__?.getSnapshot?.()?.hardwareConcurrency],
-                ["worker", "__ENV_HUB__.snapshot.deviceMemory",        () => g.__ENV_HUB__?.getSnapshot?.()?.deviceMemory],
-                ["worker", "__LAST_SHARED_WORKER_PATCH_OK__",          () => g.__LAST_SHARED_WORKER_PATCH_OK__ ?? null],
-                ["worker", "__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__",   () => g.__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__ ?? null],
-                ["worker", "__LAST_SHARED_WORKER_USER_URL_LOADED__",   () => g.__LAST_SHARED_WORKER_USER_URL_LOADED__ ?? null],
-                
-                // ───── env bridge ─────
-                ["bridge", "__ENV_BRIDGE__.exists",  () => !!g.__ENV_BRIDGE__],
-                ["bridge", "__ENV_BRIDGE__.urlKeys", () => Object.keys(g.__ENV_BRIDGE__?.urls || {})],
-
-                // ───── canvas/webgl: existence + patchState ─────
-                ["canvas", "CanvasPatchContext.exists",     () => !!g.CanvasPatchContext],
-                ["canvas", "CanvasPatchContext.__patchState", () => g.CanvasPatchContext?.__patchState || null],
-                ["canvas", "CanvasPatchContext.hooksRegistered", () =>
-                (g.CanvasPatchContext?.__patchState && g.CanvasPatchContext.__patchState.hooksRegistered) || null
-                ],
-
-                // ───── hook counts (по одной строке на счётчик) ─────
-                ["hooks", "htmlCanvasGetContextHooks.length",      () => (g.CanvasPatchContext?.htmlCanvasGetContextHooks || []).length],
-                ["hooks", "htmlCanvasToDataURLHooks.length",       () => (g.CanvasPatchContext?.htmlCanvasToDataURLHooks || []).length],
-                ["hooks", "htmlCanvasToBlobHooks.length",          () => (g.CanvasPatchContext?.htmlCanvasToBlobHooks || []).length],
-                ["hooks", "offscreenGetContextHooks.length",       () => (g.CanvasPatchContext?.offscreenGetContextHooks || []).length],
-                ["hooks", "offscreenConvertToBlobHooks.length",    () => (g.CanvasPatchContext?.offscreenConvertToBlobHooks || []).length],
-
-                ["hooks", "ctx2DGetContextHooks.length",           () => (g.CanvasPatchContext?.ctx2DGetContextHooks || []).length],
-                ["hooks", "ctx2DMeasureTextHooks.length",          () => (g.CanvasPatchContext?.ctx2DMeasureTextHooks || []).length],
-                ["hooks", "ctx2DFillTextHooks.length",             () => (g.CanvasPatchContext?.ctx2DFillTextHooks || []).length],
-                ["hooks", "ctx2DStrokeTextHooks.length",           () => (g.CanvasPatchContext?.ctx2DStrokeTextHooks || []).length],
-                ["hooks", "ctx2DFillRectHooks.length",             () => (g.CanvasPatchContext?.ctx2DFillRectHooks || []).length],
-                ["hooks", "ctx2DDrawImageHooks.length",            () => (g.CanvasPatchContext?.ctx2DDrawImageHooks || []).length],
-                ["hooks", "canvas2DNoiseHooks.length",             () => (g.CanvasPatchContext?.canvas2DNoiseHooks || []).length],
-
-                ["hooks", "webglGetParameterHooks.length",         () => (g.CanvasPatchContext?.webglGetParameterHooks || []).length],
-                ["hooks", "webglGetSupportedExtensionsHooks.length", () => (g.CanvasPatchContext?.webglGetSupportedExtensionsHooks || []).length],
-                ["hooks", "webglGetExtensionHooks.length",         () => (g.CanvasPatchContext?.webglGetExtensionHooks || []).length],
-                ["hooks", "webglGetContextHooks.length",           () => (g.CanvasPatchContext?.webglGetContextHooks || []).length],
-                ["hooks", "webglReadPixelsHooks.length",           () => (g.CanvasPatchContext?.webglReadPixelsHooks || []).length],
-                ["hooks", "webglGetShaderPrecisionFormatHooks.length", () => (g.CanvasPatchContext?.webglGetShaderPrecisionFormatHooks || []).length],
-                ["hooks", "webglShaderSourceHooks.length",         () => (g.CanvasPatchContext?.webglShaderSourceHooks || []).length],
-                ["hooks", "webglGetUniformHooks.length",           () => (g.CanvasPatchContext?.webglGetUniformHooks || []).length],
-
-                // ───── headers interceptor (таблично) ─────
-                ["headers", "HeadersInterceptor.exists", () => !!g.HeadersInterceptor],
-                ["headers", "HeadersInterceptor.hasAPI", () => {
-                const H = g.HeadersInterceptor;
-                return !!H && (typeof H === "function" || typeof H === "object");
-                }],
-                ["headers", "__HEADERS_BRIDGE_READY__", () => !!g.__HEADERS_BRIDGE_READY__],
-                ["headers", "HeadersInterceptor.allow", () => {
-                const H = g.HeadersInterceptor;
-                return (H && H.listAllow && H.listAllow()) || g.__CDP_ALLOW_SUFFIXES || null;
-                }],
-                ["headers", "HeadersInterceptor.ignore", () => {
-                const H = g.HeadersInterceptor;
-                return (H && H.listIgnore && H.listIgnore()) || g.__CDP_IGNORED_SUFFIXES || null;
-                }],
-
-                // ───── errors ─────
-                ["errors", "__ENV_BOOTSTRAP_ERROR__", () => g.__ENV_BOOTSTRAP_ERROR__ ?? null],
-                ["errors", "__ENV_BC_ERROR__",        () => g.__ENV_BC_ERROR__ ?? null],
-
-                // ───── self-checks (коротко и fail-fast-смысл: тут только диагностика, не throw) ─────
-                ["self", "self.canvas.patchStateShape", () => {
-                const C = g.CanvasPatchContext;
-                if (!C) return "SKIP: no CanvasPatchContext";
-                const ps = C.__patchState;
-                if (!ps || typeof ps !== "object") return "FAIL: __patchState missing/not object";
-                return "OK";
-                }],
-                ["self", "self.canvas.hooksRegistered", () => {
-                const C = g.CanvasPatchContext;
-                if (!C) return "SKIP: no CanvasPatchContext";
-                const v = C.__patchState && C.__patchState.hooksRegistered;
-                if (v === true) return "OK";
-                if (v === false) return "FAIL: hooksRegistered=false";
-                return "FAIL: hooksRegistered missing";
-                }],
-                ["self", "self.canvas.hookArraysAreArrays", () => {
-                const C = g.CanvasPatchContext;
-                if (!C) return "SKIP: no CanvasPatchContext";
-                const keys = [
-                    "htmlCanvasGetContextHooks","htmlCanvasToDataURLHooks","htmlCanvasToBlobHooks",
-                    "offscreenGetContextHooks","offscreenConvertToBlobHooks",
-                    "ctx2DGetContextHooks","ctx2DMeasureTextHooks","ctx2DFillTextHooks","ctx2DStrokeTextHooks",
-                    "ctx2DFillRectHooks","ctx2DDrawImageHooks","canvas2DNoiseHooks",
-                    "webglGetParameterHooks","webglGetSupportedExtensionsHooks","webglGetExtensionHooks",
-                    "webglGetContextHooks","webglReadPixelsHooks","webglGetShaderPrecisionFormatHooks",
-                    "webglShaderSourceHooks","webglGetUniformHooks",
-                ];
-                for (const k of keys) {
-                    const v = C[k];
-                    if (v == null) continue; // допустимо: ещё не инициализировано
-                    if (!isArr(v)) return "FAIL: " + k + " not array";
-                }
-                return "OK";
-                }],
-            ];
-
-
-            function takeTableSnapshot(tag = "manual") {
-            const rows = [];
-            for (const [group, key, getter] of SNAPSHOT_TABLE) {
-                let value;
-                try { value = getter(); } catch (e) { value = "❌ " + (e && e.message ? e.message : String(e)); }
-                rows.push({ tag, group, key, value, t: Date.now() });
-            }
-
-            // ВАЖНО: это лёгкое, не строит дерево в DevTools:
-            (function emitSnapToMyLogger(rows) {
-            // 1) если set_log уже стоит — самый правильный путь
-            const hadDebug = (typeof g.__DEBUG__ !== "undefined") ? g.__DEBUG__ : undefined;
-            try {
-                // подавляем реальный вывод в DevTools, но запись в _myDebugLog останется
-                try { g.__DEBUG__ = false; } catch (_) {}
-
-                if (console && typeof console.debug === "function") {
-                console.debug("[SNAP_TABLE]", rows);
-                return;
-                }
-            } finally {
-                // восстановить флаг (не оставлять частично-переключенное состояние)
-                try {
-                if (typeof hadDebug !== "undefined") g.__DEBUG__ = hadDebug;
-                } catch (_) {}
-            }
-
-            // 2) fallback: если console.debug почему-то недоступен, пишем безопасной строкой
-            try {
-                if (console && typeof console.log === "function") {
-                console.log("[SNAP_TABLE] " + JSON.stringify(rows));
-                }
-            } catch (_) {}
-            })(rows);
-
-                      
-            
-
-            // Опционально: если хочешь видеть таблицу руками — оставь, но можно выключить навсегда
-             console.table(rows);
-            
-             return rows;
-            }
-
-
-
-
-            // экспорт: доступно в консоли в любой момент после загрузки документа
-             // опционально: автоснимок после каждого reload
-             function auto() {
-                 //  включаениеть логера тут из set_log
-                 safe(() => { if (typeof g.DEBUG_ALL_ON === "function") g.DEBUG_ALL_ON(); }, null);
-                 takeTableSnapshot("after_reload");
-             }
-
-            if (document.readyState === "interactive" || document.readyState === "complete") auto();
-            else addEventListener("DOMContentLoaded", auto, { once: true });
-            })();
-            """
-        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": dump_table_js})
 
          # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs")
