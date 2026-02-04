@@ -16,8 +16,8 @@ const LOGGingModule = function LOGGingModule() {
 
     // Debug flag (respect false)
     G.__DEBUG__ =
-      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
-      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
+      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
+      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
 
     window.env = window.env || {};
     // window.env.DEBUG_DEGRADES = true;   // включить
@@ -292,25 +292,25 @@ const LOGGingModule = function LOGGingModule() {
       WRKlogger: { enabled: true, level: "debug" },
     };
 
-    global.log = function (module, level) {
-      const args = Array.prototype.slice.call(arguments, 2);
-      const config = global._logConfig[module] || global._logConfig.global;
-      if (!config || !config.enabled) return;
-      if (!levelAllows(config.level, level)) return;
+    // global.log = function (module, level) {
+    //   const args = Array.prototype.slice.call(arguments, 2);
+    //   const config = global._logConfig[module] || global._logConfig.global;
+    //   if (!config || !config.enabled) return;
+    //   if (!levelAllows(config.level, level)) return;
 
-      // Output to DevTools without recursion through patched console
-      const prefix = "%c[" + module + "]%c";
-      const style1 =
-        "color:#fff;background:#0070f3;border-radius:2px;padding:2px 4px;";
-      const style2 = "color:inherit;";
-      const callArgs = [prefix, style1, style2].concat(args);
+    //   // Output to DevTools without recursion through patched console
+    //   const prefix = "%c[" + module + "]%c";
+    //   const style1 =
+    //     "color:#fff;background:#0070f3;border-radius:2px;padding:2px 4px;";
+    //   const style2 = "color:inherit;";
+    //   const callArgs = [prefix, style1, style2].concat(args);
 
-      const orig = origConsole[level] || origConsole.log;
-      if (orig) guardedApply(orig, console, callArgs, "log." + level);
+    //   const orig = origConsole[level] || origConsole.log;
+    //   if (orig) guardedApply(orig, console, callArgs, "log." + level);
 
-      // Store entry
-      pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
-    };
+    //   // Store entry
+    //   pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
+    // };
 
     // ===== 5) Uncaught errors + unhandled rejections (consistent, no logError) =====
 
@@ -443,6 +443,9 @@ const LOGGingModule = function LOGGingModule() {
         if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:export_log:export_failed", e);
       }
     };
+
+
+
 
     // ===== 7) One-click toggles (no markers) =====
     global.DEBUG_ALL_ON = function () {

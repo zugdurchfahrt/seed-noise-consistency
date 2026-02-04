@@ -97,6 +97,7 @@ Freeze: 2025‑09‑11 (принимаются правки документац
 │   │   ├── audiocontext.js
 │   │   ├── canvas.js
 │   │   ├── context.js
+│   │   ├── core_window.js
 │   │   ├── env_params.js
 │   │   ├── font_module.js
 │   │   ├── headers_interceptor.js
@@ -122,6 +123,7 @@ Freeze: 2025‑09‑11 (принимаются правки документац
 ├── depo_browser.py
 ├── handle_cors_addon.py
 ├── headers_adapter.py
+├── cdp_catapult.py
 ├── macintel.py
 ├── main.py
 ├── main_no_proxy.py
@@ -139,7 +141,8 @@ Freeze: 2025‑09‑11 (принимаются правки документац
 ### Python (корень)
 - `main.py` — точка оркестрации: Selenium + undetected‑chromedriver, генерация/применение профиля, инъекция JS‑патчей через основной bundle, управление CDP, прокси‑режим.  
 - `main_no_proxy.py` — альтернативная конфигурация без использования прокси (ограничения CORS).  
-- `vpn_utils.py` — управление VPN‑процессом: выбор случайного `.ovpn` из `configs/`, запуск VPN, подготовка региональных полей профиля (timezone/geolocation).  
+- `cdp_catapult` — инжектор ServiceWorkerGlobalScope.  
+- `vpn_utils.py` — управление VPN‑процессом: выбор случайного `.ovpn` из `configs/`, запуск VPN, подготовка региональных полей профиля (timezone/geolocation). 
 - `handle_cors_addon.py` — аддон mitmproxy: корректные CORS (включая preflight), фильтрация служебных доменов, кольцевой буфер логов; читает `profiles/profile.json` для ожидаемых Client Hints.  
 - `headers_adapter.py` — реалистичный `Accept` под бренд/мажорную версию.  
 - `rand_met.py` — пайплайн шрифтов: per‑platform `generated_fonts/...`, эмитит `fonts_index.json` и генерирует `assets/JS_fonts_patch/font_patch.generated.js` из шаблона Jinja2.  
@@ -155,14 +158,15 @@ Freeze: 2025‑09‑11 (принимаются правки документац
 - `env_params.js` — инициализация PRNG на базе `__GLOBAL_SEED`.  
 - `hide_webdriver.js` — маскировка webdriver.  
 - `nav_total_set.js`, `screen.js`, `audiocontext.js` — корректировки `navigator`/`screen`/`AudioContext` в рамках политики сидирования/шума.  
-- `font_module.js` — потребляет `window.fontPatchConfigs`; регистрирует `@font-face`, инжектит CSS шрифтов.  
+- `font_module.js` — потребляет `window.fontPatchConfigs`; регистрирует `@font-face`, инжектит CSS шрифтов.
+- `core_window.js` — создаёт весь window-core: nativization/toString/safeDefine и т.п.   
 - `context.js` — регистрация хуков и цепочки применения.  
 - `canvas.js` — хуки Canvas 2D/Offscreen с учётом DPR и «edge‑respecting» шумом.  
 - `webgl.js` / `webgpu.js` — хуки WebGL/WebGPU; перехват параметров/расширений; дополняются статическими whitelist‑ами (см. выше).  
 - `headers_interceptor.js` — генератор `Accept` под бренд/версию; safelisted‑патч для fetch/XHR на cross‑origin; синхронизация с CDP Fetch‑мостом.  
 - `RTCPeerConnection.js` — фильтрация non‑relay ICE‑кандидатов; нормализация ICE‑серверов.  
 - `GeoOverride_source.js` / `TimezoneOverride_source.js` — оверрайды гео/часового пояса.  
-- `wrk.js` / `WORKER_PATCH_SRC.js` — `EnvBus` / `EnvHub`: снапшоты окружения, синхронизация Dedicated/Shared/Service Worker (UA/UA‑CH, inline bootstrap).
+- `wrk.js` / `WORKER_PATCH_SRC.js` : снапшоты окружения, синхронизация Dedicated/Shared/Service Worker (UA/UA‑CH, inline bootstrap).
 
 ### Генерируемые файлы и шаблоны
 - `assets/Manifest/fonts-manifest.json` — диагностический манифест (большой JSON).  
@@ -202,11 +206,9 @@ pip install --no-cache-dir -r requirements.txt
 ```
 
 ## Issues/TODO
-- Синхронизация window ↔ WorkerScope с момента старта (language(s), hardwareConcurrency, deviceMemory, userAgentData через Hub; геттеры на `WorkerNavigator.prototype`).  
+- Синхронизация Canvas(window) -Canvas(SharedWorkerGlobalScope) .  
 - Интегрировать модуль `getClientRects` / `getBoundingClientRect` (проксирование).  
-- Доработать корректный патч `toBlob` / `convertToBlob`, чтобы избежать Illegal invocation на краях.  
 - Фикс для Adapter “core‑features‑and‑limits” для WebGPU.  
-- Перенос патчей на прототипы (не на инстансы) + корректные дескрипторы.  
 - Ротация TLS‑отпечатка через OpenSSL.  
 
 З.Ы. В качестве бонуса добавлены инструменты для предварительной подготовки/обработки шрифтов.
