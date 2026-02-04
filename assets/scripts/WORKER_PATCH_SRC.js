@@ -86,7 +86,8 @@
           const v = toStringMap.get(this);
           if (v !== undefined) return v;
         }
-        return Reflect.apply(nativeToString, this, arguments);
+        return nativeToString.call(this);
+
       }}).toString;
 
       Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {

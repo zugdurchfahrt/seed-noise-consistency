@@ -1,5 +1,7 @@
 const CoreWindowModule = function CoreWindowModule(window) {
   'use strict';
+  const env = window && window.env;
+
   if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
     throw new Error('[CoreWindow] window missing');
   }
@@ -115,14 +117,13 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const existingToString = toStringDesc && toStringDesc.value;
     if (!existingToString || !existingToString.__TOSTRING_BRIDGE__) {
-      const nativeApply = Function.prototype.apply;
       const toString = ({ toString() {
         if (typeof this !== 'function') {
-          return nativeApply.call(nativeToString, this, arguments);
+          return nativeToString.call(this);
         }
         const v = toStringOverrideMap.get(this);
         if (v !== undefined) return v;
-        return nativeApply.call(nativeToString, this, arguments);
+        return nativeToString.call(this);
       }}).toString;
 
       Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {

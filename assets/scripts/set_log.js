@@ -22,6 +22,8 @@ const LOGGingModule = function LOGGingModule() {
     window.env = window.env || {};
     // window.env.DEBUG_DEGRADES = true;   // включить
     window.env.DEBUG_DEGRADES = false; // выключить
+    const env = window.env;
+
 
 
 
@@ -53,7 +55,7 @@ const LOGGingModule = function LOGGingModule() {
       };
 
       if (Array.isArray(global._myDebugLog)) {
-        global._myDebugLog.push({
+        pushEntry({
           type: "logger_guard",
           where: guard.last.where,
           message: guard.last.message,
@@ -177,7 +179,9 @@ const LOGGingModule = function LOGGingModule() {
       try {
         global._myDebugLog.push(entry);
       } catch (e) {
-        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:pushEntry:push_failed", e);
+        // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
+        // иначе рекурсия по пути ошибок (само-логирование логгера).
+        // (если очень надо сигналить — делай это через origConsole.* или просто молчи)
       }
     }
 
@@ -213,16 +217,13 @@ const LOGGingModule = function LOGGingModule() {
         const msgParts = [];
         if (args && args.length) {
           for (let i = 0; i < args.length; i++) {
-            // keep message readable but safe
             try {
               const a = args[i];
               if (typeof a === "string") {
-                // Same rationale as normalizeForJSON(): do not dump megabyte-sized payloads into message.
                 if (a.indexOf("data:") === 0) msgParts.push("[DataURL len=" + a.length + "]");
                 else if (a.indexOf("blob:") === 0) msgParts.push("[BlobURL]");
                 else msgParts.push(a);
-              }
-              else msgParts.push(safeTag(a));
+              } else msgParts.push(safeTag(a));
             } catch (_) {
               msgParts.push("[Unserializable]");
             }
@@ -234,7 +235,7 @@ const LOGGingModule = function LOGGingModule() {
           level: level,
           module: module || "global",
           message: msgParts.join(" "),
-          expanded: normArgs, // always JSON-safe
+          expanded: normArgs,
           timestamp: new Date().toISOString(),
         };
 
@@ -247,11 +248,17 @@ const LOGGingModule = function LOGGingModule() {
           }
         }
 
-        pushEntry(e);
+        pushEntry(e); // <-- обязательно вернуть
       } catch (e) {
-        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:pushLog:log_failed", e);
+        if (env && env.DEBUG_DEGRADES && origConsole && origConsole.error) {
+          try { origConsole.error(e); } catch (_) {}
+        }
       }
     }
+
+
+
+
 
     // ===== 3) Patch console.* (single source of truth) =====
     for (const level of LOG_LEVELS) {
@@ -292,25 +299,25 @@ const LOGGingModule = function LOGGingModule() {
       WRKlogger: { enabled: true, level: "debug" },
     };
 
-    // global.log = function (module, level) {
-    //   const args = Array.prototype.slice.call(arguments, 2);
-    //   const config = global._logConfig[module] || global._logConfig.global;
-    //   if (!config || !config.enabled) return;
-    //   if (!levelAllows(config.level, level)) return;
+    global.log = function (module, level) {
+      const args = Array.prototype.slice.call(arguments, 2);
+      const config = global._logConfig[module] || global._logConfig.global;
+      if (!config || !config.enabled) return;
+      if (!levelAllows(config.level, level)) return;
 
-    //   // Output to DevTools without recursion through patched console
-    //   const prefix = "%c[" + module + "]%c";
-    //   const style1 =
-    //     "color:#fff;background:#0070f3;border-radius:2px;padding:2px 4px;";
-    //   const style2 = "color:inherit;";
-    //   const callArgs = [prefix, style1, style2].concat(args);
+      // Output to DevTools without recursion through patched console
+      const prefix = "%c[" + module + "]%c";
+      const style1 =
+        "color:#fff;background:#0070f3;border-radius:2px;padding:2px 4px;";
+      const style2 = "color:inherit;";
+      const callArgs = [prefix, style1, style2].concat(args);
 
-    //   const orig = origConsole[level] || origConsole.log;
-    //   if (orig) guardedApply(orig, console, callArgs, "log." + level);
+      const orig = origConsole[level] || origConsole.log;
+      if (orig) guardedApply(orig, console, callArgs, "log." + level);
 
-    //   // Store entry
-    //   pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
-    // };
+      // Store entry
+      pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
+    };
 
     // ===== 5) Uncaught errors + unhandled rejections (consistent, no logError) =====
 
@@ -486,5 +493,17 @@ const LOGGingModule = function LOGGingModule() {
       } catch (_) {}
     };
 
-  }
+  
+
+  // after all logger globals are assigned:
+  Object.defineProperty(window, "_myDebugLog", { value: window._myDebugLog, writable:true, configurable:true, enumerable:false });
+  Object.defineProperty(window, "_logLevel",   { value: window._logLevel,   writable:true, configurable:true, enumerable:false });
+  Object.defineProperty(window, "_logConfig",  { value: window._logConfig,  writable:true, configurable:true, enumerable:false });
+  Object.defineProperty(window, "log",         { value: window.log,         writable:false, configurable:true, enumerable:false });
+  Object.defineProperty(window, "exportMyDebugLog", { value: window.exportMyDebugLog, writable:false, configurable:true, enumerable:false });
+  // и т.д. для DEBUG_ALL_*
+}
+
+
+
 }
