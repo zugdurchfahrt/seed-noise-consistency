@@ -20,11 +20,9 @@ const LOGGingModule = function LOGGingModule() {
       typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
 
     window.env = window.env || {};
-    // window.env.DEBUG_DEGRADES = true;   // включить
-    window.env.DEBUG_DEGRADES = false; // выключить
+    window.env.DEBUG_DEGRADES = true;   // включить
+    // window.env.DEBUG_DEGRADES = false; // выключить
     const env = window.env;
-
-
 
 
     // Save original console methods
@@ -39,7 +37,12 @@ const LOGGingModule = function LOGGingModule() {
 
     function getLoggerGuard() {
       if (!G.__LOGGER_GUARD__) {
-        G.__LOGGER_GUARD__ = { count: 0, last: null, lastAt: null };
+        Object.defineProperty(G, "__LOGGER_GUARD__", {
+          value: { count: 0, last: null, lastAt: null },
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
       }
       return G.__LOGGER_GUARD__;
     }
@@ -182,6 +185,10 @@ const LOGGingModule = function LOGGingModule() {
         // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
         // иначе рекурсия по пути ошибок (само-логирование логгера).
         // (если очень надо сигналить — делай это через origConsole.* или просто молчи)
+        if (env && env.DEBUG_DEGRADES) {
+          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          throw e;
+        }
       }
     }
 
@@ -189,7 +196,10 @@ const LOGGingModule = function LOGGingModule() {
     // ===== 2.5) Swallowed/degrade marker (explicit) =====
     G.__DEGRADE__ = function (code, err, extra) {
       try {
-        if (typeof pushEntry !== "function") return;
+        if (typeof pushEntry !== "function") {
+          if (env && env.DEBUG_DEGRADES) throw new TypeError();
+          return;
+        }
         pushEntry({
           type: "degrade",
           code: code ? String(code) : "unknown",
@@ -201,7 +211,14 @@ const LOGGingModule = function LOGGingModule() {
           extra: extra ? normalizeForJSON(extra) : null,
           timestamp: new Date().toISOString(),
         });
-      } catch (_) {}
+        } catch (e) {
+        if (env && env.DEBUG_DEGRADES) {
+            if (origConsole && origConsole.error) {
+            try { origConsole.error(e); } catch (_) {}
+            }
+            throw e;
+        }
+        }
     };
     global.__DEGRADE__ = G.__DEGRADE__;
 
@@ -250,15 +267,13 @@ const LOGGingModule = function LOGGingModule() {
 
         pushEntry(e); // <-- обязательно вернуть
       } catch (e) {
-        if (env && env.DEBUG_DEGRADES && origConsole && origConsole.error) {
-          try { origConsole.error(e); } catch (_) {}
+        if (env && env.DEBUG_DEGRADES) {
+          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("pushLog", e);
+          throw e;
         }
       }
     }
-
-
-
-
 
     // ===== 3) Patch console.* (single source of truth) =====
     for (const level of LOG_LEVELS) {
@@ -334,10 +349,22 @@ const LOGGingModule = function LOGGingModule() {
           timestamp: new Date().toISOString(),
         });
       } catch (e) {
-        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:onerror:record_failed", e);
+        if (env && env.DEBUG_DEGRADES) {
+          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("onerror", e);
+          throw e;
+        }
       }
       return false; // do not swallow (DevTools still shows it)
     };
+
+
+
+
+
+
+
+
 
     // 5.2 resource errors (capture=true catches <script src> load fails etc.)
     global.addEventListener(
@@ -358,7 +385,11 @@ const LOGGingModule = function LOGGingModule() {
             timestamp: new Date().toISOString(),
           });
         } catch (e) {
-          if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:resource_error:record_failed", e);
+          if (env && env.DEBUG_DEGRADES) {
+            if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+            if (typeof __DEGRADE__ === "function") __DEGRADE__("resource_error", e);
+            throw e;
+          }
         }
       },
       true
@@ -376,7 +407,11 @@ const LOGGingModule = function LOGGingModule() {
           timestamp: new Date().toISOString(),
         });
       } catch (e) {
-        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:unhandledrejection:record_failed", e);
+        if (env && env.DEBUG_DEGRADES) {
+          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("unhandledrejection", e);
+          throw e;
+        }
       }
     });
 
@@ -400,7 +435,11 @@ const LOGGingModule = function LOGGingModule() {
               timestamp: new Date().toISOString(),
             });
           } catch (e) {
-            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:worker_error:record_failed", e);
+            if (env && env.DEBUG_DEGRADES) {
+              if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+              if (typeof __DEGRADE__ === "function") __DEGRADE__("worker_error", e);
+              throw e;
+            }
           }
         });
 
@@ -415,12 +454,20 @@ const LOGGingModule = function LOGGingModule() {
               timestamp: new Date().toISOString(),
             });
           } catch (e) {
-            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:worker_unhandledrejection:record_failed", e);
+            if (env && env.DEBUG_DEGRADES) {
+              if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+              if (typeof __DEGRADE__ === "function") __DEGRADE__("worker_unhandledrejection", e);
+              throw e;
+            }
           }
         });
       }
     } catch (e) {
-      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:worker_context:init_failed", e);
+      if (env && env.DEBUG_DEGRADES) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("worker_context", e);
+        throw e;
+      }
     }
 
     // ===== 6) Export helper (in-session) =====
@@ -438,16 +485,28 @@ const LOGGingModule = function LOGGingModule() {
           try {
             document.body.removeChild(a);
           } catch (e) {
-            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:export_log:remove_link_failed", e);
+            if (env && env.DEBUG_DEGRADES) {
+              if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+              if (typeof __DEGRADE__ === "function") __DEGRADE__("exportMyDebugLog", e);
+              throw e;
+            }
           }
           try {
             URL.revokeObjectURL(url);
           } catch (e) {
-            if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:export_log:revoke_url_failed", e);
+            if (env && env.DEBUG_DEGRADES) {
+              if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+              if (typeof __DEGRADE__ === "function") __DEGRADE__("exportMyDebugLog", e);
+              throw e;
+            }
           }
         }, 5500);
       } catch (e) {
-        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES) __DEGRADE__("set_log.js:export_log:export_failed", e);
+        if (env && env.DEBUG_DEGRADES) {
+          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("exportMyDebugLog", e);
+          throw e;
+        }
       }
     };
 
@@ -468,7 +527,13 @@ const LOGGingModule = function LOGGingModule() {
         if (typeof global.__DEGRADE__ === "function") {
           global.__DEGRADE__("DEBUG_ALL_ON", null);
         }
-      } catch (_) {}
+      } catch (e) {
+        if (env && env.DEBUG_DEGRADES) {
+          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("DEBUG_ALL_ON", e);
+          throw e;
+        }
+      }
     };
 
     global.DEBUG_ALL_OFF = function () {
@@ -483,27 +548,43 @@ const LOGGingModule = function LOGGingModule() {
         if (typeof global.__DEGRADE__ === "function") {
           global.__DEGRADE__("DEBUG_ALL_OFF", null);
         }
-      } catch (_) {}
+      } catch (e) {
+        if (env && env.DEBUG_DEGRADES) {
+          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("DEBUG_ALL_OFF", e);
+          throw e;
+        }
+      }
     };
 
     global.DEBUG_ALL_TOGGLE = function () {
       try {
         if (global.__DEBUG__) global.DEBUG_ALL_OFF();
         else global.DEBUG_ALL_ON();
-      } catch (_) {}
+      } catch (e) {
+        if (env && env.DEBUG_DEGRADES) {
+          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("DEBUG_ALL_TOGGLE", e);
+          throw e;
+        }
+      }
     };
 
   
 
-  // after all logger globals are assigned:
-  Object.defineProperty(window, "_myDebugLog", { value: window._myDebugLog, writable:true, configurable:true, enumerable:false });
-  Object.defineProperty(window, "_logLevel",   { value: window._logLevel,   writable:true, configurable:true, enumerable:false });
-  Object.defineProperty(window, "_logConfig",  { value: window._logConfig,  writable:true, configurable:true, enumerable:false });
-  Object.defineProperty(window, "log",         { value: window.log,         writable:false, configurable:true, enumerable:false });
-  Object.defineProperty(window, "exportMyDebugLog", { value: window.exportMyDebugLog, writable:false, configurable:true, enumerable:false });
-  // и т.д. для DEBUG_ALL_*
-}
+      // after all logger globals are assigned:
+      Object.defineProperty(window, "_myDebugLog", { value: window._myDebugLog, writable:true, configurable:true, enumerable:false });
+      Object.defineProperty(window, "_logLevel",   { value: window._logLevel,   writable:true, configurable:true, enumerable:false });
+      Object.defineProperty(window, "_logConfig",  { value: window._logConfig,  writable:true, configurable:true, enumerable:false });
+      Object.defineProperty(window, "__DEBUG__",   { value: window.__DEBUG__,   writable:true, configurable:true, enumerable:false });
+      Object.defineProperty(window, "__DEGRADE__", { value: window.__DEGRADE__, writable:false, configurable:true, enumerable:false });
+      Object.defineProperty(window, "log",         { value: window.log,         writable:false, configurable:true, enumerable:false });
+      Object.defineProperty(window, "exportMyDebugLog", { value: window.exportMyDebugLog, writable:false, configurable:true, enumerable:false });
+      Object.defineProperty(window, "DEBUG_ALL_ON",     { value: window.DEBUG_ALL_ON,     writable:false, configurable:true, enumerable:false });
+      Object.defineProperty(window, "DEBUG_ALL_OFF",    { value: window.DEBUG_ALL_OFF,    writable:false, configurable:true, enumerable:false });
+      Object.defineProperty(window, "DEBUG_ALL_TOGGLE", { value: window.DEBUG_ALL_TOGGLE, writable:false, configurable:true, enumerable:false });
 
 
+    }
 
 }
