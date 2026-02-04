@@ -11,7 +11,7 @@ const LOGGingModule = function LOGGingModule() {
       {};
 
     // ===== 0) Central store: ONLY window._myDebugLo  =====
-    global._myDebugLog = global._myDebugLog || [];
+    if (!Array.isArray(global._myDebugLog)) global._myDebugLog = [];
     G._myDebugLog = global._myDebugLog;
 
     // Debug flag (respect false)

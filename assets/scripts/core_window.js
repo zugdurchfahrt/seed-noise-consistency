@@ -63,7 +63,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
   function ensureMarkAsNative() {
     const existing = (typeof window.markAsNative === 'function') ? window.markAsNative : null;
     if (!existing) {
-      baseMarkAsNative.__TOSTRING_BRIDGE__ = true;
+      Object.defineProperty(baseMarkAsNative, '__TOSTRING_BRIDGE__', {
+        value: true,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
       safeDefine(window, 'markAsNative', {
         value: baseMarkAsNative,
         writable: true,
@@ -77,7 +82,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const out = existing(func, name);
       return baseMarkAsNative(out, name);
     };
-    wrapped.__TOSTRING_BRIDGE__ = true;
+    Object.defineProperty(wrapped, '__TOSTRING_BRIDGE__', {
+      value: true,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
     safeDefine(window, 'markAsNative', {
       value: wrapped,
       writable: true,
@@ -115,7 +125,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         return nativeApply.call(nativeToString, this, arguments);
       }}).toString;
 
-      toString.__TOSTRING_BRIDGE__ = true;
+      Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
+        value: true,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
       const markAsNative = ensureMarkAsNative();
       markAsNative(toString, 'toString');
 

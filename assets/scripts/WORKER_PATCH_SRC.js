@@ -89,16 +89,12 @@
         return Reflect.apply(nativeToString, this, arguments);
       }}).toString;
 
-      try {
-        Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
-          value: true,
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
-      } catch (_) {
-        toString.__TOSTRING_BRIDGE__ = true;
-      }
+      Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
+        value: true,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
       markAsNative(toString, 'toString');
 
       Object.defineProperty(Function.prototype, 'toString', {
@@ -500,7 +496,12 @@
         writable: dWorker.writable,
         value: WrappedWorker
       });
-      self.Worker.__ENV_WRAPPED__ = true;
+      Object.defineProperty(self.Worker, '__ENV_WRAPPED__', {
+        value: true,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
     }
     self.__SCOPE_CONSISTENCY_PATCHED__ = true;
 
