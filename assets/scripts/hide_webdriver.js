@@ -3,7 +3,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   if (window) window.__HIDE_WEBDRIVER_READY__ = true
 
   const C = window.CanvasPatchContext;
-      if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
+      if (!C) throw new Error('[HideWebdriverPatchModule] CanvasPatchContext is undefined — module registration is not available');
   const G = (typeof globalThis !== 'undefined' && globalThis)
         || (typeof self       !== 'undefined' && self)
         || (typeof window     !== 'undefined' && window)
@@ -98,26 +98,19 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   // one wrapper factory
   function wrapNative(name, nativeFn, implFn) {
-    function wrapped() {
-      return implFn.apply(this, arguments);
+    const wrap = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
+    if (typeof wrap !== 'function') {
+      throw new Error('[HideWebdriverPatchModule] __wrapNativeApply missing');
     }
-
-    markAsNative(wrapped, name);
-
-    const lenDesc = nativeGetOwnProp(wrapped, 'length');
-    if (lenDesc && lenDesc.configurable) {
-      try { Object.defineProperty(wrapped, 'length', { value: nativeFn.length }); } catch (e) {
-        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:length_define_failed", e);
-      }
+    if (typeof nativeFn !== 'function') {
+      throw new TypeError('[HideWebdriverPatchModule] wrapNative: nativeFn must be function');
     }
-    const nameDesc = nativeGetOwnProp(wrapped, 'name');
-    if (nameDesc && nameDesc.configurable) {
-      try { Object.defineProperty(wrapped, 'name', { value: name }); } catch (e) {
-        if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:wrapNative:name_define_failed", e);
-      }
+    if (typeof implFn !== 'function') {
+      throw new TypeError('[HideWebdriverPatchModule] wrapNative: implFn must be function');
     }
-
-    return wrapped;
+    return wrap(nativeFn, name, function(_nativeFn, thisArg, args) {
+      return implFn.apply(thisArg, args);
+    });
   }
 
   // --- apply patches ---

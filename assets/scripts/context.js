@@ -493,18 +493,34 @@ const ContextPatchModule = function ContextPatchModule(window) {
           ctx = createSafeCtxProxy(ctx);
           // call hight level hooks
           for (const hook of (ctx2dHooks || [])){
-            try { ctx = hook.call(this, ctx, type, ...rest) || ctx; } catch {}
+            try { ctx = hook.call(this, ctx, type, ...rest) || ctx; } catch (e) {
+              if (typeof global.__DEGRADE__ === 'function') {
+                try { global.__DEGRADE__('context:getContext:ctx2d_hook_failed', e, { hook: hook && (hook.name || null), type: type || null }); } catch (_e) {}
+              }
+            }
           }
         }
         if (/^webgl/.test(String(type))){
           for (const hook of (webglHooks || [])){
-            try { hook.call(this, ctx, type, ...rest); } catch {}
+            try { hook.call(this, ctx, type, ...rest); } catch (e) {
+              if (typeof global.__DEGRADE__ === 'function') {
+                try { global.__DEGRADE__('context:getContext:webgl_hook_failed', e, { hook: hook && (hook.name || null), type: type || null }); } catch (_e) {}
+              }
+            }
           }
         }
         for (const hook of (htmlHooks || [])){
-          try { hook.call(this, ctx, type, ...rest); } catch {}
+          try { hook.call(this, ctx, type, ...rest); } catch (e) {
+            if (typeof global.__DEGRADE__ === 'function') {
+              try { global.__DEGRADE__('context:getContext:html_hook_failed', e, { hook: hook && (hook.name || null), type: type || null }); } catch (_e) {}
+            }
+          }
         }
-      } catch {}
+      } catch (e) {
+        if (typeof global.__DEGRADE__ === 'function') {
+          try { global.__DEGRADE__('context:getContext:chain_failed', e, { type: type || null }); } catch (_e) {}
+        }
+      }
 
       return ctx;
     } }).getContext;

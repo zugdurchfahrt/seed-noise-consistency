@@ -76,11 +76,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
     ? existingToString.__NativeToStringMap
     : null;
   const toStringOverrideMap = existingToStringMap || new WeakMap();
+  const toStringProxyTargetMap = new WeakMap();
 
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
     try {
+      // If a Proxy created by __wrapNativeApply is passed here by mistake,
+      // redirect masking to the stable native target reference.
+      const t = toStringProxyTargetMap.get(func);
+      if (t) func = t;
       const n = name || func.name || "";
       const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
       toStringOverrideMap.set(func, label);
@@ -123,6 +128,68 @@ const CoreWindowModule = function CoreWindowModule(window) {
     });
   }
 
+  // --- centralized native-shaped wrappers (Proxy/apply) ---
+  function __requireMarkAsNative() {
+    const ensure = (window && typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
+    const m = ensure ? ensure() : null;
+    if (typeof m !== 'function') {
+      throw new Error('[CoreWindow] markAsNative missing');
+    }
+    return m;
+  }
+
+  function __wrapNativeApply(nativeFn, name, applyImpl) {
+    if (typeof nativeFn !== 'function') {
+      throw new TypeError('[CoreWindow] __wrapNativeApply: nativeFn must be function');
+    }
+    if (typeof applyImpl !== 'function') {
+      throw new TypeError('[CoreWindow] __wrapNativeApply: applyImpl must be function');
+    }
+    // Use Proxy(nativeFn,{apply}) so name/length/prototype-shape come from nativeFn.
+    const wrapped = new Proxy(nativeFn, {
+      apply(target, thisArg, argList) {
+        return applyImpl(target, thisArg, argList);
+      }
+    });
+    const markAsNative = __requireMarkAsNative();
+    try {
+      // Methodology: key the stable original reference; Proxy is only an outward wrapper.
+      toStringProxyTargetMap.set(wrapped, nativeFn);
+      markAsNative(nativeFn, name || nativeFn.name || "");
+    } catch (e) {
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:wrapNativeApply:mark_failed", e);
+      throw e;
+    }
+    return wrapped;
+  }
+
+  function __wrapNativeAccessor(origGetOrSet, name, applyImpl) {
+    if (typeof origGetOrSet !== 'function') {
+      throw new TypeError('[CoreWindow] __wrapNativeAccessor: origGetOrSet must be function');
+    }
+    if (typeof applyImpl !== 'function') {
+      throw new TypeError('[CoreWindow] __wrapNativeAccessor: applyImpl must be function');
+    }
+    return __wrapNativeApply(origGetOrSet, name, applyImpl);
+  }
+
+  if (typeof window.__wrapNativeApply !== 'function') {
+    safeDefine(window, '__wrapNativeApply', {
+      value: __wrapNativeApply,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (typeof window.__wrapNativeAccessor !== 'function') {
+    safeDefine(window, '__wrapNativeAccessor', {
+      value: __wrapNativeAccessor,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+
 
   {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
@@ -158,6 +225,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         const v = toStringOverrideMap.get(this);
         if (v !== undefined) return v;
+        // Proxy-wrapped native: resolve by stable target reference.
+        const t = toStringProxyTargetMap.get(this);
+        if (t) {
+          const tv = toStringOverrideMap.get(t);
+          if (tv !== undefined) return tv;
+        }
         return nativeToString.call(this);
       }}).toString;
 
@@ -167,19 +240,19 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      safeDefine(toString, '__NativeToString', {
+      Object.defineProperty(toString, '__NativeToString', {
         value: nativeToString,
         writable: false,
         configurable: true,
         enumerable: false
       });
-      safeDefine(toString, '__NativeToStringMap', {
+      Object.defineProperty(toString, '__NativeToStringMap', {
         value: toStringOverrideMap,
         writable: false,
         configurable: true,
         enumerable: false
       });
-      safeDefine(toString, '__TOSTRING_PROXY_INSTALLED__', {
+      Object.defineProperty(toString, '__TOSTRING_PROXY_INSTALLED__', {
         value: true,
         writable: false,
         configurable: true,

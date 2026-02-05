@@ -65,7 +65,17 @@
       if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_missing", e);
       throw e;
     }
-    self.__GLOBAL_SEED = seedInit;
+    // Seed must be obtained once and then treated as immutable within session; hide it from enumeration.
+    try {
+      Object.defineProperty(self, '__GLOBAL_SEED', {
+        value: seedInit,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    } catch (_) {
+      self.__GLOBAL_SEED = seedInit;
+    }
     // --- seed __ensureMarkAsNative must exist (delivered by bootstrap) ---
     const seedEnsureDesc = Object.getOwnPropertyDescriptor(self, '__ensureMarkAsNative');
     const seedEnsure = (seedEnsureDesc && typeof seedEnsureDesc.value === 'function')
@@ -168,12 +178,26 @@
         enumerable: false
       });
     }
-    Object.defineProperty(existingToString, '__GLOBAL_SEED__', {
-      value: String(self.__GLOBAL_SEED),
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
+    // Seed is immutable within a session; keep it pinned to the bridged toString for diagnostics (non-enum).
+    try {
+      const sd = Object.getOwnPropertyDescriptor(existingToString, '__GLOBAL_SEED__');
+      const sv = (sd && Object.prototype.hasOwnProperty.call(sd, 'value')) ? sd.value : undefined;
+      const seedStr = String(self.__GLOBAL_SEED);
+      if (sv !== undefined && String(sv) !== seedStr) {
+        throw new Error('UACHPatch: __GLOBAL_SEED__ mismatch');
+      }
+      if (!sd || sd.configurable !== false) {
+        Object.defineProperty(existingToString, '__GLOBAL_SEED__', {
+          value: seedStr,
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      }
+    } catch (e) {
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_pin_failed", e);
+      throw e;
+    }
 
     markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
 
@@ -533,40 +557,44 @@
       const prevSeed = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
       const nextSeed = (s && s.seed != null) ? String(s.seed) : null;
       cache.snap = requireSnap(s, 'apply');
-      if (nextSeed != null) {
-        self.__GLOBAL_SEED = nextSeed;
+      // Paradigm: seed is immutable within session. If an external snapshot ever tries to change it — fail-fast.
+      if (prevSeed != null && nextSeed != null && prevSeed !== nextSeed) {
+        throw new Error('UACHPatch: seed mutation is not allowed');
+      }
+      // In case seed was not pinned yet (should not happen), allow setting it once from snapshot.
+      if (prevSeed == null && nextSeed != null) {
         try {
-          const td = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');
-          const ts = td && td.value;
-          if (ts && ts.__TOSTRING_BRIDGE__) {
-            Object.defineProperty(ts, '__GLOBAL_SEED__', {
-              value: String(nextSeed),
-              writable: false,
-              configurable: true,
-              enumerable: false
-            });
-          }
-        } catch (e) {
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_sync_failed", e);
-          throw e;
+          Object.defineProperty(self, '__GLOBAL_SEED', {
+            value: nextSeed,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        } catch (_) {
+          self.__GLOBAL_SEED = nextSeed;
         }
       }
-      if (prevSeed != null && nextSeed != null && prevSeed !== nextSeed) {
-        const jit = (typeof globalThis !== 'undefined' && globalThis.__JIT_CACHE__ instanceof Map)
-          ? globalThis.__JIT_CACHE__
-          : (self.__JIT_CACHE__ instanceof Map ? self.__JIT_CACHE__ : null);
-        if (jit && typeof jit.clear === 'function') jit.clear();
-        const C = (typeof globalThis !== 'undefined' && globalThis.CanvasPatchContext)
-          ? globalThis.CanvasPatchContext
-          : (self.CanvasPatchContext || null);
-        if (C && C.__TextMetrics__ && C.__TextMetrics__.cache && typeof C.__TextMetrics__.cache.clear === 'function') {
-          C.__TextMetrics__.cache.clear();
-        }
+      if (self.__GLOBAL_SEED == null || String(self.__GLOBAL_SEED) === '') {
+        throw new Error('UACHPatch: __GLOBAL_SEED missing');
       }
       if (typeof prev==='function') prev.call(self,s);
     };
     cache.snap = requireSnap(self.__lastSnap__, 'bootstrap');
-    if (self.__lastSnap__ && self.__lastSnap__.seed != null) self.__GLOBAL_SEED = String(self.__lastSnap__.seed);
+    if (self.__lastSnap__ && self.__lastSnap__.seed != null) {
+      const s0 = String(self.__lastSnap__.seed);
+      const cur0 = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
+      if (cur0 != null && cur0 !== s0) throw new Error('UACHPatch: seed mutation is not allowed');
+      try {
+        Object.defineProperty(self, '__GLOBAL_SEED', {
+          value: s0,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      } catch (_) {
+        self.__GLOBAL_SEED = s0;
+      }
+    }
     if (!self.__ENV_SYNC_BC_INSTALLED__) {
       if (typeof BroadcastChannel !== 'function') {
         throw new Error('UACHPatch: BroadcastChannel missing');

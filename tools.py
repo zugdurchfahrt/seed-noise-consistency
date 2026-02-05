@@ -280,8 +280,15 @@ def build_expected_client_hints(profile, generated_platform, browser_brand, majo
         "formFactors": ["Desktop"],
         "accept": generate_accept_header(browser_brand, major_version),
     }
-    return res
 
+    uaf = res.get('uaFullVersion')
+    if not isinstance(uaf, str) or not uaf.strip():
+        raise ValueError('build_expected_client_hints: bad uaFullVersion: %r' % (uaf,))
+    fvl = res.get('fullVersionList')
+    if not isinstance(fvl, list) or not fvl:
+        raise ValueError('build_expected_client_hints: bad fullVersionList: %r' % (fvl,))
+
+    return res
 # =====  Building browser brand/version lists and corresponding header strings=====
 def build_brands_and_related(browser_brand, major_version, browser_version):
     """

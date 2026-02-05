@@ -96,6 +96,9 @@ function EnvBus(G){
       if (!(k in heSource)) throw new Error(`EnvBus: high entropy missing ${k}`);
       const v = heSource[k];
       if (v === undefined || v === null) throw new Error(`EnvBus: high entropy bad ${k}`);
+      if (typeof v === 'string' && !v.trim() && k !== 'model') {
+        throw new Error(`EnvBus: high entropy bad ${k}`);
+      }
       if (k === 'fullVersionList' && !Array.isArray(v)) {
         throw new Error('EnvBus: high entropy bad fullVersionList');
       }
@@ -880,10 +883,9 @@ function SafeWorkerOverride(G){
       || typeof bridge.mkModuleWorkerSource !== 'function'
       || typeof bridge.publishSnapshot !== 'function'
       || typeof bridge.envSnapshot !== 'function') {
-    // Safe fallback: do not break the page if the bridge isn't ready yet.
-    // Observability: this shows up in set_log.js console capture.
-    try { console.warn('[WorkerOverride] PATCH_SKIPPED: __ENV_BRIDGE__ not ready; creating native Worker'); } catch(_){}
-    return new NativeWorker(url, opts);
+    const e = new Error('[WorkerOverride] FAIL_FAST: __ENV_BRIDGE__ not ready');
+    if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:worker_override_bridge_not_ready', e);
+    throw e;
   }
   const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
   G.__lastSnap__ = snap;
@@ -1348,8 +1350,25 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
+    const meta = G.__EXPECTED_CLIENT_HINTS;
+    if (meta && typeof meta === 'object') {
+      const he = {};
+      for (const k of KEYS) {
+        if (!(k in meta)) throw new Error(`[WorkerInit] high entropy missing ${k}`);
+        const v = meta[k];
+        if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+        if (typeof v === 'string' && !v.trim() && k !== 'model') throw new Error(`[WorkerInit] high entropy bad ${k}`);
+        if (k === 'fullVersionList' && !Array.isArray(v)) throw new Error('[WorkerInit] high entropy bad fullVersionList');
+        if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+        he[k] = v;
+      }
+      G.__LAST_UACH_HE__ = he;
+      G.__UACH_HE_READY__ = true;
+      const p = Promise.resolve(he);
+      G.__UACH_HE_PROMISE__ = p;
+      return p;
+    }
     if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
-      const meta = G.__EXPECTED_CLIENT_HINTS;
       if (!meta || typeof meta !== 'object') {
         throw new Error('[WorkerInit] userAgentData missing');
       }
@@ -1422,6 +1441,39 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
   window.WorkerPatchHooks = G.WorkerPatchHooks;
   if (G.__DEBUG__) {
     console.info('[WorkerInit] WorkerPatchHooks ready');
+  }
+
+  // reduce visibility of pipeline globals in Window realm (non-enumerable)
+  try {
+    const win = G;
+    if (win && (typeof win === 'object' || typeof win === 'function')) {
+      const keys = [
+        '__ENV_BRIDGE__',
+        '__ENV_HUB__',
+        'CanvasPatchContext',
+        '__TOSTRING_BRIDGE__',
+        '__TOSTRING_PROXY_INSTALLED__',
+        '__NativeToStringMap',
+        'toStringOverrideMap'
+      ];
+      for (const k of keys) {
+        if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
+        const d = Object.getOwnPropertyDescriptor(win, k);
+        if (!d || d.enumerable === false) continue;
+        if (d.configurable === false) {
+          const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
+          if (typeof win.__DEGRADE__ === 'function') win.__DEGRADE__('wrk:hide_pipeline_surface_nonconfigurable', e);
+          continue;
+        }
+        if ('value' in d) {
+          Object.defineProperty(win, k, { value: win[k], writable: !!d.writable, configurable: !!d.configurable, enumerable: false });
+        } else {
+          Object.defineProperty(win, k, { get: d.get, set: d.set, configurable: !!d.configurable, enumerable: false });
+        }
+      }
+    }
+  } catch (e) {
+    if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:hide_pipeline_surface_failed', e);
   }
 
 

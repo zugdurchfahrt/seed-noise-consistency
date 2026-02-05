@@ -18,6 +18,11 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   if (typeof markAsNative !== 'function') {
     throw new Error('[RtcpeerconnectionPatchModule] markAsNative missing');
   }
+  const wrapApply = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
+  const wrapAcc = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
+  if (typeof wrapApply !== 'function' || typeof wrapAcc !== 'function') {
+    throw new Error('[RTC] Core wrap primitives missing - core_window.js failed?');
+  }
 
 
   function tryCopyNameLength(wrapped, nativeFn, name) {
@@ -94,72 +99,82 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const origAddEventListener = Orig.prototype.addEventListener;
 
   // --- patch prototype methods (native invariants preserved)
-  const patchedCreateOffer = function createOffer(...args) {
-    const p = origCreateOffer.apply(this, args);
+  const patchedCreateOffer = wrapApply(origCreateOffer, 'createOffer', function(nativeFn, thisArg, args) {
+    const p = Reflect.apply(nativeFn, thisArg, args);
     return p.then(function(desc) {
-      if (desc && desc.sdp) {
-        desc.sdp = desc.sdp
-          .split('\n')
-          .filter(l => !l.startsWith('a=candidate') || l.includes('relay'))
-          .join('\n');
-      }
+      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
       return desc;
     });
-  };
-  markAsNative(patchedCreateOffer, 'createOffer');
-  tryCopyNameLength(patchedCreateOffer, origCreateOffer, 'createOffer');
+  });
   Orig.prototype.createOffer = patchedCreateOffer;
 
-  const patchedCreateAnswer = function createAnswer(...args) {
-    const p = origCreateAnswer.apply(this, args);
+  const patchedCreateAnswer = wrapApply(origCreateAnswer, 'createAnswer', function(nativeFn, thisArg, args) {
+    const p = Reflect.apply(nativeFn, thisArg, args);
     return p.then(function(desc) {
-      if (desc && desc.sdp) {
-        desc.sdp = desc.sdp
-          .split('\n')
-          .filter(l => !l.startsWith('a=candidate') || l.includes('relay'))
-          .join('\n');
-      }
+      if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
       return desc;
     });
-  };
-  markAsNative(patchedCreateAnswer, 'createAnswer');
-  tryCopyNameLength(patchedCreateAnswer, origCreateAnswer, 'createAnswer');
+  });
   Orig.prototype.createAnswer = patchedCreateAnswer;
 
-  const patchedSetLocalDescription = function setLocalDescription(desc, ...rest) {
+  const patchedSetLocalDescription = wrapApply(origSetLocalDescription, 'setLocalDescription', function(nativeFn, thisArg, args) {
+    const desc = args && args.length ? args[0] : undefined;
     if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
-    return origSetLocalDescription.call(this, desc, ...rest);
-  };
-  markAsNative(patchedSetLocalDescription, 'setLocalDescription');
-  tryCopyNameLength(patchedSetLocalDescription, origSetLocalDescription, 'setLocalDescription');
+    return Reflect.apply(nativeFn, thisArg, args);
+  });
   Orig.prototype.setLocalDescription = patchedSetLocalDescription;
 
-  const patchedAddIceCandidate = function addIceCandidate(candidate, ...rest) {
+  const patchedAddIceCandidate = wrapApply(origAddIceCandidate, 'addIceCandidate', function(nativeFn, thisArg, args) {
+    const candidate = args && args.length ? args[0] : undefined;
     if (candidate && candidate.candidate && !candidate.candidate.includes('relay')) {
       return Promise.resolve();
     }
-    return origAddIceCandidate.call(this, candidate, ...rest);
-  };
-  markAsNative(patchedAddIceCandidate, 'addIceCandidate');
-  tryCopyNameLength(patchedAddIceCandidate, origAddIceCandidate, 'addIceCandidate');
+    return Reflect.apply(nativeFn, thisArg, args);
+  });
   Orig.prototype.addIceCandidate = patchedAddIceCandidate;
 
   // --- onicecandidate accessor (prototype-level)
   try {
     const d = Object.getOwnPropertyDescriptor(Orig.prototype, 'onicecandidate');
-    if (!d || d.configurable) {
-      Object.defineProperty(Orig.prototype, 'onicecandidate', {
-        set(handler) {
-          this._onicecandidate = e => {
-            if (!e.candidate || (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))) {
-              handler && handler.call(this, e);
+    if (d && d.configurable === false) {
+      // cannot redefine
+    } else if (d && (typeof d.get === 'function' || typeof d.set === 'function')) {
+      const handlerMap = (typeof WeakMap === 'function') ? new WeakMap() : null;
+      const origGet = d.get;
+      const origSet = d.set;
+
+      const get = (typeof origGet === 'function')
+        ? wrapAcc(origGet, 'get onicecandidate', function(nativeGet, thisArg, args) {
+            if (handlerMap && handlerMap.has(thisArg)) {
+              const rec = handlerMap.get(thisArg);
+              if (rec && Object.prototype.hasOwnProperty.call(rec, 'orig')) return rec.orig;
             }
-          };
-        },
-        get() {
-          return this._onicecandidate;
-        },
+            return Reflect.apply(nativeGet, thisArg, args);
+          })
+        : undefined;
+
+      const set = (typeof origSet === 'function')
+        ? wrapAcc(origSet, 'set onicecandidate', function(nativeSet, thisArg, args) {
+            const handler = args && args.length ? args[0] : undefined;
+            if (typeof handler !== 'function') {
+              if (handlerMap) handlerMap.set(thisArg, { orig: handler, wrapped: handler });
+              return Reflect.apply(nativeSet, thisArg, args);
+            }
+            const wrapped = function(e) {
+              if (!e || !e.candidate || (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))) {
+                return handler.call(this, e);
+              }
+            };
+            if (handlerMap) handlerMap.set(thisArg, { orig: handler, wrapped });
+            return Reflect.apply(nativeSet, thisArg, [wrapped]);
+          })
+        : undefined;
+
+      Object.defineProperty(Orig.prototype, 'onicecandidate', {
+        get,
+        set,
         configurable: true,
+        enumerable: d ? !!d.enumerable : false
       });
     }
   } catch (_) {
@@ -167,21 +182,21 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   // --- filter icecandidate listeners
-  const patchedAddEventListener = function addEventListener(type, handler, options) {
+  const patchedAddEventListener = wrapApply(origAddEventListener, 'addEventListener', function(nativeFn, thisArg, args) {
+    const type = args && args.length ? args[0] : undefined;
+    const handler = args && args.length > 1 ? args[1] : undefined;
+    const options = args && args.length > 2 ? args[2] : undefined;
     if (type === 'icecandidate' && typeof handler === 'function') {
-      const wrapped = e => {
-        if (!e.candidate || (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))) {
-          handler.call(this, e);
-        } else {
-          e.stopImmediatePropagation && e.stopImmediatePropagation();
+      const wrapped = function(e) {
+        if (!e || !e.candidate || (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))) {
+          return handler.call(this, e);
         }
+        if (e && typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
       };
-      return origAddEventListener.call(this, type, wrapped, options);
+      return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
     }
-    return origAddEventListener.call(this, type, handler, options);
-  };
-  markAsNative(patchedAddEventListener, 'addEventListener');
-  tryCopyNameLength(patchedAddEventListener, origAddEventListener, 'addEventListener');
+    return Reflect.apply(nativeFn, thisArg, args);
+  });
   Orig.prototype.addEventListener = patchedAddEventListener;
 
 

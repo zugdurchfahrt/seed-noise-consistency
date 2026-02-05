@@ -419,10 +419,7 @@ def init_driver(
     window.__GPU_ARCHITECTURE__         = {json.dumps(gpu_architecture, ensure_ascii=False)};
     window.__GPU_VENDOR__               = {json.dumps(gpu_vendor, ensure_ascii=False)};
     window.__DEVICES_LABELS             = {json.dumps(devices_conf, ensure_ascii=False)};
-    window.__FULL_VERSION_LIST          = {json.dumps(expected_client_hints.get('fullVersionList'), ensure_ascii=False)};
-    window.__UA_FULL_VERSION            = {json.dumps(expected_client_hints.get('uaFullVersion'), ensure_ascii=False)};
     window.__PLUGIN_PROFILES__          = {json.dumps(profile.get("plugins", []), ensure_ascii=False)};
-    window.__PLUGIN_MIMETYPES__         = {json.dumps(profile.get("mimeTypes", []), ensure_ascii=False)};
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
@@ -990,7 +987,7 @@ def main():
         generated_oscpu = profile["os_info"] if profile["platform"] == "Win32" and "firefox" in user_agent.lower() else f"Intel Mac OS X {profile['platform_version']}" if "firefox" in user_agent.lower() else None
         generated_platform_version = profile["platform_version"]
         generated_version = profile["browser_version"]
-        browser_version = profile["browser_version"]
+        # browser_version = profile["browser_version"]
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
         expected_client_hints = build_expected_client_hints(
             profile, generated_platform, browser_brand, major_version, browser_version

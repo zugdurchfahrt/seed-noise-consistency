@@ -126,7 +126,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
     // 1) предпочитаем OffscreenCanvas, если доступен
     if (typeof OffscreenCanvas !== 'undefined') {
-      try { return new OffscreenCanvas(w, h); } catch {}
+      try { return new OffscreenCanvas(w, h); } catch (e) {
+        if (typeof window.__DEGRADE__ === 'function') {
+          try { window.__DEGRADE__('canvas:makeCanvas:offscreen_ctor_failed', e); } catch (_e) {}
+        }
+      }
     }
     
     // 2) фолбэк: DOM <canvas>
@@ -267,7 +271,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (!ctx1 || !ctx2) return img;
 
     const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
-    try { ctx2.imageSmoothingEnabled = true; } catch {}
+    try { ctx2.imageSmoothingEnabled = true; } catch (e) {
+      if (typeof window.__DEGRADE__ === 'function') {
+        try { window.__DEGRADE__('canvas:imageSmoothingEnabled:set_failed', e); } catch (_e) {}
+      }
+    }
     nativePutImageData(P1, ctx1, img, 0, 0);
     nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
     nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
@@ -334,7 +342,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (!ctx1 || !ctx2) return img;
     const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
 
-    try { ctx2.imageSmoothingEnabled = true; } catch {}
+    try { ctx2.imageSmoothingEnabled = true; } catch (e) {
+      if (typeof window.__DEGRADE__ === 'function') {
+        try { window.__DEGRADE__('canvas:imageSmoothingEnabled:set_failed', e); } catch (_e) {}
+      }
+    }
     nativePutImageData(P1, ctx1, img, 0, 0);
     nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
     nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
@@ -609,7 +621,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         }
         return await new Promise(r => sc.toBlob(r, mime, q));
     } finally {
-      try { bmp && bmp.close && bmp.close(); } catch {}
+      try { bmp && bmp.close && bmp.close(); } catch (e) {
+        if (typeof window.__DEGRADE__ === 'function') {
+          try { window.__DEGRADE__('canvas:bitmap:close_failed', e); } catch (_e) {}
+        }
+      }
     }
   }
 
@@ -645,7 +661,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
             if (sc) {
               const sctx = sc.getContext('2d', { willReadFrequently: true });
               if (sctx) {
-                try { sctx.imageSmoothingEnabled = false; } catch {}
+                try { sctx.imageSmoothingEnabled = false; } catch (e) {
+                  if (typeof window.__DEGRADE__ === 'function') {
+                    try { window.__DEGRADE__('canvas:imageSmoothingEnabled:disable_failed', e); } catch (_e) {}
+                  }
+                }
                 sctx.drawImage(bmp, 0, 0);
                 const img = sctx.getImageData(0, 0, w, h);
                 const j   = __resampleWithJitter__(img, 'encode', __CNV_CFG__); // тот же label, что у toBlob/toDataURL
@@ -661,7 +681,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
           }
         }
       } finally {
-        try { bmp && bmp.close && bmp.close(); } catch {}
+        try { bmp && bmp.close && bmp.close(); } catch (e) {
+          if (typeof window.__DEGRADE__ === 'function') {
+            try { window.__DEGRADE__('canvas:bitmap:close_failed', e); } catch (_e) {}
+          }
+        }
       }
 
       // 2) Старый IHDR-путь (PNG only) — сохраняем как fallback, чтобы не ломать совместимость
