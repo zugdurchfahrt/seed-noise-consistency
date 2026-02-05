@@ -11,7 +11,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
   function safeDefine(obj, prop, descriptor) {
     try {
       if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
-      if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
       Object.defineProperty(obj, prop, descriptor);
     } catch (e) {
       console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
@@ -33,21 +32,50 @@ const CoreWindowModule = function CoreWindowModule(window) {
   // ——— Global mask "native" + general WeakMap ———
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
   const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-  const nativeToString = (fpToStringDesc && fpToStringDesc.value) || Function.prototype.toString;
-
-  const existingToStringMap = (window.__NativeToStringMap instanceof WeakMap)
-    ? window.__NativeToStringMap
+  const existingToString = fpToStringDesc && fpToStringDesc.value;
+  const existingToStringBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
+  if (existingToStringBridge) {
+    const missingNative = (typeof existingToString.__NativeToString !== 'function');
+    const missingMap = !(existingToString.__NativeToStringMap instanceof WeakMap);
+    if (missingNative || missingMap) {
+      try {
+        if (missingNative) {
+          Object.defineProperty(existingToString, '__NativeToString', {
+            value: existingToString,
+            writable: false,
+            configurable: true,
+            enumerable: false
+          });
+        }
+        if (missingMap) {
+          Object.defineProperty(existingToString, '__NativeToStringMap', {
+            value: new WeakMap(),
+            writable: false,
+            configurable: true,
+            enumerable: false
+          });
+        }
+      } catch (e) {
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_restore_failed", e);
+        throw e;
+      }
+    }
+    if (typeof existingToString.__NativeToString !== 'function' || !(existingToString.__NativeToStringMap instanceof WeakMap)) {
+      const e = new Error('[CoreWindow] toString bridge invalid');
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_invalid", e);
+      throw e;
+    }
+  }
+  const nativeToString = existingToStringBridge
+    ? existingToString.__NativeToString
+    : (existingToString || Function.prototype.toString);
+  if (typeof nativeToString !== 'function') {
+    throw new Error('[CoreWindow] Function.prototype.toString missing');
+  }
+  const existingToStringMap = existingToStringBridge
+    ? existingToString.__NativeToStringMap
     : null;
   const toStringOverrideMap = existingToStringMap || new WeakMap();
-  try {
-    if (Object.prototype.hasOwnProperty.call(window, '__NativeToString')) delete window.__NativeToString;
-  } catch (_) {}
-  try {
-    if (Object.prototype.hasOwnProperty.call(window, '__NativeToStringMap')) delete window.__NativeToStringMap;
-  } catch (_) {}
-  try {
-    if (Object.prototype.hasOwnProperty.call(window, '__TOSTRING_PROXY_INSTALLED__')) delete window.__TOSTRING_PROXY_INSTALLED__;
-  } catch (_) {}
 
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
@@ -57,47 +85,34 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
       toStringOverrideMap.set(func, label);
     } catch (e) {
-      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:baseMarkAsNative:override_set_failed", e);
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:WeakMap.set", e);
+      throw e;
     }
     return func;
   }
 
+  let memoMarkAsNative = null;
   function ensureMarkAsNative() {
-    const existing = (typeof window.markAsNative === 'function') ? window.markAsNative : null;
-    if (!existing) {
+    if (memoMarkAsNative) return memoMarkAsNative;
+    if (!baseMarkAsNative.__TOSTRING_BRIDGE__) {
       Object.defineProperty(baseMarkAsNative, '__TOSTRING_BRIDGE__', {
         value: true,
         writable: false,
         configurable: true,
         enumerable: false
       });
-      safeDefine(window, 'markAsNative', {
-        value: baseMarkAsNative,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      return baseMarkAsNative;
     }
-    if (existing.__TOSTRING_BRIDGE__) return existing;
-    const wrapped = function markAsNative(func, name = "") {
-      const out = existing(func, name);
-      return baseMarkAsNative(out, name);
-    };
-    Object.defineProperty(wrapped, '__TOSTRING_BRIDGE__', {
-      value: true,
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
-    safeDefine(window, 'markAsNative', {
-      value: wrapped,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-    return wrapped;
+    memoMarkAsNative = baseMarkAsNative;
+    return memoMarkAsNative;
   }
+
+// Global Function.prototype.toString bridge (no Proxy to avoid [as apply] frames)
+      // IMPORTANT:
+    // - preserve native brand-check semantics:
+    //   Function.prototype.toString MUST throw when receiver is not a Function
+    // - therefore NEVER return overrides for non-functions (objects/proxies/etc)
+
+
 
   if (typeof window.__ensureMarkAsNative !== 'function') {
     safeDefine(window, '__ensureMarkAsNative', {
@@ -108,15 +123,35 @@ const CoreWindowModule = function CoreWindowModule(window) {
     });
   }
 
-  // Global Function.prototype.toString bridge (no Proxy to avoid [as apply] frames)
-        // IMPORTANT:
-      // - preserve native brand-check semantics:
-      //   Function.prototype.toString MUST throw when receiver is not a Function
-      // - therefore NEVER return overrides for non-functions (objects/proxies/etc)
+
   {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const existingToString = toStringDesc && toStringDesc.value;
-    if (!existingToString || !existingToString.__TOSTRING_BRIDGE__) {
+    if (existingToString && existingToString.__TOSTRING_BRIDGE__) {
+      const markAsNative = ensureMarkAsNative();
+      const probe = function probe(){};
+      markAsNative(probe);
+      const expected = toStringOverrideMap.get(probe);
+      if (expected === undefined) {
+        const e = new Error('[CoreWindow] toString probe missing label');
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_probe_missing", e);
+        throw e;
+      }
+      const actual = existingToString.call(probe);
+      if (actual !== expected) {
+        const e = new Error('[CoreWindow] toString bridge mismatch');
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_mismatch", e);
+        throw e;
+      }
+      if (existingToString.__TOSTRING_PROXY_INSTALLED__ !== true) {
+        safeDefine(existingToString, '__TOSTRING_PROXY_INSTALLED__', {
+          value: true,
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      }
+    } else {
       const toString = ({ toString() {
         if (typeof this !== 'function') {
           return nativeToString.call(this);
@@ -127,6 +162,24 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }}).toString;
 
       Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
+        value: true,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(toString, '__NativeToString', {
+        value: nativeToString,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(toString, '__NativeToStringMap', {
+        value: toStringOverrideMap,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(toString, '__TOSTRING_PROXY_INSTALLED__', {
         value: true,
         writable: false,
         configurable: true,

@@ -1,6 +1,6 @@
 const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
   if (!window.__PATCH_NAVTOTALSET__) {
-
+ 
     const C = window.CanvasPatchContext;
       if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
     const G = (typeof globalThis !== 'undefined' && globalThis)
@@ -48,7 +48,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navLogPush = (function () {
       const logArr = Array.isArray(window._myDebugLog) ? window._myDebugLog : null;
       return function (entry) {
-        try { if (logArr) logArr.push(entry); } catch (_) {}
+        try { if (logArr) logArr.push(entry); } catch (e) {
+          if (typeof __navDegrade === 'function') {
+            try { __navDegrade('nav_total_set:debuglog_push_failed', e, { entryType: entry && entry.type || null }); } catch (_) {}
+          }
+        }
       };
     })();
     const __navDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;

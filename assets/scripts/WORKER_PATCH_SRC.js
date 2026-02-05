@@ -49,43 +49,178 @@
         if (!(k in he)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
         const v = he[k];
         if (v === undefined || v === null) throw new Error(`UACHPatch: bad highEntropy.${k}`);
-        if (typeof v === 'string');
+        // if (typeof v === 'string' && !v) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+        if (typeof v === 'string' && !v && k !== 'model') throw new Error(`UACHPatch: bad highEntropy.${k}`);
         if (Array.isArray(v) && !v.length) throw new Error(`UACHPatch: bad highEntropy.${k}`);
       }
       return s;
     };
     cache.snap = requireSnap(self.__lastSnap__, 'init');
 
+    const seedInit = (cache.snap && cache.snap.seed != null)
+      ? String(cache.snap.seed)
+      : ((self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null);
+    if (seedInit == null || seedInit === '') {
+      const e = new Error('UACHPatch: __GLOBAL_SEED missing');
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_missing", e);
+      throw e;
+    }
+    self.__GLOBAL_SEED = seedInit;
+
     const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const existingToString = toStringDesc && toStringDesc.value;
-    const nativeToString = existingToString || Function.prototype.toString;
+    const existingToStringBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
+    if (existingToStringBridge) {
+      const missingNative = (typeof existingToString.__NativeToString !== 'function');
+      const missingMap = !(existingToString.__NativeToStringMap instanceof WeakMap);
+      if (missingNative || missingMap) {
+        try {
+          if (missingNative) {
+            Object.defineProperty(existingToString, '__NativeToString', {
+              value: existingToString,
+              writable: false,
+              configurable: true,
+              enumerable: false
+            });
+          }
+          if (missingMap) {
+            Object.defineProperty(existingToString, '__NativeToStringMap', {
+              value: new WeakMap(),
+              writable: false,
+              configurable: true,
+              enumerable: false
+            });
+          }
+        } catch (e) {
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:toString_bridge_restore_failed", e);
+          throw e;
+        }
+      }
+      if (typeof existingToString.__NativeToString !== 'function' || !(existingToString.__NativeToStringMap instanceof WeakMap)) {
+        const e = new Error('UACHPatch: toString bridge invalid');
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:toString_bridge_invalid", e);
+        throw e;
+      }
+    }
+    const nativeToString = existingToStringBridge
+      ? existingToString.__NativeToString
+      : (existingToString || Function.prototype.toString);
     if (typeof nativeToString !== 'function') {
       throw new Error('UACHPatch: Function.prototype.toString missing');
     }
 
-    const toStringMap = new WeakMap();
+    const existingToStringMap = existingToStringBridge
+      ? existingToString.__NativeToStringMap
+      : null;
+    const toStringMap = existingToStringMap || new WeakMap();
 
-    const existingMarkAsNative = (typeof self.markAsNative === 'function') ? self.markAsNative : null;
-    const markAsNative = (func, name) => {
+    function baseMarkAsNative(func, name = "") {
       if (typeof func !== 'function') return func;
-      const out = existingMarkAsNative ? existingMarkAsNative(func, name) : func;
-      const target = (typeof out === 'function') ? out : func;
       try {
-        const n = name || target.name || "";
+        const n = name || func.name || "";
         const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
-        toStringMap.set(target, label);
-      } catch (_) {}
-      return out;
-    };
-    if (!existingToString || !existingToString.__TOSTRING_BRIDGE__) {
+        toStringMap.set(func, label);
+      } catch (e) {
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:WeakMap.set", e);
+        throw e;
+      }
+      return func;
+    }
+
+    let memoMarkAsNative = null;
+    function ensureMarkAsNative() {
+      const seedNow = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
+      if (seedNow == null || seedNow === '') {
+        const e = new Error('UACHPatch: __GLOBAL_SEED missing');
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_missing", e);
+        throw e;
+      }
+      if (!memoMarkAsNative) {
+        if (!baseMarkAsNative.__TOSTRING_BRIDGE__) {
+          Object.defineProperty(baseMarkAsNative, '__TOSTRING_BRIDGE__', {
+            value: true,
+            writable: false,
+            configurable: true,
+            enumerable: false
+          });
+        }
+        memoMarkAsNative = baseMarkAsNative;
+      }
+      try {
+        Object.defineProperty(memoMarkAsNative, '__GLOBAL_SEED__', {
+          value: seedNow,
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      } catch (e) {
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_sync_failed", e);
+        throw e;
+      }
+      return memoMarkAsNative;
+    }
+
+    const ensureDesc = Object.getOwnPropertyDescriptor(self, '__ensureMarkAsNative');
+    if (ensureDesc && ensureDesc.configurable === false && ensureDesc.value !== ensureMarkAsNative) {
+      const e = new Error('UACHPatch: __ensureMarkAsNative not overridable');
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:ensure_not_overridable", e);
+      throw e;
+    }
+    if (!ensureDesc || ensureDesc.configurable !== false) {
+      Object.defineProperty(self, '__ensureMarkAsNative', {
+        value: ensureMarkAsNative,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+
+    const markAsNative = ensureMarkAsNative();
+    if (existingToString && existingToString.__TOSTRING_BRIDGE__) {
+      const probe = function probe(){};
+      markAsNative(probe);
+      const expected = toStringMap.get(probe);
+      if (expected === undefined) {
+        const e = new Error('UACHPatch: toString probe missing label');
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:toString_probe_missing", e);
+        throw e;
+      }
+      const actual = existingToString.call(probe);
+      if (actual !== expected) {
+        const e = new Error('UACHPatch: toString bridge mismatch');
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:toString_bridge_mismatch", e);
+        throw e;
+      }
+      if (existingToString.__TOSTRING_PROXY_INSTALLED__ !== true) {
+        Object.defineProperty(existingToString, '__TOSTRING_PROXY_INSTALLED__', {
+          value: true,
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      try {
+        Object.defineProperty(existingToString, '__GLOBAL_SEED__', {
+          value: String(self.__GLOBAL_SEED),
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      } catch (e) {
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_sync_failed", e);
+        throw e;
+      }
+      markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
+    } else {
       const d = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');
 
       const toString = ({ toString() {
-        if (typeof this === 'function') {
-          const v = toStringMap.get(this);
-          if (v !== undefined) return v;
+        if (typeof this !== 'function') {
+          return nativeToString.call(this);
         }
+        const v = toStringMap.get(this);
+        if (v !== undefined) return v;
         return nativeToString.call(this);
 
       }}).toString;
@@ -96,7 +231,32 @@
         configurable: true,
         enumerable: false
       });
+      Object.defineProperty(toString, '__NativeToString', {
+        value: nativeToString,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      Object.defineProperty(toString, '__NativeToStringMap', {
+        value: toStringMap,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      Object.defineProperty(toString, '__GLOBAL_SEED__', {
+        value: String(self.__GLOBAL_SEED),
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      Object.defineProperty(toString, '__TOSTRING_PROXY_INSTALLED__', {
+        value: true,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
       markAsNative(toString, 'toString');
+      markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
 
       Object.defineProperty(Function.prototype, 'toString', {
         value: toString,
@@ -320,13 +480,28 @@
       if (typeof origGet !== 'function') {
         throw new Error(`UACHPatch: ${k} native getter missing`);
       }
-      return markAsNative(function(){
+      const impl = function(){
         const recv = this;
         if (recv === nav) {
           return Reflect.apply(patchedGet, recv, []);
         }
         return Reflect.apply(origGet, recv, []);
-      }, `get ${k}`);
+      };
+
+      // IMPORTANT: native getters have stable `name` like "get hardwareConcurrency".
+      // `markAsNative()` only patches toString-labels, so we must produce a named getter function.
+      let wrapped = impl;
+      if (typeof k === 'string' && k) {
+        try {
+          const acc = ({ get [k]() { return impl.call(this); } });
+          const d = Object.getOwnPropertyDescriptor(acc, k);
+          if (d && typeof d.get === 'function') wrapped = d.get;
+        } catch (e) {
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:makeGuardedGetter_name_failed", e);
+        }
+      }
+
+      return markAsNative(wrapped, `get ${k}`);
     };
 
     const def = (obj, k, getter, enumerable = true) => {
@@ -446,7 +621,24 @@
       const prevSeed = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
       const nextSeed = (s && s.seed != null) ? String(s.seed) : null;
       cache.snap = requireSnap(s, 'apply');
-      if (nextSeed != null) self.__GLOBAL_SEED = nextSeed;
+      if (nextSeed != null) {
+        self.__GLOBAL_SEED = nextSeed;
+        try {
+          const td = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');
+          const ts = td && td.value;
+          if (ts && ts.__TOSTRING_BRIDGE__) {
+            Object.defineProperty(ts, '__GLOBAL_SEED__', {
+              value: String(nextSeed),
+              writable: false,
+              configurable: true,
+              enumerable: false
+            });
+          }
+        } catch (e) {
+          if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_sync_failed", e);
+          throw e;
+        }
+      }
       if (prevSeed != null && nextSeed != null && prevSeed !== nextSeed) {
         const jit = (typeof globalThis !== 'undefined' && globalThis.__JIT_CACHE__ instanceof Map)
           ? globalThis.__JIT_CACHE__
