@@ -296,9 +296,6 @@ def init_driver(
     threading.Thread(target=cdp.run, daemon=True).start()  
     logger.info("Thread started on port %s", cdp.PORT)
 
-    # --- Workers Initial patch reading ---
-    core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
-    logger.info("WORKER_PATCH_SRC.initated")
 
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
@@ -435,6 +432,12 @@ def init_driver(
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
     # inject_uach_strip_window(driver, user_agent)
+
+
+    # --- Workers Initial patch reading ---
+    core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
+    logger.info("WORKER_PATCH_SRC.initated")
+
 
         # --- prepare worker_bootstrap_js ---
     worker_bootstrap_js = f"""
