@@ -987,8 +987,9 @@ def main():
         generated_oscpu = profile["os_info"] if profile["platform"] == "Win32" and "firefox" in user_agent.lower() else f"Intel Mac OS X {profile['platform_version']}" if "firefox" in user_agent.lower() else None
         generated_platform_version = profile["platform_version"]
         generated_version = profile["browser_version"]
-        browser_version = profile["browser_version"]
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
+        profile["browser_brand"] = browser_brand
+        profile["browser_major_version"] = major_version
         expected_client_hints = build_expected_client_hints(
             profile, generated_platform, browser_brand, major_version, browser_version
         )
@@ -1064,7 +1065,7 @@ def main():
                         "if (!uad) return null;"
                         "const brands = Array.isArray(uad.brands) ? "
                         "uad.brands.map(b => ({brand: b.brand, version: String(b.version)})) : null;"
-                        "return { brands, platform: uad.platform, mobile: uad.mobile };"
+                        "return { brands, platform: uad.platform, mobile: uad.mobile, uaFullVersion: uad.uaFullVersion, fullVersionList: uad.fullVersionList };"
                     )
                     if current_uad:
                         exp_brands = expected_client_hints.get("brands") or []
@@ -1075,10 +1076,26 @@ def main():
                         cur_norm = sorted(
                             [(str(b.get("brand")), str(b.get("version"))) for b in cur_brands if isinstance(b, dict)]
                         )
+                        exp_uaf = expected_client_hints.get("uaFullVersion")
+                        cur_uaf = current_uad.get("uaFullVersion")
+                        exp_fvl = expected_client_hints.get("fullVersionList")
+                        cur_fvl = current_uad.get("fullVersionList")
+                        exp_fvl_norm = (
+                            sorted([(str(b.get("brand")), str(b.get("version"))) for b in exp_fvl if isinstance(b, dict)])
+                            if isinstance(exp_fvl, list)
+                            else None
+                        )
+                        cur_fvl_norm = (
+                            sorted([(str(b.get("brand")), str(b.get("version"))) for b in cur_fvl if isinstance(b, dict)])
+                            if isinstance(cur_fvl, list)
+                            else None
+                        )
                         if (
                             exp_norm != cur_norm
                             or current_uad.get("platform") != expected_client_hints.get("platform")
                             or current_uad.get("mobile") != expected_client_hints.get("mobile")
+                            or (exp_uaf is not None and cur_uaf != exp_uaf)
+                            or (exp_fvl_norm is not None and exp_fvl_norm != cur_fvl_norm)
                         ):
                             needs_reapply = True
             except Exception as e:

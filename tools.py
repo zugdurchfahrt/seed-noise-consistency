@@ -111,62 +111,147 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
     
 
 def override_user_agent_data(driver, browser_brand: str) -> None:
-    """Soft patch for Safari:
-    - Soft patch via Getters:
-    - We do not delete anything and do not create again.
-    - If the prototype already has Getter for userAgent /userAgentData -
-    - Over detectorate only Getter (configurable: true) to return
-    - agreed values ​​from Window .__ User_agent and Window .__ Expected_Client_Hints.
-    - If there are no properties (Safari/Firefox for usoragentdata) - we do nothing at all.
-    - Completely wrapped in try/catch, without  traps for Safari.
     """
+    Draft replacement for sunami/tools.py::override_user_agent_data()
+
+    Target properties:
+    - Keep "soft" behavior (no page break) BUT avoid generating broken values like ''.
+    - Preserve descriptor flags (enumerable/configurable) when redefining.
+    - Safe fallback is native behavior if contract is missing/invalid.
+    - Observability via window.__DEGRADE__ when patching fails.
+    """
+
     script = (
         "(function(){\n"
+        "  'use strict';\n"
+        "  const g = window;\n"
+        "  const D = (typeof g.__DEGRADE__ === 'function') ? g.__DEGRADE__ : null;\n"
+        "  function degrade(code, err, extra){\n"
+        "    try { if (D) D(code, err || null, extra || null); } catch(_e) {}\n"
+        "  }\n"
+        "  function isObj(x){ return !!x && (typeof x === 'object' || typeof x === 'function'); }\n"
+        "  function mustStr(obj, k, allowEmpty){\n"
+        "    const v = obj && obj[k];\n"
+        "    if (typeof v !== 'string') throw new Error('UADOverride: bad ' + k);\n"
+        "    if (!allowEmpty && !v.trim()) throw new Error('UADOverride: bad ' + k);\n"
+        "    return v;\n"
+        "  }\n"
+        "  function mustBool(obj, k){\n"
+        "    const v = obj && obj[k];\n"
+        "    if (typeof v !== 'boolean') throw new Error('UADOverride: bad ' + k);\n"
+        "    return v;\n"
+        "  }\n"
+        "  function mustBrands(obj){\n"
+        "    const a = obj && obj.brands;\n"
+        "    if (!Array.isArray(a)) throw new Error('UADOverride: bad brands');\n"
+        "    return a.map(b => {\n"
+        "      if (!b || typeof b !== 'object') throw new Error('UADOverride: bad brands entry');\n"
+        "      const brand = (typeof b.brand === 'string' && b.brand) ? b.brand : null;\n"
+        "      if (!brand) throw new Error('UADOverride: bad brands.brand');\n"
+        "      const version = (b.version != null) ? String(b.version) : '';\n"
+        "      if (!version) throw new Error('UADOverride: bad brands.version');\n"
+        "      return { brand, version };\n"
+        "    });\n"
+        "  }\n"
+        "  function mustFullVersionList(obj){\n"
+        "    const a = obj && obj.fullVersionList;\n"
+        "    if (!Array.isArray(a) || !a.length) throw new Error('UADOverride: bad fullVersionList');\n"
+        "    return a.map(x => {\n"
+        "      if (!x || typeof x !== 'object') throw new Error('UADOverride: bad fullVersionList entry');\n"
+        "      const brand = (typeof x.brand === 'string' && x.brand) ? x.brand : null;\n"
+        "      if (!brand) throw new Error('UADOverride: bad fullVersionList.brand');\n"
+        "      const version = (x.version != null) ? String(x.version) : '';\n"
+        "      if (!version) throw new Error('UADOverride: bad fullVersionList.version');\n"
+        "      return { brand, version };\n"
+        "    });\n"
+        "  }\n"
         "  try {\n"
-        "    const g = window;\n"
         "    const nav = navigator;\n"
-        "    const proto = Object.getPrototypeOf(nav) || Navigator?.prototype;\n"
-        "    const has = (obj, prop) => !!obj && (prop in obj || Object.getOwnPropertyDescriptor(obj, prop));\n"
-        "    const safeRedef = (obj, prop, getter) => {\n"
+        "    const proto = Object.getPrototypeOf(nav) || (typeof Navigator !== 'undefined' && Navigator && Navigator.prototype);\n"
+        "    if (!proto) return;\n"
+        "\n"
+        "    const dUA = Object.getOwnPropertyDescriptor(proto, 'userAgent');\n"
+        "    const origUAGet = dUA && dUA.get;\n"
+        "    if (dUA && dUA.configurable === true && typeof origUAGet === 'function') {\n"
+        "      if (typeof g.__USER_AGENT === 'string' && g.__USER_AGENT) {\n"
+        "        const getUA = function(){ return g.__USER_AGENT; };\n"
+        "        Object.defineProperty(proto, 'userAgent', {\n"
+        "          get: getUA,\n"
+        "          set: dUA.set,\n"
+        "          configurable: true,\n"
+        "          enumerable: !!dUA.enumerable\n"
+        "        });\n"
+        "      }\n"
+        "    }\n"
+        "\n"
+        "    const dUAD = Object.getOwnPropertyDescriptor(proto, 'userAgentData');\n"
+        "    const origUADGet = dUAD && dUAD.get;\n"
+        "    if (!dUAD || dUAD.configurable !== true || typeof origUADGet !== 'function') {\n"
+        "      return; // safe: cannot redefine\n"
+        "    }\n"
+        "\n"
+        "    const getUAD = function(){\n"
+        "      // Safe fallback: if contract is missing/invalid, keep native surface.\n"
+        "      const H = g.__EXPECTED_CLIENT_HINTS;\n"
+        "      if (!isObj(H)) return origUADGet.call(this);\n"
         "      try {\n"
-        "        const d = Object.getOwnPropertyDescriptor(obj, prop);\n"
-        "        if (!d || d.configurable !== true || typeof d.get !== 'function') return false;\n"
-        "        Object.defineProperty(obj, prop, { get: getter, configurable: true });\n"
-        "        return true;\n"
-        "      } catch(e) { return false; }\n"
+        "        const brands = mustBrands(H);\n"
+        "        const mobile = !!H.mobile;\n"
+        "        const platform = mustStr(H, 'platform', false);\n"
+        "        const he = {\n"
+        "          architecture: mustStr(H, 'architecture', false),\n"
+        "          bitness: mustStr(H, 'bitness', false),\n"
+        "          model: mustStr(H, 'model', true),\n"
+        "          platformVersion: mustStr(H, 'platformVersion', false),\n"
+        "          uaFullVersion: mustStr(H, 'uaFullVersion', false),\n"
+        "          fullVersionList: mustFullVersionList(H),\n"
+        "          wow64: (typeof H.wow64 === 'boolean') ? H.wow64 : false,\n"
+        "          formFactors: Array.isArray(H.formFactors) ? H.formFactors.slice(0) : ['Desktop'],\n"
+        "        };\n"
+        "\n"
+        "        // NOTE: This is still a plain object (not NavigatorUAData instance).\n"
+        "        // Draft goal is to prevent broken values + keep atomic fallback.\n"
+        "        const uad = {\n"
+        "          brands: brands.map(x => ({ brand: x.brand, version: String(x.version) })),\n"
+        "          mobile: mobile,\n"
+        "          platform: platform,\n"
+        "          getHighEntropyValues: async function(keys){\n"
+        "            if (!Array.isArray(keys)) throw new TypeError('UADOverride: bad keys');\n"
+        "            const out = {};\n"
+        "            for (let i = 0; i < keys.length; i++) {\n"
+        "              const k = keys[i];\n"
+        "              if (typeof k !== 'string' || !k) throw new TypeError('UADOverride: bad keys');\n"
+        "              if (k in he) out[k] = he[k];\n"
+        "            }\n"
+        "            return out;\n"
+        "          },\n"
+        "          toJSON: function(){ return { brands: this.brands, mobile: this.mobile, platform: this.platform }; }\n"
+        "        };\n"
+        "\n"
+        "        return uad;\n"
+        "      } catch (e) {\n"
+        "        degrade('uad_override:contract_invalid', e, { prop: 'userAgentData' });\n"
+        "        return origUADGet.call(this);\n"
+        "      }\n"
         "    };\n"
-        "    // 1) userAgent — синхронизация со значением из __USER_AGENT (если задано)\n"
-        "    if (has(proto, 'userAgent') && typeof g.__USER_AGENT === 'string') {\n"
-        "      safeRedef(proto, 'userAgent', () => g.__USER_AGENT);\n"
-        "    }\n"
-        "    // 2) userAgentData — ТОЛЬКО если свойство СУЩЕСТВУЕТ (Chromium). Ничего не создаём.\n"
-        "    if (has(proto, 'userAgentData') && g.__EXPECTED_CLIENT_HINTS) {\n"
-        "      const H = g.__EXPECTED_CLIENT_HINTS || {};\n"
-        "      const fake = {\n"
-        "        brands: (H.brands || []).map(x => ({ brand: x.brand, version: String(x.version) })),\n"
-        "        mobile: !!H.mobile,\n"
-        "        platform: String(H.platform || ''),\n"
-        "        getHighEntropyValues: async (keys) => {\n"
-        "          const src = {\n"
-        "            architecture: H.architecture || '',\n"
-        "            bitness: H.bitness || '',\n"
-        "            model: H.model || '',\n"
-        "            platformVersion: H.platformVersion || '',\n"
-        "            uaFullVersion: H.uaFullVersion || '',\n"
-        "            fullVersionList: (H.fullVersionList || []).map(x => ({ brand: x.brand, version: String(x.version) })),\n"
-        "          };\n"
-        "          const out = {};\n"
-        "          (keys || []).forEach(k => { if (k in src) out[k] = src[k]; });\n"
-        "          return out;\n"
-        "        }\n"
-        "      };\n"
-        "      safeRedef(proto, 'userAgentData', () => fake);\n"
-        "    }\n"
-        "  } catch(e) {}\n"
-        "})();"
+        "\n"
+        "    Object.defineProperty(proto, 'userAgentData', {\n"
+        "      get: getUAD,\n"
+        "      set: dUAD.set,\n"
+        "      configurable: true,\n"
+        "      enumerable: !!dUAD.enumerable\n"
+        "    });\n"
+        "  } catch(e) {\n"
+        "    degrade('uad_override:exception', e, null);\n"
+        "  }\n"
+        "})();\n"
     )
+
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
-    logger.info("[UA-soft] JS getter overrides applied for %s (no deletion)", browser_brand)
+    logger.info("[UAD-draft] JS getter overrides applied for %s (atomic fallback, no '' degradation)", browser_brand)
+
+
+
 
 def choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac):
     """
@@ -281,12 +366,6 @@ def build_expected_client_hints(profile, generated_platform, browser_brand, majo
         "accept": generate_accept_header(browser_brand, major_version),
     }
 
-    uaf = res.get('uaFullVersion')
-    if not isinstance(uaf, str) or not uaf.strip():
-        raise ValueError('build_expected_client_hints: bad uaFullVersion: %r' % (uaf,))
-    fvl = res.get('fullVersionList')
-    if not isinstance(fvl, list) or not fvl:
-        raise ValueError('build_expected_client_hints: bad fullVersionList: %r' % (fvl,))
 
     return res
 # =====  Building browser brand/version lists and corresponding header strings=====
