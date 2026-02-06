@@ -552,19 +552,48 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // ——— G. language(s) ———
     const hasLanguage = ('language' in navigator);
-    const dLanguage = Object.getOwnPropertyDescriptor(navProto,'language');
+    const dLanguage = Object.getOwnPropertyDescriptor(navProto, 'language');
+    const origGetLanguage = (dLanguage && typeof dLanguage.get === 'function') ? dLanguage.get : null;
+    const getLanguage = Object.getOwnPropertyDescriptor(({ get language() {
+      __navLogAccess('language', getLanguage);
+      if (!__isNavigatorThis(this)) {
+        if (typeof origGetLanguage === 'function') return Reflect.apply(origGetLanguage, this, arguments);
+        throw new TypeError();
+      }
+      return window.__primaryLanguage;
+    }}), 'language').get;
+    __navRegisterKey('language');
+    __navRegisterFn(getLanguage);
     const okLanguage = hasLanguage ? (dLanguage ?
-      (redefineAcc(navProto, 'language', __wrapGetter('language', () => window.__primaryLanguage, dLanguage, __isNavigatorThis)), true) :
-      safeDefineAcc(navProto, 'language', __wrapGetter('language', () => window.__primaryLanguage, dLanguage, __isNavigatorThis),  { enumerable: true })) : true;
+      (redefineAcc(navProto, 'language', getLanguage), true) :
+      safeDefineAcc(navProto, 'language', getLanguage, { enumerable: dLanguage ? !!dLanguage.enumerable : false })) : true;
     if (okLanguage === false) throw new TypeError('[nav_total_set] failed to define language');
 
     const hasLanguages = ('languages' in navigator);
-    const dLanguages = Object.getOwnPropertyDescriptor(navProto,'languages');
+    const dLanguages = Object.getOwnPropertyDescriptor(navProto, 'languages');
+    const origGetLanguages = (dLanguages && typeof dLanguages.get === 'function') ? dLanguages.get : null;
+    const getLanguages = Object.getOwnPropertyDescriptor(({ get languages() {
+      __navLogAccess('languages', getLanguages);
+      if (!__isNavigatorThis(this)) {
+        if (typeof origGetLanguages === 'function') return Reflect.apply(origGetLanguages, this, arguments);
+        throw new TypeError();
+      }
+      return window.__normalizedLanguages;
+    }}), 'languages').get;
+    __navRegisterKey('languages');
+    __navRegisterFn(getLanguages);
     const okLanguages = hasLanguages ? (dLanguages ?
-      (redefineAcc(navProto, 'languages', __wrapGetter('languages', () => window.__normalizedLanguages, dLanguages, __isNavigatorThis)), true) :
-      safeDefineAcc(navProto, 'languages', __wrapGetter('languages', () => window.__normalizedLanguages, dLanguages, __isNavigatorThis), { enumerable: true })) : true;
+      (redefineAcc(navProto, 'languages', getLanguages), true) :
+      safeDefineAcc(navProto, 'languages', getLanguages, { enumerable: dLanguages ? !!dLanguages.enumerable : false })) : true;
     if (okLanguages === false) throw new TypeError('[nav_total_set] failed to define languages');
-
+  
+  
+  
+  
+  
+  
+  
+  
     // ——— H. permissions.query ———
     if ('permissions' in navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
       const permProto = Object.getPrototypeOf(navigator.permissions) || navigator.permissions;

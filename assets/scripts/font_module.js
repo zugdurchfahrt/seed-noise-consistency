@@ -319,23 +319,23 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
   const wrappedCheck = (mark ? mark(function check(query) {
     if (throttled()) return false;
-    if (!validFontQuery(query)) return origCheck.call(this, query);
+    if (!validFontQuery(query)) return false;
     return origCheck.call(this, query);
   }, 'check') : function check(query) {
     if (throttled()) return false;
-    if (!validFontQuery(query)) return origCheck.call(this, query);
+    if (!validFontQuery(query)) return false;
     return origCheck.call(this, query);
   });
 
   const wrappedLoad = (mark ? mark(function load(query, text) {
     if (throttled()) return Promise.resolve([]);
-    if (!validFontQuery(query)) return origLoad.call(this, query, text);
-    if (text != null && typeof text !== 'string') return origLoad.call(this, query, text);
+    if (!validFontQuery(query)) return Promise.resolve([]);
+    if (text != null && typeof text !== 'string') return Promise.resolve([]);
     return origLoad.call(this, query, text);
   }, 'load') : function load(query, text) {
     if (throttled()) return Promise.resolve([]);
-    if (!validFontQuery(query)) return origLoad.call(this, query, text);
-    if (text != null && typeof text !== 'string') return origLoad.call(this, query, text);
+    if (!validFontQuery(query)) return Promise.resolve([]);
+    if (text != null && typeof text !== 'string') return Promise.resolve([]);
     return origLoad.call(this, query, text);
   });
 

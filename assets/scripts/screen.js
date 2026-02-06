@@ -112,68 +112,82 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   };
   const patchedMatchMedia = function matchMedia(query) {
     if (!isWindowThis(this)) return origMatchMedia.call(this, query);
+    query = String(query);
     let matches = true;
+    const isTrashQuery = (query.length > 1024 || /[\u0000-\u001F]/.test(query));
+    if (isTrashQuery) matches = false;
+    const q = query.toLowerCase().replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').replace(/\s*:\s*/g, ':');
+    let touched = false;
 
     
-    const deviceW = query.match(/\(device-width:\s*(\d+)px\)/);
-    if (deviceW) matches = matches && SCREEN_WIDTH === parseInt(deviceW[1], 10);
+    const deviceW = q.match(/\(device-width:\s*(\d+)px\)/);
+    if (deviceW) { touched = true; matches = matches && SCREEN_WIDTH === parseInt(deviceW[1], 10); }
 
-    const deviceH = query.match(/\(device-height:\s*(\d+)px\)/);
-    if (deviceH) matches = matches && SCREEN_HEIGHT === parseInt(deviceH[1], 10);
+    const deviceH = q.match(/\(device-height:\s*(\d+)px\)/);
+    if (deviceH) { touched = true; matches = matches && SCREEN_HEIGHT === parseInt(deviceH[1], 10); }
     
-    const maxW = query.match(/\(max-width:\s*(\d+)px\)/);
-    if (maxW) matches = matches && SCREEN_WIDTH <= parseInt(maxW[1], 10);
-    const minW = query.match(/\(min-width:\s*(\d+)px\)/);
-    if (minW) matches = matches && SCREEN_WIDTH >= parseInt(minW[1], 10);
-    const maxH = query.match(/\(max-height:\s*(\d+)px\)/);
-    if (maxH) matches = matches && SCREEN_HEIGHT <= parseInt(maxH[1], 10);
-    const minH = query.match(/\(min-height:\s*(\d+)px\)/);
-    if (minH) matches = matches && SCREEN_HEIGHT >= parseInt(minH[1], 10);
+    const maxW = q.match(/\(max-width:\s*(\d+)px\)/);
+    if (maxW) { touched = true; matches = matches && SCREEN_WIDTH <= parseInt(maxW[1], 10); }
+    const minW = q.match(/\(min-width:\s*(\d+)px\)/);
+    if (minW) { touched = true; matches = matches && SCREEN_WIDTH >= parseInt(minW[1], 10); }
+    const maxH = q.match(/\(max-height:\s*(\d+)px\)/);
+    if (maxH) { touched = true; matches = matches && SCREEN_HEIGHT <= parseInt(maxH[1], 10); }
+    const minH = q.match(/\(min-height:\s*(\d+)px\)/);
+    if (minH) { touched = true; matches = matches && SCREEN_HEIGHT >= parseInt(minH[1], 10); }
 
     // aspect-ratio safe
-    const aspectRatio = query.match(/\(aspect-ratio:\s*(\d+)\/(\d+)\)/);
+    const aspectRatio = q.match(/\(aspect-ratio:\s*(\d+)\/(\d+)\)/);
     if (aspectRatio && typeof SCREEN_WIDTH === 'number' && typeof SCREEN_HEIGHT === 'number') {
+      touched = true;
       const wInt = parseInt(aspectRatio[1], 10);
       const hInt = parseInt(aspectRatio[2], 10);
       matches = matches && (SCREEN_WIDTH * hInt === SCREEN_HEIGHT * wInt);
     } else if (aspectRatio) {
+      touched = true;
       matches = false;
     }
-    const maxAspectRatio = query.match(/\(max-aspect-ratio:\s*(\d+)\/(\d+)\)/);
+    const maxAspectRatio = q.match(/\(max-aspect-ratio:\s*(\d+)\/(\d+)\)/);
     if (maxAspectRatio) {
+      touched = true;
       const wInt = parseInt(maxAspectRatio[1], 10);
       const hInt = parseInt(maxAspectRatio[2], 10);
       matches = matches && (SCREEN_WIDTH * hInt <= SCREEN_HEIGHT * wInt);
     }
-    const minAspectRatio = query.match(/\(min-aspect-ratio:\s*(\d+)\/(\d+)\)/);
+    const minAspectRatio = q.match(/\(min-aspect-ratio:\s*(\d+)\/(\d+)\)/);
     if (minAspectRatio) {
+      touched = true;
       const wInt = parseInt(minAspectRatio[1], 10);
       const hInt = parseInt(minAspectRatio[2], 10);
       matches = matches && (SCREEN_WIDTH * hInt >= SCREEN_HEIGHT * wInt);
     }
 
-    const orientation = query.match(/\(orientation:\s*(portrait|landscape)\)/);
+    const orientation = q.match(/\(orientation:\s*(portrait|landscape)\)/);
     if (orientation) {
+      touched = true;
       const actual = (SCREEN_WIDTH > SCREEN_HEIGHT) ? "landscape" : "portrait";
       matches = matches && actual === orientation[1];
     }
     const actualOrientationDom = (SCREEN_WIDTH > SCREEN_HEIGHT) ? "landscape-primary" : "portrait-primary";
     window.__ORIENTATION = actualOrientationDom;
 
-    const color = query.match(/\(color:\s*(\d+)\)/);
+    const color = q.match(/\(color:\s*(\d+)\)/);
     if (color) {
+      touched = true;
       matches = matches && COLOR_DEPTH === parseInt(color[1], 10);
     }
 
-    const resolution = query.match(/\(resolution:\s*(\d+)dpi\)/);
+    const resolution = q.match(/\(resolution:\s*(\d+)dpi\)/);
     if (resolution) {
+      touched = true;
       const dpi = 96 * DPR;
       matches = matches && dpi === parseInt(resolution[1], 10);
     }
 
     const mql = origMatchMedia.call(this, query);
     if (mql && (typeof mql === 'object' || typeof mql === 'function')) {
-      try { mqlMatches.set(mql, matches); } catch {}
+      try {
+        if (touched || isTrashQuery) mqlMatches.set(mql, matches);
+      } catch {}
     }
     return mql;
   };

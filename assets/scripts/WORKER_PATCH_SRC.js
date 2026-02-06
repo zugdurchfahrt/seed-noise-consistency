@@ -42,8 +42,8 @@
       if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
       if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
       if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
-      if (!s.uaData && !s.uaCH) throw new Error('UACHPatch: missing userAgentData');
-      const he = (s.uaData && s.uaData.he) || (s.uaCH && s.uaCH.he) || s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+      if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
+      const he = (s.uaData && s.uaData.he) || s.highEntropy;
       if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
       for (const k of HE_KEYS) {
         if (!(k in he)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
@@ -276,7 +276,7 @@
                           throw new TypeError('Illegal invocation');
                         }
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le = cache.snap.uaData || cache.snap.uaCH;
+                        const le = cache.snap.uaData;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
                         return toBrands(le && le.brands);
                       }, 'get brands'), enumerable: !!dBrands.enumerable, configurable: !!dBrands.configurable, set: dBrands.set },
@@ -286,7 +286,7 @@
                           throw new TypeError('Illegal invocation');
                         }
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le = cache.snap.uaData || cache.snap.uaCH;
+                        const le = cache.snap.uaData;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
                         if (typeof le.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
                         return le.mobile;
@@ -297,7 +297,7 @@
                           throw new TypeError('Illegal invocation');
                         }
                         if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le = cache.snap.uaData || cache.snap.uaCH;
+                        const le = cache.snap.uaData;
                         if (!le) throw new Error('UACHPatch: missing userAgentData');
                         if (typeof le.platform !== 'string' || !le.platform) {
                           throw new Error('THW: uaData.platform missing');
@@ -313,7 +313,7 @@
         throw new TypeError('Illegal invocation');
       }
       if (!cache.snap) throw new Error('UACHPatch: no snap');
-      const le = cache.snap.uaData || cache.snap.uaCH;
+      const le = cache.snap.uaData;
       if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
       if (!Array.isArray(le.he.fullVersionList)) throw new Error('UACHPatch: bad highEntropy.fullVersionList');
       return deep(le.he.fullVersionList);
@@ -334,7 +334,7 @@
         throw new TypeError('Illegal invocation');
       }
       if (!cache.snap) throw new Error('UACHPatch: no snap');
-      const le = cache.snap.uaData || cache.snap.uaCH;
+      const le = cache.snap.uaData;
       if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
       if (typeof le.he.uaFullVersion !== 'string' || !le.he.uaFullVersion) {
         throw new Error('UACHPatch: bad highEntropy.uaFullVersion');
@@ -377,9 +377,9 @@
           if (typeof k !== 'string' || !k) throw new Error('THW: bad keys');
         }
         const s = cache.snap;
-        const le = s.uaData || s.uaCH;
+        const le = s.uaData;
         if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
-        const src = s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+        const src = s.highEntropy;
         if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
         const map = {
           brands: le.brands,

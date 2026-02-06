@@ -409,6 +409,23 @@ def init_driver(
     window.__DPR                        = {json.dumps(device_dpr_value)};
     window.__primaryLanguage            = {json.dumps(profile['language'], ensure_ascii=False)};
     window.__normalizedLanguages        = {json.dumps(profile['languages'], ensure_ascii=False)};
+
+    // Languages stable final setting (moved here to guarantee availability before nav_total_set.js)
+    // FrozenArray semantics (минимально приближенно): массив заморожен
+    if (Array.isArray(window.__normalizedLanguages)) {{
+        Object.freeze(window.__normalizedLanguages);
+    }}
+
+    // fail-fast: типы и консистентность
+    if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
+        throw new Error('THW: __primaryLanguage invalid');
+    }}
+    if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
+        throw new Error('THW: __normalizedLanguages invalid');
+    }}
+    if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
+        throw new Error('THW: language != languages[0]');
+    }}
     window.__cpu                        = {json.dumps(hardware_concurrency_value)};
     window.__memory                     = {json.dumps(device_memory_value)};
     window.__WEBGL_RENDERER__           = {json.dumps(webgl_renderer, ensure_ascii=False)};
@@ -657,31 +674,32 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
             "Emulation.setGeolocationOverride",
             {"latitude": latitude, "longitude": longitude, "accuracy": 100}
         )
-        # Languages stable final setting
-
-        lang_js = f"""
-        (() => {{
-        window.__primaryLanguage = {json.dumps(language, ensure_ascii=False)};
-        window.__normalizedLanguages = {json.dumps(normalized_languages, ensure_ascii=False)};
-
-        // FrozenArray semantics (минимально приближенно): массив заморожен
-        if (Array.isArray(window.__normalizedLanguages)) {{
-            Object.freeze(window.__normalizedLanguages);
-        }}
-
-        // fail-fast: типы и консистентность
-        if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
-            throw new Error('THW: __primaryLanguage invalid');
-        }}
-        if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
-            throw new Error('THW: __normalizedLanguages invalid');
-        }}
-        if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
-            throw new Error('THW: language != languages[0]');
-        }}
-        }})();
-        """
-        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": lang_js})
+        # Languages stable final setting is injected in init_params (page_bundle.js) to guarantee availability
+        # before JS patches (nav_total_set.js, workers bootstrap etc). Keep this legacy block commented out.
+        #
+        # lang_js = f"""
+        # (() => {{
+        # window.__primaryLanguage = {json.dumps(language, ensure_ascii=False)};
+        # window.__normalizedLanguages = {json.dumps(normalized_languages, ensure_ascii=False)};
+        #
+        # // FrozenArray semantics (минимально приближенно): массив заморожен
+        # if (Array.isArray(window.__normalizedLanguages)) {{
+        #     Object.freeze(window.__normalizedLanguages);
+        # }}
+        #
+        # // fail-fast: типы и консистентность
+        # if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
+        #     throw new Error('THW: __primaryLanguage invalid');
+        # }}
+        # if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
+        #     throw new Error('THW: __normalizedLanguages invalid');
+        # }}
+        # if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
+        #     throw new Error('THW: language != languages[0]');
+        # }}
+        # }})();
+        # """
+        # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": lang_js})
         
         device_metrics = build_device_metrics(profile)
         driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)

@@ -40,27 +40,21 @@ function EnvBus(G){
     const timeZone = G.__TIMEZONE__;
     if (!timeZone) throw new Error('EnvBus: __TIMEZONE__ missing');
 
-    // ЕДИНЫЙ источник CH: берем подготовленный (__EXPECTED_CLIENT_HINTS)
-    let ch = null;
-    if (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object') {
-      ch = G.__EXPECTED_CLIENT_HINTS;
-    } else {
+    // UAData (Window runtime) is the primary source for Worker snapshots.
+    const UAD = nav && nav.userAgentData;
+    if (!UAD) throw new Error('EnvBus: navigator.userAgentData missing');
+
+    // Contract snapshot is used only for validation (not as a data source).
+    const contract = G.__EXPECTED_CLIENT_HINTS;
+    if (!contract || typeof contract !== 'object') {
       throw new Error('EnvBus: __EXPECTED_CLIENT_HINTS missing');
     }
 
-    // низкоэнтропийные — ровно как вы уже именуете: uaData
-    const uaData = ch ? (() => {
-      if (typeof ch.platform !== 'string' || !ch.platform) {
-        throw new Error('THW: uaData.platform missing');
-      }
-      let brandsSrc = null;
-      if (Array.isArray(ch.brands)) {
-        brandsSrc = ch.brands;
-      } else if (Array.isArray(ch.fullVersionList)) {
-        brandsSrc = ch.fullVersionList;
-      } else {
-        throw new Error('THW: uaData.brands missing');
-      }
+    const uaData = (() => {
+      const platform = (typeof UAD.platform === 'string' && UAD.platform) ? UAD.platform : null;
+      if (!platform) throw new Error('THW: uaData.platform missing');
+      const brandsSrc = Array.isArray(UAD.brands) ? UAD.brands : null;
+      if (!brandsSrc) throw new Error('THW: uaData.brands missing');
       const brands = brandsSrc.map(x => {
         if (!x || typeof x !== 'object') throw new Error('THW: uaData.brand entry');
         const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
@@ -78,18 +72,50 @@ function EnvBus(G){
         }
         const major = String(versionRaw).split('.')[0];
         if (!major) throw new Error('THW: uaData.brand version missing');
-        return { brand, version: major };
+        return { brand: String(brand), version: String(major) };
       });
-      return { platform: ch.platform, brands, mobile: !!ch.mobile };
-    })() : null;
-    if (!uaData) throw new Error('EnvBus: uaData missing');
+      return { platform, brands, mobile: !!UAD.mobile };
+    })();
+
+    // Validate UAData LE vs contract snapshot (fail-fast, no fallback).
+    (function validateUaDataLE() {
+      const expPlatform = contract.platform;
+      if (typeof expPlatform !== 'string' || !expPlatform) throw new Error('EnvBus: contract.platform missing');
+      const expMobile = !!contract.mobile;
+      let expBrandsSrc = null;
+      if (Array.isArray(contract.brands)) expBrandsSrc = contract.brands;
+      else if (Array.isArray(contract.fullVersionList)) expBrandsSrc = contract.fullVersionList;
+      else throw new Error('EnvBus: contract.brands missing');
+      const expNorm = expBrandsSrc
+        .filter(x => x && typeof x === 'object')
+        .map(x => {
+          const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
+                      : (typeof x.name === 'string' && x.name) ? x.name
+                      : null;
+          const versionRaw = (typeof x.version === 'string' && x.version) ? x.version
+                           : (typeof x.version === 'number' && Number.isFinite(x.version)) ? String(x.version)
+                           : null;
+          if (!brand || !versionRaw) throw new Error('EnvBus: contract.brands entry');
+          const major = String(versionRaw).split('.')[0];
+          if (!major) throw new Error('EnvBus: contract.brands entry');
+          return [String(brand), String(major)];
+        })
+        .sort((a, b) => (a[0] === b[0] ? (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) : (a[0] < b[0] ? -1 : 1)));
+      const curNorm = uaData.brands
+        .map(b => [String(b.brand), String(b.version)])
+        .sort((a, b) => (a[0] === b[0] ? (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) : (a[0] < b[0] ? -1 : 1)));
+      const sameBrands = (expNorm.length === curNorm.length) && expNorm.every((x, i) => x[0] === curNorm[i][0] && x[1] === curNorm[i][1]);
+      if (uaData.platform !== expPlatform || !!uaData.mobile !== expMobile || !sameBrands) {
+        const e = new Error('EnvBus: UAData LE mismatch vs contract');
+        if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:uadata_le_mismatch', e, { expPlatform, expMobile });
+        throw e;
+      }
+    })();
 
     const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
     const heSource = (G.__UACH_HE_READY__ && G.__LAST_UACH_HE__ && typeof G.__LAST_UACH_HE__ === 'object')
       ? G.__LAST_UACH_HE__
-      : (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object')
-        ? G.__EXPECTED_CLIENT_HINTS
-        : null;
+      : null;
     if (!heSource) throw new Error('EnvBus: high entropy missing');
     const he = {};
     for (const k of HE_KEYS) {
@@ -119,11 +145,10 @@ function EnvBus(G){
         throw new Error('EnvBus: windowKeys missing');
       }
     })();
-    // Алиасы для совместимости с воркер-патчем
+    // Snapshot contract: uaData + highEntropy (no CH transport).
     return {
       ua, vendor, language: lang, languages: langs, dpr, cpu, mem, timeZone,
       uaData,
-      uaCH: uaData,
       highEntropy: he,
       hardwareConcurrency: cpu,
       deviceMemory: mem,
@@ -260,8 +285,8 @@ function mkModuleWorkerSource(snapshot, absUrl){
         if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
         if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
         if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
-        if (!s.uaData && !s.uaCH) throw new Error('UACHPatch: missing userAgentData');
-        const he = (s.uaData && s.uaData.he) || (s.uaCH && s.uaCH.he) || s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+        if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
+        const he = (s.uaData && s.uaData.he) || s.highEntropy;
         if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
         const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
         for (const k of KEYS) {
@@ -512,8 +537,8 @@ function mkClassicWorkerSource(snapshot, absUrl){
         if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
         if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
         if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
-        if (!s.uaData && !s.uaCH) throw new Error('UACHPatch: missing userAgentData');
-        const he = (s.uaData && s.uaData.he) || (s.uaCH && s.uaCH.he) || s.highEntropy || (s.uaCH && s.uaCH.highEntropy);
+        if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
+        const he = (s.uaData && s.uaData.he) || s.highEntropy;
         if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
         const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
         for (const k of KEYS) {
@@ -775,8 +800,8 @@ function requireWorkerSnapshot(snap, label) {
   if (!Number.isFinite(Number(snap.deviceMemory))) throw new Error('[WorkerOverride] snapshot.deviceMemory missing');
   if (!Number.isFinite(Number(snap.hardwareConcurrency))) throw new Error('[WorkerOverride] snapshot.hardwareConcurrency missing');
   if (!Number.isFinite(Number(snap.dpr))) throw new Error('[WorkerOverride] snapshot.dpr missing');
-  if (!snap.uaData && !snap.uaCH) throw new Error('[WorkerOverride] snapshot.uaData missing');
-  const he = (snap.uaData && snap.uaData.he) || (snap.uaCH && snap.uaCH.he) || snap.highEntropy || (snap.uaCH && snap.uaCH.highEntropy);
+  if (!snap.uaData) throw new Error('[WorkerOverride] snapshot.uaData missing');
+  const he = (snap.uaData && snap.uaData.he) || snap.highEntropy;
   if (!he || typeof he !== 'object') throw new Error('[WorkerOverride] snapshot.highEntropy missing');
   const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
   for (const k of KEYS) {
@@ -1360,41 +1385,9 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
-    const meta = G.__EXPECTED_CLIENT_HINTS;
-    if (meta && typeof meta === 'object') {
-      const he = {};
-      for (const k of KEYS) {
-        if (!(k in meta)) throw new Error(`[WorkerInit] high entropy missing ${k}`);
-        const v = meta[k];
-        if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
-        if (typeof v === 'string' && !v.trim() && k !== 'model') throw new Error(`[WorkerInit] high entropy bad ${k}`);
-        if (k === 'fullVersionList' && !Array.isArray(v)) throw new Error('[WorkerInit] high entropy bad fullVersionList');
-        if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
-        he[k] = v;
-      }
-      G.__LAST_UACH_HE__ = he;
-      G.__UACH_HE_READY__ = true;
-      const p = Promise.resolve(he);
-      G.__UACH_HE_PROMISE__ = p;
-      return p;
-    }
+    const contract = G.__EXPECTED_CLIENT_HINTS;
     if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
-      if (!meta || typeof meta !== 'object') {
-        throw new Error('[WorkerInit] userAgentData missing');
-      }
-      const he = {};
-      for (const k of KEYS) {
-        if (!(k in meta)) throw new Error(`[WorkerInit] high entropy missing ${k}`);
-        const v = meta[k];
-        if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
-        if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
-        he[k] = v;
-      }
-      G.__LAST_UACH_HE__ = he;
-      G.__UACH_HE_READY__ = true;
-      const p = Promise.resolve(he);
-      G.__UACH_HE_PROMISE__ = p;
-      return p;
+      throw new Error('[WorkerInit] userAgentData missing');
     }
     const p = UAD.getHighEntropyValues(KEYS).then(he => {
       if (!he || typeof he !== 'object') throw new Error('[WorkerInit] high entropy missing');
@@ -1403,6 +1396,44 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
         const v = he[k];
         if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
         if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+      }
+      if (contract && typeof contract === 'object') {
+        try {
+          for (const k of KEYS) {
+            if (!(k in contract)) continue;
+            const exp = contract[k];
+            const got = he[k];
+            if (k === 'fullVersionList') {
+              if (!Array.isArray(exp) || !Array.isArray(got)) throw new Error('[WorkerInit] contract fullVersionList mismatch');
+              const norm = (arr) => arr
+                .filter(x => x && typeof x === 'object')
+                .map(x => {
+                  const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
+                              : (typeof x.name === 'string' && x.name) ? x.name
+                              : null;
+                  const version = (typeof x.version === 'string' && x.version) ? x.version
+                                : (typeof x.version === 'number' && Number.isFinite(x.version)) ? String(x.version)
+                                : null;
+                  if (!brand || !version) throw new Error('[WorkerInit] contract fullVersionList mismatch');
+                  return [String(brand), String(version)];
+                })
+                .sort((a, b) => (a[0] === b[0] ? (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) : (a[0] < b[0] ? -1 : 1)));
+              const a = norm(exp);
+              const b = norm(got);
+              const ok = (a.length === b.length) && a.every((x, i) => x[0] === b[i][0] && x[1] === b[i][1]);
+              if (!ok) throw new Error('[WorkerInit] contract fullVersionList mismatch');
+            } else if (k === 'uaFullVersion') {
+              if (typeof exp === 'string' && exp && got !== exp) throw new Error('[WorkerInit] contract uaFullVersion mismatch');
+            } else if (typeof exp === 'string') {
+              if (typeof got !== 'string' || got !== exp) throw new Error(`[WorkerInit] contract ${k} mismatch`);
+            } else if (typeof exp === 'boolean') {
+              if (typeof got !== 'boolean' || got !== exp) throw new Error(`[WorkerInit] contract ${k} mismatch`);
+            }
+          }
+        } catch (e) {
+          if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:uadata_he_contract_mismatch', e);
+          throw e;
+        }
       }
       G.__LAST_UACH_HE__ = he;
       G.__UACH_HE_READY__ = true;
@@ -1415,15 +1446,11 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
   // 5) Полный сценарий
   function initAll(opts){
     const o = Object.assign({ publishHE: true, heKeys: null }, opts);
-    installOverrides();        // Hub → Overrides
-    if (o.publishHE) {
-      const first = snapshotOnce();
-      return snapshotHE(o.heKeys).then(() => {
-        snapshotOnce();
-        return first;
-      });
-    }
-    return snapshotOnce();
+    // Strict UAData mode: obtain HE first; only then install overrides and publish snapshots.
+    return snapshotHE(o.heKeys).then(() => {
+      installOverrides(); // Hub -> Overrides
+      return snapshotOnce();
+    });
   }
 
   // 6) Diagnostics
