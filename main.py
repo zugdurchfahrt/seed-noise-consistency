@@ -387,7 +387,7 @@ def init_driver(
         ]
         return "\n;\n".join(parts)
     
- 
+
     
     # --- creation of window.__ objects ---
     init_params = f"""
@@ -431,7 +431,7 @@ def init_driver(
     # inject_uach_strip_window(driver, user_agent)
 
 
-    # --- Workers Initial patch reading ---
+     # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     logger.info("WORKER_PATCH_SRC.initated")
 
@@ -987,7 +987,7 @@ def main():
         generated_oscpu = profile["os_info"] if profile["platform"] == "Win32" and "firefox" in user_agent.lower() else f"Intel Mac OS X {profile['platform_version']}" if "firefox" in user_agent.lower() else None
         generated_platform_version = profile["platform_version"]
         generated_version = profile["browser_version"]
-        # browser_version = profile["browser_version"]
+        browser_version = profile["browser_version"]
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
         expected_client_hints = build_expected_client_hints(
             profile, generated_platform, browser_brand, major_version, browser_version

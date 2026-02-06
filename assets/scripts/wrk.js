@@ -282,6 +282,8 @@ function mkModuleWorkerSource(snapshot, absUrl){
       } catch (e) {
         self.__lastSnap__ = ${SNAP};
         self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
+        try { __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ }); } catch (_e) {}
+        throw e;
       }
       if (!self.__ENV_SYNC_BC_INSTALLED__) {
         try {
@@ -291,6 +293,8 @@ function mkModuleWorkerSource(snapshot, absUrl){
           bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
         } catch (e) {
           self.__ENV_BC_ERROR__ = String((e && (e.stack || e.message)) || e);
+          try { __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_BC_ERROR__ }); } catch (_e) {}
+          throw e;
         }
       }
       // --- Seed nativization (Window → Worker). No runtime coupling after start. ---
@@ -419,6 +423,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
         } catch (e) {
           try { __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) }); } catch (_e) {}
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
+          throw e;
         }
       }
       // Только ПОСЛЕ зеркала грузим пользовательский код:
@@ -529,6 +534,8 @@ function mkClassicWorkerSource(snapshot, absUrl){
       } catch (e) {
         self.__lastSnap__ = ${SNAP};
         self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
+        try { __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ }); } catch (_e) {}
+        throw e;
       }
       if (!self.__ENV_SYNC_BC_INSTALLED__) {
         try {
@@ -538,6 +545,8 @@ function mkClassicWorkerSource(snapshot, absUrl){
           bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
         } catch (e) {
           self.__ENV_BC_ERROR__ = String((e && (e.stack || e.message)) || e);
+          try { __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_BC_ERROR__ }); } catch (_e) {}
+          throw e;
         }
       }
 
@@ -675,6 +684,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
         } catch (e) {
           try { __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) }); } catch (_e) {}
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
+          throw e;
         }
       }
       var __isModuleURL = function(u){

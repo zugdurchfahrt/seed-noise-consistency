@@ -1,13 +1,13 @@
 const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
   if (!window.__PATCH_NAVTOTALSET__) {
- 
+      window.__PATCH_NAVTOTALSET__ = true;
     // Must run in Window realm (not Worker)
     if (typeof document === 'undefined' || !window || window.document !== document) {
       throw new Error('[nav_total_set] not in Window realm');
     }
 
     const C = window.CanvasPatchContext;
-      if (!C) throw new Error('[nav_total_set] CanvasPatchContext is undefined — module registration is not available');
+      if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
     const G = (typeof globalThis !== 'undefined' && globalThis)
       || (typeof self !== 'undefined' && self)
       || (typeof window !== 'undefined' && window)
@@ -41,17 +41,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const devicesLabels = window.__DEVICES_LABELS;
     const colorDepth    = Number(window.__COLOR_DEPTH);
     const orientationDom = window.__ORIENTATION ?? ((height >= width) ? 'portrait-primary' : 'landscape-primary')
-
-    if (!devicesLabels || typeof devicesLabels !== 'object') {
-      throw new Error('[nav_total_set] __DEVICES_LABELS missing');
-    }
-    if (
-      typeof devicesLabels.audioinput !== 'string'
-      || typeof devicesLabels.videoinput !== 'string'
-      || typeof devicesLabels.audiooutput !== 'string'
-    ) {
-      throw new Error('[nav_total_set] __DEVICES_LABELS bad format');
-    }
 
     // strictness & diagnostics
     const STRICT        = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
@@ -117,29 +106,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
       const origGet = desc && desc.get;
 
-      if (typeof origGet === 'function') {
-        const wrapAcc = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
-        if (typeof wrapAcc !== 'function') {
-          throw new Error('[nav_total_set] __wrapNativeAccessor missing');
-        }
-        const wrapped = wrapAcc(origGet, `get ${key}`, function(nativeGet, thisArg, args) {
-          __navLogAccess(key, wrapped);
-
-          if (typeof validThis === 'function' && !validThis(thisArg)) {
-            return Reflect.apply(nativeGet, thisArg, args);
-          }
-          return (typeof getter === 'function') ? getter.call(thisArg) : getter;
-        });
-        __navRegisterFn(wrapped);
-        return wrapped;
-      }
-
       const wrapped = function () {
         __navLogAccess(key, wrapped);
 
         if (typeof validThis === 'function' && !validThis(this)) {
           if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
-          throw new TypeError();
+          throw new TypeError(); // если ты это оставляешь — обязательно иметь return ниже
         }
 
         return (typeof getter === 'function') ? getter.call(this) : getter;
@@ -1011,7 +983,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         safeDefineAcc(navProto, 'mimeTypes', __wrapGetter('mimeTypes', () => createMimeTypeArray(fakePlugins), dMimeTypes, __isNavigatorThis), { enumerable: true });
       }
 
-    window.__PATCH_NAVTOTALSET__ = true;
+   
 
     //  ——— Debug information (unified log) ———
   if (G.__DEBUG__) {

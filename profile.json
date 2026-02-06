@@ -2,24 +2,24 @@
   "profile": {
     "platform": "Win32",
     "os_info": "Windows NT 10.0; Win64; x64",
-    "os_name": "Windows 10 64-bit",
-    "platform_version": "10.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0",
-    "browser_version": "134.0.3124.129",
-    "screen_width": 2560,
-    "screen_height": 1440,
-    "device_dpr_value": 1.25,
+    "os_name": "Windows 11 64-bit",
+    "platform_version": "15.0.0",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
+    "browser_version": "136.0.3240.115",
+    "screen_width": 1920,
+    "screen_height": 1080,
+    "device_dpr_value": 1.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
     "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
-    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x2486) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x2484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
     "gpu_architecture": "ampere",
     "gpu_vendor": "nvidia",
     "devices_conf": {
-      "audioinput": "Rode NT-USB",
-      "videoinput": "Logitech HD Pro Webcam C920",
-      "audiooutput": "Jabra Elite 85h"
+      "audioinput": "Shure SM7B",
+      "videoinput": "Creative Live! Cam",
+      "audiooutput": "Sony MDR-7506"
     },
     "vendor_value": "Google Inc.",
     "languages": [
@@ -27,10 +27,29 @@
       "da"
     ],
     "language": "da-DK",
-    "deviceMemory": 4,
+    "deviceMemory": 8,
     "hardwareConcurrency": 4,
-    "plugins": [],
-    "mimeTypes": [],
+    "plugins": [
+      {
+        "name": "Microsoft Edge PDF Viewer",
+        "filename": "internal-pdf-viewer",
+        "description": "",
+        "mimeTypes": [
+          {
+            "type": "application/pdf",
+            "suffixes": "pdf",
+            "description": "PDF document"
+          }
+        ]
+      }
+    ],
+    "mimeTypes": [
+      {
+        "type": "application/pdf",
+        "suffixes": "pdf",
+        "description": "PDF document"
+      }
+    ],
     "accept_language": "da-DK,da;q=0.9"
   },
   "expected_client_hints": {
@@ -42,18 +61,18 @@
       },
       {
         "brand": "Chromium",
-        "version": "134"
+        "version": "136"
       },
       {
         "brand": "Microsoft Edge",
-        "version": "134"
+        "version": "136"
       }
     ],
     "mobile": false,
     "architecture": "x86",
     "bitness": "64",
     "model": "",
-    "platformVersion": "10.0.0",
+    "platformVersion": "15.0.0",
     "fullVersionList": [
       {
         "brand": "Not)A;Brand",
@@ -61,21 +80,21 @@
       },
       {
         "brand": "Chromium",
-        "version": "134.0.3124.129"
+        "version": "136.0.3240.115"
       },
       {
         "brand": "Microsoft Edge",
-        "version": "134.0.3124.129"
+        "version": "136.0.3240.115"
       }
     ],
-    "uaFullVersion": "134.0.3124.129",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"134\", \"Microsoft Edge\";v=\"134\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"134.0.3124.129\", \"Microsoft Edge\";v=\"134.0.3124.129\"",
+    "uaFullVersion": "136.0.3240.115",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"136\", \"Microsoft Edge\";v=\"136\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"136.0.3240.115\", \"Microsoft Edge\";v=\"136.0.3240.115\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
-    "deviceMemory": 4,
+    "deviceMemory": 8,
     "hardwareConcurrency": 4,
     "wow64": false,
     "languages": [

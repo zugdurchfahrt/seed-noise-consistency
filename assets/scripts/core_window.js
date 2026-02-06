@@ -1,5 +1,15 @@
 const CoreWindowModule = function CoreWindowModule(window) {
   'use strict';
+
+  const C = window.CanvasPatchContext;
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+        || (typeof self       !== 'undefined' && self)
+        || (typeof window     !== 'undefined' && window)
+        || (typeof global     !== 'undefined' && global)
+        || {};
+        
+
+
   const env = window && window.env;
 
   if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
@@ -7,7 +17,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
   }
   if (window.__CORE_WINDOW_LOADED__) return;
 
-  // --- nativization provider (moved from RTCPeerConnection.js) ---
+  // --- nativization provider  ---
   function safeDefine(obj, prop, descriptor) {
     try {
       if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;

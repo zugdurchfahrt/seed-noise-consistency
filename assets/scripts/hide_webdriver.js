@@ -1,6 +1,5 @@
-const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
+const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {  
   if (window && window.__HIDE_WEBDRIVER_READY__) return;
-  if (window) window.__HIDE_WEBDRIVER_READY__ = true
 
   const C = window.CanvasPatchContext;
       if (!C) throw new Error('[HideWebdriverPatchModule] CanvasPatchContext is undefined — module registration is not available');
@@ -10,7 +9,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         || (typeof global     !== 'undefined' && global)
         || {};
   
-  // // --- nativization provider is initialized in RTCPeerConnection.js ---
+  // // --- nativization provider  ---
   const safeDefine = (function() {
     const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
     if (typeof sd !== 'function') {
@@ -127,9 +126,15 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     'has',
     nativeHas,
     function (target, prop) {
-      if (target === navigator && prop === 'webdriver') return false;
+      if (target === navigator && prop === 'webdriver') return false;    
       return nativeHas(target, prop);
     }
   );
 
+  safeDefine(window, '__HIDE_WEBDRIVER_READY__', {
+    value: true,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
 }
