@@ -222,10 +222,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const patch = (key, getter) => {
         const d = Object.getOwnPropertyDescriptor(navProto, key);
         if (!d) throw new TypeError(`[nav_total_set] ${key}: descriptor missing`);
-      // Important: like native - not enumerable
-      const wrapped = __wrapGetter(key, getter, d, __isNavigatorThis);
-      const ok = (redefineAcc(navProto, key, wrapped), true);
-      if (ok === false) throw new TypeError(`[nav_total_set] failed to define ${key}`);
+        if (typeof getter !== 'function') throw new TypeError(`[nav_total_set] ${key}: getter missing`);
+        // Important: like native - not enumerable
+        const origGet = (d && typeof d.get === 'function') ? d.get : null;
+        __navRegisterKey(key);
+        const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
+          __navLogAccess(key, namedGet);
+          if (!__isNavigatorThis(this)) {
+            if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
+            throw new TypeError();
+          }
+          return getter.call(this);
+        }}), key).get;
+        __navRegisterFn(namedGet);
+        const ok = (redefineAcc(navProto, key, namedGet), true);
+        if (ok === false) throw new TypeError(`[nav_total_set] failed to define ${key}`);
       };      
 
       patch('userAgent',  () => userAgent);
@@ -252,8 +263,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (critical.has(prop)) return; // just in case
       if (!(prop in navProto)) return; // do not introduce non-native props (Chrome/Edge: e.g. buildID)
       const d = Object.getOwnPropertyDescriptor(navProto, prop);
-      const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
-      defineAccWithFallback(navProto, prop, wrapped);
+      const isData = !!(d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set);
+      if (d && !isData) {
+        const origGet = (typeof d.get === 'function') ? d.get : null;
+        __navRegisterKey(prop);
+        const namedGet = Object.getOwnPropertyDescriptor(({ get [prop]() {
+          __navLogAccess(prop, namedGet);
+          if (!__isNavigatorThis(this)) {
+            if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
+            throw new TypeError();
+          }
+          return getter.call(this);
+        }}), prop).get;
+        __navRegisterFn(namedGet);
+        defineAccWithFallback(navProto, prop, namedGet);
+      } else {
+        const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
+        defineAccWithFallback(navProto, prop, wrapped);
+      }
     });
 
     // ——— D. devicePixelRatio & screen.* ———
@@ -537,17 +564,39 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // ——— F. deviceMemory/hardwareConcurrency ———
     const hasDeviceMemory = ('deviceMemory' in navigator);
-    const dDeviceMemory = Object.getOwnPropertyDescriptor(navProto,'deviceMemory');
+    const dDeviceMemory = Object.getOwnPropertyDescriptor(navProto, 'deviceMemory');
+    const origGetDeviceMemory = (dDeviceMemory && typeof dDeviceMemory.get === 'function') ? dDeviceMemory.get : null;
+    const getDeviceMemory = Object.getOwnPropertyDescriptor(({ get deviceMemory() {
+      __navLogAccess('deviceMemory', getDeviceMemory);
+      if (!__isNavigatorThis(this)) {
+        if (typeof origGetDeviceMemory === 'function') return Reflect.apply(origGetDeviceMemory, this, arguments);
+        throw new TypeError();
+      }
+      return mem;
+    }}), 'deviceMemory').get;
+    __navRegisterKey('deviceMemory');
+    __navRegisterFn(getDeviceMemory);
     const okDeviceMemory = hasDeviceMemory ? (dDeviceMemory ?
-      (redefineAcc(navProto, 'deviceMemory', __wrapGetter('deviceMemory', () => mem, dDeviceMemory, __isNavigatorThis)), true) :
-      safeDefineAcc(navProto, 'deviceMemory', __wrapGetter('deviceMemory', () => mem, dDeviceMemory, __isNavigatorThis), { enumerable: true })) : true;
+      (redefineAcc(navProto, 'deviceMemory', getDeviceMemory), true) :
+      safeDefineAcc(navProto, 'deviceMemory', getDeviceMemory, { enumerable: true })) : true;
     if (okDeviceMemory === false) throw new TypeError('[nav_total_set] failed to define deviceMemory');
 
     const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
-    const dHardwareConcurrency = Object.getOwnPropertyDescriptor(navProto,'hardwareConcurrency');
+    const dHardwareConcurrency = Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency');
+    const origGetHardwareConcurrency = (dHardwareConcurrency && typeof dHardwareConcurrency.get === 'function') ? dHardwareConcurrency.get : null;
+    const getHardwareConcurrency = Object.getOwnPropertyDescriptor(({ get hardwareConcurrency() {
+      __navLogAccess('hardwareConcurrency', getHardwareConcurrency);
+      if (!__isNavigatorThis(this)) {
+        if (typeof origGetHardwareConcurrency === 'function') return Reflect.apply(origGetHardwareConcurrency, this, arguments);
+        throw new TypeError();
+      }
+      return cpu;
+    }}), 'hardwareConcurrency').get;
+    __navRegisterKey('hardwareConcurrency');
+    __navRegisterFn(getHardwareConcurrency);
     const okHardwareConcurrency = hasHardwareConcurrency ? (dHardwareConcurrency ?
-      (redefineAcc(navProto, 'hardwareConcurrency', __wrapGetter('hardwareConcurrency', () => cpu, dHardwareConcurrency, __isNavigatorThis)), true) :
-      safeDefineAcc(navProto, 'hardwareConcurrency', __wrapGetter('hardwareConcurrency', () => cpu, dHardwareConcurrency, __isNavigatorThis), { enumerable: true })) : true;
+      (redefineAcc(navProto, 'hardwareConcurrency', getHardwareConcurrency), true) :
+      safeDefineAcc(navProto, 'hardwareConcurrency', getHardwareConcurrency, { enumerable: true })) : true;
     if (okHardwareConcurrency === false) throw new TypeError('[nav_total_set] failed to define hardwareConcurrency');
 
     // ——— G. language(s) ———
