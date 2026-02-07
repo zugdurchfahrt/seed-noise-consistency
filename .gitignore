@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+bin/
 .vscode/
 *.py[codz]
 *$py.class
@@ -226,3 +227,4 @@ marimo/_lsp/
 __marimo__/
 sunami_BACKUP.bundle
 profile.json
+bin/_patched_copies/UAD/draft_override_user_agent_data.py

@@ -1062,7 +1062,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
 
    
-
+   
     //  ——— Debug information (unified log) ———
   if (G.__DEBUG__) {
     const hasUAD = ('userAgentData' in navigator);
