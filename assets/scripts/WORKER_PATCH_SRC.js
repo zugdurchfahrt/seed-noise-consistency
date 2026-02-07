@@ -69,7 +69,7 @@
     try {
       Object.defineProperty(self, '__GLOBAL_SEED', {
         value: seedInit,
-        writable: true,
+        writable: false,
         configurable: true,
         enumerable: false
       });

@@ -15,6 +15,7 @@ from datetime import datetime
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import WebDriverException
+
 import undetected_chromedriver as uc
 # ----------------------- DICTS-----------------------
 from depo_browser import chrome_versions, edge_versions, safari_versions, firefox_versions
@@ -248,17 +249,7 @@ def init_driver(
             msg = str(e)
             if "Timezone override is already in effect" not in msg:
                 raise
-            # Fail-fast: continue only if we can prove current timezone matches requested.
-            try:
-                res = driver.execute_cdp_cmd("Runtime.evaluate", {
-                    "expression": "Intl.DateTimeFormat().resolvedOptions().timeZone",
-                    "returnByValue": True,
-                })
-                cur_tz = ((res.get("result") or {}).get("value") or "").strip()
-            except Exception as ee:
-                raise RuntimeError("Timezone override already in effect, but current timezone cannot be verified") from ee
-            if cur_tz != timezone:
-                raise RuntimeError(f"Timezone override already in effect ({cur_tz}), expected {timezone}")
+            logger.warning("Timezone override already in effect; skipping initial override")
         driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
             "latitude": latitude,
             "longitude": longitude,
@@ -321,7 +312,7 @@ def init_driver(
             # --- env params ---
             Path(SCRIPTS_DIR / "env_params.js").read_text("utf-8"),
             "EnvParamsPatchModule(window);",
-            
+             
             # --- nav total set ---
             Path(SCRIPTS_DIR / "nav_total_set.js").read_text("utf-8"),
             "NavTotalSetPatchModule(window);",
@@ -510,6 +501,8 @@ def init_driver(
 
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
+    
+
 
     # Connect worker_bootstrap_js AFTER page_js:
     # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
@@ -669,6 +662,15 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
             "Emulation.setGeolocationOverride",
             {"latitude": latitude, "longitude": longitude, "accuracy": 100}
         )
+
+        def _inject_time_machine(driver):
+            timegeo_js = "\n;\n".join([
+                Path(SCRIPTS_DIR / "TimezoneOverride_source.js").read_text("utf-8"),
+                "patchTimeZone();",
+                Path(SCRIPTS_DIR / "GeoOverride_source.js").read_text("utf-8"),
+            ]) + "\n//# sourceURL=timegeo_bundle.js"
+            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": timegeo_js})
+        _inject_time_machine(driver)
 
         
         device_metrics = build_device_metrics(profile)
@@ -907,7 +909,6 @@ def main():
             "1920x1080": 1.0,
             # "2560x1440": 1.25,
             # "3840x2160": 2.0,
-            # "7680x4320": 3.0,
         }
         device_dpr_value = dpr_map.get(screen_res)
         if device_dpr_value is None:

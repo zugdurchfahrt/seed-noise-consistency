@@ -91,6 +91,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const origSetLocalDescription = Orig.prototype.setLocalDescription;
   const origAddIceCandidate = Orig.prototype.addIceCandidate;
   const origAddEventListener = Orig.prototype.addEventListener;
+  const origRemoveEventListener = Orig.prototype.removeEventListener;
   const origSetConfiguration = Orig.prototype.setConfiguration;
 
   // --- patch prototype methods via Core wrapper (Proxy/apply)
@@ -193,23 +194,76 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   // --- filter icecandidate listeners
+  const __iceListenerMap = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  const __iceCapture = function __iceCapture(options) {
+    if (options === true) return true;
+    if (!options || typeof options !== 'object') return false;
+    return !!options.capture;
+  };
+  const __iceRemember = function __iceRemember(thisArg, handler, capture, wrapped) {
+    if (!__iceListenerMap) return;
+    let m = __iceListenerMap.get(thisArg);
+    if (!m) { m = new Map(); __iceListenerMap.set(thisArg, m); }
+    let byHandler = m.get(handler);
+    if (!byHandler) { byHandler = new Map(); m.set(handler, byHandler); }
+    byHandler.set(capture ? 1 : 0, wrapped);
+  };
+  const __iceResolve = function __iceResolve(thisArg, handler, capture) {
+    if (!__iceListenerMap) return null;
+    const m = __iceListenerMap.get(thisArg);
+    if (!m) return null;
+    const byHandler = m.get(handler);
+    if (!byHandler) return null;
+    return byHandler.get(capture ? 1 : 0) || null;
+  };
+  const __iceForget = function __iceForget(thisArg, handler, capture) {
+    if (!__iceListenerMap) return;
+    const m = __iceListenerMap.get(thisArg);
+    if (!m) return;
+    const byHandler = m.get(handler);
+    if (!byHandler) return;
+    byHandler.delete(capture ? 1 : 0);
+    if (!byHandler.size) m.delete(handler);
+    if (!m.size) __iceListenerMap.delete(thisArg);
+  };
   if (typeof origAddEventListener === 'function') {
     Orig.prototype.addEventListener = wrapApply(origAddEventListener, 'addEventListener', function(nativeFn, thisArg, args) {
       const type = args && args.length ? args[0] : undefined;
       const handler = args && args.length > 1 ? args[1] : undefined;
       const options = args && args.length > 2 ? args[2] : undefined;
       if (type === 'icecandidate' && typeof handler === 'function') {
+        const capture = __iceCapture(options);
+        const once = !!(options && typeof options === 'object' && options.once);
         const wrapped = function(e) {
+          if (once) __iceForget(thisArg, handler, capture);
           if (!e || !e.candidate || (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))) {
             return handler.call(this, e);
           }
           if (e && typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
         };
+        __iceRemember(thisArg, handler, capture, wrapped);
         return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
       }
       return Reflect.apply(nativeFn, thisArg, args);
     });
   }
 
+
+  if (typeof origRemoveEventListener === 'function') {
+    Orig.prototype.removeEventListener = wrapApply(origRemoveEventListener, 'removeEventListener', function(nativeFn, thisArg, args) {
+      const type = args && args.length ? args[0] : undefined;
+      const handler = args && args.length > 1 ? args[1] : undefined;
+      const options = args && args.length > 2 ? args[2] : undefined;
+      if (type === 'icecandidate' && typeof handler === 'function') {
+        const capture = __iceCapture(options);
+        const wrapped = __iceResolve(thisArg, handler, capture);
+        if (wrapped) {
+          __iceForget(thisArg, handler, capture);
+          return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
+        }
+      }
+      return Reflect.apply(nativeFn, thisArg, args);
+    });
+  }
   console.log('[✔]RTC protection set');
 }

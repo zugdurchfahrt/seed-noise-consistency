@@ -126,11 +126,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
     // 1) предпочитаем OffscreenCanvas, если доступен
     if (typeof OffscreenCanvas !== 'undefined') {
-      try { return new OffscreenCanvas(w, h); } catch (e) {
-        if (typeof window.__DEGRADE__ === 'function') {
-          try { window.__DEGRADE__('canvas:makeCanvas:offscreen_ctor_failed', e); } catch (_e) {}
-        }
-      }
+      try { return new OffscreenCanvas(w, h); } catch {}
+    if (typeof document !== 'undefined') { const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
     }
     
     // 2) фолбэк: DOM <canvas>
@@ -146,17 +143,14 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   function get2DProto(ctx) {
     // pick exact proto for brand-safe native calls
-    const p = Object.getPrototypeOf(ctx);
-    const name = p && p.constructor && p.constructor.name;
-
-    if (name === 'OffscreenCanvasRenderingContext2D' && typeof OffscreenCanvasRenderingContext2D !== 'undefined') {
+    if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && ctx instanceof OffscreenCanvasRenderingContext2D) {
       return OffscreenCanvasRenderingContext2D.prototype;
     }
-    if (name === 'CanvasRenderingContext2D' && typeof CanvasRenderingContext2D !== 'undefined') {
+    if (typeof CanvasRenderingContext2D !== 'undefined' && ctx instanceof CanvasRenderingContext2D) {
       return CanvasRenderingContext2D.prototype;
     }
     // fallback: whatever the engine reports
-    return p;
+    return Object.getPrototypeOf(ctx);
   }
 
   function nativeGetImageData(P, ctx, x, y, w, h) {
@@ -271,11 +265,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (!ctx1 || !ctx2) return img;
 
     const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
-    try { ctx2.imageSmoothingEnabled = true; } catch (e) {
-      if (typeof window.__DEGRADE__ === 'function') {
-        try { window.__DEGRADE__('canvas:imageSmoothingEnabled:set_failed', e); } catch (_e) {}
-      }
-    }
+    try { ctx2.imageSmoothingEnabled = true; } catch {}
     nativePutImageData(P1, ctx1, img, 0, 0);
     nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
     nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
@@ -342,11 +332,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (!ctx1 || !ctx2) return img;
     const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
 
-    try { ctx2.imageSmoothingEnabled = true; } catch (e) {
-      if (typeof window.__DEGRADE__ === 'function') {
-        try { window.__DEGRADE__('canvas:imageSmoothingEnabled:set_failed', e); } catch (_e) {}
-      }
-    }
+    try { ctx2.imageSmoothingEnabled = true; } catch {}
     nativePutImageData(P1, ctx1, img, 0, 0);
     nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
     nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
@@ -550,10 +536,25 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return [ q256(x), q256(y), q256(w), q256(h) ];
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   // --- toBlob noise injection hook (HTMLCanvasElement) ---
   async function patchToBlobInjectNoise(blob, ...args) {
-    // 1) Ничего не делать, если blob пустой или не image/*
-    if (!blob || !(blob instanceof Blob)) return;
+    try {
+      // 1) Ничего не делать, если blob пустой или не image/*
+      if (!blob || !(blob instanceof Blob)) return;
 
       const typeArg = (typeof args[0] === 'string')
         ? args[0]
@@ -620,26 +621,27 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
           return await sc.convertToBlob({ type: mime, quality: q });
         }
         return await new Promise(r => sc.toBlob(r, mime, q));
-    } finally {
-      try { bmp && bmp.close && bmp.close(); } catch (e) {
-        if (typeof window.__DEGRADE__ === 'function') {
-          try { window.__DEGRADE__('canvas:bitmap:close_failed', e); } catch (_e) {}
-        }
+      } finally {
+        try { bmp && bmp.close && bmp.close(); } catch {}
       }
+    } catch {
+      // на любой ошибке — пропустить (вернуть undefined)
+      return;
     }
   }
 
   // IHDR-патч PNG для Offscreen/HTML convertToBlob (Promise-ветка) + выравнивание шума с toBlob/toDataURL
   async function patchConvertToBlobInjectNoise(blob, options) {
-    if (!blob) return;
+    try {
+      if (!blob) return;
 
       const reqType = (options && options.type) || blob.type || 'image/png';
       const mime = String(reqType).toLowerCase();
 
       // 1) Сначала попытаемся сделать decode → __resampleWithJitter__('encode') → re-encode,
       //    чтобы Offscreen дал тот же результат, что toBlob/toDataURL.
-      let bmp;
       try {
+        let bmp;
         if (typeof createImageBitmap === 'function') {
           try {
             bmp = await createImageBitmap(blob, {
@@ -661,11 +663,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
             if (sc) {
               const sctx = sc.getContext('2d', { willReadFrequently: true });
               if (sctx) {
-                try { sctx.imageSmoothingEnabled = false; } catch (e) {
-                  if (typeof window.__DEGRADE__ === 'function') {
-                    try { window.__DEGRADE__('canvas:imageSmoothingEnabled:disable_failed', e); } catch (_e) {}
-                  }
-                }
+                try { sctx.imageSmoothingEnabled = false; } catch {}
                 sctx.drawImage(bmp, 0, 0);
                 const img = sctx.getImageData(0, 0, w, h);
                 const j   = __resampleWithJitter__(img, 'encode', __CNV_CFG__); // тот же label, что у toBlob/toDataURL
@@ -706,7 +704,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       writeBE(u8, 12 + 4 + 13, crc >>> 0);
 
       // 6) возвращаем новый Blob с тем же типом
-    return new Blob([u8], { type: 'image/png' });
+      return new Blob([u8], { type: 'image/png' });
+
+    } catch {
+      // На любой ошибке не ломаем цепочку — просто пропускаем дальше исходный blob
+      return;
+    }
 
     // --- helpers ---
     function clampInt(v, min, max) {
@@ -848,27 +851,22 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return ctx;
     }
 
-    // 1) Снимаем пиксели, добавляем детерминированный микрошум, без мутаций исходника
+    // 1) Снимаем пиксели, добавляем детерминированный микрошум, кладём обратно
     const ctx = get2dRF(canvas);
     if (!ctx) return res;
     let img;
+    let buf;
     let snap;
     try {
       img = ctx.getImageData(0, 0, w, h);
-      const j   = __resampleWithJitter__(img, 'encode', __CNV_CFG__);
-      const tmpC = makeCanvas(w, h);
-      const tmpX = tmpC && tmpC.getContext && tmpC.getContext('2d', { willReadFrequently: true });
-      if (tmpX && j && j.data && j.width === w && j.height === h) {
-        tmpX.putImageData(j, 0, 0);
-        snap = tmpX.getImageData(0, 0, w, h);
-      } else {
-        snap = img;
-      }
+      const j = __resampleWithJitter__(img, 'encode', __CNV_CFG__);
+      buf = (j && j.data && j.width === w && j.height === h) ? j : img;
+      snap = buf;
     } catch(_) { /* тихий фолбэк на исходный res */ }
 
     // Снимок без мутаций
     if (!snap) {
-      snap = img || ctx.getImageData(0, 0, w, h);
+      return res;
     }
 
     // Усиленная быстрая сигнатура (FNV-1a, выборка с шагом)
@@ -913,7 +911,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (!sctx) return res;
     sctx.imageSmoothingEnabled = false;
     // единый edge-aware ресэмпл с микроджиттером (вариант B: шум при кодировании)
-    const buf = __resampleWithJitter__(snap, 'encode', __CNV_CFG__); // ImageData
+    if (!buf) buf = snap;
     sctx.putImageData(buf, 0, 0);
 
 
@@ -946,13 +944,13 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     // perform original draw
     const res = origDrawImage.apply(this, a);
     const ctx = this;
-    const cnv = ctx.canvas ? ctx.canvas : ctx;
+    const cnv = ctx.canvas || ctx;
     if (!cnv || !cnv.width || !cnv.height) return res;
 
     // reentrancy guard per canvas
     const __GUARD__ = Symbol.for('cnv.guard');
-    if (cnv && cnv[__GUARD__]) return res;
-    if (cnv) cnv[__GUARD__] = true;
+    if (cnv[__GUARD__]) return res;
+    cnv[__GUARD__] = true;
 
     try {
       // compute affected region from normalized args
@@ -991,7 +989,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       }
 
     } finally {
-      if (cnv) cnv[__GUARD__] = false;
+      cnv[__GUARD__] = false;
     }
 
     return res;
@@ -1021,6 +1019,150 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// === Font size scaling: контейнер мастеров (живёт в canvas.js) ===
+
+// Делаем имена доступными на уровне CanvasPatchModule (для экспорта ниже)
+let applyFillTextHook, applyStrokeTextHook;
+
+(function patchFontSizeScalingHooks(){
+  if (window.__PATCH_FONT_SCALE_HOOKS__) return;
+  window.__PATCH_FONT_SCALE_HOOKS__ = true;
+
+  const Hooks = (window.CanvasPatchHooks ||= {});
+
+  // ——— helpers ———
+  // Разбор font-шортхенда: "... 16px/normal Arial"
+  function parseFontShorthand(font) {
+    const m = String(font || '').match(
+      /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
+    );
+    if (!m) {
+      return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
+    }
+    return {
+      style:   m[1] || 'normal',
+      variant: m[2] || 'normal',
+      weight:  m[3] || 'normal',
+      sizePx:  parseFloat(m[4]),
+      line:    m[5],
+      family:  m[6]
+    };
+  }
+
+  // Масштаб под текст: сперва fontPatchConfigs, фолбэк — __FONT_SCALE__
+  function getScaleForText(ctx, text) {
+    try {
+      const cfgs = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
+      const font = String(ctx && ctx.font || '');
+      for (const c of cfgs) {
+        const fam = (c.family instanceof RegExp) ? c.family : new RegExp(c.family || '.*', 'i');
+        const wt  = (c.weight == null) ? null : String(c.weight).toLowerCase();
+        if (fam.test(font) && (!wt || font.toLowerCase().includes(wt))) {
+          const sx = Number.isFinite(c.scaleX) ? c.scaleX : (Number.isFinite(c.scale) ? c.scale : 1);
+          const sy = Number.isFinite(c.scaleY) ? c.scaleY : (Number.isFinite(c.scale) ? c.scale : 1);
+          return { sx, sy };
+        }
+      }
+    } catch {}
+    const s = (typeof window.__FONT_SCALE__ === 'number' && isFinite(window.__FONT_SCALE__)) ? window.__FONT_SCALE__ : 1;
+    return { sx: s, sy: s };
+  }
+
+
+
+
+  // ——— мастер для fillText: согласованный рендер ———
+  applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
+    const { sx, sy } = getScaleForText(this, text);
+    if (sx===1 && sy===1) {
+      return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+    }
+    // Изотропный случай — временно масштабируем font.sizePx (быстрее)
+    if (Math.abs(sx - sy) < 1e-6) {
+      const prev = this.font || '';
+      try {
+        const f = parseFontShorthand(prev);
+        f.sizePx *= sx;
+        this.font = buildFont(f);
+        return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+      } finally {
+        this.font = prev;
+      }
+    }
+    // Анизотропный — матричный scale + компенсация координат/ширины
+    this.save();
+    try {
+      this.scale(sx, sy);
+      return (maxWidth!=null)
+        ? origFillText(text, x/sx, y/sy, maxWidth/sx)
+        : origFillText(text, x/sx, y/sy);
+    } finally {
+      this.restore();
+    }
+  };
+
+  // ——— мастер для strokeText: то же, что выше ———
+  applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
+    const { sx, sy } = getScaleForText(this, text);
+    if (sx===1 && sy===1) {
+      return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+    }
+    if (Math.abs(sx - sy) < 1e-6) {
+      const prev = this.font || '';
+      try {
+        const f = parseFontShorthand(prev);
+        f.sizePx *= sx;
+        this.font = buildFont(f);
+        return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+      } finally {
+        this.font = prev;
+      }
+    }
+    this.save();
+    try {
+      this.scale(sx, sy);
+      return (maxWidth!=null)
+        ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
+        : origStrokeText(text, x/sx, y/sy);
+    } finally {
+      this.restore();
+    }
+  };
+})(); // ← IIFE корректно закрыт
+
+
+
+
+
+
+
+
+
+
+
+
+// --- final export ---
 // --- final export ---
 window.CanvasPatchHooks = {
   patch2DNoise,
@@ -1035,6 +1177,9 @@ window.CanvasPatchHooks = {
   strokeTextNoiseHook,
   fillRectNoiseHook,
   addCanvasNoise,
-  applyDrawImageHook
+  applyDrawImageHook,
+  applyFillTextHook,
+  applyStrokeTextHook,
+
 };
 }

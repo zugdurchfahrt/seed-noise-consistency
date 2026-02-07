@@ -43,50 +43,36 @@ const CoreWindowModule = function CoreWindowModule(window) {
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
   const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
   const existingToString = fpToStringDesc && fpToStringDesc.value;
-  const existingToStringBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
-  if (existingToStringBridge) {
-    const missingNative = (typeof existingToString.__NativeToString !== 'function');
-    const missingMap = !(existingToString.__NativeToStringMap instanceof WeakMap);
-    if (missingNative || missingMap) {
-      try {
-        if (missingNative) {
-          Object.defineProperty(existingToString, '__NativeToString', {
-            value: existingToString,
-            writable: false,
-            configurable: true,
-            enumerable: false
-          });
-        }
-        if (missingMap) {
-          Object.defineProperty(existingToString, '__NativeToStringMap', {
-            value: new WeakMap(),
-            writable: false,
-            configurable: true,
-            enumerable: false
-          });
-        }
-      } catch (e) {
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_restore_failed", e);
-        throw e;
-      }
-    }
-    if (typeof existingToString.__NativeToString !== 'function' || !(existingToString.__NativeToStringMap instanceof WeakMap)) {
-      const e = new Error('[CoreWindow] toString bridge invalid');
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_invalid", e);
+
+  const existingCoreToStringState = window && window.__CORE_TOSTRING_STATE__;
+  const existingCoreToStringStateOk = !!(existingCoreToStringState
+    && existingCoreToStringState.__CORE_TOSTRING_STATE__ === true
+    && typeof existingCoreToStringState.nativeToString === 'function'
+    && (existingCoreToStringState.overrideMap instanceof WeakMap)
+    && (existingCoreToStringState.proxyTargetMap instanceof WeakMap));
+
+  if (!existingCoreToStringStateOk) {
+    const legacyBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
+    if (legacyBridge) {
+      const e = new Error('[CoreWindow] legacy toString bridge detected without state');
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_legacy_bridge_without_state", e);
       throw e;
     }
   }
-  const nativeToString = existingToStringBridge
-    ? existingToString.__NativeToString
+
+  const nativeToString = existingCoreToStringStateOk
+    ? existingCoreToStringState.nativeToString
     : (existingToString || Function.prototype.toString);
   if (typeof nativeToString !== 'function') {
     throw new Error('[CoreWindow] Function.prototype.toString missing');
   }
-  const existingToStringMap = existingToStringBridge
-    ? existingToString.__NativeToStringMap
-    : null;
-  const toStringOverrideMap = existingToStringMap || new WeakMap();
-  const toStringProxyTargetMap = new WeakMap();
+
+  const toStringOverrideMap = existingCoreToStringStateOk
+    ? existingCoreToStringState.overrideMap
+    : new WeakMap();
+  const toStringProxyTargetMap = existingCoreToStringStateOk
+    ? existingCoreToStringState.proxyTargetMap
+    : new WeakMap();
 
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
@@ -203,8 +189,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
   {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-    const existingToString = toStringDesc && toStringDesc.value;
-    if (existingToString && existingToString.__TOSTRING_BRIDGE__) {
+    const currentToString = toStringDesc && toStringDesc.value;
+
+    if (existingCoreToStringStateOk) {
       const markAsNative = ensureMarkAsNative();
       const probe = function probe(){};
       markAsNative(probe);
@@ -214,19 +201,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_probe_missing", e);
         throw e;
       }
-      const actual = existingToString.call(probe);
+      if (typeof currentToString !== 'function') {
+        const e = new Error('[CoreWindow] Function.prototype.toString missing');
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_missing", e);
+        throw e;
+      }
+      const actual = currentToString.call(probe);
       if (actual !== expected) {
         const e = new Error('[CoreWindow] toString bridge mismatch');
         if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_mismatch", e);
         throw e;
-      }
-      if (existingToString.__TOSTRING_PROXY_INSTALLED__ !== true) {
-        safeDefine(existingToString, '__TOSTRING_PROXY_INSTALLED__', {
-          value: true,
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
       }
     } else {
       const toString = ({ toString() {
@@ -235,7 +219,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         const v = toStringOverrideMap.get(this);
         if (v !== undefined) return v;
-        // Proxy-wrapped native: resolve by stable target reference.
         const t = toStringProxyTargetMap.get(this);
         if (t) {
           const tv = toStringOverrideMap.get(t);
@@ -244,32 +227,20 @@ const CoreWindowModule = function CoreWindowModule(window) {
         return nativeToString.call(this);
       }}).toString;
 
-      Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
-        value: true,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
-      Object.defineProperty(toString, '__NativeToString', {
-        value: nativeToString,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
-      Object.defineProperty(toString, '__NativeToStringMap', {
-        value: toStringOverrideMap,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
-      Object.defineProperty(toString, '__TOSTRING_PROXY_INSTALLED__', {
-        value: true,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
       const markAsNative = ensureMarkAsNative();
       markAsNative(toString, 'toString');
+
+      safeDefine(window, '__CORE_TOSTRING_STATE__', {
+        value: {
+          __CORE_TOSTRING_STATE__: true,
+          nativeToString: nativeToString,
+          overrideMap: toStringOverrideMap,
+          proxyTargetMap: toStringProxyTargetMap
+        },
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
 
       Object.defineProperty(Function.prototype, 'toString', {
         value: toString,

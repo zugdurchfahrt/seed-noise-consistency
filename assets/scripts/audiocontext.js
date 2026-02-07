@@ -13,7 +13,13 @@ const AudioContextModule = function AudioContextModule(window) {
     }
     return m;
   })();
-  const AUDIO_NOISE_ENABLED = false;
+  const safeDefine = (typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
+  const __wrapNativeApply = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
+  const __wrapNativeAccessor = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
+  if (typeof safeDefine !== 'function') throw new Error('[AudioContextPatch] __safeDefine missing');
+  if (typeof __wrapNativeApply !== 'function') throw new Error('[AudioContextPatch] __wrapNativeApply missing');
+  if (typeof __wrapNativeAccessor !== 'function') throw new Error('[AudioContextPatch] __wrapNativeAccessor missing');
+  const AUDIO_NOISE_ENABLED = true;
 
   const GUARD = globalThis.__AUDIO_CTX_GUARD__ || (globalThis.__AUDIO_CTX_GUARD__ = {
     counts: {},
@@ -123,64 +129,67 @@ const AudioContextModule = function AudioContextModule(window) {
     const CTX_NAME = CTX && CTX.name ? CTX.name : 'AudioContext';
     const priority = (CTX === window.AudioContext || CTX === window.webkitAudioContext) ? 2 : 1;
 
-    // 3. We only patch sampleRate/baseLatency (getter does not break fingerprint)
-    const sampleRateDesc = Object.getOwnPropertyDescriptor(proto, 'sampleRate');
-    if (canRedefine(proto, 'sampleRate', CTX_NAME)) {
-      const origSampleGet = sampleRateDesc && sampleRateDesc.get;
-      const getSampleRate = markAsNative(
-        makeGetter('sampleRate', function(){
-          maybeUpdateRates(this, origSampleGet, null, priority);
-          return nativeSampleRate;
-        }),
-        'get sampleRate'
-      );
+    // 3. patch sampleRate/baseLatency: wrap native accessor to preserve native shape
+    const sampleRateDesc = Object.getOwnPropertyDescriptor(proto, 'sampleRate') || getPropDescriptorDeep(proto, 'sampleRate');
+    if (sampleRateDesc && typeof sampleRateDesc.get === 'function' && canRedefine(proto, 'sampleRate', CTX_NAME)) {
+      const origSampleGet = sampleRateDesc.get;
+      const getSampleRate = __wrapNativeAccessor(origSampleGet, 'get sampleRate', function(target, thisArg, argList) {
+        const v = Reflect.apply(target, thisArg, []);
+        if (Number.isFinite(v) && priority >= sampleRateSource) { nativeSampleRate = v; sampleRateSource = priority; }
+        return v;
+      });
       Object.defineProperty(proto, 'sampleRate', {
         get: getSampleRate,
+        set: sampleRateDesc.set,
         configurable: sampleRateDesc ? !!sampleRateDesc.configurable : true,
         enumerable: sampleRateDesc ? !!sampleRateDesc.enumerable : false
       });
     }
     if ('baseLatency' in proto) {
-      const baseLatencyDesc = Object.getOwnPropertyDescriptor(proto, 'baseLatency');
-      if (canRedefine(proto, 'baseLatency', CTX_NAME)) {
-        const origBaseGet = baseLatencyDesc && baseLatencyDesc.get;
-        const getBaseLatency = markAsNative(
-          makeGetter('baseLatency', function(){
-            maybeUpdateRates(this, null, origBaseGet, priority);
-            return nativeBaseLatency;
-          }),
-          'get baseLatency'
-        );
+      const baseLatencyDesc = Object.getOwnPropertyDescriptor(proto, 'baseLatency') || getPropDescriptorDeep(proto, 'baseLatency');
+      if (baseLatencyDesc && typeof baseLatencyDesc.get === 'function' && canRedefine(proto, 'baseLatency', CTX_NAME)) {
+        const origBaseGet = baseLatencyDesc.get;
+        const getBaseLatency = __wrapNativeAccessor(origBaseGet, 'get baseLatency', function(target, thisArg, argList) {
+          const v = Reflect.apply(target, thisArg, []);
+          if (Number.isFinite(v) && priority >= baseLatencySource) { nativeBaseLatency = v; baseLatencySource = priority; }
+          return v;
+        });
         Object.defineProperty(proto, 'baseLatency', {
           get: getBaseLatency,
+          set: baseLatencyDesc.set,
           configurable: baseLatencyDesc ? !!baseLatencyDesc.configurable : true,
           enumerable: baseLatencyDesc ? !!baseLatencyDesc.enumerable : false
         });
       }
     }
 
-    // 4. patch createBuffer: delegate to native (preserve brand-check semantics)
-    if (typeof proto.createBuffer === 'function' && canReplaceMethod(proto, 'createBuffer', CTX_NAME)) {
-      const origCreateBuffer = proto.createBuffer;
-      const patchedCreateBuffer = markAsNative(
-        makeMethod('createBuffer', function(numOfChannels, length, sampleRate) {
-          return origCreateBuffer.call(this, numOfChannels, length, sampleRate);
-        }),
-        'createBuffer'
-      );
-      proto.createBuffer = patchedCreateBuffer;
+
+    // 4. patch createBuffer (descriptor-strict): wrap native method via Core wrapper
+    const dCreateBuffer = Object.getOwnPropertyDescriptor(proto, 'createBuffer') || getPropDescriptorDeep(proto, 'createBuffer');
+    if (dCreateBuffer && typeof dCreateBuffer.value === 'function' && canReplaceMethod(proto, 'createBuffer', CTX_NAME)) {
+      const origCreateBuffer = dCreateBuffer.value;
+      const wrappedCreateBuffer = __wrapNativeApply(origCreateBuffer, 'createBuffer', function(target, thisArg, argList) {
+        return Reflect.apply(target, thisArg, argList);
+      });
+      safeDefine(proto, 'createBuffer', {
+        value: wrappedCreateBuffer,
+        writable: !!dCreateBuffer.writable,
+        configurable: !!dCreateBuffer.configurable,
+        enumerable: !!dCreateBuffer.enumerable
+      });
       console.log('[AudioContextPatch] Patched createBuffer on', CTX_NAME);
     }
+
   // 5. patch AnalyserNode (preserveing invariants)
-  if (typeof proto.createAnalyser === 'function' && canReplaceMethod(proto, 'createAnalyser', CTX_NAME)) {
+  if (AUDIO_NOISE_ENABLED && typeof proto.createAnalyser === 'function' && canReplaceMethod(proto, 'createAnalyser', CTX_NAME)) {
     const origCreateAnalyser = proto.createAnalyser;
     proto.createAnalyser = markAsNative(makeMethod('createAnalyser', function() {
       const analyser = origCreateAnalyser.call(this);
 
       // --- Byte Spectrum: discrete ±1/0 with compensation of the summ ---
-      const origByte = analyser.getByteFrequencyData.bind(analyser);
+      const origByte = analyser.getByteFrequencyData;
       analyser.getByteFrequencyData = markAsNative(makeMethod('getByteFrequencyData', function(array) {
-        origByte(array);
+        Reflect.apply(origByte, this, [array]);
         if (!AUDIO_NOISE_ENABLED) return;
         let delta = 0;
         const n = array.length | 0;
@@ -201,9 +210,9 @@ const AudioContextModule = function AudioContextModule(window) {
       }), 'getByteFrequencyData');
 
       // --- Float Spectrum: pair of zero summary noise, without going out for [min,max] ---
-      const origFloat = analyser.getFloatFrequencyData.bind(analyser);
+      const origFloat = analyser.getFloatFrequencyData;
       analyser.getFloatFrequencyData = markAsNative(makeMethod('getFloatFrequencyData', function(array) {
-        origFloat(array);
+        Reflect.apply(origFloat, this, [array]);
         if (!AUDIO_NOISE_ENABLED) return;
         const lo = (typeof this.minDecibels === 'number') ? this.minDecibels : -100;
         const hi = (typeof this.maxDecibels === 'number') ? this.maxDecibels : -30;
@@ -237,10 +246,10 @@ const AudioContextModule = function AudioContextModule(window) {
       }), 'getFloatFrequencyData');
 
       // --- Byte time-domain: paired±1 (The sum preserved) carefully [0..255] ---
-      const origByteTD = analyser.getByteTimeDomainData?.bind(analyser);
+      const origByteTD = analyser.getByteTimeDomainData;
       if (typeof origByteTD === 'function') {
         analyser.getByteTimeDomainData = markAsNative(makeMethod('getByteTimeDomainData', function(array) {
-          origByteTD(array);
+          Reflect.apply(origByteTD, this, [array]);
           if (!AUDIO_NOISE_ENABLED) return;
           const n = array.length | 0;
           for (let i = 0, j = n - 1; i < j; i++, j--) {
@@ -268,10 +277,10 @@ const AudioContextModule = function AudioContextModule(window) {
       }
 
       // --- Float time-domain: pair zero-summary noise within [-1..1] ---
-      const origFloatTD = analyser.getFloatTimeDomainData?.bind(analyser);
+      const origFloatTD = analyser.getFloatTimeDomainData;
       if (typeof origFloatTD === 'function') {
         analyser.getFloatTimeDomainData = markAsNative(makeMethod('getFloatTimeDomainData', function(array) {
-          origFloatTD(array);
+          Reflect.apply(origFloatTD, this, [array]);
           if (!AUDIO_NOISE_ENABLED) return;
           const n = array.length | 0;
           if (!n) return;
@@ -309,15 +318,24 @@ const AudioContextModule = function AudioContextModule(window) {
 
 
   // 6.Patch OfflineAudioContext (add noise)
-  if (typeof OfflineAudioContext.prototype.startRendering === 'function') {
-      const origStartRendering = OfflineAudioContext.prototype.startRendering;
-      OfflineAudioContext.prototype.startRendering = markAsNative(function startRendering(...args) {
-          return origStartRendering.apply(this, args).then(buffer => {
-              //add Noise, if necessary
-              return addNoiseToRenderBuffer(buffer);
-          });
-      }, 'startRendering');
+  if (AUDIO_NOISE_ENABLED && typeof OfflineAudioContext.prototype.startRendering === 'function') {
+      const dStart = Object.getOwnPropertyDescriptor(OfflineAudioContext.prototype, 'startRendering');
+      const origStartRendering = dStart && dStart.value;
+      if (typeof origStartRendering === 'function' && canReplaceMethod(OfflineAudioContext.prototype, 'startRendering', 'OfflineAudioContext')) {
+        const wrappedStartRendering = __wrapNativeApply(origStartRendering, 'startRendering', function(target, thisArg, argList) {
+          const p = Reflect.apply(target, thisArg, argList);
+          if (!p || typeof p.then !== 'function') return p;
+          return p.then(buffer => addNoiseToRenderBuffer(buffer));
+        });
+        safeDefine(OfflineAudioContext.prototype, 'startRendering', {
+          value: wrappedStartRendering,
+          writable: dStart ? !!dStart.writable : true,
+          configurable: dStart ? !!dStart.configurable : true,
+          enumerable: dStart ? !!dStart.enumerable : false
+        });
+      }
   }
+
 
   // 7. noise in renderBuffer
   function addNoiseToRenderBuffer(buffer) {

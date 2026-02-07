@@ -71,65 +71,40 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   }
 
 
-  const proto = Navigator.prototype;
+  // navigator.webdriver → spoof value without global patching:
+  // - do not patch Object.getOwnPropertyDescriptor / Reflect.has globally (descriptor invariants)
+  // - do not introduce Navigator.prototype.webdriver if it doesn't exist anywhere in the chain
+  // - preserve descriptor flags when possible
+  const nav = navigator;
+  let wdTarget = null;
+  let wdDesc = null;
+  try {
+    let cur = nav;
+    while (cur) {
+      const d = nativeGetOwnProp(cur, 'webdriver');
+      if (d) { wdTarget = cur; wdDesc = d; break; }
+      cur = Object.getPrototypeOf(cur);
+    }
+  } catch (_) {}
 
-  // navigator.webdriver → undefined (preserve descriptor layout when present)
-  const wdDesc = Object.getOwnPropertyDescriptor(proto, 'webdriver');
   if (wdDesc && wdDesc.configurable === false) {
     throw new TypeError('[HideWebdriverPatchModule] webdriver non-configurable');
   }
-  if ('webdriver' in navigator || wdDesc) {
-    safeDefine(proto, 'webdriver', {
-      get: markAsNative(() => undefined, "get webdriver"),
+  if (wdTarget) {
+    const getWebdriver = Object.getOwnPropertyDescriptor(({ get webdriver() {
+      // keep native-like brand-check semantics
+      if (this !== nav && this !== wdTarget) {
+        throw new TypeError();
+      }
+      return false;
+    }}), 'webdriver').get;
+    safeDefine(wdTarget, 'webdriver', {
+      get: markAsNative(getWebdriver, "get webdriver"),
       set: wdDesc && wdDesc.set,
       configurable: wdDesc ? !!wdDesc.configurable : true,
-      enumerable: false
+      enumerable: wdDesc ? !!wdDesc.enumerable : false
     });
   }
-
-  // --- keep natives once ---
-  const nativeGOPD = nativeGetOwnProp;
-  const nativeHas  = Reflect.has;
-
-  // one predicate
-  const isWebdriver = (obj, prop) =>
-    prop === 'webdriver' && (obj === navigator || obj === Navigator.prototype);
-
-  // one wrapper factory
-  function wrapNative(name, nativeFn, implFn) {
-    const wrap = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
-    if (typeof wrap !== 'function') {
-      throw new Error('[HideWebdriverPatchModule] __wrapNativeApply missing');
-    }
-    if (typeof nativeFn !== 'function') {
-      throw new TypeError('[HideWebdriverPatchModule] wrapNative: nativeFn must be function');
-    }
-    if (typeof implFn !== 'function') {
-      throw new TypeError('[HideWebdriverPatchModule] wrapNative: implFn must be function');
-    }
-    return wrap(nativeFn, name, function(_nativeFn, thisArg, args) {
-      return implFn.apply(thisArg, args);
-    });
-  }
-
-  // --- apply patches ---
-  Object.getOwnPropertyDescriptor = wrapNative(
-    'getOwnPropertyDescriptor',
-    nativeGOPD,
-    function (obj, prop) {
-      if (isWebdriver(obj, prop)) return undefined;
-      return nativeGOPD(obj, prop);
-    }
-  );
-
-  Reflect.has = wrapNative(
-    'has',
-    nativeHas,
-    function (target, prop) {
-      if (target === navigator && prop === 'webdriver') return false;    
-      return nativeHas(target, prop);
-    }
-  );
 
   safeDefine(window, '__HIDE_WEBDRIVER_READY__', {
     value: true,
