@@ -335,7 +335,7 @@ def init_driver(
             "WrkModule(window);",
             # --- env params ---
             Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
-            "EnvParamsPatchModule(window);",
+            "RNGsetModule(window);",
              
             # --- nav total set ---
             Path(SCRIPTS_PATCHES_NAV / "nav_total_set.js").read_text("utf-8"),
@@ -379,10 +379,6 @@ def init_driver(
             # --- context ---
             Path(SCRIPTS_CORE / "context.js").read_text("utf-8"),
             "ContextPatchModule(window);",
-            # --- headers interceptor ---
-            Path(SCRIPTS_PATCHES_STEALTH / "headers_interceptor.js").read_text("utf-8"),
-            "HeadersInterceptor(window);",
-            # --- Register hooks / post-apply ---
             """
             // —————— Register all hooks here ——————//
             if (typeof registerAllHooks === 'function') registerAllHooks();
@@ -489,8 +485,6 @@ def init_driver(
     # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
-
- 
     # =========================
     # [CH] Setting up Client hints (CDP-only) + __HEADERS__ (JS, NEW DOCUMENT)
     # NOTE: No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
@@ -529,15 +523,21 @@ def init_driver(
     # --- [HDR/01] prepare JS for NEW DOCUMENT: window.__HEADERS__ ---
     # window.__HEADERS__ — Basic set for JS-paatch. На cross-origin  safelisted (accept-language).
     # Keys like sec-ch-* will be ignored by JS (CDP-only).
+        
     headers_window_js = f"""
     window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
-    console.log("[headers_interceptor.js] window.__HEADERS__ injected (safelisted only)");
-    """
+    console.log("[headers_stage] window.__HEADERS__ injected (safelisted only)");
 
+    {Path(SCRIPTS_PATCHES_STEALTH / "headers_interceptor.js").read_text("utf-8")}
+    HeadersInterceptor(window);
+
+    //# sourceURL=headers_stage.js
+    """
     # --- [HDR/02] CDP: register __HEADERS__ for every NEW DOCUMENT ---
     # window.__HEADERS__ injected (safelisted only)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
-
+    
+ 
     # --- [HDR/03] load bridge JS (text) ---
     # Headers interceptor bridge to sync allow/ignore CDP with Fetch interceptor
     headers_bridge_path = (SCRIPTS_PATCHES_STEALTH / "headers_bridge.js")

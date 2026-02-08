@@ -1,5 +1,5 @@
 (function () {
-  const EnvParamsPatchModule = function EnvParamsPatchModule(window) {
+  const RNGsetModule = function RNGsetModule(window) {
     'use strict';
     // Global-Alias ​​(reliable in the window and workrs)
     const G = (typeof globalThis !== 'undefined' && globalThis)
@@ -111,7 +111,7 @@
       }
     })();
 
-    try { console.log('[ENV] EnvParamsPatchModule ready'); } catch (_) {}
+    try { console.log('[PRNG] RNGsetModule ready'); } catch (_) {}
   }
 
   // Function export*
@@ -121,16 +121,16 @@
         || (typeof global     !== 'undefined' && global)
         || {};
 
-  if (typeof G.EnvParamsPatchModule !== 'function') {
+  if (typeof G.RNGsetModule !== 'function') {
     try {
-      Object.defineProperty(G, 'EnvParamsPatchModule', {
-        value: EnvParamsPatchModule,
+      Object.defineProperty(G, 'RNGsetModule', {
+        value: RNGsetModule,
         writable: false,
         configurable: false,
         enumerable: true
       });
     } catch {
-      G.EnvParamsPatchModule = EnvParamsPatchModule;
+      G.RNGsetModule = RNGsetModule;
     }
   }
 })();
