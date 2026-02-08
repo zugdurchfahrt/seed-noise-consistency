@@ -1,7 +1,7 @@
 from mitmproxy import http
 import json
 from collections import deque
-from overseer import setup_logger
+from tools.tools_infra.overseer import setup_logger
 proxy_logger = setup_logger().getChild("proxy")
 proxy_logger.info("Модуль logs/proxy_full.log")
 LOG_PATH = "mitmproxy_full_log.txt"  

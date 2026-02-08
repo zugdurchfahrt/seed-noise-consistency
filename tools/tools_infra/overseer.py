@@ -3,7 +3,7 @@ import sys
 import logging
 import pathlib
 
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parent
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 class Overseer:
     """

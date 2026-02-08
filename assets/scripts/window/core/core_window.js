@@ -29,7 +29,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
-  // export for consumers (hide_webdriver.js and others)
+  // export for consumers 
   if (typeof window.__safeDefine !== 'function') {
     safeDefine(window, '__safeDefine', {
       value: safeDefine,
@@ -191,6 +191,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = toStringDesc && toStringDesc.value;
 
+    // Validate any existing bridge state, then (re)install toString wrapper.
     if (existingCoreToStringStateOk) {
       const markAsNative = ensureMarkAsNative();
       const probe = function probe(){};
@@ -212,43 +213,49 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_mismatch", e);
         throw e;
       }
-    } else {
-      const toString = ({ toString() {
-        if (typeof this !== 'function') {
-          return nativeToString.call(this);
+    }
+
+    const toString = new Proxy(nativeToString, {
+      apply(target, thisArg, argList) {
+        // Preserve native brand-check semantics.
+        if (typeof thisArg !== 'function') {
+          return Reflect.apply(target, thisArg, argList);
         }
-        const v = toStringOverrideMap.get(this);
+        const v = toStringOverrideMap.get(thisArg);
         if (v !== undefined) return v;
-        const t = toStringProxyTargetMap.get(this);
+        const t = toStringProxyTargetMap.get(thisArg);
         if (t) {
           const tv = toStringOverrideMap.get(t);
           if (tv !== undefined) return tv;
         }
-        return nativeToString.call(this);
-      }}).toString;
+        return Reflect.apply(target, thisArg, argList);
+      }
+    });
 
-      const markAsNative = ensureMarkAsNative();
-      markAsNative(toString, 'toString');
+    // Ensure self-toString looks native when inspected via our bridge.
+    toStringProxyTargetMap.set(toString, nativeToString);
 
-      safeDefine(window, '__CORE_TOSTRING_STATE__', {
-        value: {
-          __CORE_TOSTRING_STATE__: true,
-          nativeToString: nativeToString,
-          overrideMap: toStringOverrideMap,
-          proxyTargetMap: toStringProxyTargetMap
-        },
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
+    const markAsNative = ensureMarkAsNative();
+    markAsNative(toString, 'toString');
 
-      Object.defineProperty(Function.prototype, 'toString', {
-        value: toString,
-        writable: toStringDesc ? !!toStringDesc.writable : true,
-        configurable: toStringDesc ? !!toStringDesc.configurable : true,
-        enumerable: toStringDesc ? !!toStringDesc.enumerable : false
-      });
-    }
+    safeDefine(window, '__CORE_TOSTRING_STATE__', {
+      value: {
+        __CORE_TOSTRING_STATE__: true,
+        nativeToString: nativeToString,
+        overrideMap: toStringOverrideMap,
+        proxyTargetMap: toStringProxyTargetMap
+      },
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+
+    Object.defineProperty(Function.prototype, 'toString', {
+      value: toString,
+      writable: toStringDesc ? !!toStringDesc.writable : true,
+      configurable: toStringDesc ? !!toStringDesc.configurable : true,
+      enumerable: toStringDesc ? !!toStringDesc.enumerable : false
+    });
   }
 
   window.__CORE_WINDOW_LOADED__ = true;

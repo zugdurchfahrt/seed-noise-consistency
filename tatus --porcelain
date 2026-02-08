@@ -1,0 +1,50 @@
+warning: in the working copy of '.editorconfig', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'assets/fonts_raw/.gitkeep', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'configs/.gitkeep', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'license.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'main.py', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'profile.json', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'requirements.txt', LF will be replaced by CRLF the next time Git touches it
+D	PROXY_START.txt
+D	WEBGL_DICKts.js
+D	WebgpuWL.js
+D	_extra_font_handling_tools/BASICclear.py
+D	_extra_font_handling_tools/HASHCopyCL.py
+D	_extra_font_handling_tools/fontcheck.html
+D	assets/generated_fonts/MacIntel/.gitkeep
+D	assets/generated_fonts/Win32/.gitkeep
+D	assets/scripts/GeoOverride_source.js
+D	assets/scripts/RTCPeerConnection.js
+D	assets/scripts/TimezoneOverride_source.js
+D	assets/scripts/WORKER_PATCH_SRC.js
+D	assets/scripts/audiocontext.js
+D	assets/scripts/canvas.js
+D	assets/scripts/context.js
+D	assets/scripts/core_window.js
+D	assets/scripts/env_params.js
+D	assets/scripts/font_module.js
+D	assets/scripts/headers_interceptor.js
+D	assets/scripts/hide_webdriver.js
+D	assets/scripts/key_null.txt
+D	assets/scripts/nav_total_set.js
+D	assets/scripts/screen.js
+D	assets/scripts/set_log.js
+D	assets/scripts/webgl.js
+D	assets/scripts/webgpu.js
+D	assets/scripts/wrk.js
+D	assets/templates/font_patch.template.j2
+D	cdp_catapult.py
+D	datashell_win32.py
+D	depo_browser.py
+D	handle_cors_addon.py
+D	headers_adapter.py
+D	macintel.py
+M	main.py
+D	mitmproxy_full_log.txt
+D	overseer.py
+D	plugins_dict.py
+M	profile.json
+D	rand_met.py
+D	tools.py
+D	vpn_utils.py

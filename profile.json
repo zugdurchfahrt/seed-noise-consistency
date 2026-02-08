@@ -5,30 +5,30 @@
     "os_name": "Windows 11 64-bit",
     "platform_version": "15.0.0",
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
-    "browser_version": "136.0.3240.115",
+    "browser_version": "136.0.3240.131",
     "screen_width": 1920,
     "screen_height": 1080,
     "device_dpr_value": 1.0,
     "webgl_vendor": "WebKit",
     "webgl_renderer": "WebKit WebGL",
-    "webgl_unmasked_vendor": "Google Inc. (NVIDIA)",
-    "webgl_unmasked_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x2484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgl_unmasked_vendor": "Google Inc. (AMD)",
+    "webgl_unmasked_renderer": "ANGLE (AMD, AMD Radeon(TM) RX 6700 (0x73DF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "gpu_type": "discrete",
-    "gpu_architecture": "ampere",
-    "gpu_vendor": "nvidia",
+    "gpu_architecture": "rdna2",
+    "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "Shure SM7B",
-      "videoinput": "Creative Live! Cam",
-      "audiooutput": "Sony MDR-7506"
+      "audioinput": "Audio-Technica AT2035",
+      "videoinput": "Razer Kiyo",
+      "audiooutput": "Beyerdynamic DT 990 Pro"
     },
     "vendor_value": "Google Inc.",
     "languages": [
-      "da-DK",
-      "da"
+      "de-DE",
+      "de"
     ],
-    "language": "da-DK",
+    "language": "de-DE",
     "deviceMemory": 8,
-    "hardwareConcurrency": 4,
+    "hardwareConcurrency": 12,
     "plugins": [
       {
         "name": "Microsoft Edge PDF Viewer",
@@ -50,7 +50,9 @@
         "description": "PDF document"
       }
     ],
-    "accept_language": "da-DK,da;q=0.9"
+    "accept_language": "de-DE,de;q=0.9",
+    "browser_brand": "Microsoft Edge",
+    "browser_major_version": "136"
   },
   "expected_client_hints": {
     "platform": "Windows",
@@ -80,28 +82,28 @@
       },
       {
         "brand": "Chromium",
-        "version": "136.0.3240.115"
+        "version": "136.0.3240.131"
       },
       {
         "brand": "Microsoft Edge",
-        "version": "136.0.3240.115"
+        "version": "136.0.3240.131"
       }
     ],
-    "uaFullVersion": "136.0.3240.115",
+    "uaFullVersion": "136.0.3240.131",
     "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"136\", \"Microsoft Edge\";v=\"136\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"136.0.3240.115\", \"Microsoft Edge\";v=\"136.0.3240.115\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"136.0.3240.131\", \"Microsoft Edge\";v=\"136.0.3240.131\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
     "deviceMemory": 8,
-    "hardwareConcurrency": 4,
+    "hardwareConcurrency": 12,
     "wow64": false,
     "languages": [
-      "da-DK",
-      "da"
+      "de-DE",
+      "de"
     ],
-    "language": "da-DK",
+    "language": "de-DE",
     "formFactors": [
       "Desktop"
     ],

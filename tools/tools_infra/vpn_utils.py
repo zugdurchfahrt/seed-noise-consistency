@@ -33,7 +33,7 @@ PN_PROCESSES = {
 
 # === Constants and Settings ====
 # Paths to VPN Directory and Data
-PROJECT_ROOT        = pathlib.Path(__file__).resolve().parent
+PROJECT_ROOT        = pathlib.Path(__file__).resolve().parents[2]
 USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
 CONFIG_DIR          = PROJECT_ROOT / 'configs'
 TEMP_AUTH_FILE      = os.path.join(CONFIG_DIR, "temp_auth.txt")

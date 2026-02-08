@@ -4,7 +4,7 @@ import random
 import logging
 
 from headers_adapter import generate_accept_header
-from overseer import logger
+from tools.tools_infra.overseer import logger
 logger = logging.getLogger(__name__)
 
 def build_device_metrics(profile: dict) -> dict:

@@ -3,7 +3,7 @@ import json
 import time
 import requests
 from websocket import WebSocketApp
-from overseer import logger
+from tools.tools_infra.overseer import logger
 
 # Use the project's existing logging pipeline (overseer.setup_logger -> intention_entitled.log).
 logger = logger.getChild("cdp_catapult")

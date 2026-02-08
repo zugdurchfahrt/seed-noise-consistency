@@ -12,19 +12,61 @@ import logging
 import pathlib
 from pathlib import Path
 from datetime import datetime
+import sys
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import WebDriverException
 
 import undetected_chromedriver as uc
+
+# -----------------------CONSTANT VARIABLES-----------------------
+OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
+PROJECT_ROOT        = pathlib.Path(__file__).resolve().parent
+TOOLS_DIR           = PROJECT_ROOT / 'tools'
+TOOLS_RUNTIME_DIR   = TOOLS_DIR / 'tools_runtime'
+TOOLS_INFRA_DIR     = TOOLS_DIR / 'tools_infra'
+PROFILE_DATA_DIR    = PROJECT_ROOT / 'profile_data_source'
+CORS_ADDON          = TOOLS_RUNTIME_DIR / 'handle_cors_addon.py'
+USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
+CONFIG_DIR          = PROJECT_ROOT / 'configs'
+ASSETS_DIR          = PROJECT_ROOT / 'assets'
+GENERATORS_DIR      = ASSETS_DIR / 'generators'
+SCRIPTS_DIR         = ASSETS_DIR / 'scripts'
+SCRIPTS_WINDOW_DIR  = SCRIPTS_DIR / 'window'
+SCRIPTS_CORE_DIR    = SCRIPTS_WINDOW_DIR / 'core'
+SCRIPTS_PATCHES_DIR = SCRIPTS_WINDOW_DIR / 'patches'
+SCRIPTS_PATCHES_GRAPHICS_DIR = SCRIPTS_PATCHES_DIR / 'graphics'
+SCRIPTS_PATCHES_MEDIA_DIR    = SCRIPTS_PATCHES_DIR / 'media'
+SCRIPTS_PATCHES_NAV_DIR      = SCRIPTS_PATCHES_DIR / 'navigator'
+SCRIPTS_PATCHES_STEALTH_DIR  = SCRIPTS_PATCHES_DIR / 'stealth'
+SCRIPTS_WORKERSCOPE_DIR      = SCRIPTS_DIR / 'workerscope'
+MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
+PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
+CHROME_BINARY       = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
+CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
+
+# Только папки. Никаких путей к файлам.
+PY_MODULE_DIRS = [
+    PROJECT_ROOT,  # если что-то ещё осталось в корне
+    PROJECT_ROOT / "tools" / "tools_infra",
+    PROJECT_ROOT / "tools" / "tools_runtime",
+    PROJECT_ROOT / "tools" / "generators",
+    PROJECT_ROOT / "profile_data_source",  # если ты туда клал данные/модули
+    # добавь сюда ТОЛЬКО те папки, куда ты реально переложил .py
+]
+
+for d in PY_MODULE_DIRS:
+    if not d.exists():
+        raise FileNotFoundError(d)
+    sys.path.insert(0, str(d))
 # ----------------------- DICTS-----------------------
-from depo_browser import chrome_versions, edge_versions, safari_versions, firefox_versions
-from datashell_win32 import data_4_win32
-from macintel import macintel_data
+from profile_data_source.depo_browser import chrome_versions, edge_versions, safari_versions, firefox_versions
+from profile_data_source.datashell_win32 import data_4_win32
+from profile_data_source.macintel import macintel_data
 # ----------------------- MODULES-----------------------
-import cdp_catapult as cdp
-from plugins_dict import build_plugins_profile
-from tools import (
+import tools.tools_runtime.cdp_catapult as cdp
+from profile_data_source.plugins_dict import build_plugins_profile
+from tools.tools_runtime.helpers import (
     build_device_metrics,
     normalize_languages,
     choose_device_memory_and_cpu,
@@ -34,10 +76,11 @@ from tools import (
     apply_ua_overrides,
     inject_uach_strip_window,
 )
-from vpn_utils import VPNClient
-from rand_met import generate_font_manifest
-from overseer import logger, setup_logger
-from headers_adapter import build_accept_language
+from tools.tools_infra.vpn_utils import VPNClient
+from tools.tools_infra.overseer import logger, setup_logger
+
+from tools.generators.rand_met import generate_font_manifest
+from tools.tools_runtime.headers_adapter import build_accept_language
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
@@ -45,18 +88,6 @@ setup_logger(child_levels={
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
 })
-# -----------------------CONSTANT VARIABLES-----------------------
-OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
-PROJECT_ROOT        = pathlib.Path(__file__).resolve().parent
-CORS_ADDON          = PROJECT_ROOT / 'handle_cors_addon.py'
-USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
-CONFIG_DIR          = PROJECT_ROOT / 'configs'
-ASSETS_DIR          = PROJECT_ROOT / 'assets'
-SCRIPTS_DIR         = ASSETS_DIR / 'scripts'
-MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
-PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
-CHROME_BINARY       = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
-CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
 
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
@@ -293,70 +324,70 @@ def init_driver(
         parts = [
             init_params,
             # --- set_log ---
-            Path(SCRIPTS_DIR / "set_log.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE_DIR / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
             # --- core window ---
-            Path(SCRIPTS_DIR / "core_window.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE_DIR / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
             # --- RTC ---
-            Path(SCRIPTS_DIR / "RTCPeerConnection.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA_DIR / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
 
             # --- hide_webdriver (markAsNative provider) ---
-            Path(SCRIPTS_DIR / "hide_webdriver.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_STEALTH_DIR / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
             
             # --- workers (bootstrap/hooks). No direct module call here unless you have one.
-            Path(SCRIPTS_DIR / "wrk.js").read_text("utf-8"),
+            Path(SCRIPTS_WORKERSCOPE_DIR / "wrk.js").read_text("utf-8"),
             "WrkModule(window);",
             # --- env params ---
-            Path(SCRIPTS_DIR / "env_params.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE_DIR / "prng_seed.js").read_text("utf-8"),
             "EnvParamsPatchModule(window);",
              
             # --- nav total set ---
-            Path(SCRIPTS_DIR / "nav_total_set.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_NAV_DIR / "nav_total_set.js").read_text("utf-8"),
             "NavTotalSetPatchModule(window);",
 
             # --- screen ---
-            Path(SCRIPTS_DIR / "screen.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA_DIR / "screen.js").read_text("utf-8"),
             "ScreenPatchModule(window);",
 
             # --- generated patch output ---
             Path(PATCH_OUT).read_text("utf-8"),
 
             # --- fonts ---
-            Path(SCRIPTS_DIR / "font_module.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA_DIR / "font_module.js").read_text("utf-8"),
             "FontPatchModule(window);",
 
             # --- canvas ---
-            Path(SCRIPTS_DIR / "canvas.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "canvas.js").read_text("utf-8"),
             "CanvasPatchModule(window);",
 
             # --- webgl extra ---
-            Path(PROJECT_ROOT / "WEBGL_DICKts.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "WEBGL_DICKts.js").read_text("utf-8"),
             "WEBglDICKts(window);",
 
             # --- webgl ---
-            Path(SCRIPTS_DIR / "webgl.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "webgl.js").read_text("utf-8"),
             "WebglPatchModule(window);",
 
             # --- webgpu WL ---
-            Path(PROJECT_ROOT / "WebgpuWL.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "WebgpuWL.js").read_text("utf-8"),
             "WebgpuWLBootstrap(window);",
 
             # --- webgpu ---
-            Path(SCRIPTS_DIR / "webgpu.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "webgpu.js").read_text("utf-8"),
             "WebGPUPatchModule(window);",
 
             # --- audiocontext ---
-            Path(SCRIPTS_DIR / "audiocontext.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA_DIR / "audiocontext.js").read_text("utf-8"),
             "AudioContextModule(window);",
 
             # --- context ---
-            Path(SCRIPTS_DIR / "context.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE_DIR / "context.js").read_text("utf-8"),
             "ContextPatchModule(window);",
             # --- headers interceptor ---
-            Path(SCRIPTS_DIR / "headers_interceptor.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_STEALTH_DIR / "headers_interceptor.js").read_text("utf-8"),
             "HeadersInterceptor(window);",
             # --- Register hooks / post-apply ---
             """
@@ -435,7 +466,7 @@ def init_driver(
 
 
      # --- Workers Initial patch reading ---
-    core = Path(SCRIPTS_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
+    core = Path(SCRIPTS_WORKERSCOPE_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
     logger.info("WORKER_PATCH_SRC.initated")
 
 
@@ -665,9 +696,9 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
 
         def _inject_time_machine(driver):
             timegeo_js = "\n;\n".join([
-                Path(SCRIPTS_DIR / "TimezoneOverride_source.js").read_text("utf-8"),
+                Path(SCRIPTS_PATCHES_STEALTH_DIR / "TimezoneOverride_source.js").read_text("utf-8"),
                 "patchTimeZone();",
-                Path(SCRIPTS_DIR / "GeoOverride_source.js").read_text("utf-8"),
+                Path(SCRIPTS_PATCHES_STEALTH_DIR / "GeoOverride_source.js").read_text("utf-8"),
             ]) + "\n//# sourceURL=timegeo_bundle.js"
             driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": timegeo_js})
         _inject_time_machine(driver)

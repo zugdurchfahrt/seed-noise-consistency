@@ -38,6 +38,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!Number.isFinite(DPR) || DPR <= 0) {
     throw new Error('[Screen] bad dpr');
   }
+
+  const __wrapNativeApply = window.__wrapNativeApply;
+  const __wrapNativeAccessor = window.__wrapNativeAccessor;
+  if (typeof __wrapNativeApply !== 'function' || typeof __wrapNativeAccessor !== 'function') {
+    throw new Error('[Screen] core wrappers missing');
+  }
   
   function safeDefine(obj, prop, descriptor) {
     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
@@ -69,9 +75,27 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       return;
     }
     if (typeof d.get !== 'function') throw new Error(`[Screen] ${prop} getter missing`);
-    const getFn = (typeof getterOrValue === 'function')
-      ? makeNamedGetter(prop, getterOrValue)
-      : makeNamedGetter(prop, function(){ return getterOrValue; });
+    const origGet = d.get;
+    const getFn = __wrapNativeAccessor(origGet, origGet.name || '', (targetGet, thisArg, argList) => {
+      try {
+        const ctor = target && target.constructor;
+        const isProto = !!(typeof ctor === 'function' && ctor.prototype === target);
+        const ok = isProto
+          ? (target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg))
+          : ((thisArg === target) || (target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg)));
+        if (!ok) {
+          return Reflect.apply(targetGet, thisArg, argList);
+        }
+      } catch (_) {
+        // If guard fails for any reason, fall back to native semantics.
+        return Reflect.apply(targetGet, thisArg, argList);
+      }
+
+      if (typeof getterOrValue === 'function') {
+        return getterOrValue.call(thisArg);
+      }
+      return getterOrValue;
+    });
     Object.defineProperty(target, prop, {
       get: getFn,
       set: d.set,
@@ -92,10 +116,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (matchesDesc && typeof matchesDesc.get === 'function' && matchesDesc.configurable) {
       const origMatchesGet = matchesDesc.get;
       Object.defineProperty(mqlProto, 'matches', {
-        get: function matches() {
-          if (mqlMatches.has(this)) return mqlMatches.get(this);
-          return origMatchesGet.call(this);
-        },
+        get: __wrapNativeAccessor(origMatchesGet, origMatchesGet.name || '', (target, thisArg, argList) => {
+          if (mqlMatches.has(thisArg)) return mqlMatches.get(thisArg);
+          return Reflect.apply(target, thisArg, argList);
+        }),
         set: matchesDesc.set,
         configurable: matchesDesc.configurable,
         enumerable: matchesDesc.enumerable
@@ -110,8 +134,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     try { return self === window || (typeof Window === 'function' && self instanceof Window); }
     catch (_) { return false; }
   };
-  const patchedMatchMedia = function matchMedia(query) {
-    if (!isWindowThis(this)) return origMatchMedia.call(this, query);
+  const patchedMatchMedia = __wrapNativeApply(origMatchMedia, 'matchMedia', (target, thisArg, argList) => {
+    let query = (argList && argList.length) ? argList[0] : undefined;
+    if (!isWindowThis(thisArg)) return Reflect.apply(target, thisArg, argList);
     query = String(query);
     let matches = true;
     const isTrashQuery = (query.length > 1024 || /[\u0000-\u001F]/.test(query));
@@ -183,14 +208,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       matches = matches && dpi === parseInt(resolution[1], 10);
     }
 
-    const mql = origMatchMedia.call(this, query);
+    const mql = Reflect.apply(target, thisArg, [query]);
     if (mql && (typeof mql === 'object' || typeof mql === 'function')) {
       try {
         if (touched || isTrashQuery) mqlMatches.set(mql, matches);
       } catch {}
     }
     return mql;
-  };
+  });
   redefineProp(mmTarget, 'matchMedia', () => patchedMatchMedia);
 
   //  screen и orientation ──

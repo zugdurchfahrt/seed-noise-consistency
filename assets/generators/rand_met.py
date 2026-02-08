@@ -12,14 +12,14 @@ from shutil import copyfile
 from jinja2 import Environment, FileSystemLoader
 import tempfile
 import base64
-from overseer import logger
+from tools.tools_infra.overseer import logger
 logger = logger.getChild("rand_met")
 
 # ----------------------- CONST -----------------------
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parent
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 ASSETS_DIR = PROJECT_ROOT / 'assets'
-TEMPLATES = ASSETS_DIR / 'templates'
+GENERATORS = ASSETS_DIR / 'generators'
 MANIFEST_PATH = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
 FONTS_SOURCE_DIR = ASSETS_DIR / 'fonts_raw'
@@ -707,7 +707,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     logger.info(f"fonts-manifest.json generated: ({len(temp_configs)} fonts)")
 
     # === Step 5: render Jinja-template font_patch.generated.js =====
-    env = Environment(loader=FileSystemLoader(TEMPLATES), trim_blocks=True)
+    env = Environment(loader=FileSystemLoader(GENERATORS), trim_blocks=True)
     template = env.get_template('font_patch.template.j2')
     # Data preparation for JS (with the right fields) from configs_json
     configs_for_js = [
