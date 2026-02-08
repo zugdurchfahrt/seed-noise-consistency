@@ -35,6 +35,8 @@ JS_fonts_patch
 proxy_error_log.txt
 PROXY_START.txt
 mitmproxy-ca-cert.p12
+runmine_mcp.py
+\runmine_mcp.py
 proxy_out_log.txt
 profile.json
 

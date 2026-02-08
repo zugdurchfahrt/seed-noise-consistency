@@ -4,8 +4,8 @@
     "os_info": "Windows NT 10.0; Win64; x64",
     "os_name": "Windows 11 64-bit",
     "platform_version": "15.0.0",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
-    "browser_version": "136.0.3240.131",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+    "browser_version": "135.0.7049.114",
     "screen_width": 1920,
     "screen_height": 1080,
     "device_dpr_value": 1.0,
@@ -17,21 +17,21 @@
     "gpu_architecture": "rdna2",
     "gpu_vendor": "amd",
     "devices_conf": {
-      "audioinput": "Audio-Technica AT2035",
-      "videoinput": "Razer Kiyo",
-      "audiooutput": "Beyerdynamic DT 990 Pro"
+      "audioinput": "Shure SM7B",
+      "videoinput": "Creative Live! Cam Chat HD",
+      "audiooutput": "Plantronics BackBeat Pro 2"
     },
     "vendor_value": "Google Inc.",
     "languages": [
-      "de-DE",
-      "de"
+      "da-DK",
+      "da"
     ],
-    "language": "de-DE",
+    "language": "da-DK",
     "deviceMemory": 8,
-    "hardwareConcurrency": 12,
+    "hardwareConcurrency": 8,
     "plugins": [
       {
-        "name": "Microsoft Edge PDF Viewer",
+        "name": "Chrome PDF Viewer",
         "filename": "internal-pdf-viewer",
         "description": "",
         "mimeTypes": [
@@ -50,9 +50,9 @@
         "description": "PDF document"
       }
     ],
-    "accept_language": "de-DE,de;q=0.9",
-    "browser_brand": "Microsoft Edge",
-    "browser_major_version": "136"
+    "accept_language": "da-DK,da;q=0.9",
+    "browser_brand": "Google Chrome",
+    "browser_major_version": "135"
   },
   "expected_client_hints": {
     "platform": "Windows",
@@ -63,11 +63,11 @@
       },
       {
         "brand": "Chromium",
-        "version": "136"
+        "version": "135"
       },
       {
-        "brand": "Microsoft Edge",
-        "version": "136"
+        "brand": "Google Chrome",
+        "version": "135"
       }
     ],
     "mobile": false,
@@ -82,28 +82,28 @@
       },
       {
         "brand": "Chromium",
-        "version": "136.0.3240.131"
+        "version": "135.0.7049.114"
       },
       {
-        "brand": "Microsoft Edge",
-        "version": "136.0.3240.131"
+        "brand": "Google Chrome",
+        "version": "135.0.7049.114"
       }
     ],
-    "uaFullVersion": "136.0.3240.131",
-    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"136\", \"Microsoft Edge\";v=\"136\"",
-    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"136.0.3240.131\", \"Microsoft Edge\";v=\"136.0.3240.131\"",
+    "uaFullVersion": "135.0.7049.114",
+    "sec_ch_ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"135\", \"Google Chrome\";v=\"135\"",
+    "sec_ch_ua_full_version_list": "\"Not)A;Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.114\", \"Google Chrome\";v=\"135.0.7049.114\"",
     "sec_ch_ua_model": "",
     "sec_ch_ua_form_factors": [
       "Desktop"
     ],
     "deviceMemory": 8,
-    "hardwareConcurrency": 12,
+    "hardwareConcurrency": 8,
     "wow64": false,
     "languages": [
-      "de-DE",
-      "de"
+      "da-DK",
+      "da"
     ],
-    "language": "de-DE",
+    "language": "da-DK",
     "formFactors": [
       "Desktop"
     ],
