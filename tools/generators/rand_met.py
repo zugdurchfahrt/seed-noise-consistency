@@ -18,13 +18,13 @@ logger = logger.getChild("rand_met")
 # ----------------------- CONST -----------------------
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-ASSETS_DIR = PROJECT_ROOT / 'assets'
-TOOLS = PROJECT_ROOT / 'tools'
-GENERATORS = TOOLS / 'generators'
-MANIFEST_PATH = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
-PATCH_OUT = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
-FONTS_SOURCE_DIR = ASSETS_DIR / 'fonts_raw'
-INDEX_NAME = "fonts_index.json"
+ASSETS              = PROJECT_ROOT / 'assets'
+TOOLS               = PROJECT_ROOT / 'tools'
+GENERATORS          = TOOLS / 'generators'
+MANIFEST_PATH       = ASSETS/ 'Manifest' / 'fonts-manifest.json'
+PATCH_OUT           = ASSETS/ 'JS_fonts_patch' / 'font_patch.generated.js'
+FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
+INDEX_NAME          = "fonts_index.json"
 # ----------------------- UTILS -----------------------
 SYS_FONTS_WIN = [
         'Arial','Verdana','Tahoma','Times New Roman','Courier New','Georgia',
@@ -70,7 +70,7 @@ PUA_RANGES = [
 
 def get_target_dir_for(p: str) -> pathlib.Path:
     """determines the catalog according the selected platform"""
-    return ASSETS_DIR / 'generated_fonts' / ('Win32' if p == 'Win32' else 'MacIntel')
+    return ASSETS/ 'generated_fonts' / ('Win32' if p == 'Win32' else 'MacIntel')
 
 def _index_path_for(platform: str) -> pathlib.Path:
     """The path to the font index for the platform (use only get_target_dir_for)"""

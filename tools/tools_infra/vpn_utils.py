@@ -35,7 +35,7 @@ PN_PROCESSES = {
 # Paths to VPN Directory and Data
 PROJECT_ROOT        = pathlib.Path(__file__).resolve().parents[2]
 USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
-CONFIG_DIR          = PROJECT_ROOT / 'configs'
+CONFIG_DIR          = PROJECT_ROOT / 'cfg_vpn'
 TEMP_AUTH_FILE      = os.path.join(CONFIG_DIR, "temp_auth.txt")
 OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
 POLL_INTERVAL       = 0.25          # poll Interval in seconds

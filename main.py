@@ -16,34 +16,33 @@ import sys
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import WebDriverException
-
 import undetected_chromedriver as uc
 
 # -----------------------CONSTANT VARIABLES-----------------------
-OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
-PROJECT_ROOT        = pathlib.Path(__file__).resolve().parent
-TOOLS_DIR           = PROJECT_ROOT / 'tools'
-TOOLS_RUNTIME_DIR   = TOOLS_DIR / 'tools_runtime'
-TOOLS_INFRA_DIR     = TOOLS_DIR / 'tools_infra'
-PROFILE_DATA_DIR    = PROJECT_ROOT / 'profile_data_source'
-CORS_ADDON          = TOOLS_RUNTIME_DIR / 'handle_cors_addon.py'
-USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
-CONFIG_DIR          = PROJECT_ROOT / 'configs'
-ASSETS_DIR          = PROJECT_ROOT / 'assets'
-GENERATORS_DIR      = ASSETS_DIR / 'generators'
-SCRIPTS_DIR         = ASSETS_DIR / 'scripts'
-SCRIPTS_WINDOW_DIR  = SCRIPTS_DIR / 'window'
-SCRIPTS_CORE_DIR    = SCRIPTS_WINDOW_DIR / 'core'
-SCRIPTS_PATCHES_DIR = SCRIPTS_WINDOW_DIR / 'patches'
-SCRIPTS_PATCHES_GRAPHICS_DIR = SCRIPTS_PATCHES_DIR / 'graphics'
-SCRIPTS_PATCHES_MEDIA_DIR    = SCRIPTS_PATCHES_DIR / 'media'
-SCRIPTS_PATCHES_NAV_DIR      = SCRIPTS_PATCHES_DIR / 'navigator'
-SCRIPTS_PATCHES_STEALTH_DIR  = SCRIPTS_PATCHES_DIR / 'stealth'
-SCRIPTS_WORKERSCOPE_DIR      = SCRIPTS_DIR / 'workerscope'
-MANIFEST_PATH       = ASSETS_DIR / 'Manifest' / 'fonts-manifest.json'
-PATCH_OUT           = ASSETS_DIR / 'JS_fonts_patch' / 'font_patch.generated.js'
-CHROME_BINARY       = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
-CHROMEDRIVER_PATH   = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
+OPENVPN_PATH             = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
+PROJECT_ROOT             = pathlib.Path(__file__).resolve().parent
+TOOLS                    = PROJECT_ROOT / 'tools'
+GENERATORS               = TOOLS / 'generators'
+TOOLS_RUNTIME            = TOOLS / 'tools_runtime'
+TOOLS_INFRA              = TOOLS / 'tools_infra'
+PROFILE_DATA_SRC         = PROJECT_ROOT / 'profile_data_source'
+CORS_ADDON               = TOOLS_RUNTIME / 'handle_cors_addon.py'
+USER_DATA_DIR            = PROJECT_ROOT / 'user_data'
+CONFIG_DIR               = PROJECT_ROOT / 'configs'
+ASSETS                   = PROJECT_ROOT / 'assets'
+SCRIPTS                  = ASSETS / 'scripts'
+SCRIPTS_WINDOW           = SCRIPTS / 'window'
+SCRIPTS_CORE             = SCRIPTS_WINDOW / 'core'
+SCRIPTS_PATCHES          = SCRIPTS_WINDOW / 'patches'
+SCRIPTS_PATCHES_GRAPHICS = SCRIPTS_PATCHES / 'graphics'
+SCRIPTS_PATCHES_MEDIA    = SCRIPTS_PATCHES / 'media'
+SCRIPTS_PATCHES_NAV      = SCRIPTS_PATCHES / 'navigator'
+SCRIPTS_PATCHES_STEALTH  = SCRIPTS_PATCHES / 'stealth'
+SCRIPTS_WORKERSCOPE      = SCRIPTS / 'workerscope'
+MANIFEST_PATH            = ASSETS / 'Manifest' / 'fonts-manifest.json'
+PATCH_OUT                = ASSETS / 'JS_fonts_patch' / 'font_patch.generated.js'
+CHROME_BINARY            = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
+CHROMEDRIVER_PATH        = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
 
 # Только папки. Никаких путей к файлам.
 PY_MODULE_DIRS = [
@@ -52,7 +51,6 @@ PY_MODULE_DIRS = [
     PROJECT_ROOT / "tools" / "tools_runtime",
     PROJECT_ROOT / "tools" / "generators",
     PROJECT_ROOT / "profile_data_source",  # если ты туда клал данные/модули
-    # добавь сюда ТОЛЬКО те папки, куда ты реально переложил .py
 ]
 
 for d in PY_MODULE_DIRS:
@@ -70,7 +68,6 @@ from tools.tools_runtime.helpers import (
     build_device_metrics,
     normalize_languages,
     choose_device_memory_and_cpu,
-    override_user_agent_data,
     determine_browser_brand_and_versions,
     build_expected_client_hints,
     apply_ua_overrides,
@@ -78,9 +75,8 @@ from tools.tools_runtime.helpers import (
 )
 from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
-
-from tools.generators.rand_met import generate_font_manifest
 from tools.tools_runtime.headers_adapter import build_accept_language
+from tools.generators.rand_met import generate_font_manifest
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
@@ -310,84 +306,81 @@ def init_driver(
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
       
-     
     cdp.SW_META = expected_client_hints
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
      
-    
     threading.Thread(target=cdp.run, daemon=True).start()  
     logger.info("Thread started on port %s", cdp.PORT)
-
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
             # --- set_log ---
-            Path(SCRIPTS_CORE_DIR / "set_log.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
             # --- core window ---
-            Path(SCRIPTS_CORE_DIR / "core_window.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
             # --- RTC ---
-            Path(SCRIPTS_PATCHES_MEDIA_DIR / "RTCPeerConnection.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
 
             # --- hide_webdriver (markAsNative provider) ---
-            Path(SCRIPTS_PATCHES_STEALTH_DIR / "hide_webdriver.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
             
             # --- workers (bootstrap/hooks). No direct module call here unless you have one.
-            Path(SCRIPTS_WORKERSCOPE_DIR / "wrk.js").read_text("utf-8"),
+            Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
             "WrkModule(window);",
             # --- env params ---
-            Path(SCRIPTS_CORE_DIR / "prng_seed.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
             "EnvParamsPatchModule(window);",
              
             # --- nav total set ---
-            Path(SCRIPTS_PATCHES_NAV_DIR / "nav_total_set.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_NAV / "nav_total_set.js").read_text("utf-8"),
             "NavTotalSetPatchModule(window);",
 
             # --- screen ---
-            Path(SCRIPTS_PATCHES_MEDIA_DIR / "screen.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA / "screen.js").read_text("utf-8"),
             "ScreenPatchModule(window);",
 
             # --- generated patch output ---
             Path(PATCH_OUT).read_text("utf-8"),
 
             # --- fonts ---
-            Path(SCRIPTS_PATCHES_MEDIA_DIR / "font_module.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA / "font_module.js").read_text("utf-8"),
             "FontPatchModule(window);",
 
             # --- canvas ---
-            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "canvas.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "canvas.js").read_text("utf-8"),
             "CanvasPatchModule(window);",
 
             # --- webgl extra ---
-            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "WEBGL_DICKts.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "WEBGL_DICKts.js").read_text("utf-8"),
             "WEBglDICKts(window);",
 
             # --- webgl ---
-            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "webgl.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "webgl.js").read_text("utf-8"),
             "WebglPatchModule(window);",
 
             # --- webgpu WL ---
-            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "WebgpuWL.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "WebgpuWL.js").read_text("utf-8"),
             "WebgpuWLBootstrap(window);",
 
             # --- webgpu ---
-            Path(SCRIPTS_PATCHES_GRAPHICS_DIR / "webgpu.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "webgpu.js").read_text("utf-8"),
             "WebGPUPatchModule(window);",
 
             # --- audiocontext ---
-            Path(SCRIPTS_PATCHES_MEDIA_DIR / "audiocontext.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA / "audiocontext.js").read_text("utf-8"),
             "AudioContextModule(window);",
 
             # --- context ---
-            Path(SCRIPTS_CORE_DIR / "context.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "context.js").read_text("utf-8"),
             "ContextPatchModule(window);",
             # --- headers interceptor ---
-            Path(SCRIPTS_PATCHES_STEALTH_DIR / "headers_interceptor.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_STEALTH / "headers_interceptor.js").read_text("utf-8"),
             "HeadersInterceptor(window);",
             # --- Register hooks / post-apply ---
             """
@@ -457,83 +450,40 @@ def init_driver(
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
-    
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
     # inject_uach_strip_window(driver, user_agent)
 
-
      # --- Workers Initial patch reading ---
-    core = Path(SCRIPTS_WORKERSCOPE_DIR / "WORKER_PATCH_SRC.js").read_text("utf-8")
+    core = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
     logger.info("WORKER_PATCH_SRC.initated")
 
-
-        # --- prepare worker_bootstrap_js ---
-    worker_bootstrap_js = f"""
+    # --- publish worker core into __ENV_BRIDGE__ (stable for external worker_bootstrap.js) ---
+    worker_bootstrap_env_js = f"""
     (() => {{
-    const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
-    if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-
-    if (!Object.prototype.hasOwnProperty.call(BR, 'urls')) {{
-        Object.defineProperty(BR, 'urls', {{ value: {{}}, writable: false, configurable: false }});
-    }}
-    if (!BR.urls || typeof BR.urls !== 'object') throw new Error('WorkerBootstrap: BR.urls missing');
-
-    const core = {json.dumps(core)};
-
-    // Create URLs only once (idempotent)
-    if (!BR.urls.workerPatchClassic) {{
-        BR.urls.workerPatchClassic = URL.createObjectURL(new Blob([core], {{ type: 'text/javascript' }}));
-    }}
-    if (!BR.urls.workerPatchModule) {{
-        BR.urls.workerPatchModule = URL.createObjectURL(
-        new Blob(["/*module*/\\n", core, "\\nexport{{}};"], {{ type: 'text/javascript' }})
-        );
-    }}
-
-    if (typeof BR.urls.workerPatchClassic !== 'string' || !BR.urls.workerPatchClassic) {{
-        throw new Error('WorkerBootstrap: bad workerPatchClassic url');
-    }}
-    if (typeof BR.urls.workerPatchModule !== 'string' || !BR.urls.workerPatchModule) {{
-        throw new Error('WorkerBootstrap: bad workerPatchModule url');
-    }}
-
-    if (!BR.inlinePatch) {{
-        BR.inlinePatch = core;
-    }} else if (BR.inlinePatch !== core) {{
-        throw new Error('WorkerBootstrap: inlinePatch already set');
-    }}
-
-    Object.freeze(BR.urls);
-
-    function boot() {{
-        const H = window.WorkerPatchHooks;
-        if (!H || typeof H.initAll !== 'function') return; // wait until ready
-        H.initAll({{ publishHE: true }});
-        // Post-bootstrap diagnostics: confirm wrappers are installed after initAll().
-        console.info('[DIAG.postBoot]', H.diag && H.diag());
-    }}
-
-    if ('WorkerPatchHooks' in window && window.WorkerPatchHooks && typeof window.WorkerPatchHooks.initAll === 'function') {{
-        boot();
-    }} else {{
-        let _h;
-        Object.defineProperty(window, 'WorkerPatchHooks', {{
-        configurable: true,
-        get() {{ return _h; }},
-        set(v) {{ _h = v; boot(); }}
-        }});
-    }}
+        const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
+        if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+        const core = {json.dumps(core)};
+        if (!BR.inlinePatch) {{
+            BR.inlinePatch = core;
+        }} else if (BR.inlinePatch !== core) {{
+            throw new Error('WorkerBootstrap: inlinePatch already set');
+        }}
     }})();
-    //# sourceURL=worker_bootstrap_init.js
+    //# sourceURL=worker_bootstrap_env.js
     """
+
+    # --- prepare worker_bootstrap_js (reads __ENV_BRIDGE__.inlinePatch) ---
+    worker_bootstrap_js = Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")
 
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     
 
+    # Publish worker patch core early (used by external worker_bootstrap.js too)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
 
     # Connect worker_bootstrap_js AFTER page_js:
     # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
@@ -541,103 +491,60 @@ def init_driver(
 
 
  
+    # =========================
+    # [CH] Setting up Client hints (CDP-only) + __HEADERS__ (JS, NEW DOCUMENT)
+    # NOTE: No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
+    # =========================
 
-
-    #--- Setting up Client hints ---
+    # --- [CH/01] detect UA family for safelisted headers ---
     is_safari = "Safari" in user_agent and ("Chrome" not in user_agent and "Edg/" not in user_agent)
     is_firefox = "Firefox" in user_agent and ("Chrome" not in user_agent and "Edg/" not in user_agent)
+
+    # --- [CH/02] build safelisted_headers (minimal set) ---
     if is_firefox or is_safari:
         safelisted_headers = {
-                "Accept-Language": build_accept_language(profile.get("languages") or [profile.get("language")]),
-                "Sec-CH-UA": "",
-                # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
-                # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
-            }
+            "Accept-Language": build_accept_language(profile.get("languages") or [profile.get("language")]),
+            "Sec-CH-UA": "",
+            # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
+            # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
+        }
     else:
         safelisted_headers = {
-        # Main client hints
-        # "Accept": str(expected_client_hints["accept"]),
-        "Accept-Language": build_accept_language(profile.get("languages") or [profile.get("language")]),
-        # "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
-        # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
-        # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
+            # Main client hints
+            # "Accept": str(expected_client_hints["accept"]),
+            "Accept-Language": build_accept_language(profile.get("languages") or [profile.get("language")]),
+            # "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
+            # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
+            # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
         }
-    driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers":  safelisted_headers})
 
-    # window.__HEADERS__ — Basic set for JS-paatch. На cross-origin  safelisted (accept-language). Keys like sec-ch-* will be ignored by JS (CDP-only).
+    # --- [CH/03] CDP: apply HTTP headers for requests (affects navigation after this call) ---
+    driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": safelisted_headers})
+
+    # =========================
+    # [HDR] window.__HEADERS__ + bridge (NEW DOCUMENT)
+    # IMPORTANT: register __HEADERS__ BEFORE anything that may rely on it (e.g. HeadersInterceptor(window) call elsewhere).
+    # =========================
+
+    # --- [HDR/01] prepare JS for NEW DOCUMENT: window.__HEADERS__ ---
+    # window.__HEADERS__ — Basic set for JS-paatch. На cross-origin  safelisted (accept-language).
+    # Keys like sec-ch-* will be ignored by JS (CDP-only).
     headers_window_js = f"""
     window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
     console.log("[headers_interceptor.js] window.__HEADERS__ injected (safelisted only)");
     """
+
+    # --- [HDR/02] CDP: register __HEADERS__ for every NEW DOCUMENT ---
     # window.__HEADERS__ injected (safelisted only)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
 
+    # --- [HDR/03] load bridge JS (text) ---
+    # Headers interceptor bridge to sync allow/ignore CDP with Fetch interceptor
+    headers_bridge_path = (SCRIPTS_PATCHES_STEALTH / "headers_bridge.js")
+    headers_bridge_js = headers_bridge_path.read_text("utf-8")
 
-
-
-
-    # ВАЖНО: применить __HEADERS__ на ТЕКУЩЕЙ странице сразу (иначе будет только на next document)
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_window_js, "awaitPromise": False})
-
-    # ВАЖНО: повторно вызвать HeadersInterceptor(window) уже ПОСЛЕ появления __HEADERS__
-    driver.execute_cdp_cmd("Runtime.evaluate", {
-        "expression": "if (typeof HeadersInterceptor === 'function') { HeadersInterceptor(window); }",
-        "awaitPromise": False
-    })
-
-
-    # Headers interceptor bridge to sync allow/ignore  CDP with Fetch interceptor
-    headers_bridge_js = """
-    (function () {
-      const g = window;
-      // Starting ignore list for CDP interceptor: challenge domains are not touched
-      const CH_PASS = ['.cloudflare.com','.challenge.cloudflare.com','.akamaihd.net','.perimeterx.net','.hcaptcha.com','.recaptcha.net'];
-      g.__CDP_ALLOW_SUFFIXES   = g.__CDP_ALLOW_SUFFIXES   || [];
-      g.__CDP_IGNORED_SUFFIXES = g.__CDP_IGNORED_SUFFIXES || [];
-      CH_PASS.forEach(s => { if (!g.__CDP_IGNORED_SUFFIXES.includes(s)) g.__CDP_IGNORED_SUFFIXES.push(s); });
-      function norm(s){ return !s ? s : (s[0] === "." ? s : "." + s); }
-      function wire(){
-        const api = g.HeadersInterceptor;
-        if (!api) return;
-        // 1) Поднять актуальные наборы из JS-интерсептора
-        const allowFromJs  = (api.listAllow?.()  || []).map(norm);
-        const ignoreFromJs = (api.listIgnore?.() || []).map(norm);
-
-        g.__CDP_ALLOW_SUFFIXES   = Array.from(new Set([...(g.__CDP_ALLOW_SUFFIXES || []), ...allowFromJs]));
-        g.__CDP_IGNORED_SUFFIXES = Array.from(new Set([...(g.__CDP_IGNORED_SUFFIXES || []), ...ignoreFromJs]));
-
-        // 2) Обернуть методы, чтобы любые дальнейшие изменения синхронизировались
-        const _addAllow  = api.addAllow?.bind(api);
-        const _addIgnore = api.addIgnore?.bind(api);
-
-        if (_addAllow) {
-          api.addAllow = function(s){
-            try { _addAllow(s); } finally {
-              s = norm(s);
-              if (s && !g.__CDP_ALLOW_SUFFIXES.includes(s)) g.__CDP_ALLOW_SUFFIXES.push(s);
-            }
-          };
-        }
-        if (_addIgnore) {
-          api.addIgnore = function(s){
-            try { _addIgnore(s); } finally {
-              s = norm(s);
-              if (s && !g.__CDP_IGNORED_SUFFIXES.includes(s)) g.__CDP_IGNORED_SUFFIXES.push(s);
-            }
-          };
-        }
-        g.__HEADERS_BRIDGE_READY__ = true;
-        console.log("[headers_interceptor.js] CDP bridge ready");
-      }
-
-      if (document.readyState === "complete" || document.readyState === "interactive") wire();
-      else g.addEventListener("DOMContentLoaded", wire);
-      })();
-      """
+    # --- [HDR/04] CDP: register bridge for every NEW DOCUMENT ---
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
-
-    driver.execute_cdp_cmd("Runtime.evaluate", {"expression": headers_bridge_js, "awaitPromise": False})
-
 
     # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
     fetch_rules = []
@@ -696,9 +603,9 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
 
         def _inject_time_machine(driver):
             timegeo_js = "\n;\n".join([
-                Path(SCRIPTS_PATCHES_STEALTH_DIR / "TimezoneOverride_source.js").read_text("utf-8"),
+                Path(SCRIPTS_PATCHES_STEALTH / "TimezoneOverride_source.js").read_text("utf-8"),
                 "patchTimeZone();",
-                Path(SCRIPTS_PATCHES_STEALTH_DIR / "GeoOverride_source.js").read_text("utf-8"),
+                Path(SCRIPTS_PATCHES_STEALTH / "GeoOverride_source.js").read_text("utf-8"),
             ]) + "\n//# sourceURL=timegeo_bundle.js"
             driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": timegeo_js})
         _inject_time_machine(driver)
@@ -1070,7 +977,16 @@ def main():
         )
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
-            override_user_agent_data(driver, browser_brand)
+            # def override_user_agent_data(driver, browser_brand):
+            override_js = Path(SCRIPTS_PATCHES_NAV / "override_ua_data.js").read_text(encoding="utf-8")
+            if not override_js or not isinstance(override_js, str):
+                raise TypeError("override_user_agent_data: override_ua_data.js is empty/invalid")
+            driver.execute_cdp_cmd(
+                "Page.addScriptToEvaluateOnNewDocument",
+                {"source": override_js}
+            )
+
+            
         elif browser_brand == "Firefox":
             logger.info("UA data submitted via CDP for Firefox/Safari")
         else:
