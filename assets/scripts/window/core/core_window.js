@@ -258,5 +258,152 @@ const CoreWindowModule = function CoreWindowModule(window) {
     });
   }
 
+  // === Core2.0 minimal targets dispatcher (Window scope) ===
+  // Methodology: no new architecture; only unify execution mechanics for one initial kind ("method").
+  (function installCoreApplyTargets(){
+    function diagDegrade(code, err, extra) {
+      try {
+        if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__(code, err, extra);
+      } catch (_) {}
+    }
+    try {
+      const existing = window.Core;
+      if (existing && typeof existing.applyTargets === 'function') return;
+
+      const Core = (existing && (typeof existing === 'object' || typeof existing === 'function'))
+        ? existing
+        : {};
+
+      function applyTargets(targets, profile, diag) {
+        const list = Array.isArray(targets) ? targets : [];
+        if (!list.length) return [];
+
+        const markAsNative = ensureMarkAsNative();
+        const planned = [];
+
+        for (let i = 0; i < list.length; i++) {
+          const t = list[i] || {};
+          const owner = t.owner;
+          const key = t.key;
+          const kind = t.kind;
+          const mode = t.mode || 'post_process_only';
+          const policy = (t.policy === 'throw') ? 'throw' : 'skip';
+          const tag = t.diagTag ? String(t.diagTag) : 'core:applyTargets';
+
+          if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
+            const e = new TypeError('[Core.applyTargets] owner invalid');
+            diagDegrade(tag + ':owner_invalid', e, { key: key || null, kind: kind || null });
+            if (policy === 'throw') throw e;
+            return [];
+          }
+          if (typeof key !== 'string' || !key) {
+            const e = new TypeError('[Core.applyTargets] key invalid');
+            diagDegrade(tag + ':key_invalid', e, { kind: kind || null });
+            if (policy === 'throw') throw e;
+            return [];
+          }
+          if (kind !== 'method') {
+            const e = new TypeError('[Core.applyTargets] unsupported kind');
+            diagDegrade(tag + ':kind_unsupported', e, { key, kind: kind || null });
+            if (policy === 'throw') throw e;
+            return [];
+          }
+          if (mode !== 'post_process_only') {
+            const e = new TypeError('[Core.applyTargets] unsupported method mode');
+            diagDegrade(tag + ':mode_unsupported', e, { key, mode: mode || null });
+            if (policy === 'throw') throw e;
+            return [];
+          }
+
+          const desc = Object.getOwnPropertyDescriptor(owner, key);
+          if (!desc) {
+            const e = new Error('[Core.applyTargets] descriptor missing');
+            diagDegrade(tag + ':descriptor_missing', e, { key });
+            if (policy === 'throw') throw e;
+            return [];
+          }
+          if (typeof desc.value !== 'function') {
+            const e = new TypeError('[Core.applyTargets] descriptor.value not function');
+            diagDegrade(tag + ':not_function', e, { key, type: typeof desc.value });
+            if (policy === 'throw') throw e;
+            return [];
+          }
+          if (!(desc.configurable || desc.writable)) {
+            const e = new TypeError('[Core.applyTargets] non-configurable and non-writable');
+            diagDegrade(tag + ':non_configurable_non_writable', e, { key });
+            if (policy === 'throw') throw e;
+            return [];
+          }
+
+          const orig = desc.value;
+          const hooksPost = Array.isArray(t.hooksPost) ? t.hooksPost : [];
+          const wrappedRaw = ({ [key]() {
+            const args = Array.prototype.slice.call(arguments);
+            const out = Reflect.apply(orig, this, args);
+            if (typeof out !== 'string' || !hooksPost.length) return out;
+            let res = out;
+            for (let j = 0; j < hooksPost.length; j++) {
+              const hook = hooksPost[j];
+              if (typeof hook !== 'function') continue;
+              try {
+                const r = hook.call(this, res, ...args);
+                if (typeof r === 'string') res = r;
+              } catch (e) {
+                diagDegrade(tag + ':hooksPost_failed', e, { key, hook: hook && (hook.name || null) });
+                return out;
+              }
+            }
+            return res;
+          } })[key];
+
+          let wrapped;
+          try {
+            wrapped = markAsNative(wrappedRaw, key);
+          } catch (e) {
+            diagDegrade(tag + ':mark_failed', e, { key });
+            if (policy === 'throw') throw e;
+            return [];
+          }
+
+          planned.push({
+            owner,
+            key,
+            kind,
+            mode,
+            policy,
+            tag,
+            desc,
+            value: wrapped,
+          });
+        }
+
+        try {
+          if (diag && typeof diag === 'object' && typeof diag.push === 'function') {
+            diag.push({ planned: planned.length, total: list.length });
+          }
+        } catch (_) {}
+        return planned;
+      }
+
+      safeDefine(window, 'Core', {
+        value: Core,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'applyTargets', {
+        value: applyTargets,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      try { ensureMarkAsNative()(applyTargets, 'applyTargets'); } catch (_) {}
+
+    } catch (e) {
+      diagDegrade('core:installCoreApplyTargets:failed', e);
+      throw e;
+    }
+  })();
+
   window.__CORE_WINDOW_LOADED__ = true;
 }

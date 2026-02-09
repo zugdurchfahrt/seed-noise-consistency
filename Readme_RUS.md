@@ -211,4 +211,4 @@ pip install --no-cache-dir -r requirements.txt
 - Фикс для Adapter “core‑features‑and‑limits” для WebGPU.  
 - Ротация TLS‑отпечатка через OpenSSL.  
 
-З.Ы. В качестве бонуса добавлены инструменты для предварительной подготовки/обработки шрифтов.
+

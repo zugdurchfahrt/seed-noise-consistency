@@ -210,9 +210,8 @@ NO_PROXY_START.bat
 
 ## Issues/TODO
 
-- Synchronize window ↔ WorkerScope from the start (language(s), hardwareConcurrency, deviceMemory, userAgentData via Hub; getters on `WorkerNavigator.prototype`).
+- Synchronize window ↔ SharedWorkerScope completely.
 - Integrate `getClientRects` / `getBoundingClientRect` proxying.
-- Polish `toBlob` / `convertToBlob` hooks to avoid Illegal invocation on edge cases.
 - Fix Adapter “core-features-and-limits” for WebGPU.
 - Switch hooks patching to prototypes (not instances) + correct descriptors.
 - Implement TLS fingerprint rotation via OpenSSL.
