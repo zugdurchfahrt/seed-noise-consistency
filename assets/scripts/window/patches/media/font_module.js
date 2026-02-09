@@ -12,7 +12,79 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
   const C = window.CanvasPatchContext;
   if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registration is not allowed');
-  
+
+  const Core = window && window.Core;
+  if (!Core || typeof Core.applyTargets !== 'function') {
+    throw new Error('[FontPatch] Core.applyTargets is required');
+  }
+
+  function degrade(code, err, extra) {
+    try {
+      if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__(code, err, extra);
+    } catch (_) {}
+  }
+
+  function isSameDescriptor(actual, expected) {
+    if (!actual || !expected) return false;
+    const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (Object.prototype.hasOwnProperty.call(expected, k)) {
+        if (actual[k] !== expected[k]) return false;
+      }
+    }
+    return true;
+  }
+
+  function applyTargetGroup(groupTag, targets, policy) {
+    const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
+    let plans = [];
+    try {
+      plans = Core.applyTargets(targets, window.__PROFILE__, []);
+    } catch (e) {
+      degrade(groupTag + ':preflight_failed', e);
+      if (groupPolicy === 'throw') throw e;
+      return 0;
+    }
+
+    if (!Array.isArray(plans) || !plans.length) {
+      if (plans && plans.ok === false) {
+        const e = new Error('[FontPatch] target group skipped');
+        degrade(groupTag + ':group_skipped', e, { reason: plans.reason || null });
+      }
+      return 0;
+    }
+
+    const done = [];
+    try {
+      for (let i = 0; i < plans.length; i++) {
+        const p = plans[i];
+        if (!p || p.skipApply) continue;
+        if (!p.nextDesc || !p.owner || typeof p.key !== 'string') {
+          throw new Error('[FontPatch] invalid execution plan item');
+        }
+        Object.defineProperty(p.owner, p.key, p.nextDesc);
+        const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
+        if (!isSameDescriptor(after, p.nextDesc)) {
+          throw new Error('[FontPatch] descriptor post-check mismatch');
+        }
+        p.applied = true;
+        done.push(p);
+      }
+      return done.length;
+    } catch (e) {
+      for (let i = done.length - 1; i >= 0; i--) {
+        const p = done[i];
+        try {
+          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
+          else delete p.owner[p.key];
+        } catch (_) {}
+      }
+      degrade(groupTag + ':apply_failed', e);
+      if (groupPolicy === 'throw') throw e;
+      return 0;
+    }
+  }
 
   // === Fonts module local guard (window & worker) ===
   if (!Array.isArray(window.fontPatchConfigs))
@@ -40,25 +112,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       window.awaitFontsReady = window.fonts.ready;
     } else {
       window.awaitFontsReady = Promise.resolve();
-    }
-  })();
-
-  // Patch API FontFaceSet (Safe in window and in Worker if FontFaceSet avaiable)
-  (function patchFontFaceSetAPI(){
-    if (typeof window.FontFaceSet !== 'function') return;
-    const proto = window.FontFaceSet.prototype;
-    if (proto.__FONTFACESET_PATCHED) return;
-    Object.defineProperty(proto, '__FONTFACESET_PATCHED', { value: true });
-    ['load','check','forEach'].forEach(name => {
-      const desc = Object.getOwnPropertyDescriptor(proto, name);
-      if (!desc || typeof desc.value !== 'function') return;
-    });
-    const readyDesc = Object.getOwnPropertyDescriptor(proto, 'ready');
-    if (readyDesc && typeof readyDesc.get === 'function') {
-      Object.defineProperty(proto, 'ready', {
-        get() { return readyDesc.get.call(this); },
-        configurable: true
-      });
     }
   })();
 
@@ -178,7 +231,11 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             const err = first && ('reason' in first) ? first.reason : new Error('[FontPatch] font load failed');
 
             window.__FONTS_READY__ = false;
-            try { window.__FONTS_ERROR__ = String((err && (err.stack || err.message)) || err); } catch (_) {}
+            try {
+              window.__FONTS_ERROR__ = String((err && (err.stack || err.message)) || err);
+            } catch (eSet) {
+              degrade('fonts:data:set_error_failed', eSet);
+            }
 
             if (typeof window.awaitFontsReady?.reject === 'function') window.awaitFontsReady.reject(err);
             console.log(`[FontPatch] window: ${loaded} loaded, ${failed} failed`);
@@ -187,7 +244,11 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
           window.__FONTS_READY__ = true;
           if (typeof window.awaitFontsReady?.resolve === 'function') window.awaitFontsReady.resolve();
-          try { window.dispatchEvent && window.dispatchEvent(new Event('fontsready')); } catch (_) {}
+          try {
+            if (window.dispatchEvent) window.dispatchEvent(new Event('fontsready'));
+          } catch (eEvt) {
+            degrade('fonts:event:dispatch_failed', eEvt);
+          }
           console.log(`[FontPatch] window: ${loaded} loaded, ${failed} failed`);
         });
     });
@@ -225,56 +286,100 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 (() => {
   'use strict';
 
+  // data group: critical runtime promise handle
+  applyTargetGroup('fonts:data:critical', [{
+    owner: window,
+    key: 'awaitFontsReady',
+    kind: 'data',
+    value: window.awaitFontsReady,
+    allowCreate: true,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+    policy: 'throw',
+    diagTag: 'fonts:data:awaitFontsReady'
+  }], 'throw');
+
+  // data group: optional runtime flags
+  applyTargetGroup('fonts:data:flags', [
+    {
+      owner: window,
+      key: '__FONTS_READY__',
+      kind: 'data',
+      value: window.__FONTS_READY__,
+      allowCreate: true,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+      policy: 'skip',
+      diagTag: 'fonts:data:ready'
+    },
+    {
+      owner: window,
+      key: '__FONTS_ERROR__',
+      kind: 'data',
+      value: window.__FONTS_ERROR__,
+      allowCreate: true,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+      policy: 'skip',
+      diagTag: 'fonts:data:error'
+    }
+  ], 'skip');
+
   // Глобал рантайма
   const G = (typeof globalThis !== "undefined" ? globalThis : self);
 
-  // === Tunables (локальные, регулируем «на месте», без глобальных флагов) ===
-  // окно тика (мс)
-  let FFS_TICK_MS   = 16;
-  // лимит вызовов на тик в штатном режиме
-  let FFS_LIM_RUN   = 40;   // было 8 → слишком мало, даёт «6 fonts»
-  // «разгон» на старте: даём детектору сделать больше вызовов
-  let FFS_BOOT_MS   = 180;  // длительность разгона (мс)
-  let FFS_LIM_BOOT  = 96;   // лимит на тик в период разгона
-
   // FontFaceSet в текущем окружении (window/worker)
   const FFS = (G.document && G.document.fonts) || G.fonts || null;
-  if (!FFS) {
-    return;
-  }
-  if (FFS.__FONT_GUARD__) return;
-  Object.defineProperty(FFS, '__FONT_GUARD__', { value: true, configurable: false });
+  if (!FFS) return;
+
+  const proto = Object.getPrototypeOf(FFS);
+  if (!proto) return;
+
+  // accessor group: ready
+  applyTargetGroup('fonts:accessor', [{
+    owner: proto,
+    key: 'ready',
+    kind: 'accessor',
+    policy: 'skip',
+    diagTag: 'fonts:accessor:ready',
+    getImpl(origGet) {
+      return Reflect.apply(origGet, this, []);
+    }
+  }], 'skip');
+
+  // === Tunables (локальные, регулируем «на месте», без глобальных флагов) ===
+  let FFS_TICK_MS   = 16;
+  let FFS_LIM_RUN   = 40;
+  let FFS_BOOT_MS   = 180;
+  let FFS_LIM_BOOT  = 96;
 
   const now = (G.performance && typeof G.performance.now === 'function')
     ? () => G.performance.now.call(G.performance)
     : () => Date.now();
 
-  // --- троттлер ---
   const T0 = now();
   let calls = 0;
   let ts    = 0;
   const throttled = () => {
     const t = now();
-    const TMS = FFS_TICK_MS | 0;              // окно тика
+    const TMS = FFS_TICK_MS | 0;
     if (t - ts > TMS) { calls = 0; ts = t; }
-    const inBoot = (t - T0) < FFS_BOOT_MS;    // первые ~180 мс
+    const inBoot = (t - T0) < FFS_BOOT_MS;
     const LIM = inBoot ? FFS_LIM_BOOT : FFS_LIM_RUN;
-    // строгий лимит (fix off-by-one)
     return (calls++ >= LIM);
   };
 
-  // inbound "trash" validator
   const MAX_LEN = 256;
   const CTRL = /[\u0000-\u001F]/;
   const SIZED  = /\b-?\d+(?:\.\d+)?(?:px|pt|em|rem|%)\b/i;
   const FAMILY = /"[^"]+"|'[^']+'|\b[a-z0-9][\w\- ]{1,}\b/i;
-
-  // --- allow-list, синхронизированный с генератором ---
   const GENERICS = new Set(['serif','sans-serif','monospace','cursive','fantasy','system-ui']);
-  let ALLOWED_FAMILIES = null; // лениво соберём при первом обращении
+  let ALLOWED_FAMILIES = null;
 
   function extractFamily(q) {
-    // первая family из шортхенда: "italic bold 12px/14px 'My Font', Arial, sans-serif"
     const m = String(q).match(/(?:^|\s)\d+(?:\.\d+)?(?:px|pt|em|rem|%)\b(?:\/\d+(?:\.\d+)?(?:px|pt|em|rem|%))?\s+(.+)$/i);
     const raw = (m ? m[1] : q);
     return raw.split(',')[0].replace(/['"]/g,'').trim().toLowerCase();
@@ -299,51 +404,53 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
     const fam = extractFamily(q);
     if (!fam) return false;
-    if (GENERICS.has(fam)) return true;             // всегда пропускаем generics
-    return getAllowedFamilies().has(fam);           // и только те, что реально есть в fontPatchConfigs
+    if (GENERICS.has(fam)) return true;
+    return getAllowedFamilies().has(fam);
   };
 
-  const proto = Object.getPrototypeOf(FFS);
-  if (!proto) return;
+  // method group: check + forEach(declare-only)
+  applyTargetGroup('fonts:method', [
+    {
+      owner: proto,
+      key: 'check',
+      kind: 'method',
+      policy: 'skip',
+      diagTag: 'fonts:method:check',
+      invoke(orig, args) {
+        const query = args[0];
+        if (throttled()) return false;
+        if (!validFontQuery(query)) return false;
+        return Reflect.apply(orig, this, args);
+      }
+    },
+    {
+      owner: proto,
+      key: 'forEach',
+      kind: 'method',
+      mode: 'declare_only',
+      enabled: false,
+      policy: 'skip',
+      diagTag: 'fonts:method:forEach'
+    }
+  ], 'skip');
 
-  const dCheck = Object.getOwnPropertyDescriptor(proto, 'check');
-  const dLoad  = Object.getOwnPropertyDescriptor(proto, 'load');
-  if (!dCheck || typeof dCheck.value !== 'function') return;
-  if (!dLoad  || typeof dLoad.value  !== 'function') return;
-
-  const origCheck = dCheck.value;
-  const origLoad  = dLoad.value;
-
-  const ensure = (G && typeof G.__ensureMarkAsNative === 'function') ? G.__ensureMarkAsNative : null;
-  const mark = ensure ? ensure() : null;
-
-  const wrappedCheck = (mark ? mark(function check(query) {
-    if (throttled()) return false;
-    if (!validFontQuery(query)) return false;
-    return origCheck.call(this, query);
-  }, 'check') : function check(query) {
-    if (throttled()) return false;
-    if (!validFontQuery(query)) return false;
-    return origCheck.call(this, query);
-  });
-
-  const wrappedLoad = (mark ? mark(function load(query, text) {
-    if (throttled()) return Promise.resolve([]);
-    if (!validFontQuery(query)) return Promise.resolve([]);
-    if (text != null && typeof text !== 'string') return Promise.resolve([]);
-    return origLoad.call(this, query, text);
-  }, 'load') : function load(query, text) {
-    if (throttled()) return Promise.resolve([]);
-    if (!validFontQuery(query)) return Promise.resolve([]);
-    if (text != null && typeof text !== 'string') return Promise.resolve([]);
-    return origLoad.call(this, query, text);
-  });
-
-  Object.defineProperty(proto, 'check', Object.assign({}, dCheck, { value: wrappedCheck }));
-  Object.defineProperty(proto, 'load',  Object.assign({}, dLoad,  { value: wrappedLoad }));
+  // promise_method group: load
+  applyTargetGroup('fonts:promise', [{
+    owner: proto,
+    key: 'load',
+    kind: 'promise_method',
+    policy: 'skip',
+    diagTag: 'fonts:promise:load',
+    invoke(orig, args) {
+      const query = args[0];
+      const text = args[1];
+      if (throttled()) return Promise.resolve([]);
+      if (!validFontQuery(query)) return Promise.resolve([]);
+      if (text != null && typeof text !== 'string') return Promise.resolve([]);
+      return Reflect.apply(orig, this, args);
+    }
+  }], 'skip');
 })();
 
 
 }
-
-
