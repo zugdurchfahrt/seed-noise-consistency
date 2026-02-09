@@ -44,6 +44,25 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (typeof __wrapNativeApply !== 'function' || typeof __wrapNativeAccessor !== 'function') {
     throw new Error('[Screen] core wrappers missing');
   }
+  const __corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
+    ? window.Core.preflightTarget
+    : null;
+  function ensurePreflight(owner, key, kind, diagTag) {
+    if (typeof __corePreflightTarget !== 'function') return;
+    const pre = __corePreflightTarget({
+      owner,
+      key,
+      kind,
+      policy: 'throw',
+      diagTag
+    });
+    if (!pre || pre.ok !== true) {
+      const err = (pre && pre.error instanceof Error) ? pre.error : new Error(`[Screen] preflight failed for ${String(key)}`);
+      const reason = pre && pre.reason ? pre.reason : 'preflight_failed';
+      __screenDiag('warn', `${diagTag}:${reason}`, { key, kind }, err);
+      throw err;
+    }
+  }
   
   function safeDefine(obj, prop, descriptor) {
     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
@@ -64,6 +83,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (!d) throw new Error(`[Screen] ${prop} descriptor missing`);
     if (d.configurable === false) throw new Error(`[Screen] ${prop} non-configurable`);
     const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+    const kind = isData
+      ? ((typeof d.value === 'function' && typeof getterOrValue === 'function') ? 'method' : 'data')
+      : 'accessor';
+    ensurePreflight(target, prop, kind, 'screen:redefineProp');
     if (isData) {
       const value = (typeof getterOrValue === 'function') ? getterOrValue.call(target) : getterOrValue;
       Object.defineProperty(target, prop, {
@@ -114,6 +137,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (mqlProto) {
     const matchesDesc = Object.getOwnPropertyDescriptor(mqlProto, 'matches');
     if (matchesDesc && typeof matchesDesc.get === 'function' && matchesDesc.configurable) {
+      ensurePreflight(mqlProto, 'matches', 'accessor', 'screen:mql_matches');
       const origMatchesGet = matchesDesc.get;
       Object.defineProperty(mqlProto, 'matches', {
         get: __wrapNativeAccessor(origMatchesGet, origMatchesGet.name || '', (target, thisArg, argList) => {

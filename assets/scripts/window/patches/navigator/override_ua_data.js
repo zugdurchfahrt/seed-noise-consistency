@@ -1,10 +1,85 @@
 (function(){
   'use strict';
   const g = window;
+  const Core = g && g.Core;
+  if (!Core || typeof Core.applyTargets !== 'function') {
+    throw new Error('[UADOverride] Core.applyTargets is required');
+  }
+
   const D = (typeof g.__DEGRADE__ === 'function') ? g.__DEGRADE__ : null;
   function degrade(code, err, extra){
     try { if (D) D(code, err || null, extra || null); } catch(_e) {}
   }
+
+  function cloneDesc(d){
+    if (!d) return null;
+    const out = {};
+    if ('configurable' in d) out.configurable = d.configurable;
+    if ('enumerable' in d) out.enumerable = d.enumerable;
+    if ('writable' in d) out.writable = d.writable;
+    if ('value' in d) out.value = d.value;
+    if ('get' in d) out.get = d.get;
+    if ('set' in d) out.set = d.set;
+    return out;
+  }
+
+  function isSameDescriptor(actual, expected){
+    if (!actual || !expected) return false;
+    const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (Object.prototype.hasOwnProperty.call(expected, k) && actual[k] !== expected[k]) return false;
+    }
+    return true;
+  }
+
+  function applyTargetGroup(groupTag, targets, policy){
+    const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
+    let plans = [];
+    try {
+      plans = Core.applyTargets(targets, g.__PROFILE__, []);
+    } catch (e) {
+      degrade(groupTag + ':preflight_failed', e, null);
+      if (groupPolicy === 'throw') throw e;
+      return 0;
+    }
+    if (!Array.isArray(plans) || !plans.length) {
+      if (plans && plans.ok === false) {
+        degrade(groupTag + ':group_skipped', new Error('[UADOverride] group skipped'), { reason: plans.reason || null });
+      }
+      return 0;
+    }
+
+    const done = [];
+    try {
+      for (let i = 0; i < plans.length; i++) {
+        const p = plans[i];
+        if (!p || p.skipApply) continue;
+        if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
+          throw new Error('[UADOverride] invalid plan item');
+        }
+        Object.defineProperty(p.owner, p.key, p.nextDesc);
+        const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
+        if (!isSameDescriptor(after, p.nextDesc)) {
+          throw new Error('[UADOverride] descriptor post-check mismatch');
+        }
+        done.push(p);
+      }
+      return done.length;
+    } catch (e) {
+      for (let i = done.length - 1; i >= 0; i--) {
+        const p = done[i];
+        try {
+          if (p.origDesc) Object.defineProperty(p.owner, p.key, cloneDesc(p.origDesc));
+          else delete p.owner[p.key];
+        } catch (_) {}
+      }
+      degrade(groupTag + ':apply_failed', e, null);
+      if (groupPolicy === 'throw') throw e;
+      return 0;
+    }
+  }
+
   function isObj(x){ return !!x && (typeof x === 'object' || typeof x === 'function'); }
   function mustStr(obj, k, allowEmpty){
     const v = obj && obj[k];
@@ -41,82 +116,178 @@
       return { brand, version };
     });
   }
+
+  function sanitizeBrands(brands){
+    return brands.map(function (x) { return { brand: x.brand, version: String(x.version) }; });
+  }
+
+  function sanitizeHighEntropyFromHints(hints, keys, base){
+    const out = isObj(base) ? Object.assign({}, base) : {};
+    const requested = Array.isArray(keys) ? keys : [];
+    for (let i = 0; i < requested.length; i++) {
+      const k = requested[i];
+      if (typeof k !== 'string' || !k) throw new TypeError('UADOverride: bad keys');
+      if (k === 'architecture' && typeof hints.architecture === 'string') out.architecture = hints.architecture;
+      else if (k === 'bitness' && typeof hints.bitness === 'string') out.bitness = hints.bitness;
+      else if (k === 'model' && typeof hints.model === 'string') out.model = hints.model;
+      else if (k === 'platformVersion' && typeof hints.platformVersion === 'string') out.platformVersion = hints.platformVersion;
+      else if (k === 'uaFullVersion' && typeof hints.uaFullVersion === 'string') out.uaFullVersion = hints.uaFullVersion;
+      else if (k === 'fullVersionList' && Array.isArray(hints.fullVersionList)) out.fullVersionList = sanitizeBrands(hints.fullVersionList);
+      else if (k === 'wow64' && typeof hints.wow64 === 'boolean') out.wow64 = hints.wow64;
+      else if (k === 'formFactors' && Array.isArray(hints.formFactors)) out.formFactors = hints.formFactors.slice(0);
+    }
+    return out;
+  }
+
+  const patchedUADProtos = (typeof WeakSet === 'function') ? new WeakSet() : null;
+
+  function patchUADPrototype(nativeUAD, hints){
+    if (!isObj(nativeUAD)) return;
+    const proto = Object.getPrototypeOf(nativeUAD);
+    if (!isObj(proto)) return;
+    if (patchedUADProtos && patchedUADProtos.has(proto)) return;
+
+    function validUADThis(self){
+      return !!self && proto.isPrototypeOf(self);
+    }
+
+    const targets = [
+      {
+        owner: proto,
+        key: 'brands',
+        kind: 'accessor',
+        resolve: 'own',
+        policy: 'skip',
+        diagTag: 'uad_override:brands',
+        validThis: validUADThis,
+        invalidThis: 'native',
+        getImpl: function getBrands(origGet){
+          const base = Reflect.apply(origGet, this, []);
+          if (!Array.isArray(hints.brands)) return base;
+          return sanitizeBrands(hints.brands);
+        }
+      },
+      {
+        owner: proto,
+        key: 'mobile',
+        kind: 'accessor',
+        resolve: 'own',
+        policy: 'skip',
+        diagTag: 'uad_override:mobile',
+        validThis: validUADThis,
+        invalidThis: 'native',
+        getImpl: function getMobile(origGet){
+          const base = Reflect.apply(origGet, this, []);
+          if (typeof hints.mobile !== 'boolean') return base;
+          return hints.mobile;
+        }
+      },
+      {
+        owner: proto,
+        key: 'platform',
+        kind: 'accessor',
+        resolve: 'own',
+        policy: 'skip',
+        diagTag: 'uad_override:platform',
+        validThis: validUADThis,
+        invalidThis: 'native',
+        getImpl: function getPlatform(origGet){
+          const base = Reflect.apply(origGet, this, []);
+          if (typeof hints.platform !== 'string' || !hints.platform) return base;
+          return hints.platform;
+        }
+      },
+      {
+        owner: proto,
+        key: 'getHighEntropyValues',
+        kind: 'promise_method',
+        invokeClass: 'brand_strict',
+        resolve: 'own',
+        policy: 'skip',
+        diagTag: 'uad_override:getHighEntropyValues',
+        validThis: validUADThis,
+        invalidThis: 'native',
+        invoke: function invokeGetHE(orig, args){
+          const p = Reflect.apply(orig, this, args || []);
+          if (!p || typeof p.then !== 'function') {
+            throw new TypeError('UADOverride: getHighEntropyValues must return Promise');
+          }
+          const keys = args && args.length ? args[0] : [];
+          return p.then(function(res){
+            return sanitizeHighEntropyFromHints(hints, keys, res);
+          });
+        }
+      }
+    ];
+
+    const applied = applyTargetGroup('uad_override:uad_proto', targets, 'skip');
+    if (applied > 0 && patchedUADProtos) patchedUADProtos.add(proto);
+  }
+
   try {
     const nav = navigator;
     const proto = Object.getPrototypeOf(nav) || (typeof Navigator !== 'undefined' && Navigator && Navigator.prototype);
     if (!proto) return;
 
-    const dUA = Object.getOwnPropertyDescriptor(proto, 'userAgent');
-    const origUAGet = dUA && dUA.get;
-    if (dUA && dUA.configurable === true && typeof origUAGet === 'function') {
-      if (typeof g.__USER_AGENT === 'string' && g.__USER_AGENT) {
-        const getUA = function(){ return g.__USER_AGENT; };
-        Object.defineProperty(proto, 'userAgent', {
-          get: getUA,
-          set: dUA.set,
-          configurable: true,
-          enumerable: !!dUA.enumerable
-        });
-      }
+    function validNavThis(self){
+      return !!self && (self === nav || proto.isPrototypeOf(self));
     }
 
-    const dUAD = Object.getOwnPropertyDescriptor(proto, 'userAgentData');
-    const origUADGet = dUAD && dUAD.get;
-    if (!dUAD || dUAD.configurable !== true || typeof origUADGet !== 'function') {
-      return; // safe: cannot redefine
+    const targets = [];
+    if (typeof g.__USER_AGENT === 'string' && g.__USER_AGENT) {
+      targets.push({
+        owner: proto,
+        key: 'userAgent',
+        kind: 'accessor',
+        resolve: 'own',
+        policy: 'skip',
+        diagTag: 'uad_override:userAgent',
+        validThis: validNavThis,
+        invalidThis: 'native',
+        getImpl: function getUAImpl(origGet){
+          if (!isObj(this)) return Reflect.apply(origGet, this, []);
+          return g.__USER_AGENT;
+        }
+      });
     }
 
-    const getUAD = function(){
-      // Safe fallback: if contract is missing/invalid, keep native surface.
-      const H = g.__EXPECTED_CLIENT_HINTS;
-      if (!isObj(H)) return origUADGet.call(this);
-      try {
-        const brands = mustBrands(H);
-        const mobile = !!H.mobile;
-        const platform = mustStr(H, 'platform', false);
-        const he = {
-          architecture: mustStr(H, 'architecture', false),
-          bitness: mustStr(H, 'bitness', false),
-          model: mustStr(H, 'model', true),
-          platformVersion: mustStr(H, 'platformVersion', false),
-          uaFullVersion: mustStr(H, 'uaFullVersion', false),
-          fullVersionList: mustFullVersionList(H),
-          wow64: (typeof H.wow64 === 'boolean') ? H.wow64 : false,
-          formFactors: Array.isArray(H.formFactors) ? H.formFactors.slice(0) : ['Desktop'],
-        };
-
-        // NOTE: This is still a plain object (not NavigatorUAData instance).
-        // Draft goal is to prevent broken values + keep atomic fallback.
-        const uad = {
-          brands: brands.map(x => ({ brand: x.brand, version: String(x.version) })),
-          mobile: mobile,
-          platform: platform,
-          getHighEntropyValues: async function(keys){
-            if (!Array.isArray(keys)) throw new TypeError('UADOverride: bad keys');
-            const out = {};
-            for (let i = 0; i < keys.length; i++) {
-              const k = keys[i];
-              if (typeof k !== 'string' || !k) throw new TypeError('UADOverride: bad keys');
-              if (k in he) out[k] = he[k];
-            }
-            return out;
-          },
-          toJSON: function(){ return { brands: this.brands, mobile: this.mobile, platform: this.platform }; }
-        };
-
-        return uad;
-      } catch (e) {
-        degrade('uad_override:contract_invalid', e, { prop: 'userAgentData' });
-        return origUADGet.call(this);
+    targets.push({
+      owner: proto,
+      key: 'userAgentData',
+      kind: 'accessor',
+      resolve: 'own',
+      policy: 'skip',
+      diagTag: 'uad_override:userAgentData',
+      validThis: validNavThis,
+      invalidThis: 'native',
+      getImpl: function getUADImpl(origGet){
+        const nativeUAD = Reflect.apply(origGet, this, []);
+        const H = g.__EXPECTED_CLIENT_HINTS;
+        if (!isObj(H)) return nativeUAD;
+        try {
+          const hints = {
+            brands: mustBrands(H),
+            mobile: mustBool(H, 'mobile'),
+            platform: mustStr(H, 'platform', false),
+            architecture: mustStr(H, 'architecture', false),
+            bitness: mustStr(H, 'bitness', false),
+            model: mustStr(H, 'model', true),
+            platformVersion: mustStr(H, 'platformVersion', false),
+            uaFullVersion: mustStr(H, 'uaFullVersion', false),
+            fullVersionList: mustFullVersionList(H),
+            wow64: (typeof H.wow64 === 'boolean') ? H.wow64 : false,
+            formFactors: Array.isArray(H.formFactors) ? H.formFactors.slice(0) : ['Desktop']
+          };
+          patchUADPrototype(nativeUAD, hints);
+          return nativeUAD;
+        } catch (e) {
+          degrade('uad_override:contract_invalid', e, { prop: 'userAgentData' });
+          return nativeUAD;
+        }
       }
-    };
-
-    Object.defineProperty(proto, 'userAgentData', {
-      get: getUAD,
-      set: dUAD.set,
-      configurable: true,
-      enumerable: !!dUAD.enumerable
     });
+
+    applyTargetGroup('uad_override:navigator', targets, 'skip');
   } catch(e) {
     degrade('uad_override:exception', e, null);
   }

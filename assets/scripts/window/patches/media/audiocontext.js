@@ -16,6 +16,9 @@ const AudioContextModule = function AudioContextModule(window) {
   const safeDefine = (typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
   const __wrapNativeApply = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
   const __wrapNativeAccessor = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
+  const __corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
+    ? window.Core.preflightTarget
+    : null;
   if (typeof safeDefine !== 'function') throw new Error('[AudioContextPatch] __safeDefine missing');
   if (typeof __wrapNativeApply !== 'function') throw new Error('[AudioContextPatch] __wrapNativeApply missing');
   if (typeof __wrapNativeAccessor !== 'function') throw new Error('[AudioContextPatch] __wrapNativeAccessor missing');
@@ -38,6 +41,24 @@ const AudioContextModule = function AudioContextModule(window) {
         timestamp: new Date().toISOString()
       });
     }
+  }
+  function ensurePreflight(owner, key, kind, ctxName) {
+    if (typeof __corePreflightTarget !== 'function') return true;
+    const pre = __corePreflightTarget({
+      owner,
+      key,
+      kind,
+      resolve: 'proto_chain',
+      policy: 'throw',
+      diagTag: `audio:${ctxName || 'module'}:${String(key)}`
+    });
+    if (!pre || pre.ok !== true) {
+      const reason = pre && pre.reason ? pre.reason : 'preflight_failed';
+      noteIssue(`${reason}:${key}`, ctxName || null);
+      const err = (pre && pre.error instanceof Error) ? pre.error : new Error(`[AudioContextPatch] preflight failed for ${String(key)}`);
+      throw err;
+    }
+    return true;
   }
 
   function canRedefine(proto, prop, ctxName) {
@@ -132,6 +153,7 @@ const AudioContextModule = function AudioContextModule(window) {
     // 3. patch sampleRate/baseLatency: wrap native accessor to preserve native shape
     const sampleRateDesc = Object.getOwnPropertyDescriptor(proto, 'sampleRate') || getPropDescriptorDeep(proto, 'sampleRate');
     if (sampleRateDesc && typeof sampleRateDesc.get === 'function' && canRedefine(proto, 'sampleRate', CTX_NAME)) {
+      ensurePreflight(proto, 'sampleRate', 'accessor', CTX_NAME);
       const origSampleGet = sampleRateDesc.get;
       const getSampleRate = __wrapNativeAccessor(origSampleGet, 'get sampleRate', function(target, thisArg, argList) {
         const v = Reflect.apply(target, thisArg, []);
@@ -148,6 +170,7 @@ const AudioContextModule = function AudioContextModule(window) {
     if ('baseLatency' in proto) {
       const baseLatencyDesc = Object.getOwnPropertyDescriptor(proto, 'baseLatency') || getPropDescriptorDeep(proto, 'baseLatency');
       if (baseLatencyDesc && typeof baseLatencyDesc.get === 'function' && canRedefine(proto, 'baseLatency', CTX_NAME)) {
+        ensurePreflight(proto, 'baseLatency', 'accessor', CTX_NAME);
         const origBaseGet = baseLatencyDesc.get;
         const getBaseLatency = __wrapNativeAccessor(origBaseGet, 'get baseLatency', function(target, thisArg, argList) {
           const v = Reflect.apply(target, thisArg, []);
@@ -167,6 +190,7 @@ const AudioContextModule = function AudioContextModule(window) {
     // 4. patch createBuffer (descriptor-strict): wrap native method via Core wrapper
     const dCreateBuffer = Object.getOwnPropertyDescriptor(proto, 'createBuffer') || getPropDescriptorDeep(proto, 'createBuffer');
     if (dCreateBuffer && typeof dCreateBuffer.value === 'function' && canReplaceMethod(proto, 'createBuffer', CTX_NAME)) {
+      ensurePreflight(proto, 'createBuffer', 'method', CTX_NAME);
       const origCreateBuffer = dCreateBuffer.value;
       const wrappedCreateBuffer = __wrapNativeApply(origCreateBuffer, 'createBuffer', function(target, thisArg, argList) {
         return Reflect.apply(target, thisArg, argList);
@@ -182,6 +206,7 @@ const AudioContextModule = function AudioContextModule(window) {
 
   // 5. patch AnalyserNode (preserveing invariants)
   if (AUDIO_NOISE_ENABLED && typeof proto.createAnalyser === 'function' && canReplaceMethod(proto, 'createAnalyser', CTX_NAME)) {
+    ensurePreflight(proto, 'createAnalyser', 'method', CTX_NAME);
     const origCreateAnalyser = proto.createAnalyser;
     proto.createAnalyser = markAsNative(makeMethod('createAnalyser', function() {
       const analyser = origCreateAnalyser.call(this);
@@ -322,6 +347,7 @@ const AudioContextModule = function AudioContextModule(window) {
       const dStart = Object.getOwnPropertyDescriptor(OfflineAudioContext.prototype, 'startRendering');
       const origStartRendering = dStart && dStart.value;
       if (typeof origStartRendering === 'function' && canReplaceMethod(OfflineAudioContext.prototype, 'startRendering', 'OfflineAudioContext')) {
+        ensurePreflight(OfflineAudioContext.prototype, 'startRendering', 'promise_method', 'OfflineAudioContext');
         const wrappedStartRendering = __wrapNativeApply(origStartRendering, 'startRendering', function(target, thisArg, argList) {
           const p = Reflect.apply(target, thisArg, argList);
           if (!p || typeof p.then !== 'function') return p;

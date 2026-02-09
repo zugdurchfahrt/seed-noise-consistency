@@ -159,6 +159,34 @@ const CoreWindowModule = function CoreWindowModule(window) {
     return wrapped;
   }
 
+  function __wrapNativeCtor(nativeFn, name, argsImpl) {
+    if (typeof nativeFn !== 'function') {
+      throw new TypeError('[CoreWindow] __wrapNativeCtor: nativeFn must be function');
+    }
+    if (typeof argsImpl !== 'function') {
+      throw new TypeError('[CoreWindow] __wrapNativeCtor: argsImpl must be function');
+    }
+    const wrapped = new Proxy(nativeFn, {
+      apply(target, thisArg, argList) {
+        const nextArgs = argsImpl(argList || [], false);
+        return Reflect.apply(target, thisArg, nextArgs);
+      },
+      construct(target, argList, newTarget) {
+        const nextArgs = argsImpl(argList || [], true);
+        return Reflect.construct(target, nextArgs, newTarget || target);
+      }
+    });
+    const markAsNative = __requireMarkAsNative();
+    try {
+      toStringProxyTargetMap.set(wrapped, nativeFn);
+      markAsNative(nativeFn, name || nativeFn.name || "");
+    } catch (e) {
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:wrapNativeCtor:mark_failed", e);
+      throw e;
+    }
+    return wrapped;
+  }
+
   function __wrapNativeAccessor(origGetOrSet, name, applyImpl) {
     if (typeof origGetOrSet !== 'function') {
       throw new TypeError('[CoreWindow] __wrapNativeAccessor: origGetOrSet must be function');
@@ -180,6 +208,14 @@ const CoreWindowModule = function CoreWindowModule(window) {
   if (typeof window.__wrapNativeAccessor !== 'function') {
     safeDefine(window, '__wrapNativeAccessor', {
       value: __wrapNativeAccessor,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (typeof window.__wrapNativeCtor !== 'function') {
+    safeDefine(window, '__wrapNativeCtor', {
+      value: __wrapNativeCtor,
       writable: true,
       configurable: true,
       enumerable: false
@@ -286,6 +322,34 @@ const CoreWindowModule = function CoreWindowModule(window) {
     function hasDataShape(desc) {
       return !!desc && (Object.prototype.hasOwnProperty.call(desc, 'value') || Object.prototype.hasOwnProperty.call(desc, 'writable'));
     }
+    function normalizeResolveMode(v) {
+      return v === 'proto_chain' ? 'proto_chain' : 'own';
+    }
+    function normalizeInvokeClass(v) {
+      if (v === undefined || v === null || v === '') return 'normal';
+      if (v === 'normal' || v === 'brand_strict' || v === 'constructor' || v === 'meta_primitive') return v;
+      return null;
+    }
+    function resolveDescriptor(owner, key, options) {
+      const opts = options || {};
+      const mode = normalizeResolveMode(opts.mode);
+      if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
+        return { owner: null, desc: null, mode };
+      }
+      if (typeof key !== 'string' || !key) {
+        return { owner: null, desc: null, mode };
+      }
+      if (mode === 'own') {
+        return { owner, desc: Object.getOwnPropertyDescriptor(owner, key) || null, mode };
+      }
+      let cur = owner;
+      while (cur) {
+        const d = Object.getOwnPropertyDescriptor(cur, key);
+        if (d) return { owner: cur, desc: d, mode };
+        cur = Object.getPrototypeOf(cur);
+      }
+      return { owner: owner, desc: null, mode };
+    }
     function sameTargetKey(owner, key) {
       return String(key) + '::' + Object.prototype.toString.call(owner);
     }
@@ -298,6 +362,380 @@ const CoreWindowModule = function CoreWindowModule(window) {
         : {};
 
       const knownWrapped = new WeakSet();
+
+      function onInvalidThis(invalidPolicy, origFn, self, args) {
+        if (typeof invalidPolicy === 'function') return invalidPolicy.call(self, origFn, args);
+        if (invalidPolicy === 'throw') throw new TypeError();
+        if (typeof origFn === 'function') return Reflect.apply(origFn, self, args || []);
+        throw new TypeError();
+      }
+
+      function buildNamedAccessor(key, kind, impl) {
+        if (kind === 'get') {
+          return Object.getOwnPropertyDescriptor(({ get [key]() { return impl.call(this); } }), key).get;
+        }
+        return Object.getOwnPropertyDescriptor(({ set [key](v) { return impl.call(this, v); } }), key).set;
+      }
+
+      function wrapGetter(key, getter, desc, validThis, opts) {
+        const options = opts || {};
+        const isData = desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
+        if (isData) return getter;
+        const markAsNative = ensureMarkAsNative();
+        const origGet = desc && desc.get;
+        const invalidThis = options.invalidThis || 'native';
+        const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
+          if (typeof validThis === 'function' && !validThis(this)) {
+            return onInvalidThis(invalidThis, origGet, this, arguments);
+          }
+          return (typeof getter === 'function') ? getter.call(this) : getter;
+        }}), key).get;
+        if (options.mark === false) return namedGet;
+        const wrapped = markAsNative(namedGet, 'get ' + key);
+        knownWrapped.add(wrapped);
+        return wrapped;
+      }
+
+      function safeDefineAcc(target, key, getter, options) {
+        const opts = options || {};
+        const enumerable = !!opts.enumerable;
+        const validThis = typeof opts.validThis === 'function' ? opts.validThis : null;
+        if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+          throw new TypeError('[Core.safeDefineAcc] invalid target for ' + key);
+        }
+        const d = Object.getOwnPropertyDescriptor(target, key);
+        if (d && d.configurable === false) {
+          throw new TypeError('[Core.safeDefineAcc] non-configurable ' + key);
+        }
+        const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+        if (isData) {
+          const value = (typeof getter === 'function') ? getter.call(target) : getter;
+          Object.defineProperty(target, key, {
+            value: value,
+            writable: d ? !!d.writable : true,
+            configurable: d ? !!d.configurable : true,
+            enumerable: d ? !!d.enumerable : enumerable
+          });
+          return true;
+        }
+        const wrappedGet = wrapGetter(key, getter, d, validThis, { invalidThis: opts.invalidThis });
+        Object.defineProperty(target, key, {
+          get: wrappedGet,
+          set: d && d.set,
+          configurable: d ? !!d.configurable : true,
+          enumerable: d ? !!d.enumerable : enumerable
+        });
+        return true;
+      }
+
+      function defineAccWithFallback(target, key, getter, options) {
+        if (safeDefineAcc(target, key, getter, options)) return true;
+        throw new TypeError('[Core.defineAccWithFallback] failed to define ' + key);
+      }
+
+      function redefineAcc(target, key, getImpl) {
+        const d = Object.getOwnPropertyDescriptor(target, key);
+        if (d && d.configurable === false) {
+          throw new TypeError('[Core.redefineAcc] non-configurable ' + key);
+        }
+        const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+        if (isData) {
+          const value = (typeof getImpl === 'function') ? getImpl.call(target) : getImpl;
+          Object.defineProperty(target, key, {
+            value: value,
+            writable: d ? !!d.writable : true,
+            configurable: d ? !!d.configurable : true,
+            enumerable: d ? !!d.enumerable : false
+          });
+          return true;
+        }
+        const markAsNative = ensureMarkAsNative();
+        const namedGet = (typeof getImpl === 'function' && getImpl.name === '')
+          ? Object.getOwnPropertyDescriptor(({ get [key]() { return getImpl.call(this); } }), key).get
+          : getImpl;
+        if (typeof namedGet !== 'function') {
+          throw new TypeError('[Core.redefineAcc] getter missing for ' + key);
+        }
+        const wrappedGet = markAsNative(namedGet, 'get ' + key);
+        knownWrapped.add(wrappedGet);
+        Object.defineProperty(target, key, {
+          get: wrappedGet,
+          set: d && d.set,
+          configurable: d ? !!d.configurable : true,
+          enumerable: d ? !!d.enumerable : false
+        });
+        return true;
+      }
+
+      function patchDataProp(planItem, t, desc, fail) {
+        if (desc && !hasDataShape(desc)) {
+          const e = new TypeError('[Core.applyTargets] kind mismatch for data');
+          return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+        }
+        if (desc && !(desc.configurable || desc.writable)) {
+          const e = new TypeError('[Core.applyTargets] non-configurable and non-writable');
+          return fail(planItem.policy, planItem.tag, 'non_configurable', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+        }
+        const v = Object.prototype.hasOwnProperty.call(t, 'value')
+          ? t.value
+          : (desc ? desc.value : undefined);
+        if (desc) {
+          planItem.nextDesc = Object.assign({}, desc, { value: v });
+        } else {
+          planItem.nextDesc = {
+            value: v,
+            writable: Object.prototype.hasOwnProperty.call(t, 'writable') ? !!t.writable : true,
+            configurable: Object.prototype.hasOwnProperty.call(t, 'configurable') ? !!t.configurable : true,
+            enumerable: Object.prototype.hasOwnProperty.call(t, 'enumerable') ? !!t.enumerable : true
+          };
+        }
+        return planItem;
+      }
+
+      function patchAccessor(planItem, t, desc, markAsNative, fail) {
+        if (!desc) {
+          const e = new Error('[Core.applyTargets] descriptor missing');
+          return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+        }
+        if (!hasAccessorShape(desc)) {
+          const e = new TypeError('[Core.applyTargets] kind mismatch for accessor');
+          return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+        }
+        if (!desc.configurable) {
+          const e = new TypeError('[Core.applyTargets] non-configurable accessor');
+          return fail(planItem.policy, planItem.tag, 'non_configurable', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+        }
+
+        const key = planItem.key;
+        const origGet = typeof desc.get === 'function' ? desc.get : undefined;
+        const origSet = typeof desc.set === 'function' ? desc.set : undefined;
+        const getImpl = typeof t.getImpl === 'function' ? t.getImpl : null;
+        const setImpl = typeof t.setImpl === 'function' ? t.setImpl : null;
+        const validThis = typeof t.validThis === 'function' ? t.validThis : null;
+        const invalidThis = t.invalidThis || 'native';
+        let getWrapped = origGet;
+        let setWrapped = origSet;
+
+        try {
+          if (origGet) {
+            const computedGetter = function coreAccessorGet() {
+              if (getImpl) return getImpl.call(this, origGet);
+              return Reflect.apply(origGet, this, []);
+            };
+            getWrapped = wrapGetter(key, computedGetter, desc, validThis, {
+              invalidThis: invalidThis,
+              mark: true
+            });
+          }
+          if (origSet) {
+            const setRaw = buildNamedAccessor(key, 'set', function coreAccessorSet(v) {
+              if (validThis && !validThis(this)) {
+                return onInvalidThis(invalidThis, origSet, this, [v]);
+              }
+              if (setImpl) return setImpl.call(this, origSet, v);
+              return Reflect.apply(origSet, this, [v]);
+            });
+            setWrapped = markAsNative(setRaw, 'set ' + key);
+            knownWrapped.add(setWrapped);
+          }
+        } catch (e) {
+          return fail(planItem.policy, planItem.tag, 'mark_failed', e, { key, kind: planItem.kind, targetId: planItem.targetId });
+        }
+
+        planItem.nextDesc = Object.assign({}, desc, { get: getWrapped, set: setWrapped });
+        return planItem;
+      }
+
+      function patchMethod(planItem, t, desc, markAsNative, fail, isPromiseMethod) {
+        if (!desc) {
+          const e = new Error('[Core.applyTargets] descriptor missing');
+          return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+        }
+        if (!hasDataShape(desc) || typeof desc.value !== 'function') {
+          const e = new TypeError('[Core.applyTargets] kind mismatch for method');
+          return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId, type: typeof desc.value });
+        }
+        if (!(desc.configurable || desc.writable)) {
+          const e = new TypeError('[Core.applyTargets] non-configurable and non-writable');
+          return fail(planItem.policy, planItem.tag, 'non_configurable', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+        }
+        if (planItem.mode === 'declare_only' || t.enabled === false) {
+          planItem.skipApply = true;
+          planItem.reason = 'declare_only';
+          return planItem;
+        }
+
+        const key = planItem.key;
+        const orig = desc.value;
+        const invoke = typeof t.invoke === 'function' ? t.invoke : null;
+        const hooksPost = Array.isArray(t.hooksPost) ? t.hooksPost : [];
+        const validThis = typeof t.validThis === 'function' ? t.validThis : null;
+        const invalidThis = t.invalidThis || 'native';
+        const invokeClass = planItem.invokeClass || 'normal';
+        function invokeMethodPath(self, inputArgs) {
+          const args = Array.prototype.slice.call(inputArgs || []);
+          if (validThis && !validThis(self)) {
+            return onInvalidThis(invalidThis, orig, self, args);
+          }
+          const out = invoke
+            ? invoke.call(self, orig, args)
+            : Reflect.apply(orig, self, args);
+          if (!hooksPost.length || typeof out !== 'string') return out;
+          let res = out;
+          for (let j = 0; j < hooksPost.length; j++) {
+            const hook = hooksPost[j];
+            if (typeof hook !== 'function') continue;
+            try {
+              const r = hook.call(self, res, ...args);
+              if (typeof r === 'string') res = r;
+            } catch (e) {
+              diagDegrade(planItem.tag + ':hooksPost_failed', e, {
+                key,
+                kind: planItem.kind,
+                targetId: planItem.targetId,
+                invokeClass: invokeClass,
+                hook: hook && (hook.name || null),
+                promise_method: !!isPromiseMethod
+              });
+              return out;
+            }
+          }
+          return res;
+        }
+
+        let wrapped;
+        try {
+          if (invokeClass === 'normal') {
+            const wrappedRaw = ({ [key]() {
+              return invokeMethodPath(this, arguments);
+            } })[key];
+            wrapped = markAsNative(wrappedRaw, key);
+            knownWrapped.add(wrapped);
+          } else {
+            const coreWrapApply = (window && typeof window.__wrapNativeApply === 'function')
+              ? window.__wrapNativeApply
+              : null;
+            if (typeof coreWrapApply !== 'function') {
+              const e = new Error('[Core.applyTargets] core wrapper missing for invokeClass');
+              return fail(planItem.policy, planItem.tag, 'core_wrapper_missing', e, {
+                key,
+                kind: planItem.kind,
+                targetId: planItem.targetId,
+                invokeClass: invokeClass
+              });
+            }
+            wrapped = coreWrapApply(orig, key, function coreMethodApply(_target, thisArg, argList) {
+              return invokeMethodPath(thisArg, argList);
+            });
+            knownWrapped.add(wrapped);
+          }
+        } catch (e) {
+          return fail(planItem.policy, planItem.tag, 'mark_failed', e, { key, kind: planItem.kind, targetId: planItem.targetId, invokeClass: invokeClass });
+        }
+
+        planItem.nextDesc = Object.assign({}, desc, { value: wrapped });
+        planItem.value = wrapped;
+        return planItem;
+      }
+
+      function preflightTarget(t, seenOwners) {
+        const item = t || {};
+        const owner = item.owner;
+        const key = item.key;
+        const kind = item.kind;
+        const invokeClass = normalizeInvokeClass(item.invokeClass);
+        const policy = normalizePolicy(item.policy);
+        const tag = item.diagTag ? String(item.diagTag) : 'core:applyTargets';
+        const targetId = item.targetId ? String(item.targetId) : ('pf:' + sameTargetKey(owner, key));
+        const allowCreate = !!item.allowCreate;
+        const resolveMode = normalizeResolveMode(item.resolve);
+        if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
+          return { ok: false, reason: 'owner_invalid', error: new TypeError('[Core.applyTargets] owner invalid'), tag, policy, targetId, key: key || null, kind: kind || null };
+        }
+        if (typeof key !== 'string' || !key) {
+          return { ok: false, reason: 'key_invalid', error: new TypeError('[Core.applyTargets] key invalid'), tag, policy, targetId, key: key || null, kind: kind || null };
+        }
+        if (kind !== 'data' && kind !== 'accessor' && kind !== 'method' && kind !== 'promise_method') {
+          return { ok: false, reason: 'kind_unsupported', error: new TypeError('[Core.applyTargets] unsupported kind'), tag, policy, targetId, key, kind: kind || null };
+        }
+        if (invokeClass === null) {
+          return { ok: false, reason: 'invoke_class_unsupported', error: new TypeError('[Core.applyTargets] unsupported invokeClass'), tag, policy, targetId, key, kind };
+        }
+        if ((kind !== 'method' && kind !== 'promise_method') && invokeClass !== 'normal') {
+          return { ok: false, reason: 'invoke_class_kind_mismatch', error: new TypeError('[Core.applyTargets] invokeClass requires method kind'), tag, policy, targetId, key, kind };
+        }
+        const resolved = resolveDescriptor(owner, key, { mode: resolveMode });
+        const descriptorOwner = resolved && resolved.owner ? resolved.owner : owner;
+        const desc = resolved ? resolved.desc : null;
+
+        if (seenOwners) {
+          let keys = seenOwners.get(descriptorOwner);
+          if (!keys) {
+            keys = new Set();
+            seenOwners.set(descriptorOwner, keys);
+          }
+          if (keys.has(key)) {
+            return { ok: false, reason: 'duplicate_target', error: new TypeError('[Core.applyTargets] duplicate target in batch'), tag, policy, targetId, key, kind };
+          }
+          keys.add(key);
+        }
+        if (!desc && !allowCreate) {
+          return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] descriptor missing'), tag, policy, targetId, key, kind };
+        }
+        if (desc && kind === 'data') {
+          if (!hasDataShape(desc)) {
+            return { ok: false, reason: 'kind_mismatch', error: new TypeError('[Core.applyTargets] kind mismatch for data'), tag, policy, targetId, key, kind };
+          }
+          if (!(desc.configurable || desc.writable)) {
+            return { ok: false, reason: 'non_configurable', error: new TypeError('[Core.applyTargets] non-configurable and non-writable'), tag, policy, targetId, key, kind };
+          }
+        }
+        if (desc && kind === 'accessor') {
+          if (!hasAccessorShape(desc)) {
+            return { ok: false, reason: 'kind_mismatch', error: new TypeError('[Core.applyTargets] kind mismatch for accessor'), tag, policy, targetId, key, kind };
+          }
+          if (!desc.configurable) {
+            return { ok: false, reason: 'non_configurable', error: new TypeError('[Core.applyTargets] non-configurable accessor'), tag, policy, targetId, key, kind };
+          }
+        }
+        if (desc && (kind === 'method' || kind === 'promise_method')) {
+          if (!hasDataShape(desc) || typeof desc.value !== 'function') {
+            return { ok: false, reason: 'kind_mismatch', error: new TypeError('[Core.applyTargets] kind mismatch for method'), tag, policy, targetId, key, kind };
+          }
+          if (!(desc.configurable || desc.writable)) {
+            return { ok: false, reason: 'non_configurable', error: new TypeError('[Core.applyTargets] non-configurable and non-writable'), tag, policy, targetId, key, kind };
+          }
+        }
+        if (desc && (kind === 'method' || kind === 'promise_method') && typeof desc.value === 'function' && knownWrapped.has(desc.value)) {
+          return { ok: false, reason: 'duplicate_target', error: new TypeError('[Core.applyTargets] duplicate target in realm'), tag, policy, targetId, key, kind };
+        }
+        if (desc && (kind === 'method' || kind === 'promise_method') && invokeClass !== 'normal') {
+          if (typeof window.__wrapNativeApply !== 'function') {
+            return { ok: false, reason: 'core_wrapper_missing', error: new Error('[Core.applyTargets] core wrapper missing for invokeClass'), tag, policy, targetId, key, kind };
+          }
+        }
+        if (desc && kind === 'accessor') {
+          if ((typeof desc.get === 'function' && knownWrapped.has(desc.get)) || (typeof desc.set === 'function' && knownWrapped.has(desc.set))) {
+            return { ok: false, reason: 'duplicate_target', error: new TypeError('[Core.applyTargets] duplicate target in realm'), tag, policy, targetId, key, kind };
+          }
+        }
+        return {
+          ok: true,
+          reason: null,
+          error: null,
+          tag,
+          policy,
+          targetId,
+          owner,
+          descriptorOwner,
+          key,
+          kind,
+          invokeClass,
+          resolve: resolveMode,
+          desc: cloneDesc(desc),
+          allowCreate
+        };
+      }
 
       function applyTargets(targets, profile, diag) {
         const list = Array.isArray(targets) ? targets : [];
@@ -319,68 +757,33 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return planned;
         }
 
-        function seenInBatch(owner, key) {
-          if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return false;
-          let keys = seenOwners.get(owner);
-          if (!keys) {
-            keys = new Set();
-            seenOwners.set(owner, keys);
-          }
-          if (keys.has(key)) return true;
-          keys.add(key);
-          return false;
-        }
-
         for (let i = 0; i < list.length; i++) {
           const t = list[i] || {};
-          const owner = t.owner;
-          const key = t.key;
-          const kind = t.kind;
-          const policy = normalizePolicy(t.policy);
-          const tag = t.diagTag ? String(t.diagTag) : 'core:applyTargets';
           const mode = t.mode || 'default';
+          const preflight = preflightTarget(t, seenOwners);
+          if (!preflight.ok) {
+            return fail(preflight.policy, preflight.tag, preflight.reason, preflight.error, {
+              key: preflight.key || null,
+              kind: preflight.kind || null,
+              targetId: preflight.targetId
+            });
+          }
+          const owner = preflight.descriptorOwner || preflight.owner;
+          const key = preflight.key;
+          const kind = preflight.kind;
+          const invokeClass = preflight.invokeClass || 'normal';
+          const policy = preflight.policy;
+          const tag = preflight.tag;
           const targetId = t.targetId ? String(t.targetId) : (String(i) + ':' + sameTargetKey(owner, key));
-
-          if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
-            const e = new TypeError('[Core.applyTargets] owner invalid');
-            return fail(policy, tag, 'owner_invalid', e, { key: key || null, kind: kind || null, targetId });
-          }
-          if (typeof key !== 'string' || !key) {
-            const e = new TypeError('[Core.applyTargets] key invalid');
-            return fail(policy, tag, 'key_invalid', e, { kind: kind || null, targetId });
-          }
-          if (kind !== 'data' && kind !== 'accessor' && kind !== 'method' && kind !== 'promise_method') {
-            const e = new TypeError('[Core.applyTargets] unsupported kind');
-            return fail(policy, tag, 'kind_unsupported', e, { key, kind: kind || null, targetId });
-          }
-          if (seenInBatch(owner, key)) {
-            const e = new TypeError('[Core.applyTargets] duplicate target in batch');
-            return fail(policy, tag, 'duplicate_target', e, { key, kind, targetId });
-          }
-
-          const desc = Object.getOwnPropertyDescriptor(owner, key);
-          const allowCreate = !!t.allowCreate;
-          if (!desc && !allowCreate) {
-            const e = new Error('[Core.applyTargets] descriptor missing');
-            return fail(policy, tag, 'descriptor_missing', e, { key, kind, targetId });
-          }
-
-          if (desc && (kind === 'method' || kind === 'promise_method') && typeof desc.value === 'function' && knownWrapped.has(desc.value)) {
-            const e = new TypeError('[Core.applyTargets] duplicate target in realm');
-            return fail(policy, tag, 'duplicate_target', e, { key, kind, targetId });
-          }
-          if (desc && kind === 'accessor') {
-            if ((typeof desc.get === 'function' && knownWrapped.has(desc.get)) || (typeof desc.set === 'function' && knownWrapped.has(desc.set))) {
-              const e = new TypeError('[Core.applyTargets] duplicate target in realm');
-              return fail(policy, tag, 'duplicate_target', e, { key, kind, targetId });
-            }
-          }
+          const desc = preflight.desc;
 
           const planItem = {
             targetId,
             owner,
+            requestedOwner: preflight.owner,
             key,
             kind,
+            invokeClass,
             mode,
             policy,
             diagTag: tag,
@@ -395,135 +798,14 @@ const CoreWindowModule = function CoreWindowModule(window) {
           };
 
           if (kind === 'data') {
-            if (desc && !hasDataShape(desc)) {
-              const e = new TypeError('[Core.applyTargets] kind mismatch for data');
-              return fail(policy, tag, 'kind_mismatch', e, { key, kind, targetId });
-            }
-            if (desc && !(desc.configurable || desc.writable)) {
-              const e = new TypeError('[Core.applyTargets] non-configurable and non-writable');
-              return fail(policy, tag, 'non_configurable', e, { key, kind, targetId });
-            }
-            const v = Object.prototype.hasOwnProperty.call(t, 'value')
-              ? t.value
-              : (desc ? desc.value : undefined);
-            if (desc) {
-              planItem.nextDesc = Object.assign({}, desc, { value: v });
-            } else {
-              planItem.nextDesc = {
-                value: v,
-                writable: Object.prototype.hasOwnProperty.call(t, 'writable') ? !!t.writable : true,
-                configurable: Object.prototype.hasOwnProperty.call(t, 'configurable') ? !!t.configurable : true,
-                enumerable: Object.prototype.hasOwnProperty.call(t, 'enumerable') ? !!t.enumerable : true
-              };
-            }
-            planned.push(planItem);
-            continue;
+            if (patchDataProp(planItem, t, desc, fail) === planned) return planned;
+          } else if (kind === 'accessor') {
+            if (patchAccessor(planItem, t, desc, markAsNative, fail) === planned) return planned;
+          } else if (kind === 'method') {
+            if (patchMethod(planItem, t, desc, markAsNative, fail, false) === planned) return planned;
+          } else {
+            if (patchMethod(planItem, t, desc, markAsNative, fail, true) === planned) return planned;
           }
-
-          if (kind === 'accessor') {
-            if (!desc) {
-              const e = new Error('[Core.applyTargets] descriptor missing');
-              return fail(policy, tag, 'descriptor_missing', e, { key, kind, targetId });
-            }
-            if (!hasAccessorShape(desc)) {
-              const e = new TypeError('[Core.applyTargets] kind mismatch for accessor');
-              return fail(policy, tag, 'kind_mismatch', e, { key, kind, targetId });
-            }
-            if (!desc.configurable) {
-              const e = new TypeError('[Core.applyTargets] non-configurable accessor');
-              return fail(policy, tag, 'non_configurable', e, { key, kind, targetId });
-            }
-            const origGet = typeof desc.get === 'function' ? desc.get : undefined;
-            const origSet = typeof desc.set === 'function' ? desc.set : undefined;
-            const getImpl = typeof t.getImpl === 'function' ? t.getImpl : null;
-            const setImpl = typeof t.setImpl === 'function' ? t.setImpl : null;
-
-            let getWrapped = origGet;
-            let setWrapped = origSet;
-
-            try {
-              if (origGet) {
-                const wrappedGetRaw = ({ [key]() {
-                  if (getImpl) return getImpl.call(this, origGet);
-                  return Reflect.apply(origGet, this, []);
-                } })[key];
-                getWrapped = markAsNative(wrappedGetRaw, key);
-                knownWrapped.add(getWrapped);
-              }
-              if (origSet) {
-                const wrappedSetRaw = ({ [key](v) {
-                  if (setImpl) return setImpl.call(this, origSet, v);
-                  return Reflect.apply(origSet, this, [v]);
-                } })[key];
-                setWrapped = markAsNative(wrappedSetRaw, key);
-                knownWrapped.add(setWrapped);
-              }
-            } catch (e) {
-              return fail(policy, tag, 'mark_failed', e, { key, kind, targetId });
-            }
-
-            planItem.nextDesc = Object.assign({}, desc, {
-              get: getWrapped,
-              set: setWrapped
-            });
-            planned.push(planItem);
-            continue;
-          }
-
-          if (!desc) {
-            const e = new Error('[Core.applyTargets] descriptor missing');
-            return fail(policy, tag, 'descriptor_missing', e, { key, kind, targetId });
-          }
-          if (!hasDataShape(desc) || typeof desc.value !== 'function') {
-            const e = new TypeError('[Core.applyTargets] kind mismatch for method');
-            return fail(policy, tag, 'kind_mismatch', e, { key, kind, targetId, type: typeof desc.value });
-          }
-          if (!(desc.configurable || desc.writable)) {
-            const e = new TypeError('[Core.applyTargets] non-configurable and non-writable');
-            return fail(policy, tag, 'non_configurable', e, { key, kind, targetId });
-          }
-
-          if (mode === 'declare_only' || t.enabled === false) {
-            planItem.skipApply = true;
-            planItem.reason = 'declare_only';
-            planned.push(planItem);
-            continue;
-          }
-
-          const orig = desc.value;
-          const invoke = typeof t.invoke === 'function' ? t.invoke : null;
-          const hooksPost = Array.isArray(t.hooksPost) ? t.hooksPost : [];
-          const wrappedRaw = ({ [key]() {
-            const args = Array.prototype.slice.call(arguments);
-            const out = invoke
-              ? invoke.call(this, orig, args)
-              : Reflect.apply(orig, this, args);
-            if (!hooksPost.length || typeof out !== 'string') return out;
-            let res = out;
-            for (let j = 0; j < hooksPost.length; j++) {
-              const hook = hooksPost[j];
-              if (typeof hook !== 'function') continue;
-              try {
-                const r = hook.call(this, res, ...args);
-                if (typeof r === 'string') res = r;
-              } catch (e) {
-                diagDegrade(tag + ':hooksPost_failed', e, { key, kind, targetId, hook: hook && (hook.name || null) });
-                return out;
-              }
-            }
-            return res;
-          } })[key];
-
-          let wrapped;
-          try {
-            wrapped = markAsNative(wrappedRaw, key);
-            knownWrapped.add(wrapped);
-          } catch (e) {
-            return fail(policy, tag, 'mark_failed', e, { key, kind, targetId });
-          }
-
-          planItem.nextDesc = Object.assign({}, desc, { value: wrapped });
-          planItem.value = wrapped;
           planned.push(planItem);
         }
 
@@ -547,7 +829,107 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      try { ensureMarkAsNative()(applyTargets, 'applyTargets'); } catch (_) {}
+      safeDefine(Core, 'patchDataProp', {
+        value: patchDataProp,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'patchAccessor', {
+        value: patchAccessor,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'patchMethod', {
+        value: patchMethod,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'patchPromiseMethod', {
+        value: function patchPromiseMethod(planItem, t, desc, markAsNative, fail) {
+          return patchMethod(planItem, t, desc, markAsNative, fail, true);
+        },
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'preflightTarget', {
+        value: function corePreflightTarget(target) {
+          return preflightTarget(target, null);
+        },
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'resolveDescriptor', {
+        value: function coreResolveDescriptor(owner, key, options) {
+          return resolveDescriptor(owner, key, options);
+        },
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'wrapGetter', {
+        value: wrapGetter,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'safeDefineAcc', {
+        value: safeDefineAcc,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'defineAccWithFallback', {
+        value: defineAccWithFallback,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'redefineAcc', {
+        value: redefineAcc,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__wrapGetter', {
+        value: wrapGetter,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__safeDefineAcc', {
+        value: safeDefineAcc,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__defineAccWithFallback', {
+        value: defineAccWithFallback,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__redefineAcc', {
+        value: redefineAcc,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      try {
+        const coreMark = ensureMarkAsNative();
+        coreMark(applyTargets, 'applyTargets');
+        coreMark(patchDataProp, 'patchDataProp');
+        coreMark(patchAccessor, 'patchAccessor');
+        coreMark(patchMethod, 'patchMethod');
+        coreMark(safeDefineAcc, 'safeDefineAcc');
+        coreMark(defineAccWithFallback, 'defineAccWithFallback');
+        coreMark(redefineAcc, 'redefineAcc');
+        coreMark(wrapGetter, 'wrapGetter');
+      } catch (_) {}
 
     } catch (e) {
       diagDegrade('core:installCoreApplyTargets:failed', e);

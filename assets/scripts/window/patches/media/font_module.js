@@ -38,6 +38,25 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
   function applyTargetGroup(groupTag, targets, policy) {
     const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
+    const preflightTarget = (Core && typeof Core.preflightTarget === 'function') ? Core.preflightTarget : null;
+    if (typeof preflightTarget === 'function') {
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        const pre = preflightTarget(target);
+        if (!pre || pre.ok !== true) {
+          const err = (pre && pre.error instanceof Error) ? pre.error : new Error('[FontPatch] target preflight failed');
+          const reason = pre && pre.reason ? pre.reason : 'preflight_failed';
+          degrade(groupTag + ':target_preflight_failed', err, {
+            index: i,
+            reason,
+            key: target && target.key ? target.key : null,
+            kind: target && target.kind ? target.kind : null
+          });
+          if (groupPolicy === 'throw') throw err;
+          return 0;
+        }
+      }
+    }
     let plans = [];
     try {
       plans = Core.applyTargets(targets, window.__PROFILE__, []);

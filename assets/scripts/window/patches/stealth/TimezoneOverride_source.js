@@ -38,34 +38,6 @@
       });
     }
 
-    function ensureMarkAsNative() {
-      const ensure = (window && typeof window.__ensureMarkAsNative === "function") ? window.__ensureMarkAsNative : null;
-      const m = ensure ? ensure() : null;
-      if (typeof m === "function") return m;
-      return null;
-    }
-
-    function wrapCtor(orig, name, patchArgs) {
-      if (typeof orig !== "function") {
-        throw new Error("THW: Intl ctor missing");
-      }
-      const wrapped = new Proxy(orig, {
-        apply(target, thisArg, argList) {
-          const a = patchArgs(argList || []);
-          return Reflect.apply(target, thisArg, a);
-        },
-        construct(target, argList, newTarget) {
-          const a = patchArgs(argList || []);
-          return Reflect.construct(target, a, newTarget || target);
-        }
-      });
-      try {
-        const mark = ensureMarkAsNative();
-        if (mark) mark(wrapped, name || orig.name || "");
-      } catch (_) {}
-      return wrapped;
-    }
-
     // Soft-fail with observability: skip patch if we cannot prove correctness/compatibility.
     if (!timezone || typeof timezone !== "string") {
       diag("tz:missing_timezone", null);
@@ -84,6 +56,30 @@
     if (typeof __wrapNativeApply !== "function") {
       diag("tz:missing_wrapNativeApply", null, { timezone });
       return;
+    }
+    const __corePreflightTarget = (window && window.Core && typeof window.Core.preflightTarget === "function")
+      ? window.Core.preflightTarget
+      : null;
+    const __wrapNativeCtor = (window && typeof window.__wrapNativeCtor === "function") ? window.__wrapNativeCtor : null;
+    if (typeof __wrapNativeCtor !== "function") {
+      diag("tz:missing_wrapNativeCtor", null, { timezone });
+      return;
+    }
+    function ensurePreflight(owner, key, kind, tag) {
+      if (typeof __corePreflightTarget !== "function") return;
+      const pre = __corePreflightTarget({
+        owner,
+        key,
+        kind,
+        policy: "throw",
+        diagTag: tag
+      });
+      if (!pre || pre.ok !== true) {
+        const err = (pre && pre.error instanceof Error) ? pre.error : new Error("[patchTimeZone] preflight failed");
+        const reason = pre && pre.reason ? pre.reason : "preflight_failed";
+        diag(tag + ":" + reason, err, { key, kind });
+        throw err;
+      }
     }
 
     // IMPORTANT: do not patch getTimezoneOffset as a constant (DST),
@@ -131,7 +127,8 @@
     try {
       rememberValue(Intl, "DateTimeFormat");
       const OrigDTF = Intl.DateTimeFormat;
-      const PatchedDTF = wrapCtor(OrigDTF, "DateTimeFormat", (argList) => {
+      ensurePreflight(Intl, "DateTimeFormat", "method", "tz:DateTimeFormat");
+      const PatchedDTF = __wrapNativeCtor(OrigDTF, "DateTimeFormat", (argList) => {
         let locales = (argList.length >= 1) ? argList[0] : undefined;
         let options = (argList.length >= 2) ? argList[1] : undefined;
         if (locales == null) locales = spoofedLocales;
@@ -146,6 +143,7 @@
         const proto = OrigDTF.prototype;
         rememberProtoValue(proto, "resolvedOptions");
         const origResolved = proto.resolvedOptions;
+        ensurePreflight(proto, "resolvedOptions", "method", "tz:DateTimeFormat:resolvedOptions");
         const wrappedResolved = __wrapNativeApply(origResolved, "resolvedOptions", (target, thisArg, argList) => {
           const ro = Reflect.apply(target, thisArg, argList || []);
           try {
@@ -160,7 +158,8 @@
       if (Intl.NumberFormat) {
         rememberValue(Intl, "NumberFormat");
         const OrigNF = Intl.NumberFormat;
-        const PatchedNF = wrapCtor(OrigNF, "NumberFormat", (argList) => {
+        ensurePreflight(Intl, "NumberFormat", "method", "tz:NumberFormat");
+        const PatchedNF = __wrapNativeCtor(OrigNF, "NumberFormat", (argList) => {
           let locales = (argList.length >= 1) ? argList[0] : undefined;
           const options = (argList.length >= 2) ? argList[1] : undefined;
           if (locales == null) locales = spoofedLocales;
@@ -173,7 +172,8 @@
       if (Intl.Collator) {
         rememberValue(Intl, "Collator");
         const OrigCol = Intl.Collator;
-        const PatchedCol = wrapCtor(OrigCol, "Collator", (argList) => {
+        ensurePreflight(Intl, "Collator", "method", "tz:Collator");
+        const PatchedCol = __wrapNativeCtor(OrigCol, "Collator", (argList) => {
           let locales = (argList.length >= 1) ? argList[0] : undefined;
           const options = (argList.length >= 2) ? argList[1] : undefined;
           if (locales == null) locales = spoofedLocales;
@@ -187,6 +187,7 @@
         const origResolvedOptions = proto.resolvedOptions;
         if (typeof origResolvedOptions !== "function") return;
         rememberProtoValue(proto, "resolvedOptions");
+        ensurePreflight(proto, "resolvedOptions", "method", "tz:IntlResolvedOptions");
         const wrappedResolvedOptions = __wrapNativeApply(origResolvedOptions, "resolvedOptions", (target, thisArg, argList) => {
           const options = Reflect.apply(target, thisArg, argList || []);
           try {
@@ -218,6 +219,9 @@
       const origToLocaleString = Date.prototype.toLocaleString;
       const origToLocaleDateString = Date.prototype.toLocaleDateString;
       const origToLocaleTimeString = Date.prototype.toLocaleTimeString;
+      ensurePreflight(Date.prototype, "toLocaleString", "method", "tz:Date:toLocaleString");
+      ensurePreflight(Date.prototype, "toLocaleDateString", "method", "tz:Date:toLocaleDateString");
+      ensurePreflight(Date.prototype, "toLocaleTimeString", "method", "tz:Date:toLocaleTimeString");
 
       const wrappedToLocaleString = __wrapNativeApply(origToLocaleString, "toLocaleString", (target, thisArg, argList) => {
         let locales = (argList && argList.length >= 1) ? argList[0] : undefined;

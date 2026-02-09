@@ -26,6 +26,29 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       return fn;
     })();
+    const wrapNativeAccessor = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
+    if (typeof wrapNativeAccessor !== 'function') {
+      throw new Error('[NavTotalSetPatchModule] __wrapNativeAccessor missing');
+    }
+    const corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
+      ? window.Core.preflightTarget
+      : null;
+    function ensureCorePreflight(owner, key, kind, tag) {
+      if (typeof corePreflightTarget !== 'function') return;
+      const pre = corePreflightTarget({
+        owner,
+        key,
+        kind,
+        policy: 'throw',
+        diagTag: tag
+      });
+      if (!pre || pre.ok !== true) {
+        const err = (pre && pre.error instanceof Error) ? pre.error : new Error(`[nav_total_set] preflight failed for ${String(key)}`);
+        const reason = pre && pre.reason ? pre.reason : 'preflight_failed';
+        __navDiag('warn', `${tag}:${reason}`, { key, kind }, err);
+        throw err;
+      }
+    }
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
     const meta          = window.__EXPECTED_CLIENT_HINTS || {};
@@ -105,18 +128,30 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (isData) return getter;
 
       const origGet = desc && desc.get;
+      if (typeof origGet === 'function') {
+        let wrapped;
+        wrapped = wrapNativeAccessor(origGet, `get ${key}`, function (target, thisArg, argList) {
+          __navLogAccess(key, wrapped);
+          if (typeof validThis === 'function' && !validThis(thisArg)) {
+            return Reflect.apply(target, thisArg, argList || []);
+          }
+          return (typeof getter === 'function') ? getter.call(thisArg) : getter;
+        });
+        __navRegisterFn(wrapped);
+        return wrapped;
+      }
 
-      const wrapped = function () {
-        __navLogAccess(key, wrapped);
-
-        if (typeof validThis === 'function' && !validThis(this)) {
-          if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
-          throw new TypeError(); // если ты это оставляешь — обязательно иметь return ниже
-        }
-
+      const synthetic = Object.getOwnPropertyDescriptor(({ get [key]() {
         return (typeof getter === 'function') ? getter.call(this) : getter;
-      };
-
+      }}), key).get;
+      let wrapped;
+      wrapped = wrapNativeAccessor(synthetic, `get ${key}`, function (target, thisArg, argList) {
+        __navLogAccess(key, wrapped);
+        if (typeof validThis === 'function' && !validThis(thisArg)) {
+          throw new TypeError();
+        }
+        return Reflect.apply(target, thisArg, argList || []);
+      });
       __navRegisterFn(wrapped);
       return wrapped;
     }
@@ -162,6 +197,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
       if (isData) {
+        ensureCorePreflight(target, key, 'data', 'nav_total_set:safeDefineAcc');
         const value = (typeof getter === 'function') ? getter.call(target) : getter;
         Object.defineProperty(target, key, {
           value,
@@ -176,8 +212,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const acc = ({ get [key]() { return getter.call(this); } });
         getFn = Object.getOwnPropertyDescriptor(acc, key).get;
       }
+      const finalGet = (d && typeof d.get === 'function' && typeof getFn === 'function')
+        ? wrapNativeAccessor(d.get, `get ${key}`, function (target, thisArg, argList) {
+          return Reflect.apply(getFn, thisArg, argList || []);
+        })
+        : mark(getFn, `get ${key}`);
+      ensureCorePreflight(target, key, 'accessor', 'nav_total_set:safeDefineAcc');
       Object.defineProperty(target, key, {
-        get: mark(getFn, `get ${key}`),
+        get: finalGet,
         set: d && d.set,
         configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : !!enumerable
@@ -197,6 +239,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
       if (isData) {
+        ensureCorePreflight(proto, key, 'data', 'nav_total_set:redefineAcc');
         const value = (typeof getImpl === 'function') ? getImpl.call(proto) : getImpl;
         Object.defineProperty(proto, key, {
           value,
@@ -206,8 +249,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
         return;
       }
+      let getFn = getImpl;
+      if (typeof getImpl === 'function' && getImpl.name === '') {
+        const acc = ({ get [key]() { return getImpl.call(this); } });
+        getFn = Object.getOwnPropertyDescriptor(acc, key).get;
+      }
+      if (typeof getFn !== 'function') {
+        throw new TypeError(`[nav_total_set] ${key}: getter missing`);
+      }
+      const finalGet = (d && typeof d.get === 'function')
+        ? wrapNativeAccessor(d.get, `get ${key}`, function (target, thisArg, argList) {
+          return Reflect.apply(getFn, thisArg, argList || []);
+        })
+        : mark(getFn, `get ${key}`);
+      ensureCorePreflight(proto, key, 'accessor', 'nav_total_set:redefineAcc');
       Object.defineProperty(proto, key, {
-        get: mark(getImpl, `get ${key}`),
+        get: finalGet,
         set: d && d.set,
         configurable: d ? d.configurable : true,
         enumerable: d ? d.enumerable : false
@@ -308,41 +365,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
     })();
 
-    // screen.* — First try prototype, in case of refuse — own window.screen
-    (function () {
-      const scrProto = Screen && Screen.prototype;
-      const setScreen = (k, get) => {
-        redefineAcc(scrProto, k, get);
-      };
-      setScreen('width',       () => width);
-      setScreen('height',      () => height);
-      setScreen('colorDepth',  () => colorDepth);
-      setScreen('pixelDepth',  () => colorDepth);
-      setScreen('availWidth',  () => width);
-      setScreen('availHeight', () => height);
-      const orientationObj = window.screen && window.screen.orientation;
-      const orientationProto = orientationObj && Object.getPrototypeOf(orientationObj);
-      if (orientationProto && orientationProto !== Object.prototype) {
-        const typeDesc = Object.getOwnPropertyDescriptor(orientationProto, 'type');
-        if (typeDesc && typeDesc.configurable) {
-          Object.defineProperty(orientationProto, 'type', {
-            get: mark(() => orientationDom, 'get type'),
-            set: typeDesc.set,
-            configurable: typeDesc.configurable,
-            enumerable: typeDesc.enumerable
-          });
-        }
-        const angleDesc = Object.getOwnPropertyDescriptor(orientationProto, 'angle');
-        if (angleDesc && angleDesc.configurable) {
-          Object.defineProperty(orientationProto, 'angle', {
-            get: mark(() => 0, 'get angle'),
-            set: angleDesc.set,
-            configurable: angleDesc.configurable,
-            enumerable: angleDesc.enumerable
-          });
-        }
-      }
-    })();
+    // Screen.* is patched by ScreenPatchModule to keep a single patch owner.
 
     // oscpu (только если есть в прототипе)
     if ('oscpu' in navProto) {

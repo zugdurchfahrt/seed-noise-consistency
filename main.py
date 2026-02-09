@@ -312,6 +312,16 @@ def init_driver(
     threading.Thread(target=cdp.run, daemon=True).start()  
     logger.info("Thread started on port %s", cdp.PORT)
 
+
+    # desc_js = Path(SCRIPTS_PATCHES_STEALTH / "desc3.js").read_text(encoding="utf-8")
+    # driver.execute_cdp_cmd(
+    #     "Page.addScriptToEvaluateOnNewDocument",
+    #     {"source": desc_js}
+    # )
+
+
+
+
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
         parts = [
