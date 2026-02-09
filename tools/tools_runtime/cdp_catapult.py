@@ -2,17 +2,18 @@
 import json
 import time
 import requests
+import pathlib
 from pathlib import Path
 from websocket import WebSocketApp
-from tools.tools_infra.overseer import logger, PROJECT_ROOT
+from tools.tools_infra.overseer import logger
 
 # Use the project's existing logging pipeline (overseer.setup_logger -> intention_entitled.log).
 logger = logger.getChild("cdp_catapult")
 
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-PORT = None
 SCRIPTS_WORKERSCOPE = PROJECT_ROOT / "assets" / "scripts" / "workerscope"
-
+PORT = None
 # --- SW prelude injector (ServiceWorkerGlobalScope) ---
 SW_INJECT_ENABLED = True
 SW_PRIMARY = None

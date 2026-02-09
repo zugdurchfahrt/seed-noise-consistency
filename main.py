@@ -977,7 +977,6 @@ def main():
         )
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
-            # def override_user_agent_data(driver, browser_brand):
             override_js = Path(SCRIPTS_PATCHES_NAV / "override_ua_data.js").read_text(encoding="utf-8")
             if not override_js or not isinstance(override_js, str):
                 raise TypeError("override_user_agent_data: override_ua_data.js is empty/invalid")
@@ -1039,7 +1038,7 @@ def main():
                 needs_reapply = True
             if needs_reapply:
                 apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-                # inject_uach_strip_window(driver, user_agent)
+                inject_uach_strip_window(driver, user_agent)
                 logger.info("UA data re-applied via CDP (mismatch detected)")
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)

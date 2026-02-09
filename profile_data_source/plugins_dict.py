@@ -4,7 +4,7 @@
 from __future__ import annotations
 from typing import List, Dict, Tuple, Iterable, Optional
 import random
-from overseer import logger
+from tools.tools_infra.overseer import logger
 logger = logger.getChild("plugins_dict")
 
 # --- initial options for plugins ---
