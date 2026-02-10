@@ -133,13 +133,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
       (typeof WeakSet === 'function') ? new WeakSet() : null;
     const wrapped = (method === 'toDataURL')
       ? ({ toDataURL(type, quality) {
-            const self = this;
-            const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
-            if (inProgress && isObj) {
-              if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
-              inProgress.add(self);
-            }
-            try {
+           const self = this;
+           const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
+           // Internal encode paths (temporary canvases) mark the instance to avoid re-entering the hook chain.
+           // Preserve native brand-check semantics by only reading the flag on objects/functions.
+           const __CHAIN_GUARD__ = '__isChain_toDataURL';
+           if (isObj && self[__CHAIN_GUARD__]) return Reflect.apply(orig, self, arguments);
+           if (inProgress && isObj) {
+             if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
+             inProgress.add(self);
+           }
+           try {
              const patchedArgs = Array.prototype.slice.call(arguments);
              const out = Reflect.apply(orig, this, patchedArgs);
              let res = out;
@@ -533,57 +537,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (state.canvas) return 0;
     if (typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype) return 0;
     let applied = 0, total = 0;
-    total++;
-    try {
-      const Core = global && global.Core;
-      if (Core && typeof Core.applyTargets === 'function') {
-        const targets = [{
-          owner: HTMLCanvasElement.prototype,
-          key: 'toDataURL',
-          kind: 'method',
-          mode: 'post_process_only',
-          hooksPost: this.htmlCanvasToDataURLHooks,
-          policy: 'skip',
-          diagTag: 'canvas:toDataURL'
-        }];
-        const plans = Core.applyTargets(targets);
-        if (Array.isArray(plans) && plans.length) {
-          const done = [];
-          try {
-            for (const p of plans) {
-              definePatchedMethod(p.owner, p.key, p.value);
-              const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
-              const ok = !!after
-                && after.configurable === p.desc.configurable
-                && after.enumerable === p.desc.enumerable
-                && after.writable === p.desc.writable
-                && after.value === p.value;
-              if (!ok) {
-                throw new Error('[ContextPatch] toDataURL post-check mismatch');
-              }
-              patchedMethods.add(p.value);
-              done.push(p);
-            }
-            applied++;
-          } catch (e) {
-            for (let i = done.length - 1; i >= 0; i--) {
-              try {
-                const p = done[i];
-                Object.defineProperty(p.owner, p.key, p.desc);
-              } catch (_e) {}
-            }
-            throw e;
-          }
-        }
-      } else {
-        if (chain(HTMLCanvasElement.prototype, 'toDataURL', this.htmlCanvasToDataURLHooks)) applied++;
-      }
-    } catch (e) {
-      if (typeof global.__DEGRADE__ === 'function') {
-        try { global.__DEGRADE__('context:applyCanvasElementPatches:toDataURL_failed', e); } catch (_e) {}
-      }
-      // Atomic skip: leave native
-    }
+    total++; if (chain(HTMLCanvasElement.prototype, 'toDataURL', this.htmlCanvasToDataURLHooks)) applied++;
     total++; if (chainAsync(HTMLCanvasElement.prototype, 'toBlob', () => this.htmlCanvasToBlobHooks)) applied++;
     total++; if (chainGetContext(
       HTMLCanvasElement.prototype,

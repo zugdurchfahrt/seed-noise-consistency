@@ -15,13 +15,6 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     return sd;
   })();
 
-  const markAsNative = (function() {
-    const ensure = (window && typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
-    const m = ensure ? ensure() : null;
-    if (typeof m !== 'function') throw new Error('[HideWebdriverPatchModule] markAsNative missing');
-    return m;
-  })();
-
   const resolveDescriptor = (Core && typeof Core.resolveDescriptor === 'function')
     ? Core.resolveDescriptor
     : function fallbackResolve(owner, key) {
@@ -114,47 +107,6 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   function isAccessorDesc(d) {
     return !!d && (Object.prototype.hasOwnProperty.call(d, 'get') || Object.prototype.hasOwnProperty.call(d, 'set'));
-  }
-
-  function makeExternalObject() {
-    const fakeExternal = {};
-    const toString = function toString() {
-      return '[object External]';
-    };
-    Object.defineProperty(fakeExternal, 'toString', {
-      value: markAsNative(toString, 'toString'),
-      configurable: true,
-      enumerable: false
-    });
-    return fakeExternal;
-  }
-
-  const externalObj = makeExternalObject();
-
-  const externalResolved = resolveDescriptor(window, 'external', { mode: 'proto_chain' });
-  if (externalResolved && externalResolved.desc) {
-    const extDesc = cloneDesc(externalResolved.desc);
-    if (extDesc && extDesc.configurable === false && !Object.prototype.hasOwnProperty.call(extDesc, 'writable')) {
-      degrade('hide_webdriver:external_non_configurable', null, null);
-    } else {
-      const extTarget = {
-        owner: window,
-        key: 'external',
-        resolve: 'proto_chain',
-        policy: 'skip',
-        diagTag: 'hide_webdriver:external'
-      };
-      if (isAccessorDesc(extDesc)) {
-        extTarget.kind = 'accessor';
-        extTarget.getImpl = function getExternalImpl() { return externalObj; };
-      } else {
-        extTarget.kind = 'data';
-        extTarget.value = externalObj;
-      }
-      applyTargetGroup('hide_webdriver:external', [extTarget], 'skip');
-    }
-  } else {
-    degrade('hide_webdriver:external_missing', null, null);
   }
 
   const nav = navigator;

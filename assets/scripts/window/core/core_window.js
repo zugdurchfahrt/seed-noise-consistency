@@ -301,22 +301,21 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }
     }
 
-    const toString = new Proxy(nativeToString, {
-      apply(target, thisArg, argList) {
-        // Preserve native brand-check semantics.
-        if (typeof thisArg !== 'function') {
-          return Reflect.apply(target, thisArg, argList);
-        }
-        const v = toStringOverrideMap.get(thisArg);
-        if (v !== undefined) return v;
-        const t = toStringProxyTargetMap.get(thisArg);
-        if (t) {
-          const tv = toStringOverrideMap.get(t);
-          if (tv !== undefined) return tv;
-        }
-        return Reflect.apply(target, thisArg, argList);
+    const toString = ({ toString() {
+      const self = this;
+      // Preserve native brand-check semantics.
+      if (typeof self !== 'function') {
+        return Reflect.apply(nativeToString, self, arguments);
       }
-    });
+      const v = toStringOverrideMap.get(self);
+      if (v !== undefined) return v;
+      const t = toStringProxyTargetMap.get(self);
+      if (t) {
+        const tv = toStringOverrideMap.get(t);
+        if (tv !== undefined) return tv;
+      }
+      return Reflect.apply(nativeToString, self, arguments);
+    } }).toString;
 
     // Ensure self-toString looks native when inspected via our bridge.
     toStringProxyTargetMap.set(toString, nativeToString);
