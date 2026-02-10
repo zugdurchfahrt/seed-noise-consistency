@@ -60,6 +60,7 @@ const LOGGingModule = function LOGGingModule() {
       if (Array.isArray(global._myDebugLog)) {
         pushEntry({
           type: "logger_guard",
+          logger_guard: true,
           where: guard.last.where,
           message: guard.last.message,
           stack: guard.last.stack,
@@ -106,63 +107,119 @@ const LOGGingModule = function LOGGingModule() {
       );
     }
 
-    function normalizeForJSON(value, seen) {
+    const SERIAL_LIMITS = {
+      depth: 3,
+      keys: 32,
+      array: 64,
+      string: 512,
+      metaKeys: 8
+    };
+
+    function clampString(value) {
+      const s = String(value);
+      if (s.length <= SERIAL_LIMITS.string) return s;
+      return s.slice(0, SERIAL_LIMITS.string) + `...[len=${s.length}]`;
+    }
+
+    function isPlainObject(value) {
+      if (!value || typeof value !== "object") return false;
+      let proto;
       try {
+        proto = Object.getPrototypeOf(value);
+      } catch (_) {
+        return false;
+      }
+      return proto === Object.prototype || proto === null;
+    }
+
+    function metadataSnapshot(value, tag) {
+      const out = { __type: "snapshot", tag: tag || safeTag(value) };
+      try {
+        const ctor = value && value.constructor && value.constructor.name;
+        if (typeof ctor === "string" && ctor) out.ctor = ctor;
+      } catch (_) {}
+      try {
+        if (typeof value === "function") out.name = value.name || "anonymous";
+      } catch (_) {}
+      try {
+        if (value && typeof value === "object") {
+          if (typeof value.length === "number" && isFinite(value.length)) out.length = value.length;
+          const keys = Object.keys(value);
+          out.keys = keys.slice(0, SERIAL_LIMITS.metaKeys);
+          if (keys.length > SERIAL_LIMITS.metaKeys) out.keys_truncated = keys.length - SERIAL_LIMITS.metaKeys;
+        }
+      } catch (_) {}
+      return out;
+    }
+
+    function normalizeForJSON(value, seen, depth) {
+      try {
+        const lvl = typeof depth === "number" ? depth : 0;
         if (value === null || typeof value === "undefined") return value;
         const t = typeof value;
 
         if (t === "string") {
-          // Avoid huge "data:" payloads (canvas/audio/etc) in logs: they bloat JSON and skew perf timings.
           if (value.indexOf("data:") === 0) return "[DataURL len=" + value.length + "]";
           if (value.indexOf("blob:") === 0) return "[BlobURL]";
-          return value;
+          return clampString(value);
         }
         if (t === "number" || t === "boolean") return value;
+        if (t === "bigint") return String(value) + "n";
+        if (t === "symbol") return String(value);
 
         if (t === "function") {
-          return "[Function " + (value.name || "anonymous") + "]";
+          return metadataSnapshot(value, safeTag(value));
         }
 
         if (value instanceof Error) {
           return {
             __type: "Error",
-            name: value.name,
-            message: value.message,
-            stack: value.stack || null,
+            name: clampString(value.name || "Error"),
+            message: clampString(value.message || ""),
+            stack: value.stack ? clampString(value.stack) : null,
           };
         }
 
         const tag = safeTag(value);
-        if (isHostLikeTag(tag)) return tag;
+        if (isHostLikeTag(tag)) return metadataSnapshot(value, tag);
 
-        if (t !== "object") return String(value);
+        if (t !== "object") return clampString(value);
 
         // Cycles
         if (!seen) seen = new WeakSet();
         if (seen.has(value)) return "[Circular]";
         seen.add(value);
 
+        if (lvl >= SERIAL_LIMITS.depth) return metadataSnapshot(value, tag);
+
         // Arrays
         if (Array.isArray(value)) {
-          const outArr = new Array(value.length);
-          for (let i = 0; i < value.length; i++) {
-            outArr[i] = normalizeForJSON(value[i], seen);
+          const lim = Math.min(value.length, SERIAL_LIMITS.array);
+          const outArr = new Array(lim);
+          for (let i = 0; i < lim; i++) {
+            outArr[i] = normalizeForJSON(value[i], seen, lvl + 1);
           }
+          if (value.length > lim) outArr.push(`[... ${value.length - lim} more items]`);
           return outArr;
         }
 
-        // Plain objects only: keep enumerable keys
+        if (!isPlainObject(value)) return metadataSnapshot(value, tag);
+
         const out = {};
-        for (const k in value) {
+        const keys = Object.keys(value);
+        const lim = Math.min(keys.length, SERIAL_LIMITS.keys);
+        for (let i = 0; i < lim; i++) {
+          const k = keys[i];
           try {
-            out[k] = normalizeForJSON(value[k], seen);
+            out[k] = normalizeForJSON(value[k], seen, lvl + 1);
           } catch (_) {
             out[k] = "[Unserializable]";
           }
         }
+        if (keys.length > lim) out.__truncated_keys__ = keys.length - lim;
         return out;
       } catch (_) {
-        return safeTag(value);
+        return metadataSnapshot(value, safeTag(value));
       }
     }
 

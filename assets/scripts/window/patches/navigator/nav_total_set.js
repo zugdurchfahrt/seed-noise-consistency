@@ -30,9 +30,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (typeof wrapNativeAccessor !== 'function') {
       throw new Error('[NavTotalSetPatchModule] __wrapNativeAccessor missing');
     }
+    const wrapStrictAccessor = (typeof window.__wrapStrictAccessor === 'function') ? window.__wrapStrictAccessor : null;
+    if (typeof wrapStrictAccessor !== 'function') {
+      throw new Error('[NavTotalSetPatchModule] __wrapStrictAccessor missing');
+    }
     const corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
       ? window.Core.preflightTarget
       : null;
+    const coreRegisterPatchedTarget = (window.Core && typeof window.Core.registerPatchedTarget === 'function')
+      ? window.Core.registerPatchedTarget
+      : null;
+    function registerPatchedTarget(owner, key, tag) {
+      if (typeof coreRegisterPatchedTarget !== 'function') return;
+      try {
+        coreRegisterPatchedTarget(owner, key);
+      } catch (e) {
+        __navDiag('warn', (tag || 'nav_total_set') + ':register_target_failed', { key: key || null }, e);
+        if (STRICT) throw e;
+      }
+    }
     function ensureCorePreflight(owner, key, kind, tag) {
       if (typeof corePreflightTarget !== 'function') return;
       const pre = corePreflightTarget({
@@ -123,36 +139,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
     };
     function __wrapGetter(key, getter, desc, validThis) {
-      const isData = desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
       __navRegisterKey(key);
-      if (isData) return getter;
-
-      const origGet = desc && desc.get;
-      if (typeof origGet === 'function') {
-        let wrapped;
-        wrapped = wrapNativeAccessor(origGet, `get ${key}`, function (target, thisArg, argList) {
-          __navLogAccess(key, wrapped);
-          if (typeof validThis === 'function' && !validThis(thisArg)) {
-            return Reflect.apply(target, thisArg, argList || []);
-          }
-          return (typeof getter === 'function') ? getter.call(thisArg) : getter;
-        });
-        __navRegisterFn(wrapped);
-        return wrapped;
-      }
-
-      const synthetic = Object.getOwnPropertyDescriptor(({ get [key]() {
-        return (typeof getter === 'function') ? getter.call(this) : getter;
-      }}), key).get;
-      let wrapped;
-      wrapped = wrapNativeAccessor(synthetic, `get ${key}`, function (target, thisArg, argList) {
-        __navLogAccess(key, wrapped);
-        if (typeof validThis === 'function' && !validThis(thisArg)) {
-          throw new TypeError();
-        }
-        return Reflect.apply(target, thisArg, argList || []);
+      const wrapped = wrapStrictAccessor(key, getter, desc, validThis, {
+        onAccess: function (_, fn) { __navLogAccess(key, fn); }
       });
-      __navRegisterFn(wrapped);
+      if (typeof wrapped === 'function' && wrapped !== getter) __navRegisterFn(wrapped);
       return wrapped;
     }
 
@@ -205,6 +196,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable
         });
+        registerPatchedTarget(target, key, 'nav_total_set:safeDefineAcc');
         return true;
       }
       let getFn = getter;
@@ -224,6 +216,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : !!enumerable
       });
+      registerPatchedTarget(target, key, 'nav_total_set:safeDefineAcc');
       return true;
     }
 
@@ -247,6 +240,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           configurable: d ? d.configurable : true,
           enumerable: d ? d.enumerable : false
         });
+        registerPatchedTarget(proto, key, 'nav_total_set:redefineAcc');
         return;
       }
       let getFn = getImpl;
@@ -269,6 +263,77 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         configurable: d ? d.configurable : true,
         enumerable: d ? d.enumerable : false
       });
+      registerPatchedTarget(proto, key, 'nav_total_set:redefineAcc');
+    }
+
+    function isSameDescriptor(actual, expected) {
+      if (!actual || !expected) return false;
+      const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        if (Object.prototype.hasOwnProperty.call(expected, k)) {
+          if (actual[k] !== expected[k]) return false;
+        }
+      }
+      return true;
+    }
+
+    function applyCoreTargetsGroup(groupTag, targets, policy) {
+      const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
+      const Core = window.Core;
+      if (!Core || typeof Core.applyTargets !== 'function') {
+        const err = new Error('[nav_total_set] Core.applyTargets missing');
+        __navDiag('error', groupTag + ':core_missing', null, err);
+        if (groupPolicy === 'throw') throw err;
+        return 0;
+      }
+      let plans = [];
+      try {
+        plans = Core.applyTargets(targets, window.__PROFILE__, []);
+      } catch (e) {
+        __navDiag('error', groupTag + ':preflight_failed', null, e);
+        if (groupPolicy === 'throw') throw e;
+        return 0;
+      }
+      if (!Array.isArray(plans) || !plans.length) {
+        const reason = plans && plans.reason ? plans.reason : 'group_skipped';
+        __navDiag('warn', groupTag + ':' + reason, null, null);
+        if (groupPolicy === 'throw') {
+          throw new Error('[nav_total_set] target group skipped');
+        }
+        return 0;
+      }
+
+      const applied = [];
+      try {
+        for (let i = 0; i < plans.length; i++) {
+          const p = plans[i];
+          if (!p || p.skipApply) continue;
+          if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
+            throw new Error('[nav_total_set] invalid plan item');
+          }
+          Object.defineProperty(p.owner, p.key, p.nextDesc);
+          const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
+          if (!isSameDescriptor(after, p.nextDesc)) {
+            throw new Error('[nav_total_set] descriptor post-check mismatch');
+          }
+          if (typeof p.value === 'function') __navRegisterFn(p.value);
+          registerPatchedTarget(p.owner, p.key, groupTag);
+          applied.push(p);
+        }
+      } catch (e) {
+        for (let i = applied.length - 1; i >= 0; i--) {
+          const p = applied[i];
+          try {
+            if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
+            else delete p.owner[p.key];
+          } catch (_) {}
+        }
+        __navDiag('error', groupTag + ':apply_failed', null, e);
+        if (groupPolicy === 'throw') throw e;
+        return 0;
+      }
+      return applied.length;
     }
 
 
@@ -672,33 +737,34 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const permDesc = Object.getOwnPropertyDescriptor(permProto, 'query')
         || Object.getOwnPropertyDescriptor(navigator.permissions, 'query');
       if (!permDesc) throw new TypeError('[nav_total_set] permissions.query descriptor missing');
-      const origQuery = permDesc.value || navigator.permissions.query;
-      if (typeof origQuery !== 'function') throw new TypeError('[nav_total_set] permissions.query original missing');
       __navRegisterKey('permissions.query');
-      const patchedQueryRaw = ({ query(parameters) {
-        __navLogAccess('permissions.query', patchedQueryRaw);
-        const isPermThis = (this === navigator.permissions || this === permProto);
-        if (!isPermThis) {
-          return origQuery.call(this, parameters);
+      applyCoreTargetsGroup('nav_total_set:permissions.query', [{
+        owner: permProto,
+        key: 'query',
+        kind: 'promise_method',
+        invokeClass: 'brand_strict',
+        policy: 'throw',
+        diagTag: 'nav_total_set:permissions.query',
+        validThis(self) {
+          return self === navigator.permissions || self === permProto;
+        },
+        invalidThis: 'native',
+        invoke(orig, args) {
+          __navLogAccess('permissions.query', null);
+          const parameters = (args && args.length) ? args[0] : undefined;
+          if (!parameters || typeof parameters !== 'object') {
+            return Promise.resolve({ state: 'prompt', onchange: null });
+          }
+          const name = parameters && parameters.name;
+          if (name === 'persistent-storage') {
+            return Promise.resolve({ state: 'granted', onchange: null });
+          }
+          if (['geolocation', 'camera', 'audiooutput', 'microphone', 'notifications'].includes(name)) {
+            return Promise.resolve({ state: 'prompt', onchange: null });
+          }
+          return Reflect.apply(orig, this, args || []);
         }
-        if (!parameters || typeof parameters !== 'object') {
-          return Promise.resolve({ state: 'prompt', onchange: null });
-        }
-        const name = parameters && parameters.name;
-        if (name === 'persistent-storage')
-          return Promise.resolve({ state: 'granted', onchange: null });
-        if (['geolocation', 'camera', 'audiooutput', 'microphone', 'notifications'].includes(name))
-          return Promise.resolve({ state: 'prompt', onchange: null });
-        return origQuery.call(this, parameters);
-      } }).query;
-      const patchedQuery = mark(patchedQueryRaw, 'query');
-      __navRegisterFn(patchedQuery);
-      Object.defineProperty(permProto, 'query', {
-        value: patchedQuery,
-        configurable: permDesc.configurable,
-        enumerable: permDesc.enumerable,
-        writable: permDesc.writable
-      });
+      }], 'throw');
     }
 
     // ——— I. mediaDevices.enumerateDevices ———
@@ -826,23 +892,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const persistedDesc = Object.getOwnPropertyDescriptor(storageProto, 'persisted')
           || Object.getOwnPropertyDescriptor(navigator.storage, 'persisted');
         if (!persistedDesc) throw new TypeError('[nav_total_set] storage.persisted descriptor missing');
-        const origPersisted = persistedDesc.value || navigator.storage.persisted;
         __navRegisterKey('storage.persisted');
-        Object.defineProperty(storageProto, 'persisted', {
-          configurable: persistedDesc.configurable,
-          enumerable: persistedDesc.enumerable,
-          writable: persistedDesc.writable,
-          value: (function(){
-            const fn = mark(function persisted() {
-              __navLogAccess('storage.persisted', fn);
-              const isStorageThis = (this === navigator.storage || this === storageProto);
-              if (!isStorageThis && typeof origPersisted === 'function') return origPersisted.call(this);
-              return Promise.resolve(true);
-            }, 'persisted');
-            __navRegisterFn(fn);
-            return fn;
-          })()
-        });
+        applyCoreTargetsGroup('nav_total_set:storage.persisted', [{
+          owner: storageProto,
+          key: 'persisted',
+          kind: 'promise_method',
+          invokeClass: 'brand_strict',
+          policy: 'throw',
+          diagTag: 'nav_total_set:storage.persisted',
+          validThis(self) {
+            return self === navigator.storage || self === storageProto;
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
+            __navLogAccess('storage.persisted', null);
+            const isStorageThis = (this === navigator.storage || this === storageProto);
+            if (!isStorageThis) return Reflect.apply(orig, this, args || []);
+            return Promise.resolve(true);
+          }
+        }], 'throw');
       }
     }
 
@@ -915,39 +983,53 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (!createDesc) throw new TypeError('[nav_total_set] credentials.create descriptor missing');
       if (!getDesc) throw new TypeError('[nav_total_set] credentials.get descriptor missing');
       __navRegisterKey('credentials.create');
-      const patchedCreate = mark(function create(options) {
-        __navLogAccess('credentials.create', patchedCreate);
-        const isCredThis = (this === navigator.credentials || this === credProto);
-        if (!isCredThis) return origCreate ? origCreate.call(this, options) : Promise.resolve(undefined);
-        if (options && options.publicKey) {
-          return origCreate ? origCreate.call(this, options) : Promise.resolve(new PublicKeyCredential());
-        }
-        return origCreate ? origCreate.call(this, options) : Promise.resolve(undefined);
-      }, 'create');
       __navRegisterKey('credentials.get');
-      const patchedGet = mark(function get(options) {
-        __navLogAccess('credentials.get', patchedGet);
-        const isCredThis = (this === navigator.credentials || this === credProto);
-        if (!isCredThis) return origGet ? origGet.call(this, options) : Promise.resolve(undefined);
-        if (options && options.publicKey) {
-          return origGet ? origGet.call(this, options) : Promise.resolve(new PublicKeyCredential());
+      applyCoreTargetsGroup('nav_total_set:credentials', [
+        {
+          owner: credProto,
+          key: 'create',
+          kind: 'promise_method',
+          invokeClass: 'brand_strict',
+          policy: 'throw',
+          diagTag: 'nav_total_set:credentials.create',
+          validThis(self) {
+            return self === navigator.credentials || self === credProto;
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
+            __navLogAccess('credentials.create', null);
+            const options = (args && args.length) ? args[0] : undefined;
+            const isCredThis = (this === navigator.credentials || this === credProto);
+            if (!isCredThis) return Reflect.apply(orig, this, args || []);
+            if (options && options.publicKey) {
+              return origCreate ? Reflect.apply(orig, this, args || []) : Promise.resolve(new PublicKeyCredential());
+            }
+            return origCreate ? Reflect.apply(orig, this, args || []) : Promise.resolve(undefined);
+          }
+        },
+        {
+          owner: credProto,
+          key: 'get',
+          kind: 'promise_method',
+          invokeClass: 'brand_strict',
+          policy: 'throw',
+          diagTag: 'nav_total_set:credentials.get',
+          validThis(self) {
+            return self === navigator.credentials || self === credProto;
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
+            __navLogAccess('credentials.get', null);
+            const options = (args && args.length) ? args[0] : undefined;
+            const isCredThis = (this === navigator.credentials || this === credProto);
+            if (!isCredThis) return Reflect.apply(orig, this, args || []);
+            if (options && options.publicKey) {
+              return origGet ? Reflect.apply(orig, this, args || []) : Promise.resolve(new PublicKeyCredential());
+            }
+            return origGet ? Reflect.apply(orig, this, args || []) : Promise.resolve(undefined);
+          }
         }
-        return origGet ? origGet.call(this, options) : Promise.resolve(undefined);
-      }, 'get');
-      __navRegisterFn(patchedCreate);
-      __navRegisterFn(patchedGet);
-      Object.defineProperty(credProto, 'create', {
-        configurable: createDesc.configurable,
-        enumerable: createDesc.enumerable,
-        writable: createDesc.writable,
-        value: patchedCreate
-      });
-      Object.defineProperty(credProto, 'get', {
-        configurable: getDesc.configurable,
-        enumerable: getDesc.enumerable,
-        writable: getDesc.writable,
-        value: patchedGet
-      });
+      ], 'throw');
     }
     __navDiag('info', 'nav_total_set:webauthn_mock_applied');
 

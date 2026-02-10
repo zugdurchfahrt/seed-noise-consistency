@@ -131,6 +131,17 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (proto && Object.getOwnPropertyDescriptor(proto, prop)) return proto;
     return null;
   }
+  function sameDesc(actual, expected) {
+    if (!actual || !expected) return false;
+    const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (Object.prototype.hasOwnProperty.call(expected, k)) {
+        if (actual[k] !== expected[k]) return false;
+      }
+    }
+    return true;
+  }
 
   const mqlMatches = new WeakMap();
   const mqlProto = (typeof MediaQueryList !== 'undefined' && MediaQueryList.prototype) ? MediaQueryList.prototype : null;
@@ -158,12 +169,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     try { return self === window || (typeof Window === 'function' && self instanceof Window); }
     catch (_) { return false; }
   };
-  const patchedMatchMedia = __wrapNativeApply(origMatchMedia, 'matchMedia', (target, thisArg, argList) => {
-    let query = (argList && argList.length) ? argList[0] : undefined;
+  const matchMediaInvoke = function matchMediaInvoke(target, thisArg, argList) {
+    const queryRaw = (argList && argList.length) ? argList[0] : undefined;
     if (!isWindowThis(thisArg)) return Reflect.apply(target, thisArg, argList);
-    query = String(query);
+    const query = String(queryRaw);
     let matches = true;
-    const isTrashQuery = (query.length > 1024 || /[\u0000-\u001F]/.test(query));
+    const hasMediaPrefix = /\b(all|screen|print)\b/i.test(query);
+    const hasMediaExpr = /\([^)]+\)/.test(query);
+    const isTrashQuery = (typeof queryRaw !== 'string') || (query.length > 1024) || /[\u0000-\u001F]/.test(query) || (!hasMediaPrefix && !hasMediaExpr);
     if (isTrashQuery) matches = false;
     const q = query.toLowerCase().replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').replace(/\s*:\s*/g, ':');
     let touched = false;
@@ -239,8 +252,58 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       } catch {}
     }
     return mql;
-  });
-  redefineProp(mmTarget, 'matchMedia', () => patchedMatchMedia);
+  };
+  const matchMediaInvokeCore = function matchMediaInvokeCore(orig, args) {
+    const list = Array.isArray(args) ? args : [];
+    return matchMediaInvoke(orig, this, list);
+  };
+  const Core = window.Core;
+  if (Core && typeof Core.applyTargets === 'function') {
+    let plans = [];
+    try {
+      plans = Core.applyTargets([{
+        owner: mmTarget,
+        key: 'matchMedia',
+        kind: 'method',
+        resolve: 'own',
+        policy: 'throw',
+        diagTag: 'screen:matchMedia',
+        invoke: matchMediaInvokeCore
+      }], window.__PROFILE__, []);
+    } catch (e) {
+      __screenDiag('error', 'screen:matchMedia:preflight_failed', null, e);
+      throw e;
+    }
+    if (!Array.isArray(plans) || !plans.length) {
+      throw new Error('[Screen] matchMedia core plan skipped');
+    }
+    const done = [];
+    try {
+      for (let i = 0; i < plans.length; i++) {
+        const p = plans[i];
+        if (!p || p.skipApply) continue;
+        Object.defineProperty(p.owner, p.key, p.nextDesc);
+        const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
+        if (!sameDesc(after, p.nextDesc)) {
+          throw new Error('[Screen] matchMedia descriptor post-check mismatch');
+        }
+        done.push(p);
+      }
+    } catch (e) {
+      for (let i = done.length - 1; i >= 0; i--) {
+        const p = done[i];
+        try {
+          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
+          else delete p.owner[p.key];
+        } catch (_) {}
+      }
+      __screenDiag('error', 'screen:matchMedia:apply_failed', null, e);
+      throw e;
+    }
+  } else {
+    const patchedMatchMedia = __wrapNativeApply(origMatchMedia, 'matchMedia', matchMediaInvoke);
+    redefineProp(mmTarget, 'matchMedia', () => patchedMatchMedia);
+  }
 
   //  screen и orientation ──
   const screenObj = window.screen;
