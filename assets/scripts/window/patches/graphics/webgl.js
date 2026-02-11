@@ -103,11 +103,15 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (wl.includes(pname)) {
       return; // undefined → pass-through to orig.apply(this, args)
     }
-    // For non-whitelisted enums: safe fallback to native (avoid breaking callers).
+    // TTST !!if (typeof this.VERSION === 'number' && pname === this.VERSION) return;
+    // if (typeof this.SHADING_LANGUAGE_VERSION === 'number' && pname === this.SHADING_LANGUAGE_VERSION) return;
+
+    // For non-whitelisted enums: keep native pass-through to avoid null overrides
+    // that can break third-party report renderers (Object.values(null) paths).
     if (typeof window.__DEGRADE__ === 'function') {
       try { window.__DEGRADE__('webgl:param_whitelist_miss', null, { pname: pname }); } catch (_) {}
     }
-    return; // undefined → pass-through to orig.apply(this, args)
+    return; // undefined -> pass-through to orig.apply(this, args)
   }
     // === 2. getSupportedExtensions ===
   function webglGetSupportedExtensionsPatch(orig, ...args) {
@@ -236,6 +240,36 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
 
   // === 5) anti‑FP hooks  ===
+  // readPixels is void and writes into the provided buffer.
+  // Its noise hook must run post-orig; the executor mode is set here (not globally).
+  const hookModeStore = (C.__hookModeStore && typeof C.__hookModeStore === 'object') ? C.__hookModeStore : {};
+  if (!Object.prototype.hasOwnProperty.call(C, '__hookModeStore')) {
+    Object.defineProperty(C, '__hookModeStore', {
+      value: hookModeStore,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(hookModeStore, 'post_orig_once')) {
+    Object.defineProperty(hookModeStore, 'post_orig_once', {
+      value: Object.freeze({}),
+      writable: false,
+      configurable: false,
+      enumerable: false
+    });
+  }
+  const readPixelsHookMode = hookModeStore.post_orig_once;
+  if (!Array.isArray(C.webglReadPixelsHooks)) {
+    C.webglReadPixelsHooks = [];
+  }
+  Object.defineProperty(C.webglReadPixelsHooks, 'mode', {
+    value: readPixelsHookMode,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+
   function webglReadPixelsHook(orig, x, y, w, h, format, type, buffer) {
     // orig already executed by patchMethod (post-call path for readPixels)
     if (!buffer) return;
