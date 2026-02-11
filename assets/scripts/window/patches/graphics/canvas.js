@@ -34,6 +34,14 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
       throw new Error('[CanvasPatch] screenWidth / screenHeight not set');
     }
+    const viewportWidth = (
+      Number.isFinite(window.innerWidth) && window.innerWidth > 0
+    ) ? Math.round(window.innerWidth) : Math.round(screenWidth);
+    const viewportHeight = (
+      Number.isFinite(window.innerHeight) && window.innerHeight > 0
+    ) ? Math.round(window.innerHeight) : Math.round(screenHeight);
+    const baseCanvasWidth = 300;
+    const baseCanvasHeight = 150;
     const div = document.createElement('div');
     if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED) {
       throw new Error('[CanvasPatch] __GLOBAL_SEED missing');
@@ -48,23 +56,23 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     div.id = 'canvas_01' + u1.toString(36).slice(2, 10);
 
     const OFFSCREEN_LEFT_PX =
-      -Math.floor(1000 + u2 * 4002);
+      -(viewportWidth + Math.floor(1000 + u2 * 4002));
 
 
     div.style.position = 'fixed';
     div.style.left = `${OFFSCREEN_LEFT_PX}px`;
     div.style.top = '0';
-    div.style.width = '1px';
-    div.style.height = '1px';
+    div.style.width = `${viewportWidth}px`;
+    div.style.height = `${viewportHeight}px`;
     div.style.opacity = '0';
     div.style.pointerEvents = 'none';
     (document.body || document.documentElement).appendChild(div);
 
     const canvas = document.createElement('canvas');
-    canvas.width = screenWidth;
-    canvas.height = screenHeight;
-    canvas.style.width = screenWidth + 'px';
-    canvas.style.height = screenHeight + 'px';
+    canvas.width = baseCanvasWidth;
+    canvas.height = baseCanvasHeight;
+    canvas.style.width = viewportWidth + 'px';
+    canvas.style.height = viewportHeight + 'px';
     canvas.style.display = 'block';
     canvas.style.background = 'transparent';
     div.appendChild(canvas);
@@ -831,141 +839,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return 'data:image/png;base64,'+btoa(s);
   }
 
-  // Шумим ДО кодирования: снимаем пиксели, добавляем детерминированный микрошум,
-  // кодируем на временном canvas, оригинал canvas не мутируем.
+  // Deterministic pixel-noise remains in 2D draw/text hooks.
   function patchToDataURLInjectNoise(res, type, quality) {
-    // Core2.0 (first step): post-process-only, no additional canvas readback APIs.
     if (typeof res !== 'string') return res;
     if (type && String(type).toLowerCase() !== 'image/png') return res;
     if (res.indexOf('data:image/png;base64,') !== 0) return res;
-
-    try {
-      const comma = res.indexOf(',');
-      if (comma < 0) return res;
-      const base64 = res.slice(comma + 1);
-      const bin = atob(base64);
-      const buf = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-
-      // Validate PNG signature + IHDR presence (minimal bounds checks).
-      const sig = [137,80,78,71,13,10,26,10];
-      if (buf.length < 8 + 12) return res;
-      for (let i = 0; i < 8; i++) if (buf[i] !== sig[i]) return res;
-
-      const ihType = String.fromCharCode(buf[12], buf[13], buf[14], buf[15]);
-      if (ihType !== 'IHDR') return res;
-
-      // Build an ancillary, safe-to-copy chunk type derived from IHDR (example: "iHDr").
-      const chunkType =
-        ihType.charAt(0).toLowerCase() +
-        ihType.charAt(1) +
-        ihType.charAt(2) +
-        ihType.charAt(3).toLowerCase();
-
-      // Deterministic payload based on the PNG bytes (FNV-1a with adaptive stride).
-      let len = buf.length >>> 0;
-      const stride = (len >= 1<<19) ? 32
-                  : (len >= 1<<17) ? 16
-                  : (len >= 1<<15) ? 8
-                  : 4;
-      let hsh = 0x811c9dc5 >>> 0;
-      for (let i = 0; i < len; i += stride) {
-        hsh ^= buf[i];
-        hsh = (hsh + ((hsh<<1) + (hsh<<4) + (hsh<<7) + (hsh<<8) + (hsh<<24))) >>> 0;
-      }
-      for (let i = len - Math.min(stride, 16); i < len && i >= 0; i++) {
-        hsh ^= buf[i];
-        hsh = (hsh + ((hsh<<1) + (hsh<<4) + (hsh<<7) + (hsh<<8) + (hsh<<24))) >>> 0;
-      }
-      const payload = new Uint8Array(4);
-      payload[0] = (hsh >>> 24) & 255;
-      payload[1] = (hsh >>> 16) & 255;
-      payload[2] = (hsh >>>  8) & 255;
-      payload[3] = (hsh >>>  0) & 255;
-
-      function readU32BE(a, off) {
-        return ((a[off] << 24) | (a[off+1] << 16) | (a[off+2] << 8) | (a[off+3])) >>> 0;
-      }
-      function writeU32BE(a, off, v) {
-        a[off  ] = (v >>> 24) & 255;
-        a[off+1] = (v >>> 16) & 255;
-        a[off+2] = (v >>>  8) & 255;
-        a[off+3] = (v >>>  0) & 255;
-      }
-      function getCrcTable() {
-        const G = (typeof globalThis !== 'undefined' && globalThis)
-          || (typeof self !== 'undefined' && self)
-          || (typeof window !== 'undefined' && window)
-          || {};
-        if (G._crcTable) return G._crcTable;
-        const t = new Uint32Array(256);
-        for (let n = 0; n < 256; n++) {
-          let c = n;
-          for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-          t[n] = c >>> 0;
-        }
-        G._crcTable = t;
-        return t;
-      }
-      function crc32Chunk(typeStr, dataU8) {
-        const tab = getCrcTable();
-        let crc = ~0 >>> 0;
-        for (let i = 0; i < 4; i++) {
-          const b = typeStr.charCodeAt(i) & 255;
-          crc = (tab[(crc ^ b) & 255] ^ (crc >>> 8)) >>> 0;
-        }
-        for (let i = 0; i < dataU8.length; i++) {
-          crc = (tab[(crc ^ dataU8[i]) & 255] ^ (crc >>> 8)) >>> 0;
-        }
-        return (~crc) >>> 0;
-      }
-
-      // Find IEND and insert our chunk before it.
-      let off = 8;
-      let iendOff = -1;
-      while (off + 12 <= buf.length) {
-        const clen = readU32BE(buf, off);
-        const typeOff = off + 4;
-        const dataOff = off + 8;
-        const crcOff  = dataOff + clen;
-        const next    = crcOff + 4;
-        if (next > buf.length) break;
-        const t = String.fromCharCode(buf[typeOff], buf[typeOff+1], buf[typeOff+2], buf[typeOff+3]);
-        if (t === 'IEND') { iendOff = off; break; }
-        off = next;
-      }
-      if (iendOff < 0) return res;
-
-      const chunkLen = payload.length >>> 0;
-      const addLen = 4 + 4 + chunkLen + 4;
-      const out = new Uint8Array(buf.length + addLen);
-      out.set(buf.subarray(0, iendOff), 0);
-
-      let w = iendOff;
-      writeU32BE(out, w, chunkLen); w += 4;
-      out[w++] = chunkType.charCodeAt(0) & 255;
-      out[w++] = chunkType.charCodeAt(1) & 255;
-      out[w++] = chunkType.charCodeAt(2) & 255;
-      out[w++] = chunkType.charCodeAt(3) & 255;
-      out.set(payload, w); w += chunkLen;
-      const crc = crc32Chunk(chunkType, payload);
-      writeU32BE(out, w, crc); w += 4;
-
-      out.set(buf.subarray(iendOff), w);
-
-      // Back to dataURL
-      let s = '', CH = 0x8000;
-      for (let i = 0; i < out.length; i += CH) s += String.fromCharCode.apply(null, out.subarray(i, i + CH));
-      return 'data:image/png;base64,' + btoa(s);
-
-    } catch (e) {
-      try {
-        if (typeof window.__DEGRADE__ === 'function') {
-          window.__DEGRADE__('canvas:toDataURL:postprocess_failed', e, { len: res.length });
-        }
-      } catch (_e) {}
-      return res;
-    }
+    return res;
   }
     
 

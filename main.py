@@ -314,17 +314,17 @@ def init_driver(
     logger.info("Thread started on port %s", cdp.PORT)
 
 
-    desc_js = Path(SCRIPTS_PATCHES_STEALTH / "desc2.js").read_text(encoding="utf-8")
-    driver.execute_cdp_cmd(
-        "Page.addScriptToEvaluateOnNewDocument",
-        {"source": desc_js}
-    )
+    # desc_js = Path(SCRIPTS_PATCHES_STEALTH / "desc22.js").read_text(encoding="utf-8")
+    # driver.execute_cdp_cmd(
+    #     "Page.addScriptToEvaluateOnNewDocument",
+    #     {"source": desc_js}
+    # )
 
-    descN_js = Path(SCRIPTS_PATCHES_STEALTH / "desc3.js").read_text(encoding="utf-8")
-    driver.execute_cdp_cmd(
-        "Page.addScriptToEvaluateOnNewDocument",
-        {"source": descN_js}
-    )
+    # descN_js = Path(SCRIPTS_PATCHES_STEALTH / "desc3.js").read_text(encoding="utf-8")
+    # driver.execute_cdp_cmd(
+    #     "Page.addScriptToEvaluateOnNewDocument",
+    #     {"source": descN_js}
+    # )
 
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
@@ -356,7 +356,7 @@ def init_driver(
             "NavTotalSetPatchModule(window);",
 
             # --- screen ---
-            Path(SCRIPTS_PATCHES_MEDIA / "screen.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "screen.js").read_text("utf-8"),
             "ScreenPatchModule(window);",
 
             # --- generated patch output ---
@@ -855,15 +855,16 @@ def main():
         gpu_name = gpu["name"]
         gpu_code = gpu["prod_code"]
 
-      #  screen_res = random.choice(gpu["resolution"])
-        screen_res = "1920x1080"
-        screen_width, screen_height = map(int, screen_res.split("x"))
+        screen_res = random.choice(gpu["resolution"])
+        if not isinstance(screen_res, str) or not re.fullmatch(r"[1-9]\d{2,4}x[1-9]\d{2,4}", screen_res):
+            raise ValueError(f"invalid screen resolution from GPU dictionary: {screen_res!r}")
+        screen_width, screen_height = map(int, screen_res.split("x", 1))
 
         # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
         dpr_map = {
             "1920x1080": 1.0,
-            # "2560x1440": 1.25,
-            # "3840x2160": 2.0,
+            "2560x1440": 1.25,
+            "3840x2160": 2.0,
         }
         device_dpr_value = dpr_map.get(screen_res)
         if device_dpr_value is None:

@@ -1446,11 +1446,10 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
   // 5) Полный сценарий
   function initAll(opts){
     const o = Object.assign({ publishHE: true, heKeys: null }, opts);
-    // Strict UAData mode: obtain HE first; only then install overrides and publish snapshots.
-    return snapshotHE(o.heKeys).then(() => {
-      installOverrides(); // Hub -> Overrides
-      return snapshotOnce();
-    });
+    // Install overrides first to prevent early native SharedWorker creation before async HE readiness.
+    installOverrides(); // Hub -> Overrides
+    // Strict UAData mode: obtain HE first; only then publish snapshots.
+    return snapshotHE(o.heKeys).then(() => snapshotOnce());
   }
 
   // 6) Diagnostics
