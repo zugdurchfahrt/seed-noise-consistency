@@ -16,12 +16,12 @@ const LOGGingModule = function LOGGingModule() {
 
     // Debug flag (respect false)
     G.__DEBUG__ =
-      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
-      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
+      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
+      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
 
     window.env = window.env || {};
-    // window.env.DEBUG_DEGRADES = true;   // включить
-    window.env.DEBUG_DEGRADES = false; // выключить
+    window.env.DEBUG_DEGRADES = true;   // включить
+    // window.env.DEBUG_DEGRADES = false; // выключить
     const env = window.env;
 
 

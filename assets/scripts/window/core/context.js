@@ -122,6 +122,33 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.registerWebGLGetUniformHook               = fn => registerOnce(C.webglGetUniformHooks, fn);
 
   // === 3. Patch utilities ===
+  const canvasReadbackGuard =
+    (typeof WeakMap === 'function') ? new WeakMap() : null;
+  const canvasReadbackMethods = {
+    toDataURL: true,
+    toBlob: true,
+    convertToBlob: true
+  };
+  function enterCanvasReadback(self, method) {
+    if (!canvasReadbackGuard || !canvasReadbackMethods[method]) return null;
+    const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
+    if (!isObj) return null;
+    let active = canvasReadbackGuard.get(self);
+    if (!active) {
+      active = new Set();
+      canvasReadbackGuard.set(self, active);
+    }
+    // 2026-02-11: cross-method stack guard for toDataURL/toBlob/convertToBlob.
+    if (active.size > 0) return false;
+    active.add(method);
+    return active;
+  }
+  function leaveCanvasReadback(self, active, method) {
+    if (!canvasReadbackGuard || !active || active === false) return;
+    active.delete(method);
+    if (active.size === 0) canvasReadbackGuard.delete(self);
+  }
+
   function chain(proto, method, hooks){
     if (!proto || typeof proto[method] !== 'function') return false;
     const orig = proto[method];
@@ -135,11 +162,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
       ? ({ toDataURL(type, quality) {
            const self = this;
            const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
-           // Internal encode paths (temporary canvases) mark the instance to avoid re-entering the hook chain.
-           // Preserve native brand-check semantics by only reading the flag on objects/functions.
-           const __CHAIN_GUARD__ = '__isChain_toDataURL';
-           if (isObj && self[__CHAIN_GUARD__]) return Reflect.apply(orig, self, arguments);
-           if (inProgress && isObj) {
+           const readbackToken = enterCanvasReadback(self, method);
+           if (readbackToken === false) return Reflect.apply(orig, self, arguments);
+            // 2026-02-11: disabled dead guard block (__isChain_toDataURL) as non-wired in runtime.
+            // Internal encode paths guard left commented intentionally for later revisit.
+            // const __CHAIN_GUARD__ = '__isChain_toDataURL';
+            // if (isObj && self[__CHAIN_GUARD__]) return Reflect.apply(orig, self, arguments);
+            if (inProgress && isObj) {
              if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
              inProgress.add(self);
            }
@@ -158,6 +187,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
             }
             return res;
           } finally {
+            leaveCanvasReadback(self, readbackToken, method);
             if (inProgress && isObj) {
               inProgress.delete(self);
             }
@@ -202,6 +232,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
       if (typeof proto[method] !== 'function') { console.warn(`[patchMethod] not a function: ${method}`); return false; }
       if (patchedMethods.has(proto[method]))   { console.warn(`[patchMethod] already patched: ${method}`); return false; }
       if (!hooks?.length)                      { console.warn(`[patchMethod] no hooks: ${method}`); return false; }
+      const isWebGLProto =
+        (typeof WebGLRenderingContext !== 'undefined' && proto === WebGLRenderingContext.prototype) ||
+        (typeof WebGL2RenderingContext !== 'undefined' && proto === WebGL2RenderingContext.prototype);
+      if (!isWebGLProto) {
+        console.warn(`[patchMethod] non-WebGL proto rejected: ${method}`);
+        return false;
+      }
 
       const orig = proto[method];
       const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
@@ -219,20 +256,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
           try {
               if (typeof guardInstance === "function" && !guardInstance(proto, self))
                   return orig.apply(self, args);
-
-              // readPixels returns undefined; if a hook calls orig itself, patchMethod would call orig again.
-              // For readPixels we do: orig once -> hooks mutate buffer -> return.
-              if (method === 'readPixels') {
-                  const out = orig.apply(self, args);
-                  for (const hook of hooks) {
-                       if (typeof hook !== 'function') continue;
-                       try { hook.apply(self, [orig, ...args]); } catch (e) {
-                           console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
-                           throw e;
-                       }
-                   }
-                   return out;
-               }
 
               let patched = args;
               for (const hook of hooks) {
@@ -304,20 +327,24 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
     if (method === 'toBlob') {
       const wrapped = ({ toBlob(callback, type, quality) {
+        const self = this;
         const args = arguments;
+        const readbackToken = enterCanvasReadback(self, method);
+        if (readbackToken === false) return Reflect.apply(orig, self, args);
         if (typeof callback === 'function') {
-          const done = (blob) => callback(applyHooks(this, blob, args));
-          return Reflect.apply(orig, this, [done].concat(Array.prototype.slice.call(args, 1)));
-        }
-        return new Promise((resolve, reject) => {
           try {
-            const done = (blob) => {
-              try { resolve(applyHooks(this, blob, args)); }
-              catch (e) { reject(e); }
-            };
-            Reflect.apply(orig, this, [done].concat(Array.prototype.slice.call(args, 1)));
-          } catch (e) { reject(e); }
-        });
+            const done = (blob) => callback(applyHooks(self, blob, args));
+            return Reflect.apply(orig, self, [done].concat(Array.prototype.slice.call(args, 1)));
+          } finally {
+            leaveCanvasReadback(self, readbackToken, method);
+          }
+        }
+        // 2026-02-11: keep native contract - toBlob without callback returns undefined.
+        try {
+          return Reflect.apply(orig, self, args);
+        } finally {
+          leaveCanvasReadback(self, readbackToken, method);
+        }
       } }).toBlob;
       const patched = markAsNative(wrapped, method);
       definePatchedMethod(proto, method, patched);
@@ -327,12 +354,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
     if (method === 'convertToBlob') {
       const wrapped = ({ convertToBlob(options) {
+        const self = this;
         const args = arguments;
-        const p = Reflect.apply(orig, this, args);
-        if (!(p && typeof p.then === 'function')) return p;
-        const hooks = getHooksList();
-        if (!(hooks && hooks.length)) return p;
-        return p.then((blob) => applyHooks(this, blob, args));
+        const readbackToken = enterCanvasReadback(self, method);
+        if (readbackToken === false) return Reflect.apply(orig, self, args);
+        try {
+          const p = Reflect.apply(orig, self, args);
+          if (!(p && typeof p.then === 'function')) return p;
+          const hooks = getHooksList();
+          if (!(hooks && hooks.length)) return p;
+          return p.then((blob) => applyHooks(self, blob, args));
+        } finally {
+          leaveCanvasReadback(self, readbackToken, method);
+        }
       } }).convertToBlob;
       const patched = markAsNative(wrapped, method);
       definePatchedMethod(proto, method, patched);
@@ -640,7 +674,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
     // 3) Validation of the availability of exports Canvas-hooks (from CanvasPatchModule)
     [
-      'patch2DNoise','patchToDataURLInjectNoise','patchCanvasIHDRHook','masterToDataURLHook',
+      // 2026-02-11: 'patchCanvasIHDRHook' disabled (non-wired runtime hook, kept out of required list).
+      'patch2DNoise','patchToDataURLInjectNoise','masterToDataURLHook',
       'patchToBlobInjectNoise','patchConvertToBlobInjectNoise',
       'measureTextNoiseHook','fillTextNoiseHook','strokeTextNoiseHook','fillRectNoiseHook',
       'applyDrawImageHook','addCanvasNoise'
@@ -651,15 +686,18 @@ const ContextPatchModule = function ContextPatchModule(window) {
     });
 
     // 4) Registration Canvas 2D
-    if (C.registerHtmlCanvasToDataURLHook)    C.registerHtmlCanvasToDataURLHook(H.masterToDataURLHook);
-    if (C.registerHtmlCanvasToBlobHook)       C.registerHtmlCanvasToBlobHook(H.patchToBlobInjectNoise);
-    if (C.registerOffscreenConvertToBlobHook) C.registerOffscreenConvertToBlobHook(H.patchConvertToBlobInjectNoise);
+    // 2026-02-11: TEMPORARILY DISABLED in one place (pipeline de-integration only).
+    // Related implementations to revisit later:
+    // assets/scripts/window/patches/graphics/canvas.js -> masterToDataURLHook, patchToBlobInjectNoise, patchConvertToBlobInjectNoise, addCanvasNoise
+    // if (C.registerHtmlCanvasToDataURLHook)    C.registerHtmlCanvasToDataURLHook(H.masterToDataURLHook);
+    // if (C.registerHtmlCanvasToBlobHook)       C.registerHtmlCanvasToBlobHook(H.patchToBlobInjectNoise);
+    // if (C.registerOffscreenConvertToBlobHook) C.registerOffscreenConvertToBlobHook(H.patchConvertToBlobInjectNoise);
     if (C.registerCtx2DMeasureTextHook)       C.registerCtx2DMeasureTextHook(H.measureTextNoiseHook);
     if (C.registerCtx2DFillTextHook)          C.registerCtx2DFillTextHook(H.fillTextNoiseHook);
     if (C.registerCtx2DStrokeTextHook)        C.registerCtx2DStrokeTextHook(H.strokeTextNoiseHook);
     if (C.registerCtx2DFillRectHook)          C.registerCtx2DFillRectHook(H.fillRectNoiseHook);
     if (C.registerCtx2DDrawImageHook)         C.registerCtx2DDrawImageHook(H.applyDrawImageHook);
-    if (C.registerCtx2DAddNoiseHook)          C.registerCtx2DAddNoiseHook(H.addCanvasNoise);
+    // if (C.registerCtx2DAddNoiseHook)          C.registerCtx2DAddNoiseHook(H.addCanvasNoise);
 
     // 5) Validation of availability WebGL-hooks
     [
