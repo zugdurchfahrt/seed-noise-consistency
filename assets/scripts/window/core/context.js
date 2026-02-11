@@ -22,6 +22,26 @@ const ContextPatchModule = function ContextPatchModule(window) {
     webgl: false,
     hooksRegistered: false,
   });
+  const hookModeStore = (C.__hookModeStore && typeof C.__hookModeStore === 'object')
+    ? C.__hookModeStore
+    : {};
+  if (!Object.prototype.hasOwnProperty.call(C, '__hookModeStore')) {
+    Object.defineProperty(C, '__hookModeStore', {
+      value: hookModeStore,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(hookModeStore, 'post_orig_once')) {
+    Object.defineProperty(hookModeStore, 'post_orig_once', {
+      value: Object.freeze({}),
+      writable: false,
+      configurable: false,
+      enumerable: false
+    });
+  }
+  const HOOK_MODE_POST_ORIG_ONCE = hookModeStore.post_orig_once;
 
   // === 0. Utilities ===
   const NOP = () => {};
@@ -111,6 +131,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.registerCtx2DFillRectHook                 = fn => registerOnce(C.ctx2DFillRectHooks, fn);
   C.registerCtx2DDrawImageHook                = fn => registerOnce(C.ctx2DDrawImageHooks, fn);
   C.registerCtx2DAddNoiseHook                 = fn => registerOnce(C.canvas2DNoiseHooks, fn);
+  // 2026-02-11: TEMPORARILY DISABLED in one place (pipeline de-integration only).
+  // Related implementations to revisit later:
+  // assets/scripts/window/patches/graphics/canvas.js -> masterToDataURLHook, patchToBlobInjectNoise, patchConvertToBlobInjectNoise, addCanvasNoise
+  // if (C.registerHtmlCanvasToDataURLHook)    C.registerHtmlCanvasToDataURLHook(H.masterToDataURLHook);
+  // if (C.registerHtmlCanvasToBlobHook)       C.registerHtmlCanvasToBlobHook(H.patchToBlobInjectNoise);
+  // if (C.registerOffscreenConvertToBlobHook) C.registerOffscreenConvertToBlobHook(H.patchConvertToBlobInjectNoise);
+  // if (C.registerCtx2DAddNoiseHook)          C.registerCtx2DAddNoiseHook(H.addCanvasNoise);
 
   C.registerWebGLGetContextHook               = fn => registerOnce(C.webglGetContextHooks, fn);
   C.registerWebGLGetParameterHook             = fn => registerOnce(C.webglGetParameterHooks, fn);
@@ -242,6 +269,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
       const orig = proto[method];
       const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
+      const hookMode = (hooks && (typeof hooks === 'object' || typeof hooks === 'function')) ? hooks.mode : undefined;
+      const isPostOrigOnceMode = hookMode === HOOK_MODE_POST_ORIG_ONCE;
+      const forbidOrigCall = function forbidOrigCall() { throw new TypeError(); };
 
       function invoke(self, argsLike) {
           // Preserve native Illegal invocation / brand check errors
@@ -256,6 +286,20 @@ const ContextPatchModule = function ContextPatchModule(window) {
           try {
               if (typeof guardInstance === "function" && !guardInstance(proto, self))
                   return orig.apply(self, args);
+
+              if (isPostOrigOnceMode) {
+                  const out = orig.apply(self, args);
+                  for (const hook of hooks) {
+                      if (typeof hook !== 'function') continue;
+                      try {
+                          hook.apply(self, [forbidOrigCall, ...args, out]);
+                      } catch (e) {
+                          console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
+                          throw e;
+                      }
+                  }
+                  return out;
+              }
 
               let patched = args;
               for (const hook of hooks) {
@@ -637,26 +681,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       return applied;
     };
 
-  // === 3. REGISTER HOOK FUNCTIONS ===
-  C.registerHtmlCanvasToBlobHook              = fn => registerOnce(C.htmlCanvasToBlobHooks, fn);
-  C.registerHtmlCanvasToDataURLHook           = fn => registerOnce(C.htmlCanvasToDataURLHooks, fn);
-  C.registerOffscreenConvertToBlobHook        = fn => registerOnce(C.offscreenConvertToBlobHooks, fn);
-  C.registerCtx2DGetContextHook               = fn => registerOnce(C.ctx2DGetContextHooks, fn);
-  C.registerCtx2DMeasureTextHook              = fn => registerOnce(C.ctx2DMeasureTextHooks, fn);
-  C.registerCtx2DFillTextHook                 = fn => registerOnce(C.ctx2DFillTextHooks, fn);
-  C.registerCtx2DStrokeTextHook               = fn => registerOnce(C.ctx2DStrokeTextHooks, fn);
-  C.registerCtx2DFillRectHook                 = fn => registerOnce(C.ctx2DFillRectHooks, fn);
-  C.registerCtx2DDrawImageHook                = fn => registerOnce(C.ctx2DDrawImageHooks, fn);
-  C.registerCtx2DAddNoiseHook                 = fn => registerOnce(C.canvas2DNoiseHooks, fn);
-  C.registerWebGLGetContextHook               = fn => registerOnce(C.webglGetContextHooks, fn);
-  C.registerWebGLGetParameterHook             = fn => registerOnce(C.webglGetParameterHooks, fn);
-  C.registerWebGLGetSupportedExtensionsHook   = fn => registerOnce(C.webglGetSupportedExtensionsHooks, fn);
-  C.registerWebGLGetExtensionHook             = fn => registerOnce(C.webglGetExtensionHooks, fn);
-  C.registerWebGLReadPixelsHook               = fn => registerOnce(C.webglReadPixelsHooks, fn);
-  C.registerWebGLGetShaderPrecisionFormatHook = fn => registerOnce(C.webglGetShaderPrecisionFormatHooks, fn);
-  C.registerWebGLShaderSourceHook             = fn => registerOnce(C.webglShaderSourceHooks, fn);
-  C.registerWebGLGetUniformHook               = fn => registerOnce(C.webglGetUniformHooks, fn);
-
   // === 4. FINAL REGISTRATION ===
   function registerAllHooks() {
     const C = window.CanvasPatchContext;
@@ -686,18 +710,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
     });
 
     // 4) Registration Canvas 2D
-    // 2026-02-11: TEMPORARILY DISABLED in one place (pipeline de-integration only).
-    // Related implementations to revisit later:
-    // assets/scripts/window/patches/graphics/canvas.js -> masterToDataURLHook, patchToBlobInjectNoise, patchConvertToBlobInjectNoise, addCanvasNoise
-    // if (C.registerHtmlCanvasToDataURLHook)    C.registerHtmlCanvasToDataURLHook(H.masterToDataURLHook);
-    // if (C.registerHtmlCanvasToBlobHook)       C.registerHtmlCanvasToBlobHook(H.patchToBlobInjectNoise);
-    // if (C.registerOffscreenConvertToBlobHook) C.registerOffscreenConvertToBlobHook(H.patchConvertToBlobInjectNoise);
     if (C.registerCtx2DMeasureTextHook)       C.registerCtx2DMeasureTextHook(H.measureTextNoiseHook);
     if (C.registerCtx2DFillTextHook)          C.registerCtx2DFillTextHook(H.fillTextNoiseHook);
     if (C.registerCtx2DStrokeTextHook)        C.registerCtx2DStrokeTextHook(H.strokeTextNoiseHook);
     if (C.registerCtx2DFillRectHook)          C.registerCtx2DFillRectHook(H.fillRectNoiseHook);
     if (C.registerCtx2DDrawImageHook)         C.registerCtx2DDrawImageHook(H.applyDrawImageHook);
-    // if (C.registerCtx2DAddNoiseHook)          C.registerCtx2DAddNoiseHook(H.addCanvasNoise);
 
     // 5) Validation of availability WebGL-hooks
     [

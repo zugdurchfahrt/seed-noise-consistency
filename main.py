@@ -221,7 +221,7 @@ def init_driver(
     chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
     chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
     chrome_options.add_argument("--remote-allow-origins=*")
-    chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
+    # chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
     chrome_options.add_argument("--start-maximized")
@@ -848,7 +848,25 @@ def main():
         audiooutput = random.choice(data["headphone"])['name']
         devices_conf = {"audioinput": audioinput, "videoinput": videoinput, "audiooutput": audiooutput}
 
-        # ----------------------------Setting up GPU and Screen -----------------------
+
+
+    # ----------------------------Setting up GPU and Screen -----------------------
+    #     gpu = random.choice(data["GPU"])
+    #     gpu_architecture = str(gpu.get("architecture", "")).strip()
+    #     gpu_type = str(gpu.get("type", ""))
+    #     gpu_name = gpu["name"]
+    #     gpu_code = gpu["prod_code"]
+
+    #   #  screen_res = random.choice(gpu["resolution"])
+    #     screen_res = "1920x1080"
+    #     screen_width, screen_height = map(int, screen_res.split("x"))
+
+        # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
+
+
+
+
+        # # ----------------------------Setting up GPU and Screen -----------------------
         gpu = random.choice(data["GPU"])
         gpu_architecture = str(gpu.get("architecture", "")).strip()
         gpu_type = str(gpu.get("type", ""))
