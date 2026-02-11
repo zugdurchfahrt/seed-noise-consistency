@@ -39,29 +39,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     throw new Error('[Screen] bad dpr');
   }
 
-  const __wrapNativeApply = window.__wrapNativeApply;
-  const __wrapNativeAccessor = window.__wrapNativeAccessor;
-  if (typeof __wrapNativeApply !== 'function' || typeof __wrapNativeAccessor !== 'function') {
-    throw new Error('[Screen] core wrappers missing');
-  }
-  const __corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
-    ? window.Core.preflightTarget
+  const __coreApplyTargets = (window.Core && typeof window.Core.applyTargets === 'function')
+    ? window.Core.applyTargets
     : null;
-  function ensurePreflight(owner, key, kind, diagTag) {
-    if (typeof __corePreflightTarget !== 'function') return;
-    const pre = __corePreflightTarget({
-      owner,
-      key,
-      kind,
-      policy: 'throw',
-      diagTag
-    });
-    if (!pre || pre.ok !== true) {
-      const err = (pre && pre.error instanceof Error) ? pre.error : new Error(`[Screen] preflight failed for ${String(key)}`);
-      const reason = pre && pre.reason ? pre.reason : 'preflight_failed';
-      __screenDiag('warn', `${diagTag}:${reason}`, { key, kind }, err);
-      throw err;
-    }
+  if (typeof __coreApplyTargets !== 'function') {
+    throw new Error('[Screen] Core.applyTargets missing');
   }
   
   function safeDefine(obj, prop, descriptor) {
@@ -78,53 +60,134 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const acc = ({ get [prop]() { return getter.call(this); } });
     return Object.getOwnPropertyDescriptor(acc, prop).get;
   }
+  function receiverMatchesTarget(target, thisArg) {
+    try {
+      const ctor = target && target.constructor;
+      const isProto = !!(typeof ctor === 'function' && ctor.prototype === target);
+      if (isProto) {
+        return !!(target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg));
+      }
+      return !!(thisArg === target || (target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg)));
+    } catch (_) {
+      return false;
+    }
+  }
+  function applyCoreTargetsGroup(groupTag, targets, policy) {
+    const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
+    let plans = [];
+    try {
+      plans = __coreApplyTargets(targets, window.__PROFILE__, []);
+    } catch (e) {
+      __screenDiag('error', groupTag + ':preflight_failed', null, e);
+      if (groupPolicy === 'throw') throw e;
+      return 0;
+    }
+    if (!Array.isArray(plans) || !plans.length) {
+      const reason = plans && plans.reason ? plans.reason : 'group_skipped';
+      __screenDiag('warn', groupTag + ':' + reason, null, null);
+      if (groupPolicy === 'throw') {
+        throw new Error('[Screen] core plan skipped');
+      }
+      return 0;
+    }
+    const applied = [];
+    try {
+      for (let i = 0; i < plans.length; i++) {
+        const p = plans[i];
+        if (!p || p.skipApply) continue;
+        if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
+          throw new Error('[Screen] invalid core plan item');
+        }
+        Object.defineProperty(p.owner, p.key, p.nextDesc);
+        const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
+        if (!sameDesc(after, p.nextDesc)) {
+          throw new Error('[Screen] descriptor post-check mismatch');
+        }
+        applied.push(p);
+      }
+    } catch (e) {
+      let rollbackErr = null;
+      for (let i = applied.length - 1; i >= 0; i--) {
+        const p = applied[i];
+        try {
+          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
+          else delete p.owner[p.key];
+        } catch (re) {
+          if (!rollbackErr) rollbackErr = re;
+          __screenDiag('error', groupTag + ':rollback_failed', { key: p.key || null }, re);
+        }
+      }
+      if (rollbackErr) {
+        if (groupPolicy === 'throw') throw rollbackErr;
+        return 0;
+      }
+      __screenDiag('error', groupTag + ':apply_failed', null, e);
+      if (groupPolicy === 'throw') throw e;
+      return 0;
+    }
+    return applied.length;
+  }
   function redefineProp(target, prop, getterOrValue) {
     const d = Object.getOwnPropertyDescriptor(target, prop);
     if (!d) throw new Error(`[Screen] ${prop} descriptor missing`);
     if (d.configurable === false) throw new Error(`[Screen] ${prop} non-configurable`);
     const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
-    const kind = isData
-      ? ((typeof d.value === 'function' && typeof getterOrValue === 'function') ? 'method' : 'data')
-      : 'accessor';
-    ensurePreflight(target, prop, kind, 'screen:redefineProp');
+    const groupTag = 'screen:redefineProp:' + String(prop);
     if (isData) {
-      const value = (typeof getterOrValue === 'function') ? getterOrValue.call(target) : getterOrValue;
-      Object.defineProperty(target, prop, {
-        value,
-        writable: !!d.writable,
-        configurable: !!d.configurable,
-        enumerable: !!d.enumerable
-      });
+      const isMethod = (typeof d.value === 'function' && typeof getterOrValue === 'function');
+      if (isMethod) {
+        const patchedMethod = getterOrValue.call(target);
+        if (typeof patchedMethod !== 'function') {
+          throw new TypeError(`[Screen] ${prop} method patch missing`);
+        }
+        applyCoreTargetsGroup(groupTag, [{
+          owner: target,
+          key: prop,
+          kind: 'method',
+          invokeClass: 'brand_strict',
+          policy: 'throw',
+          diagTag: groupTag,
+          validThis(self) {
+            return receiverMatchesTarget(target, self);
+          },
+          invalidThis: 'native',
+          invoke(_orig, args) {
+            return Reflect.apply(patchedMethod, this, args || []);
+          }
+        }], 'throw');
+      } else {
+        const value = (typeof getterOrValue === 'function') ? getterOrValue.call(target) : getterOrValue;
+        applyCoreTargetsGroup(groupTag, [{
+          owner: target,
+          key: prop,
+          kind: 'data',
+          policy: 'throw',
+          diagTag: groupTag,
+          value,
+          writable: !!d.writable,
+          configurable: !!d.configurable,
+          enumerable: !!d.enumerable
+        }], 'throw');
+      }
       return;
     }
     if (typeof d.get !== 'function') throw new Error(`[Screen] ${prop} getter missing`);
-    const origGet = d.get;
-    const getFn = __wrapNativeAccessor(origGet, origGet.name || '', (targetGet, thisArg, argList) => {
-      try {
-        const ctor = target && target.constructor;
-        const isProto = !!(typeof ctor === 'function' && ctor.prototype === target);
-        const ok = isProto
-          ? (target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg))
-          : ((thisArg === target) || (target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg)));
-        if (!ok) {
-          return Reflect.apply(targetGet, thisArg, argList);
-        }
-      } catch (_) {
-        // If guard fails for any reason, fall back to native semantics.
-        return Reflect.apply(targetGet, thisArg, argList);
+    const namedGet = (typeof getterOrValue === 'function') ? makeNamedGetter(prop, getterOrValue) : null;
+    applyCoreTargetsGroup(groupTag, [{
+      owner: target,
+      key: prop,
+      kind: 'accessor',
+      policy: 'throw',
+      diagTag: groupTag,
+      validThis(self) {
+        return receiverMatchesTarget(target, self);
+      },
+      invalidThis: 'native',
+      getImpl: function screenAccessorGetImpl() {
+        if (namedGet) return Reflect.apply(namedGet, this, []);
+        return getterOrValue;
       }
-
-      if (typeof getterOrValue === 'function') {
-        return getterOrValue.call(thisArg);
-      }
-      return getterOrValue;
-    });
-    Object.defineProperty(target, prop, {
-      get: getFn,
-      set: d.set,
-      configurable: d.configurable,
-      enumerable: d.enumerable
-    });
+    }], 'throw');
   }
   function chooseTarget(obj, proto, prop) {
     if (obj && Object.getOwnPropertyDescriptor(obj, prop)) return obj;
@@ -148,21 +211,25 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (mqlProto) {
     const matchesDesc = Object.getOwnPropertyDescriptor(mqlProto, 'matches');
     if (matchesDesc && typeof matchesDesc.get === 'function' && matchesDesc.configurable) {
-      ensurePreflight(mqlProto, 'matches', 'accessor', 'screen:mql_matches');
       const origMatchesGet = matchesDesc.get;
-      Object.defineProperty(mqlProto, 'matches', {
-        get: __wrapNativeAccessor(origMatchesGet, origMatchesGet.name || '', (target, thisArg, argList) => {
-          if (mqlMatches.has(thisArg)) return mqlMatches.get(thisArg);
-          return Reflect.apply(target, thisArg, argList);
-        }),
-        set: matchesDesc.set,
-        configurable: matchesDesc.configurable,
-        enumerable: matchesDesc.enumerable
-      });
+      applyCoreTargetsGroup('screen:mql_matches', [{
+        owner: mqlProto,
+        key: 'matches',
+        kind: 'accessor',
+        policy: 'throw',
+        diagTag: 'screen:mql_matches',
+        validThis(self) {
+          return receiverMatchesTarget(mqlProto, self);
+        },
+        invalidThis: 'native',
+        getImpl() {
+          if (mqlMatches.has(this)) return mqlMatches.get(this);
+          return Reflect.apply(origMatchesGet, this, []);
+        }
+      }], 'throw');
     }
   }
 
-  const origMatchMedia = window.matchMedia;
   const mmTarget = chooseTarget(window, Object.getPrototypeOf(window), 'matchMedia');
   if (!mmTarget) throw new Error(`[Screen] matchMedia descriptor missing`);
   const isWindowThis = (self) => {
@@ -257,53 +324,18 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const list = Array.isArray(args) ? args : [];
     return matchMediaInvoke(orig, this, list);
   };
-  const Core = window.Core;
-  if (Core && typeof Core.applyTargets === 'function') {
-    let plans = [];
-    try {
-      plans = Core.applyTargets([{
-        owner: mmTarget,
-        key: 'matchMedia',
-        kind: 'method',
-        resolve: 'own',
-        policy: 'throw',
-        diagTag: 'screen:matchMedia',
-        invoke: matchMediaInvokeCore
-      }], window.__PROFILE__, []);
-    } catch (e) {
-      __screenDiag('error', 'screen:matchMedia:preflight_failed', null, e);
-      throw e;
-    }
-    if (!Array.isArray(plans) || !plans.length) {
-      throw new Error('[Screen] matchMedia core plan skipped');
-    }
-    const done = [];
-    try {
-      for (let i = 0; i < plans.length; i++) {
-        const p = plans[i];
-        if (!p || p.skipApply) continue;
-        Object.defineProperty(p.owner, p.key, p.nextDesc);
-        const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
-        if (!sameDesc(after, p.nextDesc)) {
-          throw new Error('[Screen] matchMedia descriptor post-check mismatch');
-        }
-        done.push(p);
-      }
-    } catch (e) {
-      for (let i = done.length - 1; i >= 0; i--) {
-        const p = done[i];
-        try {
-          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
-          else delete p.owner[p.key];
-        } catch (_) {}
-      }
-      __screenDiag('error', 'screen:matchMedia:apply_failed', null, e);
-      throw e;
-    }
-  } else {
-    const patchedMatchMedia = __wrapNativeApply(origMatchMedia, 'matchMedia', matchMediaInvoke);
-    redefineProp(mmTarget, 'matchMedia', () => patchedMatchMedia);
-  }
+  applyCoreTargetsGroup('screen:matchMedia', [{
+    owner: mmTarget,
+    key: 'matchMedia',
+    kind: 'method',
+    invokeClass: 'brand_strict',
+    resolve: 'own',
+    policy: 'throw',
+    diagTag: 'screen:matchMedia',
+    validThis: isWindowThis,
+    invalidThis: 'native',
+    invoke: matchMediaInvokeCore
+  }], 'throw');
 
   //  screen и orientation ──
   const screenObj = window.screen;

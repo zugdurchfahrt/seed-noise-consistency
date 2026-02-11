@@ -443,6 +443,18 @@
     const def = (obj, k, getter, enumerable = true) => {
       // По методологии: не молчим, если некуда ставить
       if (!nav) throw new Error(`UACHPatch: cannot define ${k} (no navigator)`);
+      const resolveNativeGetter = (desc, where) => {
+        if (desc && typeof desc.get === 'function') return desc.get;
+        const isData = !!desc
+          && Object.prototype.hasOwnProperty.call(desc, 'value')
+          && !desc.get
+          && !desc.set;
+        if (isData) {
+          const nativeValue = desc.value;
+          return function nativeDataGetterFallback() { return nativeValue; };
+        }
+        throw new Error(`UACHPatch: ${k} missing native getter on ${where}`);
+      };
 
       // 1) Если свойство уже есть как OWN на navigator — патчим ТУДА.
       // Иначе прототипный getter никогда не сработает.
@@ -451,10 +463,8 @@
         if (own.configurable === false) {
           throw new Error(`UACHPatch: ${k} not configurable on navigator`);
         }
-        if (typeof own.get !== 'function') {
-          throw new Error(`UACHPatch: ${k} missing native getter on navigator`);
-        }
-        const ownGuardedGet = makeGuardedGetter(k, nav, getter, own.get);
+        const ownOrigGet = resolveNativeGetter(own, 'navigator');
+        const ownGuardedGet = makeGuardedGetter(k, nav, getter, ownOrigGet);
         Object.defineProperty(nav, k, {
           configurable: !!own.configurable,
           enumerable: !!own.enumerable,
@@ -473,10 +483,8 @@
         if (d && d.configurable === false) {
           throw new Error(`UACHPatch: ${k} not configurable on proto`);
         }
-        if (typeof d.get !== 'function') {
-          throw new Error(`UACHPatch: ${k} missing native getter on proto`);
-        }
-        const protoGuardedGet = makeGuardedGetter(k, obj, getter, d.get);
+        const protoOrigGet = resolveNativeGetter(d, 'proto');
+        const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet);
         Object.defineProperty(obj, k, {
           configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable,

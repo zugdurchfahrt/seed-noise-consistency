@@ -26,17 +26,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       return fn;
     })();
-    const wrapNativeAccessor = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
-    if (typeof wrapNativeAccessor !== 'function') {
-      throw new Error('[NavTotalSetPatchModule] __wrapNativeAccessor missing');
-    }
     const wrapStrictAccessor = (typeof window.__wrapStrictAccessor === 'function') ? window.__wrapStrictAccessor : null;
     if (typeof wrapStrictAccessor !== 'function') {
       throw new Error('[NavTotalSetPatchModule] __wrapStrictAccessor missing');
     }
-    const corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
-      ? window.Core.preflightTarget
-      : null;
     const coreRegisterPatchedTarget = (window.Core && typeof window.Core.registerPatchedTarget === 'function')
       ? window.Core.registerPatchedTarget
       : null;
@@ -47,22 +40,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       } catch (e) {
         __navDiag('warn', (tag || 'nav_total_set') + ':register_target_failed', { key: key || null }, e);
         if (STRICT) throw e;
-      }
-    }
-    function ensureCorePreflight(owner, key, kind, tag) {
-      if (typeof corePreflightTarget !== 'function') return;
-      const pre = corePreflightTarget({
-        owner,
-        key,
-        kind,
-        policy: 'throw',
-        diagTag: tag
-      });
-      if (!pre || pre.ok !== true) {
-        const err = (pre && pre.error instanceof Error) ? pre.error : new Error(`[nav_total_set] preflight failed for ${String(key)}`);
-        const reason = pre && pre.reason ? pre.reason : 'preflight_failed';
-        __navDiag('warn', `${tag}:${reason}`, { key, kind }, err);
-        throw err;
       }
     }
     // ---- Hard consistency for platform ----
@@ -188,15 +165,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
       if (isData) {
-        ensureCorePreflight(target, key, 'data', 'nav_total_set:safeDefineAcc');
         const value = (typeof getter === 'function') ? getter.call(target) : getter;
-        Object.defineProperty(target, key, {
+        const applied = applyCoreTargetsGroup('nav_total_set:safeDefineAcc', [{
+          owner: target,
+          key,
+          kind: 'data',
+          policy: 'throw',
+          diagTag: 'nav_total_set:safeDefineAcc',
+          allowCreate: !d,
           value,
           writable: d ? !!d.writable : true,
           configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable
-        });
-        registerPatchedTarget(target, key, 'nav_total_set:safeDefineAcc');
+        }], 'throw');
+        if (applied !== 1) throw new TypeError(`[nav_total_set] failed to define ${key}`);
         return true;
       }
       let getFn = getter;
@@ -204,19 +186,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const acc = ({ get [key]() { return getter.call(this); } });
         getFn = Object.getOwnPropertyDescriptor(acc, key).get;
       }
-      const finalGet = (d && typeof d.get === 'function' && typeof getFn === 'function')
-        ? wrapNativeAccessor(d.get, `get ${key}`, function (target, thisArg, argList) {
-          return Reflect.apply(getFn, thisArg, argList || []);
-        })
-        : mark(getFn, `get ${key}`);
-      ensureCorePreflight(target, key, 'accessor', 'nav_total_set:safeDefineAcc');
-      Object.defineProperty(target, key, {
-        get: finalGet,
-        set: d && d.set,
+      if (typeof getFn !== 'function') {
+        throw new TypeError(`[nav_total_set] ${key}: getter missing`);
+      }
+      const applied = applyCoreTargetsGroup('nav_total_set:safeDefineAcc', [{
+        owner: target,
+        key,
+        kind: 'accessor',
+        policy: 'throw',
+        diagTag: 'nav_total_set:safeDefineAcc',
+        allowCreate: !d,
         configurable: d ? !!d.configurable : true,
-        enumerable: d ? !!d.enumerable : !!enumerable
-      });
-      registerPatchedTarget(target, key, 'nav_total_set:safeDefineAcc');
+        enumerable: d ? !!d.enumerable : !!enumerable,
+        invalidThis: 'native',
+        getImpl: function safeDefineAccGetImpl() {
+          return Reflect.apply(getFn, this, []);
+        }
+      }], 'throw');
+      if (applied !== 1) throw new TypeError(`[nav_total_set] failed to define ${key}`);
       return true;
     }
 
@@ -232,15 +219,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
       if (isData) {
-        ensureCorePreflight(proto, key, 'data', 'nav_total_set:redefineAcc');
         const value = (typeof getImpl === 'function') ? getImpl.call(proto) : getImpl;
-        Object.defineProperty(proto, key, {
+        const applied = applyCoreTargetsGroup('nav_total_set:redefineAcc', [{
+          owner: proto,
+          key,
+          kind: 'data',
+          policy: 'throw',
+          diagTag: 'nav_total_set:redefineAcc',
+          allowCreate: !d,
           value,
-          writable: d ? d.writable : true,
-          configurable: d ? d.configurable : true,
-          enumerable: d ? d.enumerable : false
-        });
-        registerPatchedTarget(proto, key, 'nav_total_set:redefineAcc');
+          writable: d ? !!d.writable : true,
+          configurable: d ? !!d.configurable : true,
+          enumerable: d ? !!d.enumerable : false
+        }], 'throw');
+        if (applied !== 1) throw new TypeError(`[nav_total_set] failed to define ${key}`);
         return;
       }
       let getFn = getImpl;
@@ -251,19 +243,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (typeof getFn !== 'function') {
         throw new TypeError(`[nav_total_set] ${key}: getter missing`);
       }
-      const finalGet = (d && typeof d.get === 'function')
-        ? wrapNativeAccessor(d.get, `get ${key}`, function (target, thisArg, argList) {
-          return Reflect.apply(getFn, thisArg, argList || []);
-        })
-        : mark(getFn, `get ${key}`);
-      ensureCorePreflight(proto, key, 'accessor', 'nav_total_set:redefineAcc');
-      Object.defineProperty(proto, key, {
-        get: finalGet,
-        set: d && d.set,
-        configurable: d ? d.configurable : true,
-        enumerable: d ? d.enumerable : false
-      });
-      registerPatchedTarget(proto, key, 'nav_total_set:redefineAcc');
+      const applied = applyCoreTargetsGroup('nav_total_set:redefineAcc', [{
+        owner: proto,
+        key,
+        kind: 'accessor',
+        policy: 'throw',
+        diagTag: 'nav_total_set:redefineAcc',
+        allowCreate: !d,
+        configurable: d ? !!d.configurable : true,
+        enumerable: d ? !!d.enumerable : false,
+        invalidThis: 'native',
+        getImpl: function redefineAccGetImpl() {
+          return Reflect.apply(getFn, this, []);
+        }
+      }], 'throw');
+      if (applied !== 1) throw new TypeError(`[nav_total_set] failed to define ${key}`);
     }
 
     function isSameDescriptor(actual, expected) {
@@ -322,12 +316,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           applied.push(p);
         }
       } catch (e) {
+        let rollbackErr = null;
         for (let i = applied.length - 1; i >= 0; i--) {
           const p = applied[i];
           try {
             if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
             else delete p.owner[p.key];
-          } catch (_) {}
+          } catch (re) {
+            if (!rollbackErr) rollbackErr = re;
+            __navDiag('error', groupTag + ':rollback_failed', { key: p.key || null }, re);
+          }
+        }
+        if (rollbackErr) {
+          if (groupPolicy === 'throw') throw rollbackErr;
+          return 0;
         }
         __navDiag('error', groupTag + ':apply_failed', null, e);
         if (groupPolicy === 'throw') throw e;
@@ -460,22 +462,33 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: uaData.brands missing');
             return meta.brands;
           })();
-          Object.defineProperty(uadProto, 'brands', {
+          applyCoreTargetsGroup('nav_total_set:userAgentData.brands', [{
+            owner: uadProto,
+            key: 'brands',
+            kind: 'data',
+            policy: 'throw',
+            diagTag: 'nav_total_set:userAgentData.brands',
             value,
             writable: !!dBrands.writable,
             configurable: !!dBrands.configurable,
             enumerable: !!dBrands.enumerable
-          });
+          }], 'throw');
         } else {
-          Object.defineProperty(uadProto, 'brands', {
-            get: mark(__wrapGetter('userAgentData.brands', function getBrands(){
+          applyCoreTargetsGroup('nav_total_set:userAgentData.brands', [{
+            owner: uadProto,
+            key: 'brands',
+            kind: 'accessor',
+            policy: 'throw',
+            diagTag: 'nav_total_set:userAgentData.brands',
+            configurable: !!dBrands.configurable,
+            enumerable: !!dBrands.enumerable,
+            validThis: isUadThis,
+            invalidThis: 'native',
+            getImpl: function userAgentDataBrandsGetImpl() {
               if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: uaData.brands missing');
               return meta.brands;
-            }, dBrands, isUadThis), 'get brands'),
-            set: dBrands.set,
-            configurable: !!dBrands.configurable,
-            enumerable: !!dBrands.enumerable
-          });
+            }
+          }], 'throw');
         }
       }
       if (dMobile) {
@@ -486,22 +499,33 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             if (typeof meta.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
             return meta.mobile;
           })();
-          Object.defineProperty(uadProto, 'mobile', {
+          applyCoreTargetsGroup('nav_total_set:userAgentData.mobile', [{
+            owner: uadProto,
+            key: 'mobile',
+            kind: 'data',
+            policy: 'throw',
+            diagTag: 'nav_total_set:userAgentData.mobile',
             value,
             writable: !!dMobile.writable,
             configurable: !!dMobile.configurable,
             enumerable: !!dMobile.enumerable
-          });
+          }], 'throw');
         } else {
-          Object.defineProperty(uadProto, 'mobile', {
-            get: mark(__wrapGetter('userAgentData.mobile', function getMobile(){
+          applyCoreTargetsGroup('nav_total_set:userAgentData.mobile', [{
+            owner: uadProto,
+            key: 'mobile',
+            kind: 'accessor',
+            policy: 'throw',
+            diagTag: 'nav_total_set:userAgentData.mobile',
+            configurable: !!dMobile.configurable,
+            enumerable: !!dMobile.enumerable,
+            validThis: isUadThis,
+            invalidThis: 'native',
+            getImpl: function userAgentDataMobileGetImpl() {
               if (typeof meta.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
               return meta.mobile;
-            }, dMobile, isUadThis), 'get mobile'),
-            set: dMobile.set,
-            configurable: !!dMobile.configurable,
-            enumerable: !!dMobile.enumerable
-          });
+            }
+          }], 'throw');
         }
       }
       if (dPlatform) {
@@ -512,67 +536,90 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             if (typeof chPlatform !== 'string' || !chPlatform) throw new Error('THW: uaData.platform missing');
             return chPlatform;
           })();
-          Object.defineProperty(uadProto, 'platform', {
+          applyCoreTargetsGroup('nav_total_set:userAgentData.platform', [{
+            owner: uadProto,
+            key: 'platform',
+            kind: 'data',
+            policy: 'throw',
+            diagTag: 'nav_total_set:userAgentData.platform',
             value,
             writable: !!dPlatform.writable,
             configurable: !!dPlatform.configurable,
             enumerable: !!dPlatform.enumerable
-          });
+          }], 'throw');
         } else {
-          Object.defineProperty(uadProto, 'platform', {
-            get: mark(__wrapGetter('userAgentData.platform', function getPlatform(){
+          applyCoreTargetsGroup('nav_total_set:userAgentData.platform', [{
+            owner: uadProto,
+            key: 'platform',
+            kind: 'accessor',
+            policy: 'throw',
+            diagTag: 'nav_total_set:userAgentData.platform',
+            configurable: !!dPlatform.configurable,
+            enumerable: !!dPlatform.enumerable,
+            validThis: isUadThis,
+            invalidThis: 'native',
+            getImpl: function userAgentDataPlatformGetImpl() {
               if (typeof chPlatform !== 'string' || !chPlatform) throw new Error('THW: uaData.platform missing');
               return chPlatform;
-            }, dPlatform, isUadThis), 'get platform'),
-            set: dPlatform.set,
-            configurable: !!dPlatform.configurable,
-            enumerable: !!dPlatform.enumerable
-          });
+            }
+          }], 'throw');
         }
       }
       const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
       const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
         || Object.getOwnPropertyDescriptor(nativeUAD, 'fullVersionList')
         || { configurable: true, enumerable: false };
-      const getFullVersionList = mark(__wrapGetter('userAgentData.fullVersionList', function getFullVersionList(){
-        if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) {
-          throw new Error('THW: uaData.fullVersionList missing');
+      __navRegisterKey('userAgentData.fullVersionList');
+      applyCoreTargetsGroup('nav_total_set:userAgentData.fullVersionList', [{
+        owner: uadProto,
+        key: 'fullVersionList',
+        kind: 'accessor',
+        policy: 'throw',
+        diagTag: 'nav_total_set:userAgentData.fullVersionList',
+        allowCreate: !Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList'),
+        configurable: !!dFull.configurable,
+        enumerable: !!dFull.enumerable,
+        validThis: isUadThis,
+        invalidThis: 'native',
+        getImpl: function userAgentDataFullVersionListGetImpl() {
+          if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) {
+            throw new Error('THW: uaData.fullVersionList missing');
+          }
+          return deep(meta.fullVersionList);
         }
-        return deep(meta.fullVersionList);
-      }, dFull, isUadThis), 'get fullVersionList');
-      Object.defineProperty(uadProto, 'fullVersionList', {
-        get: getFullVersionList,
-        enumerable: dFull.enumerable,
-        configurable: dFull.configurable
-      });
+      }], 'throw');
       const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
         || Object.getOwnPropertyDescriptor(nativeUAD, 'uaFullVersion')
         || { configurable: true, enumerable: false };
-      const getUaFullVersion = mark(__wrapGetter('userAgentData.uaFullVersion', function getUaFullVersion(){
-        if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) {
-          throw new Error('THW: uaData.uaFullVersion missing');
+      __navRegisterKey('userAgentData.uaFullVersion');
+      applyCoreTargetsGroup('nav_total_set:userAgentData.uaFullVersion', [{
+        owner: uadProto,
+        key: 'uaFullVersion',
+        kind: 'accessor',
+        policy: 'throw',
+        diagTag: 'nav_total_set:userAgentData.uaFullVersion',
+        allowCreate: !Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion'),
+        configurable: !!dUaFull.configurable,
+        enumerable: !!dUaFull.enumerable,
+        validThis: isUadThis,
+        invalidThis: 'native',
+        getImpl: function userAgentDataUaFullVersionGetImpl() {
+          if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) {
+            throw new Error('THW: uaData.uaFullVersion missing');
+          }
+          return meta.uaFullVersion;
         }
-        return meta.uaFullVersion;
-      }, dUaFull, isUadThis), 'get uaFullVersion');
-      Object.defineProperty(uadProto, 'uaFullVersion', {
-        get: getUaFullVersion,
-        enumerable: dUaFull.enumerable,
-        configurable: dUaFull.configurable
-      });
+      }], 'throw');
       function dropOwnIfConfigurable(obj, key) {
         const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
         if (ownDesc && ownDesc.configurable) {
-          try { delete obj[key]; } catch {}
+          try {
+            delete obj[key];
+          } catch (e) {
+            __navDiag('error', 'nav_total_set:userAgentData_dropOwn_failed', { key }, e);
+            if (STRICT) throw e;
+          }
         }
-      }
-      function defineUadProtoMethod(proto, key, fn, desc) {
-        const d = desc || Object.getOwnPropertyDescriptor(proto, key);
-        Object.defineProperty(proto, key, {
-          value: fn,
-          configurable: d ? d.configurable : true,
-          enumerable: d ? d.enumerable : false,
-          writable: d && Object.prototype.hasOwnProperty.call(d, 'writable') ? d.writable : true
-        });
       }
 
       const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
@@ -581,11 +628,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       const origGHEV = ghevDesc && ghevDesc.value;
       if (typeof origGHEV !== 'function') throw new TypeError('[nav_total_set] uaData.getHighEntropyValues original missing');
-      const getHighEntropyValues = mark(function getHighEntropyValues(keys) {
-          __navLogAccess('userAgentData.getHighEntropyValues', getHighEntropyValues);
-          if (!isUadThis(this)) {
-            return origGHEV.call(this, keys);
-          }
+      __navRegisterKey('userAgentData.getHighEntropyValues');
+      dropOwnIfConfigurable(nativeUAD, 'getHighEntropyValues');
+      applyCoreTargetsGroup('nav_total_set:userAgentData.getHighEntropyValues', [{
+        owner: uadProto,
+        key: 'getHighEntropyValues',
+        kind: 'promise_method',
+        invokeClass: 'brand_strict',
+        policy: 'throw',
+        diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+        validThis: isUadThis,
+        invalidThis: 'native',
+        invoke(_orig, args) {
+          __navLogAccess('userAgentData.getHighEntropyValues', null);
+          const keys = (args && args.length) ? args[0] : undefined;
           if (!Array.isArray(keys)) throw new Error('THW: bad keys');
           const map = {
             architecture: meta.architecture,
@@ -613,11 +669,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             result[hint] = val;
           }
           return Promise.resolve(result);
-        }, 'getHighEntropyValues');
-      __navRegisterKey('userAgentData.getHighEntropyValues');
-      __navRegisterFn(getHighEntropyValues);
-      dropOwnIfConfigurable(nativeUAD, 'getHighEntropyValues');
-      defineUadProtoMethod(uadProto, 'getHighEntropyValues', getHighEntropyValues, ghevDesc);
+        }
+      }], 'throw');
 
 
       const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
@@ -626,17 +679,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       const origToJSON = toJsonDesc && toJsonDesc.value;
       if (typeof origToJSON !== 'function') throw new TypeError('[nav_total_set] uaData.toJSON original missing');
-      const toJSON = mark(function toJSON() {
-        __navLogAccess('userAgentData.toJSON', toJSON);
-        if (!isUadThis(this)) {
-          return origToJSON.call(this);
-        }
-        return { platform: this.platform, brands: this.brands, mobile: this.mobile };
-      }, 'toJSON');
       __navRegisterKey('userAgentData.toJSON');
-      __navRegisterFn(toJSON);
       dropOwnIfConfigurable(nativeUAD, 'toJSON');
-      defineUadProtoMethod(uadProto, 'toJSON', toJSON, toJsonDesc);
+      applyCoreTargetsGroup('nav_total_set:userAgentData.toJSON', [{
+        owner: uadProto,
+        key: 'toJSON',
+        kind: 'method',
+        invokeClass: 'brand_strict',
+        policy: 'throw',
+        diagTag: 'nav_total_set:userAgentData.toJSON',
+        validThis: isUadThis,
+        invalidThis: 'native',
+        invoke() {
+          __navLogAccess('userAgentData.toJSON', null);
+          return { platform: this.platform, brands: this.brands, mobile: this.mobile };
+        }
+      }], 'throw');
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
     const dUaData = Object.getOwnPropertyDescriptor(navProto, 'userAgentData');
@@ -773,35 +831,33 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const mediaDesc = Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
         || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices');
       if (!mediaDesc) throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices descriptor missing');
-      const origEnumerate = mediaDesc.value || navigator.mediaDevices.enumerateDevices;
-      if (typeof origEnumerate !== 'function') throw new TypeError('[nav_total_set] mediaDevices.enumerateDevices original missing');
       __navRegisterKey('mediaDevices.enumerateDevices');
-      const patchedEnumerateRaw = ({ async enumerateDevices() {
-        __navLogAccess('mediaDevices.enumerateDevices', patchedEnumerateRaw);
-        const isMediaThis = (this === navigator.mediaDevices || this === mediaProto);
-        if (!isMediaThis) {
-          return origEnumerate.call(this);
+      applyCoreTargetsGroup('nav_total_set:mediaDevices.enumerateDevices', [{
+        owner: mediaProto,
+        key: 'enumerateDevices',
+        kind: 'promise_method',
+        invokeClass: 'brand_strict',
+        policy: 'throw',
+        diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+        validThis(self) {
+          return self === navigator.mediaDevices || self === mediaProto;
+        },
+        invalidThis: 'native',
+        invoke(_orig, _args) {
+          __navLogAccess('mediaDevices.enumerateDevices', null);
+          const generateHexId = (len = 64) => {
+            let s = '';
+            for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
+            return s;
+          };
+          const groupId = generateHexId(64);
+          return Promise.resolve([
+            { kind: 'audioinput',  label: devicesLabels.audioinput,  deviceId: generateHexId(64), groupId },
+            { kind: 'videoinput',  label: devicesLabels.videoinput,  deviceId: generateHexId(64), groupId },
+            { kind: 'audiooutput', label: devicesLabels.audiooutput, deviceId: generateHexId(64), groupId: generateHexId(64) }
+          ]);
         }
-        const generateHexId = (len = 64) => {
-          let s = '';
-          for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
-          return s;
-        };
-        const groupId = generateHexId(64);
-        return [
-          { kind: 'audioinput',  label: devicesLabels.audioinput,  deviceId: generateHexId(64), groupId },
-          { kind: 'videoinput',  label: devicesLabels.videoinput,  deviceId: generateHexId(64), groupId },
-          { kind: 'audiooutput', label: devicesLabels.audiooutput, deviceId: generateHexId(64), groupId: generateHexId(64) }
-        ];
-      } }).enumerateDevices;
-      const patchedEnumerate = mark(patchedEnumerateRaw, 'enumerateDevices');
-      __navRegisterFn(patchedEnumerate);
-      Object.defineProperty(mediaProto, 'enumerateDevices', {
-        value: patchedEnumerate,
-        configurable: mediaDesc.configurable,
-        enumerable: mediaDesc.enumerable,
-        writable: mediaDesc.writable
-      });
+      }], 'throw');
     }
 
     // ——— J. storage.estimate & webkitTemporaryStorage ———
@@ -824,45 +880,55 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const origEstimate = storageDesc.value || navigator.storage.estimate;
       if (typeof origEstimate !== 'function') throw new TypeError('[nav_total_set] storage.estimate original missing');
       __navRegisterKey('storage.estimate');
-      const patchedEstimateRaw = ({ estimate() {
-        __navLogAccess('storage.estimate', patchedEstimateRaw);
-        const isStorageThis = (this === navigator.storage || this === storageProto);
-        if (!isStorageThis) {
-          return origEstimate.call(this);
+      applyCoreTargetsGroup('nav_total_set:storage.estimate', [{
+        owner: storageProto,
+        key: 'estimate',
+        kind: 'promise_method',
+        invokeClass: 'brand_strict',
+        policy: 'throw',
+        diagTag: 'nav_total_set:storage.estimate',
+        validThis(self) {
+          return self === navigator.storage || self === storageProto;
+        },
+        invalidThis: 'native',
+        invoke(_orig, _args) {
+          __navLogAccess('storage.estimate', null);
+          tickUsage();
+          return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
         }
-        tickUsage();
-        return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
-      } }).estimate;
-      Object.defineProperty(storageProto, 'estimate', {
-        configurable: storageDesc.configurable,
-        enumerable: storageDesc.enumerable,
-        writable: storageDesc.writable,
-        value: (function(){
-          const fn = mark(patchedEstimateRaw, 'estimate');
-          __navRegisterFn(fn);
-          return fn;
-        })()
-      });       
+      }], 'throw');
       if (navigator.webkitTemporaryStorage) {
         const tmpProto = Object.getPrototypeOf(navigator.webkitTemporaryStorage) || navigator.webkitTemporaryStorage;
         const tmpDesc = Object.getOwnPropertyDescriptor(tmpProto, 'queryUsageAndQuota')
           || Object.getOwnPropertyDescriptor(navigator.webkitTemporaryStorage, 'queryUsageAndQuota');
         if (!tmpDesc) throw new TypeError('[nav_total_set] webkitTemporaryStorage.queryUsageAndQuota descriptor missing');
         __navRegisterKey('webkitTemporaryStorage.queryUsageAndQuota');
-        const patchedQueryUsage = mark(function (success, error) {
-          __navLogAccess('webkitTemporaryStorage.queryUsageAndQuota', patchedQueryUsage);
-          try { tickUsage(); success(usageBytes, quotaBytes); }
-          catch (e) {
-            __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota', null, e);
-            if (typeof error === 'function') error(e); }
-        }, 'queryUsageAndQuota');
-        __navRegisterFn(patchedQueryUsage);
-        Object.defineProperty(tmpProto, 'queryUsageAndQuota', {
-          configurable: tmpDesc.configurable,
-          enumerable: tmpDesc.enumerable,
-          writable: tmpDesc.writable,
-          value: patchedQueryUsage
-        });
+        applyCoreTargetsGroup('nav_total_set:webkitTemporaryStorage.queryUsageAndQuota', [{
+          owner: tmpProto,
+          key: 'queryUsageAndQuota',
+          kind: 'method',
+          invokeClass: 'brand_strict',
+          policy: 'throw',
+          diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
+          validThis(self) {
+            return self === navigator.webkitTemporaryStorage || self === tmpProto;
+          },
+          invalidThis: 'native',
+          invoke(_orig, args) {
+            __navLogAccess('webkitTemporaryStorage.queryUsageAndQuota', null);
+            const success = (args && args.length) ? args[0] : undefined;
+            const error = (args && args.length > 1) ? args[1] : undefined;
+            try {
+              tickUsage();
+              if (typeof success === 'function') success(usageBytes, quotaBytes);
+              return undefined;
+            } catch (e) {
+              __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota', null, e);
+              if (typeof error === 'function') error(e);
+              return undefined;
+            }
+          }
+        }], 'throw');
       }
 
       // Consistent “persistence”
@@ -870,23 +936,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const persistDesc = Object.getOwnPropertyDescriptor(storageProto, 'persist')
           || Object.getOwnPropertyDescriptor(navigator.storage, 'persist');
         if (!persistDesc) throw new TypeError('[nav_total_set] storage.persist descriptor missing');
-        const origPersist = persistDesc.value || navigator.storage.persist;
         __navRegisterKey('storage.persist');
-        Object.defineProperty(storageProto, 'persist', {
-          configurable: persistDesc.configurable,
-          enumerable: persistDesc.enumerable,
-          writable: persistDesc.writable,
-          value: (function(){
-            const fn = mark(function persist() {
-              __navLogAccess('storage.persist', fn);
-              const isStorageThis = (this === navigator.storage || this === storageProto);
-              if (!isStorageThis && typeof origPersist === 'function') return origPersist.call(this);
-              return Promise.resolve(true);
-            }, 'persist');
-            __navRegisterFn(fn);
-            return fn;
-          })()
-        });
+        applyCoreTargetsGroup('nav_total_set:storage.persist', [{
+          owner: storageProto,
+          key: 'persist',
+          kind: 'promise_method',
+          invokeClass: 'brand_strict',
+          policy: 'throw',
+          diagTag: 'nav_total_set:storage.persist',
+          validThis(self) {
+            return self === navigator.storage || self === storageProto;
+          },
+          invalidThis: 'native',
+          invoke(_orig, _args) {
+            __navLogAccess('storage.persist', null);
+            return Promise.resolve(true);
+          }
+        }], 'throw');
       }
       if (typeof navigator.storage.persisted === 'function') {
         const persistedDesc = Object.getOwnPropertyDescriptor(storageProto, 'persisted')

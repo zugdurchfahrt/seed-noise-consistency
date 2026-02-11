@@ -126,18 +126,48 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       policy: 'throw',
       diagTag: 'hide_webdriver:webdriver'
     };
-    if (isAccessorDesc(wdDesc)) {
+    const wdIsDataUndefined = !!wdDesc
+      && Object.prototype.hasOwnProperty.call(wdDesc, 'value')
+      && !wdDesc.get
+      && !wdDesc.set
+      && typeof wdDesc.value === 'undefined';
+    if (isAccessorDesc(wdDesc) || wdIsDataUndefined) {
       wdTarget.kind = 'accessor';
       wdTarget.getImpl = function getWebdriverImpl() { return false; };
       wdTarget.validThis = function validWebdriverThis(self) {
         return self === nav || self === wdOwner;
       };
       wdTarget.invalidThis = 'native';
+      if (wdIsDataUndefined) {
+        const own = Object.getOwnPropertyDescriptor(wdOwner, 'webdriver');
+        if (own) {
+          try {
+            delete wdOwner.webdriver;
+          } catch (e) {
+            degrade('hide_webdriver:webdriver_data_to_accessor_delete_failed', e, null);
+            throw e;
+          }
+        }
+        try {
+          wdTarget.owner = wdOwner;
+          wdTarget.resolve = 'own';
+          wdTarget.allowCreate = true;
+          applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
+        } catch (e) {
+          try {
+            if (own) Object.defineProperty(wdOwner, 'webdriver', own);
+          } catch (_) {}
+          degrade('hide_webdriver:webdriver_data_to_accessor_apply_failed', e, null);
+          throw e;
+        }
+      } else {
+        applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
+      }
     } else {
       wdTarget.kind = 'data';
       wdTarget.value = false;
+      applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
     }
-    applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
   }
 
   safeDefine(window, '__HIDE_WEBDRIVER_READY__', {

@@ -988,42 +988,13 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return patchCanvasIHDR(res, newWidth, newHeight);
   }
 
-  // master-хук, который вызывает noise-инъекцию и затем IHDR-патчер
+  // master-хук toDataURL: один post-process (без дополнительного IHDR-прохода)
   function masterToDataURLHook(res, type, quality) {
     if (typeof patchToDataURLInjectNoise === 'function') {
       res = patchToDataURLInjectNoise.call(this, res, type, quality);
     }
-    if (type === 'image/png' && typeof patchCanvasIHDRHook === 'function') {
-      const newWidth  = window._NEW_WIDTH  || this.width;
-      const newHeight = window._NEW_HEIGHT || this.height;
-      if ((newWidth|0)!==(this.width|0) || (newHeight|0)!==(this.height|0)) {
-        res = patchCanvasIHDRHook.call(this, res, type, quality, newWidth, newHeight);
-      }
-    }
     return res;
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // === Font size scaling: контейнер мастеров (живёт в canvas.js) ===
 
@@ -1139,15 +1110,6 @@ let applyFillTextHook, applyStrokeTextHook;
 
 
 
-
-
-
-
-
-
-
-
-// --- final export ---
 // --- final export ---
 window.CanvasPatchHooks = {
   patch2DNoise,

@@ -303,6 +303,7 @@ def init_driver(
             "screenOrientation": {"type": "landscapePrimary", "angle": 0}
         }
     )
+
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
       
@@ -313,13 +314,17 @@ def init_driver(
     logger.info("Thread started on port %s", cdp.PORT)
 
 
-    # desc_js = Path(SCRIPTS_PATCHES_STEALTH / "desc3.js").read_text(encoding="utf-8")
-    # driver.execute_cdp_cmd(
-    #     "Page.addScriptToEvaluateOnNewDocument",
-    #     {"source": desc_js}
-    # )
+    desc_js = Path(SCRIPTS_PATCHES_STEALTH / "desc2.js").read_text(encoding="utf-8")
+    driver.execute_cdp_cmd(
+        "Page.addScriptToEvaluateOnNewDocument",
+        {"source": desc_js}
+    )
 
-
+    descN_js = Path(SCRIPTS_PATCHES_STEALTH / "desc3.js").read_text(encoding="utf-8")
+    driver.execute_cdp_cmd(
+        "Page.addScriptToEvaluateOnNewDocument",
+        {"source": descN_js}
+    )
 
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
@@ -339,7 +344,6 @@ def init_driver(
             # --- hide_webdriver (markAsNative provider) ---
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
-            
             # --- workers (bootstrap/hooks). No direct module call here unless you have one.
             Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
             "WrkModule(window);",
@@ -391,7 +395,7 @@ def init_driver(
             "ContextPatchModule(window);",
             """
             // —————— Register all hooks here ——————//
-            if (typeof registerAllHooks === 'function') registerAllHooks();
+            if (typeof window.registerAllHooks === 'function') window.registerAllHooks();
             (function applyAllPatchesCustomOrder(win) {
                 const C = window.CanvasPatchContext; if (!C) return;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
@@ -460,7 +464,7 @@ def init_driver(
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-    # inject_uach_strip_window(driver, user_agent)
+    inject_uach_strip_window(driver, user_agent)
 
      # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
@@ -517,6 +521,8 @@ def init_driver(
             # Main client hints
             # "Accept": str(expected_client_hints["accept"]),
             "Accept-Language": build_accept_language(profile.get("languages") or [profile.get("language")]),
+            "Sec-CH-Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
+            "Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
             # "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
             # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
             # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
@@ -600,9 +606,10 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         normalized_languages = normalized_languages
         # ----------------------- Regional setting setup--------------------------------
 
-        # Timezone override
+        # # Timezone override
         driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": timezone})
         logger.info(f"[profile] Setting timezone: {timezone}, {offset_minutes}")
+
 
         # Geolocation override
         logger.info("[profile] Setting geolocation: %.4f,%.4f", latitude, longitude)
@@ -1054,6 +1061,31 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
 
 
+        # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
+        driver.get("https://abrahamjuliot.github.io/creepjs")
+
+       # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
+        time.sleep(0.5)
+        input("press Enter for exit...")
+
+    except Exception as e:
+        logger.error(f"Error in main block: {e}", exc_info=True)
+        logger.info(f"Error: {e}")
+        # ----------------------- THAT'S ALL, FOLKS!  -----------------------
+    # finally:
+    #     # Wait for mitmproxy to complete, then close the file
+    #     mitmproxy_proc.terminate()
+    #     mitmproxy_proc.wait()
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+
 
 
 
@@ -1272,34 +1304,3 @@ def main():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs")
-
-       # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
-        time.sleep(0.5)
-        input("press Enter for exit...")
-
-    except Exception as e:
-        logger.error(f"Error in main block: {e}", exc_info=True)
-        logger.info(f"Error: {e}")
-        # ----------------------- THAT'S ALL, FOLKS!  -----------------------
-    # finally:
-    #     # Wait for mitmproxy to complete, then close the file
-    #     mitmproxy_proc.terminate()
-    #     mitmproxy_proc.wait()
-if __name__ == "__main__":
-    main()

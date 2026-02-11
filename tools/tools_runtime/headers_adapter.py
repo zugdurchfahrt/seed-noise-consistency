@@ -29,7 +29,9 @@ DYNAMIC_OVERRIDES = [
     "Accept-Language",
     "Sec-CH-UA",
     "Sec-CH-UA-Platform",
-    "Sec-CH-UA-Mobile"
+    "Sec-CH-UA-Mobile",
+    "Sec-CH-Device-Memory",
+    "Device-Memory"
 ]
 # ===== Accept-Language HEADER =====
 def build_accept_language(languages):
@@ -115,6 +117,7 @@ def outbound_headers_forge(profile, expected_client_hints, user_agent):
         "Sec-CH-UA-Form-Factors": expected_client_hints.get("sec_ch_ua_form_factors", '["Desktop"]'),
         # memory/screen block
         "Sec-CH-Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
+        "Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
         "Sec-CH-Viewport-Width": str(profile["screen_width"]),
         "Sec-CH-Viewport-Height": str(profile["screen_height"]),
         "Sec-CH-Width": str(profile["screen_width"]),

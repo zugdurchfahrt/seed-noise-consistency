@@ -320,32 +320,35 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }], 'throw');
 
   // data group: optional runtime flags
-  applyTargetGroup('fonts:data:flags', [
-    {
-      owner: window,
-      key: '__FONTS_READY__',
-      kind: 'data',
-      value: window.__FONTS_READY__,
-      allowCreate: true,
-      writable: true,
-      configurable: true,
-      enumerable: true,
-      policy: 'skip',
-      diagTag: 'fonts:data:ready'
-    },
-    {
-      owner: window,
-      key: '__FONTS_ERROR__',
-      kind: 'data',
-      value: window.__FONTS_ERROR__,
-      allowCreate: true,
-      writable: true,
-      configurable: true,
-      enumerable: true,
-      policy: 'skip',
-      diagTag: 'fonts:data:error'
-    }
-  ], 'skip');
+  const fontsReadyTarget = {
+    owner: window,
+    key: '__FONTS_READY__',
+    kind: 'data',
+    allowCreate: true,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+    policy: 'skip',
+    diagTag: 'fonts:data:ready'
+  };
+  if (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')) {
+    fontsReadyTarget.value = window.__FONTS_READY__;
+  }
+  const fontsErrorTarget = {
+    owner: window,
+    key: '__FONTS_ERROR__',
+    kind: 'data',
+    allowCreate: true,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+    policy: 'skip',
+    diagTag: 'fonts:data:error'
+  };
+  if (Object.prototype.hasOwnProperty.call(window, '__FONTS_ERROR__')) {
+    fontsErrorTarget.value = window.__FONTS_ERROR__;
+  }
+  applyTargetGroup('fonts:data:flags', [fontsReadyTarget, fontsErrorTarget], 'skip');
 
   // Глобал рантайма
   const G = (typeof globalThis !== "undefined" ? globalThis : self);

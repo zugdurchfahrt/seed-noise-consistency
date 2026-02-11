@@ -301,46 +301,113 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }
     }
 
-    const toString = ({ toString() {
-      const self = this;
-      // Preserve native brand-check semantics.
-      if (typeof self !== 'function') {
-        return Reflect.apply(nativeToString, self, arguments);
+    const toString = new Proxy(nativeToString, {
+      apply(target, thisArg, argList) {
+        // Preserve native brand-check semantics.
+        if (typeof thisArg !== 'function') {
+          return Reflect.apply(target, thisArg, argList);
+        }
+        const v = toStringOverrideMap.get(thisArg);
+        if (v !== undefined) return v;
+        const t = toStringProxyTargetMap.get(thisArg);
+        if (t) {
+          const tv = toStringOverrideMap.get(t);
+          if (tv !== undefined) return tv;
+        }
+        return Reflect.apply(target, thisArg, argList);
       }
-      const v = toStringOverrideMap.get(self);
-      if (v !== undefined) return v;
-      const t = toStringProxyTargetMap.get(self);
-      if (t) {
-        const tv = toStringOverrideMap.get(t);
-        if (tv !== undefined) return tv;
-      }
-      return Reflect.apply(nativeToString, self, arguments);
-    } }).toString;
-
-    // Ensure self-toString looks native when inspected via our bridge.
-    toStringProxyTargetMap.set(toString, nativeToString);
-
-    const markAsNative = ensureMarkAsNative();
-    markAsNative(toString, 'toString');
-
-    safeDefine(window, '__CORE_TOSTRING_STATE__', {
-      value: {
-        __CORE_TOSTRING_STATE__: true,
-        nativeToString: nativeToString,
-        overrideMap: toStringOverrideMap,
-        proxyTargetMap: toStringProxyTargetMap
-      },
-      writable: false,
-      configurable: true,
-      enumerable: false
     });
 
-    Object.defineProperty(Function.prototype, 'toString', {
+    const installDesc = {
       value: toString,
       writable: toStringDesc ? !!toStringDesc.writable : true,
       configurable: toStringDesc ? !!toStringDesc.configurable : true,
       enumerable: toStringDesc ? !!toStringDesc.enumerable : false
-    });
+    };
+    const prevCoreStateDesc = nativeGetOwnProp(window, '__CORE_TOSTRING_STATE__');
+
+    try {
+      // Ensure self-toString looks native when inspected via our bridge.
+      toStringProxyTargetMap.set(toString, nativeToString);
+      const markAsNative = ensureMarkAsNative();
+      markAsNative(toString, 'toString');
+
+      Object.defineProperty(Function.prototype, 'toString', installDesc);
+
+      const installedDesc = nativeGetOwnProp(Function.prototype, 'toString');
+      if (!installedDesc || installedDesc.value !== toString) {
+        throw new Error('[CoreWindow] toString install descriptor mismatch');
+      }
+      if (!!installedDesc.writable !== !!installDesc.writable
+        || !!installedDesc.configurable !== !!installDesc.configurable
+        || !!installedDesc.enumerable !== !!installDesc.enumerable) {
+        throw new Error('[CoreWindow] toString install flags mismatch');
+      }
+
+      let nonFnErr = null;
+      try {
+        Reflect.apply(toString, {}, []);
+      } catch (e) {
+        nonFnErr = e;
+      }
+      if (!nonFnErr) {
+        throw new Error('[CoreWindow] toString brand-check lost');
+      }
+
+      const directProbe = function coreToStringProbe(){};
+      const expectedNative = Reflect.apply(nativeToString, directProbe, []);
+      const actualNative = Reflect.apply(toString, directProbe, []);
+      if (actualNative !== expectedNative) {
+        throw new Error('[CoreWindow] toString native forwarding mismatch');
+      }
+
+      safeDefine(window, '__CORE_TOSTRING_STATE__', {
+        value: {
+          __CORE_TOSTRING_STATE__: true,
+          nativeToString: nativeToString,
+          overrideMap: toStringOverrideMap,
+          proxyTargetMap: toStringProxyTargetMap
+        },
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+    } catch (e) {
+      try {
+        toStringProxyTargetMap.delete(toString);
+        toStringOverrideMap.delete(toString);
+      } catch (mapErr) {
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_maps_restore_failed", mapErr);
+      }
+
+      try {
+        if (typeof currentToString === 'function') {
+          Object.defineProperty(Function.prototype, 'toString', {
+            value: currentToString,
+            writable: toStringDesc ? !!toStringDesc.writable : true,
+            configurable: toStringDesc ? !!toStringDesc.configurable : true,
+            enumerable: toStringDesc ? !!toStringDesc.enumerable : false
+          });
+        }
+      } catch (restoreErr) {
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_restore_failed", restoreErr);
+        throw restoreErr;
+      }
+
+      try {
+        if (prevCoreStateDesc) {
+          Object.defineProperty(window, '__CORE_TOSTRING_STATE__', prevCoreStateDesc);
+        } else {
+          delete window.__CORE_TOSTRING_STATE__;
+        }
+      } catch (stateErr) {
+        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_state_restore_failed", stateErr);
+        throw stateErr;
+      }
+
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_install_failed", e);
+      throw e;
+    }
   }
 
   // === Core2.0 targets dispatcher (Window scope) ===
@@ -550,39 +617,44 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] non-configurable and non-writable');
           return fail(planItem.policy, planItem.tag, 'non_configurable', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        const v = Object.prototype.hasOwnProperty.call(t, 'value')
-          ? t.value
-          : (desc ? desc.value : undefined);
+        const hasExplicitValue = Object.prototype.hasOwnProperty.call(t, 'value');
         if (desc) {
-          planItem.nextDesc = Object.assign({}, desc, { value: v });
+          planItem.nextDesc = Object.assign({}, desc);
+          if (hasExplicitValue) {
+            planItem.nextDesc.value = t.value;
+          } else if (Object.prototype.hasOwnProperty.call(planItem.nextDesc, 'value') && typeof planItem.nextDesc.value === 'undefined') {
+            delete planItem.nextDesc.value;
+          }
         } else {
           planItem.nextDesc = {
-            value: v,
             writable: Object.prototype.hasOwnProperty.call(t, 'writable') ? !!t.writable : true,
             configurable: Object.prototype.hasOwnProperty.call(t, 'configurable') ? !!t.configurable : true,
             enumerable: Object.prototype.hasOwnProperty.call(t, 'enumerable') ? !!t.enumerable : true
           };
+          if (hasExplicitValue) {
+            planItem.nextDesc.value = t.value;
+          }
         }
         return planItem;
       }
 
       function patchAccessor(planItem, t, desc, markAsNative, fail) {
-        if (!desc) {
+        if (!desc && !planItem.allowCreate) {
           const e = new Error('[Core.applyTargets] descriptor missing');
           return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        if (!hasAccessorShape(desc)) {
+        if (desc && !hasAccessorShape(desc)) {
           const e = new TypeError('[Core.applyTargets] kind mismatch for accessor');
           return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        if (!desc.configurable) {
+        if (desc && !desc.configurable) {
           const e = new TypeError('[Core.applyTargets] non-configurable accessor');
           return fail(planItem.policy, planItem.tag, 'non_configurable', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
 
         const key = planItem.key;
-        const origGet = typeof desc.get === 'function' ? desc.get : undefined;
-        const origSet = typeof desc.set === 'function' ? desc.set : undefined;
+        const origGet = desc && typeof desc.get === 'function' ? desc.get : undefined;
+        const origSet = desc && typeof desc.set === 'function' ? desc.set : undefined;
         const getImpl = typeof t.getImpl === 'function' ? t.getImpl : null;
         const setImpl = typeof t.setImpl === 'function' ? t.setImpl : null;
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
@@ -600,6 +672,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
               invalidThis: invalidThis,
               mark: true
             });
+          } else if (getImpl) {
+            const computedGetter = function coreAccessorGetCreate() {
+              return getImpl.call(this, undefined);
+            };
+            const createDesc = {
+              configurable: Object.prototype.hasOwnProperty.call(t, 'configurable') ? !!t.configurable : true,
+              enumerable: Object.prototype.hasOwnProperty.call(t, 'enumerable') ? !!t.enumerable : true
+            };
+            getWrapped = wrapGetter(key, computedGetter, createDesc, validThis, {
+              invalidThis: invalidThis,
+              mark: true
+            });
           }
           if (origSet) {
             const setRaw = buildNamedAccessor(key, 'set', function coreAccessorSet(v) {
@@ -611,12 +695,30 @@ const CoreWindowModule = function CoreWindowModule(window) {
             });
             setWrapped = markAsNative(setRaw, 'set ' + key);
             knownWrapped.add(setWrapped);
+          } else if (setImpl) {
+            const setRaw = buildNamedAccessor(key, 'set', function coreAccessorSetCreate(v) {
+              if (validThis && !validThis(this)) {
+                return onInvalidThis(invalidThis, undefined, this, [v]);
+              }
+              return setImpl.call(this, undefined, v);
+            });
+            setWrapped = markAsNative(setRaw, 'set ' + key);
+            knownWrapped.add(setWrapped);
           }
         } catch (e) {
           return fail(planItem.policy, planItem.tag, 'mark_failed', e, { key, kind: planItem.kind, targetId: planItem.targetId });
         }
 
-        planItem.nextDesc = Object.assign({}, desc, { get: getWrapped, set: setWrapped });
+        if (desc) {
+          planItem.nextDesc = Object.assign({}, desc, { get: getWrapped, set: setWrapped });
+        } else {
+          planItem.nextDesc = {
+            get: getWrapped,
+            set: setWrapped,
+            configurable: Object.prototype.hasOwnProperty.call(t, 'configurable') ? !!t.configurable : true,
+            enumerable: Object.prototype.hasOwnProperty.call(t, 'enumerable') ? !!t.enumerable : true
+          };
+        }
         return planItem;
       }
 
@@ -646,6 +748,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
         const invalidThis = t.invalidThis || 'native';
         const invokeClass = planItem.invokeClass || 'normal';
+        function buildMethodWrapperByArity(fn, keyName, invokePath) {
+          const arity = (fn && typeof fn.length === 'number' && fn.length >= 0) ? fn.length : 0;
+          switch (arity) {
+            case 0: return ({ [keyName]() { return invokePath(this, arguments); } })[keyName];
+            case 1: return ({ [keyName](a0) { return invokePath(this, arguments); } })[keyName];
+            case 2: return ({ [keyName](a0, a1) { return invokePath(this, arguments); } })[keyName];
+            case 3: return ({ [keyName](a0, a1, a2) { return invokePath(this, arguments); } })[keyName];
+            case 4: return ({ [keyName](a0, a1, a2, a3) { return invokePath(this, arguments); } })[keyName];
+            case 5: return ({ [keyName](a0, a1, a2, a3, a4) { return invokePath(this, arguments); } })[keyName];
+            default: return ({ [keyName](...args) { return invokePath(this, args); } })[keyName];
+          }
+        }
         function invokeMethodPath(self, inputArgs) {
           const args = Array.prototype.slice.call(inputArgs || []);
           if (validThis && !validThis(self)) {
@@ -678,30 +792,11 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
         let wrapped;
         try {
-          if (invokeClass === 'normal') {
-            const wrappedRaw = ({ [key]() {
-              return invokeMethodPath(this, arguments);
-            } })[key];
-            wrapped = markAsNative(wrappedRaw, key);
-            knownWrapped.add(wrapped);
-          } else {
-            const coreWrapApply = (window && typeof window.__wrapNativeApply === 'function')
-              ? window.__wrapNativeApply
-              : null;
-            if (typeof coreWrapApply !== 'function') {
-              const e = new Error('[Core.applyTargets] core wrapper missing for invokeClass');
-              return fail(planItem.policy, planItem.tag, 'core_wrapper_missing', e, {
-                key,
-                kind: planItem.kind,
-                targetId: planItem.targetId,
-                invokeClass: invokeClass
-              });
-            }
-            wrapped = coreWrapApply(orig, key, function coreMethodApply(_target, thisArg, argList) {
-              return invokeMethodPath(thisArg, argList);
-            });
-            knownWrapped.add(wrapped);
-          }
+          // Keep brand/receiver policy via invokeMethodPath, but avoid Proxy wrappers:
+          // they trigger detector paths like "reflect set proto" and recursion checks.
+          const wrappedRaw = buildMethodWrapperByArity(orig, key, invokeMethodPath);
+          wrapped = markAsNative(wrappedRaw, key);
+          knownWrapped.add(wrapped);
         } catch (e) {
           return fail(planItem.policy, planItem.tag, 'mark_failed', e, { key, kind: planItem.kind, targetId: planItem.targetId, invokeClass: invokeClass });
         }
@@ -737,6 +832,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
         const invalidThis = t.invalidThis || 'native';
         const invokeClass = planItem.invokeClass || 'normal';
+        function buildPromiseMethodWrapperByArity(fn, keyName, invokePath) {
+          const arity = (fn && typeof fn.length === 'number' && fn.length >= 0) ? fn.length : 0;
+          switch (arity) {
+            case 0: return ({ [keyName]() { return invokePath(this, arguments); } })[keyName];
+            case 1: return ({ [keyName](a0) { return invokePath(this, arguments); } })[keyName];
+            case 2: return ({ [keyName](a0, a1) { return invokePath(this, arguments); } })[keyName];
+            case 3: return ({ [keyName](a0, a1, a2) { return invokePath(this, arguments); } })[keyName];
+            case 4: return ({ [keyName](a0, a1, a2, a3) { return invokePath(this, arguments); } })[keyName];
+            case 5: return ({ [keyName](a0, a1, a2, a3, a4) { return invokePath(this, arguments); } })[keyName];
+            default: return ({ [keyName](...args) { return invokePath(this, args); } })[keyName];
+          }
+        }
 
         function invokePromisePath(self, inputArgs) {
           const args = Array.prototype.slice.call(inputArgs || []);
@@ -782,30 +889,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
         let wrapped;
         try {
-          if (invokeClass === 'normal') {
-            const wrappedRaw = ({ [key]() {
-              return invokePromisePath(this, arguments);
-            } })[key];
-            wrapped = markAsNative(wrappedRaw, key);
-            knownWrapped.add(wrapped);
-          } else {
-            const coreWrapApply = (window && typeof window.__wrapNativeApply === 'function')
-              ? window.__wrapNativeApply
-              : null;
-            if (typeof coreWrapApply !== 'function') {
-              const e = new Error('[Core.applyTargets] core wrapper missing for invokeClass');
-              return fail(planItem.policy, planItem.tag, 'core_wrapper_missing', e, {
-                key,
-                kind: planItem.kind,
-                targetId: planItem.targetId,
-                invokeClass: invokeClass
-              });
-            }
-            wrapped = coreWrapApply(orig, key, function corePromiseMethodApply(_target, thisArg, argList) {
-              return invokePromisePath(thisArg, argList);
-            });
-            knownWrapped.add(wrapped);
-          }
+          // Same reason as patchMethod: keep strict receiver semantics without Proxy wrappers.
+          const wrappedRaw = buildPromiseMethodWrapperByArity(orig, key, invokePromisePath);
+          wrapped = markAsNative(wrappedRaw, key);
+          knownWrapped.add(wrapped);
         } catch (e) {
           return fail(planItem.policy, planItem.tag, 'mark_failed', e, { key, kind: planItem.kind, targetId: planItem.targetId, invokeClass: invokeClass });
         }
@@ -889,11 +976,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (desc && (kind === 'method' || kind === 'promise_method') && typeof desc.value === 'function' && knownWrapped.has(desc.value)) {
           return { ok: false, reason: 'duplicate_target', error: new TypeError('[Core.applyTargets] duplicate target in realm'), tag, policy, targetId, key, kind };
         }
-        if (desc && (kind === 'method' || kind === 'promise_method') && invokeClass !== 'normal') {
-          if (typeof window.__wrapNativeApply !== 'function') {
-            return { ok: false, reason: 'core_wrapper_missing', error: new Error('[Core.applyTargets] core wrapper missing for invokeClass'), tag, policy, targetId, key, kind };
-          }
-        }
         if (desc && kind === 'accessor') {
           if ((typeof desc.get === 'function' && knownWrapped.has(desc.get)) || (typeof desc.set === 'function' && knownWrapped.has(desc.set))) {
             return { ok: false, reason: 'duplicate_target', error: new TypeError('[Core.applyTargets] duplicate target in realm'), tag, policy, targetId, key, kind };
@@ -974,6 +1056,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             origDesc: cloneDesc(desc),
             desc: cloneDesc(desc),
             nextDesc: null,
+            allowCreate: !!preflight.allowCreate,
             rollbackInfo: { owner, key, desc: cloneDesc(desc) }
           };
 
