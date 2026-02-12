@@ -148,16 +148,17 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     // 3) среда без обоих вариантов
     return null;
   }
-
+// pick exact proto for brand-safe native calls
+// fallback: whatever the engine reports
   function get2DProto(ctx) {
-    // pick exact proto for brand-safe native calls
+    
     if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && ctx instanceof OffscreenCanvasRenderingContext2D) {
       return OffscreenCanvasRenderingContext2D.prototype;
     }
     if (typeof CanvasRenderingContext2D !== 'undefined' && ctx instanceof CanvasRenderingContext2D) {
       return CanvasRenderingContext2D.prototype;
     }
-    // fallback: whatever the engine reports
+    
     return Object.getPrototypeOf(ctx);
   }
 
@@ -663,7 +664,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   //     return;
   //   }
   // }
-
+  // 2026-02-11: heavy PNG blob post-process disabled in blob path (CPU guard).
+  // Keep native-shaped blob output here; draw/text noise remains in canvas pipeline.
   async function patchToBlobInjectNoise(blob, ...args) {
     try {
       if (!blob || !(blob instanceof Blob)) return;
@@ -674,8 +676,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
       const mime = (typeArg || blob.type || 'image/png').toLowerCase();
       if (!/^image\/png$/i.test(mime)) return;
-      // 2026-02-11: heavy PNG blob post-process disabled in blob path (CPU guard).
-      // Keep native-shaped blob output here; draw/text noise remains in canvas pipeline.
+
       return blob;
     } catch (e) {
       if (typeof window.__DEGRADE__ === 'function') {
@@ -686,6 +687,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   }
 
   // Promise-ветка convertToBlob: post-process PNG bytes без decode/getImageData + IHDR fallback.
+  // 2026-02-11: heavy PNG blob post-process disabled in convertToBlob path (CPU guard).
   async function patchConvertToBlobInjectNoise(blob, options) {
     try {
       if (!blob || !(blob instanceof Blob)) return;
@@ -693,7 +695,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const reqType = (options && options.type) || blob.type || 'image/png';
       const mime = String(reqType).toLowerCase();
       if (!/^image\/png$/i.test(mime)) return;
-      // 2026-02-11: heavy PNG blob post-process disabled in convertToBlob path (CPU guard).
+   
       return blob;
 
     } catch (e) {
@@ -812,12 +814,13 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // }
 
   // Deterministic pixel-noise remains in 2D draw/text hooks.
+  // 2026-02-11: keep toDataURL hook lightweight and single-pass.
+  // No decode/getImageData/re-encode/readback calls here.
   function patchToDataURLInjectNoise(res, type, quality) {
     if (typeof res !== 'string') return res;
     if (type && String(type).toLowerCase() !== 'image/png') return res;
     if (res.indexOf('data:image/png;base64,') !== 0) return res;
-    // 2026-02-11: keep toDataURL hook lightweight and single-pass.
-    // No decode/getImageData/re-encode/readback calls here.
+
     return res;
   }
     
@@ -825,7 +828,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // === HOOK FUNCTIONS ===
   function applyDrawImageHook(origDrawImage, ...args) {
     const a = args.slice();
-    // normalize numeric args
     if (a.length === 3) { a[1] = q256(a[1]); a[2] = q256(a[2]); }
     else if (a.length === 5) { a[1] = q256(a[1]); a[2] = q256(a[2]); a[3] = q256(a[3]); a[4] = q256(a[4]); }
     else if (a.length === 9) { a[5] = q256(a[5]); a[6] = q256(a[6]); a[7] = q256(a[7]); a[8] = q256(a[8]); }

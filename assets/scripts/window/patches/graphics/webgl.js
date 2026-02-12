@@ -178,8 +178,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
 
   // === 4.context patch (instance mark only; prototype patching is owned by context.js) ===
+  // If already patched or empty, immediately return
   function webglGetContextPatch(res, kind, ...args) {
-    // If already patched or empty, immediately return
     if (!res || ((__webglInstancePatched__ && __webglInstancePatched__.has(res)) || res.WebGLInstance_GPUPatched__)) return res;
     if (kind && ['webgl', 'experimental-webgl', 'webgl2'].includes(kind)) {
       if (__webglInstancePatched__) {

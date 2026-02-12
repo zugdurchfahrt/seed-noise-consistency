@@ -29,6 +29,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
+  // export for consumers 
   if (typeof window.__safeDefine !== 'function') {
     safeDefine(window, '__safeDefine', {
       value: safeDefine,
@@ -77,6 +78,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
     try {
+      // If a Proxy created by __wrapNativeApply is passed here by mistake,
+      // redirect masking to the stable native target reference.
       const t = toStringProxyTargetMap.get(func);
       if (t) func = t;
       const n = name || func.name || "";
@@ -103,6 +106,13 @@ const CoreWindowModule = function CoreWindowModule(window) {
     memoMarkAsNative = baseMarkAsNative;
     return memoMarkAsNative;
   }
+
+// Global Function.prototype.toString bridge (no Proxy to avoid [as apply] frames)
+      // IMPORTANT:
+    // - preserve native brand-check semantics:
+    //   Function.prototype.toString MUST throw when receiver is not a Function
+    // - therefore NEVER return overrides for non-functions (objects/proxies/etc)
+
 
 
   if (typeof window.__ensureMarkAsNative !== 'function') {
@@ -131,6 +141,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     if (typeof applyImpl !== 'function') {
       throw new TypeError('[CoreWindow] __wrapNativeApply: applyImpl must be function');
     }
+    // Use Proxy(nativeFn,{apply}) so name/length/prototype-shape come from nativeFn.
     const wrapped = new Proxy(nativeFn, {
       apply(target, thisArg, argList) {
         return applyImpl(target, thisArg, argList);
@@ -138,6 +149,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     });
     const markAsNative = __requireMarkAsNative();
     try {
+      // Methodology: key the stable original reference; Proxy is only an outward wrapper.
       toStringProxyTargetMap.set(wrapped, nativeFn);
       markAsNative(nativeFn, name || nativeFn.name || "");
     } catch (e) {
@@ -265,6 +277,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = toStringDesc && toStringDesc.value;
 
+    // Validate any existing bridge state, then (re)install toString wrapper.
     if (existingCoreToStringStateOk) {
       const markAsNative = ensureMarkAsNative();
       const probe = function probe(){};
@@ -290,6 +303,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
     const toString = new Proxy(nativeToString, {
       apply(target, thisArg, argList) {
+        // Preserve native brand-check semantics.
         if (typeof thisArg !== 'function') {
           return Reflect.apply(target, thisArg, argList);
         }
@@ -313,6 +327,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const prevCoreStateDesc = nativeGetOwnProp(window, '__CORE_TOSTRING_STATE__');
 
     try {
+      // Ensure self-toString looks native when inspected via our bridge.
       toStringProxyTargetMap.set(toString, nativeToString);
       const markAsNative = ensureMarkAsNative();
       markAsNative(toString, 'toString');
@@ -777,6 +792,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
         let wrapped;
         try {
+          // Keep brand/receiver policy via invokeMethodPath, but avoid Proxy wrappers:
+          // they trigger detector paths like "reflect set proto" and recursion checks.
           const wrappedRaw = buildMethodWrapperByArity(orig, key, invokeMethodPath);
           wrapped = markAsNative(wrappedRaw, key);
           knownWrapped.add(wrapped);
@@ -872,6 +889,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
         let wrapped;
         try {
+          // Same reason as patchMethod: keep strict receiver semantics without Proxy wrappers.
           const wrappedRaw = buildPromiseMethodWrapperByArity(orig, key, invokePromisePath);
           wrapped = markAsNative(wrappedRaw, key);
           knownWrapped.add(wrapped);

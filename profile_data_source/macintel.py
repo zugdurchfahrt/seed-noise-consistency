@@ -34,7 +34,7 @@ macintel_data = {
         {"id": 24, "name": "Cirrus Logic CS4262", "platform": "MacIntel"},
         {"id": 25, "name": "Apple T2 Audio Controller", "platform": "MacIntel"}
     ],
-    "microphone": [
+    "audioinput": [
         {"id": 1, "name": "Shure MV5 Digital Condenser Microphone", "platform": "MacIntel"},
         {"id": 2, "name": "Blue Yeti USB Microphone", "platform": "MacIntel"},
         {"id": 3, "name": "Audio-Technica AT2020USB+", "platform": "MacIntel"},

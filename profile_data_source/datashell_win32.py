@@ -6,7 +6,7 @@ data_4_win32 = {
         {"platform": "Win32", "os_info": "Windows NT 10.0; Win64; x64", "os_name": "Windows 11 (64-bit)", "os_version": "19.0.0"},
     ],
 
-    "builtInAudioCard": [
+    "audiooutput": [
         {"id": 1, "name": "Realtek ALC887", "platform": "Win32"},
         {"id": 2, "name": "Realtek ALC892", "platform": "Win32"},
         {"id": 3, "name": "Realtek ALC1150", "platform": "Win32"},
@@ -33,7 +33,7 @@ data_4_win32 = {
         {"id": 24, "name": "Realtek ALC1150 Advanced", "platform": "Win32"},
         {"id": 25, "name": "Creative Sound Blaster ZxR", "platform": "Win32"}
     ],
-    "microphone": [
+    "audioinput": [
         {"id": 1, "name": "Blue Yeti USB Microphone", "platform": "Win32"},
         {"id": 2, "name": "Audio-Technica AT2020USB+", "platform": "Win32"},
         {"id": 3, "name": "Rode NT-USB", "platform": "Win32"},

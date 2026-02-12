@@ -394,36 +394,94 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     setVV('pageTop', () => 0);
   }
 
-  // — make screen serializable
-  safeDefine(window.screen, "toJSON", {
-    value: () => ({
-      width:        SCREEN_WIDTH,
-      height:       SCREEN_HEIGHT,
-      availWidth:   SCREEN_WIDTH,
-      availHeight:  SCREEN_HEIGHT,
-      colorDepth:   COLOR_DEPTH,
-      pixelDepth:   COLOR_DEPTH,
-      devicePixelRatio: DPR
-    }),
-    writable:    false,
-    enumerable:  false,
-    configurable: true
-  });
-
-  // — make visualViewport serializable
-  if (window.visualViewport) {
-    safeDefine(window.visualViewport, "toJSON", {
-      value: () => ({
-        width:      SCREEN_WIDTH,
-        height:     SCREEN_HEIGHT,
-        scale:      window.visualViewport.scale,
-        pageLeft:   window.visualViewport.pageLeft,
-        pageTop:    window.visualViewport.pageTop
-      }),
-      writable:    false,
-      enumerable:  false,
+  // — make screen serializable (via Core path for nativeized wrapper shape)
+  const screenToJSONTarget = chooseTarget(window.screen, screenProto, 'toJSON') || window.screen;
+  if (!Object.getOwnPropertyDescriptor(screenToJSONTarget, 'toJSON')) {
+    safeDefine(screenToJSONTarget, 'toJSON', {
+      value: function toJSON() {
+        return {
+          width: SCREEN_WIDTH,
+          height: SCREEN_HEIGHT,
+          availWidth: SCREEN_WIDTH,
+          availHeight: SCREEN_HEIGHT,
+          colorDepth: COLOR_DEPTH,
+          pixelDepth: COLOR_DEPTH,
+          devicePixelRatio: DPR
+        };
+      },
+      writable: false,
+      enumerable: false,
       configurable: true
     });
+  }
+  // — make visualViewport serializable (via Core path for nativeized wrapper shape)
+  applyCoreTargetsGroup('screen:toJSON', [{
+    owner: screenToJSONTarget,
+    key: 'toJSON',
+    kind: 'method',
+    invokeClass: 'brand_strict',
+    resolve: 'own',
+    policy: 'throw',
+    diagTag: 'screen:toJSON',
+    validThis(self) {
+      return receiverMatchesTarget(screenToJSONTarget, self);
+    },
+    invalidThis: 'native',
+    invoke: function screenToJSONInvokeCore() {
+      return {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+        availWidth: SCREEN_WIDTH,
+        availHeight: SCREEN_HEIGHT,
+        colorDepth: COLOR_DEPTH,
+        pixelDepth: COLOR_DEPTH,
+        devicePixelRatio: DPR
+      };
+    }
+  }], 'throw');
+
+ 
+  if (window.visualViewport) {
+    const vvObj = window.visualViewport;
+    const vvToJSONTarget = chooseTarget(vvObj, Object.getPrototypeOf(vvObj), 'toJSON') || vvObj;
+    if (!Object.getOwnPropertyDescriptor(vvToJSONTarget, 'toJSON')) {
+      safeDefine(vvToJSONTarget, 'toJSON', {
+        value: function toJSON() {
+          return {
+            width: SCREEN_WIDTH,
+            height: SCREEN_HEIGHT,
+            scale: window.visualViewport.scale,
+            pageLeft: window.visualViewport.pageLeft,
+            pageTop: window.visualViewport.pageTop
+          };
+        },
+        writable: false,
+        enumerable: false,
+        configurable: true
+      });
+    }
+    applyCoreTargetsGroup('screen:visualViewport_toJSON', [{
+      owner: vvToJSONTarget,
+      key: 'toJSON',
+      kind: 'method',
+      invokeClass: 'brand_strict',
+      resolve: 'own',
+      policy: 'throw',
+      diagTag: 'screen:visualViewport_toJSON',
+      validThis(self) {
+        return receiverMatchesTarget(vvToJSONTarget, self);
+      },
+      invalidThis: 'native',
+      invoke: function visualViewportToJSONInvokeCore() {
+        return {
+          width: SCREEN_WIDTH,
+          height: SCREEN_HEIGHT,
+          scale: window.visualViewport.scale,
+          pageLeft: window.visualViewport.pageLeft,
+          pageTop: window.visualViewport.pageTop
+        };
+      }
+    }], 'throw');
   }
 
 

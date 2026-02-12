@@ -61,6 +61,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // strictness & diagnostics
     const STRICT        = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
     const DEBUG         = !!window.__NAV_PATCH_DEBUG__;
+    let mediaDevicesLabelsUnlocked = false;
+    let mediaMicGranted = false;
+    let mediaCameraGranted = false;
+    function syncMediaLabelsUnlocked() {
+      mediaDevicesLabelsUnlocked = !!(mediaMicGranted || mediaCameraGranted);
+    }
 
     if (!Number.isFinite(dpr) || dpr <= 0) {
       throw new Error('[nav_total_set] bad __DPR');
@@ -207,8 +213,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return true;
     }
 
+    // use for non-critical fields; для E/F/G Do not use(см. ниже)
     function defineAccWithFallback(objOrProto, key, getter, { enumerable } = {}) {
-      // use for non-critical fields; для E/F/G Do not use(см. ниже)
       if (safeDefineAcc(objOrProto, key, getter, { enumerable })) return true;
       throw new TypeError(`[nav_total_set] failed to define ${key}`);
     }
@@ -340,20 +346,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
 
     // Critical - only a prototype (without a phallback)
-    const critical = new Set(['userAgent','platform','vendor','appVersion']);
     // Critical - only a prototype (without a fallback)
+    // Important: like native - not enumerable
+    const critical = new Set(['userAgent','platform','vendor','appVersion']);
     (function patchCriticalOnProto(){
       const patch = (key, getter) => {
         const d = Object.getOwnPropertyDescriptor(navProto, key);
         if (!d) throw new TypeError(`[nav_total_set] ${key}: descriptor missing`);
         if (typeof getter !== 'function') throw new TypeError(`[nav_total_set] ${key}: getter missing`);
-        // Important: like native - not enumerable
-        const origGet = (d && typeof d.get === 'function') ? d.get : null;
         __navRegisterKey(key);
         const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
           __navLogAccess(key, namedGet);
           if (!__isNavigatorThis(this)) {
-            if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
             throw new TypeError();
           }
           return getter.call(this);
@@ -362,7 +366,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const ok = (redefineAcc(navProto, key, namedGet), true);
         if (ok === false) throw new TypeError(`[nav_total_set] failed to define ${key}`);
       };      
-
       patch('userAgent',  () => userAgent);
       patch('platform',   () => navPlatformOut);
       patch('vendor',     () => vendor);
@@ -384,17 +387,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ['vendorSub',            () => ""]
     ];
     navigatorPatches.forEach(([prop, getter]) => {
-      if (critical.has(prop)) return; // just in case
-      if (!(prop in navProto)) return; // do not introduce non-native props (Chrome/Edge: e.g. buildID)
+      if (critical.has(prop)) return; 
+      if (!(prop in navProto)) return;
       const d = Object.getOwnPropertyDescriptor(navProto, prop);
       const isData = !!(d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set);
       if (d && !isData) {
-        const origGet = (typeof d.get === 'function') ? d.get : null;
         __navRegisterKey(prop);
         const namedGet = Object.getOwnPropertyDescriptor(({ get [prop]() {
           __navLogAccess(prop, namedGet);
           if (!__isNavigatorThis(this)) {
-            if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
             throw new TypeError();
           }
           return getter.call(this);
@@ -431,8 +432,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         __navDiag('warn', 'nav_total_set:dpr_check_failed', null, e);
       }
     })();
-
-    // Screen.* is patched by ScreenPatchModule to keep a single patch owner.
 
     // oscpu (только если есть в прототипе)
     if ('oscpu' in navProto) {
@@ -711,11 +710,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— F. deviceMemory/hardwareConcurrency ———
     const hasDeviceMemory = ('deviceMemory' in navigator);
     const dDeviceMemory = Object.getOwnPropertyDescriptor(navProto, 'deviceMemory');
-    const origGetDeviceMemory = (dDeviceMemory && typeof dDeviceMemory.get === 'function') ? dDeviceMemory.get : null;
     const getDeviceMemory = Object.getOwnPropertyDescriptor(({ get deviceMemory() {
       __navLogAccess('deviceMemory', getDeviceMemory);
       if (!__isNavigatorThis(this)) {
-        if (typeof origGetDeviceMemory === 'function') return Reflect.apply(origGetDeviceMemory, this, arguments);
         throw new TypeError();
       }
       return mem;
@@ -729,11 +726,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
     const dHardwareConcurrency = Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency');
-    const origGetHardwareConcurrency = (dHardwareConcurrency && typeof dHardwareConcurrency.get === 'function') ? dHardwareConcurrency.get : null;
     const getHardwareConcurrency = Object.getOwnPropertyDescriptor(({ get hardwareConcurrency() {
       __navLogAccess('hardwareConcurrency', getHardwareConcurrency);
       if (!__isNavigatorThis(this)) {
-        if (typeof origGetHardwareConcurrency === 'function') return Reflect.apply(origGetHardwareConcurrency, this, arguments);
         throw new TypeError();
       }
       return cpu;
@@ -748,11 +743,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— G. language(s) ———
     const hasLanguage = ('language' in navigator);
     const dLanguage = Object.getOwnPropertyDescriptor(navProto, 'language');
-    const origGetLanguage = (dLanguage && typeof dLanguage.get === 'function') ? dLanguage.get : null;
     const getLanguage = Object.getOwnPropertyDescriptor(({ get language() {
       __navLogAccess('language', getLanguage);
       if (!__isNavigatorThis(this)) {
-        if (typeof origGetLanguage === 'function') return Reflect.apply(origGetLanguage, this, arguments);
         throw new TypeError();
       }
       return window.__primaryLanguage;
@@ -766,11 +759,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     const hasLanguages = ('languages' in navigator);
     const dLanguages = Object.getOwnPropertyDescriptor(navProto, 'languages');
-    const origGetLanguages = (dLanguages && typeof dLanguages.get === 'function') ? dLanguages.get : null;
     const getLanguages = Object.getOwnPropertyDescriptor(({ get languages() {
       __navLogAccess('languages', getLanguages);
       if (!__isNavigatorThis(this)) {
-        if (typeof origGetLanguages === 'function') return Reflect.apply(origGetLanguages, this, arguments);
         throw new TypeError();
       }
       return window.__normalizedLanguages;
@@ -782,13 +773,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       safeDefineAcc(navProto, 'languages', getLanguages, { enumerable: dLanguages ? !!dLanguages.enumerable : false })) : true;
     if (okLanguages === false) throw new TypeError('[nav_total_set] failed to define languages');
   
-  
-  
-  
-  
-  
-  
-  
+   
     // ——— H. permissions.query ———
     if ('permissions' in navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
       const permProto = Object.getPrototypeOf(navigator.permissions) || navigator.permissions;
@@ -808,18 +793,45 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         },
         invalidThis: 'native',
         invoke(orig, args) {
-          __navLogAccess('permissions.query', null);
           const parameters = (args && args.length) ? args[0] : undefined;
-          if (!parameters || typeof parameters !== 'object') {
-            return Promise.resolve({ state: 'prompt', onchange: null });
+          const permName = (parameters && typeof parameters === 'object' && typeof parameters.name === 'string')
+            ? parameters.name
+            : null;
+          if (permName === 'microphone') {
+            const sourceName = 'audioinput';
+            const label = (devicesLabels && typeof devicesLabels === 'object') ? devicesLabels[sourceName] : undefined;
+            if (!label) {
+              throw new TypeError('[nav_total_set] devices_labels.audioinput missing for permissions.query("microphone")');
+            }
+            const out = Reflect.apply(orig, this, args || []);
+            return Promise.resolve(out).then(function onPermissionsQueryResolved(status) {
+              const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
+              mediaMicGranted = state === 'granted';
+              syncMediaLabelsUnlocked();
+              __navLogAccess('permissions.query', null, {
+                permission: permName,
+                source: sourceName,
+                state,
+                mediaDevicesLabelsUnlocked
+              });
+              return status;
+            });
           }
-          const name = parameters && parameters.name;
-          if (name === 'persistent-storage') {
-            return Promise.resolve({ state: 'granted', onchange: null });
+          if (permName === 'camera') {
+            const out = Reflect.apply(orig, this, args || []);
+            return Promise.resolve(out).then(function onPermissionsQueryResolved(status) {
+              const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
+              mediaCameraGranted = state === 'granted';
+              syncMediaLabelsUnlocked();
+              __navLogAccess('permissions.query', null, {
+                permission: permName,
+                state,
+                mediaDevicesLabelsUnlocked
+              });
+              return status;
+            });
           }
-          if (['geolocation', 'camera', 'audiooutput', 'microphone', 'notifications'].includes(name)) {
-            return Promise.resolve({ state: 'prompt', onchange: null });
-          }
+          __navLogAccess('permissions.query', null);
           return Reflect.apply(orig, this, args || []);
         }
       }], 'throw');
@@ -844,29 +856,59 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         },
         invalidThis: 'native',
         invoke(_orig, _args) {
-          __navLogAccess('mediaDevices.enumerateDevices', null);
+          if (!devicesLabels || typeof devicesLabels !== 'object') {
+            throw new TypeError('[nav_total_set] devices labels missing');
+          }
+          if (typeof devicesLabels.audioinput !== 'string'
+            || typeof devicesLabels.videoinput !== 'string'
+            || typeof devicesLabels.audiooutput !== 'string') {
+            throw new TypeError('[nav_total_set] devices labels invalid');
+          }
           const generateHexId = (len = 64) => {
             let s = '';
             for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
             return s;
           };
+          const audioUnlocked = !!mediaMicGranted;
+          const videoUnlocked = !!mediaCameraGranted;
+          __navLogAccess('mediaDevices.enumerateDevices', null, {
+            multimediaDevices: { speakers: 1, micros: 1, webcams: 1 },
+            labelsHidden: !(audioUnlocked || videoUnlocked),
+            audioUnlocked,
+            videoUnlocked
+          });
           const groupId = generateHexId(64);
           return Promise.resolve([
-            { kind: 'audioinput',  label: devicesLabels.audioinput,  deviceId: generateHexId(64), groupId },
-            { kind: 'videoinput',  label: devicesLabels.videoinput,  deviceId: generateHexId(64), groupId },
-            { kind: 'audiooutput', label: devicesLabels.audiooutput, deviceId: generateHexId(64), groupId: generateHexId(64) }
+            {
+              kind: 'audioinput',
+              label: audioUnlocked ? devicesLabels.audioinput : '',
+              deviceId: audioUnlocked ? generateHexId(64) : '',
+              groupId: audioUnlocked ? groupId : ''
+            },
+            {
+              kind: 'videoinput',
+              label: videoUnlocked ? devicesLabels.videoinput : '',
+              deviceId: videoUnlocked ? generateHexId(64) : '',
+              groupId: videoUnlocked ? groupId : ''
+            },
+            {
+              kind: 'audiooutput',
+              label: audioUnlocked ? devicesLabels.audiooutput : '',
+              deviceId: audioUnlocked ? generateHexId(64) : '',
+              groupId: audioUnlocked ? generateHexId(64) : ''
+            }
           ]);
         }
       }], 'throw');
     }
 
     // ——— J. storage.estimate & webkitTemporaryStorage ———
+     // Конфигурация: берём из глобалов (как и прочие параметры в модуле), иначе безопасные дефолты
     if (navigator.storage && typeof navigator.storage.estimate === 'function') {
       const storageProto = Object.getPrototypeOf(navigator.storage) || navigator.storage;
       const storageDesc = Object.getOwnPropertyDescriptor(storageProto, 'estimate')
         || Object.getOwnPropertyDescriptor(navigator.storage, 'estimate');
       if (!storageDesc) throw new TypeError('[nav_total_set] storage.estimate descriptor missing');
-      // Конфигурация: берём из глобалов (как и прочие параметры в модуле), иначе безопасные дефолты
       const QUOTA_MB   = Number(window.__STORAGE_QUOTA_MB   ?? 120);
       const USED_PCT   = Math.max(0, Math.min(100, Number(window.__STORAGE_USED_PCT ?? 3))); // ~3% занято
       const quotaBytes = Math.floor(QUOTA_MB * 1024 * 1024);
@@ -981,28 +1023,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
       // ———  JS heap sizing from deviceMemory ———
+       // if-стиль: патчим только если dm валиден
+                 // dm: 0.25, 0.5, 1, 2, 4, 8, …
+        // читаем dm каждый раз — «жёсткая» привязка к текущему realm
+        // dm нелегален → не вмешиваемся (оставляем натив/предыдущее)
     const perfProto = (window.Performance && Performance.prototype) || Object.getPrototypeOf(performance);
     if (perfProto) {
-      // if-стиль: патчим только если dm валиден
       const dm0 = Number(navigator.deviceMemory);
       if (typeof dm0 === 'number' && isFinite(dm0)) {
 
         const heapFromDM = mark(function heapFromDM(dm) {
-          // dm: 0.25, 0.5, 1, 2, 4, 8, …
           if (!(typeof dm === 'number' && isFinite(dm))) return null;
-          if (dm <= 0.5) return 512  * 1024 * 1024;   // ~512MB
-          if (dm <= 1)   return 768  * 1024 * 1024;   // ~768MB
-          if (dm <= 2)   return 1536 * 1024 * 1024;   // ~1.5GB
-          if (dm <= 4)   return 3072 * 1024 * 1024;   // ~3GB
-          return 4096 * 1024 * 1024;                  // cap ~4GB для dm ≥ 8
+          if (dm <= 0.5) return 512  * 1024 * 1024;   
+          if (dm <= 1)   return 768  * 1024 * 1024;   
+          if (dm <= 2)   return 1536 * 1024 * 1024;   
+          if (dm <= 4)   return 3072 * 1024 * 1024;   
+          return 4096 * 1024 * 1024;                  
         }, 'heapFromDM');
-
         const getMemory = mark(function () {
-          // читаем dm каждый раз — «жёсткая» привязка к текущему realm
           const dm = Number(navigator.deviceMemory);
           const limit = heapFromDM(dm);
           if (limit == null) {
-            // dm нелегален → не вмешиваемся (оставляем натив/предыдущее)
             const d = Object.getOwnPropertyDescriptor(perfProto, 'memory')
                     || Object.getOwnPropertyDescriptor(performance, 'memory');
             return d && d.get ? d.get.call(performance) : undefined;
@@ -1013,7 +1054,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }, 'get memory');
 
         try {
-          // first try patch prototype, if rejected — try own on instance
           redefineAcc(perfProto, 'memory', getMemory);
         } catch (_) {
           __navDiag('error', 'nav_total_set:performance_memory_proto', null, _);

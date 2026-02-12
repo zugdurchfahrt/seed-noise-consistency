@@ -348,12 +348,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (!d) throw new TypeError(`[nav_total_set] ${key}: descriptor missing`);
         if (typeof getter !== 'function') throw new TypeError(`[nav_total_set] ${key}: getter missing`);
         // Important: like native - not enumerable
-        const origGet = (d && typeof d.get === 'function') ? d.get : null;
         __navRegisterKey(key);
         const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
           __navLogAccess(key, namedGet);
           if (!__isNavigatorThis(this)) {
-            if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
             throw new TypeError();
           }
           return getter.call(this);
@@ -389,12 +387,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const d = Object.getOwnPropertyDescriptor(navProto, prop);
       const isData = !!(d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set);
       if (d && !isData) {
-        const origGet = (typeof d.get === 'function') ? d.get : null;
         __navRegisterKey(prop);
         const namedGet = Object.getOwnPropertyDescriptor(({ get [prop]() {
           __navLogAccess(prop, namedGet);
           if (!__isNavigatorThis(this)) {
-            if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
             throw new TypeError();
           }
           return getter.call(this);
@@ -711,11 +707,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— F. deviceMemory/hardwareConcurrency ———
     const hasDeviceMemory = ('deviceMemory' in navigator);
     const dDeviceMemory = Object.getOwnPropertyDescriptor(navProto, 'deviceMemory');
-    const origGetDeviceMemory = (dDeviceMemory && typeof dDeviceMemory.get === 'function') ? dDeviceMemory.get : null;
     const getDeviceMemory = Object.getOwnPropertyDescriptor(({ get deviceMemory() {
       __navLogAccess('deviceMemory', getDeviceMemory);
       if (!__isNavigatorThis(this)) {
-        if (typeof origGetDeviceMemory === 'function') return Reflect.apply(origGetDeviceMemory, this, arguments);
         throw new TypeError();
       }
       return mem;
@@ -729,11 +723,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
     const dHardwareConcurrency = Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency');
-    const origGetHardwareConcurrency = (dHardwareConcurrency && typeof dHardwareConcurrency.get === 'function') ? dHardwareConcurrency.get : null;
     const getHardwareConcurrency = Object.getOwnPropertyDescriptor(({ get hardwareConcurrency() {
       __navLogAccess('hardwareConcurrency', getHardwareConcurrency);
       if (!__isNavigatorThis(this)) {
-        if (typeof origGetHardwareConcurrency === 'function') return Reflect.apply(origGetHardwareConcurrency, this, arguments);
         throw new TypeError();
       }
       return cpu;
@@ -748,11 +740,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— G. language(s) ———
     const hasLanguage = ('language' in navigator);
     const dLanguage = Object.getOwnPropertyDescriptor(navProto, 'language');
-    const origGetLanguage = (dLanguage && typeof dLanguage.get === 'function') ? dLanguage.get : null;
     const getLanguage = Object.getOwnPropertyDescriptor(({ get language() {
       __navLogAccess('language', getLanguage);
       if (!__isNavigatorThis(this)) {
-        if (typeof origGetLanguage === 'function') return Reflect.apply(origGetLanguage, this, arguments);
         throw new TypeError();
       }
       return window.__primaryLanguage;
@@ -766,11 +756,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     const hasLanguages = ('languages' in navigator);
     const dLanguages = Object.getOwnPropertyDescriptor(navProto, 'languages');
-    const origGetLanguages = (dLanguages && typeof dLanguages.get === 'function') ? dLanguages.get : null;
     const getLanguages = Object.getOwnPropertyDescriptor(({ get languages() {
       __navLogAccess('languages', getLanguages);
       if (!__isNavigatorThis(this)) {
-        if (typeof origGetLanguages === 'function') return Reflect.apply(origGetLanguages, this, arguments);
         throw new TypeError();
       }
       return window.__normalizedLanguages;

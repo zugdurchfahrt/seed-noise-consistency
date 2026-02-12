@@ -1009,10 +1009,9 @@ function SafeSharedWorkerOverride(G){
   }
 
   // === SharedWorker override wrapper (complete, self-contained) ===
+   // Normalize 2nd arg to an options object (always), so `type` is never lost
   const WrappedSharedWorker = mark(function SharedWorker(url, nameOrOpts) {
     const abs = new URL(url, location.href).href;
-
-    // Normalize 2nd arg to an options object (always), so `type` is never lost
     const hasOptsObj =
       !!(nameOrOpts && (typeof nameOrOpts === 'object' || typeof nameOrOpts === 'function')) &&
       (typeof nameOrOpts !== 'string');
