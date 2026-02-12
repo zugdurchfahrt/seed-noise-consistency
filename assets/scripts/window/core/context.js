@@ -71,8 +71,28 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return (typeof global !== 'undefined' && global.CanvasPatchHooks) ? global.CanvasPatchHooks : null;
   }
 
+  function corePreflight(owner, key, kind, diagTag) {
+    const core = global && global.Core;
+    if (!core || typeof core.preflightTarget !== 'function') {
+      throw new Error('[ContextPatch] Core.preflightTarget missing');
+    }
+    const preflight = core.preflightTarget({
+      owner: owner,
+      key: key,
+      kind: kind,
+      resolve: 'own',
+      policy: 'throw',
+      diagTag: diagTag || 'context:preflight'
+    });
+    if (!preflight || preflight.ok !== true) {
+      throw (preflight && preflight.error) ? preflight.error : new Error('[ContextPatch] preflight failed');
+    }
+    return preflight;
+  }
+
   function definePatchedMethod(proto, method, value) {
-    const d = Object.getOwnPropertyDescriptor(proto, method);
+    const preflight = corePreflight(proto, method, 'method', 'context:definePatchedMethod');
+    const d = preflight.desc || Object.getOwnPropertyDescriptor(proto, method);
     if (!d) {
       throw new Error(`[ContextPatch] descriptor missing for ${method}`);
     }
@@ -256,8 +276,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // === WEBGL PATCHING ===
   function patchMethod(proto, method, hooks) {
       if (!proto)                              { console.warn(`[patchMethod] proto is not defined: ${method}`); return false; }
-      if (typeof proto[method] !== 'function') { console.warn(`[patchMethod] not a function: ${method}`); return false; }
-      if (patchedMethods.has(proto[method]))   { console.warn(`[patchMethod] already patched: ${method}`); return false; }
       if (!hooks?.length)                      { console.warn(`[patchMethod] no hooks: ${method}`); return false; }
       const isWebGLProto =
         (typeof WebGLRenderingContext !== 'undefined' && proto === WebGLRenderingContext.prototype) ||
@@ -267,7 +285,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
         return false;
       }
 
-      const orig = proto[method];
+      const preflight = corePreflight(proto, method, 'method', 'context:webgl:patchMethod');
+      const desc = preflight.desc || Object.getOwnPropertyDescriptor(proto, method);
+      if (!desc || typeof desc.value !== 'function') {
+        throw new TypeError(`[patchMethod] not a function: ${method}`);
+      }
+      if (patchedMethods.has(desc.value))      { console.warn(`[patchMethod] already patched: ${method}`); return false; }
+
+      const orig = desc.value;
       const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
       const hookMode = (hooks && (typeof hooks === 'object' || typeof hooks === 'function')) ? hooks.mode : undefined;
       const isPostOrigOnceMode = hookMode === HOOK_MODE_POST_ORIG_ONCE;
@@ -579,6 +604,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
         }
         if (/^webgl/.test(String(type))){
+          if (C && typeof C.applyWebGLContextPatches === 'function') {
+            const state = C.__patchState || (C.__patchState = patchState);
+            if (state.webgl !== true) {
+              C.applyWebGLContextPatches();
+            }
+          }
           for (const hook of (webglHooks || [])){
             try { hook.call(this, ctx, type, ...rest); } catch (e) {
               if (typeof global.__DEGRADE__ === 'function') {

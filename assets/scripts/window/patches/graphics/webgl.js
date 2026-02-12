@@ -27,12 +27,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
 
     const markNative = (function() {
-      const ensure = (typeof window.__ensureMarkAsNative === 'function')
-        ? window.__ensureMarkAsNative
-        : null;
-      const m = ensure ? ensure() : null;
+      if (typeof window.__ensureMarkAsNative !== 'function') {
+        throw new Error('[WebglPatchModule] __ensureMarkAsNative missing');
+      }
+      const m = window.__ensureMarkAsNative();
       if (typeof m !== 'function') {
-        throw new Error('[WebglPatchModule] markAsNative missing');
+        throw new Error('[WebglPatchModule] __ensureMarkAsNative returned non-function');
       }
       return m;
     })();
@@ -177,51 +177,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
     return res;
   }
 
-  // === 4.context patch (shaderSource → selective downgrade) ===
+  // === 4.context patch (instance mark only; prototype patching is owned by context.js) ===
   function webglGetContextPatch(res, kind, ...args) {
     // If already patched or empty, immediately return
     if (!res || ((__webglInstancePatched__ && __webglInstancePatched__.has(res)) || res.WebGLInstance_GPUPatched__)) return res;
-
-    const proto = Object.getPrototypeOf(res);
     if (kind && ['webgl', 'experimental-webgl', 'webgl2'].includes(kind)) {
-    const state = C && C.__patchState;
-    const skipProtoWrap = !!(state && state.webgl);
-    if (proto && proto.shaderSource && !skipProtoWrap) {
-      let owner = proto;
-      let d = null;
-      while (owner) {
-        d = Object.getOwnPropertyDescriptor(owner, 'shaderSource');
-        if (d) break;
-        owner = Object.getPrototypeOf(owner);
-      }
-      const already = (__webglShaderSourcePatchedProtos__ && owner && __webglShaderSourcePatchedProtos__.has(owner));
-      if (!already) {
-        if (!d || typeof d.value !== 'function') {
-          if (typeof window.__DEGRADE__ === 'function') {
-            try { window.__DEGRADE__('webgl:shaderSource:missing_descriptor', null); } catch (_) {}
-          }
-        } else if (d && d.configurable === false) {
-          if (typeof window.__DEGRADE__ === 'function') {
-            try { window.__DEGRADE__('webgl:shaderSource:non_configurable', null); } catch (_) {}
-          }
-        } else {
-          const orig = d.value;
-        // НИЧЕГО НЕ МЕНЯЕМ ЗДЕСЬ — вся precision-политика уедет в webglShaderSourceHook
-        const wrapped = ({ shaderSource(shader, src) {
-          return orig.call(this, shader, src);
-        } }).shaderSource;
-
-        markNative(wrapped, 'shaderSource');
-          Object.defineProperty(owner, 'shaderSource', {
-            value: wrapped,
-            writable: d ? !!d.writable : true,
-            configurable: d ? !!d.configurable : true,
-            enumerable: d ? !!d.enumerable : false
-          });
-          if (__webglShaderSourcePatchedProtos__) __webglShaderSourcePatchedProtos__.add(owner);
-        }
-      }
-
       if (__webglInstancePatched__) {
         __webglInstancePatched__.add(res);
       } else {
@@ -232,7 +192,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
           enumerable: false
         });
       }
-    }
     }
     return res;
   }
