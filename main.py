@@ -491,7 +491,6 @@ def init_driver(
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     
-
     # Publish worker patch core early (used by external worker_bootstrap.js too)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
 

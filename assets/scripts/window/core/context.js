@@ -185,6 +185,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       active = new Set();
       canvasReadbackGuard.set(self, active);
     }
+    // 2026-02-11: cross-method stack guard for toDataURL/toBlob/convertToBlob.
     if (active.size > 0) return false;
     active.add(method);
     return active;
@@ -210,6 +211,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
            const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
            const readbackToken = enterCanvasReadback(self, method);
            if (readbackToken === false) return Reflect.apply(orig, self, arguments);
+            // 2026-02-11: disabled dead guard block (__isChain_toDataURL) as non-wired in runtime.
+            // Internal encode paths guard left commented intentionally for later revisit.
+            // const __CHAIN_GUARD__ = '__isChain_toDataURL';
+            // if (isObj && self[__CHAIN_GUARD__]) return Reflect.apply(orig, self, arguments);
             if (inProgress && isObj) {
              if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
              inProgress.add(self);
@@ -294,6 +299,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const forbidOrigCall = function forbidOrigCall() { throw new TypeError(); };
 
       function invoke(self, argsLike) {
+          // Preserve native Illegal invocation / brand check errors
           const isObj = (self !== null) && (typeof self === 'object' || typeof self === 'function');
           const args = Array.isArray(argsLike) ? argsLike : Array.prototype.slice.call(argsLike);
 
@@ -333,6 +339,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
                           return res; // result substitution
                       }
 
+                      // argument substitution
                       if (Array.isArray(res)) {
                           patched = res;
                           continue;
@@ -401,6 +408,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
             leaveCanvasReadback(self, readbackToken, method);
           }
         }
+        // 2026-02-11: keep native contract - toBlob without callback returns undefined.
         try {
           return Reflect.apply(orig, self, args);
         } finally {
@@ -479,10 +487,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     };
 
     // --- measureText: post-process TextMetrics via CanvasPatchHooks.applyMeasureTextHook ---
-      // (do not change width here to preserve consistency)
-    // optional fallback if applyMeasureTextHook absent
-
-    patchOnce('measureText', (orig) => function(text){
+    patchOnce('measureText', (orig) => ({ measureText(text) {
       const txt = ''.concat(text);
       const m = Reflect.apply(orig, this, [txt]);
 
@@ -492,18 +497,23 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
         if (H && typeof H.applyMeasureTextHook === 'function') {
           const r = Reflect.apply(H.applyMeasureTextHook, this, [m, txt, fontStr]);
+
           return r ?? m;
         }
+
+        // optional fallback if applyMeasureTextHook absent
         if (H && typeof H.measureTextNoiseHook === 'function') {
+          // leave native as-is if only info hook exists
+          // (do not change width here to preserve consistency)
           H.measureTextNoiseHook.call(this, m, txt, fontStr);
         }
       } catch { /* silent */ }
 
       return m;
-    });
+    } }).measureText);
 
     // --- fillText ---
-    patchOnce('fillText', (orig) => function(text, x, y, ...rest){
+    patchOnce('fillText', (orig) => ({ fillText(text, x, y, ...rest) {
       try {
         const H = getHooks();
 
@@ -519,10 +529,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
       } catch { /* silent */ }
 
       return Reflect.apply(orig, this, [text, x, y, ...rest]);
-    });
+    } }).fillText);
 
     // --- strokeText ---
-    patchOnce('strokeText', (orig) => function(text, x, y, ...rest){
+    patchOnce('strokeText', (orig) => ({ strokeText(text, x, y, ...rest) {
       try {
         const H = getHooks();
 
@@ -538,10 +548,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
       } catch { /* silent */ }
 
       return Reflect.apply(orig, this, [text, x, y, ...rest]);
-    });
+    } }).strokeText);
 
     // --- fillRect ---
-    patchOnce('fillRect', (orig) => function(x, y, w, h){
+    patchOnce('fillRect', (orig) => ({ fillRect(x, y, w, h) {
       try {
         const H = getHooks();
         if (H && typeof H.fillRectNoiseHook === 'function') {
@@ -550,11 +560,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
         }
       } catch { /* silent */ }
       return Reflect.apply(orig, this, [x, y, w, h]);
-    });
+    } }).fillRect);
 
     // --- drawImage ---
-    // IMPORTANT: return real ctx (brand-safe). No Proxy.
-    patchOnce('drawImage', (orig) => function(...args){
+    patchOnce('drawImage', (orig) => ({ drawImage(image, dx, dy, ...rest) {
+      const args = [image, dx, dy, ...rest];
       try {
         const H = getHooks();
         if (H && typeof H.applyDrawImageHook === 'function') {
@@ -563,13 +573,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
         }
       } catch { /* silent */ }
       return Reflect.apply(orig, this, args);
-    });
+    } }).drawImage);
+
+    // IMPORTANT: return real ctx (brand-safe). No Proxy.
     return ctx;
   }
 
   // === 5. getContext interception for HTMLCanvasElement/OffscreenCanvas ===
-  // call hight level hooks
-
   function chainGetContext(proto, method, htmlHooks, ctx2dHooks, webglHooks){
     if (!proto || typeof proto[method] !== 'function') return false;
     const orig = proto[method];
@@ -581,9 +591,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const rest = Array.prototype.slice.call(args, 1);
       const res = Reflect.apply(orig, this, args);
       let ctx = res;
+
       try {
         if (type === '2d' && ctx){
           ctx = createSafeCtxProxy(ctx);
+          // call hight level hooks
           for (const hook of (ctx2dHooks || [])){
             try { ctx = hook.call(this, ctx, type, ...rest) || ctx; } catch (e) {
               if (typeof global.__DEGRADE__ === 'function') {
@@ -593,12 +605,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
         }
         if (/^webgl/.test(String(type))){
-          if (C && typeof C.applyWebGLContextPatches === 'function') {
-            const state = C.__patchState || (C.__patchState = patchState);
-            if (state.webgl !== true) {
-              C.applyWebGLContextPatches();
-            }
-          }
           for (const hook of (webglHooks || [])){
             try { hook.call(this, ctx, type, ...rest); } catch (e) {
               if (typeof global.__DEGRADE__ === 'function') {

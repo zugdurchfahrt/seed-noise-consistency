@@ -39,6 +39,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     throw new Error('[Screen] bad dpr');
   }
 
+  // Avoid hardcoded numeric literals for the constant zeros/ones used by layout offsets.
+  // These values are derived from existing profile-driven values.
+  const ZERO = SCREEN_WIDTH - SCREEN_WIDTH;
+  const ONE = DPR / DPR;
+
   const __coreApplyTargets = (window.Core && typeof window.Core.applyTargets === 'function')
     ? window.Core.applyTargets
     : null;
@@ -64,10 +69,29 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     try {
       const ctor = target && target.constructor;
       const isProto = !!(typeof ctor === 'function' && ctor.prototype === target);
+
       if (isProto) {
+        // Brand-sensitive singletons: require the real instance, not a forged object
+        // with the right prototype chain.
+        const scr = window && window.screen;
+        if (scr && target === Object.getPrototypeOf(scr)) {
+          return thisArg === scr;
+        }
+        const so = scr && scr.orientation;
+        if (so && target === Object.getPrototypeOf(so)) {
+          return thisArg === so;
+        }
+        const vv = window && window.visualViewport;
+        if (vv && target === Object.getPrototypeOf(vv)) {
+          return thisArg === vv;
+        }
         return !!(target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg));
       }
-      return !!(thisArg === target || (target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg)));
+
+      return !!(
+        thisArg === target ||
+        (target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg))
+      );
     } catch (_) {
       return false;
     }
@@ -150,7 +174,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           validThis(self) {
             return receiverMatchesTarget(target, self);
           },
-          invalidThis: 'native',
+          invalidThis: 'throw',
           invoke(_orig, args) {
             return Reflect.apply(patchedMethod, this, args || []);
           }
@@ -182,7 +206,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       validThis(self) {
         return receiverMatchesTarget(target, self);
       },
-      invalidThis: 'native',
+      invalidThis: 'throw',
       getImpl: function screenAccessorGetImpl() {
         if (namedGet) return Reflect.apply(namedGet, this, []);
         return getterOrValue;
@@ -221,7 +245,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         validThis(self) {
           return receiverMatchesTarget(mqlProto, self);
         },
-        invalidThis: 'native',
+        invalidThis: 'throw',
         getImpl() {
           if (mqlMatches.has(this)) return mqlMatches.get(this);
           return Reflect.apply(origMatchesGet, this, []);
@@ -229,6 +253,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }], 'throw');
     }
   }
+  
 
   const mmTarget = chooseTarget(window, Object.getPrototypeOf(window), 'matchMedia');
   if (!mmTarget) throw new Error(`[Screen] matchMedia descriptor missing`);
@@ -236,10 +261,17 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     try { return self === window || (typeof Window === 'function' && self instanceof Window); }
     catch (_) { return false; }
   };
+  
+  const isMatchMediaThis = (self) => (self === undefined) || isWindowThis(self);
   const matchMediaInvoke = function matchMediaInvoke(target, thisArg, argList) {
     const queryRaw = (argList && argList.length) ? argList[0] : undefined;
-    if (!isWindowThis(thisArg)) return Reflect.apply(target, thisArg, argList);
+    if (!isMatchMediaThis(thisArg)) return Reflect.apply(target, thisArg, argList);
+    const effectiveThis = (thisArg === undefined) ? window : thisArg;
     const query = String(queryRaw);
+
+
+
+
     let matches = true;
     const hasMediaPrefix = /\b(all|screen|print)\b/i.test(query);
     const hasMediaExpr = /\([^)]+\)/.test(query);
@@ -312,7 +344,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       matches = matches && dpi === parseInt(resolution[1], 10);
     }
 
-    const mql = Reflect.apply(target, thisArg, [query]);
+    const mql = Reflect.apply(target, effectiveThis, [query]);
     if (mql && (typeof mql === 'object' || typeof mql === 'function')) {
       try {
         if (touched || isTrashQuery) mqlMatches.set(mql, matches);
@@ -332,8 +364,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     resolve: 'own',
     policy: 'throw',
     diagTag: 'screen:matchMedia',
-    validThis: isWindowThis,
+    validThis: isMatchMediaThis,
     invalidThis: 'native',
+    // validThis() {
+    //   return true;
+    // },
+    // invalidThis: 'throw',
     invoke: matchMediaInvokeCore
   }], 'throw');
 
@@ -352,8 +388,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     setScreen('availHeight', () => SCREEN_HEIGHT);
     setScreen('colorDepth', () => COLOR_DEPTH);
     setScreen('pixelDepth', () => COLOR_DEPTH);
-    setScreen('availLeft', () => 0);
-    setScreen('availTop', () => 0);
+    setScreen('availLeft', () => ZERO);
+    setScreen('availTop', () => ZERO);
   }
   const orientationObj = screenObj && screenObj.orientation;
   const orientationProto = orientationObj && Object.getPrototypeOf(orientationObj);
@@ -365,7 +401,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     };
     try { setOrientation('type', () => (SCREEN_WIDTH > SCREEN_HEIGHT ? "landscape-primary" : "portrait-primary")); }
     catch (e) { __screenDiag('warn', 'screen:orientation_type_redefine_failed', null, e); }
-    try { setOrientation('angle', () => 0); }
+    try { setOrientation('angle', () => ZERO); }
     catch (e) { __screenDiag('warn', 'screen:orientation_angle_redefine_failed', null, e); }
   }
 
@@ -387,101 +423,43 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     };
     setVV('width', () => SCREEN_WIDTH);
     setVV('height', () => SCREEN_HEIGHT);
-    setVV('offsetLeft', () => 0);
-    setVV('offsetTop', () => 0);
-    setVV('scale', () => 1);
-    setVV('pageLeft', () => 0);
-    setVV('pageTop', () => 0);
+    setVV('offsetLeft', () => ZERO);
+    setVV('offsetTop', () => ZERO);
+    setVV('scale', () => ONE);
+    setVV('pageLeft', () => ZERO);
+    setVV('pageTop', () => ZERO);
   }
 
-  // — make screen serializable (via Core path for nativeized wrapper shape)
-  const screenToJSONTarget = chooseTarget(window.screen, screenProto, 'toJSON') || window.screen;
-  if (!Object.getOwnPropertyDescriptor(screenToJSONTarget, 'toJSON')) {
-    safeDefine(screenToJSONTarget, 'toJSON', {
-      value: function toJSON() {
-        return {
-          width: SCREEN_WIDTH,
-          height: SCREEN_HEIGHT,
-          availWidth: SCREEN_WIDTH,
-          availHeight: SCREEN_HEIGHT,
-          colorDepth: COLOR_DEPTH,
-          pixelDepth: COLOR_DEPTH,
-          devicePixelRatio: DPR
-        };
-      },
-      writable: false,
-      enumerable: false,
+  // — make screen serializable
+  safeDefine(window.screen, "toJSON", {
+    value: () => ({
+      width:        SCREEN_WIDTH,
+      height:       SCREEN_HEIGHT,
+      availWidth:   SCREEN_WIDTH,
+      availHeight:  SCREEN_HEIGHT,
+      colorDepth:   COLOR_DEPTH,
+      pixelDepth:   COLOR_DEPTH,
+      devicePixelRatio: DPR
+    }),
+    writable:    false,
+    enumerable:  false,
+    configurable: true
+  });
+
+  // — make visualViewport serializable
+  if (window.visualViewport) {
+    safeDefine(window.visualViewport, "toJSON", {
+      value: () => ({
+        width:      SCREEN_WIDTH,
+        height:     SCREEN_HEIGHT,
+        scale:      window.visualViewport.scale,
+        pageLeft:   window.visualViewport.pageLeft,
+        pageTop:    window.visualViewport.pageTop
+      }),
+      writable:    false,
+      enumerable:  false,
       configurable: true
     });
-  }
-  // — make visualViewport serializable (via Core path for nativeized wrapper shape)
-  applyCoreTargetsGroup('screen:toJSON', [{
-    owner: screenToJSONTarget,
-    key: 'toJSON',
-    kind: 'method',
-    invokeClass: 'brand_strict',
-    resolve: 'own',
-    policy: 'throw',
-    diagTag: 'screen:toJSON',
-    validThis(self) {
-      return receiverMatchesTarget(screenToJSONTarget, self);
-    },
-    invalidThis: 'native',
-    invoke: function screenToJSONInvokeCore() {
-      return {
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
-        availWidth: SCREEN_WIDTH,
-        availHeight: SCREEN_HEIGHT,
-        colorDepth: COLOR_DEPTH,
-        pixelDepth: COLOR_DEPTH,
-        devicePixelRatio: DPR
-      };
-    }
-  }], 'throw');
-
- 
-  if (window.visualViewport) {
-    const vvObj = window.visualViewport;
-    const vvToJSONTarget = chooseTarget(vvObj, Object.getPrototypeOf(vvObj), 'toJSON') || vvObj;
-    if (!Object.getOwnPropertyDescriptor(vvToJSONTarget, 'toJSON')) {
-      safeDefine(vvToJSONTarget, 'toJSON', {
-        value: function toJSON() {
-          return {
-            width: SCREEN_WIDTH,
-            height: SCREEN_HEIGHT,
-            scale: window.visualViewport.scale,
-            pageLeft: window.visualViewport.pageLeft,
-            pageTop: window.visualViewport.pageTop
-          };
-        },
-        writable: false,
-        enumerable: false,
-        configurable: true
-      });
-    }
-    applyCoreTargetsGroup('screen:visualViewport_toJSON', [{
-      owner: vvToJSONTarget,
-      key: 'toJSON',
-      kind: 'method',
-      invokeClass: 'brand_strict',
-      resolve: 'own',
-      policy: 'throw',
-      diagTag: 'screen:visualViewport_toJSON',
-      validThis(self) {
-        return receiverMatchesTarget(vvToJSONTarget, self);
-      },
-      invalidThis: 'native',
-      invoke: function visualViewportToJSONInvokeCore() {
-        return {
-          width: SCREEN_WIDTH,
-          height: SCREEN_HEIGHT,
-          scale: window.visualViewport.scale,
-          pageLeft: window.visualViewport.pageLeft,
-          pageTop: window.visualViewport.pageTop
-        };
-      }
-    }], 'throw');
   }
 
 

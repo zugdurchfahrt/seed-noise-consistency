@@ -204,7 +204,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         allowCreate: !d,
         configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : !!enumerable,
-        invalidThis: 'native',
+        invalidThis: 'throw',
         getImpl: function safeDefineAccGetImpl() {
           return Reflect.apply(getFn, this, []);
         }
@@ -258,7 +258,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         allowCreate: !d,
         configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : false,
-        invalidThis: 'native',
+        invalidThis: 'throw',
         getImpl: function redefineAccGetImpl() {
           return Reflect.apply(getFn, this, []);
         }
@@ -482,7 +482,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             configurable: !!dBrands.configurable,
             enumerable: !!dBrands.enumerable,
             validThis: isUadThis,
-            invalidThis: 'native',
+            invalidThis: 'throw',
             getImpl: function userAgentDataBrandsGetImpl() {
               if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: uaData.brands missing');
               return meta.brands;
@@ -519,7 +519,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             configurable: !!dMobile.configurable,
             enumerable: !!dMobile.enumerable,
             validThis: isUadThis,
-            invalidThis: 'native',
+            invalidThis: 'throw',
             getImpl: function userAgentDataMobileGetImpl() {
               if (typeof meta.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
               return meta.mobile;
@@ -556,7 +556,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             configurable: !!dPlatform.configurable,
             enumerable: !!dPlatform.enumerable,
             validThis: isUadThis,
-            invalidThis: 'native',
+            invalidThis: 'throw',
             getImpl: function userAgentDataPlatformGetImpl() {
               if (typeof chPlatform !== 'string' || !chPlatform) throw new Error('THW: uaData.platform missing');
               return chPlatform;
@@ -579,7 +579,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         configurable: !!dFull.configurable,
         enumerable: !!dFull.enumerable,
         validThis: isUadThis,
-        invalidThis: 'native',
+        invalidThis: 'throw',
         getImpl: function userAgentDataFullVersionListGetImpl() {
           if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) {
             throw new Error('THW: uaData.fullVersionList missing');
@@ -601,7 +601,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         configurable: !!dUaFull.configurable,
         enumerable: !!dUaFull.enumerable,
         validThis: isUadThis,
-        invalidThis: 'native',
+        invalidThis: 'throw',
         getImpl: function userAgentDataUaFullVersionGetImpl() {
           if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) {
             throw new Error('THW: uaData.uaFullVersion missing');
@@ -637,7 +637,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         policy: 'throw',
         diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
         validThis: isUadThis,
-        invalidThis: 'native',
+        invalidThis: 'throw',
         invoke(_orig, args) {
           __navLogAccess('userAgentData.getHighEntropyValues', null);
           const keys = (args && args.length) ? args[0] : undefined;
@@ -688,7 +688,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         policy: 'throw',
         diagTag: 'nav_total_set:userAgentData.toJSON',
         validThis: isUadThis,
-        invalidThis: 'native',
+        invalidThis: 'throw',
         invoke() {
           __navLogAccess('userAgentData.toJSON', null);
           return { platform: this.platform, brands: this.brands, mobile: this.mobile };
@@ -791,7 +791,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         validThis(self) {
           return self === navigator.permissions || self === permProto;
         },
-        invalidThis: 'native',
+        invalidThis: 'throw',
         invoke(orig, args) {
           const parameters = (args && args.length) ? args[0] : undefined;
           const permName = (parameters && typeof parameters === 'object' && typeof parameters.name === 'string')
@@ -854,7 +854,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         validThis(self) {
           return self === navigator.mediaDevices || self === mediaProto;
         },
-        invalidThis: 'native',
+        invalidThis: 'throw',
         invoke(_orig, _args) {
           if (!devicesLabels || typeof devicesLabels !== 'object') {
             throw new TypeError('[nav_total_set] devices labels missing');
@@ -932,7 +932,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         validThis(self) {
           return self === navigator.storage || self === storageProto;
         },
-        invalidThis: 'native',
+        invalidThis: 'throw',
         invoke(_orig, _args) {
           __navLogAccess('storage.estimate', null);
           tickUsage();
@@ -955,7 +955,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis(self) {
             return self === navigator.webkitTemporaryStorage || self === tmpProto;
           },
-          invalidThis: 'native',
+          invalidThis: 'throw',
           invoke(_orig, args) {
             __navLogAccess('webkitTemporaryStorage.queryUsageAndQuota', null);
             const success = (args && args.length) ? args[0] : undefined;
@@ -989,7 +989,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis(self) {
             return self === navigator.storage || self === storageProto;
           },
-          invalidThis: 'native',
+          invalidThis: 'throw',
           invoke(_orig, _args) {
             __navLogAccess('storage.persist', null);
             return Promise.resolve(true);
@@ -1011,7 +1011,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis(self) {
             return self === navigator.storage || self === storageProto;
           },
-          invalidThis: 'native',
+          invalidThis: 'throw',
           invoke(orig, args) {
             __navLogAccess('storage.persisted', null);
             const isStorageThis = (this === navigator.storage || this === storageProto);
@@ -1101,7 +1101,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis(self) {
             return self === navigator.credentials || self === credProto;
           },
-          invalidThis: 'native',
+          invalidThis: 'throw',
           invoke(orig, args) {
             __navLogAccess('credentials.create', null);
             const options = (args && args.length) ? args[0] : undefined;
@@ -1123,7 +1123,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis(self) {
             return self === navigator.credentials || self === credProto;
           },
-          invalidThis: 'native',
+          invalidThis: 'throw',
           invoke(orig, args) {
             __navLogAccess('credentials.get', null);
             const options = (args && args.length) ? args[0] : undefined;

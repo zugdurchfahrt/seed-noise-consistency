@@ -220,6 +220,113 @@ function WorkerOverrides_install(G, hub) {
 (function setupEnvBridge(global){
   const BR = (global.__ENV_BRIDGE__ = global.__ENV_BRIDGE__ || {});
 
+const SEED_NATIVIZATION_SRC = `
+      // --- Seed nativization (Window → Worker). No runtime coupling after start. ---
+      try {
+        if (typeof self.__ensureMarkAsNative !== 'function') {
+          const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
+
+          const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
+          const existingToString = fpToStringDesc && fpToStringDesc.value;
+          const existingBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
+
+          if (existingBridge) {
+            const n = existingToString.__NativeToString;
+            const m = existingToString.__NativeToStringMap;
+            if (typeof n !== 'function' || !(m instanceof WeakMap)) {
+              throw new Error('UACHPatch: seed toString bridge invalid');
+            }
+          }
+
+          const nativeToString = existingBridge
+            ? existingToString.__NativeToString
+            : (existingToString || Function.prototype.toString);
+
+          if (typeof nativeToString !== 'function') {
+            throw new Error('UACHPatch: Function.prototype.toString missing');
+          }
+
+          const toStringMap = existingBridge
+            ? existingToString.__NativeToStringMap
+            : new WeakMap();
+
+          function baseMarkAsNative(func, name = "") {
+            if (typeof func !== 'function') return func;
+            const n = name || func.name || "";
+            const label = n
+              ? ('function ' + n + '() { [native code] }')
+              : 'function () { [native code] }';
+            toStringMap.set(func, label);
+            return func;
+          }
+
+          let memoMarkAsNative = null;
+          function ensureMarkAsNative() {
+            if (memoMarkAsNative) return memoMarkAsNative;
+            if (!baseMarkAsNative.__TOSTRING_BRIDGE__) {
+              Object.defineProperty(baseMarkAsNative, '__TOSTRING_BRIDGE__', {
+                value: true,
+                writable: false,
+                configurable: true,
+                enumerable: false
+              });
+            }
+            memoMarkAsNative = baseMarkAsNative;
+            return memoMarkAsNative;
+          }
+
+          Object.defineProperty(self, '__ensureMarkAsNative', {
+            value: ensureMarkAsNative,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+
+          if (!existingBridge) {
+            const d = nativeGetOwnProp(Function.prototype, 'toString');
+
+            const toString = ({ toString() {
+              if (typeof this !== 'function') {
+                return nativeToString.call(this);
+              }
+              const v = toStringMap.get(this);
+              if (v !== undefined) return v;
+              return nativeToString.call(this);
+            }}).toString;
+
+            Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
+              value: true, writable: false, configurable: true, enumerable: false
+            });
+            Object.defineProperty(toString, '__NativeToString', {
+              value: nativeToString, writable: false, configurable: true, enumerable: false
+            });
+            Object.defineProperty(toString, '__NativeToStringMap', {
+              value: toStringMap, writable: false, configurable: true, enumerable: false
+            });
+            Object.defineProperty(toString, '__TOSTRING_PROXY_INSTALLED__', {
+              value: true, writable: false, configurable: true, enumerable: false
+            });
+
+            const markAsNative = ensureMarkAsNative();
+            markAsNative(toString, 'toString');
+            markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
+
+            Object.defineProperty(Function.prototype, 'toString', {
+              value: toString,
+              writable: d ? !!d.writable : true,
+              configurable: d ? !!d.configurable : true,
+              enumerable: d ? !!d.enumerable : false
+            });
+          }
+        }
+      } catch (e) {
+        self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);
+        throw e;
+      }
+`;
+
+
+
 function mkModuleWorkerSource(snapshot, absUrl){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('THW: mkModuleWorkerSource bad snapshot');
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('THW: mkModuleWorkerSource bad absUrl');
@@ -323,107 +430,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
         }
       }
       // --- Seed nativization (Window → Worker). No runtime coupling after start. ---
-      try {
-        if (typeof self.__ensureMarkAsNative !== 'function') {
-          const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
-
-          const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-          const existingToString = fpToStringDesc && fpToStringDesc.value;
-          const existingBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
-
-          if (existingBridge) {
-            const n = existingToString.__NativeToString;
-            const m = existingToString.__NativeToStringMap;
-            if (typeof n !== 'function' || !(m instanceof WeakMap)) {
-              throw new Error('UACHPatch: seed toString bridge invalid');
-            }
-          }
-
-          const nativeToString = existingBridge
-            ? existingToString.__NativeToString
-            : (existingToString || Function.prototype.toString);
-
-          if (typeof nativeToString !== 'function') {
-            throw new Error('UACHPatch: Function.prototype.toString missing');
-          }
-
-          const toStringMap = existingBridge
-            ? existingToString.__NativeToStringMap
-            : new WeakMap();
-
-          function baseMarkAsNative(func, name = "") {
-            if (typeof func !== 'function') return func;
-            const n = name || func.name || "";
-            const label = n
-              ? ('function ' + n + '() { [native code] }')
-              : 'function () { [native code] }';
-            toStringMap.set(func, label);
-            return func;
-          }
-
-          let memoMarkAsNative = null;
-          function ensureMarkAsNative() {
-            if (memoMarkAsNative) return memoMarkAsNative;
-            if (!baseMarkAsNative.__TOSTRING_BRIDGE__) {
-              Object.defineProperty(baseMarkAsNative, '__TOSTRING_BRIDGE__', {
-                value: true,
-                writable: false,
-                configurable: true,
-                enumerable: false
-              });
-            }
-            memoMarkAsNative = baseMarkAsNative;
-            return memoMarkAsNative;
-          }
-
-          Object.defineProperty(self, '__ensureMarkAsNative', {
-            value: ensureMarkAsNative,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-
-          if (!existingBridge) {
-            const d = nativeGetOwnProp(Function.prototype, 'toString');
-
-            const toString = ({ toString() {
-              if (typeof this !== 'function') {
-                return nativeToString.call(this);
-              }
-              const v = toStringMap.get(this);
-              if (v !== undefined) return v;
-              return nativeToString.call(this);
-            }}).toString;
-
-            Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
-              value: true, writable: false, configurable: true, enumerable: false
-            });
-            Object.defineProperty(toString, '__NativeToString', {
-              value: nativeToString, writable: false, configurable: true, enumerable: false
-            });
-            Object.defineProperty(toString, '__NativeToStringMap', {
-              value: toStringMap, writable: false, configurable: true, enumerable: false
-            });
-            Object.defineProperty(toString, '__TOSTRING_PROXY_INSTALLED__', {
-              value: true, writable: false, configurable: true, enumerable: false
-            });
-
-            const markAsNative = ensureMarkAsNative();
-            markAsNative(toString, 'toString');
-            markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
-
-            Object.defineProperty(Function.prototype, 'toString', {
-              value: toString,
-              writable: d ? !!d.writable : true,
-              configurable: d ? !!d.configurable : true,
-              enumerable: d ? !!d.enumerable : false
-            });
-          }
-        }
-      } catch (e) {
-        self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);
-        throw e;
-      }
+      ${SEED_NATIVIZATION_SRC}
       let __patchOK = false;
       try {
         // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
@@ -469,9 +476,6 @@ function mkModuleWorkerSource(snapshot, absUrl){
     //# sourceURL=worker_module_bootstrap.js
   `;
 }
-
-
-
 
 function mkClassicWorkerSource(snapshot, absUrl){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('THW: mkClassicWorkerSource bad snapshot');
@@ -576,115 +580,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
       }
 
       // --- Seed nativization (Window → Worker). No runtime coupling after start. ---
-      try {
-        if (typeof self.__ensureMarkAsNative !== 'function') {
-          const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
-
-          const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-          const existingToString = fpToStringDesc && fpToStringDesc.value;
-          const existingBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
-
-          if (existingBridge) {
-            const n = existingToString.__NativeToString;
-            const m = existingToString.__NativeToStringMap;
-            if (typeof n !== 'function' || !(m instanceof WeakMap)) {
-              throw new Error('UACHPatch: seed toString bridge invalid');
-            }
-          }
-
-          const nativeToString = existingBridge
-            ? existingToString.__NativeToString
-            : (existingToString || Function.prototype.toString);
-
-          if (typeof nativeToString !== 'function') {
-            throw new Error('UACHPatch: Function.prototype.toString missing');
-          }
-
-          const toStringMap = existingBridge
-            ? existingToString.__NativeToStringMap
-            : new WeakMap();
-
-          function baseMarkAsNative(func, name = "") {
-            if (typeof func !== 'function') return func;
-            const n = name || func.name || "";
-            const label = n
-              ? ('function ' + n + '() { [native code] }')
-              : 'function () { [native code] }';
-            toStringMap.set(func, label);
-            return func;
-          }
-
-          let memoMarkAsNative = null;
-          function ensureMarkAsNative() {
-            if (memoMarkAsNative) return memoMarkAsNative;
-            if (!baseMarkAsNative.__TOSTRING_BRIDGE__) {
-              Object.defineProperty(baseMarkAsNative, '__TOSTRING_BRIDGE__', {
-                value: true,
-                writable: false,
-                configurable: true,
-                enumerable: false
-              });
-            }
-            memoMarkAsNative = baseMarkAsNative;
-            return memoMarkAsNative;
-          }
-
-          Object.defineProperty(self, '__ensureMarkAsNative', {
-            value: ensureMarkAsNative,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-
-          if (!existingBridge) {
-            const d = nativeGetOwnProp(Function.prototype, 'toString');
-
-            const toString = ({ toString() {
-              if (typeof this !== 'function') {
-                return nativeToString.call(this);
-              }
-              const v = toStringMap.get(this);
-              if (v !== undefined) return v;
-              return nativeToString.call(this);
-            }}).toString;
-
-            Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
-              value: true, writable: false, configurable: true, enumerable: false
-            });
-            Object.defineProperty(toString, '__NativeToString', {
-              value: nativeToString, writable: false, configurable: true, enumerable: false
-            });
-            Object.defineProperty(toString, '__NativeToStringMap', {
-              value: toStringMap, writable: false, configurable: true, enumerable: false
-            });
-            Object.defineProperty(toString, '__TOSTRING_PROXY_INSTALLED__', {
-              value: true, writable: false, configurable: true, enumerable: false
-            });
-
-            const markAsNative = ensureMarkAsNative();
-            markAsNative(toString, 'toString');
-            markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
-
-            Object.defineProperty(Function.prototype, 'toString', {
-              value: toString,
-              writable: d ? !!d.writable : true,
-              configurable: d ? !!d.configurable : true,
-              enumerable: d ? !!d.enumerable : false
-            });
-          }
-        }
-      } catch (e) {
-        self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);
-        throw e;
-      }
-
-
-
-
-
-
-
-
+      ${SEED_NATIVIZATION_SRC}
       let __patchOK = false;
       try {
         // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>

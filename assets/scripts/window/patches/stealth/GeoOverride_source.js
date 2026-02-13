@@ -185,7 +185,7 @@
         resolve: 'own',
         diagTag: 'geo:getCurrentPosition',
         validThis: validGeoThis,
-        invalidThis: 'native',
+        invalidThis: 'throw',
         invoke: function invokeGetCurrentPosition(orig, args) {
           const next = Array.prototype.slice.call(args || []);
           next[0] = wrapSuccess(next[0], next[1]);
@@ -201,7 +201,7 @@
         resolve: 'own',
         diagTag: 'geo:watchPosition',
         validThis: validGeoThis,
-        invalidThis: 'native',
+        invalidThis: 'throw',
         invoke: function invokeWatchPosition(orig, args) {
           const next = Array.prototype.slice.call(args || []);
           next[0] = wrapSuccess(next[0], next[1]);
@@ -217,7 +217,7 @@
         resolve: 'own',
         diagTag: 'geo:clearWatch',
         validThis: validGeoThis,
-        invalidThis: 'native'
+        invalidThis: 'throw'
       }
     ];
 

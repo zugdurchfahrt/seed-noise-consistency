@@ -111,9 +111,9 @@ const AudioContextModule = function AudioContextModule(window) {
     return true;
   }
 
-  // 1. lazy native values for sampleRate/baseLatency (avoid eager AudioContext init)
+  // 1. lazy native values for sampleRate/baseLatency (avoid eager AudioContext init)// let sampleRateSource =;  0=default, 1=offline, 2=audio
   let nativeSampleRate = 44100, nativeBaseLatency = 0.0029;
-  let sampleRateSource = 0; // 0=default, 1=offline, 2=audio
+  let sampleRateSource = 0;
   let baseLatencySource = 0;
 
   function maybeUpdateRates(self, origSampleGet, origBaseGet, priority) {

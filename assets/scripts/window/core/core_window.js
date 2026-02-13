@@ -730,9 +730,19 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const orig = desc.value;
         const invoke = typeof t.invoke === 'function' ? t.invoke : null;
         const hooksPost = Array.isArray(t.hooksPost) ? t.hooksPost : [];
-        const validThis = typeof t.validThis === 'function' ? t.validThis : null;
-        const invalidThis = t.invalidThis || 'native';
         const invokeClass = planItem.invokeClass || 'normal';
+        const requiresStrictThis = invokeClass !== 'normal';
+        const validThis = typeof t.validThis === 'function' ? t.validThis : null;
+        const invalidThis = requiresStrictThis ? 'throw' : (t.invalidThis || 'native');
+        if (requiresStrictThis && !validThis) {
+          const e = new TypeError('[Core.applyTargets] invokeClass requires validThis');
+          return fail(planItem.policy, planItem.tag, 'invoke_class_requires_valid_this', e, {
+            key: planItem.key,
+            kind: planItem.kind,
+            targetId: planItem.targetId,
+            invokeClass
+          });
+        }
         function buildMethodWrapperByArity(fn, keyName, invokePath) {
           const arity = (fn && typeof fn.length === 'number' && fn.length >= 0) ? fn.length : 0;
           switch (arity) {
@@ -812,9 +822,19 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const orig = desc.value;
         const invoke = typeof t.invoke === 'function' ? t.invoke : null;
         const hooksPost = Array.isArray(t.hooksPost) ? t.hooksPost : [];
-        const validThis = typeof t.validThis === 'function' ? t.validThis : null;
-        const invalidThis = t.invalidThis || 'native';
         const invokeClass = planItem.invokeClass || 'normal';
+        const requiresStrictThis = invokeClass !== 'normal';
+        const validThis = typeof t.validThis === 'function' ? t.validThis : null;
+        const invalidThis = requiresStrictThis ? 'throw' : (t.invalidThis || 'native');
+        if (requiresStrictThis && !validThis) {
+          const e = new TypeError('[Core.applyTargets] invokeClass requires validThis');
+          return fail(planItem.policy, planItem.tag, 'invoke_class_requires_valid_this', e, {
+            key: planItem.key,
+            kind: planItem.kind,
+            targetId: planItem.targetId,
+            invokeClass
+          });
+        }
         function buildPromiseMethodWrapperByArity(fn, keyName, invokePath) {
           const arity = (fn && typeof fn.length === 'number' && fn.length >= 0) ? fn.length : 0;
           switch (arity) {

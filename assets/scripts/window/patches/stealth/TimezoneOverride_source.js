@@ -203,7 +203,7 @@
           validThis(self) {
             try { return !!(self && self instanceof OrigDTF); } catch (_) { return false; }
           },
-          invalidThis: "native",
+          invalidThis: "throw",
           invoke(orig, args) {
             const ro = Reflect.apply(orig, this, args || []);
             try {
@@ -255,7 +255,7 @@
           validThis(self) {
             try { return !!(self && self.constructor && self.constructor.prototype && self.constructor.prototype.isPrototypeOf(self)); } catch (_) { return false; }
           },
-          invalidThis: "native",
+          invalidThis: "throw",
           invoke(orig, args) {
             const options = Reflect.apply(orig, this, args || []);
             try {
@@ -301,7 +301,7 @@
           validThis(self) {
             try { return !!(self && self instanceof Date); } catch (_) { return false; }
           },
-          invalidThis: "native",
+          invalidThis: "throw",
           invoke(orig, args) {
             let locales = (args && args.length >= 1) ? args[0] : undefined;
             let options = (args && args.length >= 2) ? args[1] : undefined;
@@ -320,7 +320,7 @@
           validThis(self) {
             try { return !!(self && self instanceof Date); } catch (_) { return false; }
           },
-          invalidThis: "native",
+          invalidThis: "throw",
           invoke(orig, args) {
             let locales = (args && args.length >= 1) ? args[0] : undefined;
             let options = (args && args.length >= 2) ? args[1] : undefined;
@@ -339,7 +339,7 @@
           validThis(self) {
             try { return !!(self && self instanceof Date); } catch (_) { return false; }
           },
-          invalidThis: "native",
+          invalidThis: "throw",
           invoke(orig, args) {
             let locales = (args && args.length >= 1) ? args[0] : undefined;
             let options = (args && args.length >= 2) ? args[1] : undefined;
