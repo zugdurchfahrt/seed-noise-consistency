@@ -945,7 +945,7 @@ def main():
         logger.info("full profile: %s", json.dumps(profile, indent=4))
 
         # ----------------------- Own data collection  -----------------------
-        save_dir = str(PROJECT_ROOT / "profiles")
+        save_dir = str(PROFILE_DATA_SRC / "profiles")
         os.makedirs(save_dir, exist_ok=True)
         filename = f"profile_{datetime.now():%Y%m%d_%H%M%S_%f}.json"
         filepath = os.path.join(save_dir, filename)
