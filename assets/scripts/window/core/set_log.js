@@ -630,7 +630,7 @@ const LOGGingModule = function LOGGingModule() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "my_debug_log.json";
+        a.download = "my_debug_log_" + new Date().toISOString().replace(/:/g, "").replace(/Z$/, "") + ".json";
         document.body.appendChild(a);
         a.click();
         setTimeout(function () {
