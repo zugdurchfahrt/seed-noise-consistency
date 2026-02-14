@@ -228,3 +228,8 @@ sunami_BACKUP.bundle
 profile.json
 bin/_patched_copies/UAD/draft_override_user_agent_data.py
 AGENTS.md
+assets/generated_fonts/Win32/fonts_index.json
+profile.json
+docs/pitfalls.md
+assets/scripts/window/DEGRADE_CALLS_SUMMARY.md
+assets/generated_fonts/Win32/fonts_index.json

@@ -10,23 +10,31 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const DPR           = Number(window.__DPR);
 
   const __screenDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
-  const __screenLogArr = Array.isArray(window._myDebugLog) ? window._myDebugLog : null;
+  const __screenDegradeDiag = (__screenDegrade && typeof __screenDegrade.diag === 'function')
+    ? __screenDegrade.diag.bind(__screenDegrade)
+    : null;
   function __screenDiag(level, code, extra, err) {
-    if ((level === 'warn' || level === 'error') && typeof __screenDegrade === 'function') {
-      __screenDegrade(code || 'screen', err || null, extra || null);
+    const normalizedLevel = (level === 'warn' || level === 'error' || level === 'info' || level === 'debug')
+      ? level
+      : 'info';
+    const normalizedCode = code || 'screen';
+    const ctx = {
+      module: 'screen',
+      diagTag: 'screen',
+      surface: 'screen',
+      key: null,
+      stage: normalizedLevel,
+      message: normalizedCode,
+      data: extra || null,
+      type: 'pipeline missing data'
+    };
+    if (__screenDegradeDiag) {
+      try { __screenDegradeDiag(normalizedLevel, normalizedCode, ctx, err || null); } catch (_) {}
       return;
     }
-    try {
-      if (__screenLogArr) {
-        __screenLogArr.push({
-          type: 'screen_' + level,
-          code: code || null,
-          extra: extra || null,
-          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack || null } : null,
-          timestamp: new Date().toISOString()
-        });
-      }
-    } catch (_) {}
+    if (typeof __screenDegrade === 'function') {
+      try { __screenDegrade(normalizedCode, err || null, ctx); } catch (_) {}
+    }
   }
 
   if (!Number.isFinite(SCREEN_WIDTH) || !Number.isFinite(SCREEN_HEIGHT)) {

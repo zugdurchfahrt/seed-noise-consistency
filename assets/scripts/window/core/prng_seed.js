@@ -11,7 +11,6 @@
     // Idempotent‑guard For the whole module
     if (G.__PATCH_ENVPARAMS__) return; // why: Protection against re -initialization
     G.__PATCH_ENVPARAMS__ = true;
-    G._myDebugLog = G._myDebugLog || [];
 
     // Fallbacks (do not interfere, if already defined)
     if (typeof G.mulberry32 !== 'function') {

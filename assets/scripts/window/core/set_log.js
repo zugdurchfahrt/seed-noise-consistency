@@ -1,28 +1,45 @@
 const LOGGingModule = function LOGGingModule() {
-    if (!window.__PATCH_MYTYPER__) {
-    window.__PATCH_MYTYPER__ = true;
-
-    const global = window;
-    const C = (global.CanvasPatchContext = global.CanvasPatchContext || {});
     const G =
       (typeof globalThis !== "undefined" && globalThis) ||
       (typeof self !== "undefined" && self) ||
       (typeof window !== "undefined" && window) ||
       {};
+    const W = (typeof window !== "undefined" && window) ? window : null;
 
-    // ===== 0) Central store: ONLY window._myDebugLo  =====
-    if (!Array.isArray(global._myDebugLog)) global._myDebugLog = [];
-    G._myDebugLog = global._myDebugLog;
+    if (!G.__PATCH_MYTYPER__) {
+    G.__PATCH_MYTYPER__ = true;
+
+    const global = G;
+    const C = ((W || G).CanvasPatchContext = (W || G).CanvasPatchContext || {});
+
+    // ===== 0) Central store: private buffer only =====
+    const STORE = new WeakMap();
+    const FALLBACK_BUF = [];
+    let degradeFn = null;
+
+    function _buf() {
+      const key = degradeFn || G.__DEGRADE__;
+      if (typeof key !== "function") return FALLBACK_BUF;
+      if (!STORE.has(key)) STORE.set(key, []);
+      return STORE.get(key);
+    }
+
+    function _guardPush(entry) {
+      try { _buf().push(entry); } catch (_) {}
+    }
+
 
     // Debug flag (respect false)
     G.__DEBUG__ =
       typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
       // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
 
-    window.env = window.env || {};
-    window.env.DEBUG_DEGRADES = true;   // включить
-    // window.env.DEBUG_DEGRADES = false; // выключить
-    const env = window.env;
+    global.env = global.env || {};
+    // Toggle for *logger self-diagnostics visibility*.
+    // IMPORTANT: must not change runtime behavior by throwing from the logger.
+    global.env.DEBUG_DEGRADES = true;   // включить
+    // global.env.DEBUG_DEGRADES = false; // выключить
+    const env = global.env;
 
 
     // Save original console methods
@@ -57,16 +74,16 @@ const LOGGingModule = function LOGGingModule() {
         stack: (err && err.stack) ? String(err.stack) : null
       };
 
-      if (Array.isArray(global._myDebugLog)) {
-        pushEntry({
-          type: "logger_guard",
-          logger_guard: true,
-          where: guard.last.where,
-          message: guard.last.message,
-          stack: guard.last.stack,
-          timestamp: new Date().toISOString()
-        });
-      }
+      _guardPush({
+        type: "logger_guard",
+        logger_guard: true,
+        where: guard.last.where,
+        message: guard.last.message,
+        stack: guard.last.stack,
+        timestamp: new Date().toISOString()
+      });
+
+      
     }
 
 
@@ -75,7 +92,8 @@ const LOGGingModule = function LOGGingModule() {
         return Reflect.apply(fn, self, args);
       } catch (err) {
         recordLoggerError(err, where);
-        throw err;
+        // Logging must never become a runtime crash source.
+        return undefined;
       }
     }
 
@@ -237,14 +255,15 @@ const LOGGingModule = function LOGGingModule() {
 
     function pushEntry(entry) {
       try {
-        global._myDebugLog.push(entry);
+        _buf().push(entry);
       } catch (e) {
         // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
         // иначе рекурсия по пути ошибок (само-логирование логгера).
         // (если очень надо сигналить — делай это через origConsole.* или просто молчи)
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-          throw e;
+          // Keep last-known logger failure in memory; never throw outward from the logger.
+          try { recordLoggerError(e, "pushEntry"); } catch (_) {}
         }
       }
     }
@@ -252,9 +271,14 @@ const LOGGingModule = function LOGGingModule() {
 
     // ===== 2.5) Swallowed/degrade marker (explicit) =====
     G.__DEGRADE__ = function (code, err, extra) {
+    degradeFn = G.__DEGRADE__;
       try {
         if (typeof pushEntry !== "function") {
-          if (env && env.DEBUG_DEGRADES) throw new TypeError();
+          if (env && env.DEBUG_DEGRADES) {
+            const te = new TypeError("[set_log] pushEntry is missing");
+            try { recordLoggerError(te, "__DEGRADE__:pushEntry_missing"); } catch (_) {}
+            if (origConsole && origConsole.error) { try { origConsole.error(te); } catch (_) {} }
+          }
           return;
         }
         pushEntry({
@@ -273,11 +297,84 @@ const LOGGingModule = function LOGGingModule() {
             if (origConsole && origConsole.error) {
             try { origConsole.error(e); } catch (_) {}
             }
-            throw e;
+            try { recordLoggerError(e, "__DEGRADE__"); } catch (_) {}
         }
         }
     };
-    global.__DEGRADE__ = G.__DEGRADE__;
+
+    Object.defineProperty(G.__DEGRADE__, "getBuffer", {
+      value() {
+        return _buf().slice();
+      },
+      enumerable: false,
+      writable: false,
+      configurable: false
+    });
+
+    /**
+     * window.__DEGRADE__.diag(level, code, ctx, err?)
+     *
+     * Единый вход для диагностических событий всех модулей.
+     *
+     * @param {string} level - 'info'|'warn'|'error'|'fatal'
+     * @param {string} code - идентификатор события
+     * @param {object} ctx - plain-object контекст: module, diagTag, surface, key, stage, message, data, type
+     * @param {Error} [err] - опциональная ошибка
+     *
+     * Записывает в shape: { type:'degrade', code, error, extra:{ level, type, ... }, timestamp }.
+     * Fail-safe: не бросает исключения и не пишет в console.
+     */
+    Object.defineProperty(G.__DEGRADE__, "diag", {
+      value(level, code, ctx, err) {
+        try {
+          const validLevels = ["info", "warn", "error", "fatal"];
+          const rawLevel = String(level || "info");
+          const normalizedLevel = validLevels.indexOf(rawLevel) !== -1 ? rawLevel : "info";
+          const normalizedCode = String(code || "unknown");
+
+          let safeCtx = ctx;
+          if (!isPlainObject(safeCtx)) {
+            safeCtx = {};
+          }
+
+
+      const validTypes = ["pipeline missing data", "browser structure missing data"];
+      const rawType = (safeCtx && typeof safeCtx.type === "string") ? safeCtx.type : "";
+      const validatedType = validTypes.indexOf(rawType) !== -1 ? rawType : "pipeline missing data";
+
+      let dataIn = safeCtx && safeCtx.data;
+      if (rawType && validatedType !== rawType) {
+        if (dataIn && typeof dataIn === "object") {
+          try { dataIn = Object.assign({}, dataIn, { _badType: rawType }); }
+          catch (_) { dataIn = { _badType: rawType }; }
+        } else {
+          dataIn = { _badType: rawType };
+        }
+      }
+      const safeData = normalizeForJSON(dataIn);
+
+      const extraObj = {
+        level: normalizedLevel,
+        type: validatedType,
+        module: (typeof safeCtx.module === "string") ? safeCtx.module : undefined,
+        diagTag: (typeof safeCtx.diagTag === "string") ? safeCtx.diagTag : undefined,
+        surface: (typeof safeCtx.surface === "string") ? safeCtx.surface : undefined,
+        key: (typeof safeCtx.key === "string") ? safeCtx.key : undefined,
+        stage: (typeof safeCtx.stage === "string") ? safeCtx.stage : undefined,
+        message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
+        data: safeData
+      };
+
+      G.__DEGRADE__(normalizedCode, err, extraObj);
+
+      } catch (e) { try { recordLoggerError(e, "diag"); } catch (_) {} }
+
+    },
+    enumerable: false,
+    writable: false,
+    configurable: false
+  });
+  global.__DEGRADE__ = G.__DEGRADE__;
 
 
 
@@ -326,8 +423,8 @@ const LOGGingModule = function LOGGingModule() {
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("pushLog", e);
-          throw e;
+          // Do not call __DEGRADE__ here (it writes through pushEntry); avoid recursion.
+          try { recordLoggerError(e, "pushLog"); } catch (_) {}
         }
       }
     }
@@ -408,8 +505,7 @@ const LOGGingModule = function LOGGingModule() {
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("onerror", e);
-          throw e;
+          try { recordLoggerError(e, "onerror"); } catch (_) {}
         }
       }
       return false; // do not swallow (DevTools still shows it)
@@ -444,8 +540,7 @@ const LOGGingModule = function LOGGingModule() {
         } catch (e) {
           if (env && env.DEBUG_DEGRADES) {
             if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-            if (typeof __DEGRADE__ === "function") __DEGRADE__("resource_error", e);
-            throw e;
+            try { recordLoggerError(e, "resource_error"); } catch (_) {}
           }
         }
       },
@@ -466,8 +561,7 @@ const LOGGingModule = function LOGGingModule() {
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("unhandledrejection", e);
-          throw e;
+          try { recordLoggerError(e, "unhandledrejection"); } catch (_) {}
         }
       }
     });
@@ -491,14 +585,13 @@ const LOGGingModule = function LOGGingModule() {
               colno: typeof (e && e.colno) === "number" ? e.colno : null,
               timestamp: new Date().toISOString(),
             });
-          } catch (e) {
-            if (env && env.DEBUG_DEGRADES) {
-              if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-              if (typeof __DEGRADE__ === "function") __DEGRADE__("worker_error", e);
-              throw e;
-            }
-          }
-        });
+           } catch (e) {
+             if (env && env.DEBUG_DEGRADES) {
+               if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+               try { recordLoggerError(e, "worker_error"); } catch (_) {}
+             }
+           }
+         });
 
         global.addEventListener("unhandledrejection", function (event) {
           try {
@@ -510,27 +603,29 @@ const LOGGingModule = function LOGGingModule() {
               stack: reason && reason.stack ? String(reason.stack) : null,
               timestamp: new Date().toISOString(),
             });
-          } catch (e) {
-            if (env && env.DEBUG_DEGRADES) {
-              if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-              if (typeof __DEGRADE__ === "function") __DEGRADE__("worker_unhandledrejection", e);
-              throw e;
-            }
-          }
-        });
+           } catch (e) {
+             if (env && env.DEBUG_DEGRADES) {
+               if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+               try { recordLoggerError(e, "worker_unhandledrejection"); } catch (_) {}
+             }
+           }
+         });
       }
-    } catch (e) {
-      if (env && env.DEBUG_DEGRADES) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("worker_context", e);
-        throw e;
-      }
-    }
+     } catch (e) {
+       if (env && env.DEBUG_DEGRADES) {
+         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+         try { recordLoggerError(e, "worker_context"); } catch (_) {}
+       }
+     }
 
     // ===== 6) Export helper (in-session) =====
     global.exportMyDebugLog = function () {
       try {
-        const data = JSON.stringify(global._myDebugLog, null, 2);
+        if (typeof document === "undefined" || !document) return;
+        const list = (typeof G.__DEGRADE__ === "function" && typeof G.__DEGRADE__.getBuffer === "function")
+          ? G.__DEGRADE__.getBuffer()
+          : [];
+        const data = JSON.stringify(list, null, 2);
         const blob = new Blob([data], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -544,8 +639,7 @@ const LOGGingModule = function LOGGingModule() {
           } catch (e) {
             if (env && env.DEBUG_DEGRADES) {
               if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-              if (typeof __DEGRADE__ === "function") __DEGRADE__("exportMyDebugLog", e);
-              throw e;
+              try { recordLoggerError(e, "exportMyDebugLog:removeChild"); } catch (_) {}
             }
           }
           try {
@@ -553,16 +647,14 @@ const LOGGingModule = function LOGGingModule() {
           } catch (e) {
             if (env && env.DEBUG_DEGRADES) {
               if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-              if (typeof __DEGRADE__ === "function") __DEGRADE__("exportMyDebugLog", e);
-              throw e;
+              try { recordLoggerError(e, "exportMyDebugLog:revokeObjectURL"); } catch (_) {}
             }
           }
         }, 5500);
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("exportMyDebugLog", e);
-          throw e;
+          try { recordLoggerError(e, "exportMyDebugLog"); } catch (_) {}
         }
       }
     };
@@ -587,8 +679,7 @@ const LOGGingModule = function LOGGingModule() {
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("DEBUG_ALL_ON", e);
-          throw e;
+          try { recordLoggerError(e, "DEBUG_ALL_ON"); } catch (_) {}
         }
       }
     };
@@ -608,8 +699,7 @@ const LOGGingModule = function LOGGingModule() {
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("DEBUG_ALL_OFF", e);
-          throw e;
+          try { recordLoggerError(e, "DEBUG_ALL_OFF"); } catch (_) {}
         }
       }
     };
@@ -621,25 +711,59 @@ const LOGGingModule = function LOGGingModule() {
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("DEBUG_ALL_TOGGLE", e);
-          throw e;
+          try { recordLoggerError(e, "DEBUG_ALL_TOGGLE"); } catch (_) {}
         }
+      }
+    };
+
+    // Logger self-diagnostics mode toggles (controls verbosity, not runtime throws)
+    global.DEBUG_DEGRADES_ON = function () {
+      try {
+        global.env = global.env || {};
+        global.env.DEBUG_DEGRADES = true;
+        if (typeof global.__DEGRADE__ === "function") global.__DEGRADE__("DEBUG_DEGRADES_ON", null);
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "DEBUG_DEGRADES_ON"); } catch (_) {}
+      }
+    };
+
+    global.DEBUG_DEGRADES_OFF = function () {
+      try {
+        global.env = global.env || {};
+        global.env.DEBUG_DEGRADES = false;
+        if (typeof global.__DEGRADE__ === "function") global.__DEGRADE__("DEBUG_DEGRADES_OFF", null);
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "DEBUG_DEGRADES_OFF"); } catch (_) {}
+      }
+    };
+
+    global.DEBUG_DEGRADES_TOGGLE = function () {
+      try {
+        global.env = global.env || {};
+        global.env.DEBUG_DEGRADES = !global.env.DEBUG_DEGRADES;
+        if (typeof global.__DEGRADE__ === "function") global.__DEGRADE__("DEBUG_DEGRADES_TOGGLE", null, { enabled: !!global.env.DEBUG_DEGRADES });
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
       }
     };
 
   
 
-      // after all logger globals are assigned:
-      Object.defineProperty(window, "_myDebugLog", { value: window._myDebugLog, writable:true, configurable:true, enumerable:false });
-      Object.defineProperty(window, "_logLevel",   { value: window._logLevel,   writable:true, configurable:true, enumerable:false });
-      Object.defineProperty(window, "_logConfig",  { value: window._logConfig,  writable:true, configurable:true, enumerable:false });
-      Object.defineProperty(window, "__DEBUG__",   { value: window.__DEBUG__,   writable:true, configurable:true, enumerable:false });
-      Object.defineProperty(window, "__DEGRADE__", { value: window.__DEGRADE__, writable:false, configurable:true, enumerable:false });
-      Object.defineProperty(window, "log",         { value: window.log,         writable:false, configurable:true, enumerable:false });
-      Object.defineProperty(window, "exportMyDebugLog", { value: window.exportMyDebugLog, writable:false, configurable:true, enumerable:false });
-      Object.defineProperty(window, "DEBUG_ALL_ON",     { value: window.DEBUG_ALL_ON,     writable:false, configurable:true, enumerable:false });
-      Object.defineProperty(window, "DEBUG_ALL_OFF",    { value: window.DEBUG_ALL_OFF,    writable:false, configurable:true, enumerable:false });
-      Object.defineProperty(window, "DEBUG_ALL_TOGGLE", { value: window.DEBUG_ALL_TOGGLE, writable:false, configurable:true, enumerable:false });
+      // after all logger globals are assigned (Window realm only):
+      if (W) {
+        Object.defineProperty(W, "_logLevel",   { value: W._logLevel,   writable:true, configurable:true, enumerable:false });
+        Object.defineProperty(W, "_logConfig",  { value: W._logConfig,  writable:true, configurable:true, enumerable:false });
+        Object.defineProperty(W, "__DEBUG__",   { value: W.__DEBUG__,   writable:true, configurable:true, enumerable:false });
+        Object.defineProperty(W, "__DEGRADE__", { value: W.__DEGRADE__, writable:false, configurable:true, enumerable:false });
+        Object.defineProperty(W, "log",         { value: W.log,         writable:false, configurable:true, enumerable:false });
+        Object.defineProperty(W, "exportMyDebugLog", { value: W.exportMyDebugLog, writable:false, configurable:true, enumerable:false });
+        Object.defineProperty(W, "DEBUG_ALL_ON",     { value: W.DEBUG_ALL_ON,     writable:false, configurable:true, enumerable:false });
+        Object.defineProperty(W, "DEBUG_ALL_OFF",    { value: W.DEBUG_ALL_OFF,    writable:false, configurable:true, enumerable:false });
+        Object.defineProperty(W, "DEBUG_ALL_TOGGLE", { value: W.DEBUG_ALL_TOGGLE, writable:false, configurable:true, enumerable:false });
+      }
 
 
     }

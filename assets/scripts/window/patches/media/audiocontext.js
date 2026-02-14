@@ -23,6 +23,10 @@ const AudioContextModule = function AudioContextModule(window) {
   if (typeof __wrapNativeApply !== 'function') throw new Error('[AudioContextPatch] __wrapNativeApply missing');
   if (typeof __wrapNativeAccessor !== 'function') throw new Error('[AudioContextPatch] __wrapNativeAccessor missing');
   const AUDIO_NOISE_ENABLED = true;
+  const __audioDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __audioDegradeDiag = (__audioDegrade && typeof __audioDegrade.diag === 'function')
+    ? __audioDegrade.diag.bind(__audioDegrade)
+    : null;
 
   const GUARD = globalThis.__AUDIO_CTX_GUARD__ || (globalThis.__AUDIO_CTX_GUARD__ = {
     counts: {},
@@ -33,13 +37,22 @@ const AudioContextModule = function AudioContextModule(window) {
     const key = String(code);
     GUARD.counts[key] = (GUARD.counts[key] || 0) + 1;
     GUARD.last = { code: key, detail: detail || null, at: Date.now() };
-    if (Array.isArray(globalThis._myDebugLog)) {
-      globalThis._myDebugLog.push({
-        type: 'audio_guard',
-        code: key,
-        detail: detail || null,
-        timestamp: new Date().toISOString()
-      });
+    const ctx = {
+      module: 'audiocontext',
+      diagTag: 'audio_guard',
+      surface: 'audio',
+      key,
+      stage: 'guard',
+      message: key,
+      data: detail || null,
+      type: 'pipeline missing data'
+    };
+    if (__audioDegradeDiag) {
+      try { __audioDegradeDiag('warn', 'audiocontext:' + key, ctx, null); } catch (_) {}
+      return;
+    }
+    if (typeof __audioDegrade === 'function') {
+      try { __audioDegrade('audiocontext:' + key, null, ctx); } catch (_) {}
     }
   }
   function ensurePreflight(owner, key, kind, ctxName) {

@@ -660,14 +660,28 @@
     if (Number(sanity.hardwareConcurrency) !== Number(cache.snap.hardwareConcurrency)) throw new Error('UACHPatch: hardwareConcurrency mismatch');
     self.__UACH_MIRROR_INSTALLED__ = true;
 
-    if (Array.isArray(self._myDebugLog)) {
-      self._myDebugLog.push({
-        type: "worker_patch",
+    const __workerDegrade = (typeof __DEGRADE__ === "function") ? __DEGRADE__ : null;
+    const __workerDegradeDiag = (__workerDegrade && typeof __workerDegrade.diag === "function")
+      ? __workerDegrade.diag.bind(__workerDegrade)
+      : null;
+    const __workerCtx = {
+      module: "WORKER_PATCH_SRC",
+      diagTag: "worker_patch",
+      surface: "worker",
+      key: "installWorkerUACHMirror",
+      stage: "installed",
+      message: "worker patch installed",
+      data: {
         core: true,
         mirror: !!self.__UACH_MIRROR_INSTALLED__,
-        scope: !!self.__SCOPE_CONSISTENCY_PATCHED__,
-        timestamp: new Date().toISOString()
-      });
+        scope: !!self.__SCOPE_CONSISTENCY_PATCHED__
+      },
+      type: "pipeline missing data"
+    };
+    if (__workerDegradeDiag) {
+      try { __workerDegradeDiag("info", "WORKER_PATCH_SRC:worker_patch", __workerCtx, null); } catch (_) {}
+    } else if (typeof __workerDegrade === "function") {
+      try { __workerDegrade("WORKER_PATCH_SRC:worker_patch", null, __workerCtx); } catch (_) {}
     }
   };
 })();
