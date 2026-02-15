@@ -571,7 +571,23 @@ def run_worker_seed():
     injected = set()   # targetId set
     manual_attach_sent = set()  # targetId set for fallback manual attach
     seed_prelude = _build_worker_seed_prelude(WORKER_GLOBAL_SEED)
-    sanity_expr = "(() => { try { return String(globalThis.__GLOBAL_SEED); } catch (e) { return null; } })()"
+    # sanity_expr = "(() => { try { return String(globalThis.__GLOBAL_SEED); } catch (e) { return null; } })()"
+
+
+    sanity_expr = (
+        "(() => {"
+        " const G = globalThis;"
+        " let seed = null;"
+        " try { seed = String(G.__GLOBAL_SEED); } catch (e) {}"
+        " let tsb = null;"
+        " try { tsb = !!(Function.prototype.toString && Function.prototype.toString.__TOSTRING_BRIDGE__); } catch (e) {}"
+        " let emn = null;"
+        " try { emn = (typeof G.__ensureMarkAsNative); } catch (e) {}"
+        " return { seed, toStringBridge: tsb, ensureMarkAsNativeType: emn };"
+        "})()"
+    )
+
+
 
     pending = {}
     pending_sess = {}  # (sessionId, innerId) -> str tag
