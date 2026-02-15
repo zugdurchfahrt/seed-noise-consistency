@@ -71,12 +71,20 @@
       }
       return done.length;
     } catch (e) {
+      let rollbackErr = null;
       for (let i = done.length - 1; i >= 0; i--) {
         const p = done[i];
         try {
           if (p.origDesc) Object.defineProperty(p.owner, p.key, cloneDesc(p.origDesc));
           else delete p.owner[p.key];
-        } catch (_) {}
+        } catch (re) {
+          if (!rollbackErr) rollbackErr = re;
+          degrade(groupTag + ':rollback_failed', re, { key: p && p.key ? p.key : null });
+        }
+      }
+      if (rollbackErr) {
+        if (groupPolicy === 'throw') throw rollbackErr;
+        return 0;
       }
       degrade(groupTag + ':apply_failed', e);
       if (groupPolicy === 'throw') throw e;
@@ -168,7 +176,9 @@
           return success(maskPosition(position));
         } catch (e) {
           if (typeof error === 'function') {
-            try { return error(e); } catch (_) {}
+            try { return error(e); } catch (ee) {
+              degrade('geo:success_wrapper_error_callback_failed', ee);
+            }
           }
           throw e;
         }

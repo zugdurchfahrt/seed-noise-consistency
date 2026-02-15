@@ -13,9 +13,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const rawLevel = String(level || 'info');
         const normalizedCode = String(code || 'nav_total_set');
         const x = (extra && typeof extra === 'object') ? extra : {};
+        const rawType = (typeof x.type === 'string') ? x.type : '';
+        const normalizedType = (rawType === __navTypePipeline || rawType === __navTypeBrowser) ? rawType : undefined;
         const ctxKey = (typeof x.key === 'string' || x.key === null) ? x.key : undefined;
         const ctxDiagTag = (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : undefined;
         const rawStage = (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
+        const normalizedStage = (
+          rawStage === 'preflight' ||
+          rawStage === 'apply' ||
+          rawStage === 'rollback' ||
+          rawStage === 'contract' ||
+          rawStage === 'hook' ||
+          rawStage === 'runtime' ||
+          rawStage === 'guard'
+        ) ? rawStage : 'runtime';
         const ctxMessage = (typeof x.message === 'string' && x.message)
           ? x.message
           : ((err && typeof err.message === 'string' && err.message) ? err.message : normalizedCode);
@@ -25,11 +36,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           diagTag: ctxDiagTag,
           surface: 'navigator',
           key: ctxKey,
-          stage: rawStage,
+          stage: normalizedStage,
           message: ctxMessage,
           data: hasData ? x.data : undefined
         };
-        if (typeof x.type === 'string') ctx.type = x.type;
+        if (typeof normalizedType === 'string') ctx.type = normalizedType;
 
         const D = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || __navDegrade;
         if (D && typeof D.diag === 'function') {
@@ -47,54 +58,81 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             message: ctx.message,
             data: ctx.data
           };
-          if (typeof x.type === 'string') extraObj.type = x.type;
+          if (typeof normalizedType === 'string') extraObj.type = normalizedType;
           D(normalizedCode, err || null, extraObj);
         }
-      } catch (_) {}
+      } catch (diagErr) {
+        const fallback = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || __navDegrade;
+        if (fallback && typeof fallback.diag === 'function') {
+          try {
+            fallback.diag('warn', 'nav_total_set:diag_failed', {
+              module: 'nav_total_set',
+              diagTag: 'nav_total_set',
+              surface: 'navigator',
+              key: null,
+              stage: 'guard',
+              message: '__navDiag failed',
+              type: __navTypeBrowser,
+              data: { failedCode: String(code || 'nav_total_set') }
+            }, diagErr || null);
+          } catch (fallbackErr) {
+            const suppressedFallbackError = fallbackErr;
+            void suppressedFallbackError;
+          }
+        }
+      }
+    }
+    function __navDiagPipeline(level, code, extra, err) {
+      const x = (extra && typeof extra === 'object') ? extra : {};
+      if (typeof x.type !== 'string' || !x.type) x.type = __navTypePipeline;
+      if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'nav_total_set';
+      __navDiag(level, code, x, err);
+    }
+    function __navDiagBrowser(level, code, extra, err) {
+      const x = (extra && typeof extra === 'object') ? extra : {};
+      if (typeof x.type !== 'string' || !x.type) x.type = __navTypeBrowser;
+      if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'nav_total_set';
+      __navDiag(level, code, x, err);
     }
     // Must run in Window realm (not Worker)
     if (typeof document === 'undefined' || !window || window.document !== document) {
-      __navDiag('fatal', 'nav_total_set:not_window_realm', {
+      __navDiagBrowser('fatal', 'nav_total_set:not_window_realm', {
         stage: 'preflight',
-        type: __navTypeBrowser,
-        diagTag: 'nav_total_set',
         message: 'not in Window realm'
       });
       return;
     }
 
     const C = window.CanvasPatchContext;
-    if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
+    if (!C) {
+      __navDiagPipeline('warn', 'nav_total_set:canvas_patch_context_missing', {
+        stage: 'preflight',
+        message: 'CanvasPatchContext missing'
+      });
+    }
 
     // basic random from the existing seed initialization
-    const R = window.rand.use('nav');
+    const R = (window.rand && typeof window.rand.use === 'function') ? window.rand.use('nav') : null;
     if (typeof R !== 'function') {
-      throw new Error('[NavTotalSetPatchModule] "R" is not initialized');
+      __navDiagPipeline('warn', 'nav_total_set:rand_missing', {
+        stage: 'preflight',
+        message: 'rand source missing'
+      });
     }
-    const mark = (() => {
-      const ensure = (typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
-      const fn = ensure ? ensure() : null;
-      if (typeof fn !== 'function') {
-        __navDiag('fatal', 'nav_total_set:mark_as_native_missing', {
-          stage: 'preflight',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set',
-          message: '[NavTotalSetPatchModule] markAsNative missing'
-        });
-        return null;
-      }
-      return fn;
-    })();
-    if (typeof mark !== 'function') return;
+    const mark = (typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative() : null;
+    const __navMark = (typeof mark === 'function') ? mark : function passthroughMark(fn) { return fn; };
+    if (typeof mark !== 'function') {
+      __navDiagPipeline('warn', 'nav_total_set:mark_as_native_missing', {
+        stage: 'preflight',
+        message: 'markAsNative missing'
+      });
+    }
     const wrapStrictAccessor = (typeof window.__wrapStrictAccessor === 'function') ? window.__wrapStrictAccessor : null;
     if (typeof wrapStrictAccessor !== 'function') {
-      __navDiag('fatal', 'nav_total_set:wrap_strict_accessor_missing', {
+      __navDiagPipeline('warn', 'nav_total_set:wrap_strict_accessor_missing', {
         stage: 'preflight',
-        type: __navTypePipeline,
-        diagTag: 'nav_total_set',
-        message: '[NavTotalSetPatchModule] __wrapStrictAccessor missing'
+        message: 'wrapStrictAccessor missing'
       });
-      return;
     }
     const coreRegisterPatchedTarget = (window.Core && typeof window.Core.registerPatchedTarget === 'function')
       ? window.Core.registerPatchedTarget
@@ -104,9 +142,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       try {
         coreRegisterPatchedTarget(owner, key);
       } catch (e) {
-        __navDiag('warn', (tag || 'nav_total_set') + ':register_target_failed', {
+        __navDiagBrowser('warn', (tag || 'nav_total_set') + ':register_target_failed', {
           stage: 'apply',
-          type: __navTypeBrowser,
           diagTag: (tag || 'nav_total_set'),
           key: key || null,
           message: 'registerPatchedTarget failed'
@@ -141,10 +178,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     if (!Number.isFinite(dpr) || dpr <= 0) {
-      __navDiag('fatal', 'nav_total_set:bad_dpr', {
+      __navDiagPipeline('fatal', 'nav_total_set:bad_dpr', {
         stage: 'preflight',
-        type: __navTypePipeline,
-        diagTag: 'nav_total_set',
         key: 'devicePixelRatio',
         message: 'bad __DPR',
         data: { dpr: dpr }
@@ -195,6 +230,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     };
     function __wrapGetter(key, getter, desc, validThis) {
       __navRegisterKey(key);
+      if (typeof wrapStrictAccessor !== 'function') {
+        if (desc && typeof desc.get === 'function') return desc.get;
+        return getter;
+      }
       const wrapped = wrapStrictAccessor(key, getter, desc, validThis, {
         onAccess: function (_, fn) { __navLogAccess(key, fn); }
       });
@@ -934,7 +973,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }], 'throw');
       }
 
-
       const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
       const origToJSON = toJsonDesc && toJsonDesc.value;
       if (!toJsonDesc || typeof origToJSON !== 'function') {
@@ -1151,7 +1189,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         policy: 'throw',
         diagTag: 'nav_total_set:permissions.query',
         validThis(self) {
-          return self === navigator.permissions || self === permProto;
+          return self === navigator.permissions;
         },
         invalidThis: 'throw',
         invoke(orig, args) {
@@ -1161,30 +1199,32 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             : null;
           if (permName === 'microphone') {
             const sourceName = 'audioinput';
-            const label = (devicesLabels && typeof devicesLabels === 'object') ? devicesLabels[sourceName] : undefined;
-            if (!label) {
-              __navDiag('error', 'nav_total_set:permissions_query_devices_label_missing', {
-                stage: 'runtime',
-                type: __navTypePipeline,
-                diagTag: 'nav_total_set:permissions.query',
-                key: 'permissions.query',
-                message: 'devices_labels.audioinput missing for permissions.query("microphone")'
-              });
-              return Reflect.apply(orig, this, args || []);
-            }
-            const out = Reflect.apply(orig, this, args || []);
-            return Promise.resolve(out).then(function onPermissionsQueryResolved(status) {
-              const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
-              mediaMicGranted = state === 'granted';
-              syncMediaLabelsUnlocked();
-              __navLogAccess('permissions.query', null, {
-                permission: permName,
-                source: sourceName,
-                state,
-                mediaDevicesLabelsUnlocked
-              });
-              return status;
+
+          const label = (devicesLabels && typeof devicesLabels === 'object') ? devicesLabels[sourceName] : undefined;
+          const out = Reflect.apply(orig, this, args || []);
+          if (!label) {
+            __navDiag('warn', 'nav_total_set:permissions_query_devices_label_missing', {
+              stage: 'runtime',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:permissions.query',
+              key: 'permissions.query',
+              message: 'devices_labels.audioinput missing for permissions.query("microphone")'
             });
+          }
+
+          return Promise.resolve(out).then(function onPermissionsQueryResolved(status) {
+            const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
+            mediaMicGranted = state === 'granted';
+            syncMediaLabelsUnlocked();
+            __navLogAccess('permissions.query', null, {
+              permission: permName,
+              source: sourceName,
+              state,
+              mediaDevicesLabelsUnlocked
+            });
+            return status;
+          });
+
           }
           if (permName === 'camera') {
             const out = Reflect.apply(orig, this, args || []);
@@ -1230,7 +1270,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         policy: 'throw',
         diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
         validThis(self) {
-          return self === navigator.mediaDevices || self === mediaProto;
+          return self === navigator.mediaDevices;
         },
         invalidThis: 'throw',
         invoke(orig, args) {
@@ -1254,6 +1294,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               key: 'mediaDevices.enumerateDevices',
               message: 'devices labels invalid'
             });
+            return Reflect.apply(orig, this, args || []);
+          }
+          if (typeof R !== 'function') {
             return Reflect.apply(orig, this, args || []);
           }
           const generateHexId = (len = 64) => {
@@ -1303,6 +1346,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         || Object.getOwnPropertyDescriptor(navigator.storage, 'estimate');
       if (!storageDesc) {
         __navDiag('error', 'nav_total_set:storage_estimate_descriptor_missing', {
+          surface: 'storage',
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:storage.estimate',
@@ -1316,13 +1360,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       let usageBytes   = Math.max(0, Math.floor(quotaBytes * USED_PCT / 100));
 
       // Monotonous “jitter” of usage within a few KB, on R(), so as not to break the module’s entropy
-      const tickUsage = mark(function tickUsage() {
-        usageBytes = Math.min(quotaBytes - 4096, usageBytes + Math.floor(R() * 4096));
+      const tickUsage = __navMark(function tickUsage() {
+        if (typeof R === 'function') {
+          usageBytes = Math.min(quotaBytes - 4096, usageBytes + Math.floor(R() * 4096));
+        }
       }, 'tickUsage');
 
       const origEstimate = storageDesc.value || navigator.storage.estimate;
       if (typeof origEstimate !== 'function') {
         __navDiag('error', 'nav_total_set:storage_estimate_original_missing', {
+          surface: 'storage',
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:storage.estimate',
@@ -1339,7 +1386,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         policy: 'throw',
         diagTag: 'nav_total_set:storage.estimate',
         validThis(self) {
-          return self === navigator.storage || self === storageProto;
+          return self === navigator.storage;
         },
         invalidThis: 'throw',
         invoke(_orig, _args) {
@@ -1355,6 +1402,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           || Object.getOwnPropertyDescriptor(navigator.webkitTemporaryStorage, 'queryUsageAndQuota');
         if (!tmpDesc) {
           __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota_descriptor_missing', {
+            surface: 'storage',
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
@@ -1380,19 +1428,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             const error = (args && args.length > 1) ? args[1] : undefined;
             try {
               tickUsage();
-              if (typeof success === 'function') success(usageBytes, quotaBytes);
-              return undefined;
             } catch (e) {
               __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota', {
+                surface: 'storage',
                 stage: 'runtime',
                 type: __navTypeBrowser,
                 diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
                 key: 'webkitTemporaryStorage.queryUsageAndQuota',
                 message: 'webkitTemporaryStorage.queryUsageAndQuota failed'
               }, e);
+              if (typeof _orig === 'function') return Reflect.apply(_orig, this, args || []);
               if (typeof error === 'function') error(e);
               return undefined;
             }
+            if (typeof success === 'function') success(usageBytes, quotaBytes);
+            return undefined;
           }
         }], 'throw');
         }
@@ -1404,6 +1454,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           || Object.getOwnPropertyDescriptor(navigator.storage, 'persist');
         if (!persistDesc) {
           __navDiag('error', 'nav_total_set:storage_persist_descriptor_missing', {
+            surface: 'storage',
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:storage.persist',
@@ -1420,12 +1471,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persist',
           validThis(self) {
-            return self === navigator.storage || self === storageProto;
+            return self === navigator.storage;
           },
           invalidThis: 'throw',
-          invoke(_orig, _args) {
+          // invoke(_orig, _args) {
+          //   __navLogAccess('storage.persist', null);
+          //   return Promise.resolve(true);
+          // }
+          invoke(orig, args) {
             __navLogAccess('storage.persist', null);
-            return Promise.resolve(true);
+            const out = Reflect.apply(orig, this, args || []);
+            return Promise.resolve(out);
           }
         }], 'throw');
         }
@@ -1435,6 +1491,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           || Object.getOwnPropertyDescriptor(navigator.storage, 'persisted');
         if (!persistedDesc) {
           __navDiag('error', 'nav_total_set:storage_persisted_descriptor_missing', {
+            surface: 'storage',
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:storage.persisted',
@@ -1451,14 +1508,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persisted',
           validThis(self) {
-            return self === navigator.storage || self === storageProto;
+            return self === navigator.storage;
           },
           invalidThis: 'throw',
+          // invoke(orig, args) {
+          //   __navLogAccess('storage.persisted', null);
+          //   const isStorageThis = (this === navigator.storage || this === storageProto);
+          //   if (!isStorageThis) return Reflect.apply(orig, this, args || []);
+          //   return Promise.resolve(true);
+          // }
           invoke(orig, args) {
             __navLogAccess('storage.persisted', null);
-            const isStorageThis = (this === navigator.storage || this === storageProto);
-            if (!isStorageThis) return Reflect.apply(orig, this, args || []);
-            return Promise.resolve(true);
+            const out = Reflect.apply(orig, this, args || []);
+            return Promise.resolve(out);
           }
         }], 'throw');
         }
@@ -1476,7 +1538,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const dm0 = Number(navigator.deviceMemory);
       if (typeof dm0 === 'number' && isFinite(dm0)) {
 
-        const heapFromDM = mark(function heapFromDM(dm) {
+        const heapFromDM = __navMark(function heapFromDM(dm) {
           if (!(typeof dm === 'number' && isFinite(dm))) return null;
           if (dm <= 0.5) return 512  * 1024 * 1024;   
           if (dm <= 1)   return 768  * 1024 * 1024;   
@@ -1484,7 +1546,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           if (dm <= 4)   return 3072 * 1024 * 1024;   
           return 4096 * 1024 * 1024;                  
         }, 'heapFromDM');
-        const getMemory = mark(function () {
+        const getMemory = __navMark(function () {
           const dm = Number(navigator.deviceMemory);
           const limit = heapFromDM(dm);
           if (limit == null) {
@@ -1493,29 +1555,32 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             return d && d.get ? d.get.call(performance) : undefined;
           }
           const total = Math.floor(limit * 0.25);
-          const used  = Math.min(total - 1, Math.floor(total * (0.40 + 0.15 * R())));
+          const randMix = (typeof R === 'function') ? (0.40 + 0.15 * R()) : 0.40;
+          const used  = Math.min(total - 1, Math.floor(total * randMix));
           return { jsHeapSizeLimit: limit, totalJSHeapSize: total, usedJSHeapSize: used };
         }, 'get memory');
 
         try {
           redefineAcc(perfProto, 'memory', getMemory);
         } catch (_) {
-          __navDiag('error', 'nav_total_set:performance_memory_proto', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set:performance.memory',
-            key: 'performance.memory',
-            message: 'performance.memory proto define failed'
-          }, _);
-          try {
-            Object.defineProperty(performance, 'memory', { get: getMemory, configurable: true });
-          } catch (__) {
-            __navDiag('error', 'nav_total_set:performance_memory_own', {
+            __navDiag('error', 'nav_total_set:performance_memory_proto', {
+              surface: 'performance',
               stage: 'apply',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:performance.memory',
               key: 'performance.memory',
-              message: 'performance.memory own define failed'
+              message: 'performance.memory proto define failed'
+          }, _);
+          try {
+            Object.defineProperty(performance, 'memory', { get: getMemory, configurable: true });
+          } catch (__) {
+              __navDiag('error', 'nav_total_set:performance_memory_own', {
+                surface: 'performance',
+                stage: 'apply',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:performance.memory',
+                key: 'performance.memory',
+                message: 'performance.memory own define failed'
             }, __);
           }
         }
@@ -1524,12 +1589,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // ——— K. WebAuthn (stub) ———
     if (!window.PublicKeyCredential) {
-      window.PublicKeyCredential = mark(function PublicKeyCredential() {}, 'PublicKeyCredential');
+      window.PublicKeyCredential = __navMark(function PublicKeyCredential() {}, 'PublicKeyCredential');
       Object.defineProperty(PublicKeyCredential, 'isUserVerifyingPlatformAuthenticatorAvailable', {
         configurable: true,
         enumerable: false,
         writable: true,
-        value: mark(function isUserVerifyingPlatformAuthenticatorAvailable() { return Promise.resolve(true); },
+        value: __navMark(function isUserVerifyingPlatformAuthenticatorAvailable() { return Promise.resolve(true); },
              'isUserVerifyingPlatformAuthenticatorAvailable')
       });
     }
@@ -1543,6 +1608,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         || Object.getOwnPropertyDescriptor(navigator.credentials, 'get');
       if (!createDesc || !getDesc) {
         __navDiag('error', 'nav_total_set:credentials_descriptor_missing', {
+          surface: 'credentials',
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:credentials',
@@ -1656,11 +1722,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             description: { value: String(p.description), enumerable: true,  configurable: true },
             length:      { value: p.mimeTypes.length,    enumerable: true,  configurable: true },
             item: {
-              value: mark(itemMethod, 'item'),
+              value: __navMark(itemMethod, 'item'),
               enumerable: false, configurable: true
             },
             namedItem: {
-              value: mark(namedItemMethod, 'namedItem'),
+              value: __navMark(namedItemMethod, 'namedItem'),
               enumerable: false, configurable: true
             }
           });
@@ -1685,8 +1751,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         // array of plugins
         const pluginArray = Object.create(PluginArray.prototype, {
           length:    { value: arr.length, enumerable: true, configurable: true },
-          item:      { value: mark(({ item(index) { return pluginArray[String(index)] || null; } }).item, 'item'), enumerable: false, configurable: true },
-          namedItem: { value: mark(({ namedItem(name) { for (let i = 0; i < arr.length; i++) if (pluginArray[String(i)]?.name === name) return pluginArray[String(i)]; return null; } }).namedItem, 'namedItem'), enumerable: false, configurable: true }
+          item:      { value: __navMark(({ item(index) { return pluginArray[String(index)] || null; } }).item, 'item'), enumerable: false, configurable: true },
+          namedItem: { value: __navMark(({ namedItem(name) { for (let i = 0; i < arr.length; i++) if (pluginArray[String(i)]?.name === name) return pluginArray[String(i)]; return null; } }).namedItem, 'namedItem'), enumerable: false, configurable: true }
         });
 
         // Indexes ? enumerable + named props (non-enumerable)
@@ -1712,8 +1778,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const mimes = Array.isArray(__MIME_OBJECTS_SINGLETON__) ? __MIME_OBJECTS_SINGLETON__ : [];
         const mimeArray = Object.create(MimeTypeArray.prototype, {
           length:    { value: mimes.length, enumerable: true, configurable: true },
-          item:      { value: mark(({ item(index) { return mimeArray[String(index)] || null; } }).item, 'item'), enumerable: false, configurable: true },
-          namedItem: { value: mark(({ namedItem(type) { return mimeArray[type] || null; } }).namedItem, 'namedItem'), enumerable: false, configurable: true }
+          item:      { value: __navMark(({ item(index) { return mimeArray[String(index)] || null; } }).item, 'item'), enumerable: false, configurable: true },
+          namedItem: { value: __navMark(({ namedItem(type) { return mimeArray[type] || null; } }).namedItem, 'namedItem'), enumerable: false, configurable: true }
         });
 
         for (let i = 0; i < mimes.length; i++) {

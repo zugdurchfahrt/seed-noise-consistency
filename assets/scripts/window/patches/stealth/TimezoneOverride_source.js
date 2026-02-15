@@ -149,18 +149,20 @@
 
     const restores = [];
     function pushRestore(fn) { restores.push(fn); }
-    function rollback() {
+    function rollback(reasonTag) {
       for (let i = restores.length - 1; i >= 0; i--) {
-        try { restores[i](); } catch (_) {}
+        try {
+          restores[i]();
+        } catch (e) {
+          diag((reasonTag || "tz:rollback") + ":restore_failed", e);
+        }
       }
     }
 
     function rememberValue(obj, prop) {
       const d = Object.getOwnPropertyDescriptor(obj, prop);
       pushRestore(() => {
-        try {
-          if (d) safeDefine(obj, prop, d);
-        } catch (_) {}
+        if (d) safeDefine(obj, prop, d);
       });
       return d;
     }
@@ -168,9 +170,7 @@
     function rememberProtoValue(obj, prop) {
       const d = Object.getOwnPropertyDescriptor(obj, prop);
       pushRestore(() => {
-        try {
-          if (d) safeDefine(obj, prop, d);
-        } catch (_) {}
+        if (d) safeDefine(obj, prop, d);
       });
       return d;
     }
@@ -214,31 +214,26 @@
         }], "throw");
       }
 
-      // ---- Intl.NumberFormat: default locales ----
-      if (Intl.NumberFormat) {
-        rememberValue(Intl, "NumberFormat");
-        const OrigNF = Intl.NumberFormat;
-        const PatchedNF = __wrapNativeCtor(OrigNF, "NumberFormat", (argList) => {
+      function patchIntlCtorDefaultLocales(ctorName) {
+        if (!Intl || typeof Intl[ctorName] !== "function") return;
+        rememberValue(Intl, ctorName);
+        const OrigCtor = Intl[ctorName];
+        const PatchedCtor = __wrapNativeCtor(OrigCtor, ctorName, (argList) => {
           let locales = (argList.length >= 1) ? argList[0] : undefined;
           const options = (argList.length >= 2) ? argList[1] : undefined;
           if (locales == null) locales = spoofedLocales;
           return [locales, options];
         });
-        redefineValue(Intl, "NumberFormat", PatchedNF, "tz:NumberFormat");
+        redefineValue(Intl, ctorName, PatchedCtor, "tz:" + ctorName);
       }
 
-      // ---- Intl.Collator: default locales ----
-      if (Intl.Collator) {
-        rememberValue(Intl, "Collator");
-        const OrigCol = Intl.Collator;
-        const PatchedCol = __wrapNativeCtor(OrigCol, "Collator", (argList) => {
-          let locales = (argList.length >= 1) ? argList[0] : undefined;
-          const options = (argList.length >= 2) ? argList[1] : undefined;
-          if (locales == null) locales = spoofedLocales;
-          return [locales, options];
-        });
-        redefineValue(Intl, "Collator", PatchedCol, "tz:Collator");
-      }
+      // ---- Intl constructors: default locales ----
+      patchIntlCtorDefaultLocales("NumberFormat");
+      patchIntlCtorDefaultLocales("Collator");
+      patchIntlCtorDefaultLocales("ListFormat");
+      patchIntlCtorDefaultLocales("PluralRules");
+      patchIntlCtorDefaultLocales("RelativeTimeFormat");
+      patchIntlCtorDefaultLocales("DisplayNames");
 
       // For other Intl.* keep only resolvedOptions().locale mask.
       function patchIntlResolvedOptions(proto, fields) {
@@ -353,7 +348,7 @@
       window.__TZ_PATCHED__ = true;
       console.log("patchTimeZone: applied:", timezone, offsetMinutes, spoofedLocale);
     } catch (e) {
-      rollback();
+      rollback("tz:apply_failed");
       diag("tz:apply_failed", e, { timezone, offsetMinutes });
       throw e;
     }

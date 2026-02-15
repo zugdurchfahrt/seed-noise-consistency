@@ -670,7 +670,7 @@ def main():
     logger.info(f"Seed for the current session has been generated: {global_seed}")
     client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
     try:
-        json_path = str(PROJECT_ROOT / "profile.json")
+        json_path = str(PROFILE_DATA_SRC/ "profile.json")
         if os.path.exists(json_path):
             os.remove(json_path)
             logger.info("Previous profile.json had been deleted")
@@ -945,7 +945,7 @@ def main():
         logger.info("full profile: %s", json.dumps(profile, indent=4))
 
         # ----------------------- Own data collection  -----------------------
-        save_dir = str(PROFILE_DATA_SRC / "profiles")
+        save_dir = str(PROJECT_ROOT / "profiles")
         os.makedirs(save_dir, exist_ok=True)
         filename = f"profile_{datetime.now():%Y%m%d_%H%M%S_%f}.json"
         filepath = os.path.join(save_dir, filename)
