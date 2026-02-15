@@ -133,7 +133,6 @@ function EnvBus(G){
     }
     uaData.he = he;
 
-    const seed = String(G && G.__GLOBAL_SEED);
     const windowKeys = (() => {
       try {
         const keys = Object.getOwnPropertyNames(G);
@@ -152,7 +151,6 @@ function EnvBus(G){
       highEntropy: he,
       hardwareConcurrency: cpu,
       deviceMemory: mem,
-      seed,
       windowKeys
     };
   }

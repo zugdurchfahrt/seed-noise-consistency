@@ -309,9 +309,30 @@ def init_driver(
       
     cdp.SW_META = expected_client_hints
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
-     
-    threading.Thread(target=cdp.run, daemon=True).start()  
-    logger.info("Thread started on port %s", cdp.PORT)
+      
+    sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
+    sw_thread.start()
+    logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
+    cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
+
+    # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
+    # This replaces the legacy Window->Worker seed propagation via snapshots.
+    # NOTE: if the CDP websocket drops mid-session, paused workers may remain paused.
+    if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
+        cdp.enable_worker_seed_inject(global_seed)
+        worker_seed_thread = threading.Thread(
+            target=cdp.run_worker_seed,
+            daemon=True,
+            name="cdp_worker_seed_injector",
+        )
+        worker_seed_thread.start()
+        logger.info(
+            "Worker seed injector thread started name=%s ident=%s on port %s",
+            worker_seed_thread.name,
+            worker_seed_thread.ident,
+            cdp.PORT,
+        )
+        cdp.log_cdp_runtime_diag("main_after_worker_seed_thread_start")
 
 
     # desc_js = Path(SCRIPTS_PATCHES_STEALTH / "desc22.js").read_text(encoding="utf-8")
@@ -1065,9 +1086,28 @@ def main():
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs")
 
-       # PLEASE, DO NO REMOVE THIS input, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
+        # Keep main thread alive; otherwise daemon CDP threads die on process exit.
+        # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.
+        def _hold_until_driver_end():
+            logger.warning("stdin is unavailable; keepalive mode is active (Ctrl+C to exit)")
+            while True:
+                try:
+                    driver.execute_script("return 1")
+                except Exception:
+                    logger.info("Driver session ended; keepalive loop finished")
+                    break
+                time.sleep(1.0)
+
         time.sleep(0.5)
-        input("press Enter for exit...")
+        try:
+            if sys.stdin is not None and sys.stdin.isatty():
+                input("press Enter for exit...")
+            else:
+                _hold_until_driver_end()
+        except EOFError:
+            _hold_until_driver_end()
+        except KeyboardInterrupt:
+            logger.info("Interrupted by user (Ctrl+C)")
 
     except Exception as e:
         logger.error(f"Error in main block: {e}", exc_info=True)
@@ -1300,8 +1340,4 @@ if __name__ == "__main__":
         #     })();
         #     """
         # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": dump_table_js})
-
-
-
-
 

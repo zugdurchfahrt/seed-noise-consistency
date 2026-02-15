@@ -1,6 +1,8 @@
 # cdp_catapult.py  (SW injector only)
 import json
 import time
+import threading
+import subprocess
 import requests
 import pathlib
 from pathlib import Path
@@ -21,7 +23,88 @@ SW_LANGS = None
 SW_HC = None
 SW_DM = None
 SW_META = None
+# --- Dedicated/Shared Worker __GLOBAL_SEED injector (WorkerGlobalScope) ---
+WORKER_SEED_INJECT_ENABLED = False
+WORKER_GLOBAL_SEED = None
+_RUNNING_WORKER_SEED = False
 _RUNNING = False
+
+
+def _is_ws_disconnect_error(err) -> bool:
+    if err is None:
+        return False
+    name = getattr(err.__class__, "__name__", "")
+    text = str(err or "")
+    text_low = text.lower()
+    return (
+        name == "WebSocketConnectionClosedException"
+        or "connection to remote host was lost" in text_low
+        or "connection is already closed" in text_low
+        or "socket is already closed" in text_low
+    )
+
+
+def _collect_cdp_tcp_clients(port: int):
+    """
+    Best-effort OS snapshot of TCP clients connected to the CDP port.
+    Returns (listener_pid, clients_by_pid) or None if unavailable.
+    """
+    try:
+        raw = subprocess.check_output(
+            ["netstat", "-ano", "-p", "tcp"],
+            encoding="utf-8",
+            errors="ignore",
+        )
+    except Exception as e:
+        logger.warning("CDP diag: netstat unavailable port=%s err=%r", port, e)
+        return None
+
+    suffix = f":{port}"
+    listener_pid = None
+    clients_by_pid = {}
+    for ln in raw.splitlines():
+        line = ln.strip()
+        if not line.startswith("TCP"):
+            continue
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        local_addr, remote_addr, state, pid = parts[1], parts[2], parts[3].upper(), parts[4]
+        if local_addr.endswith(suffix) and state == "LISTENING":
+            listener_pid = pid
+        if local_addr.endswith(suffix) and state == "ESTABLISHED":
+            clients_by_pid.setdefault(pid, set()).add(remote_addr)
+    return listener_pid, clients_by_pid
+
+
+def log_cdp_runtime_diag(tag: str):
+    port = PORT
+    t = threading.current_thread()
+    logger.info(
+        "CDP diag: tag=%s thread=%s ident=%s native_id=%s port=%s",
+        tag,
+        t.name,
+        t.ident,
+        getattr(t, "native_id", None),
+        port,
+    )
+    if not port:
+        logger.warning("CDP diag: PORT is not set")
+        return
+
+    snap = _collect_cdp_tcp_clients(int(port))
+    if snap is None:
+        return
+    listener_pid, clients_by_pid = snap
+    pid_parts = []
+    for pid, remotes in sorted(clients_by_pid.items(), key=lambda kv: (str(kv[0]))):
+        pid_parts.append(f"{pid}:{len(remotes)}")
+    logger.info(
+        "CDP diag: listener_pid=%s established_client_pids=%s total_clients=%d",
+        listener_pid,
+        ",".join(pid_parts) if pid_parts else "none",
+        len(clients_by_pid),
+    )
 
 
 
@@ -52,6 +135,18 @@ def enable_sw_language_inject(language: str, normalized_languages: list[str], ha
     SW_INJECT_ENABLED = True
 
 
+def enable_worker_seed_inject(global_seed: str):
+    """
+    Enable Dedicated/Shared worker injection for __GLOBAL_SEED.
+    Call this BEFORE starting run_worker_seed().
+    """
+    global WORKER_SEED_INJECT_ENABLED, WORKER_GLOBAL_SEED
+    if not isinstance(global_seed, str) or not global_seed.strip():
+        raise ValueError("Worker seed inject: global_seed must be non-empty str")
+    WORKER_GLOBAL_SEED = global_seed
+    WORKER_SEED_INJECT_ENABLED = True
+
+
 def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
     if not isinstance(SW_META, dict) or not SW_META:
         raise ValueError("SW inject: expected_client_hints missing")
@@ -76,6 +171,41 @@ def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_c
 //# sourceURL=sw_prelude_env.js
 """
     return (sw_env_js + "\n" + sw_prelude_js).strip()
+
+
+def _build_worker_seed_prelude(global_seed: str) -> str:
+    if not isinstance(global_seed, str) or not global_seed.strip():
+        raise ValueError("Worker seed inject: global_seed must be non-empty str")
+    return f"""
+(() => {{
+  'use strict';
+  const G = globalThis;
+  const seed = {json.dumps(global_seed, ensure_ascii=False)};
+  try {{
+    const d = Object.getOwnPropertyDescriptor(G, '__GLOBAL_SEED');
+    if (d && d.configurable === false) {{
+      const cur = ('value' in d) ? d.value : G.__GLOBAL_SEED;
+      if (String(cur) !== String(seed)) {{
+        throw new Error('WorkerSeed: __GLOBAL_SEED non-configurable mismatch');
+      }}
+      return;
+    }}
+  }} catch (e) {{
+    // fallthrough
+  }}
+  try {{
+    Object.defineProperty(G, '__GLOBAL_SEED', {{
+      value: String(seed),
+      writable: false,
+      configurable: true,
+      enumerable: false
+    }});
+  }} catch (e) {{
+    try {{ G.__GLOBAL_SEED = String(seed); }} catch (_e) {{}}
+  }}
+}})();
+//# sourceURL=worker_seed_env.js
+""".strip()
 
 def get_ws_url():
     port = PORT
@@ -148,6 +278,7 @@ def run():
         raise ValueError("SW inject: fail") from e
 
     logger.info("SW inject: CDP websocket starting: %s", ws_url)
+    log_cdp_runtime_diag("sw_run_before_ws")
 
     msg_id = {"v": 0}
     sess_id = {}       # per-session counters
@@ -182,7 +313,7 @@ def run():
     pending = {}
     pending_sess = {}  # (sessionId, innerId) -> str tag
 
-    fatal = {"err": None}
+    fatal = {"err": None, "disconnect": False}
 
     def _patch_skipped(reason, err=None):
         if err is not None:
@@ -224,6 +355,7 @@ def run():
         ws.send(json.dumps({"id": mid, "method": method, "params": params or {}, "sessionId": sessionId}))
 
     def on_open(ws):
+        log_cdp_runtime_diag("sw_on_open")
         send(ws, "Target.setDiscoverTargets", {"discover": True})
 
         params = {
@@ -378,13 +510,249 @@ def run():
 
 
     def on_error(ws, err):
+        if _is_ws_disconnect_error(err):
+            fatal["disconnect"] = True
+            logger.warning("SW inject: websocket disconnected; stopping loop err=%r", err)
+            try:
+                ws.close()
+            except Exception:
+                pass
+            return
         _fatal(ws, "cdp websocket error", err)
 
     def on_close(ws, code, msg):
         global _RUNNING
         _RUNNING = False
-        if code is not None or msg:
+        if fatal["disconnect"]:
+            logger.info("SW inject: websocket closed after disconnect code=%r msg=%r", code, msg)
+        elif code is not None or msg:
             logger.error("SW inject: websocket closed code=%r msg=%r", code, msg)
+
+    ws = WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close)
+    ws.run_forever()
+    if fatal["err"]:
+        raise fatal["err"]
+
+
+def run_worker_seed():
+    """
+    Dedicated/Shared worker seed injector loop:
+    - connects to CDP
+    - auto-attaches to worker/shared_worker with waitForDebuggerOnStart=true (pauses on start)
+    - Runtime.evaluate(seed prelude) before resuming
+
+    IMPORTANT: if the CDP websocket drops mid-session, paused workers may remain paused.
+    """
+    global _RUNNING_WORKER_SEED
+    if _RUNNING_WORKER_SEED:
+        return
+    _RUNNING_WORKER_SEED = True
+
+    if not WORKER_SEED_INJECT_ENABLED:
+        _RUNNING_WORKER_SEED = False
+        logger.error("Worker seed inject: disabled flag encountered (PATCH_SKIPPED)")
+        raise RuntimeError("Worker seed inject: disabled")
+    if not isinstance(WORKER_GLOBAL_SEED, str) or not WORKER_GLOBAL_SEED.strip():
+        _RUNNING_WORKER_SEED = False
+        logger.error("Worker seed inject: WORKER_GLOBAL_SEED missing (PATCH_SKIPPED)")
+        raise RuntimeError("Worker seed inject: seed missing")
+
+    try:
+        ws_url = get_ws_url()
+    except Exception as e:
+        _RUNNING_WORKER_SEED = False
+        logger.exception("Worker seed inject: get_ws_url failed (PATCH_SKIPPED)")
+        raise ValueError("Worker seed inject: fail") from e
+
+    logger.warning("Worker seed inject: CDP websocket starting (waitForDebuggerOnStart=true): %s", ws_url)
+    log_cdp_runtime_diag("worker_seed_before_ws")
+
+    msg_id = {"v": 0}
+    injected = set()   # targetId set
+    manual_attach_sent = set()  # targetId set for fallback manual attach
+    seed_prelude = _build_worker_seed_prelude(WORKER_GLOBAL_SEED)
+    sanity_expr = "(() => { try { return String(globalThis.__GLOBAL_SEED); } catch (e) { return null; } })()"
+
+    pending = {}
+    pending_sess = {}  # (sessionId, innerId) -> str tag
+    fatal = {"err": None, "disconnect": False}
+
+    def _patch_skipped(reason, err=None):
+        if err is not None:
+            logger.error("Worker seed inject: PATCH_SKIPPED %s err=%r", reason, err)
+        else:
+            logger.error("Worker seed inject: PATCH_SKIPPED %s", reason)
+
+    def _fatal(ws, reason, err=None):
+        if fatal["err"] is None:
+            fatal["err"] = RuntimeError(reason)
+        _patch_skipped(reason, err)
+        try:
+            ws.close()
+        except Exception:
+            pass
+
+    def send(ws, method, params=None, tag=None):
+        msg_id["v"] += 1
+        mid = msg_id["v"]
+        if tag:
+            pending[mid] = tag
+        ws.send(json.dumps({"id": mid, "method": method, "params": params or {}}))
+
+    def send_sess(ws, sessionId, method, params=None):
+        msg_id["v"] += 1
+        mid = msg_id["v"]
+        tag = method
+        if method == "Runtime.evaluate" and params and isinstance(params, dict):
+            try:
+                expr = params.get("expression")
+                if expr == seed_prelude:
+                    tag = "Runtime.evaluate:worker_seed_prelude"
+                elif expr == sanity_expr:
+                    tag = "Runtime.evaluate:worker_seed_sanity"
+            except Exception:
+                pass
+        pending_sess[(sessionId, mid)] = tag
+        ws.send(json.dumps({"id": mid, "method": method, "params": params or {}, "sessionId": sessionId}))
+
+    def on_open(ws):
+        log_cdp_runtime_diag("worker_seed_on_open")
+        send(ws, "Target.setDiscoverTargets", {"discover": True})
+        params = {
+            "autoAttach": True,
+            "waitForDebuggerOnStart": True,
+            "flatten": True,
+            "filter": [
+                {"type": "worker", "exclude": False},
+                {"type": "shared_worker", "exclude": False},
+            ],
+        }
+        send(ws, "Target.setAutoAttach", params, tag="autoattach_worker_seed")
+        logger.info("Worker seed inject: enabled (autoAttach) filter=worker,shared_worker")
+
+    def on_message(ws, message):
+        try:
+            msg = json.loads(message)
+        except Exception:
+            return
+
+        if "id" in msg:
+            mid = msg.get("id")
+            sid = msg.get("sessionId")
+            tag = None
+            if sid:
+                tag = pending_sess.pop((sid, mid), None)
+            if tag is None:
+                tag = pending.pop(mid, None)
+            if tag == "autoattach_worker_seed" and msg.get("error"):
+                _fatal(ws, "autoattach filter unsupported", msg.get("error"))
+                return
+            if isinstance(tag, str) and tag.startswith("attach_worker_seed:"):
+                if msg.get("error"):
+                    tid = tag.split(":", 1)[1] if ":" in tag else "unknown"
+                    logger.warning(
+                        "Worker seed inject: manual attach failed targetId=%s err=%r",
+                        tid,
+                        msg.get("error"),
+                    )
+                return
+            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:worker_seed_prelude", "Runtime.evaluate:worker_seed_sanity"):
+                res = msg.get("result") or {}
+                exc = res.get("exceptionDetails")
+                if exc:
+                    _fatal(ws, "worker seed Runtime.evaluate exceptionDetails", exc)
+                    return
+                if tag == "Runtime.evaluate:worker_seed_sanity":
+                    try:
+                        out = (res.get("result") or {}).get("value")
+                        expected = str(WORKER_GLOBAL_SEED)
+                        if not isinstance(out, str) or out != expected:
+                            _fatal(ws, "worker seed sanity: mismatch", {"expected_len": len(expected), "got": out})
+                            return
+                        logger.info("Worker seed inject: sanity OK (__GLOBAL_SEED set)")
+                    except Exception as e:
+                        _fatal(ws, "worker seed sanity: parse/compare failed", e)
+            return
+
+        if msg.get("method") == "Target.targetCreated":
+            p = msg.get("params") or {}
+            info = p.get("targetInfo") or {}
+            ttype = info.get("type")
+            tid = info.get("targetId")
+            turl = info.get("url")
+            if ttype in ("worker", "shared_worker") and tid and tid not in injected and tid not in manual_attach_sent:
+                manual_attach_sent.add(tid)
+                logger.info(
+                    "Worker seed inject: targetCreated %s targetId=%s url=%r -> manual attach",
+                    ttype,
+                    tid,
+                    turl,
+                )
+                try:
+                    send(
+                        ws,
+                        "Target.attachToTarget",
+                        {"targetId": tid, "flatten": True},
+                        tag=f"attach_worker_seed:{tid}",
+                    )
+                except Exception as e:
+                    _patch_skipped("manual attach send failed", e)
+            return
+
+        if msg.get("method") != "Target.attachedToTarget":
+            return
+
+        p = msg.get("params") or {}
+        sessionId = p.get("sessionId") or msg.get("sessionId")
+        info = p.get("targetInfo") or {}
+        ttype = info.get("type")
+        tid = info.get("targetId")
+        turl = info.get("url")
+
+        if not sessionId or not tid:
+            return
+        if ttype not in ("worker", "shared_worker"):
+            _patch_skipped(f"non-worker target attached: {ttype}")
+            try:
+                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+            except Exception as e:
+                _fatal(ws, "resume non-worker target failed", e)
+            return
+        if tid in injected:
+            return
+        injected.add(tid)
+
+        logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
+        try:
+            send_sess(ws, sessionId, "Runtime.enable")
+            send_sess(ws, sessionId, "Runtime.evaluate", {"expression": seed_prelude, "awaitPromise": True})
+            send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
+        except Exception as e:
+            _fatal(ws, "worker seed inject failed", e)
+        finally:
+            try:
+                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+            except Exception as e:
+                _fatal(ws, "worker resume failed", e)
+
+    def on_error(ws, err):
+        if _is_ws_disconnect_error(err):
+            fatal["disconnect"] = True
+            logger.warning("Worker seed inject: websocket disconnected; stopping loop err=%r", err)
+            try:
+                ws.close()
+            except Exception:
+                pass
+            return
+        _fatal(ws, "cdp websocket error", err)
+
+    def on_close(ws, code, msg):
+        global _RUNNING_WORKER_SEED
+        _RUNNING_WORKER_SEED = False
+        if fatal["disconnect"]:
+            logger.info("Worker seed inject: websocket closed after disconnect code=%r msg=%r", code, msg)
+        elif code is not None or msg:
+            logger.error("Worker seed inject: websocket closed code=%r msg=%r", code, msg)
 
     ws = WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close)
     ws.run_forever()

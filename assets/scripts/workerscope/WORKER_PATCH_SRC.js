@@ -57,9 +57,8 @@
     };
     cache.snap = requireSnap(self.__lastSnap__, 'init');
 
-    const seedInit = (cache.snap && cache.snap.seed != null)
-      ? String(cache.snap.seed)
-      : ((self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null);
+    // Seed must be provided inside the worker realm (e.g. via CDP prelude).
+    const seedInit = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
     if (seedInit == null || seedInit === '') {
       const e = new Error('UACHPatch: __GLOBAL_SEED missing');
       if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_missing", e);
@@ -563,45 +562,20 @@
       if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
       if (cache.snap === s) return;
       const prevSeed = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
-      const nextSeed = (s && s.seed != null) ? String(s.seed) : null;
       cache.snap = requireSnap(s, 'apply');
-      // Paradigm: seed is immutable within session. If an external snapshot ever tries to change it — fail-fast.
-      if (prevSeed != null && nextSeed != null && prevSeed !== nextSeed) {
-        throw new Error('UACHPatch: seed mutation is not allowed');
-      }
-      // In case seed was not pinned yet (should not happen), allow setting it once from snapshot.
-      if (prevSeed == null && nextSeed != null) {
-        try {
-          Object.defineProperty(self, '__GLOBAL_SEED', {
-            value: nextSeed,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-        } catch (_) {
-          self.__GLOBAL_SEED = nextSeed;
-        }
-      }
       if (self.__GLOBAL_SEED == null || String(self.__GLOBAL_SEED) === '') {
         throw new Error('UACHPatch: __GLOBAL_SEED missing');
       }
       if (typeof prev==='function') prev.call(self,s);
+      // Paradigm: seed is immutable within session.
+      const curSeed = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
+      if (prevSeed != null && curSeed != null && prevSeed !== curSeed) {
+        throw new Error('UACHPatch: seed mutation is not allowed');
+      }
     };
     cache.snap = requireSnap(self.__lastSnap__, 'bootstrap');
-    if (self.__lastSnap__ && self.__lastSnap__.seed != null) {
-      const s0 = String(self.__lastSnap__.seed);
-      const cur0 = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
-      if (cur0 != null && cur0 !== s0) throw new Error('UACHPatch: seed mutation is not allowed');
-      try {
-        Object.defineProperty(self, '__GLOBAL_SEED', {
-          value: s0,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      } catch (_) {
-        self.__GLOBAL_SEED = s0;
-      }
+    if (self.__GLOBAL_SEED == null || String(self.__GLOBAL_SEED) === '') {
+      throw new Error('UACHPatch: __GLOBAL_SEED missing');
     }
     if (!self.__ENV_SYNC_BC_INSTALLED__) {
       if (typeof BroadcastChannel !== 'function') {
