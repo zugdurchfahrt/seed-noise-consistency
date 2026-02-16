@@ -90,22 +90,10 @@ const WebglPatchModule = function WebglPatchModule(window) {
       throw new Error('[WebGLPatchModule] __WEBGL_PARAM_WHITELIST__ missing/invalid');
     }
 
-    // Always let core string params through via orig to avoid nulls breaking FP scripts
-    // (keep masked vendor/renderer logic in webglGetParameterMask)
-    // if (typeof this.VERSION === 'number' && pname === this.VERSION) {
-    //   return orig.call(this, pname, ...args);
-    // }
-    // if (typeof this.SHADING_LANGUAGE_VERSION === 'number' && pname === this.SHADING_LANGUAGE_VERSION) {
-    //   return orig.call(this, pname, ...args);
-    // }
-
     //Allowed parameters - we let the original (patchMethodThen it will call orig)
     if (wl.includes(pname)) {
       return; // undefined → pass-through to orig.apply(this, args)
     }
-    // TTST !!if (typeof this.VERSION === 'number' && pname === this.VERSION) return;
-    // if (typeof this.SHADING_LANGUAGE_VERSION === 'number' && pname === this.SHADING_LANGUAGE_VERSION) return;
-
     // For non-whitelisted enums: keep native pass-through to avoid null overrides
     // that can break third-party report renderers (Object.values(null) paths).
     if (typeof window.__DEGRADE__ === 'function') {
@@ -176,7 +164,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
     return res;
   }
-
   // === 4.context patch (instance mark only; prototype patching is owned by context.js) ===
   // If already patched or empty, immediately return
   function webglGetContextPatch(res, kind, ...args) {
@@ -195,9 +182,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
     return res;
   }
-
-
-
   // === 5) anti‑FP hooks  ===
   // readPixels is void and writes into the provided buffer.
   // Its noise hook must run post-orig; the executor mode is set here (not globally).
@@ -264,14 +248,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
     // If we cannot preserve descriptors/prototype safely, keep native result.
     return res;
   }
-
-  function webglShaderSourceHook(orig, shader, src) {
-    if (typeof src !== 'string') return; // undefined → patchMethod Calls orig(shader, src)
- 
-    try {
       // Unified precision policy by default: vertex="mediump", fragment="highp"
       // You can redefine through window._precisionPolicy = { vertex, fragment, mode }
       // mode: "float-only" (только precision-строки) | "smart"(by default: precision-strings + safe fallback \bhighp\b)
+  function webglShaderSourceHook(orig, shader, src) {
+    if (typeof src !== 'string') return; // undefined → patchMethod Calls orig(shader, src)
+    try {
       const pol   = (typeof window !== 'undefined' && window._precisionPolicy) || {};
       const vPol  = String(pol.vertex   || 'mediump').toLowerCase();
       const fPol  = String(pol.fragment || 'highp').toLowerCase();

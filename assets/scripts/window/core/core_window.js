@@ -50,15 +50,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     && (existingCoreToStringState.overrideMap instanceof WeakMap)
     && (existingCoreToStringState.proxyTargetMap instanceof WeakMap));
 
-  if (!existingCoreToStringStateOk) {
-    const legacyBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
-    if (legacyBridge) {
-      const e = new Error('[CoreWindow] legacy toString bridge detected without state');
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_legacy_bridge_without_state", e);
-      throw e;
-    }
-  }
-
   const nativeToString = existingCoreToStringStateOk
     ? existingCoreToStringState.nativeToString
     : (existingToString || Function.prototype.toString);
@@ -92,14 +83,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
   let memoMarkAsNative = null;
   function ensureMarkAsNative() {
     if (memoMarkAsNative) return memoMarkAsNative;
-    if (!baseMarkAsNative.__TOSTRING_BRIDGE__) {
-      Object.defineProperty(baseMarkAsNative, '__TOSTRING_BRIDGE__', {
-        value: true,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
-    }
     memoMarkAsNative = baseMarkAsNative;
     return memoMarkAsNative;
   }

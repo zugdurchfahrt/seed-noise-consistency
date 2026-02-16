@@ -29,6 +29,15 @@
       throw new Error('UACHPatch: WorkerNavigator unavailable');
     }
     const cache = { snap:null };
+    const emitDegrade = (level, code, ctx, err) => {
+      const d = (typeof __DEGRADE__ === "function") ? __DEGRADE__ : null;
+      if (!d) return;
+      if (typeof d.diag === "function") {
+        d.diag(level, code, ctx || null, err || null);
+        return;
+      }
+      d(code, err || null, ctx || null);
+    };
     const validDpr = v => Number.isFinite(v) && v > 0;
     const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
     const LE_KEYS = ['brands','mobile','platform'];
@@ -61,7 +70,15 @@
     const seedInit = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
     if (seedInit == null || seedInit === '') {
       const e = new Error('UACHPatch: __GLOBAL_SEED missing');
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_missing", e);
+      emitDegrade('error', 'worker_patch_src:seed:preflight:missing', {
+        type: 'pipeline missing data',
+        stage: 'preflight',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__GLOBAL_SEED',
+        key: '__GLOBAL_SEED',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
       throw e;
     }
     // Seed must be obtained once and then treated as immutable within session; hide it from enumeration.
@@ -83,7 +100,15 @@
 
     if (!seedEnsure) {
       const e = new Error('UACHPatch: __ensureMarkAsNative missing');
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seedEnsure_missing", e);
+      emitDegrade('error', 'worker_patch_src:ensure:preflight:missing', {
+        type: 'pipeline missing data',
+        stage: 'preflight',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__ensureMarkAsNative',
+        key: '__ensureMarkAsNative',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
       throw e;
     }
 
@@ -95,49 +120,25 @@
       throw new Error('UACHPatch: markAsNative seed unstable');
     }
 
-    const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
-    const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-    const existingToString = toStringDesc && toStringDesc.value;
-    const existingToStringBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
-
-    // По концепции: мост обязан быть seed’ом, не ставим “с нуля” в патче
-    if (!existingToStringBridge) {
-      throw new Error('UACHPatch: toString bridge missing');
+    const state = self.__CORE_TOSTRING_STATE__ || null;
+    if (!state) {
+      throw new Error('UACHPatch: __CORE_TOSTRING_STATE__ missing');
     }
-    const nativeToString = existingToString.__NativeToString;
-    const toStringMap = existingToString.__NativeToStringMap;
-    if (typeof nativeToString !== 'function' || !(toStringMap instanceof WeakMap)) {
-      throw new Error('UACHPatch: toString bridge invalid');
+    const nativeToString = state.nativeToString;
+    const overrideMap = state.overrideMap;
+    const proxyTargetMap = state.proxyTargetMap;
+    if (typeof nativeToString !== 'function' || !(overrideMap instanceof WeakMap) || !(proxyTargetMap instanceof WeakMap)) {
+      throw new Error('UACHPatch: __CORE_TOSTRING_STATE__ invalid');
     }
 
     let memoMarkAsNative = null;
     function ensureMarkAsNative() {
-      const seedNow = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
-      if (seedNow == null || seedNow === '') {
-        const e = new Error('UACHPatch: __GLOBAL_SEED missing');
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_missing", e);
-        throw e;
-      }
       if (!memoMarkAsNative) {
         const wrapped = function markAsNative(func, name = "") {
           return seedMarkAsNative(func, name);
         };
-        if (!wrapped.__TOSTRING_BRIDGE__) {
-          Object.defineProperty(wrapped, '__TOSTRING_BRIDGE__', {
-            value: true,
-            writable: false,
-            configurable: true,
-            enumerable: false
-          });
-        }
         memoMarkAsNative = wrapped;
       }
-      Object.defineProperty(memoMarkAsNative, '__GLOBAL_SEED__', {
-        value: seedNow,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
       return memoMarkAsNative;
     }
 
@@ -145,7 +146,15 @@
     const ensureDesc = Object.getOwnPropertyDescriptor(self, '__ensureMarkAsNative');
     if (ensureDesc && ensureDesc.configurable === false && ensureDesc.value !== ensureMarkAsNative) {
       const e = new Error('UACHPatch: __ensureMarkAsNative not overridable');
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:ensure_not_overridable", e);
+      emitDegrade('error', 'worker_patch_src:ensure:apply:not_overridable', {
+        type: 'browser structure missing data',
+        stage: 'apply',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__ensureMarkAsNative',
+        key: '__ensureMarkAsNative',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
       throw e;
     }
     if (!ensureDesc || ensureDesc.configurable !== false) {
@@ -159,43 +168,14 @@
 
     const markAsNative = ensureMarkAsNative();
 
-    // sanity: seed bridge must reflect labels written by seedMarkAsNative
+    // sanity: toString state must reflect labels written by seedMarkAsNative
     {
       const probe = function probe(){};
       markAsNative(probe);
-      const expected = toStringMap.get(probe);
+      const expected = overrideMap.get(probe);
       if (expected === undefined) throw new Error('UACHPatch: toString probe missing label');
-      const actual = existingToString.call(probe);
-      if (actual !== expected) throw new Error('UACHPatch: toString bridge mismatch');
-    }
-
-    if (existingToString.__TOSTRING_PROXY_INSTALLED__ !== true) {
-      Object.defineProperty(existingToString, '__TOSTRING_PROXY_INSTALLED__', {
-        value: true,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
-    }
-    // Seed is immutable within a session; keep it pinned to the bridged toString for diagnostics (non-enum).
-    try {
-      const sd = Object.getOwnPropertyDescriptor(existingToString, '__GLOBAL_SEED__');
-      const sv = (sd && Object.prototype.hasOwnProperty.call(sd, 'value')) ? sd.value : undefined;
-      const seedStr = String(self.__GLOBAL_SEED);
-      if (sv !== undefined && String(sv) !== seedStr) {
-        throw new Error('UACHPatch: __GLOBAL_SEED__ mismatch');
-      }
-      if (!sd || sd.configurable !== false) {
-        Object.defineProperty(existingToString, '__GLOBAL_SEED__', {
-          value: seedStr,
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
-      }
-    } catch (e) {
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:seed_pin_failed", e);
-      throw e;
+      const actual = Function.prototype.toString.call(probe);
+      if (actual !== expected) throw new Error('UACHPatch: toString state mismatch');
     }
 
     markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
@@ -432,7 +412,15 @@
           const d = Object.getOwnPropertyDescriptor(acc, k);
           if (d && typeof d.get === 'function') wrapped = d.get;
         } catch (e) {
-          if (typeof __DEGRADE__ === "function") __DEGRADE__("WORKER_PATCH_SRC:makeGuardedGetter_name_failed", e);
+          emitDegrade('warn', 'worker_patch_src:getter:apply:name_failed', {
+            type: 'browser structure missing data',
+            stage: 'apply',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'makeGuardedGetter',
+            key: 'name',
+            policy: 'skip',
+            action: 'skip'
+          }, e);
         }
       }
 

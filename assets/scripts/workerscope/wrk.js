@@ -221,54 +221,47 @@ function WorkerOverrides_install(G, hub) {
 const SEED_NATIVIZATION_SRC = `
       // --- Seed nativization (Window → Worker). No runtime coupling after start. ---
       try {
-        if (typeof self.__ensureMarkAsNative !== 'function') {
+        const existingState = self.__CORE_TOSTRING_STATE__;
+        const existingStateOk = !!(existingState
+          && existingState.__CORE_TOSTRING_STATE__ === true
+          && typeof existingState.nativeToString === 'function'
+          && (existingState.overrideMap instanceof WeakMap)
+          && (existingState.proxyTargetMap instanceof WeakMap));
+        if (typeof self.__ensureMarkAsNative !== 'function' || !existingStateOk) {
           const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
 
           const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
           const existingToString = fpToStringDesc && fpToStringDesc.value;
-          const existingBridge = !!(existingToString && existingToString.__TOSTRING_BRIDGE__);
-
-          if (existingBridge) {
-            const n = existingToString.__NativeToString;
-            const m = existingToString.__NativeToStringMap;
-            if (typeof n !== 'function' || !(m instanceof WeakMap)) {
-              throw new Error('UACHPatch: seed toString bridge invalid');
-            }
-          }
-
-          const nativeToString = existingBridge
-            ? existingToString.__NativeToString
+          const nativeToString = existingStateOk
+            ? existingState.nativeToString
             : (existingToString || Function.prototype.toString);
 
           if (typeof nativeToString !== 'function') {
             throw new Error('UACHPatch: Function.prototype.toString missing');
           }
 
-          const toStringMap = existingBridge
-            ? existingToString.__NativeToStringMap
+          const toStringOverrideMap = existingStateOk
+            ? existingState.overrideMap
+            : new WeakMap();
+          const toStringProxyTargetMap = existingStateOk
+            ? existingState.proxyTargetMap
             : new WeakMap();
 
           function baseMarkAsNative(func, name = "") {
             if (typeof func !== 'function') return func;
+            const t = toStringProxyTargetMap.get(func);
+            if (t) func = t;
             const n = name || func.name || "";
             const label = n
               ? ('function ' + n + '() { [native code] }')
               : 'function () { [native code] }';
-            toStringMap.set(func, label);
+            toStringOverrideMap.set(func, label);
             return func;
           }
 
           let memoMarkAsNative = null;
           function ensureMarkAsNative() {
             if (memoMarkAsNative) return memoMarkAsNative;
-            if (!baseMarkAsNative.__TOSTRING_BRIDGE__) {
-              Object.defineProperty(baseMarkAsNative, '__TOSTRING_BRIDGE__', {
-                value: true,
-                writable: false,
-                configurable: true,
-                enumerable: false
-              });
-            }
             memoMarkAsNative = baseMarkAsNative;
             return memoMarkAsNative;
           }
@@ -280,40 +273,63 @@ const SEED_NATIVIZATION_SRC = `
             enumerable: false
           });
 
-          if (!existingBridge) {
+          const markAsNative = ensureMarkAsNative();
+          markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
+
+          if (!existingStateOk) {
             const d = nativeGetOwnProp(Function.prototype, 'toString');
 
-            const toString = ({ toString() {
-              if (typeof this !== 'function') {
-                return nativeToString.call(this);
+            const toString = new Proxy(nativeToString, {
+              apply(target, thisArg, argList) {
+                const fn = toStringProxyTargetMap.get(thisArg) || thisArg;
+                if (typeof fn !== 'function') {
+                  return Reflect.apply(target, thisArg, argList);
+                }
+                if (toStringOverrideMap.has(fn)) {
+                  return toStringOverrideMap.get(fn);
+                }
+                return Reflect.apply(target, fn, argList);
               }
-              const v = toStringMap.get(this);
-              if (v !== undefined) return v;
-              return nativeToString.call(this);
-            }}).toString;
-
-            Object.defineProperty(toString, '__TOSTRING_BRIDGE__', {
-              value: true, writable: false, configurable: true, enumerable: false
             });
-            Object.defineProperty(toString, '__NativeToString', {
-              value: nativeToString, writable: false, configurable: true, enumerable: false
-            });
-            Object.defineProperty(toString, '__NativeToStringMap', {
-              value: toStringMap, writable: false, configurable: true, enumerable: false
-            });
-            Object.defineProperty(toString, '__TOSTRING_PROXY_INSTALLED__', {
-              value: true, writable: false, configurable: true, enumerable: false
-            });
-
-            const markAsNative = ensureMarkAsNative();
+            const nameDesc = nativeGetOwnProp(toString, 'name');
+            if (!nameDesc || nameDesc.value !== 'toString') {
+              if (nameDesc && nameDesc.configurable === false) {
+                throw new Error('UACHPatch: toString proxy name non-configurable mismatch');
+              }
+              Object.defineProperty(toString, 'name', {
+                value: 'toString',
+                writable: false,
+                configurable: true,
+                enumerable: false
+              });
+            }
             markAsNative(toString, 'toString');
-            markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
+            toStringProxyTargetMap.set(toString, nativeToString);
 
             Object.defineProperty(Function.prototype, 'toString', {
               value: toString,
               writable: d ? !!d.writable : true,
               configurable: d ? !!d.configurable : true,
               enumerable: d ? !!d.enumerable : false
+            });
+
+            const directProbe = function directProbe(){};
+            const expectedNative = Reflect.apply(nativeToString, directProbe, []);
+            const actualNative = Function.prototype.toString.call(directProbe);
+            if (actualNative !== expectedNative) {
+              throw new Error('UACHPatch: toString native forwarding mismatch');
+            }
+
+            Object.defineProperty(self, '__CORE_TOSTRING_STATE__', {
+              value: {
+                __CORE_TOSTRING_STATE__: true,
+                nativeToString: nativeToString,
+                overrideMap: toStringOverrideMap,
+                proxyTargetMap: toStringProxyTargetMap
+              },
+              writable: false,
+              configurable: true,
+              enumerable: false
             });
           }
         }
@@ -1380,9 +1396,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
         '__ENV_BRIDGE__',
         '__ENV_HUB__',
         'CanvasPatchContext',
-        '__TOSTRING_BRIDGE__',
-        '__TOSTRING_PROXY_INSTALLED__',
-        '__NativeToStringMap',
+        '__CORE_TOSTRING_STATE__',
         'toStringOverrideMap'
       ];
       for (const k of keys) {

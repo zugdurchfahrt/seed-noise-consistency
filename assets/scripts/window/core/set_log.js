@@ -31,14 +31,14 @@ const LOGGingModule = function LOGGingModule() {
 
     // Debug flag (respect false)
     G.__DEBUG__ =
-      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
-      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
+      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
+      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
 
     global.env = global.env || {};
     // Toggle for *logger self-diagnostics visibility*.
     // IMPORTANT: must not change runtime behavior by throwing from the logger.
-    global.env.DEBUG_DEGRADES = true;   // включить
-    // global.env.DEBUG_DEGRADES = false; // выключить
+    // global.env.DEBUG_DEGRADES = true;   // включить
+    global.env.DEBUG_DEGRADES = false; // выключить
     const env = global.env;
 
 
@@ -82,10 +82,7 @@ const LOGGingModule = function LOGGingModule() {
         stack: guard.last.stack,
         timestamp: new Date().toISOString()
       });
-
-      
     }
-
 
     function guardedApply(fn, self, args, where) {
       try {
@@ -100,8 +97,6 @@ const LOGGingModule = function LOGGingModule() {
     // Supported logging levels
     const LOG_LEVELS = ["error", "warn", "log", "info", "debug", "trace"];
     G._logLevel = global._logLevel || "log";
-
-
 
     function levelAllows(currentLevel, eventLevel) {
       const idx = LOG_LEVELS.indexOf(currentLevel);
@@ -377,8 +372,6 @@ const LOGGingModule = function LOGGingModule() {
   global.__DEGRADE__ = G.__DEGRADE__;
 
 
-
-
     // ===== 2) Core logger: pushLog (console + errors) =====
     function pushLog(level, args, withStack, module) {
       try {
@@ -510,14 +503,6 @@ const LOGGingModule = function LOGGingModule() {
       }
       return false; // do not swallow (DevTools still shows it)
     };
-
-
-
-
-
-
-
-
 
     // 5.2 resource errors (capture=true catches <script src> load fails etc.)
     global.addEventListener(
@@ -659,9 +644,6 @@ const LOGGingModule = function LOGGingModule() {
       }
     };
 
-
-
-
     // ===== 7) One-click toggles (no markers) =====
     global.DEBUG_ALL_ON = function () {
       try {
@@ -750,9 +732,7 @@ const LOGGingModule = function LOGGingModule() {
       }
     };
 
-  
-
-      // after all logger globals are assigned (Window realm only):
+        // after all logger globals are assigned (Window realm only):
       if (W) {
         Object.defineProperty(W, "_logLevel",   { value: W._logLevel,   writable:true, configurable:true, enumerable:false });
         Object.defineProperty(W, "_logConfig",  { value: W._logConfig,  writable:true, configurable:true, enumerable:false });
@@ -764,8 +744,5 @@ const LOGGingModule = function LOGGingModule() {
         Object.defineProperty(W, "DEBUG_ALL_OFF",    { value: W.DEBUG_ALL_OFF,    writable:false, configurable:true, enumerable:false });
         Object.defineProperty(W, "DEBUG_ALL_TOGGLE", { value: W.DEBUG_ALL_TOGGLE, writable:false, configurable:true, enumerable:false });
       }
-
-
     }
-
 }

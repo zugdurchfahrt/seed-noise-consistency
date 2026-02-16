@@ -11,8 +11,6 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
 
-
-      
   // === MODULE INITIALIZATION ===
   // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
   // Состояние модуля (общий контекст)
@@ -57,7 +55,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
     const OFFSCREEN_LEFT_PX =
       -(viewportWidth + Math.floor(1000 + u2 * 4002));
-
 
     div.style.position = 'fixed';
     div.style.left = `${OFFSCREEN_LEFT_PX}px`;
@@ -256,69 +253,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     m.set(tmp);
   }
 
-  // edge-aware ресемпл с микроджиттером; возвращает ImageData
-  // function __resampleWithJitter__(img, label, cfg = __CNV_CFG__) {
-  //   if (!img || !img.data || !img.width || !img.height) return img;
-  //   const w = img.width | 0, h = img.height | 0; if (!w || !h) return img;
-  //   const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
-  //     ? +devicePixelRatio
-  //     : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
-  //         ? +globalThis.__DPR
-  //         : undefined);
-  //   const { epsX, epsY } = __getJitter__(label, w, h, dpr);
-
-  //   const C1 = makeCanvas(w, h), C2 = makeCanvas(w, h);
-  //   if (!C1 || !C2) return img;
-  //   const ctx1 = C1.getContext('2d', { willReadFrequently: true });
-  //   const ctx2 = C2.getContext('2d', { willReadFrequently: true });
-  //   if (!ctx1 || !ctx2) return img;
-
-  //   const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
-  //   try { ctx2.imageSmoothingEnabled = true; } catch {}
-  //   nativePutImageData(P1, ctx1, img, 0, 0);
-  //   nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
-  //   nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
-  //   nativeDrawImage(P2, ctx2, C1, 0, 0);
-  //   const res = nativeGetImageData(P2, ctx2, 0, 0, w, h);
-
-  //   const src = img.data, dst = res.data;
-  //   const mask = new Float32Array(w * h);
-  //   let sum = 0;
-  //   for (let y = 0; y < h; y++) {
-  //     const yo = y * w;
-  //     for (let x = 0; x < w; x++) {
-  //       const i4 = (yo + x) << 2;
-  //       const l  = 0.2126 * src[i4] + 0.7152 * src[i4 + 1] + 0.0722 * src[i4 + 2];
-  //       const xr = (x + 1 < w) ? ((yo + x + 1) << 2) : i4;
-  //       const yd = (y + 1 < h) ? (((y + 1) * w + x) << 2) : i4;
-  //       const lr = 0.2126 * src[xr] + 0.7152 * src[xr + 1] + 0.0722 * src[xr + 2];
-  //       const ld = 0.2126 * src[yd] + 0.7152 * src[yd + 1] + 0.0722 * src[yd + 2];
-  //       let m = ((Math.abs(l - lr) + Math.abs(l - ld)) / 255) * ((cfg && cfg.edgeGain) || 4.0);
-  //       if (m > 1) m = 1; mask[yo + x] = m; sum += m;
-  //     }
-  //   }
-  //   const mean = sum / (w * h);
-  //   if (mean < ((cfg && cfg.flatMeanThreshold) ?? 0.02)) return img;
-
-  //   const blurPasses = (cfg && cfg.maskBlurPasses) | 0;
-  //   for (let p = 0; p < blurPasses; p++) boxBlurMask(mask, w, h);
-
-  //   const out = new Uint8ClampedArray(src.length);
-  //   for (let i = 0; i < out.length; i += 4) {
-  //     const m = mask[i >> 2];
-  //     if (m > 0) {
-  //       out[i]     = src[i]     + (dst[i]     - src[i])     * m;
-  //       out[i + 1] = src[i + 1] + (dst[i + 1] - src[i + 1]) * m;
-  //       out[i + 2] = src[i + 2] + (dst[i + 2] - src[i + 2]) * m;
-  //     } else {
-  //       out[i]     = src[i];
-  //       out[i + 1] = src[i + 1];
-  //       out[i + 2] = src[i + 2];
-  //     }
-  //     out[i + 3] = src[i + 3];
-  //   }
-  //   return new ImageData(out, w, h);
-  // }
 
   // --- 2D ImageData noise hook ---
   function patch2DNoise(img, type) {
@@ -546,125 +480,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   }
 
 
-
-  // --- toBlob noise injection hook (HTMLCanvasElement) ---
-  // async function patchPngBlobPostProcess(blob, diagCode) {
-  //   try {
-  //     if (!blob || !(blob instanceof Blob)) return;
-
-  //     const u8 = new Uint8Array(await blob.arrayBuffer());
-  //     if (u8.length < 8 + 12) return;
-
-  //     const sig = [137,80,78,71,13,10,26,10];
-  //     for (let i = 0; i < 8; i++) if (u8[i] !== sig[i]) return;
-  //     const ihType = String.fromCharCode(u8[12], u8[13], u8[14], u8[15]);
-  //     if (ihType !== 'IHDR') return;
-
-  //     const chunkType =
-  //       ihType.charAt(0).toLowerCase() +
-  //       ihType.charAt(1) +
-  //       ihType.charAt(2) +
-  //       ihType.charAt(3).toLowerCase();
-
-  //     // Deterministic payload from PNG bytes (same FNV-1a mechanics as toDataURL post-process).
-  //     const len = u8.length >>> 0;
-  //     const stride = (len >= 1<<19) ? 32
-  //                 : (len >= 1<<17) ? 16
-  //                 : (len >= 1<<15) ? 8
-  //                 : 4;
-  //     let hsh = 0x811c9dc5 >>> 0;
-  //     for (let i = 0; i < len; i += stride) {
-  //       hsh ^= u8[i];
-  //       hsh = (hsh + ((hsh<<1) + (hsh<<4) + (hsh<<7) + (hsh<<8) + (hsh<<24))) >>> 0;
-  //     }
-  //     for (let i = len - Math.min(stride, 16); i < len && i >= 0; i++) {
-  //       hsh ^= u8[i];
-  //       hsh = (hsh + ((hsh<<1) + (hsh<<4) + (hsh<<7) + (hsh<<8) + (hsh<<24))) >>> 0;
-  //     }
-
-  //     const payload = new Uint8Array(4);
-  //     payload[0] = (hsh >>> 24) & 255;
-  //     payload[1] = (hsh >>> 16) & 255;
-  //     payload[2] = (hsh >>> 8)  & 255;
-  //     payload[3] = (hsh >>> 0)  & 255;
-
-  //     function readU32BE(a, off) {
-  //       return ((a[off] << 24) | (a[off+1] << 16) | (a[off+2] << 8) | (a[off+3])) >>> 0;
-  //     }
-  //     function writeU32BE(a, off, v) {
-  //       a[off  ] = (v >>> 24) & 255;
-  //       a[off+1] = (v >>> 16) & 255;
-  //       a[off+2] = (v >>> 8)  & 255;
-  //       a[off+3] = (v >>> 0)  & 255;
-  //     }
-  //     function getCrcTable() {
-  //       const G = (typeof globalThis !== 'undefined' && globalThis)
-  //         || (typeof self !== 'undefined' && self)
-  //         || (typeof window !== 'undefined' && window)
-  //         || {};
-  //       if (G._crcTable) return G._crcTable;
-  //       const t = new Uint32Array(256);
-  //       for (let n = 0; n < 256; n++) {
-  //         let c = n;
-  //         for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-  //         t[n] = c >>> 0;
-  //       }
-  //       G._crcTable = t;
-  //       return t;
-  //     }
-  //     function crc32Chunk(typeStr, dataU8) {
-  //       const tab = getCrcTable();
-  //       let crc = ~0 >>> 0;
-  //       for (let i = 0; i < 4; i++) {
-  //         const b = typeStr.charCodeAt(i) & 255;
-  //         crc = (tab[(crc ^ b) & 255] ^ (crc >>> 8)) >>> 0;
-  //       }
-  //       for (let i = 0; i < dataU8.length; i++) {
-  //         crc = (tab[(crc ^ dataU8[i]) & 255] ^ (crc >>> 8)) >>> 0;
-  //       }
-  //       return (~crc) >>> 0;
-  //     }
-
-  //     let off = 8;
-  //     let iendOff = -1;
-  //     while (off + 12 <= u8.length) {
-  //       const clen = readU32BE(u8, off);
-  //       const typeOff = off + 4;
-  //       const dataOff = off + 8;
-  //       const crcOff  = dataOff + clen;
-  //       const next    = crcOff + 4;
-  //       if (next > u8.length) break;
-  //       const t = String.fromCharCode(u8[typeOff], u8[typeOff+1], u8[typeOff+2], u8[typeOff+3]);
-  //       if (t === 'IEND') { iendOff = off; break; }
-  //       off = next;
-  //     }
-  //     if (iendOff < 0) return;
-
-  //     const chunkLen = payload.length >>> 0;
-  //     const addLen = 4 + 4 + chunkLen + 4;
-  //     const out = new Uint8Array(u8.length + addLen);
-  //     out.set(u8.subarray(0, iendOff), 0);
-
-  //     let w = iendOff;
-  //     writeU32BE(out, w, chunkLen); w += 4;
-  //     out[w++] = chunkType.charCodeAt(0) & 255;
-  //     out[w++] = chunkType.charCodeAt(1) & 255;
-  //     out[w++] = chunkType.charCodeAt(2) & 255;
-  //     out[w++] = chunkType.charCodeAt(3) & 255;
-  //     out.set(payload, w); w += chunkLen;
-  //     const crc = crc32Chunk(chunkType, payload);
-  //     writeU32BE(out, w, crc); w += 4;
-  //     out.set(u8.subarray(iendOff), w);
-
-  //     return new Blob([out], { type: 'image/png' });
-  //   } catch (e) {
-  //     if (typeof window.__DEGRADE__ === 'function') {
-  //       try { window.__DEGRADE__(diagCode || 'canvas:blob:postprocess_failed', e); } catch (_e) {}
-  //     }
-  //     return;
-  //   }
-  // }
-  // 2026-02-11: heavy PNG blob post-process disabled in blob path (CPU guard).
   // Keep native-shaped blob output here; draw/text noise remains in canvas pipeline.
   async function patchToBlobInjectNoise(blob, ...args) {
     try {
@@ -705,113 +520,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return;
     }
 
-    // --- helpers ---
-    // function clampInt(v, min, max) {
-    //   v = Number.isFinite(v) ? Math.floor(v) : min;
-    //   if (v < min) v = min; if (v > max) v = max; return v | 0;
-    // }
-    // function isPngWithIhdr(bytes) {
-    //   // сигнатура PNG
-    //   const sig = [137,80,78,71,13,10,26,10];
-    //   for (let i=0;i<8;i++) if (bytes[i]!==sig[i]) return false;
-    //   const len = (bytes[8]<<24)|(bytes[9]<<16)|(bytes[10]<<8)|bytes[11];
-    //   if (len !== 13) return false;
-    //   if (String.fromCharCode(bytes[12],bytes[13],bytes[14],bytes[15]) !== 'IHDR') return false;
-    //   return true;
-    // }
-    // function writeBE(a, off, v) {
-    //   a[off  ] = (v >>> 24) & 255;
-    //   a[off+1] = (v >>> 16) & 255;
-    //   a[off+2] = (v >>>  8) & 255;
-    //   a[off+3] = (v >>>  0) & 255;
-    // }
-    // function getCrcTable() {
-    //   const G = (typeof globalThis !== 'undefined' && globalThis)
-    //     || (typeof self !== 'undefined' && self)
-    //     || (typeof window !== 'undefined' && window)
-    //     || {};
-    //   if (G._crcTable) return G._crcTable;
-    //   const t = new Uint32Array(256);
-    //   for (let n = 0; n < 256; n++) {
-    //     let c = n;
-    //     for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-    //     t[n] = c >>> 0;
-    //   }
-    //   G._crcTable = t;
-    //   return t;
-    // }
-    // function crc32(arr, from, toExcl) {
-    //   const tab = getCrcTable();
-    //   let crc = ~0 >>> 0;
-    //   for (let i = from; i < toExcl; i++) crc = (tab[(crc ^ arr[i]) & 0xFF] ^ (crc >>> 8)) >>> 0;
-    //   return (~crc) >>> 0;
-    // }
   }
 
-
-// --- IHDR patch (для masterToDataURLHook) ---
-/**
- * Синхронный хук для dataURL/HTMLCanvasElement.
- * OffscreenCanvas — не поддерживается (нет sync toDataURL).
- */
-  // function patchCanvasIHDR(input, newW, newH) {
-  //   const MAX_DIM = 0x7fffffff;
-  //   const W = Math.max(1, Math.min(Math.floor(newW), MAX_DIM))|0;
-  //   const H = Math.max(1, Math.min(Math.floor(newH), MAX_DIM))|0;
-
-  //   let base64;
-  //   if (typeof input === 'string' && input.startsWith('data:image/png')) {
-  //     base64 = input.split(',')[1];
-  //   } else if (typeof HTMLCanvasElement !== 'undefined' && input instanceof HTMLCanvasElement) {
-  //     const G = (typeof globalThis !== 'undefined' && globalThis)
-  //       || (typeof self !== 'undefined' && self)
-  //       || (typeof window !== 'undefined' && window)
-  //       || {};
-  //     const safeInvoke = (typeof G.__canvasSafeInvoke__ === 'function')
-  //       ? G.__canvasSafeInvoke__
-  //       : ((fn, tgt, args) => fn.apply(tgt, args));
-  //     if (!HTMLCanvasElement.prototype || typeof HTMLCanvasElement.prototype.toDataURL !== 'function') {
-  //       throw new TypeError('[patchCanvasIHDRSync] Unsupported input type for sync path');
-  //     }
-  //     const url = safeInvoke(HTMLCanvasElement.prototype.toDataURL, input, ['image/png']);
-  //     base64 = url.split(',')[1];
-  //   } else {
-  //     throw new TypeError('[patchCanvasIHDRSync] Unsupported input type for sync path');
-  //   }
-
-  //   const bin = atob(base64);
-  //   const buf = new Uint8Array(bin.length);
-  //   for (let i=0;i<bin.length;i++) buf[i] = bin.charCodeAt(i);
-
-  //   // PNG + IHDR
-  //   const sig=[137,80,78,71,13,10,26,10];
-  //   for (let i=0;i<8;i++) if (buf[i]!==sig[i]) return 'data:image/png;base64,'+base64;
-  //   const len=((buf[8]<<24)|(buf[9]<<16)|(buf[10]<<8)|buf[11]); if (len!==13) return 'data:image/png;base64,'+base64;
-  //   if (String.fromCharCode(buf[12],buf[13],buf[14],buf[15])!=='IHDR') return 'data:image/png;base64,'+base64;
-
-  //   // write W/H
-  //   buf.set([ (W>>>24)&255,(W>>>16)&255,(W>>>8)&255,(W)&255 ], 16);
-  //   buf.set([ (H>>>24)&255,(H>>>16)&255,(H>>>8)&255,(H)&255 ], 20);
-
-  //   // CRC
-  //   const G = (typeof globalThis !== 'undefined' && globalThis)
-  //     || (typeof self !== 'undefined' && self)
-  //     || (typeof window !== 'undefined' && window)
-  //     || {};
-
-  //   const tab = (function(){ if (G._crcTable) return G._crcTable;
-  //     const t=new Uint32Array(256); for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0;} return (G._crcTable=t);
-  //   })();
-  //   let crc=~0>>>0;
-  //   for (let i=12;i<12+4+13;i++) crc=(tab[(crc^buf[i])&255]^(crc>>>8))>>>0;
-  //   crc=(~crc)>>>0;
-  //   const crcOff=12+4+13;
-  //   buf.set([ (crc>>>24)&255,(crc>>>16)&255,(crc>>>8)&255,(crc)&255 ], crcOff);
-
-  //   // back to dataURL
-  //   let s='',CH=0x8000; for(let i=0;i<buf.length;i+=CH) s+=String.fromCharCode.apply(null,buf.subarray(i,i+CH));
-  //   return 'data:image/png;base64,'+btoa(s);
-  // }
 
   // Deterministic pixel-noise remains in 2D draw/text hooks.
   // 2026-02-11: keep toDataURL hook lightweight and single-pass.
@@ -834,14 +544,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return origDrawImage.apply(this, a);
   }
 
-  // 2026-02-11: disabled non-wired runtime hook (kept commented intentionally, do not delete).
-  // function patchCanvasIHDRHook(res, type, quality, newWidth, newHeight) {
-  //   if (type !== 'image/png') return res;
-  //   if (!newWidth || !newHeight) return res;
-  //   if (typeof res !== 'string') return res;
-  //   // синхронная цепочка master → синхронный IHDR-патчер
-  //   return patchCanvasIHDR(res, newWidth, newHeight);
-  // }
 
   // master-хук toDataURL: один post-process (без дополнительного IHDR-прохода)
   function masterToDataURLHook(res, type, quality) {
@@ -962,8 +664,6 @@ let applyFillTextHook, applyStrokeTextHook;
     }
   };
 })(); // ← IIFE корректно закрыт
-
-
 
 
 // --- final export ---
