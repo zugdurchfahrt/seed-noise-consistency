@@ -119,20 +119,34 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'rand source missing'
       });
     }
-    const mark = (typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative() : null;
-    const __navMark = (typeof mark === 'function') ? mark : function passthroughMark(fn) { return fn; };
+    let mark = null;
+    try {
+      mark = (typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative() : null;
+    } catch (e) {
+      __navDiagPipeline('error', 'nav_total_set:mark_as_native_failed', {
+        stage: 'preflight',
+        message: '__ensureMarkAsNative failed',
+        data: { policy: 'skip', action: 'native' }
+      }, e);
+      return;
+    }
     if (typeof mark !== 'function') {
       __navDiagPipeline('warn', 'nav_total_set:mark_as_native_missing', {
         stage: 'preflight',
-        message: 'markAsNative missing'
+        message: 'markAsNative missing',
+        data: { policy: 'skip', action: 'native' }
       });
+      return;
     }
+    const __navMark = mark;
     const wrapStrictAccessor = (typeof window.__wrapStrictAccessor === 'function') ? window.__wrapStrictAccessor : null;
     if (typeof wrapStrictAccessor !== 'function') {
       __navDiagPipeline('warn', 'nav_total_set:wrap_strict_accessor_missing', {
         stage: 'preflight',
-        message: 'wrapStrictAccessor missing'
+        message: 'wrapStrictAccessor missing',
+        data: { policy: 'skip', action: 'native' }
       });
+      return;
     }
     const coreRegisterPatchedTarget = (window.Core && typeof window.Core.registerPatchedTarget === 'function')
       ? window.Core.registerPatchedTarget
@@ -191,6 +205,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navPatchedFns = (typeof WeakSet === 'function') ? new WeakSet() : null;
     const __navPatchedKeys = new Set();
     const __navSeen = new Set();
+    let __navReceiverCheckDiagSent = false;
     const __navLogPush = (function () {
       const logArr = Array.isArray(window._myDebugLog) ? window._myDebugLog : null;
       return function (entry) {
@@ -224,7 +239,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __isNavigatorThis = (self) => {
       try {
         return self === navigator || (typeof Navigator === 'function' && self instanceof Navigator);
-      } catch (_) {
+      } catch (e) {
+        if (!__navReceiverCheckDiagSent) {
+          __navReceiverCheckDiagSent = true;
+          __navDiag('warn', 'nav_total_set:navigator_this_check_failed', {
+            stage: 'guard',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set',
+            key: null,
+            message: 'Navigator receiver check failed',
+            data: { policy: 'skip', action: 'native' }
+          }, e);
+        }
         return false;
       }
     };
@@ -1562,27 +1588,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
         try {
           redefineAcc(perfProto, 'memory', getMemory);
-        } catch (_) {
-            __navDiag('error', 'nav_total_set:performance_memory_proto', {
-              surface: 'performance',
-              stage: 'apply',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:performance.memory',
-              key: 'performance.memory',
-              message: 'performance.memory proto define failed'
-          }, _);
-          try {
-            Object.defineProperty(performance, 'memory', { get: getMemory, configurable: true });
-          } catch (__) {
-              __navDiag('error', 'nav_total_set:performance_memory_own', {
-                surface: 'performance',
-                stage: 'apply',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:performance.memory',
-                key: 'performance.memory',
-                message: 'performance.memory own define failed'
-            }, __);
-          }
+        } catch (e) {
+          __navDiag('warn', 'nav_total_set:performance_memory_proto', {
+            surface: 'performance',
+            stage: 'apply',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:performance.memory',
+            key: 'performance.memory',
+            message: 'performance.memory proto define failed',
+            data: { policy: 'skip', action: 'native' }
+          }, e);
         }
       }
     }

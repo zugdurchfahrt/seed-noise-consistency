@@ -258,7 +258,7 @@ def init_driver(
         raise RuntimeError(f"CDP port mismatch: requested {chrome_debug_port}, got {cdp.PORT}")
     if vscode_cdp_debug:
         logger.info("Chrome DevTools port: %s", cdp.PORT)
-    
+          
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
         Centralized module for setting browser engine parameters via CDP.
@@ -282,7 +282,7 @@ def init_driver(
             "longitude": longitude,
             "accuracy": accuracy,
         })
-        
+
         # 3. Device Metrics (screen scales, including navigator.mobile)
         if device_metrics:
             driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
@@ -316,8 +316,7 @@ def init_driver(
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
 
     # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
-    # This replaces the legacy Window->Worker seed propagation via snapshots.
-    # NOTE: if the CDP websocket drops mid-session, paused workers may remain paused.
+    # if the CDP websocket drops mid-session, paused workers may remain paused.
     if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
         cdp.enable_worker_seed_inject(global_seed)
         worker_seed_thread = threading.Thread(
@@ -334,12 +333,11 @@ def init_driver(
         )
         cdp.log_cdp_runtime_diag("main_after_worker_seed_thread_start")
 
-
-    # desc_js = Path(SCRIPTS_PATCHES_STEALTH / "desc22.js").read_text(encoding="utf-8")
-    # driver.execute_cdp_cmd(
-    #     "Page.addScriptToEvaluateOnNewDocument",
-    #     {"source": desc_js}
-    # )
+        # reflect_js = Path(SCRIPTS_CORE / "BESTLOGgptV3.js").read_text(encoding="utf-8")
+        # driver.execute_cdp_cmd(
+        #     "Page.addScriptToEvaluateOnNewDocument",
+        #     {"source": reflect_js}
+        # )
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
@@ -354,7 +352,6 @@ def init_driver(
             # --- RTC ---
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
-
             # --- hide_webdriver (markAsNative provider) ---
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
@@ -364,46 +361,35 @@ def init_driver(
             # --- env params ---
             Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
             "RNGsetModule(window);",
-             
             # --- nav total set ---
             Path(SCRIPTS_PATCHES_NAV / "nav_total_set.js").read_text("utf-8"),
             "NavTotalSetPatchModule(window);",
-
             # --- screen ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "screen.js").read_text("utf-8"),
             "ScreenPatchModule(window);",
-
             # --- generated patch output ---
             Path(PATCH_OUT).read_text("utf-8"),
-
             # --- fonts ---
             Path(SCRIPTS_PATCHES_MEDIA / "font_module.js").read_text("utf-8"),
             "FontPatchModule(window);",
-
             # --- canvas ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "canvas.js").read_text("utf-8"),
             "CanvasPatchModule(window);",
-
             # --- webgl extra ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "WEBGL_DICKts.js").read_text("utf-8"),
             "WEBglDICKts(window);",
-
             # --- webgl ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "webgl.js").read_text("utf-8"),
             "WebglPatchModule(window);",
-
             # --- webgpu WL ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "WebgpuWL.js").read_text("utf-8"),
             "WebgpuWLBootstrap(window);",
-
             # --- webgpu ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "webgpu.js").read_text("utf-8"),
             "WebGPUPatchModule(window);",
-
             # --- audiocontext ---
             Path(SCRIPTS_PATCHES_MEDIA / "audiocontext.js").read_text("utf-8"),
             "AudioContextModule(window);",
-
             # --- context ---
             Path(SCRIPTS_CORE / "context.js").read_text("utf-8"),
             "ContextPatchModule(window);",
@@ -449,7 +435,6 @@ def init_driver(
     if (Array.isArray(window.__normalizedLanguages)) {{
         Object.freeze(window.__normalizedLanguages);
     }}
-
     // fail-fast: типы и консистентность
     if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
         throw new Error('THW: __primaryLanguage invalid');
@@ -498,7 +483,6 @@ def init_driver(
     }})();
     //# sourceURL=worker_bootstrap_env.js
     """
-
     # --- prepare worker_bootstrap_js (reads __ENV_BRIDGE__.inlinePatch) ---
     worker_bootstrap_js = Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")
 
@@ -514,7 +498,7 @@ def init_driver(
 
     # =========================
     # [CH] Setting up Client hints (CDP-only) + __HEADERS__ (JS, NEW DOCUMENT)
-    # NOTE: No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
+    #  No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
     # =========================
 
     # --- [CH/01] detect UA family for safelisted headers ---
@@ -1073,6 +1057,7 @@ def main():
                 logger.info("UA data re-applied via CDP (mismatch detected)")
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
+        
 
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------

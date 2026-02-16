@@ -89,7 +89,16 @@
         configurable: true,
         enumerable: false
       });
-    } catch (_) {
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:seed:apply:seal_failed', {
+        type: 'browser structure missing data',
+        stage: 'apply',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__GLOBAL_SEED',
+        key: '__GLOBAL_SEED',
+        policy: 'skip',
+        action: 'native'
+      }, e);
       self.__GLOBAL_SEED = seedInit;
     }
     // --- seed __ensureMarkAsNative must exist (delivered by bootstrap) ---
@@ -112,43 +121,56 @@
       throw e;
     }
 
-    const seedMarkAsNative = seedEnsure();
-    if (typeof seedMarkAsNative !== 'function') {
-      throw new Error('UACHPatch: markAsNative seed missing');
-    }
-    if (seedMarkAsNative !== seedEnsure()) {
-      throw new Error('UACHPatch: markAsNative seed unstable');
-    }
-
     const state = self.__CORE_TOSTRING_STATE__ || null;
     if (!state) {
-      throw new Error('UACHPatch: __CORE_TOSTRING_STATE__ missing');
+      const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ missing');
+      emitDegrade('error', 'worker_patch_src:state:preflight:missing', {
+        type: 'pipeline missing data',
+        stage: 'preflight',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__CORE_TOSTRING_STATE__',
+        key: '__CORE_TOSTRING_STATE__',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
+    }
+    if (state.__CORE_TOSTRING_STATE__ !== true) {
+      const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ marker invalid');
+      emitDegrade('error', 'worker_patch_src:state:contract:marker_invalid', {
+        type: 'pipeline missing data',
+        stage: 'contract',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__CORE_TOSTRING_STATE__',
+        key: '__CORE_TOSTRING_STATE__',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
     }
     const nativeToString = state.nativeToString;
     const overrideMap = state.overrideMap;
     const proxyTargetMap = state.proxyTargetMap;
     if (typeof nativeToString !== 'function' || !(overrideMap instanceof WeakMap) || !(proxyTargetMap instanceof WeakMap)) {
-      throw new Error('UACHPatch: __CORE_TOSTRING_STATE__ invalid');
+      const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ invalid');
+      emitDegrade('error', 'worker_patch_src:state:contract:invalid', {
+        type: 'pipeline missing data',
+        stage: 'contract',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__CORE_TOSTRING_STATE__',
+        key: '__CORE_TOSTRING_STATE__',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
     }
 
-    let memoMarkAsNative = null;
-    function ensureMarkAsNative() {
-      if (!memoMarkAsNative) {
-        const wrapped = function markAsNative(func, name = "") {
-          return seedMarkAsNative(func, name);
-        };
-        memoMarkAsNative = wrapped;
-      }
-      return memoMarkAsNative;
-    }
-
-    // override self.__ensureMarkAsNative with derived (fork) if allowed
-    const ensureDesc = Object.getOwnPropertyDescriptor(self, '__ensureMarkAsNative');
-    if (ensureDesc && ensureDesc.configurable === false && ensureDesc.value !== ensureMarkAsNative) {
-      const e = new Error('UACHPatch: __ensureMarkAsNative not overridable');
-      emitDegrade('error', 'worker_patch_src:ensure:apply:not_overridable', {
-        type: 'browser structure missing data',
-        stage: 'apply',
+    const markAsNative = seedEnsure();
+    if (typeof markAsNative !== 'function') {
+      const e = new Error('UACHPatch: markAsNative seed missing');
+      emitDegrade('error', 'worker_patch_src:ensure:contract:missing_mark', {
+        type: 'pipeline missing data',
+        stage: 'contract',
         module: 'WORKER_PATCH_SRC',
         surface: '__ensureMarkAsNative',
         key: '__ensureMarkAsNative',
@@ -157,28 +179,71 @@
       }, e);
       throw e;
     }
-    if (!ensureDesc || ensureDesc.configurable !== false) {
-      Object.defineProperty(self, '__ensureMarkAsNative', {
-        value: ensureMarkAsNative,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
+    if (markAsNative !== seedEnsure()) {
+      const e = new Error('UACHPatch: markAsNative seed unstable');
+      emitDegrade('error', 'worker_patch_src:ensure:contract:unstable_mark', {
+        type: 'pipeline missing data',
+        stage: 'contract',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__ensureMarkAsNative',
+        key: '__ensureMarkAsNative',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
     }
 
-    const markAsNative = ensureMarkAsNative();
-
-    // sanity: toString state must reflect labels written by seedMarkAsNative
+    // sanity: toString state must reflect labels written by seed markAsNative
     {
       const probe = function probe(){};
       markAsNative(probe);
       const expected = overrideMap.get(probe);
-      if (expected === undefined) throw new Error('UACHPatch: toString probe missing label');
+      if (expected === undefined) {
+        const e = new Error('UACHPatch: toString probe missing label');
+        emitDegrade('error', 'worker_patch_src:tostring:contract:probe_missing', {
+          type: 'pipeline missing data',
+          stage: 'contract',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'Function.prototype.toString',
+          key: 'toString',
+          policy: 'throw',
+          action: 'throw'
+        }, e);
+        throw e;
+      }
       const actual = Function.prototype.toString.call(probe);
-      if (actual !== expected) throw new Error('UACHPatch: toString state mismatch');
+      if (actual !== expected) {
+        const e = new Error('UACHPatch: toString state mismatch');
+        emitDegrade('error', 'worker_patch_src:tostring:contract:state_mismatch', {
+          type: 'pipeline missing data',
+          stage: 'contract',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'Function.prototype.toString',
+          key: 'toString',
+          policy: 'throw',
+          action: 'throw'
+        }, e);
+        throw e;
+      }
+      const directProbe = function workerPatchDirectProbe(){};
+      const expectedNative = Reflect.apply(nativeToString, directProbe, []);
+      const actualNative = Function.prototype.toString.call(directProbe);
+      if (actualNative !== expectedNative) {
+        const e = new Error('UACHPatch: toString native forwarding mismatch');
+        emitDegrade('error', 'worker_patch_src:tostring:contract:forwarding_mismatch', {
+          type: 'pipeline missing data',
+          stage: 'contract',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'Function.prototype.toString',
+          key: 'toString',
+          policy: 'throw',
+          action: 'throw'
+        }, e);
+        throw e;
+      }
     }
 
-    markAsNative(ensureMarkAsNative, '__ensureMarkAsNative');
+    markAsNative(seedEnsure, '__ensureMarkAsNative');
 
 
     const getDevicePixelRatio = markAsNative(function getDevicePixelRatio(){
@@ -631,7 +696,7 @@
       diagTag: "worker_patch",
       surface: "worker",
       key: "installWorkerUACHMirror",
-      stage: "installed",
+      stage: "apply",
       message: "worker patch installed",
       data: {
         core: true,
