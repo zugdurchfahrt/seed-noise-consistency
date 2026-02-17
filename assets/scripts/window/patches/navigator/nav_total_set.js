@@ -830,101 +830,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 }], 'skip');
               }
             }
-            const copyFullVersionList = function copyFullVersionList(list) {
-              if (!Array.isArray(list)) return [];
-              return list.map(function (item) {
-                if (item && typeof item === 'object' && !Array.isArray(item)) {
-                  return Object.assign({}, item);
-                }
-                return item;
-              });
-            };
-            const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
-              || Object.getOwnPropertyDescriptor(nativeUAD, 'fullVersionList')
-              || null;
-            const origFullGet = (dFull && typeof dFull.get === 'function') ? dFull.get : null;
-            __navRegisterKey('userAgentData.fullVersionList');
-            if (!dFull) {
-              __navDiag('error', 'nav_total_set:userAgentData_fullVersionList_descriptor_missing', {
-                stage: 'preflight',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:userAgentData.fullVersionList',
-                key: 'userAgentData.fullVersionList',
-                message: 'uaData.fullVersionList descriptor missing'
-              });
-            } else {
-              applyCoreTargetsGroup('nav_total_set:userAgentData.fullVersionList', [{
-                owner: uadOwner,
-                key: 'fullVersionList',
-                kind: 'accessor',
-                wrapLayer: 'named_wrapper_strict',
-                policy: 'strict',
-                diagTag: 'nav_total_set:userAgentData.fullVersionList',
-                configurable: !!dFull.configurable,
-                enumerable: !!dFull.enumerable,
-                validThis: uadValidThis,
-                invalidThis: uadInvalidThis,
-                getImpl: function userAgentDataFullVersionListGetImpl() {
-                  if (Array.isArray(meta.fullVersionList) && meta.fullVersionList.length) {
-                    return copyFullVersionList(meta.fullVersionList);
-                  }
-                  __navDiag('error', 'nav_total_set:userAgentData_fullVersionList_runtime_missing', {
-                    stage: 'runtime',
-                    type: __navTypePipeline,
-                    diagTag: 'nav_total_set:userAgentData.fullVersionList',
-                    key: 'userAgentData.fullVersionList',
-                    message: 'uaData.fullVersionList missing'
-                  });
-                  if (typeof origFullGet === 'function') return Reflect.apply(origFullGet, this, []);
-                  return undefined;
-                }
-              }], 'skip');
-            }
-
-            const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
-              || Object.getOwnPropertyDescriptor(nativeUAD, 'uaFullVersion')
-              || null;
-            const origUaFullGet = (dUaFull && typeof dUaFull.get === 'function') ? dUaFull.get : null;
-            __navRegisterKey('userAgentData.uaFullVersion');
-            if (!dUaFull) {
-              __navDiag('error', 'nav_total_set:userAgentData_uaFullVersion_descriptor_missing', {
-                stage: 'preflight',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:userAgentData.uaFullVersion',
-                key: 'userAgentData.uaFullVersion',
-                message: 'uaData.uaFullVersion descriptor missing'
-              });
-            } else {
-              applyCoreTargetsGroup('nav_total_set:userAgentData.uaFullVersion', [{
-                owner: uadOwner,
-                key: 'uaFullVersion',
-                kind: 'accessor',
-                wrapLayer: 'named_wrapper_strict',
-                policy: 'strict',
-                diagTag: 'nav_total_set:userAgentData.uaFullVersion',
-                configurable: !!dUaFull.configurable,
-                enumerable: !!dUaFull.enumerable,
-                validThis: uadValidThis,
-                invalidThis: uadInvalidThis,
-                getImpl: function userAgentDataUaFullVersionGetImpl() {
-                  if (typeof meta.uaFullVersion === 'string' && meta.uaFullVersion) return meta.uaFullVersion;
-                  __navDiag('error', 'nav_total_set:userAgentData_uaFullVersion_runtime_missing', {
-                    stage: 'runtime',
-                    type: __navTypePipeline,
-                    diagTag: 'nav_total_set:userAgentData.uaFullVersion',
-                    key: 'userAgentData.uaFullVersion',
-                    message: 'uaData.uaFullVersion missing'
-                  });
-                  if (typeof origUaFullGet === 'function') return Reflect.apply(origUaFullGet, this, []);
-                  return undefined;
-                }
-              }], 'skip');
-            }
-      function dropOwnIfConfigurable(obj, key) {
-        const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
-        if (ownDesc && ownDesc.configurable) {
-          try {
-            delete obj[key];
+            // `uaFullVersion` / `fullVersionList` are high-entropy keys returned by
+            // `getHighEntropyValues()`, not stable NavigatorUAData properties across Chromium.
+            // Do not create synthetic descriptors on `NavigatorUAData` here (avoid shape drift).
+       function dropOwnIfConfigurable(obj, key) {
+         const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
+         if (ownDesc && ownDesc.configurable) {
+           try {
+             delete obj[key];
           } catch (e) {
             __navDiag('error', 'nav_total_set:userAgentData_dropOwn_failed', {
               stage: 'apply',

@@ -1,29 +1,36 @@
 const WebGPUPatchModule = function WebGPUPatchModule(window) {
-  if (!window.__PATCH_WEBGPU__) {
-    window.__PATCH_WEBGPU__ = true;
+  if (window.__PATCH_WEBGPU__) return;
 
-    const C = window.CanvasPatchContext;
-    if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available');
+  const C = window.CanvasPatchContext;
+  if (!C) {
+    try { if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__('webgpu:canvas_patch_context_missing', new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available'), { stage: 'preflight' }); } catch (_) {}
+    return;
+  }
 
-    const Core = window && window.Core;
-    if (!Core || typeof Core.applyTargets !== 'function') {
-      throw new Error('[WebGPUPatchModule] Core.applyTargets is required');
+  const Core = window && window.Core;
+  if (!Core || typeof Core.applyTargets !== 'function') {
+    try { if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__('webgpu:core_missing', new Error('[WebGPUPatchModule] Core.applyTargets is required'), { stage: 'preflight' }); } catch (_) {}
+    return;
+  }
+
+  function degrade(code, err, extra) {
+    try {
+      if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__(code, err, extra);
+    } catch (_) {}
+  }
+
+  const markNative = (function resolveMarkNative() {
+    const ensure = typeof window.__ensureMarkAsNative === 'function' ? window.__ensureMarkAsNative : null;
+    const m = ensure ? ensure() : null;
+    if (typeof m !== 'function') {
+      degrade('webgpu:mark_native_missing', new Error('[WebGPUPatchModule] markAsNative missing'), { stage: 'preflight' });
+      return null;
     }
+    return m;
+  })();
+  if (!markNative) return;
 
-    const markNative = (function resolveMarkNative() {
-      const ensure = typeof window.__ensureMarkAsNative === 'function' ? window.__ensureMarkAsNative : null;
-      const m = ensure ? ensure() : null;
-      if (typeof m !== 'function') {
-        throw new Error('[WebGPUPatchModule] markAsNative missing');
-      }
-      return m;
-    })();
-
-    function degrade(code, err, extra) {
-      try {
-        if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__(code, err, extra);
-      } catch (_) {}
-    }
+  window.__PATCH_WEBGPU__ = true;
 
     function isSameDescriptor(actual, expected) {
       if (!actual || !expected) return false;
@@ -262,10 +269,12 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       const deviceLimitsDesc = resolveDescriptorOnProtoChain(device, 'limits').desc;
 
       if (!deviceFeaturesDesc || typeof deviceFeaturesDesc.get !== 'function') {
-        throw new Error('[WebGPU] GPUDevice.features getter missing');
+        degrade('webgpu:device:features_getter_missing', new Error('[WebGPU] GPUDevice.features getter missing'), { stage: 'preflight' });
+        return;
       }
       if (!deviceLimitsDesc || typeof deviceLimitsDesc.get !== 'function') {
-        throw new Error('[WebGPU] GPUDevice.limits getter missing');
+        degrade('webgpu:device:limits_getter_missing', new Error('[WebGPU] GPUDevice.limits getter missing'), { stage: 'preflight' });
+        return;
       }
 
       const targets = [
@@ -273,6 +282,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: device,
           key: 'features',
           kind: 'accessor',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
           policy: 'throw',
           diagTag: 'webgpu:device:features',
@@ -287,6 +297,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: device,
           key: 'limits',
           kind: 'accessor',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
           policy: 'throw',
           diagTag: 'webgpu:device:limits',
@@ -299,9 +310,10 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
         }
       ];
 
-      const applied = applyCoreTargetsGroup('webgpu:device_proto', targets, 'throw');
+      const applied = applyCoreTargetsGroup('webgpu:device_proto', targets, 'skip');
       if (applied !== targets.length) {
-        throw new Error('[WebGPU] GPUDevice patch apply count mismatch');
+        degrade('webgpu:device:apply_count_mismatch', new Error('[WebGPU] GPUDevice patch apply count mismatch'), { stage: 'apply' });
+        return;
       }
       __deviceProtoPatched__.add(deviceProto);
     }
@@ -316,7 +328,8 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
 
       const requestDeviceResolved = resolveDescriptorOnProtoChain(adapter, 'requestDevice');
       if (!requestDeviceResolved.desc || typeof requestDeviceResolved.desc.value !== 'function') {
-        throw new Error('[WebGPU] adapter.requestDevice missing');
+        degrade('webgpu:adapter:requestDevice_missing', new Error('[WebGPU] adapter.requestDevice missing'), { stage: 'preflight' });
+        return;
       }
 
       const infoResolved = resolveDescriptorOnProtoChain(adapter, 'info');
@@ -329,6 +342,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: adapter,
           key: 'requestDevice',
           kind: 'promise_method',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
           invokeClass: 'brand_strict',
           policy: 'throw',
@@ -373,6 +387,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: adapter,
           key: 'requestAdapterInfo',
           kind: 'promise_method',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
           invokeClass: 'brand_strict',
           policy: 'throw',
@@ -405,6 +420,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: adapter,
           key: 'info',
           kind: 'accessor',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
           policy: 'throw',
           diagTag: 'webgpu:adapter:info',
@@ -428,6 +444,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: adapter,
           key: 'features',
           kind: 'accessor',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
           policy: 'throw',
           diagTag: 'webgpu:adapter:features',
@@ -446,6 +463,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: adapter,
           key: 'limits',
           kind: 'accessor',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
           policy: 'throw',
           diagTag: 'webgpu:adapter:limits',
@@ -458,9 +476,10 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
         });
       }
 
-      const applied = applyCoreTargetsGroup('webgpu:adapter_proto', targets, 'throw');
+      const applied = applyCoreTargetsGroup('webgpu:adapter_proto', targets, 'skip');
       if (applied !== targets.length) {
-        throw new Error('[WebGPU] GPUAdapter patch apply count mismatch');
+        degrade('webgpu:adapter:apply_count_mismatch', new Error('[WebGPU] GPUAdapter patch apply count mismatch'), { stage: 'apply' });
+        return;
       }
       __adapterProtoPatched__.add(adapterProto);
     }
@@ -473,6 +492,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       owner: gpu,
       key: 'requestAdapter',
       kind: 'promise_method',
+      wrapLayer: 'core_wrapper',
       resolve: 'proto_chain',
       invokeClass: 'brand_strict',
       policy: 'throw',
@@ -495,9 +515,9 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       }
     }];
 
-    const applied = applyCoreTargetsGroup('webgpu:navigator_gpu', requestAdapterTargets, 'throw');
+    const applied = applyCoreTargetsGroup('webgpu:navigator_gpu', requestAdapterTargets, 'skip');
     if (applied !== requestAdapterTargets.length) {
-      throw new Error('[WebGPU] navigator.gpu.requestAdapter patch failed');
+      degrade('webgpu:navigator:requestAdapter_apply_failed', new Error('[WebGPU] navigator.gpu.requestAdapter patch failed'), { stage: 'apply' });
+      return;
     }
-  }
 };

@@ -3,7 +3,8 @@
 
   const Core = window && window.Core;
   if (!Core || typeof Core.applyTargets !== 'function') {
-    throw new Error('[GeoOverride] Core.applyTargets is required');
+    try { if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__('geo:core_missing', new Error('[GeoOverride] Core.applyTargets is required'), { stage: 'preflight' }); } catch (_) {}
+    return;
   }
 
   const latitude = window.__LATITUDE__;
@@ -94,7 +95,8 @@
 
   function patchGeolocation(lat, lon) {
     if (typeof lat !== 'number' || typeof lon !== 'number') {
-      throw new Error('THW: geolocation missing latitude/longitude');
+      degrade('geo:coords_missing', new Error('[GeoOverride] geolocation missing latitude/longitude'), { stage: 'preflight' });
+      return false;
     }
 
     const nav = navigator;
@@ -113,16 +115,19 @@
     const geolocationResolved = resolveDescriptor(nav, 'geolocation', { mode: 'proto_chain' });
     const geolocationDesc = geolocationResolved && geolocationResolved.desc;
     if (!geolocationDesc || typeof geolocationDesc.get !== 'function') {
-      throw new Error('THW: geolocation descriptor missing');
+      degrade('geo:geolocation_descriptor_missing', new Error('[GeoOverride] geolocation descriptor missing'), { stage: 'preflight' });
+      return false;
     }
 
     const nativeGeo = Reflect.apply(geolocationDesc.get, nav, []);
     if (!nativeGeo || typeof nativeGeo !== 'object') {
-      throw new Error('THW: geolocation object missing');
+      degrade('geo:geolocation_object_missing', new Error('[GeoOverride] geolocation object missing'), { stage: 'preflight' });
+      return false;
     }
     const geoProto = Object.getPrototypeOf(nativeGeo);
     if (!geoProto || (typeof geoProto !== 'object' && typeof geoProto !== 'function')) {
-      throw new Error('THW: geolocation prototype missing');
+      degrade('geo:geolocation_proto_missing', new Error('[GeoOverride] geolocation prototype missing'), { stage: 'preflight' });
+      return false;
     }
 
     function validGeoThis(self) {
@@ -172,16 +177,14 @@
     function wrapSuccess(success, error) {
       if (typeof success !== 'function') return success;
       return function patchedGeoSuccess(position) {
+        let masked = position;
         try {
-          return success(maskPosition(position));
+          masked = maskPosition(position);
         } catch (e) {
-          if (typeof error === 'function') {
-            try { return error(e); } catch (ee) {
-              degrade('geo:success_wrapper_error_callback_failed', ee);
-            }
-          }
-          throw e;
+          degrade('geo:mask_position_failed', e);
+          masked = position;
         }
+        return success(masked);
       };
     }
 
@@ -190,6 +193,7 @@
         owner: geoProto,
         key: 'getCurrentPosition',
         kind: 'method',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
         policy: 'throw',
         resolve: 'own',
@@ -206,6 +210,7 @@
         owner: geoProto,
         key: 'watchPosition',
         kind: 'method',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
         policy: 'throw',
         resolve: 'own',
@@ -222,6 +227,7 @@
         owner: geoProto,
         key: 'clearWatch',
         kind: 'method',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
         policy: 'throw',
         resolve: 'own',
@@ -231,11 +237,16 @@
       }
     ];
 
-    applyTargetGroup('geo:methods', targets, 'throw');
+    try {
+      applyTargetGroup('geo:methods', targets, 'throw');
+    } catch (e) {
+      degrade('geo:apply_failed', e);
+      return false;
+    }
     degrade('geo:patched', null, { latitude: lat, longitude: lon });
+    return true;
   }
 
   window.patchGeolocation = patchGeolocation;
-  patchGeolocation(latitude, longitude);
-  window.__GEO_PATCHED__ = true;
+  if (patchGeolocation(latitude, longitude)) window.__GEO_PATCHED__ = true;
 })();
