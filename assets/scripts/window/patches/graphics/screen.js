@@ -2,49 +2,95 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!window.__PATCH_SCREEN__) {
   
   const C = window.CanvasPatchContext;
-  if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available');
+  if (!C) {
+    const D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+    if (D && typeof D.diag === 'function') {
+      try {
+        D.diag('fatal', 'screen:canvas_patch_context_missing', {
+          module: 'screen',
+          diagTag: 'screen',
+          surface: 'screen',
+          key: null,
+          stage: 'preflight',
+          message: 'CanvasPatchContext missing',
+          data: null,
+          type: 'pipeline missing data'
+        }, null);
+      } catch (_) {}
+    }
+    return;
+  }
     
   const SCREEN_WIDTH  = Number(window.__WIDTH);
   const SCREEN_HEIGHT = Number(window.__HEIGHT);
   const COLOR_DEPTH   = Number(window.__COLOR_DEPTH);
   const DPR           = Number(window.__DPR);
+  const __screenTypePipeline = 'pipeline missing data';
+  const __screenTypeBrowser = 'browser structure missing data';
 
   const __screenDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
   const __screenDegradeDiag = (__screenDegrade && typeof __screenDegrade.diag === 'function')
     ? __screenDegrade.diag.bind(__screenDegrade)
     : null;
   function __screenDiag(level, code, extra, err) {
-    const normalizedLevel = (level === 'warn' || level === 'error' || level === 'info' || level === 'debug')
+    const normalizedLevel = (level === 'warn' || level === 'error' || level === 'info' || level === 'fatal')
       ? level
       : 'info';
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const normalizedStage = (
+      x.stage === 'preflight' ||
+      x.stage === 'apply' ||
+      x.stage === 'rollback' ||
+      x.stage === 'contract' ||
+      x.stage === 'hook' ||
+      x.stage === 'runtime' ||
+      x.stage === 'guard'
+    ) ? x.stage : 'runtime';
+    const normalizedType = (
+      x.type === __screenTypePipeline ||
+      x.type === __screenTypeBrowser
+    ) ? x.type : __screenTypePipeline;
     const normalizedCode = code || 'screen';
     const ctx = {
       module: 'screen',
-      diagTag: 'screen',
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'screen',
       surface: 'screen',
-      key: null,
-      stage: normalizedLevel,
-      message: normalizedCode,
-      data: extra || null,
-      type: 'pipeline missing data'
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: normalizedStage,
+      message: (typeof x.message === 'string' && x.message) ? x.message : normalizedCode,
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: normalizedType
     };
     if (__screenDegradeDiag) {
       try { __screenDegradeDiag(normalizedLevel, normalizedCode, ctx, err || null); } catch (_) {}
       return;
     }
     if (typeof __screenDegrade === 'function') {
-      try { __screenDegrade(normalizedCode, err || null, ctx); } catch (_) {}
+      try {
+        __screenDegrade(normalizedCode, err || null, {
+          level: normalizedLevel,
+          module: ctx.module,
+          diagTag: ctx.diagTag,
+          surface: ctx.surface,
+          key: ctx.key,
+          stage: ctx.stage,
+          message: ctx.message,
+          data: ctx.data,
+          type: ctx.type
+        });
+      } catch (_) {}
     }
   }
 
+  try {
   if (!Number.isFinite(SCREEN_WIDTH) || !Number.isFinite(SCREEN_HEIGHT)) {
-    throw new Error('[Screen] bad width/height');
+    throw new Error('bad width/height');
   }
   if (!Number.isFinite(COLOR_DEPTH)) {
-    throw new Error('[Screen] bad colorDepth');
+    throw new Error('bad colorDepth');
   }
   if (!Number.isFinite(DPR) || DPR <= 0) {
-    throw new Error('[Screen] bad dpr');
+    throw new Error('bad dpr');
   }
 
   // Avoid hardcoded numeric literals for the constant zeros/ones used by layout offsets.
@@ -56,14 +102,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     ? window.Core.applyTargets
     : null;
   if (typeof __coreApplyTargets !== 'function') {
-    throw new Error('[Screen] Core.applyTargets missing');
+    throw new Error('Core.applyTargets missing');
   }
   
   function safeDefine(obj, prop, descriptor) {
     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
     const d = Object.getOwnPropertyDescriptor(obj, prop);
     if (d && d.configurable === false) {
-      throw new TypeError(`[Screen] ${prop} non-configurable`);
+      throw new TypeError(`${prop} non-configurable`);
     }
     if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
     Object.defineProperty(obj, prop, descriptor);
@@ -73,6 +119,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const acc = ({ get [prop]() { return getter.call(this); } });
     return Object.getOwnPropertyDescriptor(acc, prop).get;
   }
+  let __screenReceiverCheckDiagSent = false;
   function receiverMatchesTarget(target, thisArg) {
     try {
       const ctor = target && target.constructor;
@@ -100,25 +147,58 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         thisArg === target ||
         (target && typeof target.isPrototypeOf === 'function' && target.isPrototypeOf(thisArg))
       );
-    } catch (_) {
+    } catch (e) {
+      if (!__screenReceiverCheckDiagSent) {
+        __screenReceiverCheckDiagSent = true;
+        __screenDiag('warn', 'screen:receiver_matches_target_failed', {
+          stage: 'guard',
+          type: __screenTypeBrowser,
+          diagTag: 'screen',
+          key: null,
+          message: 'receiverMatchesTarget failed',
+          data: null
+        }, e);
+      }
       return false;
     }
   }
   function applyCoreTargetsGroup(groupTag, targets, policy) {
     const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
     let plans = [];
+    let groupKey = null;
+    if (Array.isArray(targets)) {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        if (t && typeof t.key === 'string') {
+          groupKey = t.key;
+          break;
+        }
+      }
+    }
     try {
       plans = __coreApplyTargets(targets, window.__PROFILE__, []);
     } catch (e) {
-      __screenDiag('error', groupTag + ':preflight_failed', null, e);
+      __screenDiag('error', groupTag + ':preflight_failed', {
+        stage: 'preflight',
+        type: __screenTypePipeline,
+        diagTag: groupTag,
+        key: groupKey,
+        message: 'Core.applyTargets preflight failed'
+      }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
     if (!Array.isArray(plans) || !plans.length) {
       const reason = plans && plans.reason ? plans.reason : 'group_skipped';
-      __screenDiag('warn', groupTag + ':' + reason, null, null);
+      __screenDiag('warn', groupTag + ':' + reason, {
+        stage: 'preflight',
+        type: __screenTypePipeline,
+        diagTag: groupTag,
+        key: groupKey,
+        message: reason
+      }, null);
       if (groupPolicy === 'throw') {
-        throw new Error('[Screen] core plan skipped');
+        throw new Error('core plan skipped');
       }
       return 0;
     }
@@ -128,12 +208,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         const p = plans[i];
         if (!p || p.skipApply) continue;
         if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
-          throw new Error('[Screen] invalid core plan item');
+          throw new Error('invalid core plan item');
         }
         Object.defineProperty(p.owner, p.key, p.nextDesc);
         const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
         if (!sameDesc(after, p.nextDesc)) {
-          throw new Error('[Screen] descriptor post-check mismatch');
+          throw new Error('descriptor post-check mismatch');
         }
         applied.push(p);
       }
@@ -146,14 +226,26 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           else delete p.owner[p.key];
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
-          __screenDiag('error', groupTag + ':rollback_failed', { key: p.key || null }, re);
+          __screenDiag('error', groupTag + ':rollback_failed', {
+            stage: 'rollback',
+            type: __screenTypeBrowser,
+            diagTag: groupTag,
+            key: p.key || null,
+            message: 'rollback failed'
+          }, re);
         }
       }
       if (rollbackErr) {
         if (groupPolicy === 'throw') throw rollbackErr;
         return 0;
       }
-      __screenDiag('error', groupTag + ':apply_failed', null, e);
+      __screenDiag('error', groupTag + ':apply_failed', {
+        stage: 'apply',
+        type: __screenTypeBrowser,
+        diagTag: groupTag,
+        key: groupKey,
+        message: 'apply failed'
+      }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
@@ -161,8 +253,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   function redefineProp(target, prop, getterOrValue) {
     const d = Object.getOwnPropertyDescriptor(target, prop);
-    if (!d) throw new Error(`[Screen] ${prop} descriptor missing`);
-    if (d.configurable === false) throw new Error(`[Screen] ${prop} non-configurable`);
+    if (!d) throw new Error(`${prop} descriptor missing`);
+    if (d.configurable === false) throw new Error(`${prop} non-configurable`);
     const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
     const groupTag = 'screen:redefineProp:' + String(prop);
     if (isData) {
@@ -170,12 +262,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       if (isMethod) {
         const patchedMethod = getterOrValue.call(target);
         if (typeof patchedMethod !== 'function') {
-          throw new TypeError(`[Screen] ${prop} method patch missing`);
+          throw new TypeError(`${prop} method patch missing`);
         }
         applyCoreTargetsGroup(groupTag, [{
           owner: target,
           key: prop,
           kind: 'method',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           policy: 'throw',
           diagTag: groupTag,
@@ -193,6 +286,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           owner: target,
           key: prop,
           kind: 'data',
+          wrapLayer: 'descriptor_only',
           policy: 'throw',
           diagTag: groupTag,
           value,
@@ -203,13 +297,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
       return;
     }
-    if (typeof d.get !== 'function') throw new Error(`[Screen] ${prop} getter missing`);
+    if (typeof d.get !== 'function') throw new Error(`${prop} getter missing`);
     const namedGet = (typeof getterOrValue === 'function') ? makeNamedGetter(prop, getterOrValue) : null;
     applyCoreTargetsGroup(groupTag, [{
       owner: target,
       key: prop,
       kind: 'accessor',
-      policy: 'throw',
+      wrapLayer: 'named_wrapper_strict',
+      policy: 'strict',
       diagTag: groupTag,
       validThis(self) {
         return receiverMatchesTarget(target, self);
@@ -219,7 +314,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         if (namedGet) return Reflect.apply(namedGet, this, []);
         return getterOrValue;
       }
-    }], 'throw');
+    }], 'skip');
   }
   function chooseTarget(obj, proto, prop) {
     if (obj && Object.getOwnPropertyDescriptor(obj, prop)) return obj;
@@ -248,6 +343,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         owner: mqlProto,
         key: 'matches',
         kind: 'accessor',
+        wrapLayer: 'core_wrapper',
         policy: 'throw',
         diagTag: 'screen:mql_matches',
         validThis(self) {
@@ -264,10 +360,23 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   
 
   const mmTarget = chooseTarget(window, Object.getPrototypeOf(window), 'matchMedia');
-  if (!mmTarget) throw new Error(`[Screen] matchMedia descriptor missing`);
+  if (!mmTarget) throw new Error('matchMedia descriptor missing');
+  let __screenMatchMediaThisCheckDiagSent = false;
   const isWindowThis = (self) => {
     try { return self === window || (typeof Window === 'function' && self instanceof Window); }
-    catch (_) { return false; }
+    catch (e) {
+      if (!__screenMatchMediaThisCheckDiagSent) {
+        __screenMatchMediaThisCheckDiagSent = true;
+        __screenDiag('warn', 'screen:matchMedia_window_this_check_failed', {
+          stage: 'guard',
+          type: __screenTypeBrowser,
+          diagTag: 'screen:matchMedia',
+          key: 'matchMedia',
+          message: 'Window receiver check failed'
+        }, e);
+      }
+      return false;
+    }
   };
   
   const isMatchMediaThis = (self) => (self === undefined) || isWindowThis(self);
@@ -356,7 +465,15 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (mql && (typeof mql === 'object' || typeof mql === 'function')) {
       try {
         if (touched || isTrashQuery) mqlMatches.set(mql, matches);
-      } catch {}
+      } catch (e) {
+        __screenDiag('warn', 'screen:mql_matches_cache_set_failed', {
+          stage: 'runtime',
+          type: __screenTypeBrowser,
+          diagTag: 'screen:mql_matches',
+          key: 'matches',
+          message: 'MediaQueryList cache set failed'
+        }, e);
+      }
     }
     return mql;
   };
@@ -368,6 +485,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     owner: mmTarget,
     key: 'matchMedia',
     kind: 'method',
+    wrapLayer: 'core_wrapper',
     invokeClass: 'brand_strict',
     resolve: 'own',
     policy: 'throw',
@@ -387,7 +505,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (screenObj && screenProto && screenProto !== Object.prototype) {
     const setScreen = (k, get) => {
       const target = chooseTarget(screenObj, screenProto, k);
-      if (!target) throw new Error(`[Screen] ${k} descriptor missing`);
+      if (!target) throw new Error(`${k} descriptor missing`);
       redefineProp(target, k, get);
     };
     setScreen('width', () => SCREEN_WIDTH);
@@ -404,19 +522,35 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (orientationObj && orientationProto && orientationProto !== Object.prototype) {
     const setOrientation = (k, get) => {
       const target = chooseTarget(orientationObj, orientationProto, k);
-      if (!target) throw new Error(`[Screen] orientation.${k} descriptor missing`);
+      if (!target) throw new Error(`orientation.${k} descriptor missing`);
       redefineProp(target, k, get);
     };
     try { setOrientation('type', () => (SCREEN_WIDTH > SCREEN_HEIGHT ? "landscape-primary" : "portrait-primary")); }
-    catch (e) { __screenDiag('warn', 'screen:orientation_type_redefine_failed', null, e); }
+    catch (e) {
+      __screenDiag('warn', 'screen:orientation_type_redefine_failed', {
+        stage: 'apply',
+        type: __screenTypeBrowser,
+        diagTag: 'screen',
+        key: 'orientation.type',
+        message: 'orientation.type redefine failed'
+      }, e);
+    }
     try { setOrientation('angle', () => ZERO); }
-    catch (e) { __screenDiag('warn', 'screen:orientation_angle_redefine_failed', null, e); }
+    catch (e) {
+      __screenDiag('warn', 'screen:orientation_angle_redefine_failed', {
+        stage: 'apply',
+        type: __screenTypeBrowser,
+        diagTag: 'screen',
+        key: 'orientation.angle',
+        message: 'orientation.angle redefine failed'
+      }, e);
+    }
   }
 
   // inner/outerWidth/Height
   ["innerWidth", "innerHeight", "outerWidth", "outerHeight"].forEach(prop => {
     const target = chooseTarget(window, Object.getPrototypeOf(window), prop);
-    if (!target) throw new Error(`[Screen] ${prop} descriptor missing`);
+    if (!target) throw new Error(`${prop} descriptor missing`);
     redefineProp(target, prop, () => (prop.endsWith("Width") ? SCREEN_WIDTH : SCREEN_HEIGHT));
   });
 
@@ -426,7 +560,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const vvProto = vv && Object.getPrototypeOf(vv);
     const setVV = (k, get) => {
       const t = chooseTarget(vv, vvProto, k);
-      if (!t) throw new Error(`[Screen] visualViewport.${k} descriptor missing`);
+      if (!t) throw new Error(`visualViewport.${k} descriptor missing`);
       redefineProp(t, k, get);
     };
     setVV('width', () => SCREEN_WIDTH);
@@ -490,29 +624,61 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
 
 
   document.addEventListener("DOMContentLoaded", () => {
-    __screenDiag('debug', 'screen:patched_viewport', {
-      html:   { width:  document.documentElement.clientWidth,  height: document.documentElement.clientHeight },
-      window: { width:  window.innerWidth,  height: window.innerHeight },
-      screen: { width:  window.screen.width,  height: window.screen.height }
+    __screenDiag('info', 'screen:patched_viewport', {
+      stage: 'runtime',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: null,
+      message: 'patched viewport snapshot',
+      data: {
+        html:   { width:  document.documentElement.clientWidth,  height: document.documentElement.clientHeight },
+        window: { width:  window.innerWidth,  height: window.innerHeight },
+        screen: { width:  window.screen.width,  height: window.screen.height }
+      }
     });
   });
 
   // log after DOM ready for document & div
   document.addEventListener("DOMContentLoaded", () => {
-    __screenDiag('debug', 'screen:document_div_client_sizes', {
-      html: {
-        width:  document.documentElement.clientWidth,
-        height: document.documentElement.clientHeight
-      },
-      div: {
-        width:  document.querySelector("div")?.clientWidth,
-        height: document.querySelector("div")?.clientHeight
+    __screenDiag('info', 'screen:document_div_client_sizes', {
+      stage: 'runtime',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: null,
+      message: 'document and div client sizes',
+      data: {
+        html: {
+          width:  document.documentElement.clientWidth,
+          height: document.documentElement.clientHeight
+        },
+        div: {
+          width:  document.querySelector("div")?.clientWidth,
+          height: document.querySelector("div")?.clientHeight
+        }
       }
     });
   });
   
-  __screenDiag('info', 'screen:patches_applied');
+  __screenDiag('info', 'screen:patches_applied', {
+    stage: 'apply',
+    type: __screenTypePipeline,
+    diagTag: 'screen',
+    key: null,
+    message: 'screen patches applied',
+    data: null
+  });
   window.__PATCH_SCREEN__ = true;
+  } catch (e) {
+    __screenDiag('fatal', 'screen:fatal', {
+      stage: 'apply',
+      type: __screenTypeBrowser,
+      diagTag: 'screen',
+      key: null,
+      message: 'fatal module error',
+      data: null
+    }, e);
+    return;
+  }
   } 
 }
   

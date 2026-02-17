@@ -6,34 +6,84 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         || (typeof window     !== 'undefined' && window)
         || (typeof global     !== 'undefined' && global)
         || {};
+  const __rtcDegrade = (window && typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  function __rtcDiag(level, code, extra, err) {
+    try {
+      const x = (extra && typeof extra === 'object') ? extra : {};
+      const ctx = {
+        module: 'rtc',
+        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'rtc',
+        surface: 'webrtc',
+        key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+        stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+        message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'rtc'),
+        data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+        type: (typeof x.type === 'string' && x.type) ? x.type : 'pipeline missing data'
+      };
+      if (__rtcDegrade && typeof __rtcDegrade.diag === 'function') {
+        __rtcDegrade.diag(String(level || 'info'), String(code || 'rtc'), ctx, err || null);
+        return;
+      }
+      if (typeof __rtcDegrade === 'function') {
+        __rtcDegrade(String(code || 'rtc'), err || null, Object.assign({ level: String(level || 'info') }, ctx));
+      }
+    } catch (_) {}
+  }
 
   if (!window.__CORE_WINDOW_LOADED__) {
-    throw new Error('[RTC] core_window.js not loaded - must load BEFORE RTCPeerConnection.js');
+    __rtcDiag('fatal', 'rtc:core_window_missing', {
+      stage: 'preflight',
+      key: 'core_window',
+      message: 'core_window.js not loaded - must load BEFORE RTCPeerConnection.js',
+      type: 'pipeline missing data'
+    }, new Error('[RTC] core_window.js not loaded'));
+    return;
   }
 
   const safeDefine = (function() {
     const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
-    if (typeof sd !== 'function') {
-      throw new Error('[RTC] safeDefine missing');
-    }
+    if (typeof sd !== 'function') return null;
     return sd;
   })();
+  if (typeof safeDefine !== 'function') {
+    __rtcDiag('fatal', 'rtc:safe_define_missing', {
+      stage: 'preflight',
+      key: '__safeDefine',
+      message: 'safeDefine missing',
+      type: 'pipeline missing data'
+    }, new Error('[RTC] safeDefine missing'));
+    return;
+  }
 
   const wrapApply = (function() {
     const wrap = (window && typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
-    if (typeof wrap !== 'function') {
-      throw new Error('[RTC] __wrapNativeApply missing');
-    }
+    if (typeof wrap !== 'function') return null;
     return wrap;
   })();
+  if (typeof wrapApply !== 'function') {
+    __rtcDiag('fatal', 'rtc:wrap_native_apply_missing', {
+      stage: 'preflight',
+      key: '__wrapNativeApply',
+      message: '__wrapNativeApply missing',
+      type: 'pipeline missing data'
+    }, new Error('[RTC] __wrapNativeApply missing'));
+    return;
+  }
 
   const wrapAcc = (function() {
     const wrap = (window && typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
-    if (typeof wrap !== 'function') {
-      throw new Error('[RTC] __wrapNativeAccessor missing');
-    }
+    if (typeof wrap !== 'function') return null;
     return wrap;
   })();
+  if (typeof wrapAcc !== 'function') {
+    __rtcDiag('fatal', 'rtc:wrap_native_accessor_missing', {
+      stage: 'preflight',
+      key: '__wrapNativeAccessor',
+      message: '__wrapNativeAccessor missing',
+      type: 'pipeline missing data'
+    }, new Error('[RTC] __wrapNativeAccessor missing'));
+    return;
+  }
 
   const Orig = window.RTCPeerConnection;
   if (!Orig) return;
@@ -93,7 +143,9 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const origAddEventListener = Orig.prototype.addEventListener;
   const origRemoveEventListener = Orig.prototype.removeEventListener;
   const origSetConfiguration = Orig.prototype.setConfiguration;
+  const origOnIceDesc = Object.getOwnPropertyDescriptor(Orig.prototype, 'onicecandidate') || null;
 
+  try {
   // --- patch prototype methods via Core wrapper (Proxy/apply)
   if (typeof origCreateOffer === 'function') {
     Orig.prototype.createOffer = wrapApply(origCreateOffer, 'createOffer', function(nativeFn, thisArg, args) {
@@ -265,5 +317,33 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       return Reflect.apply(nativeFn, thisArg, args);
     });
   }
-  console.log('[✔]RTC protection set');
+  __rtcDiag('info', 'rtc:patched', {
+    stage: 'apply',
+    key: 'RTCPeerConnection',
+    message: 'RTC patch applied',
+    type: 'pipeline missing data',
+    data: null
+  }, null);
+  } catch (e) {
+    try { if (typeof origCreateOffer === 'function') Orig.prototype.createOffer = origCreateOffer; } catch (_) {}
+    try { if (typeof origCreateAnswer === 'function') Orig.prototype.createAnswer = origCreateAnswer; } catch (_) {}
+    try { if (typeof origSetLocalDescription === 'function') Orig.prototype.setLocalDescription = origSetLocalDescription; } catch (_) {}
+    try { if (typeof origAddIceCandidate === 'function') Orig.prototype.addIceCandidate = origAddIceCandidate; } catch (_) {}
+    try { if (typeof origSetConfiguration === 'function') Orig.prototype.setConfiguration = origSetConfiguration; } catch (_) {}
+    try { if (typeof origAddEventListener === 'function') Orig.prototype.addEventListener = origAddEventListener; } catch (_) {}
+    try { if (typeof origRemoveEventListener === 'function') Orig.prototype.removeEventListener = origRemoveEventListener; } catch (_) {}
+    try {
+      if (origOnIceDesc) Object.defineProperty(Orig.prototype, 'onicecandidate', origOnIceDesc);
+      else { try { delete Orig.prototype.onicecandidate; } catch (_) {} }
+    } catch (_) {}
+    try { delete Orig.__PATCH_RTCPEERCONNECTION__; } catch (_) {}
+    __rtcDiag('fatal', 'rtc:apply_failed', {
+      stage: 'apply',
+      key: 'RTCPeerConnection',
+      message: 'RTC patch apply failed (rolled back)',
+      type: 'browser structure missing data',
+      data: null
+    }, e);
+    return;
+  }
 }

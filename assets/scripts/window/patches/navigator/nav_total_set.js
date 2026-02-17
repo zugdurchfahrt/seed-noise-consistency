@@ -165,6 +165,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (STRICT) throw e;
       }
     }
+
+    try {
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
     const meta          = window.__EXPECTED_CLIENT_HINTS || {};
@@ -373,6 +375,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: target,
           key,
           kind: 'data',
+          wrapLayer: 'descriptor_only',
           policy: 'throw',
           diagTag: 'nav_total_set:safeDefineAcc',
           allowCreate: !d,
@@ -396,6 +399,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: target,
         key,
         kind: 'accessor',
+        wrapLayer: 'named_wrapper',
         policy: 'throw',
         diagTag: 'nav_total_set:safeDefineAcc',
         allowCreate: !d,
@@ -427,6 +431,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: proto,
           key,
           kind: 'data',
+          wrapLayer: 'descriptor_only',
           policy: 'throw',
           diagTag: 'nav_total_set:redefineAcc',
           allowCreate: !d,
@@ -450,6 +455,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: proto,
         key,
         kind: 'accessor',
+        wrapLayer: 'named_wrapper',
         policy: 'throw',
         diagTag: 'nav_total_set:redefineAcc',
         allowCreate: !d,
@@ -787,6 +793,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                     owner: uadOwner,
                     key: spec.key,
                     kind: 'data',
+                    wrapLayer: 'descriptor_only',
                     policy: uadPolicy,
                     diagTag: 'nav_total_set:' + fullKey,
                     value: spec.readValue(),
@@ -801,7 +808,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   owner: uadOwner,
                   key: spec.key,
                   kind: 'accessor',
-                  policy: uadPolicy,
+                  wrapLayer: 'named_wrapper_strict',
+                  policy: 'strict',
                   diagTag: 'nav_total_set:' + fullKey,
                   configurable: !!spec.desc.configurable,
                   enumerable: !!spec.desc.enumerable,
@@ -819,7 +827,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                     if (typeof origGet === 'function') return Reflect.apply(origGet, this, []);
                     return undefined;
                   }
-                }], 'throw');
+                }], 'skip');
               }
             }
             const copyFullVersionList = function copyFullVersionList(list) {
@@ -833,65 +841,85 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             };
             const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
               || Object.getOwnPropertyDescriptor(nativeUAD, 'fullVersionList')
-              || { configurable: true, enumerable: false };
+              || null;
             const origFullGet = (dFull && typeof dFull.get === 'function') ? dFull.get : null;
             __navRegisterKey('userAgentData.fullVersionList');
-            applyCoreTargetsGroup('nav_total_set:userAgentData.fullVersionList', [{
-              owner: uadOwner,
-              key: 'fullVersionList',
-              kind: 'accessor',
-              policy: uadPolicy,
-              diagTag: 'nav_total_set:userAgentData.fullVersionList',
-              allowCreate: !Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList'),
-              configurable: !!dFull.configurable,
-              enumerable: !!dFull.enumerable,
-              validThis: uadValidThis,
-              invalidThis: uadInvalidThis,
-              getImpl: function userAgentDataFullVersionListGetImpl() {
-                if (Array.isArray(meta.fullVersionList) && meta.fullVersionList.length) {
-                  return copyFullVersionList(meta.fullVersionList);
+            if (!dFull) {
+              __navDiag('error', 'nav_total_set:userAgentData_fullVersionList_descriptor_missing', {
+                stage: 'preflight',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:userAgentData.fullVersionList',
+                key: 'userAgentData.fullVersionList',
+                message: 'uaData.fullVersionList descriptor missing'
+              });
+            } else {
+              applyCoreTargetsGroup('nav_total_set:userAgentData.fullVersionList', [{
+                owner: uadOwner,
+                key: 'fullVersionList',
+                kind: 'accessor',
+                wrapLayer: 'named_wrapper_strict',
+                policy: 'strict',
+                diagTag: 'nav_total_set:userAgentData.fullVersionList',
+                configurable: !!dFull.configurable,
+                enumerable: !!dFull.enumerable,
+                validThis: uadValidThis,
+                invalidThis: uadInvalidThis,
+                getImpl: function userAgentDataFullVersionListGetImpl() {
+                  if (Array.isArray(meta.fullVersionList) && meta.fullVersionList.length) {
+                    return copyFullVersionList(meta.fullVersionList);
+                  }
+                  __navDiag('error', 'nav_total_set:userAgentData_fullVersionList_runtime_missing', {
+                    stage: 'runtime',
+                    type: __navTypePipeline,
+                    diagTag: 'nav_total_set:userAgentData.fullVersionList',
+                    key: 'userAgentData.fullVersionList',
+                    message: 'uaData.fullVersionList missing'
+                  });
+                  if (typeof origFullGet === 'function') return Reflect.apply(origFullGet, this, []);
+                  return undefined;
                 }
-                __navDiag('error', 'nav_total_set:userAgentData_fullVersionList_runtime_missing', {
-                  stage: 'runtime',
-                  type: __navTypePipeline,
-                  diagTag: 'nav_total_set:userAgentData.fullVersionList',
-                  key: 'userAgentData.fullVersionList',
-                  message: 'uaData.fullVersionList missing'
-                });
-                if (typeof origFullGet === 'function') return Reflect.apply(origFullGet, this, []);
-                return undefined;
-              }
-            }], 'throw');
+              }], 'skip');
+            }
 
             const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
               || Object.getOwnPropertyDescriptor(nativeUAD, 'uaFullVersion')
-              || { configurable: true, enumerable: false };
+              || null;
             const origUaFullGet = (dUaFull && typeof dUaFull.get === 'function') ? dUaFull.get : null;
             __navRegisterKey('userAgentData.uaFullVersion');
-            applyCoreTargetsGroup('nav_total_set:userAgentData.uaFullVersion', [{
-              owner: uadOwner,
-              key: 'uaFullVersion',
-              kind: 'accessor',
-              policy: uadPolicy,
-              diagTag: 'nav_total_set:userAgentData.uaFullVersion',
-              allowCreate: !Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion'),
-              configurable: !!dUaFull.configurable,
-              enumerable: !!dUaFull.enumerable,
-              validThis: uadValidThis,
-              invalidThis: uadInvalidThis,
-              getImpl: function userAgentDataUaFullVersionGetImpl() {
-                if (typeof meta.uaFullVersion === 'string' && meta.uaFullVersion) return meta.uaFullVersion;
-                __navDiag('error', 'nav_total_set:userAgentData_uaFullVersion_runtime_missing', {
-                  stage: 'runtime',
-                  type: __navTypePipeline,
-                  diagTag: 'nav_total_set:userAgentData.uaFullVersion',
-                  key: 'userAgentData.uaFullVersion',
-                  message: 'uaData.uaFullVersion missing'
-                });
-                if (typeof origUaFullGet === 'function') return Reflect.apply(origUaFullGet, this, []);
-                return undefined;
-              }
-            }], 'throw');
+            if (!dUaFull) {
+              __navDiag('error', 'nav_total_set:userAgentData_uaFullVersion_descriptor_missing', {
+                stage: 'preflight',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:userAgentData.uaFullVersion',
+                key: 'userAgentData.uaFullVersion',
+                message: 'uaData.uaFullVersion descriptor missing'
+              });
+            } else {
+              applyCoreTargetsGroup('nav_total_set:userAgentData.uaFullVersion', [{
+                owner: uadOwner,
+                key: 'uaFullVersion',
+                kind: 'accessor',
+                wrapLayer: 'named_wrapper_strict',
+                policy: 'strict',
+                diagTag: 'nav_total_set:userAgentData.uaFullVersion',
+                configurable: !!dUaFull.configurable,
+                enumerable: !!dUaFull.enumerable,
+                validThis: uadValidThis,
+                invalidThis: uadInvalidThis,
+                getImpl: function userAgentDataUaFullVersionGetImpl() {
+                  if (typeof meta.uaFullVersion === 'string' && meta.uaFullVersion) return meta.uaFullVersion;
+                  __navDiag('error', 'nav_total_set:userAgentData_uaFullVersion_runtime_missing', {
+                    stage: 'runtime',
+                    type: __navTypePipeline,
+                    diagTag: 'nav_total_set:userAgentData.uaFullVersion',
+                    key: 'userAgentData.uaFullVersion',
+                    message: 'uaData.uaFullVersion missing'
+                  });
+                  if (typeof origUaFullGet === 'function') return Reflect.apply(origUaFullGet, this, []);
+                  return undefined;
+                }
+              }], 'skip');
+            }
       function dropOwnIfConfigurable(obj, key) {
         const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
         if (ownDesc && ownDesc.configurable) {
@@ -926,6 +954,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: uadProto,
           key: 'getHighEntropyValues',
           kind: 'promise_method',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           policy: 'throw',
           diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
@@ -1016,6 +1045,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: uadProto,
           key: 'toJSON',
           kind: 'method',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           policy: 'throw',
           diagTag: 'nav_total_set:userAgentData.toJSON',
@@ -1050,8 +1080,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'userAgentData descriptor missing'
       });
     } else {
-      const okUaData = (redefineAcc(navProto, 'userAgentData', __wrapGetter('userAgentData', function get_userAgentData(){ return nativeUAD; }, dUaData, __isNavigatorThis)), true);
-      if (okUaData === false) {
+      __navRegisterKey('userAgentData');
+      const getUserAgentData = Object.getOwnPropertyDescriptor(({ get userAgentData() {
+        __navLogAccess('userAgentData', getUserAgentData);
+        if (!__isNavigatorThis(this)) {
+          throw new TypeError();
+        }
+        return nativeUAD;
+      }}), 'userAgentData').get;
+      __navRegisterFn(getUserAgentData);
+      const appliedUaData = applyCoreTargetsGroup('nav_total_set:userAgentData', [{
+        owner: navProto,
+        key: 'userAgentData',
+        kind: 'accessor',
+        wrapLayer: 'named_wrapper_strict',
+        policy: 'strict',
+        diagTag: 'nav_total_set:userAgentData',
+        configurable: !!dUaData.configurable,
+        enumerable: !!dUaData.enumerable,
+        validThis: __isNavigatorThis,
+        invalidThis: 'throw',
+        getImpl: function getUserAgentDataImpl() {
+          return Reflect.apply(getUserAgentData, this, []);
+        }
+      }], 'skip');
+      if (appliedUaData !== 1) {
         __navDiag('error', 'nav_total_set:userAgentData_define_failed', {
           stage: 'apply',
           type: __navTypeBrowser,
@@ -1104,17 +1157,43 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }}), 'deviceMemory').get;
     __navRegisterKey('deviceMemory');
     __navRegisterFn(getDeviceMemory);
-    const okDeviceMemory = hasDeviceMemory ? (dDeviceMemory ?
-      (redefineAcc(navProto, 'deviceMemory', getDeviceMemory), true) :
-      safeDefineAcc(navProto, 'deviceMemory', getDeviceMemory, { enumerable: true })) : true;
-    if (okDeviceMemory === false) {
-      __navDiag('error', 'nav_total_set:deviceMemory_define_failed', {
-        stage: 'apply',
-        type: __navTypeBrowser,
-        diagTag: 'nav_total_set',
-        key: 'deviceMemory',
-        message: 'failed to define deviceMemory'
-      });
+    if (hasDeviceMemory) {
+      if (!dDeviceMemory) {
+        __navDiag('error', 'nav_total_set:deviceMemory_descriptor_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set',
+          key: 'deviceMemory',
+          message: 'deviceMemory descriptor missing'
+        });
+      } else {
+        const dmIsData = Object.prototype.hasOwnProperty.call(dDeviceMemory, 'value') && !dDeviceMemory.get && !dDeviceMemory.set;
+        const appliedDeviceMemory = applyCoreTargetsGroup('nav_total_set:deviceMemory', [{
+          owner: navProto,
+          key: 'deviceMemory',
+          kind: 'accessor',
+          wrapLayer: 'named_wrapper_strict',
+          policy: 'strict',
+          diagTag: 'nav_total_set:deviceMemory',
+          configurable: !!dDeviceMemory.configurable,
+          enumerable: !!dDeviceMemory.enumerable,
+          allowShapeChange: !!dmIsData,
+          validThis: __isNavigatorThis,
+          invalidThis: 'throw',
+          getImpl: function deviceMemoryGetImpl() {
+            return Reflect.apply(getDeviceMemory, this, []);
+          }
+        }], 'skip');
+        if (appliedDeviceMemory !== 1) {
+          __navDiag('error', 'nav_total_set:deviceMemory_define_failed', {
+            stage: 'apply',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set',
+            key: 'deviceMemory',
+            message: 'failed to define deviceMemory'
+          });
+        }
+      }
     }
 
     const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
@@ -1128,17 +1207,43 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }}), 'hardwareConcurrency').get;
     __navRegisterKey('hardwareConcurrency');
     __navRegisterFn(getHardwareConcurrency);
-    const okHardwareConcurrency = hasHardwareConcurrency ? (dHardwareConcurrency ?
-      (redefineAcc(navProto, 'hardwareConcurrency', getHardwareConcurrency), true) :
-      safeDefineAcc(navProto, 'hardwareConcurrency', getHardwareConcurrency, { enumerable: true })) : true;
-    if (okHardwareConcurrency === false) {
-      __navDiag('error', 'nav_total_set:hardwareConcurrency_define_failed', {
-        stage: 'apply',
-        type: __navTypeBrowser,
-        diagTag: 'nav_total_set',
-        key: 'hardwareConcurrency',
-        message: 'failed to define hardwareConcurrency'
-      });
+    if (hasHardwareConcurrency) {
+      if (!dHardwareConcurrency) {
+        __navDiag('error', 'nav_total_set:hardwareConcurrency_descriptor_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set',
+          key: 'hardwareConcurrency',
+          message: 'hardwareConcurrency descriptor missing'
+        });
+      } else {
+        const hcIsData = Object.prototype.hasOwnProperty.call(dHardwareConcurrency, 'value') && !dHardwareConcurrency.get && !dHardwareConcurrency.set;
+        const appliedHardwareConcurrency = applyCoreTargetsGroup('nav_total_set:hardwareConcurrency', [{
+          owner: navProto,
+          key: 'hardwareConcurrency',
+          kind: 'accessor',
+          wrapLayer: 'named_wrapper_strict',
+          policy: 'strict',
+          diagTag: 'nav_total_set:hardwareConcurrency',
+          configurable: !!dHardwareConcurrency.configurable,
+          enumerable: !!dHardwareConcurrency.enumerable,
+          allowShapeChange: !!hcIsData,
+          validThis: __isNavigatorThis,
+          invalidThis: 'throw',
+          getImpl: function hardwareConcurrencyGetImpl() {
+            return Reflect.apply(getHardwareConcurrency, this, []);
+          }
+        }], 'skip');
+        if (appliedHardwareConcurrency !== 1) {
+          __navDiag('error', 'nav_total_set:hardwareConcurrency_define_failed', {
+            stage: 'apply',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set',
+            key: 'hardwareConcurrency',
+            message: 'failed to define hardwareConcurrency'
+          });
+        }
+      }
     }
 
     // ——— G. language(s) ———
@@ -1153,17 +1258,43 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }}), 'language').get;
     __navRegisterKey('language');
     __navRegisterFn(getLanguage);
-    const okLanguage = hasLanguage ? (dLanguage ?
-      (redefineAcc(navProto, 'language', getLanguage), true) :
-      safeDefineAcc(navProto, 'language', getLanguage, { enumerable: dLanguage ? !!dLanguage.enumerable : false })) : true;
-    if (okLanguage === false) {
-      __navDiag('error', 'nav_total_set:language_define_failed', {
-        stage: 'apply',
-        type: __navTypeBrowser,
-        diagTag: 'nav_total_set',
-        key: 'language',
-        message: 'failed to define language'
-      });
+    if (hasLanguage) {
+      if (!dLanguage) {
+        __navDiag('error', 'nav_total_set:language_descriptor_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set',
+          key: 'language',
+          message: 'language descriptor missing'
+        });
+      } else {
+        const langIsData = Object.prototype.hasOwnProperty.call(dLanguage, 'value') && !dLanguage.get && !dLanguage.set;
+        const appliedLanguage = applyCoreTargetsGroup('nav_total_set:language', [{
+          owner: navProto,
+          key: 'language',
+          kind: 'accessor',
+          wrapLayer: 'named_wrapper_strict',
+          policy: 'strict',
+          diagTag: 'nav_total_set:language',
+          configurable: !!dLanguage.configurable,
+          enumerable: !!dLanguage.enumerable,
+          allowShapeChange: !!langIsData,
+          validThis: __isNavigatorThis,
+          invalidThis: 'throw',
+          getImpl: function languageGetImpl() {
+            return Reflect.apply(getLanguage, this, []);
+          }
+        }], 'skip');
+        if (appliedLanguage !== 1) {
+          __navDiag('error', 'nav_total_set:language_define_failed', {
+            stage: 'apply',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set',
+            key: 'language',
+            message: 'failed to define language'
+          });
+        }
+      }
     }
 
     const hasLanguages = ('languages' in navigator);
@@ -1177,17 +1308,43 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }}), 'languages').get;
     __navRegisterKey('languages');
     __navRegisterFn(getLanguages);
-    const okLanguages = hasLanguages ? (dLanguages ?
-      (redefineAcc(navProto, 'languages', getLanguages), true) :
-      safeDefineAcc(navProto, 'languages', getLanguages, { enumerable: dLanguages ? !!dLanguages.enumerable : false })) : true;
-    if (okLanguages === false) {
-      __navDiag('error', 'nav_total_set:languages_define_failed', {
-        stage: 'apply',
-        type: __navTypeBrowser,
-        diagTag: 'nav_total_set',
-        key: 'languages',
-        message: 'failed to define languages'
-      });
+    if (hasLanguages) {
+      if (!dLanguages) {
+        __navDiag('error', 'nav_total_set:languages_descriptor_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set',
+          key: 'languages',
+          message: 'languages descriptor missing'
+        });
+      } else {
+        const langsIsData = Object.prototype.hasOwnProperty.call(dLanguages, 'value') && !dLanguages.get && !dLanguages.set;
+        const appliedLanguages = applyCoreTargetsGroup('nav_total_set:languages', [{
+          owner: navProto,
+          key: 'languages',
+          kind: 'accessor',
+          wrapLayer: 'named_wrapper_strict',
+          policy: 'strict',
+          diagTag: 'nav_total_set:languages',
+          configurable: !!dLanguages.configurable,
+          enumerable: !!dLanguages.enumerable,
+          allowShapeChange: !!langsIsData,
+          validThis: __isNavigatorThis,
+          invalidThis: 'throw',
+          getImpl: function languagesGetImpl() {
+            return Reflect.apply(getLanguages, this, []);
+          }
+        }], 'skip');
+        if (appliedLanguages !== 1) {
+          __navDiag('error', 'nav_total_set:languages_define_failed', {
+            stage: 'apply',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set',
+            key: 'languages',
+            message: 'failed to define languages'
+          });
+        }
+      }
     }
 
   
@@ -1211,6 +1368,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: permProto,
         key: 'query',
         kind: 'promise_method',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
         policy: 'throw',
         diagTag: 'nav_total_set:permissions.query',
@@ -1292,6 +1450,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: mediaProto,
         key: 'enumerateDevices',
         kind: 'promise_method',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
         policy: 'throw',
         diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
@@ -1408,6 +1567,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: storageProto,
         key: 'estimate',
         kind: 'promise_method',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
         policy: 'throw',
         diagTag: 'nav_total_set:storage.estimate',
@@ -1441,6 +1601,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: tmpProto,
           key: 'queryUsageAndQuota',
           kind: 'method',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           policy: 'throw',
           diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
@@ -1493,6 +1654,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: storageProto,
           key: 'persist',
           kind: 'promise_method',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persist',
@@ -1530,6 +1692,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: storageProto,
           key: 'persisted',
           kind: 'promise_method',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persisted',
@@ -1638,6 +1801,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: credProto,
           key: 'create',
           kind: 'promise_method',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           policy: 'throw',
           diagTag: 'nav_total_set:credentials.create',
@@ -1660,6 +1824,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: credProto,
           key: 'get',
           kind: 'promise_method',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           policy: 'throw',
           diagTag: 'nav_total_set:credentials.get',
@@ -1842,6 +2007,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       diagTag: 'nav_total_set'
     });
   }
+
+    }
+    } catch (e) {
+      __navDiagBrowser('fatal', 'nav_total_set:fatal', {
+        stage: 'apply',
+        diagTag: 'nav_total_set',
+        key: null,
+        message: 'fatal module error'
+      }, e);
+      return;
+    }
   }
-}
 }

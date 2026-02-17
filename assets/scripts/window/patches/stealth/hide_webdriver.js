@@ -1,19 +1,61 @@
 const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   if (window && window.__HIDE_WEBDRIVER_READY__) return;
+  const __D = (window && typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  function __hwDegrade(code, err, extra) {
+    try { if (__D) __D(code, err || null, extra || null); } catch (_) {}
+  }
 
   const C = window.CanvasPatchContext;
-  if (!C) throw new Error('[HideWebdriverPatchModule] CanvasPatchContext is undefined — module registration is not available');
+  if (!C) {
+    __hwDegrade('hide_webdriver:canvas_patch_context_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext missing'), {
+      level: 'fatal',
+      module: 'hide_webdriver',
+      diagTag: 'hide_webdriver',
+      surface: 'navigator',
+      key: null,
+      stage: 'preflight',
+      message: 'CanvasPatchContext missing',
+      type: 'pipeline missing data',
+      data: null
+    });
+    return;
+  }
 
   const Core = window && window.Core;
   if (!Core || typeof Core.applyTargets !== 'function') {
-    throw new Error('[HideWebdriverPatchModule] Core.applyTargets is required');
+    __hwDegrade('hide_webdriver:core_missing', new Error('[HideWebdriverPatchModule] Core.applyTargets missing'), {
+      level: 'fatal',
+      module: 'hide_webdriver',
+      diagTag: 'hide_webdriver',
+      surface: 'navigator',
+      key: null,
+      stage: 'preflight',
+      message: 'Core.applyTargets missing',
+      type: 'pipeline missing data',
+      data: null
+    });
+    return;
   }
 
   const safeDefine = (function() {
     const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
-    if (typeof sd !== 'function') throw new Error('[HideWebdriverPatchModule] safeDefine missing');
+    if (typeof sd !== 'function') {
+      __hwDegrade('hide_webdriver:safe_define_missing', new Error('[HideWebdriverPatchModule] safeDefine missing'), {
+        level: 'fatal',
+        module: 'hide_webdriver',
+        diagTag: 'hide_webdriver',
+        surface: 'navigator',
+        key: '__safeDefine',
+        stage: 'preflight',
+        message: 'safeDefine missing',
+        type: 'pipeline missing data',
+        data: null
+      });
+      return null;
+    }
     return sd;
   })();
+  if (typeof safeDefine !== 'function') return;
 
   const resolveDescriptor = (Core && typeof Core.resolveDescriptor === 'function')
     ? Core.resolveDescriptor
@@ -109,71 +151,52 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     return !!d && (Object.prototype.hasOwnProperty.call(d, 'get') || Object.prototype.hasOwnProperty.call(d, 'set'));
   }
 
-  const nav = navigator;
-  const wdResolved = resolveDescriptor(nav, 'webdriver', { mode: 'proto_chain' });
-  if (!wdResolved || !wdResolved.desc) {
-    degrade('hide_webdriver:webdriver_missing', null, null);
-  } else {
-    const wdDesc = cloneDesc(wdResolved.desc);
-    if (wdDesc && wdDesc.configurable === false) {
-      throw new TypeError('[HideWebdriverPatchModule] webdriver non-configurable');
-    }
-    const wdOwner = wdResolved.owner || Object.getPrototypeOf(nav);
-    const wdTarget = {
-      owner: nav,
-      key: 'webdriver',
-      resolve: 'proto_chain',
-      policy: 'throw',
-      diagTag: 'hide_webdriver:webdriver'
-    };
-    const wdIsDataUndefined = !!wdDesc
-      && Object.prototype.hasOwnProperty.call(wdDesc, 'value')
-      && !wdDesc.get
-      && !wdDesc.set
-      && typeof wdDesc.value === 'undefined';
-    if (isAccessorDesc(wdDesc) || wdIsDataUndefined) {
-      wdTarget.kind = 'accessor';
-      wdTarget.getImpl = function getWebdriverImpl() { return false; };
-      wdTarget.validThis = function validWebdriverThis(self) {
-        return self === nav || self === wdOwner;
-      };
-      wdTarget.invalidThis = 'native';
-      if (wdIsDataUndefined) {
-        const own = Object.getOwnPropertyDescriptor(wdOwner, 'webdriver');
-        if (own) {
-          try {
-            delete wdOwner.webdriver;
-          } catch (e) {
-            degrade('hide_webdriver:webdriver_data_to_accessor_delete_failed', e, null);
-            throw e;
-          }
-        }
-        try {
-          wdTarget.owner = wdOwner;
-          wdTarget.resolve = 'own';
-          wdTarget.allowCreate = true;
-          applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
-        } catch (e) {
-          try {
-            if (own) Object.defineProperty(wdOwner, 'webdriver', own);
-          } catch (_) {}
-          degrade('hide_webdriver:webdriver_data_to_accessor_apply_failed', e, null);
-          throw e;
-        }
-      } else {
-        applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
-      }
+  try {
+    const nav = navigator;
+    const wdResolved = resolveDescriptor(nav, 'webdriver', { mode: 'proto_chain' });
+    if (!wdResolved || !wdResolved.desc) {
+      degrade('hide_webdriver:webdriver_missing', null, null);
     } else {
-      wdTarget.kind = 'data';
-      wdTarget.value = false;
-      applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
+      const wdDesc = cloneDesc(wdResolved.desc);
+      if (wdDesc && wdDesc.configurable === false) {
+        const e = new TypeError('[HideWebdriverPatchModule] webdriver non-configurable');
+        degrade('hide_webdriver:webdriver_non_configurable', e, null);
+        return;
+      }
+      const wdOwner = wdResolved.owner || Object.getPrototypeOf(nav);
+      const wdTarget = {
+        owner: nav,
+        key: 'webdriver',
+        resolve: 'proto_chain',
+        policy: 'strict',
+        wrapLayer: 'named_wrapper_strict',
+        diagTag: 'hide_webdriver:webdriver',
+        kind: 'accessor',
+        getImpl: function getWebdriverImpl() { return false; },
+        validThis: function validWebdriverThis(self) {
+          return self === nav || self === wdOwner;
+        },
+        invalidThis: 'native'
+      };
+      const wdIsData = !!wdDesc && Object.prototype.hasOwnProperty.call(wdDesc, 'value') && !wdDesc.get && !wdDesc.set;
+      if (wdIsData) {
+        wdTarget.allowShapeChange = true;
+      }
+      applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'skip');
     }
+  } catch (e) {
+    degrade('hide_webdriver:fatal', e, null);
+    return;
   }
 
-  safeDefine(window, '__HIDE_WEBDRIVER_READY__', {
-    value: true,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
+  try {
+    safeDefine(window, '__HIDE_WEBDRIVER_READY__', {
+      value: true,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  } catch (e) {
+    degrade('hide_webdriver:ready_define_failed', e, null);
+  }
 };

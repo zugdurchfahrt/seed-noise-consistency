@@ -3,17 +3,96 @@ const WebglPatchModule = function WebglPatchModule(window) {
     window.__PATCH_WEBGL__ = true;
 
     const C = window.CanvasPatchContext;
-    if (!C) throw new Error(' WebglPatchModule] CanvasPatchContext is undefined — registration is not available');
     const G = (typeof globalThis !== 'undefined' && globalThis)
           || (typeof self       !== 'undefined' && self)
           || (typeof window     !== 'undefined' && window)
           || (typeof global     !== 'undefined' && global)
           || {};
+    const __webglTypePipeline = 'pipeline missing data';
+    const __webglTypeBrowser = 'browser structure missing data';
+    const __webglDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+    const __webglDegradeDiag = (__webglDegrade && typeof __webglDegrade.diag === 'function')
+      ? __webglDegrade.diag.bind(__webglDegrade)
+      : null;
+    function __webglDiag(level, code, extra, err) {
+      const normalizedLevel = (level === 'info' || level === 'warn' || level === 'error' || level === 'fatal')
+        ? level
+        : 'info';
+      const x = (extra && typeof extra === 'object') ? extra : {};
+      const normalizedStage = (
+        x.stage === 'preflight' ||
+        x.stage === 'apply' ||
+        x.stage === 'rollback' ||
+        x.stage === 'contract' ||
+        x.stage === 'hook' ||
+        x.stage === 'runtime' ||
+        x.stage === 'guard'
+      ) ? x.stage : 'runtime';
+      const normalizedType = (
+        x.type === __webglTypePipeline ||
+        x.type === __webglTypeBrowser
+      ) ? x.type : __webglTypePipeline;
+      const normalizedCode = code || 'webgl';
+      const ctx = {
+        module: 'webgl',
+        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'webgl',
+        surface: 'webgl',
+        key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+        stage: normalizedStage,
+        message: (typeof x.message === 'string' && x.message) ? x.message : normalizedCode,
+        data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+        type: normalizedType
+      };
+      if (__webglDegradeDiag) {
+        try { __webglDegradeDiag(normalizedLevel, normalizedCode, ctx, err || null); } catch (_) {}
+        return;
+      }
+      if (typeof __webglDegrade === 'function') {
+        try {
+          __webglDegrade(normalizedCode, err || null, {
+            level: normalizedLevel,
+            module: ctx.module,
+            diagTag: ctx.diagTag,
+            surface: ctx.surface,
+            key: ctx.key,
+            stage: ctx.stage,
+            message: ctx.message,
+            data: ctx.data,
+            type: ctx.type
+          });
+        } catch (_) {}
+      }
+    }
+    function __webglDiagPipeline(level, code, extra, err) {
+      const x = (extra && typeof extra === 'object') ? extra : {};
+      if (typeof x.type !== 'string' || !x.type) x.type = __webglTypePipeline;
+      if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'webgl';
+      __webglDiag(level, code, x, err);
+    }
+    function __webglDiagBrowser(level, code, extra, err) {
+      const x = (extra && typeof extra === 'object') ? extra : {};
+      if (typeof x.type !== 'string' || !x.type) x.type = __webglTypeBrowser;
+      if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'webgl';
+      __webglDiag(level, code, x, err);
+    }
+    if (!C) {
+      __webglDiagPipeline('fatal', 'webgl:canvas_patch_context_missing', {
+        stage: 'preflight',
+        key: null,
+        message: 'CanvasPatchContext missing'
+      });
+      return;
+    }
 
     // basic random from the existing seed initialization
-    const R = window.rand.use('webgl');
+    const R = (window.rand && typeof window.rand.use === 'function') ? window.rand.use('webgl') : null;
     if (typeof R !== 'function') {
-      throw new Error('[WebGLPatchModule] "R" is not initialized');
+      __webglDiagPipeline('fatal', 'webgl:rand_missing', {
+        stage: 'preflight',
+        key: null,
+        message: 'rand source missing'
+      });
+      return;
     }
     
     // Internal markers: avoid leaving visible properties on WebGL instances/objects
@@ -23,19 +102,32 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const __webglDebugInfoCache__ = (typeof WeakMap === 'function') ? new WeakMap() : null;
     const __WEBGL_DEBUGINFO_CACHE_PROP__ = 'WebGLInstance_DebugInfoCache__';
     if (!__webglInstancePatched__ || !__webglDebugInfoPatched__ || !__webglShaderSourcePatchedProtos__ || !__webglDebugInfoCache__) {
-      throw new Error('[WebGLPatchModule] WeakMap/WeakSet are required');
+      __webglDiagBrowser('fatal', 'webgl:weak_structures_missing', {
+        stage: 'preflight',
+        key: null,
+        message: 'WeakMap/WeakSet are required'
+      });
+      return;
     }
 
-    const markNative = (function() {
+    let markNative = null;
+    try {
       if (typeof window.__ensureMarkAsNative !== 'function') {
-        throw new Error('[WebglPatchModule] __ensureMarkAsNative missing');
+        throw new Error('__ensureMarkAsNative missing');
       }
       const m = window.__ensureMarkAsNative();
       if (typeof m !== 'function') {
-        throw new Error('[WebglPatchModule] __ensureMarkAsNative returned non-function');
+        throw new Error('__ensureMarkAsNative returned non-function');
       }
-      return m;
-    })();
+      markNative = m;
+    } catch (e) {
+      __webglDiagPipeline('fatal', 'webgl:mark_native_missing', {
+        stage: 'preflight',
+        key: null,
+        message: 'markAsNative missing'
+      }, e);
+      return;
+    }
 
     
     function noiseAt(x, y, w, h) {
@@ -55,9 +147,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (dbg === undefined) {
       try { dbg = this.getExtension('WEBGL_debug_renderer_info'); } catch(e){
         dbg = null;
-        if (typeof window.__DEGRADE__ === 'function') {
-          try { window.__DEGRADE__('webgl:getExtension:debug_renderer_info_throw', e); } catch (_) {}
-        }
+        __webglDiagBrowser('warn', 'webgl:getExtension:debug_renderer_info_throw', {
+          stage: 'runtime',
+          key: 'getExtension',
+          message: 'debug renderer info getExtension threw'
+        }, e);
       }
       if (__webglDebugInfoCache__) {
         __webglDebugInfoCache__.set(this, dbg);
@@ -69,8 +163,21 @@ const WebglPatchModule = function WebglPatchModule(window) {
             configurable: true,
             enumerable: false
           });
-        } catch (_) {
-          try { this[__WEBGL_DEBUGINFO_CACHE_PROP__] = dbg; } catch (_) {}
+        } catch (e) {
+          try {
+            this[__WEBGL_DEBUGINFO_CACHE_PROP__] = dbg;
+          } catch (e2) {
+            __webglDiagBrowser('warn', 'webgl:debug_info_cache_set_failed', {
+              stage: 'runtime',
+              key: 'getExtension',
+              message: 'debug info cache set failed'
+            }, e2);
+          }
+          __webglDiagBrowser('warn', 'webgl:debug_info_cache_define_failed', {
+            stage: 'runtime',
+            key: 'getExtension',
+            message: 'debug info cache define failed'
+          }, e);
         }
       }
     }
@@ -87,7 +194,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
   function webglWhitelistParameterHook(orig, pname, ...args) {
     const wl = window.__WEBGL_PARAM_WHITELIST__;
     if (!Array.isArray(wl)) {
-      throw new Error('[WebGLPatchModule] __WEBGL_PARAM_WHITELIST__ missing/invalid');
+      __webglDiagPipeline('warn', 'webgl:param_whitelist_missing', {
+        stage: 'guard',
+        key: 'getParameter',
+        message: '__WEBGL_PARAM_WHITELIST__ missing/invalid'
+      });
+      return;
     }
 
     //Allowed parameters - we let the original (patchMethodThen it will call orig)
@@ -96,9 +208,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
     // For non-whitelisted enums: keep native pass-through to avoid null overrides
     // that can break third-party report renderers (Object.values(null) paths).
-    if (typeof window.__DEGRADE__ === 'function') {
-      try { window.__DEGRADE__('webgl:param_whitelist_miss', null, { pname: pname }); } catch (_) {}
-    }
+    __webglDiagPipeline('warn', 'webgl:param_whitelist_miss', {
+      stage: 'guard',
+      key: 'getParameter',
+      message: 'parameter not in whitelist',
+      data: { pname: pname }
+    });
     return; // undefined -> pass-through to orig.apply(this, args)
   }
     // === 2. getSupportedExtensions ===
@@ -106,7 +221,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const whitelist = Array.isArray(window.__EXTENSIONS_WHITELIST__)
       ? window.__EXTENSIONS_WHITELIST__ : [];
 
-    const res = orig.apply(this, args);
+    const res = Reflect.apply(orig, this, args);
     if (!Array.isArray(res)) return res;
 
     return res.filter(ext => whitelist.includes(ext));
@@ -116,7 +231,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const whitelist = Array.isArray(window.__EXTENSIONS_WHITELIST__)
       ? window.__EXTENSIONS_WHITELIST__ : [];
     if (!whitelist.includes(name)) return null;
-    const res = orig.call(this, name, ...rest);
+    const res = Reflect.apply(orig, this, [name].concat(rest));
     //  WEBGL_debug_renderer_info
     if (name === 'WEBGL_debug_renderer_info' &&
       res && typeof res === 'object' &&
@@ -124,16 +239,18 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
       if (typeof res.getParameter === 'function') {
         const origGetParameter = res.getParameter;
+        // Hybrid routing: normal callable surface stays on named-wrapper path
+        // (markAsNative), without forcing Proxy-based wrapping.
         const wrappedGetParameter = ({ getParameter(pname) {
           if (pname === this.UNMASKED_VENDOR_WEBGL)
             return window.__WEBGL_UNMASKED_VENDOR__;
           if (pname === this.UNMASKED_RENDERER_WEBGL)
             return window.__WEBGL_UNMASKED_RENDERER__;
-          return origGetParameter.call(this, pname);
+          return Reflect.apply(origGetParameter, this, [pname]);
         }}).getParameter;
 
-        markNative(wrappedGetParameter, 'getParameter');
-        res.getParameter = wrappedGetParameter;
+        const wrappedGetParameterNative = markNative(wrappedGetParameter, 'getParameter');
+        res.getParameter = wrappedGetParameterNative;
       }
       if (__webglDebugInfoPatched__) {
         __webglDebugInfoPatched__.add(res);
@@ -157,8 +274,21 @@ const WebglPatchModule = function WebglPatchModule(window) {
             configurable: true,
             enumerable: false
           });
-        } catch (_) {
-          try { this[__WEBGL_DEBUGINFO_CACHE_PROP__] = res || null; } catch (_) {}
+        } catch (e) {
+          try {
+            this[__WEBGL_DEBUGINFO_CACHE_PROP__] = res || null;
+          } catch (e2) {
+            __webglDiagBrowser('warn', 'webgl:debug_info_cache_set_failed', {
+              stage: 'runtime',
+              key: 'getExtension',
+              message: 'debug info cache set failed'
+            }, e2);
+          }
+          __webglDiagBrowser('warn', 'webgl:debug_info_cache_define_failed', {
+            stage: 'runtime',
+            key: 'getExtension',
+            message: 'debug info cache define failed'
+          }, e);
         }
       }
     }
@@ -228,7 +358,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
 
   function webglGetShaderPrecisionFormatHook(orig, shaderType, precisionType) {
-    const res = orig.call(this, shaderType, precisionType);
+    const res = Reflect.apply(orig, this, [shaderType, precisionType]);
     if (!res) return res;
     const v = (R() - 0.5);
     const rangeMin = Math.round(res.rangeMin + v);
@@ -292,16 +422,24 @@ const WebglPatchModule = function WebglPatchModule(window) {
       return;
  
     } catch (e) {
-      if (typeof window.__DEGRADE__ === 'function') {
-        try { window.__DEGRADE__('webgl:shaderSourceHook:error', e); } catch (_) {}
-      }
+      __webglDiagPipeline('warn', 'webgl:shaderSourceHook:error', {
+        stage: 'hook',
+        key: 'shaderSource',
+        message: 'shaderSource hook failed'
+      }, e);
       // for any malfunction case - return the original without modifications
       return;
     }
   }
 
   function webglGetUniformHook(orig, program, location) {
-    const res = orig.call(this, program, location);
+    const res = Reflect.apply(orig, this, [program, location]);
+    // WebGL contract: null/undefined are semantically valid in many paths,
+    // and legal zero must not be treated as missing.
+    if (res == null) return res;
+    if (typeof res === 'number' && (!Number.isFinite(res) || Number.isNaN(res) || res === 0)) {
+      return res;
+    }
     if (typeof res === 'number' && typeof R === 'function') {
       return res + (R() - 0.5) * 1e-4;
     }
@@ -327,9 +465,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
       enumerable: false
     });
   } catch (e) {
-    if (typeof window.__DEGRADE__ === 'function') {
-      try { window.__DEGRADE__('webgl:webglHooks:define_failed', e); } catch (_) {}
-    }
+    __webglDiagBrowser('error', 'webgl:webglHooks:define_failed', {
+      stage: 'apply',
+      key: 'webglHooks',
+      message: 'webglHooks define failed'
+    }, e);
     window.webglHooks = {
       webglGetParameterMask,
       webglWhitelistParameterHook,
@@ -343,10 +483,21 @@ const WebglPatchModule = function WebglPatchModule(window) {
     };
     const h = window.webglHooks;
     if (!h || typeof h !== 'object' || typeof h.webglGetParameterMask !== 'function') {
-      throw e;
+      __webglDiagBrowser('fatal', 'webgl:webglHooks:fallback_invalid', {
+        stage: 'apply',
+        key: 'webglHooks',
+        message: 'webglHooks fallback invalid'
+      }, e);
+      return;
     }
   }
-    console.log('[WebGLPatchModule] WebglPatchModule applied');
+    __webglDiag('info', 'webgl:patches_applied', {
+      stage: 'apply',
+      type: __webglTypePipeline,
+      key: null,
+      message: 'webgl patches applied',
+      data: null
+    });
 }
 }
 
