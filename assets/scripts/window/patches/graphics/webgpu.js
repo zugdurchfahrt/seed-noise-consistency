@@ -1,29 +1,92 @@
 const WebGPUPatchModule = function WebGPUPatchModule(window) {
   if (window.__PATCH_WEBGPU__) return;
 
+  const __webgpuTypePipeline = 'pipeline missing data';
+  const __webgpuTypeBrowser = 'browser structure missing data';
+  const __webgpuDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __webgpuDegradeDiag = (__webgpuDegrade && typeof __webgpuDegrade.diag === 'function')
+    ? __webgpuDegrade.diag.bind(__webgpuDegrade)
+    : null;
+
+  function emitDegrade(level, code, err, extra) {
+    const d = __webgpuDegrade;
+    if (typeof d !== 'function') return;
+
+    const e = (err instanceof Error)
+      ? err
+      : (err == null ? null : new Error(String(err)));
+
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const normalizedLevel = (level === 'info' || level === 'warn' || level === 'error' || level === 'fatal')
+      ? level
+      : 'info';
+    const normalizedCode = code || 'webgpu';
+
+    const ctx = {
+      module: 'webgpu',
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'webgpu',
+      surface: 'webgpu',
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+      message: (typeof x.message === 'string' && x.message) ? x.message : normalizedCode,
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: (typeof x.type === 'string' && x.type) ? x.type : __webgpuTypePipeline
+    };
+
+    if (__webgpuDegradeDiag) {
+      try { __webgpuDegradeDiag(normalizedLevel, normalizedCode, ctx, e || null); } catch (_) {}
+      return;
+    }
+
+    try {
+      d(normalizedCode, e || null, {
+        level: normalizedLevel,
+        module: ctx.module,
+        diagTag: ctx.diagTag,
+        surface: ctx.surface,
+        key: ctx.key,
+        stage: ctx.stage,
+        message: ctx.message,
+        data: ctx.data,
+        type: ctx.type
+      });
+    } catch (_) {}
+  }
+
+  function degrade(code, err, extra) {
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const lvl = (x.level === 'info' || x.level === 'warn' || x.level === 'error' || x.level === 'fatal')
+      ? x.level
+      : 'warn';
+    emitDegrade(lvl, code, err, x);
+  }
+
   const C = window.CanvasPatchContext;
   if (!C) {
-    try { if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__('webgpu:canvas_patch_context_missing', new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available'), { stage: 'preflight' }); } catch (_) {}
+    degrade('webgpu:canvas_patch_context_missing', new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available'), {
+      stage: 'preflight',
+      level: 'fatal',
+      type: __webgpuTypePipeline,
+      key: 'CanvasPatchContext'
+    });
     return;
   }
 
   const Core = window && window.Core;
   if (!Core || typeof Core.applyTargets !== 'function') {
-    try { if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__('webgpu:core_missing', new Error('[WebGPUPatchModule] Core.applyTargets is required'), { stage: 'preflight' }); } catch (_) {}
+    degrade('webgpu:core_missing', new Error('[WebGPUPatchModule] Core.applyTargets is required'), {
+      stage: 'preflight',
+      level: 'fatal',
+      type: __webgpuTypePipeline,
+      key: 'Core.applyTargets'
+    });
     return;
   }
-
-  function degrade(code, err, extra) {
-    try {
-      if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__(code, err, extra);
-    } catch (_) {}
-  }
-
   const markNative = (function resolveMarkNative() {
     const ensure = typeof window.__ensureMarkAsNative === 'function' ? window.__ensureMarkAsNative : null;
     const m = ensure ? ensure() : null;
     if (typeof m !== 'function') {
-      degrade('webgpu:mark_native_missing', new Error('[WebGPUPatchModule] markAsNative missing'), { stage: 'preflight' });
+      degrade('webgpu:mark_native_missing', new Error('[WebGPUPatchModule] markAsNative missing'), { stage: 'preflight', level: 'fatal', type: __webgpuTypePipeline, key: 'markAsNative' });
       return null;
     }
     return m;
@@ -50,7 +113,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       try {
         plans = Core.applyTargets(targets, window.__PROFILE__, []);
       } catch (e) {
-        degrade(groupTag + ':preflight_failed', e);
+        degrade(groupTag + ':preflight_failed', e, { stage: 'preflight', level: 'error', type: __webgpuTypePipeline, diagTag: groupTag, key: null });
         if (groupPolicy === 'throw') throw e;
         return 0;
       }
@@ -58,7 +121,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       if (!Array.isArray(plans) || !plans.length) {
         const reason = plans && plans.reason ? plans.reason : 'group_skipped';
         const err = new Error('[WebGPU] target group skipped: ' + reason);
-        degrade(groupTag + ':' + reason, err);
+        degrade(groupTag + ':' + reason, err, { stage: 'preflight', level: 'warn', type: __webgpuTypeBrowser, diagTag: groupTag, key: null, data: { reason: reason } });
         if (groupPolicy === 'throw') throw err;
         return 0;
       }
@@ -87,14 +150,14 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             else delete p.owner[p.key];
           } catch (re) {
             if (!rollbackErr) rollbackErr = re;
-            degrade(groupTag + ':rollback_failed', re, { key: p.key || null });
+            degrade(groupTag + ':rollback_failed', re, { stage: 'rollback', level: 'error', type: __webgpuTypePipeline, diagTag: groupTag, key: p.key || null });
           }
         }
         if (rollbackErr) {
           if (groupPolicy === 'throw') throw rollbackErr;
           return 0;
         }
-        degrade(groupTag + ':apply_failed', e);
+        degrade(groupTag + ':apply_failed', e, { stage: 'apply', level: 'error', type: __webgpuTypePipeline, diagTag: groupTag, key: null });
         if (groupPolicy === 'throw') throw e;
         return 0;
       }
@@ -123,7 +186,8 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
         seen.add(cur);
         try {
           cur = Object.getPrototypeOf(cur);
-        } catch (_) {
+        } catch (e) {
+          degrade('webgpu:proto_chain:getPrototypeOf_failed', e, { stage: 'guard', level: 'warn', type: __webgpuTypePipeline, diagTag: 'webgpu', key: 'Object.getPrototypeOf' });
           return false;
         }
       }
@@ -202,7 +266,8 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           if (prop === 'has') {
             const nativeHas = Reflect.get(target, 'has', target);
             if (typeof nativeHas !== 'function') {
-              throw new TypeError('[WebGPU] GPUSupportedFeatures.has missing');
+              degrade('webgpu:features:has_missing', new Error('[WebGPU] GPUSupportedFeatures.has missing'), { stage: 'contract', level: 'warn', type: __webgpuTypeBrowser, diagTag: 'webgpu', key: 'GPUSupportedFeatures.has' });
+              return nativeHas;
             }
             return markNative(function has(feature) {
               return __WL_FEATURES__.has(feature) && Reflect.apply(nativeHas, target, [feature]);
@@ -269,11 +334,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       const deviceLimitsDesc = resolveDescriptorOnProtoChain(device, 'limits').desc;
 
       if (!deviceFeaturesDesc || typeof deviceFeaturesDesc.get !== 'function') {
-        degrade('webgpu:device:features_getter_missing', new Error('[WebGPU] GPUDevice.features getter missing'), { stage: 'preflight' });
+        degrade('webgpu:device:features_getter_missing', new Error('[WebGPU] GPUDevice.features getter missing'), { stage: 'preflight', level: 'error', type: __webgpuTypeBrowser, diagTag: 'webgpu', key: 'GPUDevice.features' });
         return;
       }
       if (!deviceLimitsDesc || typeof deviceLimitsDesc.get !== 'function') {
-        degrade('webgpu:device:limits_getter_missing', new Error('[WebGPU] GPUDevice.limits getter missing'), { stage: 'preflight' });
+        degrade('webgpu:device:limits_getter_missing', new Error('[WebGPU] GPUDevice.limits getter missing'), { stage: 'preflight', level: 'error', type: __webgpuTypeBrowser, diagTag: 'webgpu', key: 'GPUDevice.limits' });
         return;
       }
 
@@ -312,7 +377,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
 
       const applied = applyCoreTargetsGroup('webgpu:device_proto', targets, 'skip');
       if (applied !== targets.length) {
-        degrade('webgpu:device:apply_count_mismatch', new Error('[WebGPU] GPUDevice patch apply count mismatch'), { stage: 'apply' });
+        degrade('webgpu:device:apply_count_mismatch', new Error('[WebGPU] GPUDevice patch apply count mismatch'), { stage: 'apply', level: 'error', type: __webgpuTypePipeline, diagTag: 'webgpu', key: 'GPUDevice' });
         return;
       }
       __deviceProtoPatched__.add(deviceProto);
@@ -328,7 +393,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
 
       const requestDeviceResolved = resolveDescriptorOnProtoChain(adapter, 'requestDevice');
       if (!requestDeviceResolved.desc || typeof requestDeviceResolved.desc.value !== 'function') {
-        degrade('webgpu:adapter:requestDevice_missing', new Error('[WebGPU] adapter.requestDevice missing'), { stage: 'preflight' });
+        degrade('webgpu:adapter:requestDevice_missing', new Error('[WebGPU] adapter.requestDevice missing'), { stage: 'preflight', level: 'error', type: __webgpuTypeBrowser, diagTag: 'webgpu', key: 'GPUAdapter.requestDevice' });
         return;
       }
 
@@ -374,7 +439,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               patchDevicePrototype(device);
               return device;
             }, function onDeviceReject(err) {
-              degrade('webgpu:adapter:requestDevice:rejected', err);
+              degrade('webgpu:adapter:requestDevice:rejected', err, { stage: 'runtime', level: 'warn', type: 'runtime rejection', diagTag: 'webgpu', key: 'GPUAdapter.requestDevice' });
               throw err;
             });
           }
@@ -404,7 +469,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               __adapterInfoValueCache__.set(this, built);
               return built;
             }, (err) => {
-              degrade('webgpu:adapter:requestAdapterInfo:rejected', err);
+              degrade('webgpu:adapter:requestAdapterInfo:rejected', err, { stage: 'runtime', level: 'warn', type: 'runtime rejection', diagTag: 'webgpu', key: 'GPUAdapter.requestAdapterInfo' });
               const built = buildAdapterInfo(readNativeAdapterInfo(this));
               __adapterInfoValueCache__.set(this, built);
               return built;
@@ -478,7 +543,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
 
       const applied = applyCoreTargetsGroup('webgpu:adapter_proto', targets, 'skip');
       if (applied !== targets.length) {
-        degrade('webgpu:adapter:apply_count_mismatch', new Error('[WebGPU] GPUAdapter patch apply count mismatch'), { stage: 'apply' });
+        degrade('webgpu:adapter:apply_count_mismatch', new Error('[WebGPU] GPUAdapter patch apply count mismatch'), { stage: 'apply', level: 'error', type: __webgpuTypePipeline, diagTag: 'webgpu', key: 'GPUAdapter' });
         return;
       }
       __adapterProtoPatched__.add(adapterProto);
@@ -492,7 +557,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       owner: gpu,
       key: 'requestAdapter',
       kind: 'promise_method',
-      wrapLayer: 'core_wrapper',
+      wrapLayer: 'named_wrapper',
       resolve: 'proto_chain',
       invokeClass: 'brand_strict',
       policy: 'throw',
@@ -509,7 +574,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           patchAdapterPrototype(adapter);
           return adapter;
         }, function onAdapterReject(err) {
-          degrade('webgpu:navigator:requestAdapter:rejected', err);
+          degrade('webgpu:navigator:requestAdapter:rejected', err, { stage: 'runtime', level: 'warn', type: 'runtime rejection', diagTag: 'webgpu', key: 'navigator.gpu.requestAdapter' });
           throw err;
         });
       }
@@ -517,7 +582,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
 
     const applied = applyCoreTargetsGroup('webgpu:navigator_gpu', requestAdapterTargets, 'skip');
     if (applied !== requestAdapterTargets.length) {
-      degrade('webgpu:navigator:requestAdapter_apply_failed', new Error('[WebGPU] navigator.gpu.requestAdapter patch failed'), { stage: 'apply' });
+      degrade('webgpu:navigator:requestAdapter_apply_failed', new Error('[WebGPU] navigator.gpu.requestAdapter patch failed'), { stage: 'apply', level: 'error', type: __webgpuTypePipeline, diagTag: 'webgpu', key: 'navigator.gpu.requestAdapter' });
       return;
     }
 };

@@ -1138,9 +1138,25 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if ((kind === 'accessor' || kind === 'method' || kind === 'promise_method') && wrapLayer === 'descriptor_only') {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] descriptor_only unsupported for non-data kind'), tag, policy, targetId, key, kind };
         }
-        if ((kind === 'method' || kind === 'promise_method') && invokeClass !== 'normal' && wrapLayer === 'named_wrapper') {
-          return { ok: false, reason: 'wrap_layer_unsupported', error: new TypeError('[Core.applyTargets] invokeClass requires core_wrapper wrapLayer'), tag, policy, targetId, key, kind };
+        // if ((kind === 'method' || kind === 'promise_method') && invokeClass !== 'normal' && wrapLayer === 'named_wrapper') {
+        //   return { ok: false, reason: 'wrap_layer_unsupported', error: new TypeError('[Core.applyTargets] invokeClass requires core_wrapper wrapLayer'), tag, policy, targetId, key, kind };
+        // }
+
+
+        if ((kind === 'method' || kind === 'promise_method')
+            && (invokeClass === 'constructor' || invokeClass === 'meta_primitive')
+            && wrapLayer === 'named_wrapper') {
+          return { ok: false, reason: 'wrap_layer_unsupported',
+            error: new TypeError('[Core.applyTargets] invokeClass requires core_wrapper wrapLayer'),
+            tag, policy, targetId, key, kind
+          };
         }
+
+
+
+
+
+
         const resolved = resolveDescriptor(owner, key, { mode: resolveMode });
         const descriptorOwner = resolved && resolved.owner ? resolved.owner : owner;
         const desc = resolved ? resolved.desc : null;
