@@ -45,6 +45,27 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   // === 0. Utilities ===
   const NOP = () => {};
+  function emitContextDiag(level, code, err, extra) {
+    const d = global && global.__DEGRADE__;
+    if (typeof d !== 'function') return;
+    const eventCode = (typeof code === 'string' && code) ? code : 'context:diag';
+    const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
+    const ctx = Object.assign({
+      module: 'context',
+      diagTag: 'context',
+      surface: 'canvas',
+      key: null,
+      stage: 'runtime',
+      message: eventCode,
+      type: 'pipeline missing data',
+      data: null
+    }, (extra && typeof extra === 'object') ? extra : null);
+    if (typeof d.diag === 'function') {
+      d.diag(level, eventCode, ctx, e);
+      return;
+    }
+    d(eventCode, e, ctx);
+  }
 
   const patchedMethods = new WeakSet();
   const markAsNative = (function() {
@@ -63,7 +84,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
-    catch { return false; }
+    catch (e) {
+      emitContextDiag('warn', 'context:guard_instance:runtime:failed', e, {
+        key: 'guardInstance',
+        stage: 'runtime',
+        type: 'browser structure missing data'
+      });
+      return false;
+    }
   }
 
 
@@ -223,15 +251,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
              const patchedArgs = Array.prototype.slice.call(arguments);
              const out = Reflect.apply(orig, this, patchedArgs);
              let res = out;
-             for (const hook of hookList){
-               try {
-                 const r = hook.call(this, res, ...patchedArgs);
-                 if (typeof r === 'string') res = r;
-              } catch (e) {
-                if (global.__DEBUG__) console.error(`[CHAIN POST ERROR ${method}]`, e);
-                throw e;
-              }
-            }
+              for (const hook of hookList){
+                try {
+                  const r = hook.call(this, res, ...patchedArgs);
+                  if (typeof r === 'string') res = r;
+               } catch (e) {
+                 emitContextDiag('error', 'context:chain:hook:post_failed', e, {
+                   key: method,
+                   stage: 'hook',
+                   data: { hook: hook && (hook.name || null) }
+                 });
+                 throw e;
+               }
+             }
             return res;
           } finally {
             leaveCanvasReadback(self, readbackToken, method);
@@ -255,7 +287,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 const next = hook.apply(this, patchedArgs);
                 if (next && Array.isArray(next)) patchedArgs = next;
               } catch (e) {
-                if (global.__DEBUG__) console.error(`[CHAIN HOOK ERROR ${method}]`, e);
+                emitContextDiag('error', 'context:chain:hook:args_failed', e, {
+                  key: method,
+                  stage: 'hook',
+                  data: { hook: hook && (hook.name || null) }
+                });
                 throw e;
               }
             }
@@ -275,12 +311,36 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   // === WEBGL PATCHING ===
   function patchMethod(proto, method, hooks) {
-      if (!proto)                              { console.warn(`[patchMethod] proto is not defined: ${method}`); return false; }
-      if (!hooks?.length)                      { console.warn(`[patchMethod] no hooks: ${method}`); return false; }
+      if (!proto) {
+        emitContextDiag('warn', 'context:webgl:preflight:proto_missing', null, {
+          stage: 'preflight',
+          surface: 'webgl',
+          key: method,
+          type: 'browser structure missing data'
+        });
+        console.warn(`[patchMethod] proto is not defined: ${method}`);
+        return false;
+      }
+      if (!hooks?.length) {
+        emitContextDiag('warn', 'context:webgl:preflight:hooks_missing', null, {
+          stage: 'preflight',
+          surface: 'webgl',
+          key: method,
+          type: 'pipeline missing data'
+        });
+        console.warn(`[patchMethod] no hooks: ${method}`);
+        return false;
+      }
       const isWebGLProto =
         (typeof WebGLRenderingContext !== 'undefined' && proto === WebGLRenderingContext.prototype) ||
         (typeof WebGL2RenderingContext !== 'undefined' && proto === WebGL2RenderingContext.prototype);
       if (!isWebGLProto) {
+        emitContextDiag('warn', 'context:webgl:preflight:proto_rejected', null, {
+          stage: 'preflight',
+          surface: 'webgl',
+          key: method,
+          type: 'browser structure missing data'
+        });
         console.warn(`[patchMethod] non-WebGL proto rejected: ${method}`);
         return false;
       }
@@ -290,7 +350,16 @@ const ContextPatchModule = function ContextPatchModule(window) {
       if (!desc || typeof desc.value !== 'function') {
         throw new TypeError(`[patchMethod] not a function: ${method}`);
       }
-      if (patchedMethods.has(desc.value))      { console.warn(`[patchMethod] already patched: ${method}`); return false; }
+      if (patchedMethods.has(desc.value)) {
+        emitContextDiag('info', 'context:webgl:apply:already_patched', null, {
+          stage: 'apply',
+          surface: 'webgl',
+          key: method,
+          type: 'pipeline missing data'
+        });
+        console.warn(`[patchMethod] already patched: ${method}`);
+        return false;
+      }
 
       const orig = desc.value;
       const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
@@ -319,6 +388,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
                       try {
                           hook.apply(self, [forbidOrigCall, ...args, out]);
                       } catch (e) {
+                          emitContextDiag('error', 'context:webgl:hook:post_failed', e, {
+                            stage: 'hook',
+                            surface: 'webgl',
+                            key: method,
+                            data: { hook: hook.name || 'anon' }
+                          });
                           console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
                           throw e;
                       }
@@ -334,8 +409,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
                       // override console logging
                       if (res !== undefined && !Array.isArray(res)) {
-                          if (global.__DEBUG__ && !(global._logConfig && global._logConfig.WEBGLlogger === false))
+                          if (global.__DEBUG__ && !(global._logConfig && global._logConfig.WEBGLlogger === false)) {
+                              emitContextDiag('info', 'context:webgl:hook:override', null, {
+                                stage: 'hook',
+                                surface: 'webgl',
+                                key: method,
+                                data: { hook: hook.name || 'anon' }
+                              });
                               console.warn('[patchMethod override]', method, hook.name || 'anon', res);
+                          }
                           return res; // result substitution
                       }
 
@@ -346,8 +428,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
                       }
 
                    } catch (e) {
-                       console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
-                       throw e;
+                        emitContextDiag('error', 'context:webgl:hook:failed', e, {
+                          stage: 'hook',
+                          surface: 'webgl',
+                          key: method,
+                          data: { hook: hook.name || 'anon' }
+                        });
+                        console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
+                        throw e;
                    }
                }
               return orig.apply(self, patched);
@@ -477,11 +565,16 @@ const ContextPatchModule = function ContextPatchModule(window) {
       return true;
     }
 
-    const getFontStr = (self) => {
+      const getFontStr = (self) => {
       try {
         const f = self && typeof self.font === 'string' && self.font.trim() ? self.font : '16px sans-serif';
         return f;
-      } catch {
+      } catch (e) {
+        emitContextDiag('warn', 'context:ctx2d:runtime:font_read_failed', e, {
+          stage: 'runtime',
+          key: 'font',
+          type: 'browser structure missing data'
+        });
         return '16px sans-serif';
       }
     };
@@ -507,7 +600,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           // (do not change width here to preserve consistency)
           H.measureTextNoiseHook.call(this, m, txt, fontStr);
         }
-      } catch { /* silent */ }
+      } catch (e) {
+        emitContextDiag('warn', 'context:ctx2d:hook:measureText_failed', e, {
+          stage: 'hook',
+          key: 'measureText'
+        });
+      }
 
       return m;
     } }).measureText);
@@ -526,7 +624,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           const a = H.fillTextNoiseHook.apply(this, [text, x, y, ...rest]) || [text, x, y, ...rest];
           return Reflect.apply(orig, this, a);
         }
-      } catch { /* silent */ }
+      } catch (e) {
+        emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, {
+          stage: 'hook',
+          key: 'fillText'
+        });
+      }
 
       return Reflect.apply(orig, this, [text, x, y, ...rest]);
     } }).fillText);
@@ -545,7 +648,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           const a = H.strokeTextNoiseHook.apply(this, [text, x, y, ...rest]) || [text, x, y, ...rest];
           return Reflect.apply(orig, this, a);
         }
-      } catch { /* silent */ }
+      } catch (e) {
+        emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, {
+          stage: 'hook',
+          key: 'strokeText'
+        });
+      }
 
       return Reflect.apply(orig, this, [text, x, y, ...rest]);
     } }).strokeText);
@@ -558,7 +666,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           const a = H.fillRectNoiseHook.call(this, x, y, w, h);
           if (Array.isArray(a)) return Reflect.apply(orig, this, a);
         }
-      } catch { /* silent */ }
+      } catch (e) {
+        emitContextDiag('warn', 'context:ctx2d:hook:fillRect_failed', e, {
+          stage: 'hook',
+          key: 'fillRect'
+        });
+      }
       return Reflect.apply(orig, this, [x, y, w, h]);
     } }).fillRect);
 
@@ -571,7 +684,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           const callOrig = (...a) => Reflect.apply(orig, this, a);
           return H.applyDrawImageHook.call(this, callOrig, ...args);
         }
-      } catch { /* silent */ }
+      } catch (e) {
+        emitContextDiag('warn', 'context:ctx2d:hook:drawImage_failed', e, {
+          stage: 'hook',
+          key: 'drawImage'
+        });
+      }
       return Reflect.apply(orig, this, args);
     } }).drawImage);
 
@@ -598,32 +716,40 @@ const ContextPatchModule = function ContextPatchModule(window) {
           // call hight level hooks
           for (const hook of (ctx2dHooks || [])){
             try { ctx = hook.call(this, ctx, type, ...rest) || ctx; } catch (e) {
-              if (typeof global.__DEGRADE__ === 'function') {
-                try { global.__DEGRADE__('context:getContext:ctx2d_hook_failed', e, { hook: hook && (hook.name || null), type: type || null }); } catch (_e) {}
-              }
+              emitContextDiag('warn', 'context:getContext:ctx2d_hook_failed', e, {
+                stage: 'hook',
+                key: 'getContext',
+                data: { hook: hook && (hook.name || null), type: type || null }
+              });
             }
           }
         }
         if (/^webgl/.test(String(type))){
           for (const hook of (webglHooks || [])){
             try { hook.call(this, ctx, type, ...rest); } catch (e) {
-              if (typeof global.__DEGRADE__ === 'function') {
-                try { global.__DEGRADE__('context:getContext:webgl_hook_failed', e, { hook: hook && (hook.name || null), type: type || null }); } catch (_e) {}
-              }
+              emitContextDiag('warn', 'context:getContext:webgl_hook_failed', e, {
+                stage: 'hook',
+                key: 'getContext',
+                data: { hook: hook && (hook.name || null), type: type || null }
+              });
             }
           }
         }
         for (const hook of (htmlHooks || [])){
           try { hook.call(this, ctx, type, ...rest); } catch (e) {
-            if (typeof global.__DEGRADE__ === 'function') {
-              try { global.__DEGRADE__('context:getContext:html_hook_failed', e, { hook: hook && (hook.name || null), type: type || null }); } catch (_e) {}
-            }
+            emitContextDiag('warn', 'context:getContext:html_hook_failed', e, {
+              stage: 'hook',
+              key: 'getContext',
+              data: { hook: hook && (hook.name || null), type: type || null }
+            });
           }
         }
       } catch (e) {
-        if (typeof global.__DEGRADE__ === 'function') {
-          try { global.__DEGRADE__('context:getContext:chain_failed', e, { type: type || null }); } catch (_e) {}
-        }
+        emitContextDiag('error', 'context:getContext:chain_failed', e, {
+          stage: 'hook',
+          key: 'getContext',
+          data: { type: type || null }
+        });
       }
 
       return ctx;
@@ -651,7 +777,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
       this.webglGetContextHooks
     )) applied++;
     state.canvas = true;
-    if (global.__DEBUG__) console.log(`[CanvasPatch] Canvas element patches: applied ${applied} из ${total}`);
+    if (global.__DEBUG__) {
+      emitContextDiag('info', 'context:canvas:apply:patches_applied', null, {
+        stage: 'apply',
+        key: 'HTMLCanvasElement.getContext',
+        data: { applied: applied, total: total }
+      });
+    }
     return applied;
   };
 
@@ -671,7 +803,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
       )) applied++;
       state.offscreen = true;
     }
-    if (global.__DEBUG__) console.log(`[CanvasPatch] Offscreen patches: applied ${applied} из ${total}`);
+    if (global.__DEBUG__) {
+      emitContextDiag('info', 'context:offscreen:apply:patches_applied', null, {
+        stage: 'apply',
+        key: 'OffscreenCanvas.getContext',
+        data: { applied: applied, total: total }
+      });
+    }
     return applied;
   };
 
@@ -703,7 +841,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
         if (patchMethod(proto, m, hooks)) applied++;
       }
       if (total > 0 && (applied > 0 || already === total)) state.webgl = true;
-      console.log(`[CanvasPatch] WebGL context patches: applied ${applied} из ${total}`);
+      emitContextDiag('info', 'context:webgl:apply:patches_applied', null, {
+        stage: 'apply',
+        key: 'WebGLRenderingContext',
+        data: { applied: applied, total: total, already: already }
+      });
       return applied;
     };
 

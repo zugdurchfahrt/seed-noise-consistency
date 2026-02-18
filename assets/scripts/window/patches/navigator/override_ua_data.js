@@ -7,8 +7,56 @@
   }
 
   const D = (typeof g.__DEGRADE__ === 'function') ? g.__DEGRADE__ : null;
-  function degrade(code, err, extra){
-    try { if (D) D(code, err || null, extra || null); } catch(_e) {}
+  const __uadTypePipeline = 'pipeline missing data';
+  const __uadTypeBrowser = 'browser structure missing data';
+  function __uadDiag(level, code, extra, err) {
+    if (!D) return;
+    const rawLevel = String(level || 'info');
+    const normalizedCode = String(code || 'uad_override:diag');
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const rawStage = (typeof x.stage === 'string' && x.stage) ? x.stage : 'apply';
+    const normalizedStage = (
+      rawStage === 'preflight' ||
+      rawStage === 'apply' ||
+      rawStage === 'rollback' ||
+      rawStage === 'contract' ||
+      rawStage === 'hook' ||
+      rawStage === 'runtime' ||
+      rawStage === 'guard'
+    ) ? rawStage : 'apply';
+    const rawType = (typeof x.type === 'string' && x.type) ? x.type : '';
+    const normalizedType = (rawType === __uadTypePipeline || rawType === __uadTypeBrowser) ? rawType : undefined;
+    const ctxKey = (typeof x.key === 'string' || x.key === null) ? x.key : undefined;
+    const ctxMessage = (typeof x.message === 'string' && x.message)
+      ? x.message
+      : ((err && typeof err.message === 'string' && err.message) ? err.message : normalizedCode);
+    const ctx = Object.assign({
+      module: 'uad_override',
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'uad_override',
+      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'navigator',
+      key: ctxKey,
+      stage: normalizedStage,
+      message: ctxMessage,
+      data: x
+    }, x);
+    if (typeof normalizedType === 'string') ctx.type = normalizedType;
+    if (typeof D.diag === 'function') {
+      D.diag(rawLevel, normalizedCode, ctx, err || null);
+      return;
+    }
+    D(normalizedCode, err || null, ctx);
+  }
+  function __uadDiagPipeline(level, code, extra, err) {
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    if (typeof x.type !== 'string' || !x.type) x.type = __uadTypePipeline;
+    if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'uad_override';
+    __uadDiag(level, code, x, err);
+  }
+  function __uadDiagBrowser(level, code, extra, err) {
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    if (typeof x.type !== 'string' || !x.type) x.type = __uadTypeBrowser;
+    if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'uad_override';
+    __uadDiag(level, code, x, err);
   }
 
   function cloneDesc(d){
@@ -39,13 +87,13 @@
     try {
       plans = Core.applyTargets(targets, g.__PROFILE__, []);
     } catch (e) {
-      degrade(groupTag + ':preflight_failed', e, null);
+      __uadDiagPipeline('error', groupTag + ':preflight_failed', { stage: 'preflight' }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
     if (!Array.isArray(plans) || !plans.length) {
       if (plans && plans.ok === false) {
-        degrade(groupTag + ':group_skipped', new Error('[UADOverride] group skipped'), { reason: plans.reason || null });
+        __uadDiagPipeline('error', groupTag + ':group_skipped', { stage: 'preflight', reason: plans.reason || null }, new Error('[UADOverride] group skipped'));
       }
       return 0;
     }
@@ -72,9 +120,11 @@
         try {
           if (p.origDesc) Object.defineProperty(p.owner, p.key, cloneDesc(p.origDesc));
           else delete p.owner[p.key];
-        } catch (_) {}
+        } catch (rollbackErr) {
+          __uadDiagBrowser('error', groupTag + ':rollback_failed', { stage: 'rollback', key: p && p.key ? p.key : null }, rollbackErr);
+        }
       }
-      degrade(groupTag + ':apply_failed', e, null);
+      __uadDiagBrowser('error', groupTag + ':apply_failed', { stage: 'apply' }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
@@ -281,7 +331,7 @@
           patchUADPrototype(nativeUAD, hints);
           return nativeUAD;
         } catch (e) {
-          degrade('uad_override:contract_invalid', e, { prop: 'userAgentData' });
+          __uadDiagPipeline('error', 'uad_override:contract_invalid', { stage: 'contract', prop: 'userAgentData' }, e);
           return nativeUAD;
         }
       }
@@ -289,6 +339,6 @@
 
     applyTargetGroup('uad_override:navigator', targets, 'skip');
   } catch(e) {
-    degrade('uad_override:exception', e, null);
+    __uadDiagPipeline('error', 'uad_override:exception', { stage: 'apply' }, e);
   }
 })();

@@ -23,7 +23,7 @@ SW_LANGS = None
 SW_HC = None
 SW_DM = None
 SW_META = None
-# --- Dedicated/Shared Worker __GLOBAL_SEED injector (WorkerGlobalScope) ---
+# --- Dedicated/Shared Worker CDP_GLOBAL_SEED injector (WorkerGlobalScope) ---
 WORKER_SEED_INJECT_ENABLED = False
 WORKER_GLOBAL_SEED = None
 _RUNNING_WORKER_SEED = False
@@ -137,7 +137,7 @@ def enable_sw_language_inject(language: str, normalized_languages: list[str], ha
 
 def enable_worker_seed_inject(global_seed: str):
     """
-    Enable Dedicated/Shared worker injection for __GLOBAL_SEED.
+    Enable Dedicated/Shared worker injection for CDP_GLOBAL_SEED.
     Call this BEFORE starting run_worker_seed().
     """
     global WORKER_SEED_INJECT_ENABLED, WORKER_GLOBAL_SEED
@@ -182,11 +182,11 @@ def _build_worker_seed_prelude(global_seed: str) -> str:
   const G = globalThis;
   const seed = {json.dumps(global_seed, ensure_ascii=False)};
   try {{
-    const d = Object.getOwnPropertyDescriptor(G, '__GLOBAL_SEED');
+    const d = Object.getOwnPropertyDescriptor(G, 'CDP_GLOBAL_SEED');
     if (d && d.configurable === false) {{
-      const cur = ('value' in d) ? d.value : G.__GLOBAL_SEED;
+      const cur = ('value' in d) ? d.value : G.CDP_GLOBAL_SEED;
       if (String(cur) !== String(seed)) {{
-        throw new Error('WorkerSeed: __GLOBAL_SEED non-configurable mismatch');
+        throw new Error('WorkerSeed: CDP_GLOBAL_SEED non-configurable mismatch');
       }}
       return;
     }}
@@ -194,14 +194,14 @@ def _build_worker_seed_prelude(global_seed: str) -> str:
     // fallthrough
   }}
   try {{
-    Object.defineProperty(G, '__GLOBAL_SEED', {{
+    Object.defineProperty(G, 'CDP_GLOBAL_SEED', {{
       value: String(seed),
       writable: false,
       configurable: true,
       enumerable: false
     }});
   }} catch (e) {{
-    try {{ G.__GLOBAL_SEED = String(seed); }} catch (_e) {{}}
+    try {{ G.CDP_GLOBAL_SEED = String(seed); }} catch (_e) {{}}
   }}
 }})();
 //# sourceURL=worker_seed_env.js
@@ -571,19 +571,22 @@ def run_worker_seed():
     injected = set()   # targetId set
     manual_attach_sent = set()  # targetId set for fallback manual attach
     seed_prelude = _build_worker_seed_prelude(WORKER_GLOBAL_SEED)
-    # sanity_expr = "(() => { try { return String(globalThis.__GLOBAL_SEED); } catch (e) { return null; } })()"
+    # sanity_expr = "(() => { try { return String(globalThis.CDP_GLOBAL_SEED); } catch (e) { return null; } })()"
 
 
     sanity_expr = (
         "(() => {"
         " const G = globalThis;"
-        " let seed = null;"
-        " try { seed = String(G.__GLOBAL_SEED); } catch (e) {}"
-        " let tsb = null;"
-        " try { tsb = !!(Function.prototype.toString && Function.prototype.toString.__TOSTRING_BRIDGE__); } catch (e) {}"
-        " let emn = null;"
-        " try { emn = (typeof G.__ensureMarkAsNative); } catch (e) {}"
-        " return { seed, toStringBridge: tsb, ensureMarkAsNativeType: emn };"
+        " let cdpGlobalSeed = null;"
+        " try { cdpGlobalSeed = String(G.CDP_GLOBAL_SEED); } catch (e) {}"
+        " let coreToStringStateOk = null;"
+        " try {"
+        "   const s = G.__CORE_TOSTRING_STATE__;"
+        "   coreToStringStateOk = !!(s && s.__CORE_TOSTRING_STATE__ === true);"
+        " } catch (e) {}"
+        " let ensureMarkAsNativeType = null;"
+        " try { ensureMarkAsNativeType = (typeof G.__ensureMarkAsNative); } catch (e) {}"
+        " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType };"
         "})()"
     )
 
@@ -681,11 +684,16 @@ def run_worker_seed():
                 if tag == "Runtime.evaluate:worker_seed_sanity":
                     try:
                         out = (res.get("result") or {}).get("value")
-                        expected = str(WORKER_GLOBAL_SEED)
-                        if not isinstance(out, str) or out != expected:
-                            _fatal(ws, "worker seed sanity: mismatch", {"expected_len": len(expected), "got": out})
+                        expected_seed = str(WORKER_GLOBAL_SEED)
+                        got_seed = out.get("cdpGlobalSeed") if isinstance(out, dict) else None
+                        if not isinstance(got_seed, str) or got_seed != expected_seed:
+                            _fatal(
+                                ws,
+                                "worker seed sanity: mismatch",
+                                {"expected_len": len(expected_seed), "got": out},
+                            )
                             return
-                        logger.info("Worker seed inject: sanity OK (__GLOBAL_SEED set)")
+                        logger.info("Worker seed inject: sanity OK (CDP_GLOBAL_SEED set)")
                     except Exception as e:
                         _fatal(ws, "worker seed sanity: parse/compare failed", e)
             return

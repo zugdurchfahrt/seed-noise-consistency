@@ -24,7 +24,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       Object.defineProperty(obj, prop, descriptor);
     } catch (e) {
       console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
-      if (typeof env !== "undefined" && env && env.DEBUG_DEGRADES && typeof __DEGRADE__ === "function") __DEGRADE__("hide_webdriver.js:safeDefine:define_failed", e);
+      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:safeDefine:define_failed", e);
       throw e;
     }
   }
@@ -72,8 +72,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
-  const nativeToString = existingCoreToStringStateOk
-    ? existingCoreToStringState.nativeToString
+  const nativeToString = sharedCoreToStringStateOk
+    ? sharedCoreToStringState.nativeToString
     : (existingToString || Function.prototype.toString);
   if (typeof nativeToString !== 'function') {
     throw new Error('[CoreWindow] Function.prototype.toString missing');
@@ -282,6 +282,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = toStringDesc && toStringDesc.value;
 
+    let skipToStringInstall = false;
     if (existingCoreToStringStateOk) {
       const markAsNative = ensureMarkAsNative();
       const probe = function probe(){};
@@ -303,8 +304,14 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_mismatch", e);
         throw e;
       }
+
+      // Already installed and consistent: do not re-install another Proxy layer.
+      skipToStringInstall = true;
     }
 
+    if (skipToStringInstall) {
+      // Keep existing Function.prototype.toString; shared maps still used for markAsNative.
+    } else {
     const toString = new Proxy(nativeToString, {
       apply(target, thisArg, argList) {
         if (typeof thisArg !== 'function') {
@@ -410,19 +417,25 @@ const CoreWindowModule = function CoreWindowModule(window) {
       if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_install_failed", e);
       throw e;
     }
+    }
   }
 
   // === Core2.0 targets dispatcher (Window scope) ===
   // Methodology: Core controls preflight/dispatch/nativization/diag. Module applies descriptors.
   (function installCoreApplyTargets(){
     function diagDegrade(code, err, extra) {
+      if (typeof window.__DEGRADE__ !== 'function') return;
       try {
-        if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__(code, err, extra);
-      } catch (_) {}
+        window.__DEGRADE__(code, err, extra);
+      } catch (diagErr) {
+        try { console.error('[CoreWindow] __DEGRADE__ failed:', diagErr); } catch (_) {}
+        throw diagErr;
+      }
     }
     function normalizePolicy(v) {
-      if (v === 'throw' || v === 'strict') return v;
-      return 'skip';
+      if (v === undefined || v === null || v === '') return 'skip';
+      if (v === 'skip' || v === 'throw' || v === 'strict') return v;
+      return null;
     }
     function cloneDesc(d) {
       if (!d) return null;
@@ -535,7 +548,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const checkThis = (typeof validThis === 'function') ? validThis : null;
         let wrapLayer = normalizeWrapLayer(options.wrapLayer);
         if (wrapLayer === null) {
-          const e = new TypeError();
+          const e = new TypeError('[Core.wrapGetter] unsupported wrapLayer');
           diagDegrade('core:wrapGetter:wrap_layer_unsupported', e, {
             module: 'core_window',
             diagTag: 'core:wrapGetter',
@@ -546,7 +559,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             message: 'unsupported wrapLayer',
             data: { wrapLayer: options.wrapLayer }
           });
-          wrapLayer = 'auto';
+          throw e;
         }
         const valueFromGetter = function (thisArg) {
           return (typeof getter === 'function') ? getter.call(thisArg) : getter;
@@ -622,11 +635,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         return true;
       }
 
-      function defineAccWithFallback(target, key, getter, options) {
-        if (safeDefineAcc(target, key, getter, options)) return true;
-        throw new TypeError('[Core.defineAccWithFallback] failed to define ' + key);
-      }
-
       function redefineAcc(target, key, getImpl) {
         const d = Object.getOwnPropertyDescriptor(target, key);
         if (d && d.configurable === false) {
@@ -662,6 +670,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }
 
       function patchDataProp(planItem, t, desc, fail) {
+        planItem.descriptorPath = 'descriptor_data';
+        planItem.wrapperClass = null;
+        if (t && typeof t.wrapperClass === 'string') {
+          const wc = t.wrapperClass;
+          if (wc !== 'synthetic_named' && wc !== 'core_proxy') {
+            const e = new TypeError('[Core.applyTargets] unsupported wrapperClass for data');
+            return fail(planItem.policy, planItem.tag, 'wrapper_class_unsupported', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId, wrapperClass: wc });
+          }
+          planItem.wrapperClass = wc;
+          planItem.descriptorPath = null;
+        }
         if (desc && !hasDataShape(desc)) {
           const e = new TypeError('[Core.applyTargets] kind mismatch for data');
           return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -735,6 +754,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] named_wrapper_strict cannot use core_wrapper');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
+        planItem.wrapperClass = (strictAccessorContract || !useCoreWrapper) ? 'synthetic_named' : 'core_proxy';
         let getWrapped = origGet;
         let setWrapped = origSet;
 
@@ -882,6 +902,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return fail(planItem.policy, planItem.tag, 'wrap_layer_kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
         const useCoreWrapper = wrapLayer === 'core_wrapper' || (wrapLayer === 'auto' && requiresStrictThis);
+        planItem.wrapperClass = useCoreWrapper ? 'core_proxy' : 'synthetic_named';
         if (requiresStrictThis && !validThis) {
           const e = new TypeError('[Core.applyTargets] invokeClass requires validThis');
           return fail(planItem.policy, planItem.tag, 'invoke_class_requires_valid_this', e, {
@@ -990,6 +1011,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return fail(planItem.policy, planItem.tag, 'wrap_layer_kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
         const useCoreWrapper = wrapLayer === 'core_wrapper' || (wrapLayer === 'auto' && requiresStrictThis);
+        planItem.wrapperClass = useCoreWrapper ? 'core_proxy' : 'synthetic_named';
         if (requiresStrictThis && !validThis) {
           const e = new TypeError('[Core.applyTargets] invokeClass requires validThis');
           return fail(planItem.policy, planItem.tag, 'invoke_class_requires_valid_this', e, {
@@ -1092,6 +1114,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (typeof key !== 'string' || !key) {
           return { ok: false, reason: 'key_invalid', error: new TypeError('[Core.applyTargets] key invalid'), tag, policy, targetId, key: key || null, kind: kind || null };
         }
+        if (policy === null) {
+          return { ok: false, reason: 'policy_unsupported', error: new TypeError('[Core.applyTargets] unsupported policy'), tag, policy: 'throw', targetId, key, kind: kind || null };
+        }
         if (kind !== 'data' && kind !== 'accessor' && kind !== 'method' && kind !== 'promise_method') {
           return { ok: false, reason: 'kind_unsupported', error: new TypeError('[Core.applyTargets] unsupported kind'), tag, policy, targetId, key, kind: kind || null };
         }
@@ -1110,11 +1135,11 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (kind === 'accessor' && policy === 'strict' && wrapLayer !== 'named_wrapper_strict') {
           return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] strict policy for accessor requires named_wrapper_strict'), tag, policy, targetId, key, kind };
         }
-        if (kind === 'accessor' && policy === 'strict' && wrapLayer === 'auto') {
-          return { ok: false, reason: 'wrap_layer_unsupported', error: new TypeError('[Core.applyTargets] accessor strict policy cannot use auto wrapLayer'), tag, policy, targetId, key, kind };
+        if ((kind === 'accessor' || kind === 'method' || kind === 'promise_method') && wrapLayer === 'descriptor_only') {
+          return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] descriptor_only unsupported for non-data kind'), tag, policy, targetId, key, kind };
         }
-        if ((kind === 'method' || kind === 'promise_method') && wrapLayer === 'descriptor_only') {
-          return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] descriptor_only unsupported for method kind'), tag, policy, targetId, key, kind };
+        if ((kind === 'method' || kind === 'promise_method') && invokeClass !== 'normal' && wrapLayer === 'named_wrapper') {
+          return { ok: false, reason: 'wrap_layer_unsupported', error: new TypeError('[Core.applyTargets] invokeClass requires core_wrapper wrapLayer'), tag, policy, targetId, key, kind };
         }
         const resolved = resolveDescriptor(owner, key, { mode: resolveMode });
         const descriptorOwner = resolved && resolved.owner ? resolved.owner : owner;
@@ -1374,37 +1399,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      safeDefine(Core, 'defineAccWithFallback', {
-        value: defineAccWithFallback,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
       safeDefine(Core, 'redefineAcc', {
-        value: redefineAcc,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, '__wrapGetter', {
-        value: wrapGetter,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, '__safeDefineAcc', {
-        value: safeDefineAcc,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, '__defineAccWithFallback', {
-        value: defineAccWithFallback,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, '__redefineAcc', {
         value: redefineAcc,
         writable: true,
         configurable: true,
@@ -1418,7 +1413,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         coreMark(patchMethod, 'patchMethod');
         coreMark(patchPromiseMethod, 'patchPromiseMethod');
         coreMark(safeDefineAcc, 'safeDefineAcc');
-        coreMark(defineAccWithFallback, 'defineAccWithFallback');
         coreMark(redefineAcc, 'redefineAcc');
         coreMark(wrapGetter, 'wrapGetter');
       } catch (e) {

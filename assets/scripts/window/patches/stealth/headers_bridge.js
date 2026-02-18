@@ -1,5 +1,27 @@
 (function () {
   const g = window;
+  function emitDegrade(level, code, err, extra) {
+    const d = g.__DEGRADE__;
+    if (typeof d !== 'function') return;
+    const e = err instanceof Error
+      ? err
+      : (err == null ? null : new Error(String(err)));
+    const ctx = Object.assign({
+      type: 'pipeline missing data',
+      module: 'headers_bridge',
+      diagTag: 'headers_bridge',
+      surface: 'network',
+      key: null,
+      stage: 'apply',
+      message: code,
+      data: null
+    }, extra || null);
+    if (typeof d.diag === 'function') {
+      d.diag(level, code, ctx, e);
+      return;
+    }
+    d(code, e, ctx);
+  }
   // Starting ignore list for CDP interceptor: challenge domains are not touched
   const CH_PASS = ['.cloudflare.com','.challenge.cloudflare.com','.akamaihd.net','.perimeterx.net','.hcaptcha.com','.recaptcha.net'];
   g.__CDP_ALLOW_SUFFIXES   = g.__CDP_ALLOW_SUFFIXES   || [];
@@ -37,7 +59,13 @@
       };
     }
     g.__HEADERS_BRIDGE_READY__ = true;
-    console.log("[headers_interceptor.js] CDP bridge ready");
+    emitDegrade('info', 'headers_bridge:init:apply:ready', null, {
+      message: 'CDP bridge ready',
+      data: {
+        allowCount: Array.isArray(g.__CDP_ALLOW_SUFFIXES) ? g.__CDP_ALLOW_SUFFIXES.length : 0,
+        ignoreCount: Array.isArray(g.__CDP_IGNORED_SUFFIXES) ? g.__CDP_IGNORED_SUFFIXES.length : 0
+      }
+    });
   }
 
   if (document.readyState === "complete" || document.readyState === "interactive") wire();

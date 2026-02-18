@@ -408,20 +408,43 @@ function mkModuleWorkerSource(snapshot, absUrl){
       'use strict';
       self.__GW_BOOTSTRAP__ = true;
       var __ENV_EMIT_Q__ = [];
+      var __emitDiag = function(code, err, extra){
+        try {
+          var d = self && self.__DEGRADE__;
+          if (typeof d !== 'function') return;
+          var e = (err && typeof err === 'object') ? err : new Error(String(err || code));
+          var ctx = {
+            type: 'pipeline missing data',
+            stage: 'apply',
+            module: 'wrk',
+            surface: 'worker_bootstrap',
+            key: '__ENV_BOOTSTRAP_ERROR__',
+            policy: 'throw',
+            action: 'throw'
+          };
+          if (extra && typeof extra === 'object') {
+            for (var k in extra) {
+              if (Object.prototype.hasOwnProperty.call(extra, k)) ctx[k] = extra[k];
+            }
+          }
+          if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
+          else d(code, e, ctx);
+        } catch(__diagErr) {}
+      };
       var __emit = function(msg){
         var sent = false;
-        try { if (typeof self.postMessage === 'function') self.postMessage(msg); } catch(_e) {}
-        try { sent = sent || (typeof self.postMessage === 'function'); } catch(_e) {}
+        try { if (typeof self.postMessage === 'function') self.postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
+        try { sent = sent || (typeof self.postMessage === 'function'); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage_probe' }); }
         try {
           if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
             for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
-              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) {}
+              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
             }
             sent = true;
           }
-        } catch(_e) {}
+        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_ports_enumeration' }); }
         if (!sent) {
-          try { __ENV_EMIT_Q__.push(msg); } catch(_e) {}
+          try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue' }); }
         }
       };
       try {
@@ -432,28 +455,28 @@ function mkModuleWorkerSource(snapshot, absUrl){
             var ports = ev && ev.ports;
             if (ports && ports.length) {
               for (var j = 0; j < ports.length; j++) {
-                try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) {}
+                try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
                 self.__ENV_SHARED_PORTS__.push(ports[j]);
               }
             }
-          } catch(_e) {}
+          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_connect_event' }); }
           try {
             if (__ENV_EMIT_Q__ && __ENV_EMIT_Q__.length) {
               var q = __ENV_EMIT_Q__.slice(0);
               __ENV_EMIT_Q__.length = 0;
               for (var k = 0; k < q.length; k++) {
-                try { __emit(q[k]); } catch(_e) {}
+                __emit(q[k]);
               }
             }
-          } catch(_e) {}
+          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue_flush' }); }
         });
-      } catch(_e) {}
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'connect_listener_install' }); }
       // Buffer early messages sent before user code installs its handler(s).
       // Without this, callers that postMessage immediately after Worker() may time out.
       const __MSG_Q__ = [];
       let __MSG_BUF__ = true;
       const __onEarlyMsg__ = ev => { if (__MSG_BUF__) __MSG_Q__.push(ev && ev.data); };
-      try { self.addEventListener('message', __onEarlyMsg__); } catch(_e) {}
+      try { self.addEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_install' }); }
       const __requireSnap = s => {
         if (!s || typeof s !== 'object') throw new Error('UACHPatch: no snapshot');
         if (typeof s.language !== 'string' || !s.language) throw new Error('UACHPatch: bad language');
@@ -482,7 +505,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
       } catch (e) {
         self.__lastSnap__ = ${SNAP};
         self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
-        try { __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ }); } catch (_e) {}
+        __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ });
         throw e;
       }
       if (!self.__ENV_SYNC_BC_INSTALLED__) {
@@ -493,7 +516,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
           bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
         } catch (e) {
           self.__ENV_BC_ERROR__ = String((e && (e.stack || e.message)) || e);
-          try { __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_BC_ERROR__ }); } catch (_e) {}
+          __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_BC_ERROR__ });
           throw e;
         }
       }
@@ -511,7 +534,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
         if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
       } catch (e) {
-        try { __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) }); } catch (_e) {}
+        __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
         self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
         throw e;
       }
@@ -521,7 +544,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
         } catch (e) {
-          try { __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) }); } catch (_e) {}
+          __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
           throw e;
         }
@@ -532,13 +555,13 @@ function mkModuleWorkerSource(snapshot, absUrl){
       await import(USER);
       // Replay any early messages after user code is loaded.
       __MSG_BUF__ = false;
-      try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) {}
+      try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
       try {
         if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
           for (const d of __MSG_Q__) self.dispatchEvent(new MessageEvent('message', { data: d }));
         }
-      } catch(_e) {}
-      try { __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER }); } catch(_e) {}
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_replay_dispatch' }); }
+      __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER });
     })();
     export {};
     //# sourceURL=worker_module_bootstrap.js
@@ -558,20 +581,43 @@ function mkClassicWorkerSource(snapshot, absUrl){
       'use strict';
       self.__GW_BOOTSTRAP__ = true;
       var __ENV_EMIT_Q__ = [];
+      var __emitDiag = function(code, err, extra){
+        try {
+          var d = self && self.__DEGRADE__;
+          if (typeof d !== 'function') return;
+          var e = (err && typeof err === 'object') ? err : new Error(String(err || code));
+          var ctx = {
+            type: 'pipeline missing data',
+            stage: 'apply',
+            module: 'wrk',
+            surface: 'worker_bootstrap',
+            key: '__ENV_BOOTSTRAP_ERROR__',
+            policy: 'throw',
+            action: 'throw'
+          };
+          if (extra && typeof extra === 'object') {
+            for (var k in extra) {
+              if (Object.prototype.hasOwnProperty.call(extra, k)) ctx[k] = extra[k];
+            }
+          }
+          if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
+          else d(code, e, ctx);
+        } catch(__diagErr) {}
+      };
       var __emit = function(msg){
         var sent = false;
-        try { if (typeof self.postMessage === 'function') self.postMessage(msg); } catch(_e) {}
-        try { sent = sent || (typeof self.postMessage === 'function'); } catch(_e) {}
+        try { if (typeof self.postMessage === 'function') self.postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
+        try { sent = sent || (typeof self.postMessage === 'function'); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage_probe' }); }
         try {
           if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
             for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
-              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) {}
+              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
             }
             sent = true;
           }
-        } catch(_e) {}
+        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_ports_enumeration' }); }
         if (!sent) {
-          try { __ENV_EMIT_Q__.push(msg); } catch(_e) {}
+          try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue' }); }
         }
       };
       try {
@@ -582,27 +628,27 @@ function mkClassicWorkerSource(snapshot, absUrl){
             var ports = ev && ev.ports;
             if (ports && ports.length) {
               for (var j = 0; j < ports.length; j++) {
-                try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) {}
+                try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
                 self.__ENV_SHARED_PORTS__.push(ports[j]);
               }
             }
-          } catch(_e) {}
+          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_connect_event' }); }
           try {
             if (__ENV_EMIT_Q__ && __ENV_EMIT_Q__.length) {
               var q = __ENV_EMIT_Q__.slice(0);
               __ENV_EMIT_Q__.length = 0;
               for (var k = 0; k < q.length; k++) {
-                try { __emit(q[k]); } catch(_e) {}
+                __emit(q[k]);
               }
             }
-          } catch(_e) {}
+          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue_flush' }); }
         });
-      } catch(_e) {}
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'connect_listener_install' }); }
       // Buffer early messages sent before user code installs its handler(s).
       var __MSG_Q__ = [];
       var __MSG_BUF__ = true;
       var __onEarlyMsg__ = function(ev){ if (__MSG_BUF__) __MSG_Q__.push(ev && ev.data); };
-      try { self.addEventListener('message', __onEarlyMsg__); } catch(_e) {}
+      try { self.addEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_install' }); }
       var __requireSnap = function(s){
         if (!s || typeof s !== 'object') throw new Error('UACHPatch: no snapshot');
         if (typeof s.language !== 'string' || !s.language) throw new Error('UACHPatch: bad language');
@@ -631,7 +677,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
       } catch (e) {
         self.__lastSnap__ = ${SNAP};
         self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
-        try { __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ }); } catch (_e) {}
+        __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ });
         throw e;
       }
       if (!self.__ENV_SYNC_BC_INSTALLED__) {
@@ -642,7 +688,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
           bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
         } catch (e) {
           self.__ENV_BC_ERROR__ = String((e && (e.stack || e.message)) || e);
-          try { __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_BC_ERROR__ }); } catch (_e) {}
+          __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_BC_ERROR__ });
           throw e;
         }
       }
@@ -661,7 +707,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
         if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
       } catch (e) {
-        try { __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) }); } catch (_e) {}
+        __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
         self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
         throw e;
       }
@@ -671,7 +717,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
         } catch (e) {
-          try { __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) }); } catch (_e) {}
+          __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
           throw e;
         }
@@ -700,23 +746,23 @@ function mkClassicWorkerSource(snapshot, absUrl){
         return import(USER).then(function(){
           // Replay any early messages after user code is loaded.
           __MSG_BUF__ = false;
-          try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) {}
+          try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
           try {
             if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
               for (var i = 0; i < __MSG_Q__.length; i++) self.dispatchEvent(new MessageEvent('message', { data: __MSG_Q__[i] }));
             }
-          } catch(_e) {}
+          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_replay_dispatch' }); }
           __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER });
         });
       }
       // Replay any early messages after user code is loaded.
       __MSG_BUF__ = false;
-      try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) {}
+      try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
       try {
         if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
           for (var i = 0; i < __MSG_Q__.length; i++) self.dispatchEvent(new MessageEvent('message', { data: __MSG_Q__[i] }));
         }
-      } catch(_e) {}
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_replay_dispatch' }); }
       __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER });
     })();
     //# sourceURL=worker_classic_bootstrap.js
@@ -862,6 +908,27 @@ function definePatchedValue(target, key, value, label) {
   });
 }
 
+function emitWorkerBootstrapDegrade(G, scope, bootErr) {
+  const d = G && G.__DEGRADE__;
+  if (typeof d !== 'function') return;
+  const err = bootErr instanceof Error ? bootErr : new Error(String(bootErr || 'Worker bootstrap error'));
+  const ctx = {
+    type: 'pipeline missing data',
+    stage: 'apply',
+    module: 'wrk',
+    surface: 'worker_bootstrap',
+    key: '__ENV_BOOTSTRAP_ERROR__',
+    policy: 'throw',
+    action: 'throw',
+    scope: scope || null
+  };
+  if (typeof d.diag === 'function') {
+    d.diag('error', 'wrk:worker_bootstrap:apply:error', ctx, err);
+    return;
+  }
+  d('wrk:worker_bootstrap:apply:error', err, ctx);
+}
+
 
 function SafeWorkerOverride(G){
   if (!G || !G.Worker) throw new Error('[WorkerOverride] Worker missing');
@@ -920,6 +987,9 @@ function SafeWorkerOverride(G){
       const bootErr = data && typeof data === 'object' && data.__ENV_BOOTSTRAP_ERROR__;
       if (bootErr) {
         try { G.__LAST_WORKER_BOOTSTRAP_ERROR__ = bootErr; } catch(_) {}
+        emitWorkerBootstrapDegrade(G, 'Worker', bootErr);
+        try { ev.stopImmediatePropagation(); ev.stopPropagation(); } catch(_) {}
+        try { if (w && typeof w.terminate === 'function') w.terminate(); } catch(_) {}
         cleanup();
         return;
       }
@@ -1033,6 +1103,7 @@ function SafeSharedWorkerOverride(G){
           if (bootErr) {
             internal = true;
             try { G.__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__ = bootErr; } catch(_) {}
+            emitWorkerBootstrapDegrade(G, 'SharedWorker', bootErr);
           }
           const loaded = data.__ENV_USER_URL_LOADED__;
           if (typeof loaded === 'string') {

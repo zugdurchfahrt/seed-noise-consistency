@@ -29,16 +29,16 @@ const LOGGingModule = function LOGGingModule() {
     }
 
 
-    // Debug flag (respect false)
+    // Debug flag
     G.__DEBUG__ =
-      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
-      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
+      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
+      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
 
     global.env = global.env || {};
     // Toggle for *logger self-diagnostics visibility*.
     // IMPORTANT: must not change runtime behavior by throwing from the logger.
-    // global.env.DEBUG_DEGRADES = true;   // включить
-    global.env.DEBUG_DEGRADES = false; // выключить
+    global.env.DEBUG_DEGRADES = true;   // включить
+    // global.env.DEBUG_DEGRADES = false; // выключить
     const env = global.env;
 
 
@@ -333,20 +333,36 @@ const LOGGingModule = function LOGGingModule() {
           }
 
 
-      const validTypes = ["pipeline missing data", "browser structure missing data"];
-      const rawType = (safeCtx && typeof safeCtx.type === "string") ? safeCtx.type : "";
-      const validatedType = validTypes.indexOf(rawType) !== -1 ? rawType : "pipeline missing data";
+      // const validTypes = ["pipeline missing data", "browser structure missing data"];
+      // const rawType = (safeCtx && typeof safeCtx.type === "string") ? safeCtx.type : "";
+      // const validatedType = validTypes.indexOf(rawType) !== -1 ? rawType : "pipeline missing data";
 
+      // let dataIn = safeCtx && safeCtx.data;
+      // if (rawType && validatedType !== rawType) {
+      //   if (dataIn && typeof dataIn === "object") {
+      //     try { dataIn = Object.assign({}, dataIn, { _badType: rawType }); }
+      //     catch (_) { dataIn = { _badType: rawType }; }
+      //   } else {
+      //     dataIn = { _badType: rawType };
+      //   }
+      // }
+      // const safeData = normalizeForJSON(dataIn);
+
+
+
+      // accept any string type; do not overwrite ctx.type
+      const rawType = (safeCtx && typeof safeCtx.type === "string") ? safeCtx.type : undefined;
+      const validatedType = rawType; // keep as-is; undefined if not provided
+
+      // ensure data is never null (so you can debug centrally)
       let dataIn = safeCtx && safeCtx.data;
-      if (rawType && validatedType !== rawType) {
-        if (dataIn && typeof dataIn === "object") {
-          try { dataIn = Object.assign({}, dataIn, { _badType: rawType }); }
-          catch (_) { dataIn = { _badType: rawType }; }
-        } else {
-          dataIn = { _badType: rawType };
-        }
+      if (dataIn == null || (typeof dataIn !== "object" && typeof dataIn !== "function")) {
+        dataIn = {}; // or { _missingData: true } if you want an explicit marker
       }
       const safeData = normalizeForJSON(dataIn);
+
+
+
 
       const extraObj = {
         level: normalizedLevel,
@@ -359,6 +375,21 @@ const LOGGingModule = function LOGGingModule() {
         message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
         data: safeData
       };
+
+
+
+
+      // const extraObj = {
+      //   level: normalizedLevel,
+      //   type: validatedType,
+      //   module: (typeof safeCtx.module === "string") ? safeCtx.module : undefined,
+      //   diagTag: (typeof safeCtx.diagTag === "string") ? safeCtx.diagTag : undefined,
+      //   surface: (typeof safeCtx.surface === "string") ? safeCtx.surface : undefined,
+      //   key: (typeof safeCtx.key === "string") ? safeCtx.key : undefined,
+      //   stage: (typeof safeCtx.stage === "string") ? safeCtx.stage : undefined,
+      //   message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
+      //   data: safeData
+      // };
 
       G.__DEGRADE__(normalizedCode, err, extraObj);
 

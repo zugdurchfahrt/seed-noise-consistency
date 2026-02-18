@@ -10,6 +10,27 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 
 const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+  function emitCanvasDiag(level, code, err, extra) {
+    const d = window.__DEGRADE__;
+    if (typeof d !== 'function') return;
+    const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
+    const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
+    const ctx = Object.assign({
+      module: 'canvas',
+      diagTag: 'canvas',
+      surface: 'canvas',
+      key: null,
+      stage: 'runtime',
+      message: eventCode,
+      type: 'pipeline missing data',
+      data: null
+    }, (extra && typeof extra === 'object') ? extra : null);
+    if (typeof d.diag === 'function') {
+      d.diag(level, eventCode, ctx, e);
+      return;
+    }
+    d(eventCode, e, ctx);
+  }
 
   // === MODULE INITIALIZATION ===
   // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
@@ -101,7 +122,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   function realInit() {
     _ensureDomOnce();
     _ensureOffscreenOnce();
-    console.log('[CanvasPatchModule] realInit done, window.canvas set:', window.canvas);
+    emitCanvasDiag('info', 'canvas:init:apply:real_init', null, {
+      stage: 'apply',
+      message: 'Canvas realInit done',
+      data: { hasCanvas: !!window.canvas }
+    });
   }
 
   if (typeof document !== 'undefined' && document.readyState === 'loading') {
@@ -131,7 +156,13 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
     // 1) предпочитаем OffscreenCanvas, если доступен
     if (typeof OffscreenCanvas !== 'undefined') {
-      try { return new OffscreenCanvas(w, h); } catch {}
+      try { return new OffscreenCanvas(w, h); } catch (e) {
+        emitCanvasDiag('warn', 'canvas:makeCanvas:apply:offscreen_construct_failed', e, {
+          stage: 'apply',
+          key: 'OffscreenCanvas',
+          type: 'browser structure missing data'
+        });
+      }
     if (typeof document !== 'undefined') { const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
     }
     
@@ -210,9 +241,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (!(typeof dpr === 'number' && dpr > 0)) {
       if (typeof globalThis !== 'undefined') {
         if (!globalThis.__JITTER_DPR_WARNED__) {
-          if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
-            console.warn('[CanvasPatch] jitter disabled: DPR missing/invalid');
-          }
+          emitCanvasDiag('warn', 'canvas:jitter:preflight:dpr_missing', null, {
+            stage: 'preflight',
+            key: 'dpr',
+            message: 'jitter disabled: DPR missing/invalid',
+            type: 'pipeline missing data'
+          });
           globalThis.__JITTER_DPR_WARNED__ = true;
         }
       }
@@ -275,7 +309,13 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (!ctx1 || !ctx2) return img;
     const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
 
-    try { ctx2.imageSmoothingEnabled = true; } catch {}
+    try { ctx2.imageSmoothingEnabled = true; } catch (e) {
+      emitCanvasDiag('warn', 'canvas:patch2DNoise:apply:imageSmoothing_set_failed', e, {
+        stage: 'apply',
+        key: 'imageSmoothingEnabled',
+        type: 'browser structure missing data'
+      });
+    }
     nativePutImageData(P1, ctx1, img, 0, 0);
     nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
     nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
@@ -348,7 +388,14 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const cnv  = (this && this.canvas) ? this.canvas : null;
       const cid  = (() => {
         try { const cw = cnv && cnv.width, ch = cnv && cnv.height; return `cnv@${cw}x${ch}@${(Math.round(dpr * 1024))}`; }
-        catch { return `cnv@${w}x${h}@${(Math.round(dpr * 1024))}`; }
+        catch (e) {
+          emitCanvasDiag('warn', 'canvas:addCanvasNoise:runtime:canvas_size_read_failed', e, {
+            stage: 'runtime',
+            key: 'canvas',
+            type: 'browser structure missing data'
+          });
+          return `cnv@${w}x${h}@${(Math.round(dpr * 1024))}`;
+        }
       })();
       const baseKey = `px|${w}x${h}|${cid}|dx:${dx|0},dy:${dy|0}`;
 
@@ -377,7 +424,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
           }
         }
       }
-    } catch { /* silent */ }
+    } catch (e) {
+      emitCanvasDiag('warn', 'canvas:addCanvasNoise:hook:failed', e, {
+        stage: 'hook',
+        key: 'addCanvasNoise'
+      });
+    }
   }
 
   function measureTextNoiseHook(res, text, font) {
@@ -451,7 +503,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         },
         has: (t,p) => p in t,
       });
-    } catch(_) {}
+    } catch (e) {
+      emitCanvasDiag('warn', 'canvas:measureText:hook:failed', e, {
+        stage: 'hook',
+        key: 'measureText'
+      });
+    }
     return nativeMetrics;
   }
 
@@ -494,9 +551,10 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
       return blob;
     } catch (e) {
-      if (typeof window.__DEGRADE__ === 'function') {
-        try { window.__DEGRADE__('canvas:toBlob:hook_failed', e); } catch (_e) {}
-      }
+      emitCanvasDiag('warn', 'canvas:toBlob:hook_failed', e, {
+        stage: 'hook',
+        key: 'toBlob'
+      });
       return;
     }
   }
@@ -514,9 +572,10 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return blob;
 
     } catch (e) {
-      if (typeof window.__DEGRADE__ === 'function') {
-        try { window.__DEGRADE__('canvas:convertToBlob:hook_failed', e); } catch (_e) {}
-      }
+      emitCanvasDiag('warn', 'canvas:convertToBlob:hook_failed', e, {
+        stage: 'hook',
+        key: 'convertToBlob'
+      });
       return;
     }
 
@@ -598,7 +657,12 @@ let applyFillTextHook, applyStrokeTextHook;
           return { sx, sy };
         }
       }
-    } catch {}
+    } catch (e) {
+      emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
+        stage: 'runtime',
+        key: 'fontPatchConfigs'
+      });
+    }
     const s = (typeof window.__FONT_SCALE__ === 'number' && isFinite(window.__FONT_SCALE__)) ? window.__FONT_SCALE__ : 1;
     return { sx: s, sy: s };
   }
@@ -663,7 +727,7 @@ let applyFillTextHook, applyStrokeTextHook;
       this.restore();
     }
   };
-})(); // ← IIFE корректно закрыт
+})();
 
 
 // --- final export ---

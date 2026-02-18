@@ -20,13 +20,41 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     if (DEBUG) console.debug.apply(console, [LOG_PREFIX].concat([].slice.call(arguments)));
   }
 
+  function emitDegrade(level, code, err, extra) {
+    const d = window.__DEGRADE__;
+    if (typeof d !== 'function') return;
+    const e = err instanceof Error
+      ? err
+      : (err == null ? null : new Error(String(err)));
+    const ctx = Object.assign({
+      type: 'browser structure missing data',
+      stage: 'apply',
+      module: 'headers_interceptor',
+      surface: 'network',
+      key: null,
+      policy: 'skip',
+      action: 'native'
+    }, extra || null);
+    if (typeof d.diag === 'function') {
+      d.diag(level, code, ctx, e);
+      return;
+    }
+    d(code, e, ctx);
+  }
+
   /** Безопасный разбор URL c базой location.href */
   function toURLLike(input) {
     try {
       if (input instanceof URL) return input;
       if (typeof input === 'string') return new URL(input, window.location.href);
       if (input && typeof input.url === 'string') return new URL(input.url, window.location.href);
-    } catch (_) {}
+    } catch (e) {
+      emitDegrade('warn', 'headers_interceptor:url:preflight:parse_failed', e, {
+        stage: 'preflight',
+        surface: 'toURLLike',
+        key: 'url'
+      });
+    }
     return null;
   }
 
@@ -63,7 +91,14 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       if (!url) return false;
       const p = url.pathname.toLowerCase();
       return /\.(png|jpe?g|webp|gif|avif|bmp|ico|svg)$/.test(p);
-    } catch { return false; }
+    } catch (e) {
+      emitDegrade('warn', 'headers_interceptor:url:preflight:image_probe_failed', e, {
+        stage: 'preflight',
+        surface: 'isLikelyImageURL',
+        key: 'url'
+      });
+      return false;
+    }
   }
 
   function isLikelyFontURL(u) {
@@ -75,7 +110,14 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       if (!url) return false;
       const p = url.pathname.toLowerCase();
       return /\.(woff2|woff|ttf|otf|eot)$/.test(p);
-    } catch { return false; }
+    } catch (e) {
+      emitDegrade('warn', 'headers_interceptor:url:preflight:font_probe_failed', e, {
+        stage: 'preflight',
+        surface: 'isLikelyFontURL',
+        key: 'url'
+      });
+      return false;
+    }
   }
 
   function isLikelyMediaURL(u) {
@@ -87,7 +129,14 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       if (!url) return false;
       const p = url.pathname.toLowerCase();
       return /\.(mp4|webm|ogg|mp3|wav|m4a)$/.test(p);
-    } catch { return false; }
+    } catch (e) {
+      emitDegrade('warn', 'headers_interceptor:url:preflight:media_probe_failed', e, {
+        stage: 'preflight',
+        surface: 'isLikelyMediaURL',
+        key: 'url'
+      });
+      return false;
+    }
   }
 
   function isImageFontMediaRequest(req, targetURL) {
@@ -96,7 +145,13 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       if (/\bimage\//i.test(accept) || /\bfont\/|application\/font/i.test(accept) || /\bvideo\/|\baudio\//i.test(accept)) {
         return true;
       }
-    } catch {}
+    } catch (e) {
+      emitDegrade('warn', 'headers_interceptor:request:preflight:accept_probe_failed', e, {
+        stage: 'preflight',
+        surface: 'isImageFontMediaRequest',
+        key: 'accept'
+      });
+    }
     return isLikelyImageURL(targetURL || req) || isLikelyFontURL(targetURL || req) || isLikelyMediaURL(targetURL || req);
   }
 
@@ -131,7 +186,13 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       headerProfile = name;
       return true;
     }
-    console.warn(`${LOG_PREFIX} unknown header profile: ${name}`);
+    emitDegrade('warn', 'headers_interceptor:profile:preflight:unknown', null, {
+      stage: 'preflight',
+      surface: 'setProfile',
+      key: 'profile',
+      type: 'pipeline missing data',
+      data: { profile: name }
+    });
     return false;
   }
 
@@ -172,13 +233,23 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
 
   const C = window.CanvasPatchContext;
   if (!C) {
-    console.warn(`${LOG_PREFIX} CanvasPatchContext is not ready — skipping headers patch for now`);
+    emitDegrade('warn', 'headers_interceptor:init:preflight:canvas_context_missing', null, {
+      stage: 'preflight',
+      surface: 'CanvasPatchContext',
+      key: 'CanvasPatchContext',
+      type: 'pipeline missing data'
+    });
     return; // API уже экспортирован
   }
 
   const RAW_H = (window.__HEADERS__ && typeof window.__HEADERS__ === 'object') ? window.__HEADERS__ : null;
   if (!RAW_H) {
-    console.log(`${LOG_PREFIX} window.__HEADERS__ is missing/invalid — skipping headers patch for now`);
+    emitDegrade('warn', 'headers_interceptor:init:preflight:headers_missing', null, {
+      stage: 'preflight',
+      surface: '__HEADERS__',
+      key: '__HEADERS__',
+      type: 'pipeline missing data'
+    });
     return; // API уже экспортирован; main.py вызовет HeadersInterceptor(window) повторно после инжекта
   }
 
@@ -251,7 +322,13 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     const toInject = filterHeadersForCors(target, profileHeaders);
     for (const k in toInject) {
       if (Object.prototype.hasOwnProperty.call(toInject, k)) {
-        try { normalizedBase.set(k, String(toInject[k])); } catch (e) { dlog('Failed to set header', k, e); }
+        try { normalizedBase.set(k, String(toInject[k])); } catch (e) {
+          emitDegrade('warn', 'headers_interceptor:headers:apply:set_failed', e, {
+            stage: 'apply',
+            surface: 'buildMergedHeaders',
+            key: String(k)
+          });
+        }
       }
     }
     return normalizedBase;
@@ -286,7 +363,11 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       const finalReq = new Request(baseReq, { headers: mergedHeaders });
       return _fetch.call(this, finalReq);
     } catch (e) {
-      console.warn(`${LOG_PREFIX} fetch patch error:`, e);
+      emitDegrade('warn', 'headers_interceptor:fetch:apply:failed', e, {
+        stage: 'apply',
+        surface: 'fetch',
+        key: 'fetch'
+      });
       return _fetch.apply(this, arguments);
     }
   };
@@ -299,7 +380,13 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
   XMLHttpRequest.prototype.open = function (method, url) {
     try {
       XHR_STATE.set(this, { method: String(method || 'GET').toUpperCase(), url: String(url || '') });
-    } catch {}
+    } catch (e) {
+      emitDegrade('warn', 'headers_interceptor:xhr:apply:state_set_failed', e, {
+        stage: 'apply',
+        surface: 'XMLHttpRequest.open',
+        key: 'XHR_STATE'
+      });
+    }
     return XHROpen.apply(this, arguments);
   };
 
@@ -317,14 +404,32 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
 
       for (const k in allowedToInject) {
         if (Object.prototype.hasOwnProperty.call(allowedToInject, k)) {
-          try { this.setRequestHeader(k, String(allowedToInject[k])); } catch (e) { dlog('XHR failed setRequestHeader', k, e); }
+          try { this.setRequestHeader(k, String(allowedToInject[k])); } catch (e) {
+            emitDegrade('warn', 'headers_interceptor:xhr:apply:set_header_failed', e, {
+              stage: 'apply',
+              surface: 'XMLHttpRequest.send',
+              key: String(k)
+            });
+          }
         }
       }
     } catch (e) {
-      console.warn(`${LOG_PREFIX} XHR patch error:`, e);
+      emitDegrade('warn', 'headers_interceptor:xhr:apply:failed', e, {
+        stage: 'apply',
+        surface: 'XMLHttpRequest.send',
+        key: 'send'
+      });
     }
     return XHRSend.apply(this, arguments);
   };
 
-  console.log(`${LOG_PREFIX} patch loaded. Header profile: ${headerProfile}`);
+  emitDegrade('info', 'headers_interceptor:init:apply:installed', null, {
+    stage: 'apply',
+    surface: 'HeadersInterceptor',
+    key: 'install',
+    type: 'pipeline missing data',
+    policy: 'skip',
+    action: 'skip',
+    data: { profile: headerProfile }
+  });
 }

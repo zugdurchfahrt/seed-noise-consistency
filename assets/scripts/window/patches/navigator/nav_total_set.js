@@ -5,10 +5,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       || (typeof self !== 'undefined' && self)
       || (typeof window !== 'undefined' && window)
       || {};
-    const __navDegrade = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || null;
+    const __navD = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || null;
     const __navTypePipeline = 'pipeline missing data';
     const __navTypeBrowser = 'browser structure missing data';
     function __navDiag(level, code, extra, err) {
+      const D = __navD;
       try {
         const rawLevel = String(level || 'info');
         const normalizedCode = String(code || 'nav_total_set');
@@ -42,7 +43,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         };
         if (typeof normalizedType === 'string') ctx.type = normalizedType;
 
-        const D = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || __navDegrade;
         if (D && typeof D.diag === 'function') {
           D.diag(rawLevel, normalizedCode, ctx, err || null);
           return;
@@ -59,13 +59,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             data: ctx.data
           };
           if (typeof normalizedType === 'string') extraObj.type = normalizedType;
-          D(normalizedCode, err || null, extraObj);
+           D(normalizedCode, err || null, extraObj);
         }
       } catch (diagErr) {
-        const fallback = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || __navDegrade;
-        if (fallback && typeof fallback.diag === 'function') {
+        if (D && typeof D.diag === 'function') {
           try {
-            fallback.diag('warn', 'nav_total_set:diag_failed', {
+            D.diag('warn', 'nav_total_set:diag_failed', {
               module: 'nav_total_set',
               diagTag: 'nav_total_set',
               surface: 'navigator',
@@ -76,9 +75,38 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               data: { failedCode: String(code || 'nav_total_set') }
             }, diagErr || null);
           } catch (fallbackErr) {
-            const suppressedFallbackError = fallbackErr;
-            void suppressedFallbackError;
+            if (typeof D === 'function') {
+              try {
+                D('nav_total_set:diag_failed', fallbackErr || diagErr || null, {
+                  level: 'warn',
+                  module: 'nav_total_set',
+                  diagTag: 'nav_total_set',
+                  surface: 'navigator',
+                  key: null,
+                  stage: 'guard',
+                  message: '__navDiag failed',
+                  type: __navTypeBrowser,
+                  data: { failedCode: String(code || 'nav_total_set') }
+                });
+              } catch (_) {}
+            }
           }
+          return;
+        }
+        if (typeof D === 'function') {
+          try {
+            D('nav_total_set:diag_failed', diagErr || null, {
+              level: 'warn',
+              module: 'nav_total_set',
+              diagTag: 'nav_total_set',
+              surface: 'navigator',
+              key: null,
+              stage: 'guard',
+              message: '__navDiag failed',
+              type: __navTypeBrowser,
+              data: { failedCode: String(code || 'nav_total_set') }
+            });
+          } catch (_) {}
         }
       }
     }
@@ -148,10 +176,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       });
       return;
     }
-    const coreRegisterPatchedTarget = (window.Core && typeof window.Core.registerPatchedTarget === 'function')
-      ? window.Core.registerPatchedTarget
-      : null;
     function registerPatchedTarget(owner, key, tag) {
+      const coreRegisterPatchedTarget = (window.Core && typeof window.Core.registerPatchedTarget === 'function')
+        ? window.Core.registerPatchedTarget
+        : null;
       if (typeof coreRegisterPatchedTarget !== 'function') return;
       try {
         coreRegisterPatchedTarget(owner, key);
@@ -414,11 +442,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return true;
     }
 
-    // use for non-critical fields; для E/F/G Do not use(см. ниже)
-    function defineAccWithFallback(objOrProto, key, getter, { enumerable } = {}) {
-      if (safeDefineAcc(objOrProto, key, getter, { enumerable })) return true;
-      throw new TypeError(`failed to define ${key}`);
-    }
     function redefineAcc(proto, key, getImpl) {
       const d = Object.getOwnPropertyDescriptor(proto, key);
       if (d && d.configurable === false) {
@@ -481,6 +504,66 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return true;
     }
 
+    function cloneDescriptor(desc) {
+      if (!desc) return null;
+      const copy = {};
+      if (Object.prototype.hasOwnProperty.call(desc, 'configurable')) copy.configurable = desc.configurable;
+      if (Object.prototype.hasOwnProperty.call(desc, 'enumerable')) copy.enumerable = desc.enumerable;
+      if (Object.prototype.hasOwnProperty.call(desc, 'writable')) copy.writable = desc.writable;
+      if (Object.prototype.hasOwnProperty.call(desc, 'value')) copy.value = desc.value;
+      if (Object.prototype.hasOwnProperty.call(desc, 'get')) copy.get = desc.get;
+      if (Object.prototype.hasOwnProperty.call(desc, 'set')) copy.set = desc.set;
+      return copy;
+    }
+
+    const __navModuleApplied = [];
+    const __navModuleAppliedOwners = (typeof WeakMap === 'function') ? new WeakMap() : null;
+    function rememberModuleApplied(planItem) {
+      if (!planItem || !planItem.owner || typeof planItem.key !== 'string') return;
+      const owner = planItem.owner;
+      const key = String(planItem.key);
+      if (__navModuleAppliedOwners) {
+        let bucket = __navModuleAppliedOwners.get(owner);
+        if (!bucket) {
+          bucket = new Set();
+          __navModuleAppliedOwners.set(owner, bucket);
+        }
+        if (bucket.has(key)) return;
+        bucket.add(key);
+      } else {
+        for (let i = 0; i < __navModuleApplied.length; i++) {
+          const row = __navModuleApplied[i];
+          if (row && row.owner === owner && row.key === key) return;
+        }
+      }
+      __navModuleApplied.push({
+        owner,
+        key,
+        origDesc: cloneDescriptor(planItem.origDesc)
+      });
+    }
+
+    function rollbackModuleApplied() {
+      let rollbackErr = null;
+      for (let i = __navModuleApplied.length - 1; i >= 0; i--) {
+        const row = __navModuleApplied[i];
+        if (!row || !row.owner || typeof row.key !== 'string') continue;
+        try {
+          if (row.origDesc) Object.defineProperty(row.owner, row.key, row.origDesc);
+          else delete row.owner[row.key];
+        } catch (e) {
+          if (!rollbackErr) rollbackErr = e;
+          __navDiagBrowser('error', 'nav_total_set:module_rollback_failed', {
+            stage: 'rollback',
+            diagTag: 'nav_total_set',
+            key: row.key,
+            message: 'module rollback failed'
+          }, e);
+        }
+      }
+      if (rollbackErr) throw rollbackErr;
+    }
+
     function applyCoreTargetsGroup(groupTag, targets, policy) {
       const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
       let groupKey;
@@ -505,6 +588,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }, err);
         if (groupPolicy === 'throw') throw err;
         return 0;
+      }
+      if (typeof Core.registerPatchedTarget !== 'function') {
+        const err = new Error('Core.registerPatchedTarget missing');
+        __navDiag('warn', groupTag + ':core_registry_missing', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: groupTag,
+          key: groupKey,
+          message: 'Core.registerPatchedTarget missing'
+        }, err);
+        if (groupPolicy === 'throw') throw err;
       }
       let plans = [];
       try {
@@ -549,9 +643,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           if (!isSameDescriptor(after, p.nextDesc)) {
             throw new Error('descriptor post-check mismatch');
           }
+          applied.push(p);
+        }
+
+        // Side-effects only after full group apply succeeds (atomicity + registry/dedup invariant).
+        for (let i = 0; i < applied.length; i++) {
+          const p = applied[i];
           if (typeof p.value === 'function') __navRegisterFn(p.value);
           registerPatchedTarget(p.owner, p.key, groupTag);
-          applied.push(p);
+          rememberModuleApplied(p);
         }
       } catch (e) {
         let rollbackErr = null;
@@ -643,10 +743,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           return getter.call(this);
         }}), prop).get;
         __navRegisterFn(namedGet);
-        defineAccWithFallback(navProto, prop, namedGet);
+        safeDefineAcc(navProto, prop, namedGet);
       } else {
         const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
-        defineAccWithFallback(navProto, prop, wrapped);
+        safeDefineAcc(navProto, prop, wrapped);
       }
     });
 
@@ -701,7 +801,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if ('oscpu' in navProto) {
       const dOscpu = Object.getOwnPropertyDescriptor(navProto, 'oscpu');
       const wrappedOscpu = __wrapGetter('oscpu', () => undefined, dOscpu, __isNavigatorThis);
-      defineAccWithFallback(navProto, 'oscpu', wrappedOscpu);
+      safeDefineAcc(navProto, 'oscpu', wrappedOscpu);
     }
     // ——— E. userAgentData (low + high entropy) ———
     if ('userAgentData' in navigator) {
@@ -827,7 +927,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                     if (typeof origGet === 'function') return Reflect.apply(origGet, this, []);
                     return undefined;
                   }
-                }], 'skip');
+                }], 'throw');
               }
             }
             // `uaFullVersion` / `fullVersionList` are high-entropy keys returned by
@@ -885,7 +985,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 message: 'bad highEntropy keys'
               });
               return Reflect.apply(orig, this, args || []);
-            }
+             }
+             const nativeOut = Reflect.apply(orig, this, args || []);
+             if (!nativeOut || typeof nativeOut.then !== 'function') {
+               const err = new TypeError('promise_contract_failed');
+               __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_promise_contract_failed', {
+                 stage: 'runtime',
+                 type: __navTypePipeline,
+                 diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+                 key: 'userAgentData.getHighEntropyValues',
+                 message: 'promise_contract_failed'
+               }, err);
+               throw err;
+             }
+             const uaFullVersion = (meta && meta.uaFullVersion != null)
+               ? meta.uaFullVersion
+               : window.__UA_FULL_VERSION;
+             const fullVersionList = (meta && meta.fullVersionList != null)
+               ? meta.fullVersionList
+               : window.__FULL_VERSION_LIST;
             const map = {
               architecture: meta.architecture,
               bitness: meta.bitness,
@@ -894,8 +1012,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               mobile: meta.mobile,
               platform: chPlatform,
               platformVersion: meta.platformVersion,
-              uaFullVersion: meta.uaFullVersion,
-              fullVersionList: meta.fullVersionList,
+              uaFullVersion: uaFullVersion,
+              fullVersionList: fullVersionList,
               deviceMemory: mem,
               hardwareConcurrency: cpu,
               wow64: meta.wow64,
@@ -911,7 +1029,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   key: 'userAgentData.getHighEntropyValues',
                   message: 'bad highEntropy key item'
                 });
-                return Reflect.apply(orig, this, args || []);
+                return nativeOut;
               }
               if (!(hint in map)) {
                 __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_missing_hint', {
@@ -921,7 +1039,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   key: 'userAgentData.getHighEntropyValues',
                   message: 'missing highEntropy key'
                 });
-                return Reflect.apply(orig, this, args || []);
+                return nativeOut;
               }
               const val = map[hint];
               if (val === undefined || val === null || (typeof val === 'string' && !val && hint !== 'model') || (Array.isArray(val) && !val.length)) {
@@ -932,13 +1050,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   key: 'userAgentData.getHighEntropyValues',
                   message: 'missing highEntropy value'
                 });
-                return Reflect.apply(orig, this, args || []);
+                return nativeOut;
               }
               result[hint] = val;
-            }
-            return Promise.resolve(result);
-          }
-        }], 'throw');
+             }
+             return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
+               try {
+                 const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : {};
+                 return Object.assign({}, base, result);
+               } catch (e) {
+                 __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
+                   stage: 'runtime',
+                   type: __navTypePipeline,
+                   diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+                   key: 'userAgentData.getHighEntropyValues',
+                   message: 'hooksPost_failed'
+                 }, e);
+                 return nativeResolved;
+               }
+             });
+           }
+         }], 'throw');
       }
 
       const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
@@ -1016,7 +1148,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         getImpl: function getUserAgentDataImpl() {
           return Reflect.apply(getUserAgentData, this, []);
         }
-      }], 'skip');
+      }], 'throw');
       if (appliedUaData !== 1) {
         __navDiag('error', 'nav_total_set:userAgentData_define_failed', {
           stage: 'apply',
@@ -1096,7 +1228,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           getImpl: function deviceMemoryGetImpl() {
             return Reflect.apply(getDeviceMemory, this, []);
           }
-        }], 'skip');
+        }], 'throw');
         if (appliedDeviceMemory !== 1) {
           __navDiag('error', 'nav_total_set:deviceMemory_define_failed', {
             stage: 'apply',
@@ -1146,7 +1278,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           getImpl: function hardwareConcurrencyGetImpl() {
             return Reflect.apply(getHardwareConcurrency, this, []);
           }
-        }], 'skip');
+        }], 'throw');
         if (appliedHardwareConcurrency !== 1) {
           __navDiag('error', 'nav_total_set:hardwareConcurrency_define_failed', {
             stage: 'apply',
@@ -1197,7 +1329,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           getImpl: function languageGetImpl() {
             return Reflect.apply(getLanguage, this, []);
           }
-        }], 'skip');
+        }], 'throw');
         if (appliedLanguage !== 1) {
           __navDiag('error', 'nav_total_set:language_define_failed', {
             stage: 'apply',
@@ -1247,7 +1379,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           getImpl: function languagesGetImpl() {
             return Reflect.apply(getLanguages, this, []);
           }
-        }], 'skip');
+        }], 'throw');
         if (appliedLanguages !== 1) {
           __navDiag('error', 'nav_total_set:languages_define_failed', {
             stage: 'apply',
@@ -1923,13 +2055,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     }
     } catch (e) {
+      let rollbackErr = null;
+      try {
+        rollbackModuleApplied();
+      } catch (re) {
+        rollbackErr = re;
+      }
       __navDiagBrowser('fatal', 'nav_total_set:fatal', {
         stage: 'apply',
         diagTag: 'nav_total_set',
         key: null,
-        message: 'fatal module error'
-      }, e);
-      return;
+        message: 'fatal module error',
+        data: { rollbackOk: !rollbackErr }
+      }, rollbackErr || e);
+      throw (rollbackErr || e);
     }
   }
 }

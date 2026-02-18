@@ -67,15 +67,15 @@
     cache.snap = requireSnap(self.__lastSnap__, 'init');
 
     // Seed must be provided inside the worker realm (e.g. via CDP prelude).
-    const seedInit = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
+    const seedInit = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
     if (seedInit == null || seedInit === '') {
-      const e = new Error('UACHPatch: __GLOBAL_SEED missing');
+      const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
       emitDegrade('error', 'worker_patch_src:seed:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
         module: 'WORKER_PATCH_SRC',
-        surface: '__GLOBAL_SEED',
-        key: '__GLOBAL_SEED',
+        surface: 'CDP_GLOBAL_SEED',
+        key: 'CDP_GLOBAL_SEED',
         policy: 'throw',
         action: 'throw'
       }, e);
@@ -83,7 +83,7 @@
     }
     // Seed must be obtained once and then treated as immutable within session; hide it from enumeration.
     try {
-      Object.defineProperty(self, '__GLOBAL_SEED', {
+      Object.defineProperty(self, 'CDP_GLOBAL_SEED', {
         value: seedInit,
         writable: false,
         configurable: true,
@@ -94,12 +94,12 @@
         type: 'browser structure missing data',
         stage: 'apply',
         module: 'WORKER_PATCH_SRC',
-        surface: '__GLOBAL_SEED',
-        key: '__GLOBAL_SEED',
+        surface: 'CDP_GLOBAL_SEED',
+        key: 'CDP_GLOBAL_SEED',
         policy: 'skip',
         action: 'native'
       }, e);
-      self.__GLOBAL_SEED = seedInit;
+      self.CDP_GLOBAL_SEED = seedInit;
     }
     // --- seed __ensureMarkAsNative must exist (delivered by bootstrap) ---
     const seedEnsureDesc = Object.getOwnPropertyDescriptor(self, '__ensureMarkAsNative');
@@ -549,6 +549,55 @@
       throw new Error(`UACHPatch: cannot define ${k} (no proto)`);
     };
 
+    const failWorkerNavigatorSanity = (code, key, message, data) => {
+      const err = new Error(message);
+      emitDegrade('error', code, {
+        type: 'browser structure missing data',
+        stage: 'sanity',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: key || null,
+        policy: 'throw',
+        action: 'throw',
+        data: data || null
+      }, err);
+      throw err;
+    };
+    const assertWorkerNavigatorDescriptor = (k) => {
+      const owner = (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype) || proto || null;
+      if (!owner) {
+        failWorkerNavigatorSanity(
+          'worker_patch_src:workernavigator_descriptor:sanity:owner_missing',
+          k,
+          `UACHPatch: ${k} descriptor owner missing`
+        );
+      }
+      const d = Object.getOwnPropertyDescriptor(owner, k);
+      if (!d) {
+        failWorkerNavigatorSanity(
+          'worker_patch_src:workernavigator_descriptor:sanity:missing',
+          k,
+          `UACHPatch: ${k} descriptor missing after apply`
+        );
+      }
+      const hasGetter = typeof d.get === 'function';
+      const hasValue = Object.prototype.hasOwnProperty.call(d, 'value');
+      if (!hasGetter || hasValue) {
+        failWorkerNavigatorSanity(
+          'worker_patch_src:workernavigator_descriptor:sanity:mismatch',
+          k,
+          `UACHPatch: ${k} descriptor shape mismatch`,
+          {
+            hasGetter,
+            hasSetter: typeof d.set === 'function',
+            hasValue,
+            configurable: !!d.configurable,
+            enumerable: !!d.enumerable
+          }
+        );
+      }
+    };
+
 
     const getLanguage = markAsNative(function getLanguage(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
@@ -582,6 +631,10 @@
       return v;
     }, 'get hardwareConcurrency');
     def(proto, 'hardwareConcurrency', getHardwareConcurrency, true);
+    assertWorkerNavigatorDescriptor('language');
+    assertWorkerNavigatorDescriptor('languages');
+    assertWorkerNavigatorDescriptor('deviceMemory');
+    assertWorkerNavigatorDescriptor('hardwareConcurrency');
 
 
 
@@ -614,21 +667,21 @@
     self.__applyEnvSnapshot__ = s => {
       if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
       if (cache.snap === s) return;
-      const prevSeed = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
+      const prevSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
       cache.snap = requireSnap(s, 'apply');
-      if (self.__GLOBAL_SEED == null || String(self.__GLOBAL_SEED) === '') {
-        throw new Error('UACHPatch: __GLOBAL_SEED missing');
+      if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
+        throw new Error('UACHPatch: CDP_GLOBAL_SEED missing');
       }
       if (typeof prev==='function') prev.call(self,s);
       // Paradigm: seed is immutable within session.
-      const curSeed = (self.__GLOBAL_SEED != null) ? String(self.__GLOBAL_SEED) : null;
+      const curSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
       if (prevSeed != null && curSeed != null && prevSeed !== curSeed) {
         throw new Error('UACHPatch: seed mutation is not allowed');
       }
     };
     cache.snap = requireSnap(self.__lastSnap__, 'bootstrap');
-    if (self.__GLOBAL_SEED == null || String(self.__GLOBAL_SEED) === '') {
-      throw new Error('UACHPatch: __GLOBAL_SEED missing');
+    if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
+      throw new Error('UACHPatch: CDP_GLOBAL_SEED missing');
     }
     if (!self.__ENV_SYNC_BC_INSTALLED__) {
       if (typeof BroadcastChannel !== 'function') {
@@ -679,12 +732,38 @@
       deviceMemory: self.navigator && self.navigator.deviceMemory,
       hardwareConcurrency: self.navigator && self.navigator.hardwareConcurrency
     };
-    if (sanity.language !== cache.snap.language) throw new Error('UACHPatch: language mismatch');
-    if (!Array.isArray(sanity.languages) || sanity.languages.join(',') !== cache.snap.languages.join(',')) {
-      throw new Error('UACHPatch: languages mismatch');
+    if (sanity.language !== cache.snap.language) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'language',
+        'UACHPatch: language mismatch',
+        { actual: sanity.language, expected: cache.snap.language }
+      );
     }
-    if (Number(sanity.deviceMemory) !== Number(cache.snap.deviceMemory)) throw new Error('UACHPatch: deviceMemory mismatch');
-    if (Number(sanity.hardwareConcurrency) !== Number(cache.snap.hardwareConcurrency)) throw new Error('UACHPatch: hardwareConcurrency mismatch');
+    if (!Array.isArray(sanity.languages) || sanity.languages.join(',') !== cache.snap.languages.join(',')) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'languages',
+        'UACHPatch: languages mismatch',
+        { actual: sanity.languages, expected: cache.snap.languages }
+      );
+    }
+    if (Number(sanity.deviceMemory) !== Number(cache.snap.deviceMemory)) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'deviceMemory',
+        'UACHPatch: deviceMemory mismatch',
+        { actual: sanity.deviceMemory, expected: cache.snap.deviceMemory }
+      );
+    }
+    if (Number(sanity.hardwareConcurrency) !== Number(cache.snap.hardwareConcurrency)) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'hardwareConcurrency',
+        'UACHPatch: hardwareConcurrency mismatch',
+        { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
+      );
+    }
     self.__UACH_MIRROR_INSTALLED__ = true;
 
     const __workerDegrade = (typeof __DEGRADE__ === "function") ? __DEGRADE__ : null;
