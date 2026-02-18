@@ -1928,12 +1928,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             return null;
           } }).namedItem;
 
-          // Create a ?plugin? with strictly enumerable properties
+          // Create plugin object: metadata non-enumerable, mime indexes enumerable
           const pluginObj = Object.create(Plugin.prototype, {
-            name:        { value: String(p.name),        enumerable: true,  configurable: true },
-            filename:    { value: String(p.filename),    enumerable: true,  configurable: true },
-            description: { value: String(p.description), enumerable: true,  configurable: true },
-            length:      { value: p.mimeTypes.length,    enumerable: true,  configurable: true },
+            name:        { value: String(p.name),        enumerable: false, configurable: true },
+            filename:    { value: String(p.filename),    enumerable: false, configurable: true },
+            description: { value: String(p.description), enumerable: false, configurable: true },
+            length:      { value: p.mimeTypes.length,    enumerable: false, configurable: true },
             item: {
               value: __navMark(itemMethod, 'item'),
               enumerable: false, configurable: true
@@ -1947,14 +1947,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           // mime-??????? (enumerable ????, enabledPlugin ? ?? pluginObj)
           for (let j = 0; j < p.mimeTypes.length; j++) {
             const m = p.mimeTypes[j];
+            const mType = String(m.type);
             const mimeObj = Object.create(MimeType.prototype, {
-              type:         { value: String(m.type),        enumerable: true, configurable: true },
+              type:         { value: mType,                  enumerable: true, configurable: true },
               suffixes: { value: String(m.suffixes ?? ''),enumerable: true, configurable: true },
               description: { value: String(m.description ?? ''), enumerable: true, configurable: true },
               enabledPlugin:{ value: pluginObj,             enumerable: true, configurable: true }
             });
             // index on the plugin itself ? enumerable
             Object.defineProperty(pluginObj, String(j), { value: mimeObj, enumerable: true, configurable: true });
+            if (mType) {
+              Object.defineProperty(pluginObj, mType, { value: mimeObj, enumerable: false, configurable: true });
+            }
             mimeObjects.push(mimeObj);
           }
 

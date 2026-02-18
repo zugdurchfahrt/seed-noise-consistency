@@ -22,7 +22,7 @@ PLUGIN_DICT: Dict[str, List]  = {
                 "filename": "internal-pdf-viewer",
                 "description": "",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": "PDF document"}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": ""}
                 ],
             }
         ],
@@ -32,7 +32,7 @@ PLUGIN_DICT: Dict[str, List]  = {
                 "filename": "internal-pdf-viewer",
                 "description": "Portable Document Format",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": "PDF document"}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"}
                 ],
             }
         ],
@@ -46,7 +46,7 @@ PLUGIN_DICT: Dict[str, List]  = {
                 "filename": "internal-pdf-viewer",
                 "description": "Portable Document Format",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": "PDF document"}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"}
                 ],
             }
         ],
@@ -56,7 +56,7 @@ PLUGIN_DICT: Dict[str, List]  = {
                 "filename": "internal-pdf-viewer",
                 "description": "",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": "PDF document"}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": ""}
                 ],
             }
         ],
@@ -70,7 +70,7 @@ PLUGIN_DICT: Dict[str, List]  = {
                 "filename": "internal-pdf-viewer",
                 "description": "",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": "PDF document"}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": ""}
                 ],
             }
         ],
@@ -82,7 +82,7 @@ PLUGIN_DICT: Dict[str, List]  = {
             "filename": "openh264.xpi",
             "description": "OpenH264 Video Codec provided by Cisco Systems, Inc.",
             "mimeTypes": [
-                {"type": "video/h264", "suffixes": "h264", "description": "H.264 video"}
+                {"type": "video/h264", "suffixes": "h264", "description": "OpenH264 Video Codec provided by Cisco Systems, Inc."}
             ],
         },
         {
@@ -90,7 +90,7 @@ PLUGIN_DICT: Dict[str, List]  = {
             "filename": "widevinecdm.xpi",
             "description": "Widevine Content Decryption Module provided by Google Inc.",
             "mimeTypes": [
-                {"type": "application/x-widevine-cdm", "suffixes": "cdm", "description": "Widevine CDM"}
+                {"type": "application/x-widevine-cdm", "suffixes": "cdm", "description": "Widevine Content Decryption Module provided by Google Inc."}
             ],
         },
     ],
@@ -102,7 +102,7 @@ PLUGIN_DICT: Dict[str, List]  = {
             "filename": "internal-pdf-viewer",
             "description": "Portable Document Format",
             "mimeTypes": [
-                {"type": "application/pdf", "suffixes": "pdf", "description": "PDF document"}
+                {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"}
             ],
         }
     ],
@@ -222,4 +222,3 @@ def build_plugins_profile(browser_choice: str, *, rng: Optional[random.Random] =
     return cleaned, mime_final
 
 __all__ = ["PLUGIN_DICT", "plugin_key_for", "build_plugins_profile"]
-
