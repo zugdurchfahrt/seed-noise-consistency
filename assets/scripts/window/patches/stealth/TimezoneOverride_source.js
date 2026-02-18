@@ -267,7 +267,7 @@
           owner: proto,
           key: "resolvedOptions",
           kind: "method",
-          wrapLayer: "core_wrapper",
+          wrapLayer: "named_wrapper",
           invokeClass: "brand_strict",
           policy: "throw",
           diagTag: "tz:DateTimeFormat:resolvedOptions",

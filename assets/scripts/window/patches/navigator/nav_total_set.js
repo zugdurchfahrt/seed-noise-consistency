@@ -686,8 +686,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return applied.length;
     }
 
-
-    // Critical - only a prototype (without a phallback)
     // Critical - only a prototype (without a fallback)
     // Important: like native - not enumerable
     const critical = new Set(['userAgent','platform','vendor','appVersion']);
@@ -1707,10 +1705,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             return self === navigator.storage;
           },
           invalidThis: 'throw',
-          // invoke(_orig, _args) {
-          //   __navLogAccess('storage.persist', null);
-          //   return Promise.resolve(true);
-          // }
           invoke(orig, args) {
             __navLogAccess('storage.persist', null);
             const out = Reflect.apply(orig, this, args || []);
@@ -1745,12 +1739,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             return self === navigator.storage;
           },
           invalidThis: 'throw',
-          // invoke(orig, args) {
-          //   __navLogAccess('storage.persisted', null);
-          //   const isStorageThis = (this === navigator.storage || this === storageProto);
-          //   if (!isStorageThis) return Reflect.apply(orig, this, args || []);
-          //   return Promise.resolve(true);
-          // }
           invoke(orig, args) {
             __navLogAccess('storage.persisted', null);
             const out = Reflect.apply(orig, this, args || []);
@@ -1763,10 +1751,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
       // ———  JS heap sizing from deviceMemory ———
-       // if-стиль: патчим только если dm валиден
-                 // dm: 0.25, 0.5, 1, 2, 4, 8, …
-        // читаем dm каждый раз — «жёсткая» привязка к текущему realm
-        // dm нелегален → не вмешиваемся (оставляем натив/предыдущее)
+      // if-стиль: патчим только если dm валиден
+      // dm: 0.25, 0.5, 1, 2, 4, 8, …
+      // читаем dm каждый раз — «жёсткая» привязка к текущему realm
+      // dm нелегален → не вмешиваемся (оставляем натив/предыдущее)
     const perfProto = (window.Performance && Performance.prototype) || Object.getPrototypeOf(performance);
     if (perfProto) {
       const dm0 = Number(navigator.deviceMemory);
