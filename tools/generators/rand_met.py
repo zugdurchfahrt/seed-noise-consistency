@@ -418,82 +418,7 @@ def fsType_restricts(tt: TTFont) -> bool:
     except Exception:
         return False
 
-def has_protective_gsub(font_path: pathlib.Path, threshold: int = 20) -> bool:
-    """
-    Heuristic: returns True if the font's GSUB contains single substitutions that remap a large portion
-    of base Latin/Cyrillic letters under default-enabled features (liga/calt/locl/rlig/ccmp).
-    """
-    try:
-        tt = TTFont(str(font_path))
-        if 'GSUB' not in tt:
-            return False
-        gsub = tt['GSUB'].table
-        if not getattr(gsub, 'LookupList', None):
-            return False
 
-        # Build cmap for target codepoints -> glyph names
-        best = tt.getBestCmap() or {}
-        targets = []
-        # Basic Latin A-Z a-z
-        for cp in list(range(0x41, 0x5A+1)) + list(range(0x61,0x7A+1)):
-            if cp in best:
-                targets.append(best[cp])
-        # Cyrillic А-я + Ёё
-        for cp in list(range(0x410,0x44F+1)) + [0x401,0x451]:
-            if cp in best:
-                targets.append(best[cp])
-        targets = set(targets)
-
-        # Map lookup index -> set(feature tags)
-        feat_tags_by_lookup = {}
-        FL = gsub.FeatureList
-        SL = gsub.ScriptList
-        if FL and SL:
-            # default-enabled OT features in browsers
-            default_enabled = {'liga','rlig','clig','calt','ccmp','locl'}
-            # collect default feature indices from common scripts
-            def collect_feature_indices():
-                idxs = set()
-                for script_record in SL.ScriptRecord:
-                    script = script_record.Script
-                    # default lang sys
-                    if script.DefaultLangSys:
-                        idxs.update(script.DefaultLangSys.FeatureIndex)
-                    for ls in script.LangSysRecord:
-                        # also include default of explicit lang systems (rare)
-                        idxs.update(ls.LangSys.FeatureIndex)
-                return idxs
-            feat_idxs = collect_feature_indices()
-            for i in feat_idxs:
-                if i < len(FL.FeatureRecord):
-                    fr = FL.FeatureRecord[i]
-                    tag = fr.FeatureTag.strip()
-                    if tag in default_enabled:
-                        for li in fr.Feature.LookupListIndex:
-                            feat_tags_by_lookup.setdefault(li,set()).add(tag)
-        suspicious = 0
-        # iterate lookups; if feature mapping unknown, be conservative and still check
-        for li, lookup in enumerate(gsub.LookupList.Lookup):
-            # only consider if referenced by default-enabled features (if mapping built); else skip
-            if feat_tags_by_lookup and li not in feat_tags_by_lookup:
-                continue
-            if lookup.LookupType == 1:  # Single Substitution
-                for st in lookup.SubTable:
-                    mapping = getattr(st,'mapping',None)
-                    if not mapping:
-                        continue
-                    for src, dst in mapping.items():
-                        if src in targets:
-                            if dst != src:
-                                suspicious += 1
-            elif lookup.LookupType == 4:  # Ligature (single letter shouldn't trigger)
-                # ignore ligatures of multiple components; not helpful here
-                pass
-            # other lookup types could be present but we focus on type 1
-        return suspicious >= threshold
-    except Exception as e:
-        logger.warning(f"[GSUB check] {font_path}: {e}")
-        return False
 
 def generate_font_metadata(platform: str, subfamilies_src=None):
     """
@@ -606,10 +531,6 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
             if fsType_restricts(tt):
                 logger.warning(f"[Skipped] {src_path.name} — licence constraints (OS/2 fsType).")
-                continue
-
-            if has_protective_gsub(src_path, threshold=20):
-                logger.warning(f"[Skipped] {src_path.name} — GSUB-PROTECTION detected (demo/trial).")
                 continue
 
             # sanity check: Extreme metrics can break the layout
