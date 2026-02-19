@@ -11,6 +11,8 @@ bin/
 # Distribution / packaging
 .Python
 build/
+/sunami/assets/generated_fonts/MacIntel
+/sunami/assets/generated_fonts/Win32
 develop-eggs/
 dist/
 downloads/
@@ -232,5 +234,6 @@ assets/generated_fonts/Win32/fonts_index.json
 profile.json
 docs/pitfalls.md
 assets/scripts/window/DEGRADE_CALLS_SUMMARY.md
+assets/generated_fonts/Win32/fonts_index.json
 assets/generated_fonts/Win32/fonts_index.json
 assets/generated_fonts/Win32/fonts_index.json

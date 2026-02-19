@@ -4,6 +4,7 @@ import hashlib
 import random
 import string
 import pathlib
+import re
 from typing import Dict, Set, Tuple
 from collections import defaultdict
 from typing import Set as _Set
@@ -255,6 +256,17 @@ def random_string(length=12):
     return ''.join(random.choice(alphabet) for _ in range(length))
 
 
+def _normalize_postscript_name(value: str) -> str:
+    s = str(value or "")
+    if not s:
+        return ""
+    s = re.sub(r"\bBold[\s_]+Italic\b", "BoldItalic", s, flags=re.IGNORECASE)
+    s = re.sub(r"[\s_]+", "", s)
+    s = re.sub(r"[^A-Za-z0-9-]", "", s)
+    s = re.sub(r"-{2,}", "-", s).strip("-")
+    return s
+
+
 def _normalize_subfamilies(src):
     """
     forms a sourcesubfamilies as the list of strings.
@@ -262,19 +274,56 @@ def _normalize_subfamilies(src):
     Empty/incorrect source -> Return of globalSUBFAMILIES.
     """
     try:
+        allowed = {re.sub(r"\s+", " ", s.strip().lower()): s for s in SUBFAMILIES}
+        allowed_compact = {re.sub(r"[\s_-]+", "", k): v for k, v in allowed.items()}
+        aliases = {
+            "regular": "Regular",
+            "italic": "Italic",
+            "bold": "Bold",
+            "bolditalic": "Bold Italic",
+            "semilight": "Semilight",
+            "semilightitalic": "Semilight Italic",
+            "semibold": "SemiBold",
+            "semibolditalic": "SemiBold Italic",
+            "light": "Light",
+            "lightitalic": "Light Italic",
+            "black": "Black",
+            "blackitalic": "Black Italic",
+        }
+
+        def _canon(v):
+            if not isinstance(v, str):
+                return None
+            norm = re.sub(r"\s+", " ", v.strip())
+            if not norm:
+                return None
+            lk = norm.lower()
+            if lk in allowed:
+                return allowed[lk]
+            compact = re.sub(r"[\s_-]+", "", lk)
+            if compact in aliases:
+                return aliases[compact]
+            return allowed_compact.get(compact)
+
+        raw = []
         if isinstance(src, (list, tuple, set)):
-            out = [s.strip() for s in src if isinstance(s, str) and s.strip()]
-            return sorted(set(out)) or SUBFAMILIES
-        if isinstance(src, dict):
-            out = []
+            raw.extend(src)
+        elif isinstance(src, dict):
             for k, v in src.items():
-                if isinstance(k, str) and k.strip():
-                    out.append(k.strip())
-                if isinstance(v, str) and v.strip():
-                    out.append(v.strip())
-                elif isinstance(v, (list, tuple, set)):
-                    out.extend([s.strip() for s in v if isinstance(s, str) and s.strip()])
-            return sorted(set(out)) or SUBFAMILIES
+                raw.append(k)
+                if isinstance(v, (list, tuple, set)):
+                    raw.extend(v)
+                else:
+                    raw.append(v)
+        else:
+            return SUBFAMILIES
+
+        canon = [c for c in (_canon(v) for v in raw) if c]
+        if not canon:
+            return SUBFAMILIES
+
+        canon_set = set(canon)
+        return [s for s in SUBFAMILIES if s in canon_set] or SUBFAMILIES
     except Exception:
         pass
     return SUBFAMILIES
@@ -469,7 +518,7 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     unique_id = f"{family[:2]}-{random_string(12)}"
     full_name = f"{family} {subfamily}"
     version = f"Version {random.randint(1,5)}.{random.randint(0,9999)}"
-    ps_name = f"{family}-{subfamily}"
+    ps_name = _normalize_postscript_name(f"{family}-{subfamily}")
     designer = random.choice(designers)
     license_desc = random.choice(licenses)
 
@@ -629,6 +678,9 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     family_counter = defaultdict(int)
     used_families = set()
     temp_configs = []
+    skip_stats = defaultdict(int)
+    CSS_FAMILY = (os.environ.get("FONTS_CSS_FAMILY") or "FPFont").strip() or "FPFont"
+    logger.info(f"[fonts] cssFamily fixed: {CSS_FAMILY}")
 
     _saved_state = random.getstate()
     random.seed(_seed ^ 0x9E3779B1)
@@ -636,12 +688,14 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         for fname in fingerprint_names:
             rec = files_map.get(fname)
             if not rec:
+                skip_stats["missing_index_entry"] += 1
                 logger.warning(f"[fonts]There is no entry in the index for {fname}, пропуск")
                 continue
 
             data_url = _get_data_url(platform, target_dir, fname, rec)  # Lazy side-cache .b64
             # If _get_data_url returned empty (no-woff2/error) - skip the font
             if not data_url:
+                skip_stats["empty_data_url"] += 1
                 logger.warning(f"[fonts] Пропуск {fname}: пустой data URL")
                 continue
 
@@ -653,11 +707,17 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             family     = meta_values.get(1, fname)
             subfamily  = meta_values.get(2, "")
             full_name  = meta_values.get(4, "")
-            postscript = meta_values.get(6, "")
+            postscript = _normalize_postscript_name(meta_values.get(6, ""))
 
             #limits families dups and removes duplicates
             uniq_triple = (family, full_name, postscript)
-            if uniq_triple in used_families or family_counter[family] >= max_family_repeats:
+            if uniq_triple in used_families:
+                skip_stats["duplicate_uniq_triple"] += 1
+                logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
+                continue
+            if family_counter[family] >= max_family_repeats:
+                skip_stats["family_repeat_limit"] += 1
+                logger.debug(f"[fonts] Step4 skip {fname}: family_repeat_limit family={family} limit={max_family_repeats}")
                 continue
 
             _sf = (subfamily or "").lower()
@@ -667,7 +727,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             cfg = {
                 "name": name_no_ext,
                 "url": data_url,
-                "fontFamily": meta_values.get(6, name_no_ext),
+                "cssFamily": CSS_FAMILY,
                 "family": family,
                 "subfamily": subfamily,
                 "weight": weight,
@@ -675,7 +735,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 "unique_id": meta_values.get(3, ""),
                 "full_name": meta_values.get(4, ""),
                 "version": meta_values.get(5, ""),
-                "postscript_name": meta_values.get(6, ""),
+                "postscript_name": postscript,
                 "designer": meta_values.get(9, ""),
                 "license": meta_values.get(13, ""),
                 "fallback": name_no_ext,
@@ -693,6 +753,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             )
     finally:
         random.setstate(_saved_state)
+    if skip_stats:
+        logger.debug(f"[fonts] Step4 skip stats: {dict(skip_stats)}")
 
     # === Step 5: create fonts-manifest.json for fingerprint_files =====
     os.makedirs(manifest_path.parent, exist_ok=True)
@@ -707,6 +769,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     configs_for_js = [
         {
             "name": c["name"],
+            "cssFamily": c.get("cssFamily"),
             "family": c["family"],
             "url": c["url"],
             "fallback": c["fallback"],
