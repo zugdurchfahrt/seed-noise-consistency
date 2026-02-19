@@ -928,12 +928,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 }], 'throw');
               }
             }
-            // `uaFullVersion` / `fullVersionList` are high-entropy keys returned by
+            // `fullVersionList` is a high-entropy key returned by
             // `getHighEntropyValues()`, not stable NavigatorUAData properties across Chromium.
             // Do not create synthetic descriptors on `NavigatorUAData` here (avoid shape drift).
-       function dropOwnIfConfigurable(obj, key) {
-         const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
-         if (ownDesc && ownDesc.configurable) {
+        function dropOwnIfConfigurable(obj, key) {
+          const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
+          if (ownDesc && ownDesc.configurable) {
            try {
              delete obj[key];
           } catch (e) {
@@ -996,27 +996,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                }, err);
                throw err;
              }
-             const uaFullVersion = (meta && meta.uaFullVersion != null)
-               ? meta.uaFullVersion
-               : window.__UA_FULL_VERSION;
              const fullVersionList = (meta && meta.fullVersionList != null)
                ? meta.fullVersionList
                : window.__FULL_VERSION_LIST;
-            const map = {
-              architecture: meta.architecture,
-              bitness: meta.bitness,
-              model: meta.model,
-              brands: meta.brands,
-              mobile: meta.mobile,
-              platform: chPlatform,
-              platformVersion: meta.platformVersion,
-              uaFullVersion: uaFullVersion,
-              fullVersionList: fullVersionList,
-              deviceMemory: mem,
-              hardwareConcurrency: cpu,
-              wow64: meta.wow64,
-              formFactors: meta.formFactors
-            };
+             const map = {
+               architecture: meta.architecture,
+               bitness: meta.bitness,
+               model: meta.model,
+               brands: meta.brands,
+               mobile: meta.mobile,
+               platform: chPlatform,
+               platformVersion: meta.platformVersion,
+               fullVersionList: fullVersionList,
+               deviceMemory: mem,
+               hardwareConcurrency: cpu,
+               wow64: meta.wow64,
+               formFactors: meta.formFactors
+             };
             const result = {};
             for (const hint of keys) {
               if (typeof hint !== 'string' || !hint) {

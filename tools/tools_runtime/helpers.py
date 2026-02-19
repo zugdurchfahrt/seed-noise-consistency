@@ -209,7 +209,6 @@ def build_expected_client_hints(profile, generated_platform, browser_brand, majo
         "model": "",
         "platformVersion": profile["platform_version"],
         "fullVersionList": full_version_list,
-        "uaFullVersion": browser_version,
         "sec_ch_ua": sec_ch_ua,
         "sec_ch_ua_full_version_list": sec_ch_ua_full_version_list,
         "sec_ch_ua_model": "",
@@ -295,7 +294,7 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand):
         driver: The browser driver instance (e.g., Selenium WebDriver) to apply the overrides to.
         profile (dict): A dictionary containing the 'user_agent' string to be set.
         expected_client_hints (dict): A dictionary of client hints to construct the UserAgentMetadata, including keys such as
-            'platform', 'brands', 'mobile', 'architecture', 'bitness', 'model', 'platformVersion', 'uaFullVersion',
+            'platform', 'brands', 'mobile', 'architecture', 'bitness', 'model', 'platformVersion',
             'fullVersionList', 'deviceMemory', 'hardwareConcurrency', 'wow64', and 'formFactors'.
     browser_brand (str): The browser brand name (e.g., "chrome", "edge") to determine if the override should be applied.
     Side Effects:
@@ -311,7 +310,6 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand):
         "bitness":             expected_client_hints["bitness"],
         "model":               expected_client_hints["model"],
         "platformVersion":     expected_client_hints["platformVersion"],
-        "uaFullVersion":       expected_client_hints["uaFullVersion"],
         "fullVersionList":     expected_client_hints["fullVersionList"],
         "deviceMemory":        expected_client_hints["deviceMemory"],
         "hardwareConcurrency": expected_client_hints["hardwareConcurrency"],

@@ -310,6 +310,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
   }
 
   // === WEBGL PATCHING ===
+
+  // ===== WEBGL hook override logging: two toggles (ВКЛ/ВЫКЛ) =====
+  // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override" (emitContextDiag + console.warn ниже),
+  // НЕ отключают хук, НЕ отключают патчинг, НЕ трогают остальные warn/error.
+  const WEBGL_OVERRIDE_DIAG_LOG    = false;  // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
+  const WEBGL_OVERRIDE_CONSOLE_LOG = false;  // true=ВКЛ, false=ВЫКЛ (console.warn для override)
+
   function patchMethod(proto, method, hooks) {
       if (!proto) {
         emitContextDiag('warn', 'context:webgl:preflight:proto_missing', null, {
@@ -368,7 +375,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const forbidOrigCall = function forbidOrigCall() { throw new TypeError(); };
 
       function invoke(self, argsLike) {
-          // Preserve native Illegal invocation / brand check errors
           const isObj = (self !== null) && (typeof self === 'object' || typeof self === 'function');
           const args = Array.isArray(argsLike) ? argsLike : Array.prototype.slice.call(argsLike);
 
@@ -407,17 +413,25 @@ const ContextPatchModule = function ContextPatchModule(window) {
                   try {
                       const res = hook.apply(self, [orig, ...patched]);
 
-                      // override console logging
+                      // override logging (TOGGLED)
                       if (res !== undefined && !Array.isArray(res)) {
-                          if (global.__DEBUG__ && !(global._logConfig && global._logConfig.WEBGLlogger === false)) {
-                              emitContextDiag('info', 'context:webgl:hook:override', null, {
-                                stage: 'hook',
-                                surface: 'webgl',
-                                key: method,
-                                data: { hook: hook.name || 'anon' }
-                              });
-                              console.warn('[patchMethod override]', method, hook.name || 'anon', res);
+                          const webglLoggerGate =
+                            !(global._logConfig && global._logConfig.WEBGLlogger === false);
+
+                          if (global.__DEBUG__ && webglLoggerGate) {
+                              if (WEBGL_OVERRIDE_DIAG_LOG) {
+                                emitContextDiag('debug', 'context:webgl:hook:override', null, {
+                                  stage: 'hook',
+                                  surface: 'webgl',
+                                  key: method,
+                                  data: { hook: hook.name || 'anon' }
+                                });
+                              }
+                              if (WEBGL_OVERRIDE_CONSOLE_LOG) {
+                                console.warn('[patchMethod override]', method, hook.name || 'anon', res);
+                              }
                           }
+
                           return res; // result substitution
                       }
 
@@ -445,7 +459,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
       }
 
-      // IMPORTANT: use MethodDefinition functions to match native (non-constructible, no "prototype")
       const wrappedRaw = (function(){
           switch (orig.length) {
               case 0: return ({ [method]() { return invoke(this, arguments); } })[method];

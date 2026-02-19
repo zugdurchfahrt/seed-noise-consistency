@@ -346,6 +346,7 @@ def init_driver(
             # --- set_log ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
+            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
             # --- core window ---
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
@@ -1015,7 +1016,7 @@ def main():
                         "if (!uad) return null;"
                         "const brands = Array.isArray(uad.brands) ? "
                         "uad.brands.map(b => ({brand: b.brand, version: String(b.version)})) : null;"
-                        "return { brands, platform: uad.platform, mobile: uad.mobile, uaFullVersion: uad.uaFullVersion, fullVersionList: uad.fullVersionList };"
+                        "return { brands, platform: uad.platform, mobile: uad.mobile };"
                     )
                     if current_uad:
                         exp_brands = expected_client_hints.get("brands") or []
@@ -1026,26 +1027,10 @@ def main():
                         cur_norm = sorted(
                             [(str(b.get("brand")), str(b.get("version"))) for b in cur_brands if isinstance(b, dict)]
                         )
-                        exp_uaf = expected_client_hints.get("uaFullVersion")
-                        cur_uaf = current_uad.get("uaFullVersion")
-                        exp_fvl = expected_client_hints.get("fullVersionList")
-                        cur_fvl = current_uad.get("fullVersionList")
-                        exp_fvl_norm = (
-                            sorted([(str(b.get("brand")), str(b.get("version"))) for b in exp_fvl if isinstance(b, dict)])
-                            if isinstance(exp_fvl, list)
-                            else None
-                        )
-                        cur_fvl_norm = (
-                            sorted([(str(b.get("brand")), str(b.get("version"))) for b in cur_fvl if isinstance(b, dict)])
-                            if isinstance(cur_fvl, list)
-                            else None
-                        )
                         if (
                             exp_norm != cur_norm
                             or current_uad.get("platform") != expected_client_hints.get("platform")
                             or current_uad.get("mobile") != expected_client_hints.get("mobile")
-                            or (exp_uaf is not None and cur_uaf != exp_uaf)
-                            or (exp_fvl_norm is not None and exp_fvl_norm != cur_fvl_norm)
                         ):
                             needs_reapply = True
             except Exception as e:
@@ -1096,4 +1081,3 @@ def main():
     #     mitmproxy_proc.wait()
 if __name__ == "__main__":
     main()
-

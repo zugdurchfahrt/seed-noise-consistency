@@ -332,24 +332,6 @@ const LOGGingModule = function LOGGingModule() {
             safeCtx = {};
           }
 
-
-      // const validTypes = ["pipeline missing data", "browser structure missing data"];
-      // const rawType = (safeCtx && typeof safeCtx.type === "string") ? safeCtx.type : "";
-      // const validatedType = validTypes.indexOf(rawType) !== -1 ? rawType : "pipeline missing data";
-
-      // let dataIn = safeCtx && safeCtx.data;
-      // if (rawType && validatedType !== rawType) {
-      //   if (dataIn && typeof dataIn === "object") {
-      //     try { dataIn = Object.assign({}, dataIn, { _badType: rawType }); }
-      //     catch (_) { dataIn = { _badType: rawType }; }
-      //   } else {
-      //     dataIn = { _badType: rawType };
-      //   }
-      // }
-      // const safeData = normalizeForJSON(dataIn);
-
-
-
       // accept any string type; do not overwrite ctx.type
       const rawType = (safeCtx && typeof safeCtx.type === "string") ? safeCtx.type : undefined;
       const validatedType = rawType; // keep as-is; undefined if not provided
@@ -360,9 +342,6 @@ const LOGGingModule = function LOGGingModule() {
         dataIn = {}; // or { _missingData: true } if you want an explicit marker
       }
       const safeData = normalizeForJSON(dataIn);
-
-
-
 
       const extraObj = {
         level: normalizedLevel,
@@ -375,21 +354,6 @@ const LOGGingModule = function LOGGingModule() {
         message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
         data: safeData
       };
-
-
-
-
-      // const extraObj = {
-      //   level: normalizedLevel,
-      //   type: validatedType,
-      //   module: (typeof safeCtx.module === "string") ? safeCtx.module : undefined,
-      //   diagTag: (typeof safeCtx.diagTag === "string") ? safeCtx.diagTag : undefined,
-      //   surface: (typeof safeCtx.surface === "string") ? safeCtx.surface : undefined,
-      //   key: (typeof safeCtx.key === "string") ? safeCtx.key : undefined,
-      //   stage: (typeof safeCtx.stage === "string") ? safeCtx.stage : undefined,
-      //   message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
-      //   data: safeData
-      // };
 
       G.__DEGRADE__(normalizedCode, err, extraObj);
 
@@ -776,4 +740,5 @@ const LOGGingModule = function LOGGingModule() {
         Object.defineProperty(W, "DEBUG_ALL_TOGGLE", { value: W.DEBUG_ALL_TOGGLE, writable:false, configurable:true, enumerable:false });
       }
     }
+    
 }

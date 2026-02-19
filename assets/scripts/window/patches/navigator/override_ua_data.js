@@ -181,7 +181,6 @@
       else if (k === 'bitness' && typeof hints.bitness === 'string') out.bitness = hints.bitness;
       else if (k === 'model' && typeof hints.model === 'string') out.model = hints.model;
       else if (k === 'platformVersion' && typeof hints.platformVersion === 'string') out.platformVersion = hints.platformVersion;
-      else if (k === 'uaFullVersion' && typeof hints.uaFullVersion === 'string') out.uaFullVersion = hints.uaFullVersion;
       else if (k === 'fullVersionList' && Array.isArray(hints.fullVersionList)) out.fullVersionList = sanitizeBrands(hints.fullVersionList);
       else if (k === 'wow64' && typeof hints.wow64 === 'boolean') out.wow64 = hints.wow64;
       else if (k === 'formFactors' && Array.isArray(hints.formFactors)) out.formFactors = hints.formFactors.slice(0);
@@ -323,7 +322,6 @@
             bitness: mustStr(H, 'bitness', false),
             model: mustStr(H, 'model', true),
             platformVersion: mustStr(H, 'platformVersion', false),
-            uaFullVersion: mustStr(H, 'uaFullVersion', false),
             fullVersionList: mustFullVersionList(H),
             wow64: (typeof H.wow64 === 'boolean') ? H.wow64 : false,
             formFactors: Array.isArray(H.formFactors) ? H.formFactors.slice(0) : ['Desktop']

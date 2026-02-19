@@ -108,7 +108,6 @@ def outbound_headers_forge(profile, expected_client_hints, user_agent):
         "Sec-CH-Lang": ", ".join(expected_client_hints.get("languages", [expected_client_hints.get("language")])),
         # Extended client hints
         "Sec-CH-UA-Platform-Version": f'"{expected_client_hints["platformVersion"]}"',
-        "Sec-CH-UA-Full-Version": expected_client_hints.get("uaFullVersion", ""),
         "Sec-CH-UA-Full-Version-List": expected_client_hints["sec_ch_ua_full_version_list"],
         "Sec-CH-UA-Arch": expected_client_hints.get("architecture"),
         "Sec-CH-UA-Bitness": expected_client_hints.get("bitness"),
@@ -132,7 +131,6 @@ def import_headers(headers, keys, flow):
         v = headers.get(k)
         if v:
             flow.request.headers[k] = v
-
 
 
 

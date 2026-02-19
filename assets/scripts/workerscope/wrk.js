@@ -112,7 +112,7 @@ function EnvBus(G){
       }
     })();
 
-    const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+    const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
     const heSource = (G.__UACH_HE_READY__ && G.__LAST_UACH_HE__ && typeof G.__LAST_UACH_HE__ === 'object')
       ? G.__LAST_UACH_HE__
       : null;
@@ -486,7 +486,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
         if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
         const he = (s.uaData && s.uaData.he) || s.highEntropy;
         if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
-        const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+        const KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
         for (const k of KEYS) {
           if (!(k in he)) throw new Error('UACHPatch: missing highEntropy.' + k);
           const v = he[k];
@@ -658,7 +658,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
         if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
         const he = (s.uaData && s.uaData.he) || s.highEntropy;
         if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
-        const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+        const KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
         for (const k of KEYS) {
           if (!(k in he)) throw new Error('UACHPatch: missing highEntropy.' + k);
           const v = he[k];
@@ -813,7 +813,7 @@ function requireWorkerSnapshot(snap, label) {
   if (!snap.uaData) throw new Error('[WorkerOverride] snapshot.uaData missing');
   const he = (snap.uaData && snap.uaData.he) || snap.highEntropy;
   if (!he || typeof he !== 'object') throw new Error('[WorkerOverride] snapshot.highEntropy missing');
-  const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+  const KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
   for (const k of KEYS) {
     if (!(k in he)) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
     const v = he[k];
@@ -1418,7 +1418,7 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     const UAD = G.navigator && G.navigator.userAgentData;
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
-      : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
+      : ['architecture','bitness','model','platformVersion','fullVersionList','formFactors','wow64'];
     const contract = G.__EXPECTED_CLIENT_HINTS;
     if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
       throw new Error('[WorkerInit] userAgentData missing');
@@ -1456,8 +1456,6 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
               const b = norm(got);
               const ok = (a.length === b.length) && a.every((x, i) => x[0] === b[i][0] && x[1] === b[i][1]);
               if (!ok) throw new Error('[WorkerInit] contract fullVersionList mismatch');
-            } else if (k === 'uaFullVersion') {
-              if (typeof exp === 'string' && exp && got !== exp) throw new Error('[WorkerInit] contract uaFullVersion mismatch');
             } else if (typeof exp === 'string') {
               if (typeof got !== 'string' || got !== exp) throw new Error(`[WorkerInit] contract ${k} mismatch`);
             } else if (typeof exp === 'boolean') {

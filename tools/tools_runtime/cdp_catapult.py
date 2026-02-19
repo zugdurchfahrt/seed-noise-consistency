@@ -299,16 +299,15 @@ def run():
             "  languages: nav.languages,"
             "  hardwareConcurrency: nav.hardwareConcurrency,"
             "  deviceMemory: nav.deviceMemory,"
-            "  uad: nav.userAgentData ? {"
-            "    platform: nav.userAgentData.platform,"
-            "    mobile: nav.userAgentData.mobile,"
-            "    brands: nav.userAgentData.brands,"
-            "    uaFullVersion: nav.userAgentData.uaFullVersion,"
-            "    fullVersionList: nav.userAgentData.fullVersionList"
-            "  } : null"
-            " };"
-            "})()"
-        )
+             "  uad: nav.userAgentData ? {"
+             "    platform: nav.userAgentData.platform,"
+             "    mobile: nav.userAgentData.mobile,"
+             "    brands: nav.userAgentData.brands,"
+             "    fullVersionList: nav.userAgentData.fullVersionList"
+             "  } : null"
+             " };"
+             "})()"
+         )
 
     pending = {}
     pending_sess = {}  # (sessionId, innerId) -> str tag
@@ -437,9 +436,6 @@ def run():
                             return
                         if list(uad.get("brands") or []) != list(exp["uad"].get("brands") or []):
                             _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
-                            return
-                        if uad.get("uaFullVersion") != exp["uad"].get("uaFullVersion"):
-                            _fatal(ws, "sw sanity: uad uaFullVersion mismatch", {"expected": exp, "got": out})
                             return
                         if list(uad.get("fullVersionList") or []) != list(exp["uad"].get("fullVersionList") or []):
                             _fatal(ws, "sw sanity: uad fullVersionList mismatch", {"expected": exp, "got": out})

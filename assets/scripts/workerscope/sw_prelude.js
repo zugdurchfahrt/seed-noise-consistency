@@ -52,7 +52,6 @@
   if (!Array.isArray(meta.brands) || !meta.brands.length) throw new Error('THW: SW uaData.brands missing');
   if (typeof meta.mobile !== 'boolean') throw new Error('THW: SW uaData.mobile missing');
   if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) throw new Error('THW: SW uaData.fullVersionList missing');
-  if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) throw new Error('THW: SW uaData.uaFullVersion missing');
 
   const dUad = Object.getOwnPropertyDescriptor(proto, 'userAgentData');
   if (!dUad) throw new Error('THW: SW userAgentData descriptor missing');
@@ -69,10 +68,6 @@
     || { configurable: true, enumerable: false };
   if (dFull.configurable === false) throw new Error('THW: SW uaData fullVersionList non-configurable');
 
-  const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion')
-    || Object.getOwnPropertyDescriptor(uad, 'uaFullVersion')
-    || { configurable: true, enumerable: false };
-  if (dUaFull.configurable === false) throw new Error('THW: SW uaData uaFullVersion non-configurable');
 
   const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
   if (!ghevDesc) throw new Error('THW: SW uaData.getHighEntropyValues descriptor missing');
@@ -167,18 +162,13 @@
     enumerable: dFull.enumerable,
     configurable: dFull.configurable
   });
-  Object.defineProperty(uadProto, 'uaFullVersion', {
-    get: guardedUadGetter(meta.uaFullVersion, dUaFull.get, dUaFull.value),
-    enumerable: dUaFull.enumerable,
-    configurable: dUaFull.configurable
-  });
 
   const getHighEntropyValues = function(keys) {
-    if (!isUadThis(this)) {
-      return origGHEV.call(this, keys);
-    }
-    if (!Array.isArray(keys)) throw new Error('THW: SW uaData bad keys');
-    const map = {
+      if (!isUadThis(this)) {
+        return origGHEV.call(this, keys);
+      }
+      if (!Array.isArray(keys)) throw new Error('THW: SW uaData bad keys');
+      const map = {
       architecture: meta.architecture,
       bitness: meta.bitness,
       model: meta.model,
@@ -186,24 +176,23 @@
       mobile: mobileValue,
       platform: platformValue,
       platformVersion: meta.platformVersion,
-      uaFullVersion: meta.uaFullVersion,
       fullVersionList: deep(meta.fullVersionList),
       deviceMemory: Number(dm),
       hardwareConcurrency: Number(hc),
       wow64: meta.wow64,
       formFactors: meta.formFactors
     };
-    const result = {};
-    for (const hint of keys) {
-      if (typeof hint !== 'string' || !hint) throw new Error('THW: SW uaData bad keys');
-      if (!(hint in map)) throw new Error('THW: SW uaData missing ' + hint);
-      const val = map[hint];
-      if (val === undefined || val === null) throw new Error('THW: SW uaData missing ' + hint);
-      if (typeof val === 'string' && !val && hint !== 'model') throw new Error('THW: SW uaData missing ' + hint);
-      if (Array.isArray(val) && !val.length) throw new Error('THW: SW uaData missing ' + hint);
-      result[hint] = val;
-    }
-    return Promise.resolve(result);
+      const result = {};
+      for (const hint of keys) {
+        if (typeof hint !== 'string' || !hint) throw new Error('THW: SW uaData bad keys');
+      if (!(hint in map)) continue;
+        const val = map[hint];
+        if (val === undefined || val === null) throw new Error('THW: SW uaData missing ' + hint);
+        if (typeof val === 'string' && !val && hint !== 'model') throw new Error('THW: SW uaData missing ' + hint);
+        if (Array.isArray(val) && !val.length) throw new Error('THW: SW uaData missing ' + hint);
+        result[hint] = val;
+      }
+      return Promise.resolve(result);
   };
   dropOwnIfConfigurable(uad, 'getHighEntropyValues');
   defineUadProtoMethod(uadProto, 'getHighEntropyValues', getHighEntropyValues, ghevDesc);

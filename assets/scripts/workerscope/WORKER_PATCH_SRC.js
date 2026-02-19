@@ -39,7 +39,7 @@
       d(code, err || null, ctx || null);
     };
     const validDpr = v => Number.isFinite(v) && v > 0;
-    const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
+    const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
     const LE_KEYS = ['brands','mobile','platform'];
     const ALL_KEYS = new Set(HE_KEYS.concat(LE_KEYS));
     const requireSnap = (s, where) => {
@@ -370,29 +370,6 @@
         set: dFull.set
       });
     }
-    const dUaFull = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion');
-    const origUaFullGet = dUaFull && dUaFull.get;
-    const getUaFullVersion = markAsNative(function getUaFullVersion(){
-      if (!isUadThis(this)) {
-        if (typeof origUaFullGet === 'function') return origUaFullGet.call(this);
-        throw new TypeError('Illegal invocation');
-      }
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
-      const le = cache.snap.uaData;
-      if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
-      if (typeof le.he.uaFullVersion !== 'string' || !le.he.uaFullVersion) {
-        throw new Error('UACHPatch: bad highEntropy.uaFullVersion');
-      }
-      return le.he.uaFullVersion;
-    }, 'get uaFullVersion');
-    if (dUaFull) {
-      Object.defineProperty(uadProto, 'uaFullVersion', {
-        configurable: !!dUaFull.configurable,
-        enumerable: !!dUaFull.enumerable,
-        get: getUaFullVersion,
-        set: dUaFull.set
-      });
-    }
     const dToJSON = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
     const origToJSON = dToJSON && dToJSON.value;
     const toJSON = markAsNative(function toJSON(){
@@ -433,7 +410,6 @@
           bitness: src.bitness,
           model: src.model,
           platformVersion: src.platformVersion,
-          uaFullVersion: src.uaFullVersion,
           fullVersionList: src.fullVersionList,
           wow64: src.wow64,
           formFactors: src.formFactors
@@ -528,16 +504,22 @@
 
       // 2) Иначе — патчим на proto (как раньше)
       if (obj) {
-        const d = Object.getOwnPropertyDescriptor(obj, k);
+        // CORE 4.1: descriptor-owner по proto-chain (не всегда OWN на ближайшем proto)
+        let owner = obj;
+        let d = null;
+        for (let o = obj; o; o = Object.getPrototypeOf(o)) {
+          try { d = Object.getOwnPropertyDescriptor(o, k) || null; } catch (_) { d = null; }
+          if (d) { owner = o; break; }
+        }
         if (!d) {
-          throw new Error(`UACHPatch: ${k} native descriptor missing on proto`);
+          throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
         }
-        if (d && d.configurable === false) {
-          throw new Error(`UACHPatch: ${k} not configurable on proto`);
+        if (d.configurable === false) {
+          throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
         }
-        const protoOrigGet = resolveNativeGetter(d, 'proto');
+        const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
         const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet);
-        Object.defineProperty(obj, k, {
+        Object.defineProperty(owner, k, {
           configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable,
           get: protoGuardedGet,
@@ -572,7 +554,12 @@
           `UACHPatch: ${k} descriptor owner missing`
         );
       }
-      const d = Object.getOwnPropertyDescriptor(owner, k);
+      // CORE 4.1: descriptor-owner по proto-chain
+      let d = null;
+      for (let o = owner; o; o = Object.getPrototypeOf(o)) {
+        try { d = Object.getOwnPropertyDescriptor(o, k) || null; } catch (_) { d = null; }
+        if (d) break;
+      }
       if (!d) {
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator_descriptor:sanity:missing',
@@ -610,7 +597,17 @@
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!Array.isArray(cache.snap.languages)) throw new Error('UACHPatch: bad languages');
       const out = cache.snap.languages.slice();
-      try { Object.freeze(out); } catch(_) {}
+      try { Object.freeze(out); } catch(e) {
+        emitDegrade('warn', 'worker_patch_src:languages:freeze_failed', {
+          type: 'browser structure missing data',
+          stage: 'runtime',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'WorkerNavigator.languages',
+          key: 'Object.freeze',
+          policy: 'skip',
+          action: 'native'
+        }, e);
+      }
       return out;
     }, 'get languages');
     def(proto,'languages', getLanguages, true);
@@ -705,11 +702,9 @@
           ? `(async function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=s=>{self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
           : `(function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=function(s){self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-        try {
-          return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
-        } finally {
-          URL.revokeObjectURL(blobURL);
-        }
+        // Do not revoke immediately: the worker may still be fetching the bootstrap script.
+        // Early revoke can surface as `importScripts(blob:...) failed to load` in real sites.
+        return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
       }, 'Worker');
       Object.defineProperty(self, 'Worker', {
         configurable: dWorker.configurable,
