@@ -518,7 +518,7 @@ const AudioContextModule = function AudioContextModule(window) {
             //The amplitude of the noise expressed through its own parameters of the node
             const range = Math.max(1e-9, hi - lo);
             const baseAmp = range * (typeof this.smoothingTimeConstant === 'number' ? this.smoothingTimeConstant : 0.8)
-                                  / Math.max(1, this.fftSize || 2048);
+                                  / Math.max(1, (this.fftSize || 2048) * 0.5);
 
             // pair scheme: delta_i = -delta_j => the amount is exactly 0; additionly, limiting the local gap to the boundaries
             const tiny = range / 1e6; //technically "do not touch" the edge - from the same units as the data

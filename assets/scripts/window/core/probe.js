@@ -390,10 +390,9 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
 
     for (let i = 0; i < parts.length; i++) {
       if (current == null) {
-        return {
-          ok: false,
-          error: new Error(`Cannot read '${parts[i]}' of ${current}`)
-        };
+        // Path chain is missing (e.g. webkit-prefixed APIs on Chromium).
+        // This is not an exception-worthy condition for the probe: treat as "not present".
+        return { ok: true, value: undefined };
       }
       const step = safeGet(current, parts[i]);
       if (!step.ok) return step;

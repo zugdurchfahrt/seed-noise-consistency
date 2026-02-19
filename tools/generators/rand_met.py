@@ -27,24 +27,22 @@ FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
 # ----------------------- UTILS -----------------------
 SYS_FONTS_WIN = [
-        'Arial','Verdana','Tahoma','Times New Roman','Courier New','Georgia',
-        'Palatino','Garamond','Comic Sans MS','Trebuchet MS','Impact',
-        'Lucida Sans','Segoe UI','Calibri','Consolas','Candara',
-        'Franklin Gothic Medium','Constantia','Corbel','Century Gothic']
+    'Segoe UI','Arial','Calibri','Verdana','Tahoma','Candara','Trebuchet MS',
+    'Bahnschrift','Aptos','Times New Roman','Georgia','Cambria','Constantia',
+    'Consolas','Courier New','Cascadia Code','Comic Sans MS','Impact',
+    'Segoe Print','Segoe Script']
+
+    
     
 SYS_FONTS_MAC = [
         'Helvetica','Geneva','Lucida Grande','Palatino','Menlo','Monaco',
         'Gill Sans','Avenir','Baskerville','Didot','Futura','Optima',
         'American Typewriter','Hoefler Text','Courier','Arial','Verdana',
         'Trebuchet MS','Comic Sans MS','Georgia']
+
 SUBFAMILIES = [
-        "Thin", "Extra Light", "Light", "Regular", "Medium", "SemiBold", "Bold", "Extra Bold",
-        "Black", "Italic", "Oblique", "Extended", "Narrow", "Expanded", "Ultra Light",
-        "Ultra Bold", "Heavy", "Mono", "Display", "Hairline", "Book", "DemiBold", "Extra Black", "Ultra Black",
-        "Condensed", "Extra Condensed", "Ultra Condensed", "Compressed", "Extra Compressed",
-        "Wide", "Extra Wide", "Ultra Wide", "Slanted", "Backslant", "Caption", "Text", "Subhead", "Headline", "Poster", "Small Caps", "Titling",
-        "Inline", "Shadow", "Variable", "Stencil", "Outline", "Engraved", "Script", "Rounded",
-        "UI", "Micro", "Footnote", "Compact"]
+        "Light", "Light Italic", "Regular", "Italic", "Semilight", "Semilight Italic",
+        "SemiBold", "SemiBold Italic", "Bold", "Bold Italic", "Black", "Black Italic"]
 
 PLATFORM_ID_MAP = {
     "Win32": (3, 1, 1033),
@@ -55,11 +53,26 @@ ACCEPT_EXTS = {".woff2", ".woff", ".ttf", ".otf"}
 
 # --- Keyword heuristics for icon/emoji fonts ---
 ICON_KEYWORDS = {
-    "icon", "icons", "emoji", "emojis", "awesome", "material", "fontello",
-    "ionicons", "bootstrap-icons", "octicons", "simpleicons", "remixicon",
-    "feather", "weather", "symbol", "symbols", "dingbat", "dingbats",
-    "wingdings", "seguiemj", "seguiemoji", "segoe ui emoji"
+    # generic
+    "icon", "icons", "iconic", "pictogram", "pictograms",
+    "symbola", "dingbat", "dingbats", "pua", "emoji", "emojis",
+    "segoe ui emoji", "segoe ui symbol", "seguiemj", "seguiemoji", "segoeuiemoji",
+    "noto color emoji", "noto emoji", "apple color emoji", "twemoji", "twitter emoji",
+    "fluent emoji", "microsoft fluent", "color emoji",
+    # classic Windows / legacy symbol fonts
+    "wingdings", "webdings", "zapf dingbats", "zapfdingbats",
+    "marlett", "mt extra",
+
+    # major icon libraries
+    "font awesome", "fontawesome", "fa-", "fortawesome",
+    "material icons", "material symbols", "material design icons", "mdi",
+    "bootstrap icons", "bootstrap-icons","ionicons",
+    "octicons", "simple icons", "simpleicons", "feather", "feather icons","heroicons", "remixicon", "remix icon",
+    "tabler icons", "tabler", "phosphor", "phosphor icons", "lucide", "lucide icons", "entypo", "typicons",
+    "lineicons", "line icons", "devicons",
+
 }
+
 
 PUA_RANGES = [
     (0xE000, 0xF8FF),       # BMP PUA
@@ -343,10 +356,6 @@ def has_symbol_emoji_traits(tt: TTFont, cmap: Dict[int, str]) -> bool:
                 break
     if pua / total >= 0.5:
         return True
-    # too few basic letters (likely symbol)
-    letters = sum(1 for cp in cmap.keys() if (0x41<=cp<=0x5A) or (0x61<=cp<=0x7A))
-    if letters < 10:
-        return True
     return False
 
 def fsType_restricts(tt: TTFont) -> bool:
@@ -442,33 +451,25 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     Generates font metadata: family, subfamily, unique_id и т.д.
     Returns the dictionary like {1: family, 2: subfamily, 3: unique_id, 4: full_name, 5: version, 6: ps_name, 9: designer, 13: license_desc}
     """
-    common_families = [
-        "NeoMono", "PrimeSans", "LunaText", "OmniMono", "GravitaPro", "NimbusPro", "CodaSans", "ClarityMono", "Interstate", "Vectora",
-        "Codex", "OrbitaSans", "Viretta", "Axionis", "Lumora", "Equinox", "VisioraX", "Condensed", "AtlasType", "NorthAtlas", "LumenSans",
-        "Qorin", "Torus", "ZenithMono", "QuantumSans", "Auralis", "StellarText", "AxiomSans", "Solvex", "Visage", "Nexora",]
 
     if platform == "MacIntel":
-        family_names = SYS_FONTS_MAC + common_families
+        family_names = SYS_FONTS_MAC
         designers = ["Apple Inc.", "5th Dimension", "Futura Design", "Omni Group", "Generation Frontline Foundry", "Bright Kernel Foundry", "FontAddicts Group"]
     else:
-        family_names = SYS_FONTS_WIN + common_families
-        designers = ["Microsoft Corp.", "Dynamix Typefaces", "New Vision Fonts", "Monolith Design", "Pure bury design", "Granite & Grid",
-                    "PrototypeFont Factory", "Sharp Sable Graphics", "Friendly Typefaces", "Cobalt Letterworks"]
+        family_names = SYS_FONTS_WIN
+        designers = ["Microsoft Corporation", "Steve Matteson", "Matthew Carter", "Lucas de Groot"]
     
     subfamilies = _normalize_subfamilies(subfamilies_src) if subfamilies_src is not None else SUBFAMILIES
     
-    licenses = [
-        "Public Domain", "Gift for community", "Free for personal use",
-        "GNU General Public License (GPL)", "MIT License",
-        "SIL Open Font License (OFL)", "Apache License 2.0", "Creative Commons license",
-    ]
+    licenses = ["Licensed under the SIL Open Font License, Version 1.1", "Available under the OFL license",
+                "This Font Software is licensed under the SIL Open Font License, Version 1.1", "Licensed under the Apache License, Version 2.0", "Desktop License"]
 
     family = random.choice(family_names)
     subfamily = random.choice(subfamilies)
     unique_id = f"{family[:2]}-{random_string(12)}"
-    full_name = f"{family} {subfamily}".strip()
+    full_name = f"{family} {subfamily}"
     version = f"Version {random.randint(1,5)}.{random.randint(0,9999)}"
-    ps_name = f"{family}-{subfamily}".replace(" ", "")
+    ps_name = f"{family}-{subfamily}"
     designer = random.choice(designers)
     license_desc = random.choice(licenses)
 
@@ -516,11 +517,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     else:
         raw_files = [f for f in FONTS_SOURCE_DIR.iterdir() if f.is_file() and f.suffix.lower() == '.woff2']
         os.makedirs(target_dir, exist_ok=True)
-        passed_checks = set()
-        if target_dir.exists():
-            for f in target_dir.iterdir():
-                if f.is_file() and f.suffix.lower() == '.woff2':
-                    passed_checks.add(get_font_compare(f))
+  
         moved_count = 0
         for idx, src_path in enumerate(raw_files): 
             with open(src_path, 'rb') as f:
@@ -528,11 +525,6 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             if len(data) == 0 or data[:4] != b'wOF2':
                 logger.error(f"[Error] Wrong file format: {src_path}")
                 raise RuntimeError(f"Wrong/empty file found: {src_path}")
-            check_res = get_font_compare(src_path)
-            if check_res in passed_checks:
-                logger.warning(f"[Duplicated] {src_path.name} — skipped (family={check_res[0]}, subfamily={check_res[1]})")
-                os.remove(src_path)
-                continue
             
             # === Extended woff2 files check ===
             try:
@@ -592,9 +584,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 i += 1
 
             copyfile(src_path, dst_path)
-            passed_checks.add(check_res)
             moved_count += 1
-            logger.info(f"[ADD Font] {src_path.name} → {dst_path.name} (family={check_res[0]})")
+            logger.info(f"[ADD Font] {src_path.name} → {dst_path.name}")
             os.remove(src_path)
         logger.info(f"[ADD Fonts] Files transferred: {moved_count}")
 
@@ -606,6 +597,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     if not all_names:
         logger.warning(f'[WARNING] for {platform} is no .woff2 in {target_dir}')
         return []
+
+
 
     # Stabilized seed for manifest(env + platform + file composition)
     seed_env = os.environ.get("__GLOBAL_SEED", "0")
