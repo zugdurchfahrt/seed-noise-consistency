@@ -267,6 +267,122 @@ def _normalize_postscript_name(value: str) -> str:
     return s
 
 
+def _get_nameid_any(tt: TTFont, name_id: int) -> str:
+    """
+    Return the first decodable nameID string from the name table, or ''.
+    This is a minimal, platform-agnostic reader for consistency mapping.
+    """
+    try:
+        name_table = tt["name"]
+    except Exception:
+        return ""
+    for rec in getattr(name_table, "names", []) or []:
+        if getattr(rec, "nameID", None) != name_id:
+            continue
+        try:
+            s = rec.toUnicode()
+        except Exception:
+            try:
+                s = str(rec.string, errors="ignore")
+            except Exception:
+                continue
+        s = (s or "").strip()
+        if s:
+            return s
+    return ""
+
+
+def _normalize_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip())
+
+
+def _normalize_subfamily_value(value: str) -> str:
+    """
+    Canonicalize any incoming subfamily string to the project's known set.
+    Unknown/empty values degrade to Regular (if available).
+    """
+    default_sub = "Regular" if "Regular" in SUBFAMILIES else (SUBFAMILIES[0] if SUBFAMILIES else "")
+    s0 = _normalize_whitespace(value)
+    if not s0:
+        return default_sub
+    key = s0.lower().replace("-", " ").replace("_", " ")
+    key = _normalize_whitespace(key)
+
+    # Exact / alias mapping
+    if "bold" in key and (("italic" in key) or ("oblique" in key)):
+        return "Bold Italic" if "Bold Italic" in SUBFAMILIES else default_sub
+    if "bold" in key:
+        return "Bold" if "Bold" in SUBFAMILIES else default_sub
+    if ("italic" in key) or ("oblique" in key):
+        return "Italic" if "Italic" in SUBFAMILIES else default_sub
+    if "black" in key:
+        return "Black" if "Black" in SUBFAMILIES else default_sub
+    if "semibold" in key or "demibold" in key:
+        return "SemiBold" if "SemiBold" in SUBFAMILIES else default_sub
+    if "semilight" in key:
+        return "Semilight" if "Semilight" in SUBFAMILIES else default_sub
+    if "light" in key:
+        return "Light" if "Light" in SUBFAMILIES else default_sub
+    return default_sub
+
+
+def _derive_full_name(family: str, subfamily: str) -> str:
+    family = _normalize_whitespace(family)
+    subfamily = _normalize_whitespace(subfamily)
+    if not family:
+        return subfamily or ""
+    if not subfamily or subfamily == "Regular":
+        return family
+    return f"{family} {subfamily}"
+
+
+def _env_json_dict(name: str) -> dict:
+    """
+    Read an env var as JSON dict. Invalid JSON is reported and ignored.
+    """
+    raw = os.environ.get(name)
+    if not raw:
+        return {}
+    try:
+        val = json.loads(raw)
+    except Exception as e:
+        logger.warning(f"[fonts] invalid env JSON in {name}: {e}")
+        return {}
+    if not isinstance(val, dict):
+        logger.warning(f"[fonts] invalid env JSON in {name}: expected dict, got {type(val).__name__}")
+        return {}
+    return val
+
+
+def _empty_if_unknown(value: str) -> str:
+    s = _normalize_whitespace(value)
+    if not s:
+        return ""
+    if s.lower() in ("unknown", "n/a", "na", "none", "null"):
+        return ""
+    return s
+
+
+def _short_tag_from(rec: dict, name_no_ext: str) -> str:
+    """
+    Derive a short stable tag from existing inputs (index record/file name).
+    No new hardcoded identifiers; used only for collision-avoidance.
+    """
+    md5 = ""
+    if isinstance(rec, dict):
+        md5 = _normalize_whitespace(str(rec.get("md5") or ""))
+    if md5:
+        return re.sub(r"[^A-Za-z0-9]+", "", md5)[:6]
+    # fall back to suffix of generated name (e.g. W32_0_5ec22d -> 5ec22d)
+    parts = (name_no_ext or "").split("_")
+    if parts:
+        cand = parts[-1]
+        cand = re.sub(r"[^A-Za-z0-9]+", "", cand)
+        if cand:
+            return cand[:6]
+    return ""
+
+
 def _normalize_subfamilies(src):
     """
     forms a sourcesubfamilies as the list of strings.
@@ -439,13 +555,27 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
                 "This Font Software is licensed under the SIL Open Font License, Version 1.1", "Licensed under the Apache License, Version 2.0", "Desktop License"]
 
     family = random.choice(family_names)
-    subfamily = random.choice(subfamilies)
+    subfamily = _normalize_subfamily_value(random.choice(subfamilies))
     unique_id = f"{family[:2]}-{random_string(12)}"
-    full_name = f"{family} {subfamily}"
-    version = f"Version {random.randint(1,5)}.{random.randint(0,9999)}"
+    full_name = _derive_full_name(family, subfamily)
+    # Keep these fields consistent via registry or leave empty; do not randomize independently.
+    version = ""
     ps_name = _normalize_postscript_name(f"{family}-{subfamily}")
-    designer = random.choice(designers)
-    license_desc = random.choice(licenses)
+    designer = ""
+    license_desc = ""
+
+    designer_by_family = _env_json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
+    license_by_designer = _env_json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
+    license_by_family = _env_json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
+    version_by_family = _env_json_dict("FONTS_VERSION_BY_FAMILY_JSON")
+
+    fam_key = _normalize_whitespace(family)
+    if fam_key:
+        designer = _empty_if_unknown(designer_by_family.get(fam_key, "")) if isinstance(designer_by_family, dict) else ""
+        version = _empty_if_unknown(version_by_family.get(fam_key, "")) if isinstance(version_by_family, dict) else ""
+        license_desc = _empty_if_unknown(license_by_family.get(fam_key, "")) if isinstance(license_by_family, dict) else ""
+        if not license_desc and designer:
+            license_desc = _empty_if_unknown(license_by_designer.get(designer, "")) if isinstance(license_by_designer, dict) else ""
 
     return {
         1: family,
@@ -602,6 +732,10 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     skip_stats = defaultdict(int)
     CSS_FAMILY = (os.environ.get("FONTS_CSS_FAMILY") or "FPFont").strip() or "FPFont"
     logger.info(f"[fonts] cssFamily fixed: {CSS_FAMILY}")
+    designer_by_family = _env_json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
+    license_by_designer = _env_json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
+    license_by_family = _env_json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
+    version_by_family = _env_json_dict("FONTS_VERSION_BY_FAMILY_JSON")
 
     _saved_state = random.getstate()
     random.seed(_seed ^ 0x9E3779B1)
@@ -623,19 +757,83 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             file_path = target_dir / fname
             name_no_ext = pathlib.Path(fname).stem
 
-            # deterministic generation of metadata (seed is already fixed above)
-            meta_values = generate_font_metadata(platform, subfamilies_src)
-            family     = meta_values.get(1, fname)
-            subfamily  = meta_values.get(2, "")
-            full_name  = meta_values.get(4, "")
-            postscript = _normalize_postscript_name(meta_values.get(6, ""))
+            # Registry-like nameID model: take (1,2,5,9,13) from file and derive (4,6) from (1,2).
+            # This keeps fields mutually consistent and avoids independent randomization.
+            try:
+                tt = TTFont(str(file_path))
+            except Exception as e:
+                skip_stats["ttfont_open_failed"] += 1
+                logger.warning(f"[fonts] Step4 skip {fname}: can not read TTFont ({e})")
+                tt = None
+
+            if tt is not None:
+                base_family_raw = _get_nameid_any(tt, 1)
+                base_sub_raw = _get_nameid_any(tt, 2)
+                base_family = _normalize_whitespace(base_family_raw) or name_no_ext
+                subfamily = _normalize_subfamily_value(base_sub_raw)
+                version = _empty_if_unknown(_get_nameid_any(tt, 5))
+                designer = _empty_if_unknown(_get_nameid_any(tt, 9))
+                license_desc = _empty_if_unknown(_get_nameid_any(tt, 13))
+            else:
+                base_family = name_no_ext
+                subfamily = _normalize_subfamily_value("")
+                version = ""
+                designer = ""
+                license_desc = ""
+
+            # Apply registry overrides (non-random, consistent relationships).
+            fam_key = _normalize_whitespace(base_family)
+            if fam_key and isinstance(designer_by_family, dict) and fam_key in designer_by_family:
+                designer = _empty_if_unknown(designer_by_family.get(fam_key, ""))
+            if fam_key and isinstance(version_by_family, dict) and fam_key in version_by_family:
+                version = _empty_if_unknown(version_by_family.get(fam_key, ""))
+            if fam_key and isinstance(license_by_family, dict) and fam_key in license_by_family:
+                license_desc = _empty_if_unknown(license_by_family.get(fam_key, ""))
+            if not license_desc and designer and isinstance(license_by_designer, dict):
+                license_desc = _empty_if_unknown(license_by_designer.get(designer, ""))
+
+            family = base_family
+            full_name = _derive_full_name(family, subfamily)
+            postscript = _normalize_postscript_name(f"{family}-{subfamily}")
+
+            # stable, non-random unique_id derived from existing variables (no external assumptions)
+            uniq_tag = re.sub(r"[^A-Za-z0-9]+", "", name_no_ext)[:8]
+            prefix = (family[:2] or "")
+            unique_id = f"{prefix}-{uniq_tag}" if (prefix and uniq_tag) else ""
+
+            meta_values = {
+                1: family,
+                2: subfamily,
+                3: unique_id,
+                4: full_name,
+                5: version,
+                6: postscript,
+                9: designer,
+                13: license_desc,
+            }
 
             #limits families dups and removes duplicates
             uniq_triple = (family, full_name, postscript)
             if uniq_triple in used_families:
-                skip_stats["duplicate_uniq_triple"] += 1
-                logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
-                continue
+                tag = _short_tag_from(rec, name_no_ext)
+                if tag:
+                    family = _normalize_whitespace(f"{base_family} {tag}")
+                    full_name = _derive_full_name(family, subfamily)
+                    postscript = _normalize_postscript_name(f"{family}-{subfamily}")
+                    uniq_triple = (family, full_name, postscript)
+                    if uniq_triple in used_families:
+                        skip_stats["duplicate_uniq_triple"] += 1
+                        logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
+                        continue
+                    skip_stats["duplicate_uniq_triple_uniqueized"] += 1
+                    logger.debug(f"[fonts] Step4 uniqueized {fname}: family tag={tag}")
+                    meta_values[1] = family
+                    meta_values[4] = full_name
+                    meta_values[6] = postscript
+                else:
+                    skip_stats["duplicate_uniq_triple"] += 1
+                    logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
+                    continue
             if family_counter[family] >= max_family_repeats:
                 skip_stats["family_repeat_limit"] += 1
                 logger.debug(f"[fonts] Step4 skip {fname}: family_repeat_limit family={family} limit={max_family_repeats}")
@@ -649,14 +847,14 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 "name": name_no_ext,
                 "url": data_url,
                 "cssFamily": CSS_FAMILY,
-                "family": family,
+                "family": meta_values.get(1, family),
                 "subfamily": subfamily,
                 "weight": weight,
                 "style": style,
                 "unique_id": meta_values.get(3, ""),
                 "full_name": meta_values.get(4, ""),
                 "version": meta_values.get(5, ""),
-                "postscript_name": postscript,
+                "postscript_name": meta_values.get(6, postscript),
                 "designer": meta_values.get(9, ""),
                 "license": meta_values.get(13, ""),
                 "fallback": name_no_ext,
