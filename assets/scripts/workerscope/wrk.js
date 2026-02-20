@@ -1415,11 +1415,48 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
   // 4) HE-догонка (не блокирует загрузку, без «N»/«Nav»)
   function snapshotHE(keys){
     if (G.__UACH_HE_PROMISE__) return G.__UACH_HE_PROMISE__;
-    const UAD = G.navigator && G.navigator.userAgentData;
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','fullVersionList','formFactors','wow64'];
     const contract = G.__EXPECTED_CLIENT_HINTS;
+
+    // Prefer contract values: avoids blocking initAll() on async native HE.
+    if (contract && typeof contract === 'object') {
+      try {
+        const he = {};
+        for (const k of KEYS) {
+          if (!(k in contract)) throw new Error('[WorkerInit] contract missing ' + k);
+          const v = contract[k];
+          if (v === undefined || v === null) throw new Error('[WorkerInit] contract bad ' + k);
+          if (typeof v === 'string' && !v.trim() && k !== 'model') throw new Error('[WorkerInit] contract bad ' + k);
+          if (Array.isArray(v) && !v.length) throw new Error('[WorkerInit] contract bad ' + k);
+          if (k === 'fullVersionList') {
+            if (!Array.isArray(v) || !v.length) throw new Error('[WorkerInit] contract bad fullVersionList');
+            for (const x of v) {
+              if (!x || typeof x !== 'object') throw new Error('[WorkerInit] contract bad fullVersionList');
+              const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
+                          : (typeof x.name === 'string' && x.name) ? x.name
+                          : null;
+              const version = (typeof x.version === 'string' && x.version) ? x.version
+                            : (typeof x.version === 'number' && Number.isFinite(x.version)) ? String(x.version)
+                            : null;
+              if (!brand || !version) throw new Error('[WorkerInit] contract bad fullVersionList');
+            }
+          }
+          he[k] = v;
+        }
+        G.__LAST_UACH_HE__ = he;
+        G.__UACH_HE_READY__ = true;
+        const p = Promise.resolve(he);
+        G.__UACH_HE_PROMISE__ = p;
+        return p;
+      } catch (e) {
+        if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:uadata_he_contract_mismatch', e);
+        throw e;
+      }
+    }
+
+    const UAD = G.navigator && G.navigator.userAgentData;
     if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
       throw new Error('[WorkerInit] userAgentData missing');
     }
@@ -1430,42 +1467,6 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
         const v = he[k];
         if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
         if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
-      }
-      if (contract && typeof contract === 'object') {
-        try {
-          for (const k of KEYS) {
-            if (!(k in contract)) continue;
-            const exp = contract[k];
-            const got = he[k];
-            if (k === 'fullVersionList') {
-              if (!Array.isArray(exp) || !Array.isArray(got)) throw new Error('[WorkerInit] contract fullVersionList mismatch');
-              const norm = (arr) => arr
-                .filter(x => x && typeof x === 'object')
-                .map(x => {
-                  const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
-                              : (typeof x.name === 'string' && x.name) ? x.name
-                              : null;
-                  const version = (typeof x.version === 'string' && x.version) ? x.version
-                                : (typeof x.version === 'number' && Number.isFinite(x.version)) ? String(x.version)
-                                : null;
-                  if (!brand || !version) throw new Error('[WorkerInit] contract fullVersionList mismatch');
-                  return [String(brand), String(version)];
-                })
-                .sort((a, b) => (a[0] === b[0] ? (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) : (a[0] < b[0] ? -1 : 1)));
-              const a = norm(exp);
-              const b = norm(got);
-              const ok = (a.length === b.length) && a.every((x, i) => x[0] === b[i][0] && x[1] === b[i][1]);
-              if (!ok) throw new Error('[WorkerInit] contract fullVersionList mismatch');
-            } else if (typeof exp === 'string') {
-              if (typeof got !== 'string' || got !== exp) throw new Error(`[WorkerInit] contract ${k} mismatch`);
-            } else if (typeof exp === 'boolean') {
-              if (typeof got !== 'boolean' || got !== exp) throw new Error(`[WorkerInit] contract ${k} mismatch`);
-            }
-          }
-        } catch (e) {
-          if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:uadata_he_contract_mismatch', e);
-          throw e;
-        }
       }
       G.__LAST_UACH_HE__ = he;
       G.__UACH_HE_READY__ = true;

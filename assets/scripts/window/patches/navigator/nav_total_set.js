@@ -984,7 +984,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               });
               return Reflect.apply(orig, this, args || []);
              }
-             const nativeOut = Reflect.apply(orig, this, args || []);
+             const filteredKeys = keys.filter(k => (typeof k === 'string' && k && k !== 'uaFullVersion'));
+             const args2 = (args && args.length) ? args.slice(0) : [filteredKeys];
+             args2[0] = filteredKeys;
+             const nativeOut = Reflect.apply(orig, this, args2);
              if (!nativeOut || typeof nativeOut.then !== 'function') {
                const err = new TypeError('promise_contract_failed');
                __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_promise_contract_failed', {
@@ -1026,14 +1029,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 return nativeOut;
               }
               if (!(hint in map)) {
-                __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_missing_hint', {
+                if (hint === 'uaFullVersion') continue;
+                __navDiag('warn', 'nav_total_set:userAgentData_getHighEntropyValues_missing_hint', {
                   stage: 'runtime',
                   type: __navTypePipeline,
                   diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                   key: 'userAgentData.getHighEntropyValues',
                   message: 'missing highEntropy key'
                 });
-                return nativeOut;
+                continue;
               }
               const val = map[hint];
               if (val === undefined || val === null || (typeof val === 'string' && !val && hint !== 'model') || (Array.isArray(val) && !val.length)) {
@@ -1051,7 +1055,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
              return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
                try {
                  const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : {};
-                 return Object.assign({}, base, result);
+                 const out = Object.assign({}, base, result);
+                 try { if (Object.prototype.hasOwnProperty.call(out, 'uaFullVersion')) delete out.uaFullVersion; } catch (_) {}
+                 return out;
                } catch (e) {
                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
                    stage: 'runtime',
