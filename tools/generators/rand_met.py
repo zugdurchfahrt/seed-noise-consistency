@@ -17,8 +17,12 @@ from tools.tools_infra.overseer import logger
 logger = logger.getChild("rand_met")
 
 # ----------------------- CONST -----------------------
-PROJECT_ROOT        = pathlib.Path(__file__).resolve().parents[2]
-ASSETS              = PROJECT_ROOT / 'assets'
+PROJECT_ROOT            = pathlib.Path(__file__).resolve().parents[2]
+ASSETS                  = PROJECT_ROOT / 'assets'
+PROFILE_DATA_SOURCE     = ASSETS / 'profile_data_source'
+DESIGNER_BY_FAMILY_PATH = PROFILE_DATA_SOURCE / 'FONTS_DESIGNER_BY_FAMILY_JSON.json'
+LICENSE_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_LICENSE_BY_FAMILY_JSON.json'
+VERSION_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_VERSION_BY_FAMILY_JSON.json'
 TOOLS               = PROJECT_ROOT / 'tools'
 GENERATORS          = TOOLS / 'generators'
 TEMPLATES           = ASSETS / 'templates'
@@ -26,6 +30,7 @@ MANIFEST_PATH       = ASSETS/ 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS/ 'JS_fonts_patch' / 'font_patch.generated.js'
 FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
+CSS_FAMILY = (os.environ.get("FONTS_CSS_FAMILY") or "FPFont").strip() or "FPFont"
 # ----------------------- UTILS -----------------------
 SYS_FONTS_WIN = [
     'Segoe UI','Arial','Calibri','Verdana','Tahoma','Candara','Trebuchet MS',
@@ -335,23 +340,31 @@ def _derive_full_name(family: str, subfamily: str) -> str:
         return family
     return f"{family} {subfamily}"
 
-
-def _env_json_dict(name: str) -> dict:
+def json_dict(path: pathlib.Path) -> dict:
+    # def _env_json_dict(name: str) -> dict:
     """
     Read an env var as JSON dict. Invalid JSON is reported and ignored.
     """
-    raw = os.environ.get(name)
-    if not raw:
-        return {}
     try:
-        val = json.loads(raw)
-    except Exception as e:
-        logger.warning(f"[fonts] invalid env JSON in {name}: {e}")
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
         return {}
-    if not isinstance(val, dict):
-        logger.warning(f"[fonts] invalid env JSON in {name}: expected dict, got {type(val).__name__}")
-        return {}
-    return val
+        
+
+    
+    # raw = os.environ.get(name)
+    # if not raw:
+    #     return {}
+    # try:
+    #     val = json.loads(raw)
+    # except Exception as e:
+    #     logger.warning(f"[fonts] invalid env JSON in {name}: {e}")
+    #     return {}
+    # if not isinstance(val, dict):
+    #     logger.warning(f"[fonts] invalid env JSON in {name}: expected dict, got {type(val).__name__}")
+    #     return {}
+    # return val
 
 
 def _empty_if_unknown(value: str) -> str:
@@ -536,57 +549,69 @@ def fsType_restricts(tt: TTFont) -> bool:
 
 
 
-def generate_font_metadata(platform: str, subfamilies_src=None):
+def generate_random_nameids_from_pools(pools, rng):
     """
-    Generates font metadata: family, subfamily, unique_id и т.д.
-    Returns the dictionary like {1: family, 2: subfamily, 3: unique_id, 4: full_name, 5: version, 6: ps_name, 9: designer, 13: license_desc}
+    Build nameID container from constrained pools.
+    Core randomness is limited to (family, subfamily); derived fields are computed deterministically.
     """
-
-    if platform == "MacIntel":
-        family_names = SYS_FONTS_MAC
-        designers = ["Apple Inc.", "5th Dimension", "Futura Design", "Omni Group", "Generation Frontline Foundry", "Bright Kernel Foundry", "FontAddicts Group"]
-    else:
-        family_names = SYS_FONTS_WIN
-        designers = ["Microsoft Corporation", "Steve Matteson", "Matthew Carter", "Lucas de Groot"]
-    
-    subfamilies = _normalize_subfamilies(subfamilies_src) if subfamilies_src is not None else SUBFAMILIES
-    
-    licenses = ["Licensed under the SIL Open Font License, Version 1.1", "Available under the OFL license",
-                "This Font Software is licensed under the SIL Open Font License, Version 1.1", "Licensed under the Apache License, Version 2.0", "Desktop License"]
-
-    family = random.choice(family_names)
-    subfamily = _normalize_subfamily_value(random.choice(subfamilies))
-    unique_id = f"{family[:2]}-{random_string(12)}"
+    family_names = pools.get("family_names") or []
+    subfamilies = pools.get("subfamilies") or SUBFAMILIES
+    family = rng.choice(family_names)
+    subfamily = _normalize_subfamily_value(rng.choice(subfamilies))
+    unique_id = f"{family[:2]}-{''.join(rng.choice(string.ascii_letters + string.digits) for _ in range(12))}"
     full_name = _derive_full_name(family, subfamily)
-    # Keep these fields consistent via registry or leave empty; do not randomize independently.
-    version = ""
     ps_name = _normalize_postscript_name(f"{family}-{subfamily}")
-    designer = ""
-    license_desc = ""
+    return {
+        1: family,
+        2: subfamily,
+        3: unique_id,
+        4: full_name,
+        5: "",
+        6: ps_name,
+        9: "",
+        13: "",
+    }
 
-    designer_by_family = _env_json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
-    license_by_designer = _env_json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
-    license_by_family = _env_json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
-    version_by_family = _env_json_dict("FONTS_VERSION_BY_FAMILY_JSON")
 
-    fam_key = _normalize_whitespace(family)
+def metadata_container_template(platform: str, subfamilies_src=None, rng=None):
+    """
+    Neutral metadata container:
+    A) choose (family, subfamily) from pools
+    B) derive (full_name, postscript_name)
+    C) apply registry-mapped showcase fields
+    """
+    r = rng if hasattr(rng, "choice") else random
+    family_names = SYS_FONTS_MAC if platform == "MacIntel" else SYS_FONTS_WIN
+    subfamilies = _normalize_subfamilies(subfamilies_src) if subfamilies_src is not None else SUBFAMILIES
+    pools = {
+        "family_names": family_names,
+        "subfamilies": subfamilies,
+    }
+    meta = generate_random_nameids_from_pools(pools, r)
+
+    designer_by_family = json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
+    license_by_designer =  json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
+    license_by_family = json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
+    version_by_family = json_dict("FONTS_VERSION_BY_FAMILY_JSON")
+
+    fam_key = _normalize_whitespace(meta.get(1, ""))
     if fam_key:
         designer = _empty_if_unknown(designer_by_family.get(fam_key, "")) if isinstance(designer_by_family, dict) else ""
         version = _empty_if_unknown(version_by_family.get(fam_key, "")) if isinstance(version_by_family, dict) else ""
         license_desc = _empty_if_unknown(license_by_family.get(fam_key, "")) if isinstance(license_by_family, dict) else ""
         if not license_desc and designer:
             license_desc = _empty_if_unknown(license_by_designer.get(designer, "")) if isinstance(license_by_designer, dict) else ""
+        meta[9] = designer
+        meta[5] = version
+        meta[13] = license_desc
+    return meta
 
-    return {
-        1: family,
-        2: subfamily,
-        3: unique_id,
-        4: full_name,
-        5: version,
-        6: ps_name,
-        9: designer,
-        13: license_desc
-    }
+
+def generate_font_metadata(platform: str, subfamilies_src=None):
+    """
+    Backward-compatible wrapper for the metadata container.
+    """
+    return metadata_container_template(platform, subfamilies_src=subfamilies_src, rng=random)
 
 def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamilies_src=None):
     """
@@ -621,30 +646,34 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     else:
         raw_files = [f for f in FONTS_SOURCE_DIR.iterdir() if f.is_file() and f.suffix.lower() == '.woff2']
         os.makedirs(target_dir, exist_ok=True)
+        copy_skip_stats = defaultdict(int)
   
         moved_count = 0
         for idx, src_path in enumerate(raw_files): 
             with open(src_path, 'rb') as f:
                 data = f.read()
             if len(data) == 0 or data[:4] != b'wOF2':
-                logger.error(f"[Error] Wrong file format: {src_path}")
+                logger.error(f"[Skipped] {src_path.name} reason=bad_woff2_header detail=wrong_or_empty_file")
                 raise RuntimeError(f"Wrong/empty file found: {src_path}")
             
             # === Extended woff2 files check ===
             try:
                 tt = TTFont(str(src_path))
             except Exception as e:
-                logger.warning(f"[Skipped] {src_path.name} — can not read file ({e}).")
+                copy_skip_stats["ttfont_open_failed"] += 1
+                logger.warning(f"[Skipped] {src_path.name} reason=ttfont_open_failed detail={e}")
                 continue
 
             cmap = get_best_cmap(tt)
             if not cmap:
-                logger.warning(f"[Skipped] {src_path.name} — has no union map (cmap).")
+                copy_skip_stats["missing_cmap"] += 1
+                logger.warning(f"[Skipped] {src_path.name} reason=missing_cmap")
                 continue
 
             ok_ascii, missing_ascii = has_ascii_letters_and_digits(cmap)
             if not ok_ascii:
-                logger.warning(f"[Skipped] {src_path.name} — no basic ASCII (skipped: {len(missing_ascii)}).")
+                copy_skip_stats["ascii_missing"] += 1
+                logger.warning(f"[Skipped] {src_path.name} reason=ascii_missing detail=missing_count:{len(missing_ascii)}")
                 continue
 
             # optional: demands cyrillic letters (by default - is off not to dirupt script behavior)
@@ -652,15 +681,18 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             if require_cyrillic:
                 ok_cy, missing_cy = has_cyrillic_letters(cmap)
                 if not ok_cy:
-                    logger.warning(f"[Skipped] {src_path.name} — no cyrillic letters (skipped: {len(missing_cy)}).")
+                    copy_skip_stats["cyrillic_missing"] += 1
+                    logger.warning(f"[Skipped] {src_path.name} reason=cyrillic_missing detail=missing_count:{len(missing_cy)}")
                     continue
 
             if has_symbol_emoji_traits(tt, cmap):
-                logger.warning(f"[Skipped] {src_path.name} — seems to be icon/emoji (PUA/colored/kyy words/no latin letters)")
+                copy_skip_stats["icon_emoji_traits"] += 1
+                logger.warning(f"[Skipped] {src_path.name} reason=icon_emoji_traits")
                 continue
 
             if fsType_restricts(tt):
-                logger.warning(f"[Skipped] {src_path.name} — licence constraints (OS/2 fsType).")
+                copy_skip_stats["fsType_restricted"] += 1
+                logger.warning(f"[Skipped] {src_path.name} reason=fsType_restricted")
                 continue
 
             # sanity check: Extreme metrics can break the layout
@@ -669,7 +701,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 ascent = tt["OS/2"].usWinAscent if "OS/2" in tt else None
                 descent = tt["OS/2"].usWinDescent if "OS/2" in tt else None
                 if upm and ascent and descent and (ascent + descent) > 4 * upm:
-                    logger.warning(f"[Skipped] {src_path.name} — anomal metrics (ascent+descent >> UPM).")
+                    copy_skip_stats["anomalous_metrics"] += 1
+                    logger.warning(f"[Skipped] {src_path.name} reason=anomalous_metrics detail=ascent_plus_descent_gt_4x_upm")
                     continue
             except Exception:
                 pass
@@ -688,6 +721,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             logger.info(f"[ADD Font] {src_path.name} → {dst_path.name}")
             os.remove(src_path)
         logger.info(f"[ADD Fonts] Files transferred: {moved_count}")
+        if copy_skip_stats:
+            logger.info(f"[ADD Fonts] Skip summary: {dict(copy_skip_stats)}")
 
     # === Step 2: Ensure that target_dir exists and get all_files ===
     os.makedirs(target_dir, exist_ok=True)
@@ -707,40 +742,43 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     _rng = random.Random(_seed)
 
 
-    # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
+    # === Step 3: Select a random amount N of fonts (seeded) ===
     MIN_N = int(os.environ.get("FONTS_MIN_N", "14"))
     MAX_N = int(os.environ.get("FONTS_MAX_N", "16"))
     max_n = len(all_names)
 
     if max_n == 0:
         logger.warning(f"[Fonts] No files passed filters ({max_n}) for MIN_N={MIN_N} — manifest will be empty")
-        fingerprint_names = []
+        N = 0
+        candidate_names = []
     else:
         hi = min(MAX_N, max_n)
         lo = 1 if max_n < MIN_N else MIN_N
         N = _rng.randint(lo, hi)
         if N < MIN_N:
             logger.warning(f"[Fonts] Only {max_n} files available < MIN_N={MIN_N} — using N={N}")
-        fingerprint_names = _rng.sample(sorted(all_names), k=N)
-        fingerprint_names.sort()  # fix the order in the manifest
-        
-    # === Step 4: collect temp_configs for Jinja ===
+        candidate_names = sorted(all_names)
+        _rng.shuffle(candidate_names)
+         
+    # === Step 4: collect temp_configs for Jinja (drop duplicates; pick other files instead of tagging) ===
     max_family_repeats = 6
     family_counter = defaultdict(int)
     used_families = set()
     temp_configs = []
     skip_stats = defaultdict(int)
-    CSS_FAMILY = (os.environ.get("FONTS_CSS_FAMILY") or "FPFont").strip() or "FPFont"
+    
     logger.info(f"[fonts] cssFamily fixed: {CSS_FAMILY}")
-    designer_by_family = _env_json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
-    license_by_designer = _env_json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
-    license_by_family = _env_json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
-    version_by_family = _env_json_dict("FONTS_VERSION_BY_FAMILY_JSON")
+    designer_by_family = json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
+    license_by_designer = json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
+    license_by_family = json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
+    version_by_family = json_dict("FONTS_VERSION_BY_FAMILY_JSON")
 
     _saved_state = random.getstate()
     random.seed(_seed ^ 0x9E3779B1)
     try:
-        for fname in fingerprint_names:
+        for fname in candidate_names:
+            if len(temp_configs) >= N:
+                break
             rec = files_map.get(fname)
             if not rec:
                 skip_stats["missing_index_entry"] += 1
@@ -771,9 +809,10 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 base_sub_raw = _get_nameid_any(tt, 2)
                 base_family = _normalize_whitespace(base_family_raw) or name_no_ext
                 subfamily = _normalize_subfamily_value(base_sub_raw)
-                version = _empty_if_unknown(_get_nameid_any(tt, 5))
-                designer = _empty_if_unknown(_get_nameid_any(tt, 9))
-                license_desc = _empty_if_unknown(_get_nameid_any(tt, 13))
+                # Registry-only policy for showcase metadata: do not mix source 5/9/13 with generated profile.
+                version = ""
+                designer = ""
+                license_desc = ""
             else:
                 base_family = name_no_ext
                 subfamily = _normalize_subfamily_value("")
@@ -781,7 +820,15 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 designer = ""
                 license_desc = ""
 
-            # Apply registry overrides (non-random, consistent relationships).
+            family = base_family
+            # Step B (derived): these fields are strictly derived from (family, subfamily).
+            full_name = _derive_full_name(family, subfamily)
+            postscript = _normalize_postscript_name(f"{family}-{subfamily}")
+            _sf = (subfamily or "").lower()
+            weight = "bold" if any(k in _sf for k in ("bold","black","heavy","semibold","demibold","extrabold","ultrabold")) else "normal"
+            style  = "italic" if ("italic" in _sf or "oblique" in _sf) else "normal"
+
+            # Step C (registry): optional metadata must come from family/designer registry mapping.
             fam_key = _normalize_whitespace(base_family)
             if fam_key and isinstance(designer_by_family, dict) and fam_key in designer_by_family:
                 designer = _empty_if_unknown(designer_by_family.get(fam_key, ""))
@@ -791,10 +838,6 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 license_desc = _empty_if_unknown(license_by_family.get(fam_key, ""))
             if not license_desc and designer and isinstance(license_by_designer, dict):
                 license_desc = _empty_if_unknown(license_by_designer.get(designer, ""))
-
-            family = base_family
-            full_name = _derive_full_name(family, subfamily)
-            postscript = _normalize_postscript_name(f"{family}-{subfamily}")
 
             # stable, non-random unique_id derived from existing variables (no external assumptions)
             uniq_tag = re.sub(r"[^A-Za-z0-9]+", "", name_no_ext)[:8]
@@ -812,36 +855,16 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 13: license_desc,
             }
 
-            #limits families dups and removes duplicates
+            # Dedup: drop duplicates; do not mutate/tag font fields.
             uniq_triple = (family, full_name, postscript)
             if uniq_triple in used_families:
-                tag = _short_tag_from(rec, name_no_ext)
-                if tag:
-                    family = _normalize_whitespace(f"{base_family} {tag}")
-                    full_name = _derive_full_name(family, subfamily)
-                    postscript = _normalize_postscript_name(f"{family}-{subfamily}")
-                    uniq_triple = (family, full_name, postscript)
-                    if uniq_triple in used_families:
-                        skip_stats["duplicate_uniq_triple"] += 1
-                        logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
-                        continue
-                    skip_stats["duplicate_uniq_triple_uniqueized"] += 1
-                    logger.debug(f"[fonts] Step4 uniqueized {fname}: family tag={tag}")
-                    meta_values[1] = family
-                    meta_values[4] = full_name
-                    meta_values[6] = postscript
-                else:
-                    skip_stats["duplicate_uniq_triple"] += 1
-                    logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
-                    continue
+                skip_stats["duplicate_uniq_triple"] += 1
+                logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
+                continue
             if family_counter[family] >= max_family_repeats:
                 skip_stats["family_repeat_limit"] += 1
                 logger.debug(f"[fonts] Step4 skip {fname}: family_repeat_limit family={family} limit={max_family_repeats}")
                 continue
-
-            _sf = (subfamily or "").lower()
-            weight = "bold" if any(k in _sf for k in ("bold","black","heavy","semibold","demibold","extrabold","ultrabold")) else "normal"
-            style  = "italic" if ("italic" in _sf or "oblique" in _sf) else "normal"
 
             cfg = {
                 "name": name_no_ext,
@@ -874,6 +897,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         random.setstate(_saved_state)
     if skip_stats:
         logger.debug(f"[fonts] Step4 skip stats: {dict(skip_stats)}")
+    if temp_configs:
+        temp_configs.sort(key=lambda x: x.get("name", ""))
 
     # === Step 5: create fonts-manifest.json for fingerprint_files =====
     os.makedirs(manifest_path.parent, exist_ok=True)

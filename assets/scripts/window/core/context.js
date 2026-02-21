@@ -470,6 +470,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
       })();
 
       const wrapped = markAsNative(wrappedRaw, method);
+      if (global.__DEBUG__ && (method === 'getParameter' || method === 'readPixels')) {
+        emitContextDiag('info', 'context:webgl:wrapLayer:selected', null, {
+          stage: 'apply',
+          surface: 'webgl',
+          key: method,
+          data: { wrapLayer: 'named_wrapper', wrapperClass: 'synthetic_named' }
+        });
+      }
 
       definePatchedMethod(proto, method, wrapped);
       patchedMethods.add(wrapped);

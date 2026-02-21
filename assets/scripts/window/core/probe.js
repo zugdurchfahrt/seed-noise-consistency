@@ -641,6 +641,42 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
   }
 
   function printTouchedMethods() {
+    function makeSandboxOracle() {
+      if (!globalThis.document || typeof document.createElement !== "function") {
+        return { ok: false, error: new Error("[probe] document missing (sandbox oracle)") };
+      }
+      const iframe = document.createElement("iframe");
+      iframe.src = "about:blank";
+      iframe.style.display = "none";
+      // sandboxed realm: scripts disabled => reduces chance our patch runs there
+      iframe.sandbox = "allow-same-origin";
+      try {
+        (document.documentElement || document.body || document).appendChild(iframe);
+      } catch (e) {
+        return { ok: false, error: e };
+      }
+      try {
+        const w = iframe.contentWindow;
+        const oracleToString =
+          w && w.Function && w.Function.prototype && w.Function.prototype.toString;
+        const oracleObjToString =
+          w && w.Object && w.Object.prototype && w.Object.prototype.toString;
+        const oracleSetProto = w && w.Reflect && w.Reflect.setPrototypeOf;
+        return {
+          ok: typeof oracleToString === "function",
+          iframe,
+          w,
+          oracleToString,
+          oracleObjToString,
+          oracleSetProto
+        };
+      } catch (e) {
+        try { iframe.remove(); } catch (_) {}
+        return { ok: false, error: e };
+      }
+    }
+
+    const sandboxOracle = makeSandboxOracle();
     function resolveMethodRoot(path) {
       if (
         typeof path === "string" &&
@@ -671,14 +707,55 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
       const r = readPath(root, path);
       let toStringStatus = null;
       let toStringError = null;
+      let objectToString = null;
+      let objectToStringError = null;
+      let sandboxToStringStatus = null;
+      let sandboxToStringError = null;
+      let sandboxHasNativeCode = null;
+      let sandboxObjToString = null;
+      let sandboxObjToStringError = null;
+      let setProtoStatus = null;
+      let setProtoError = null;
 
       if (r.ok && typeof r.value === "function") {
+        try {
+          objectToString = Object.prototype.toString.call(r.value);
+        } catch (e) {
+          objectToStringError = errorShape(e);
+        }
         try {
           Function.prototype.toString.call(r.value);
           toStringStatus = "callable checked";
         } catch (e) {
           toStringStatus = "callable check failed";
           toStringError = errorShape(e);
+        }
+
+        try {
+          const p = Reflect.getPrototypeOf(r.value);
+          const ok = Reflect.setPrototypeOf(r.value, p);
+          setProtoStatus = ok === true ? "ok" : "failed";
+        } catch (e) {
+          setProtoStatus = "threw";
+          setProtoError = errorShape(e);
+        }
+
+        if (sandboxOracle && sandboxOracle.ok && typeof sandboxOracle.oracleToString === "function") {
+          try {
+            const s = Reflect.apply(sandboxOracle.oracleToString, r.value, []);
+            sandboxToStringStatus = "ok";
+            sandboxHasNativeCode = typeof s === "string" && s.indexOf("[native code]") !== -1;
+          } catch (e) {
+            sandboxToStringStatus = "threw";
+            sandboxToStringError = errorShape(e);
+          }
+        }
+        if (sandboxOracle && sandboxOracle.ok && typeof sandboxOracle.oracleObjToString === "function") {
+          try {
+            sandboxObjToString = Reflect.apply(sandboxOracle.oracleObjToString, r.value, []);
+          } catch (e) {
+            sandboxObjToStringError = errorShape(e);
+          }
         }
       } else if (r.ok) {
         toStringStatus = "not callable (expected)";
@@ -692,8 +769,17 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
         exists: r.ok && r.value != null,
         isMethod: r.ok && typeof r.value === "function",
         signature: r.ok && typeof r.value === "function" ? fnSig(r.value) : null,
+        objectToString,
+        objectToStringError,
         toStringStatus,
         toStringError,
+        sandboxToStringStatus,
+        sandboxToStringError,
+        sandboxHasNativeCode,
+        sandboxObjToString,
+        sandboxObjToStringError,
+        setProtoStatus,
+        setProtoError,
         value: r.ok ? toPrintable(r.value) : null,
         error: r.ok ? null : errorShape(r.error)
       };
@@ -702,6 +788,10 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     console.group("[probe] Touched methods");
     console.table(rows);
     console.groupEnd();
+
+    try {
+      if (sandboxOracle && sandboxOracle.iframe) sandboxOracle.iframe.remove();
+    } catch (_) {}
 
     return { paths: METHOD_PATHS.slice(), rows };
   }

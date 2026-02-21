@@ -268,7 +268,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     const __isNavigatorThis = (self) => {
       try {
-        return self === navigator || (typeof Navigator === 'function' && self instanceof Navigator);
+        return self === navigator;
       } catch (e) {
         if (!__navReceiverCheckDiagSent) {
           __navReceiverCheckDiagSent = true;
@@ -695,16 +695,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (!d) throw new TypeError(`${key}: descriptor missing`);
         if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
         __navRegisterKey(key);
-        const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
-          __navLogAccess(key, namedGet);
-          if (!__isNavigatorThis(this)) {
-            throw new TypeError();
+        const applied = applyCoreTargetsGroup('nav_total_set:critical', [{
+          owner: navProto,
+          key: key,
+          kind: 'accessor',
+          wrapLayer: 'named_wrapper',
+          policy: 'throw',
+          diagTag: 'nav_total_set:critical',
+          allowCreate: false,
+          configurable: !!d.configurable,
+          enumerable: !!d.enumerable,
+          validThis: __isNavigatorThis,
+          invalidThis: 'native',
+          getImpl: function navCriticalGetImpl() {
+            __navLogAccess(key, null);
+            return getter.call(this);
           }
-          return getter.call(this);
-        }}), key).get;
-        __navRegisterFn(namedGet);
-        const ok = (redefineAcc(navProto, key, namedGet), true);
-        if (ok === false) throw new TypeError(`failed to define ${key}`);
+        }], 'throw');
+        if (applied !== 1) throw new TypeError(`failed to define ${key}`);
       };      
       patch('userAgent',  () => userAgent);
       patch('platform',   () => navPlatformOut);
