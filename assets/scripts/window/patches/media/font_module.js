@@ -341,6 +341,198 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
   })();
 
+// font -guard (must run after minimal env validation and after exposeFontsReady)
+(() => {
+  'use strict';
+
+  // data group: critical runtime promise handle
+  try {
+    applyTargetGroup('fonts:data:critical', [{
+      owner: window,
+      key: 'awaitFontsReady',
+      kind: 'data',
+      wrapLayer: 'descriptor_only',
+      value: window.awaitFontsReady,
+      allowCreate: true,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+      policy: 'throw',
+      diagTag: 'fonts:data:awaitFontsReady'
+    }], 'throw');
+  } catch (e) {
+    // policy:'throw' соблюдена (fail-fast для шага), но "наружу" не бросаем: выходим с нативным fallback
+    __fontDiagBrowser('fatal', 'fonts:data:critical_failed', {
+      stage: 'apply',
+      diagTag: 'fonts:data:awaitFontsReady',
+      key: 'awaitFontsReady',
+      message: 'critical data patch failed (suppressed throw)',
+      data: null
+    }, e);
+    return;
+  }
+
+  // data group: optional runtime flags
+  const fontsReadyTarget = {
+    owner: window,
+    key: '__FONTS_READY__',
+    kind: 'data',
+    wrapLayer: 'descriptor_only',
+    allowCreate: true,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+    policy: 'skip',
+    diagTag: 'fonts:data:ready'
+  };
+  if (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')) {
+    fontsReadyTarget.value = window.__FONTS_READY__;
+  }
+  const fontsErrorTarget = {
+    owner: window,
+    key: '__FONTS_ERROR__',
+    kind: 'data',
+    wrapLayer: 'descriptor_only',
+    allowCreate: true,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+    policy: 'skip',
+    diagTag: 'fonts:data:error'
+  };
+  if (Object.prototype.hasOwnProperty.call(window, '__FONTS_ERROR__')) {
+    fontsErrorTarget.value = window.__FONTS_ERROR__;
+  }
+  applyTargetGroup('fonts:data:flags', [fontsReadyTarget, fontsErrorTarget], 'skip');
+
+  // Глобал рантайма
+  const G = (typeof globalThis !== "undefined" ? globalThis : self);
+
+  // FontFaceSet в текущем окружении (window/worker)
+  const FFS = (G.document && G.document.fonts) || G.fonts || null;
+  if (!FFS) return;
+
+  const proto = Object.getPrototypeOf(FFS);
+  if (!proto) return;
+
+  // accessor group: ready
+  applyTargetGroup('fonts:accessor', [{
+    owner: proto,
+    key: 'ready',
+    kind: 'accessor',
+    wrapLayer: 'named_wrapper',
+    policy: 'skip',
+    diagTag: 'fonts:accessor:ready',
+    getImpl(origGet) {
+      return Reflect.apply(origGet, this, []);
+    }
+  }], 'skip');
+
+  // === Tunables (локальные, регулируем «на месте», без глобальных флагов) ===
+  let FFS_TICK_MS   = 16;
+  let FFS_LIM_RUN   = 40;
+  let FFS_BOOT_MS   = 180;
+  let FFS_LIM_BOOT  = 96;
+
+  const now = (G.performance && typeof G.performance.now === 'function')
+    ? () => G.performance.now.call(G.performance)
+    : () => Date.now();
+
+  const T0 = now();
+  let calls = 0;
+  let ts    = 0;
+  const throttled = () => {
+    const t = now();
+    const TMS = FFS_TICK_MS | 0;
+    if (t - ts > TMS) { calls = 0; ts = t; }
+    const inBoot = (t - T0) < FFS_BOOT_MS;
+    const LIM = inBoot ? FFS_LIM_BOOT : FFS_LIM_RUN;
+    return (calls++ >= LIM);
+  };
+
+  const MAX_LEN = 256;
+  const CTRL = /[\u0000-\u001F]/;
+  const SIZED  = /\b-?\d+(?:\.\d+)?(?:px|pt|em|rem|%)\b/i;
+  const FAMILY = /"[^"]+"|'[^']+'|\b[a-z0-9][\w\- ]{1,}\b/i;
+  const GENERICS = new Set(['serif','sans-serif','monospace','cursive','fantasy','system-ui']);
+  let ALLOWED_FAMILIES = null;
+
+  function extractFamily(q) {
+    const m = String(q).match(/(?:^|\s)\d+(?:\.\d+)?(?:px|pt|em|rem|%)\b(?:\/\d+(?:\.\d+)?(?:px|pt|em|rem|%))?\s+(.+)$/i);
+    const raw = (m ? m[1] : q);
+    return raw.split(',')[0].replace(/['"]/g,'').trim().toLowerCase();
+  }
+
+  function getAllowedFamilies() {
+    if (ALLOWED_FAMILIES) return ALLOWED_FAMILIES;
+    const win = (typeof window !== 'undefined') ? window : G;
+    const domPlat = win.__NAV_PLATFORM__;
+    const cfgs = Array.isArray(win.fontPatchConfigs) ? win.fontPatchConfigs : [];
+    ALLOWED_FAMILIES = new Set(
+      (domPlat ? cfgs.filter(f => f.platform_dom === domPlat) : cfgs)
+        .flatMap(f => [f.cssFamily, f.family, f.name, f.fallback].filter(Boolean))
+        .map(s => s.toLowerCase())
+    );
+    return ALLOWED_FAMILIES;
+  }
+
+  const validFontQuery = q => {
+    if (!(typeof q === 'string' && q.length <= MAX_LEN && !CTRL.test(q) && SIZED.test(q) && FAMILY.test(q))) {
+      return false;
+    }
+    const fam = extractFamily(q);
+    if (!fam) return false;
+    if (GENERICS.has(fam)) return true;
+    return getAllowedFamilies().has(fam);
+  };
+
+  // method group: check + forEach(declare-only)
+  applyTargetGroup('fonts:method', [
+    {
+      owner: proto,
+      key: 'check',
+      kind: 'method',
+      wrapLayer: 'named_wrapper',
+      policy: 'skip',
+      diagTag: 'fonts:method:check',
+      invoke(orig, args) {
+        const query = args[0];
+        if (throttled()) return false;
+        if (!validFontQuery(query)) return false;
+        return Reflect.apply(orig, this, args);
+      }
+    },
+    {
+      owner: proto,
+      key: 'forEach',
+      kind: 'method',
+      wrapLayer: 'named_wrapper',
+      mode: 'declare_only',
+      enabled: false,
+      policy: 'skip',
+      diagTag: 'fonts:method:forEach'
+    }
+  ], 'skip');
+
+  // promise_method group: load
+  applyTargetGroup('fonts:promise', [{
+    owner: proto,
+    key: 'load',
+    kind: 'promise_method',
+    wrapLayer: 'named_wrapper',
+    policy: 'skip',
+    diagTag: 'fonts:promise:load',
+    invoke(orig, args) {
+      const query = args[0];
+      const text = args[1];
+      if (throttled()) return Promise.resolve([]);
+      if (!validFontQuery(query)) return Promise.resolve([]);
+      if (text != null && typeof text !== 'string') return Promise.resolve([]);
+      return Reflect.apply(orig, this, args);
+    }
+  }], 'skip');
+})();
+
   const domPlat = window.__NAV_PLATFORM__;
   if (!domPlat) {
     // preflight soft-skip: keep awaitFontsReady as native document.fonts.ready where possible
@@ -590,197 +782,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 }
 
 
-// font -guard
-(() => {
-  'use strict';
-
-  // data group: critical runtime promise handle
-  try {
-    applyTargetGroup('fonts:data:critical', [{
-      owner: window,
-      key: 'awaitFontsReady',
-      kind: 'data',
-      wrapLayer: 'descriptor_only',
-      value: window.awaitFontsReady,
-      allowCreate: true,
-      writable: true,
-      configurable: true,
-      enumerable: true,
-      policy: 'throw',
-      diagTag: 'fonts:data:awaitFontsReady'
-    }], 'throw');
-  } catch (e) {
-    // policy:'throw' соблюдена (fail-fast для шага), но "наружу" не бросаем: выходим с нативным fallback
-    __fontDiagBrowser('fatal', 'fonts:data:critical_failed', {
-      stage: 'apply',
-      diagTag: 'fonts:data:awaitFontsReady',
-      key: 'awaitFontsReady',
-      message: 'critical data patch failed (suppressed throw)',
-      data: null
-    }, e);
-    return;
-  }
-
-  // data group: optional runtime flags
-  const fontsReadyTarget = {
-    owner: window,
-    key: '__FONTS_READY__',
-    kind: 'data',
-    wrapLayer: 'descriptor_only',
-    allowCreate: true,
-    writable: true,
-    configurable: true,
-    enumerable: true,
-    policy: 'skip',
-    diagTag: 'fonts:data:ready'
-  };
-  if (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')) {
-    fontsReadyTarget.value = window.__FONTS_READY__;
-  }
-  const fontsErrorTarget = {
-    owner: window,
-    key: '__FONTS_ERROR__',
-    kind: 'data',
-    wrapLayer: 'descriptor_only',
-    allowCreate: true,
-    writable: true,
-    configurable: true,
-    enumerable: true,
-    policy: 'skip',
-    diagTag: 'fonts:data:error'
-  };
-  if (Object.prototype.hasOwnProperty.call(window, '__FONTS_ERROR__')) {
-    fontsErrorTarget.value = window.__FONTS_ERROR__;
-  }
-  applyTargetGroup('fonts:data:flags', [fontsReadyTarget, fontsErrorTarget], 'skip');
-
-  // Глобал рантайма
-  const G = (typeof globalThis !== "undefined" ? globalThis : self);
-
-  // FontFaceSet в текущем окружении (window/worker)
-  const FFS = (G.document && G.document.fonts) || G.fonts || null;
-  if (!FFS) return;
-
-  const proto = Object.getPrototypeOf(FFS);
-  if (!proto) return;
-
-  // accessor group: ready
-  applyTargetGroup('fonts:accessor', [{
-    owner: proto,
-    key: 'ready',
-    kind: 'accessor',
-    wrapLayer: 'named_wrapper',
-    policy: 'skip',
-    diagTag: 'fonts:accessor:ready',
-    getImpl(origGet) {
-      return Reflect.apply(origGet, this, []);
-    }
-  }], 'skip');
-
-  // === Tunables (локальные, регулируем «на месте», без глобальных флагов) ===
-  let FFS_TICK_MS   = 16;
-  let FFS_LIM_RUN   = 40;
-  let FFS_BOOT_MS   = 180;
-  let FFS_LIM_BOOT  = 96;
-
-  const now = (G.performance && typeof G.performance.now === 'function')
-    ? () => G.performance.now.call(G.performance)
-    : () => Date.now();
-
-  const T0 = now();
-  let calls = 0;
-  let ts    = 0;
-  const throttled = () => {
-    const t = now();
-    const TMS = FFS_TICK_MS | 0;
-    if (t - ts > TMS) { calls = 0; ts = t; }
-    const inBoot = (t - T0) < FFS_BOOT_MS;
-    const LIM = inBoot ? FFS_LIM_BOOT : FFS_LIM_RUN;
-    return (calls++ >= LIM);
-  };
-
-  const MAX_LEN = 256;
-  const CTRL = /[\u0000-\u001F]/;
-  const SIZED  = /\b-?\d+(?:\.\d+)?(?:px|pt|em|rem|%)\b/i;
-  const FAMILY = /"[^"]+"|'[^']+'|\b[a-z0-9][\w\- ]{1,}\b/i;
-  const GENERICS = new Set(['serif','sans-serif','monospace','cursive','fantasy','system-ui']);
-  let ALLOWED_FAMILIES = null;
-
-  function extractFamily(q) {
-    const m = String(q).match(/(?:^|\s)\d+(?:\.\d+)?(?:px|pt|em|rem|%)\b(?:\/\d+(?:\.\d+)?(?:px|pt|em|rem|%))?\s+(.+)$/i);
-    const raw = (m ? m[1] : q);
-    return raw.split(',')[0].replace(/['"]/g,'').trim().toLowerCase();
-  }
-
-  function getAllowedFamilies() {
-    if (ALLOWED_FAMILIES) return ALLOWED_FAMILIES;
-    const win = (typeof window !== 'undefined') ? window : G;
-    const domPlat = win.__NAV_PLATFORM__;
-    const cfgs = Array.isArray(win.fontPatchConfigs) ? win.fontPatchConfigs : [];
-    ALLOWED_FAMILIES = new Set(
-      (domPlat ? cfgs.filter(f => f.platform_dom === domPlat) : cfgs)
-        .flatMap(f => [f.cssFamily, f.family, f.name, f.fallback].filter(Boolean))
-        .map(s => s.toLowerCase())
-    );
-    return ALLOWED_FAMILIES;
-  }
-
-  const validFontQuery = q => {
-    if (!(typeof q === 'string' && q.length <= MAX_LEN && !CTRL.test(q) && SIZED.test(q) && FAMILY.test(q))) {
-      return false;
-    }
-    const fam = extractFamily(q);
-    if (!fam) return false;
-    if (GENERICS.has(fam)) return true;
-    return getAllowedFamilies().has(fam);
-  };
-
-  // method group: check + forEach(declare-only)
-  applyTargetGroup('fonts:method', [
-    {
-      owner: proto,
-      key: 'check',
-      kind: 'method',
-      wrapLayer: 'named_wrapper',
-      policy: 'skip',
-      diagTag: 'fonts:method:check',
-      invoke(orig, args) {
-        const query = args[0];
-        if (throttled()) return false;
-        if (!validFontQuery(query)) return false;
-        return Reflect.apply(orig, this, args);
-      }
-    },
-    {
-      owner: proto,
-      key: 'forEach',
-      kind: 'method',
-      wrapLayer: 'named_wrapper',
-      mode: 'declare_only',
-      enabled: false,
-      policy: 'skip',
-      diagTag: 'fonts:method:forEach'
-    }
-  ], 'skip');
-
-  // promise_method group: load
-  applyTargetGroup('fonts:promise', [{
-    owner: proto,
-    key: 'load',
-    kind: 'promise_method',
-    wrapLayer: 'named_wrapper',
-    policy: 'skip',
-    diagTag: 'fonts:promise:load',
-    invoke(orig, args) {
-      const query = args[0];
-      const text = args[1];
-      if (throttled()) return Promise.resolve([]);
-      if (!validFontQuery(query)) return Promise.resolve([]);
-      if (text != null && typeof text !== 'string') return Promise.resolve([]);
-      return Reflect.apply(orig, this, args);
-    }
-  }], 'skip');
-})();
 
 
 }

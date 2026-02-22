@@ -573,13 +573,25 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const proto = CanvasRenderingContext2D.prototype;
 
     // Patch once-per-method: if already patched, do nothing
-    function patchOnce(method, makeWrapped){
+    function patchOnce(method, makeApplyImpl){
       if (!proto || typeof proto[method] !== 'function') return false;
       if (patchedMethods.has(proto[method])) return false;
 
       const orig = proto[method];
-      const wrappedRaw = makeWrapped(orig);
-      const wrapped = markAsNative(wrappedRaw, method);
+      const wrapApply = (global && typeof global.__wrapNativeApply === 'function')
+        ? global.__wrapNativeApply
+        : null;
+      if (typeof wrapApply !== 'function') {
+        emitContextDiag('error', 'context:ctx2d:guard:wrap_native_apply_missing', null, {
+          stage: 'guard',
+          key: method,
+          type: 'pipeline missing data',
+          data: { need: '__wrapNativeApply' }
+        });
+        return false;
+      }
+      const applyImpl = makeApplyImpl(orig);
+      const wrapped = wrapApply(orig, method, applyImpl);
 
       definePatchedMethod(proto, method, wrapped);
       patchedMethods.add(wrapped);
@@ -601,16 +613,16 @@ const ContextPatchModule = function ContextPatchModule(window) {
     };
 
     // --- measureText: post-process TextMetrics via CanvasPatchHooks.applyMeasureTextHook ---
-    patchOnce('measureText', (orig) => ({ measureText(text) {
-      const txt = ''.concat(text);
-      const m = Reflect.apply(orig, this, [txt]);
+    patchOnce('measureText', (orig) => (target, thisArg, argList) => {
+      const txt = ''.concat((argList && argList.length) ? argList[0] : '');
+      const m = Reflect.apply(target, thisArg, [txt]);
 
       try {
         const H = getHooks();
-        const fontStr = getFontStr(this);
+        const fontStr = getFontStr(thisArg);
 
         if (H && typeof H.applyMeasureTextHook === 'function') {
-          const r = Reflect.apply(H.applyMeasureTextHook, this, [m, txt, fontStr]);
+          const r = Reflect.apply(H.applyMeasureTextHook, thisArg, [m, txt, fontStr]);
 
           return r ?? m;
         }
@@ -619,7 +631,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         if (H && typeof H.measureTextNoiseHook === 'function') {
           // leave native as-is if only info hook exists
           // (do not change width here to preserve consistency)
-          H.measureTextNoiseHook.call(this, m, txt, fontStr);
+          H.measureTextNoiseHook.call(thisArg, m, txt, fontStr);
         }
       } catch (e) {
         emitContextDiag('warn', 'context:ctx2d:hook:measureText_failed', e, {
@@ -629,21 +641,25 @@ const ContextPatchModule = function ContextPatchModule(window) {
       }
 
       return m;
-    } }).measureText);
+    });
 
     // --- fillText ---
-    patchOnce('fillText', (orig) => ({ fillText(text, x, y, ...rest) {
+    patchOnce('fillText', (orig) => (target, thisArg, argList) => {
+      const text = argList && argList.length ? argList[0] : undefined;
+      const x = argList && argList.length > 1 ? argList[1] : undefined;
+      const y = argList && argList.length > 2 ? argList[2] : undefined;
+      const rest = (argList && argList.length > 3) ? Array.prototype.slice.call(argList, 3) : [];
       try {
         const H = getHooks();
 
         if (H && typeof H.applyFillTextHook === 'function') {
-          const callOrig = (...a) => Reflect.apply(orig, this, a);
-          return H.applyFillTextHook.call(this, callOrig, text, x, y, ...rest);
+          const callOrig = (...a) => Reflect.apply(target, thisArg, a);
+          return H.applyFillTextHook.call(thisArg, callOrig, text, x, y, ...rest);
         }
 
         if (H && typeof H.fillTextNoiseHook === 'function') {
-          const a = H.fillTextNoiseHook.apply(this, [text, x, y, ...rest]) || [text, x, y, ...rest];
-          return Reflect.apply(orig, this, a);
+          const a = H.fillTextNoiseHook.apply(thisArg, [text, x, y, ...rest]) || [text, x, y, ...rest];
+          return Reflect.apply(target, thisArg, a);
         }
       } catch (e) {
         emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, {
@@ -652,22 +668,26 @@ const ContextPatchModule = function ContextPatchModule(window) {
         });
       }
 
-      return Reflect.apply(orig, this, [text, x, y, ...rest]);
-    } }).fillText);
+      return Reflect.apply(target, thisArg, [text, x, y, ...rest]);
+    });
 
     // --- strokeText ---
-    patchOnce('strokeText', (orig) => ({ strokeText(text, x, y, ...rest) {
+    patchOnce('strokeText', (orig) => (target, thisArg, argList) => {
+      const text = argList && argList.length ? argList[0] : undefined;
+      const x = argList && argList.length > 1 ? argList[1] : undefined;
+      const y = argList && argList.length > 2 ? argList[2] : undefined;
+      const rest = (argList && argList.length > 3) ? Array.prototype.slice.call(argList, 3) : [];
       try {
         const H = getHooks();
 
         if (H && typeof H.applyStrokeTextHook === 'function') {
-          const callOrig = (...a) => Reflect.apply(orig, this, a);
-          return H.applyStrokeTextHook.call(this, callOrig, text, x, y, ...rest);
+          const callOrig = (...a) => Reflect.apply(target, thisArg, a);
+          return H.applyStrokeTextHook.call(thisArg, callOrig, text, x, y, ...rest);
         }
 
         if (H && typeof H.strokeTextNoiseHook === 'function') {
-          const a = H.strokeTextNoiseHook.apply(this, [text, x, y, ...rest]) || [text, x, y, ...rest];
-          return Reflect.apply(orig, this, a);
+          const a = H.strokeTextNoiseHook.apply(thisArg, [text, x, y, ...rest]) || [text, x, y, ...rest];
+          return Reflect.apply(target, thisArg, a);
         }
       } catch (e) {
         emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, {
@@ -676,16 +696,20 @@ const ContextPatchModule = function ContextPatchModule(window) {
         });
       }
 
-      return Reflect.apply(orig, this, [text, x, y, ...rest]);
-    } }).strokeText);
+      return Reflect.apply(target, thisArg, [text, x, y, ...rest]);
+    });
 
     // --- fillRect ---
-    patchOnce('fillRect', (orig) => ({ fillRect(x, y, w, h) {
+    patchOnce('fillRect', (orig) => (target, thisArg, argList) => {
+      const x = argList && argList.length ? argList[0] : undefined;
+      const y = argList && argList.length > 1 ? argList[1] : undefined;
+      const w = argList && argList.length > 2 ? argList[2] : undefined;
+      const h = argList && argList.length > 3 ? argList[3] : undefined;
       try {
         const H = getHooks();
         if (H && typeof H.fillRectNoiseHook === 'function') {
-          const a = H.fillRectNoiseHook.call(this, x, y, w, h);
-          if (Array.isArray(a)) return Reflect.apply(orig, this, a);
+          const a = H.fillRectNoiseHook.call(thisArg, x, y, w, h);
+          if (Array.isArray(a)) return Reflect.apply(target, thisArg, a);
         }
       } catch (e) {
         emitContextDiag('warn', 'context:ctx2d:hook:fillRect_failed', e, {
@@ -693,17 +717,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: 'fillRect'
         });
       }
-      return Reflect.apply(orig, this, [x, y, w, h]);
-    } }).fillRect);
+      return Reflect.apply(target, thisArg, [x, y, w, h]);
+    });
 
     // --- drawImage ---
-    patchOnce('drawImage', (orig) => ({ drawImage(image, dx, dy, ...rest) {
-      const args = [image, dx, dy, ...rest];
+    patchOnce('drawImage', (orig) => (target, thisArg, argList) => {
+      const args = (argList && argList.length) ? Array.prototype.slice.call(argList) : [];
       try {
         const H = getHooks();
         if (H && typeof H.applyDrawImageHook === 'function') {
-          const callOrig = (...a) => Reflect.apply(orig, this, a);
-          return H.applyDrawImageHook.call(this, callOrig, ...args);
+          const callOrig = (...a) => Reflect.apply(target, thisArg, a);
+          return H.applyDrawImageHook.call(thisArg, callOrig, ...args);
         }
       } catch (e) {
         emitContextDiag('warn', 'context:ctx2d:hook:drawImage_failed', e, {
@@ -711,8 +735,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: 'drawImage'
         });
       }
-      return Reflect.apply(orig, this, args);
-    } }).drawImage);
+      return Reflect.apply(target, thisArg, args);
+    });
 
     // IMPORTANT: return real ctx (brand-safe). No Proxy.
     return ctx;

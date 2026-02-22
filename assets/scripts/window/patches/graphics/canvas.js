@@ -1,3 +1,43 @@
+/*
+== CONTRACT (CURRENT PIPELINE FACTS) ==
+
+Draft target: `Canvas_blueprint2102/canvas_stucture_draft.js`
+Source base:  `sunami/assets/scripts/window/patches/graphics/canvas.js`
+Date: 2026-02-21
+
+1) Roles (single contract)
+- `window.CanvasPatchContext` — internal state/registries/queues (pipeline “bus”) used by `context.js`.
+- `window.CanvasPatchHooks` — export surface ONLY (functions) consumed by `context.js.registerAllHooks()` and by ctx2D wrappers
+  (analogy: `window.webglHooks`).
+
+2) Identity / export rule (DO NOT break reference)
+- Never replace `window.CanvasPatchHooks` object entirely (no `window.CanvasPatchHooks = { ... }`).
+- Reason: `context.js` validates + registers against one container, and wrappers read hooks by reference; replacing the object creates “two baskets”.
+- Allowed pattern: ensure container exists, then assign properties onto the SAME object identity; optional `Object.defineProperty(...)`
+  is OK only if `value` is that same existing object (non-enumerable export, like in `webgl.js`).
+
+3) ctx2D text pipeline order (facts from `sunami/assets/scripts/window/core/context.js`)
+- `fillText`: if `typeof H.applyFillTextHook === 'function'` → runs FIRST and receives `(callOrig, text, x, y, ...rest)`.
+  Else if `typeof H.fillTextNoiseHook === 'function'` → can rewrite args → then native `fillText`.
+  Else → native `fillText`.
+- `strokeText`: same order with `applyStrokeTextHook` / `strokeTextNoiseHook`.
+
+4) Registration facts (facts from `sunami/assets/scripts/window/core/context.js`)
+- Required Canvas exports (hard-required by `registerAllHooks()`):
+  `patch2DNoise`, `patchToDataURLInjectNoise`, `masterToDataURLHook`,
+  `patchToBlobInjectNoise`, `patchConvertToBlobInjectNoise`,
+  `measureTextNoiseHook`, `fillTextNoiseHook`, `strokeTextNoiseHook`, `fillRectNoiseHook`,
+  `applyDrawImageHook`, `addCanvasNoise`.
+- `applyFillTextHook` / `applyStrokeTextHook` are OPTIONAL: not in the required list and not registered via `CanvasPatchContext`.
+  They only affect runtime if present, via wrapper precedence (see пункт 3).
+
+5) Local constraints for this module draft
+- Preserve all commented-out / disabled hooks exactly as-is (they are part of the operational contract).
+- No silent-swallow: if something fails, either keep native untouched (atomic skip) + emit `__DEGRADE__.diag`, or fail-fast.
+
+== END CONTRACT ==
+*/
+
 const CanvasPatchModule = function CanvasPatchModule(window) {
 const G = (typeof globalThis !== 'undefined' && globalThis)
   || (typeof self !== 'undefined' && self)
@@ -432,6 +472,23 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     }
   }
 
+  // =====================================================================
+  // TEXT / FONTS (Layer 1: vector/layout stage, pre-raster)
+  //
+  // What lives here (single semantic block):
+  // - TextMetrics: `measureTextNoiseHook` + `applyMeasureTextHook` (Proxy + cache)
+  // - Text draw noise: `fillTextNoiseHook` / `strokeTextNoiseHook` (arg-level jitter)
+  // - Font-scaling masters: `patchFontSizeScalingHooks()` → `applyFillTextHook` / `applyStrokeTextHook`
+  //
+  // Runtime order (facts from `sunami/assets/scripts/window/core/context.js`):
+  // - fillText:  `applyFillTextHook` (if exists) → `fillTextNoiseHook` → native
+  // - strokeText:`applyStrokeTextHook` (if exists) → `strokeTextNoiseHook` → native
+  //
+  // Important invariants:
+  // - `widthNoise` must remain local to `applyMeasureTextHook` (do not mutate global state here).
+  // - TextMetrics cache can "freeze" first-seen values per key; if first `measureText()` happens before fonts load,
+  //   downstream hashes may stop changing. Root-cause is *not proven here* — needs runtime confirmation.
+  // =====================================================================
   function measureTextNoiseHook(res, text, font) {
     if (!res) return null;
     const txt  = String(text ?? '');
@@ -468,6 +525,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   //  Proxy TextMetrics
   function applyMeasureTextHook(nativeMetrics, text, font) {
     try {
+      // NOTE: widthNoise is intentionally applied ONLY here (post-read),
+      // measureTextNoiseHook itself must not change returned metrics for consistency.
       const info = measureTextNoiseHook.call(this, nativeMetrics, text, font);
       if (!info || typeof info !== 'object') return nativeMetrics;
       const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
@@ -531,6 +590,149 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const dy = __stableNoise__(keyy, -(__CNV_CFG__.dyPx), (__CNV_CFG__.dyPx));
     return [text, x + dx, y + dy, ...rest];
   }
+
+  // === Font size scaling: masters for fillText/strokeText (Layer 1) ===
+  //
+  // Requirements:
+  // - Reads global configs: `window.fontPatchConfigs` (optional)
+  // - Writes global idempotency flag: `window.__PATCH_FONT_SCALE_HOOKS__`
+  // - Exports masters: `applyFillTextHook` / `applyStrokeTextHook` (via final export section)
+  //
+  // NOTE: This block must not replace `window.CanvasPatchHooks` identity.
+  let applyFillTextHook, applyStrokeTextHook;
+
+  (function patchFontSizeScalingHooks(){
+    if (window.__PATCH_FONT_SCALE_HOOKS__) return;
+    window.__PATCH_FONT_SCALE_HOOKS__ = true;
+
+    const Hooks = (window.CanvasPatchHooks ||= {});
+
+    // ——— helpers ———
+    // Разбор font-шортхенда: "... 16px/normal Arial"
+    function parseFontShorthand(font) {
+      const m = String(font || '').match(
+        /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
+      );
+      if (!m) {
+        return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
+      }
+      return {
+        style:   m[1] || 'normal',
+        variant: m[2] || 'normal',
+        weight:  m[3] || 'normal',
+        sizePx:  parseFloat(m[4]),
+        line:    m[5],
+        family:  m[6]
+      };
+    }
+
+    function buildFont(f) {
+      if (!f || typeof f !== 'object') {
+        throw new Error('[CanvasPatch] buildFont: invalid font object');
+      }
+      const parts = [];
+      if (f.style && f.style !== 'normal') parts.push(String(f.style));
+      if (f.variant && f.variant !== 'normal') parts.push(String(f.variant));
+      if (f.weight && f.weight !== 'normal') parts.push(String(f.weight));
+
+      const sizePx = f.sizePx;
+      if (!(typeof sizePx === 'number' && isFinite(sizePx) && sizePx > 0)) {
+        throw new Error('[CanvasPatch] buildFont: invalid sizePx');
+      }
+      const sizePart = `${sizePx}px` + (f.line ? `/${String(f.line)}` : '');
+      parts.push(sizePart);
+
+      const family = (typeof f.family === 'string') ? f.family.trim() : '';
+      if (!family) {
+        throw new Error('[CanvasPatch] buildFont: missing family');
+      }
+      parts.push(family);
+
+      return parts.join(' ');
+    }
+
+    // Масштаб под текст: сперва fontPatchConfigs, фолбэк — __FONT_SCALE__
+    function getScaleForText(ctx, text) {
+      try {
+        const cfgs = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
+        const font = String(ctx && ctx.font || '');
+        for (const c of cfgs) {
+          const fam = (c.family instanceof RegExp) ? c.family : new RegExp(c.family || '.*', 'i');
+          const wt  = (c.weight == null) ? null : String(c.weight).toLowerCase();
+          if (fam.test(font) && (!wt || font.toLowerCase().includes(wt))) {
+            const sx = Number.isFinite(c.scaleX) ? c.scaleX : (Number.isFinite(c.scale) ? c.scale : 1);
+            const sy = Number.isFinite(c.scaleY) ? c.scaleY : (Number.isFinite(c.scale) ? c.scale : 1);
+            return { sx, sy };
+          }
+        }
+      } catch (e) {
+        emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
+          stage: 'runtime',
+          key: 'fontPatchConfigs'
+        });
+      }
+      const s = (typeof window.__FONT_SCALE__ === 'number' && isFinite(window.__FONT_SCALE__)) ? window.__FONT_SCALE__ : 1;
+      return { sx: s, sy: s };
+    }
+
+    // ——— master for fillText: consistent render ———
+    applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
+      const { sx, sy } = getScaleForText(this, text);
+      if (sx===1 && sy===1) {
+        return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+      }
+      // Isotropic — temporarily scale font.sizePx (faster)
+      if (Math.abs(sx - sy) < 1e-6) {
+        const prev = this.font || '';
+        try {
+          const f = parseFontShorthand(prev);
+          f.sizePx *= sx;
+          this.font = buildFont(f);
+          return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+        } finally {
+          this.font = prev;
+        }
+      }
+      // Anisotropic — matrix scale + coordinate/width compensation
+      this.save();
+      try {
+        this.scale(sx, sy);
+        return (maxWidth!=null)
+          ? origFillText(text, x/sx, y/sy, maxWidth/sx)
+          : origFillText(text, x/sx, y/sy);
+      } finally {
+        this.restore();
+      }
+    };
+
+    // ——— master for strokeText: same as above ———
+    applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
+      const { sx, sy } = getScaleForText(this, text);
+      if (sx===1 && sy===1) {
+        return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+      }
+      if (Math.abs(sx - sy) < 1e-6) {
+        const prev = this.font || '';
+        try {
+          const f = parseFontShorthand(prev);
+          f.sizePx *= sx;
+          this.font = buildFont(f);
+          return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+        } finally {
+          this.font = prev;
+        }
+      }
+      this.save();
+      try {
+        this.scale(sx, sy);
+        return (maxWidth!=null)
+          ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
+          : origStrokeText(text, x/sx, y/sy);
+      } finally {
+        this.restore();
+      }
+    };
+  })();
 
   function fillRectNoiseHook(x, y, w, h){
     return [ q256(x), q256(y), q256(w), q256(h) ];
@@ -613,141 +815,56 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return res;
   }
 
-// === Font size scaling: контейнер мастеров (живёт в canvas.js) ===
-
-// Делаем имена доступными на уровне CanvasPatchModule (для экспорта ниже)
-let applyFillTextHook, applyStrokeTextHook;
-
-(function patchFontSizeScalingHooks(){
-  if (window.__PATCH_FONT_SCALE_HOOKS__) return;
-  window.__PATCH_FONT_SCALE_HOOKS__ = true;
-
-  const Hooks = (window.CanvasPatchHooks ||= {});
-
-  // ——— helpers ———
-  // Разбор font-шортхенда: "... 16px/normal Arial"
-  function parseFontShorthand(font) {
-    const m = String(font || '').match(
-      /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
-    );
-    if (!m) {
-      return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
-    }
-    return {
-      style:   m[1] || 'normal',
-      variant: m[2] || 'normal',
-      weight:  m[3] || 'normal',
-      sizePx:  parseFloat(m[4]),
-      line:    m[5],
-      family:  m[6]
-    };
-  }
-
-  // Масштаб под текст: сперва fontPatchConfigs, фолбэк — __FONT_SCALE__
-  function getScaleForText(ctx, text) {
-    try {
-      const cfgs = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
-      const font = String(ctx && ctx.font || '');
-      for (const c of cfgs) {
-        const fam = (c.family instanceof RegExp) ? c.family : new RegExp(c.family || '.*', 'i');
-        const wt  = (c.weight == null) ? null : String(c.weight).toLowerCase();
-        if (fam.test(font) && (!wt || font.toLowerCase().includes(wt))) {
-          const sx = Number.isFinite(c.scaleX) ? c.scaleX : (Number.isFinite(c.scale) ? c.scale : 1);
-          const sy = Number.isFinite(c.scaleY) ? c.scaleY : (Number.isFinite(c.scale) ? c.scale : 1);
-          return { sx, sy };
-        }
-      }
-    } catch (e) {
-      emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
-        stage: 'runtime',
-        key: 'fontPatchConfigs'
-      });
-    }
-    const s = (typeof window.__FONT_SCALE__ === 'number' && isFinite(window.__FONT_SCALE__)) ? window.__FONT_SCALE__ : 1;
-    return { sx: s, sy: s };
-  }
-
-
-
-
-  // ——— мастер для fillText: согласованный рендер ———
-  applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
-    const { sx, sy } = getScaleForText(this, text);
-    if (sx===1 && sy===1) {
-      return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
-    }
-    // Изотропный случай — временно масштабируем font.sizePx (быстрее)
-    if (Math.abs(sx - sy) < 1e-6) {
-      const prev = this.font || '';
-      try {
-        const f = parseFontShorthand(prev);
-        f.sizePx *= sx;
-        this.font = buildFont(f);
-        return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
-      } finally {
-        this.font = prev;
-      }
-    }
-    // Анизотропный — матричный scale + компенсация координат/ширины
-    this.save();
-    try {
-      this.scale(sx, sy);
-      return (maxWidth!=null)
-        ? origFillText(text, x/sx, y/sy, maxWidth/sx)
-        : origFillText(text, x/sx, y/sy);
-    } finally {
-      this.restore();
-    }
-  };
-
-  // ——— мастер для strokeText: то же, что выше ———
-  applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
-    const { sx, sy } = getScaleForText(this, text);
-    if (sx===1 && sy===1) {
-      return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
-    }
-    if (Math.abs(sx - sy) < 1e-6) {
-      const prev = this.font || '';
-      try {
-        const f = parseFontShorthand(prev);
-        f.sizePx *= sx;
-        this.font = buildFont(f);
-        return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
-      } finally {
-        this.font = prev;
-      }
-    }
-    this.save();
-    try {
-      this.scale(sx, sy);
-      return (maxWidth!=null)
-        ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
-        : origStrokeText(text, x/sx, y/sy);
-    } finally {
-      this.restore();
-    }
-  };
-})();
-
 
 // --- final export ---
-window.CanvasPatchHooks = {
-  patch2DNoise,
-  patchToDataURLInjectNoise,
-  // 2026-02-11: disabled export with runtime-disabled hook.
-  // patchCanvasIHDRHook,
-  masterToDataURLHook,
-  patchToBlobInjectNoise,
-  patchConvertToBlobInjectNoise,
-  measureTextNoiseHook,
-  applyMeasureTextHook,
-  fillTextNoiseHook,
-  strokeTextNoiseHook,
-  fillRectNoiseHook,
-  addCanvasNoise,
-  applyDrawImageHook,
-  applyFillTextHook,
-  applyStrokeTextHook,
+// IMPORTANT: do not replace the CanvasPatchHooks object identity.
+// Other modules may hold a reference to the existing object and/or keep config fields on it.
+const __CanvasPatchHooksExisting__ = window.CanvasPatchHooks;
+const __CanvasPatchHooks__ =
+  (__CanvasPatchHooksExisting__ && (typeof __CanvasPatchHooksExisting__ === 'object' || typeof __CanvasPatchHooksExisting__ === 'function'))
+    ? __CanvasPatchHooksExisting__
+    : (__CanvasPatchHooksExisting__ == null ? {} : null);
 
-};
+if (!__CanvasPatchHooks__) {
+  // Contract violation: CanvasPatchHooks must be an object container for exports.
+  // Fail-fast: context.js relies on this being an object and will otherwise misbehave silently.
+  throw new Error('[CanvasPatch] CanvasPatchHooks contract violation (expected object)');
+}
+
+// Prefer hidden (non-enumerable) export like webglHooks, but keep the same object identity.
+try {
+  Object.defineProperty(window, 'CanvasPatchHooks', {
+    value: __CanvasPatchHooks__,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} catch (e) {
+  // Fallback: best-effort assignment. Do NOT allocate a new object here.
+  try { if (window.CanvasPatchHooks == null) window.CanvasPatchHooks = __CanvasPatchHooks__; } catch (_) {}
+  emitCanvasDiag('warn', 'canvas:CanvasPatchHooks:define_failed', e, {
+    stage: 'apply',
+    key: 'CanvasPatchHooks',
+    type: 'browser structure missing data'
+  });
+}
+
+__CanvasPatchHooks__.patch2DNoise = patch2DNoise;
+__CanvasPatchHooks__.patchToDataURLInjectNoise = patchToDataURLInjectNoise;
+// 2026-02-11: disabled export with runtime-disabled hook.
+// __CanvasPatchHooks__.patchCanvasIHDRHook = patchCanvasIHDRHook;
+__CanvasPatchHooks__.masterToDataURLHook = masterToDataURLHook;
+__CanvasPatchHooks__.patchToBlobInjectNoise = patchToBlobInjectNoise;
+__CanvasPatchHooks__.patchConvertToBlobInjectNoise = patchConvertToBlobInjectNoise;
+__CanvasPatchHooks__.measureTextNoiseHook = measureTextNoiseHook;
+__CanvasPatchHooks__.applyMeasureTextHook = applyMeasureTextHook;
+__CanvasPatchHooks__.fillTextNoiseHook = fillTextNoiseHook;
+__CanvasPatchHooks__.strokeTextNoiseHook = strokeTextNoiseHook;
+__CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
+__CanvasPatchHooks__.addCanvasNoise = addCanvasNoise;
+__CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
+
+// optional masters (may be absent depending on build/guards)
+if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
+if (typeof applyStrokeTextHook === 'function') __CanvasPatchHooks__.applyStrokeTextHook = applyStrokeTextHook;
 }

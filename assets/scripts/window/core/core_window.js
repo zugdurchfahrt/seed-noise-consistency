@@ -7,10 +7,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         || (typeof window     !== 'undefined' && window)
         || (typeof global     !== 'undefined' && global)
         || {};
-        
-
-
-  const env = window && window.env;
+     
 
   if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
     throw new Error('[CoreWindow] window missing');

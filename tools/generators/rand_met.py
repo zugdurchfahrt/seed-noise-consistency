@@ -16,10 +16,11 @@ import base64
 from tools.tools_infra.overseer import logger
 logger = logger.getChild("rand_met")
 
+
 # ----------------------- CONST -----------------------
 PROJECT_ROOT            = pathlib.Path(__file__).resolve().parents[2]
 ASSETS                  = PROJECT_ROOT / 'assets'
-PROFILE_DATA_SOURCE     = ASSETS / 'profile_data_source'
+PROFILE_DATA_SOURCE     = PROJECT_ROOT / 'profile_data_source'
 DESIGNER_BY_FAMILY_PATH = PROFILE_DATA_SOURCE / 'FONTS_DESIGNER_BY_FAMILY_JSON.json'
 LICENSE_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_LICENSE_BY_FAMILY_JSON.json'
 VERSION_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_VERSION_BY_FAMILY_JSON.json'
@@ -36,7 +37,9 @@ SYS_FONTS_WIN = [
     'Segoe UI','Arial','Calibri','Verdana','Tahoma','Candara','Trebuchet MS',
     'Bahnschrift','Aptos','Times New Roman','Georgia','Cambria','Constantia',
     'Consolas','Courier New','Cascadia Code','Comic Sans MS','Impact',
-    'Segoe Print','Segoe Script']
+    'Segoe Print','Segoe Script','Cascadia Mono','Corbel','DejaVu Sans',
+    'DejaVu Sans Mono','DejaVu Serif','Gentium','Inter','Liberation Mono',
+    'Liberation Sans','Liberation Serif','Montserrat','Roboto','Tinos']
 
     
     
@@ -341,32 +344,46 @@ def _derive_full_name(family: str, subfamily: str) -> str:
     return f"{family} {subfamily}"
 
 def json_dict(path: pathlib.Path) -> dict:
-    # def _env_json_dict(name: str) -> dict:
     """
-    Read an env var as JSON dict. Invalid JSON is reported and ignored.
+    Read a JSON file as dict.
     """
     try:
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
+        logger.warning(f"[fonts] json_dict missing file: {path}")
+        return {}
+    except Exception as e:
+        logger.warning(f"[fonts] json_dict read failed: {path} ({type(e).__name__}: {e})")
+        return {}
+
+
+def _env_json_dict(name: str) -> dict:
+    """
+    Read env var as JSON dict.
+    Supports both inline JSON and a path to a JSON file.
+    """
+    raw = os.environ.get(name, "")
+    raw = (raw or "").strip()
+    if not raw:
+        return {}
+    # file path mode
+    try:
+        p = pathlib.Path(raw)
+        if p.exists() and p.is_file():
+            obj = json_dict(p)
+            return obj if isinstance(obj, dict) else {}
+    except Exception:
+        pass
+    # inline JSON mode
+    try:
+        obj = json.loads(raw)
+        return obj if isinstance(obj, dict) else {}
+    except Exception as e:
+        logger.warning(f"[fonts] bad JSON env {name}: {e}")
         return {}
         
-
     
-    # raw = os.environ.get(name)
-    # if not raw:
-    #     return {}
-    # try:
-    #     val = json.loads(raw)
-    # except Exception as e:
-    #     logger.warning(f"[fonts] invalid env JSON in {name}: {e}")
-    #     return {}
-    # if not isinstance(val, dict):
-    #     logger.warning(f"[fonts] invalid env JSON in {name}: expected dict, got {type(val).__name__}")
-    #     return {}
-    # return val
-
-
 def _empty_if_unknown(value: str) -> str:
     s = _normalize_whitespace(value)
     if not s:
@@ -589,10 +606,18 @@ def metadata_container_template(platform: str, subfamilies_src=None, rng=None):
     }
     meta = generate_random_nameids_from_pools(pools, r)
 
-    designer_by_family = json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
-    license_by_designer =  json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
-    license_by_family = json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
-    version_by_family = json_dict("FONTS_VERSION_BY_FAMILY_JSON")
+
+    designer_by_family = json_dict(DESIGNER_BY_FAMILY_PATH)
+    license_by_designer =  json_dict(DESIGNER_BY_FAMILY_PATH)
+    license_by_family = json_dict(LICENSE_BY_FAMILY_PATH)
+    version_by_family = json_dict(VERSION_BY_FAMILY_PATH)
+
+
+
+    # designer_by_family = json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
+    # license_by_designer =  json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
+    # license_by_family = json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
+    # version_by_family = json_dict("FONTS_VERSION_BY_FAMILY_JSON")
 
     fam_key = _normalize_whitespace(meta.get(1, ""))
     if fam_key:
@@ -768,10 +793,22 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     skip_stats = defaultdict(int)
     
     logger.info(f"[fonts] cssFamily fixed: {CSS_FAMILY}")
-    designer_by_family = json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
-    license_by_designer = json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
-    license_by_family = json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
-    version_by_family = json_dict("FONTS_VERSION_BY_FAMILY_JSON")
+    
+    
+    
+
+    designer_by_family = json_dict(DESIGNER_BY_FAMILY_PATH)
+    license_by_designer =  json_dict(DESIGNER_BY_FAMILY_PATH)
+    license_by_family = json_dict(LICENSE_BY_FAMILY_PATH)
+    version_by_family = json_dict(VERSION_BY_FAMILY_PATH)
+    
+    
+    
+    
+    # designer_by_family = json_dict("FONTS_DESIGNER_BY_FAMILY_JSON")
+    # license_by_designer = json_dict("FONTS_LICENSE_BY_DESIGNER_JSON")
+    # license_by_family = json_dict("FONTS_LICENSE_BY_FAMILY_JSON")
+    # version_by_family = json_dict("FONTS_VERSION_BY_FAMILY_JSON")
 
     _saved_state = random.getstate()
     random.seed(_seed ^ 0x9E3779B1)
@@ -809,10 +846,10 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 base_sub_raw = _get_nameid_any(tt, 2)
                 base_family = _normalize_whitespace(base_family_raw) or name_no_ext
                 subfamily = _normalize_subfamily_value(base_sub_raw)
-                # Registry-only policy for showcase metadata: do not mix source 5/9/13 with generated profile.
-                version = ""
-                designer = ""
-                license_desc = ""
+                # Showcase metadata: take from file first, then apply registry overrides (do not randomize).
+                version = _empty_if_unknown(_get_nameid_any(tt, 5))
+                designer = _empty_if_unknown(_get_nameid_any(tt, 9))
+                license_desc = _empty_if_unknown(_get_nameid_any(tt, 13))
             else:
                 base_family = name_no_ext
                 subfamily = _normalize_subfamily_value("")
@@ -920,7 +957,10 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "platform_id": c["platform_id"],
             "platform_dom": c.get("platform_dom"),
             "weight": c.get("weight","normal"),
-            "style": c.get("style","normal")
+            "style": c.get("style","normal"),
+            "designer": c.get("designer", ""),
+            "license": c.get("license", ""),
+            "version": c.get("version", "")
         }
         for c in temp_configs
     ]

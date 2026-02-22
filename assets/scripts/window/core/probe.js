@@ -104,6 +104,8 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     "CanvasRenderingContext2D.prototype.measureText",
     "CanvasRenderingContext2D.prototype.fillText",
     "CanvasRenderingContext2D.prototype.strokeText",
+    "CanvasRenderingContext2D.prototype.fillRect",
+    "CanvasRenderingContext2D.prototype.drawImage",
     "WebGLRenderingContext.prototype.getParameter",
     "WebGLRenderingContext.prototype.getSupportedExtensions",
     "WebGLRenderingContext.prototype.getExtension",
@@ -238,7 +240,7 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
           return null;
         }
       },
-      keys: ["measureText", "fillText", "strokeText"]
+      keys: ["measureText", "fillText", "strokeText", "fillRect", "drawImage"]
     },
     {
       label: "WebGLRenderingContext.prototype",
@@ -932,6 +934,85 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
         ["2d"]
       );
 
+      let ctx2d = null;
+      try {
+        ctx2d = canvas && typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
+      } catch (_) {
+        ctx2d = null;
+      }
+      const drawImageSrc = (() => {
+        try {
+          if (typeof document === "undefined" || typeof document.createElement !== "function") return null;
+          const src = document.createElement("canvas");
+          src.width = 1;
+          src.height = 1;
+          return src;
+        } catch (_) {
+          return null;
+        }
+      })();
+      const drawImageArgs = drawImageSrc ? [drawImageSrc, 0, 0] : (canvas ? [canvas, 0, 0] : []);
+
+      const ctx2dMeasureTextFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.measureText
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.measureText",
+        ctx2dMeasureTextFn,
+        ctx2d,
+        ["A"],
+        {},
+        ["A"]
+      );
+
+      const ctx2dFillTextFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.fillText
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.fillText",
+        ctx2dFillTextFn,
+        ctx2d,
+        ["A", 0, 0],
+        {},
+        ["A", 0, 0]
+      );
+
+      const ctx2dStrokeTextFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.strokeText
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.strokeText",
+        ctx2dStrokeTextFn,
+        ctx2d,
+        ["A", 0, 0],
+        {},
+        ["A", 0, 0]
+      );
+
+      const ctx2dFillRectFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.fillRect
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.fillRect",
+        ctx2dFillRectFn,
+        ctx2d,
+        [0, 0, 1, 1],
+        {},
+        [0, 0, 1, 1]
+      );
+
+      const ctx2dDrawImageFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.drawImage
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.drawImage",
+        ctx2dDrawImageFn,
+        ctx2d,
+        drawImageArgs,
+        {},
+        drawImageArgs
+      );
+
       const AudioCtxCtor = (typeof AudioContext === "function")
         ? AudioContext
         : (typeof webkitAudioContext === "function" ? webkitAudioContext : null);
@@ -1394,6 +1475,8 @@ function printToStringCrossRealmChecks() {
     { p: "CanvasRenderingContext2D.prototype", k: "measureText",     exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "CanvasRenderingContext2D.prototype", k: "fillText",        exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "CanvasRenderingContext2D.prototype", k: "strokeText",      exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
+    { p: "CanvasRenderingContext2D.prototype", k: "fillRect",        exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
+    { p: "CanvasRenderingContext2D.prototype", k: "drawImage",       exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "WebGLRenderingContext.prototype", k: "getParameter",       exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "WebGLRenderingContext.prototype", k: "getSupportedExtensions", exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "WebGLRenderingContext.prototype", k: "getExtension",       exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
