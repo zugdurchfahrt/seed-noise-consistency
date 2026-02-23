@@ -307,31 +307,31 @@ def init_driver(
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
       
-    cdp.SW_META = expected_client_hints
-    cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
+    # cdp.SW_META = expected_client_hints
+    # cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
       
-    sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
-    sw_thread.start()
-    logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
+    # sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
+    # sw_thread.start()
+    # logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
 
-    # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
-    # if the CDP websocket drops mid-session, paused workers may remain paused.
-    if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
-        cdp.enable_worker_seed_inject(global_seed)
-        worker_seed_thread = threading.Thread(
-            target=cdp.run_worker_seed,
-            daemon=True,
-            name="cdp_worker_seed_injector",
-        )
-        worker_seed_thread.start()
-        logger.info(
-            "Worker seed injector thread started name=%s ident=%s on port %s",
-            worker_seed_thread.name,
-            worker_seed_thread.ident,
-            cdp.PORT,
-        )
-        cdp.log_cdp_runtime_diag("main_after_worker_seed_thread_start")
+    # # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
+    # # if the CDP websocket drops mid-session, paused workers may remain paused.
+    # if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
+    #     cdp.enable_worker_seed_inject(global_seed)
+    #     worker_seed_thread = threading.Thread(
+    #         target=cdp.run_worker_seed,
+    #         daemon=True,
+    #         name="cdp_worker_seed_injector",
+    #     )
+    #     worker_seed_thread.start()
+    #     logger.info(
+    #         "Worker seed injector thread started name=%s ident=%s on port %s",
+    #         worker_seed_thread.name,
+    #         worker_seed_thread.ident,
+    #         cdp.PORT,
+    #     )
+    cdp.log_cdp_runtime_diag("main_after_worker_seed_thread_start")
 
         # reflect_js = Path(SCRIPTS_CORE / "BESTLOGgptV3.js").read_text(encoding="utf-8")
         # driver.execute_cdp_cmd(
@@ -357,8 +357,8 @@ def init_driver(
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
             # --- workers (bootstrap/hooks). No direct module call here unless you have one.
-            Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
-            "WrkModule(window);",
+            # Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
+            # "WrkModule(window);",
             # --- env params ---
             Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
             "RNGsetModule(window);",
@@ -404,7 +404,7 @@ def init_driver(
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             // ——— Worker env diagnostics (pre-bootstrap) ———//
-            console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
+            // console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             })(window);
             """
         ]
@@ -467,42 +467,42 @@ def init_driver(
     inject_uach_strip_window(driver, user_agent)
 
      # --- Workers Initial patch reading ---
-    core = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
-    logger.info("WORKER_PATCH_SRC.initated")
+    # core = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
+    # logger.info("WORKER_PATCH_SRC.initated")
 
     # --- publish worker core into __ENV_BRIDGE__ (stable for external worker_bootstrap.js) ---
-    worker_bootstrap_env_js = f"""
-    (() => {{
-        const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
-        if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-        const core = {json.dumps(core)};
-        if (!BR.inlinePatch) {{
-            BR.inlinePatch = core;
-        }} else if (BR.inlinePatch !== core) {{
-            throw new Error('WorkerBootstrap: inlinePatch already set');
-        }}
-    }})();
-    //# sourceURL=worker_bootstrap_env.js
-    """
-    # --- prepare worker_bootstrap_js (reads __ENV_BRIDGE__.inlinePatch) ---
-    worker_bootstrap_js = Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")
+    # worker_bootstrap_env_js = f"""
+    # (() => {{
+    #     const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
+    #     if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+    #     const core = {json.dumps(core)};
+    #     if (!BR.inlinePatch) {{
+    #         BR.inlinePatch = core;
+    #     }} else if (BR.inlinePatch !== core) {{
+    #         throw new Error('WorkerBootstrap: inlinePatch already set');
+    #     }}
+    # }})();
+    # //# sourceURL=worker_bootstrap_env.js
+    # """
+    # # --- prepare worker_bootstrap_js (reads __ENV_BRIDGE__.inlinePatch) ---
+    # worker_bootstrap_js = Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")
 
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     
-    # Publish worker patch core early (used by external worker_bootstrap.js too)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
+    # # Publish worker patch core early (used by external worker_bootstrap.js too)
+    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
 
-    # Connect worker_bootstrap_js AFTER page_js:
-    # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
+    # # Connect worker_bootstrap_js AFTER page_js:
+    # # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
+    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
     # =========================
     # [CH] Setting up Client hints (CDP-only) + __HEADERS__ (JS, NEW DOCUMENT)
     #  No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
     # =========================
 
-    # --- [CH/01] detect UA family for safelisted headers ---
+    # # --- [CH/01] detect UA family for safelisted headers ---
     is_safari = "Safari" in user_agent and ("Chrome" not in user_agent and "Edg/" not in user_agent)
     is_firefox = "Firefox" in user_agent and ("Chrome" not in user_agent and "Edg/" not in user_agent)
 
@@ -538,37 +538,37 @@ def init_driver(
     # window.__HEADERS__ — Basic set for JS-paatch. На cross-origin  safelisted (accept-language).
     # Keys like sec-ch-* will be ignored by JS (CDP-only).
         
-    headers_window_js = f"""
-    window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
-    console.log("[headers_stage] window.__HEADERS__ injected (safelisted only)");
+    # headers_window_js = f"""
+    # window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
+    # console.log("[headers_stage] window.__HEADERS__ injected (safelisted only)");
 
-    {Path(SCRIPTS_PATCHES_STEALTH / "headers_interceptor.js").read_text("utf-8")}
-    HeadersInterceptor(window);
+    # {Path(SCRIPTS_PATCHES_STEALTH / "headers_interceptor.js").read_text("utf-8")}
+    # HeadersInterceptor(window);
 
-    //# sourceURL=headers_stage.js
-    """
-    # --- [HDR/02] CDP: register __HEADERS__ for every NEW DOCUMENT ---
-    # window.__HEADERS__ injected (safelisted only)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
+    # //# sourceURL=headers_stage.js
+    # """
+    # # --- [HDR/02] CDP: register __HEADERS__ for every NEW DOCUMENT ---
+    # # window.__HEADERS__ injected (safelisted only)
+    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
     
  
     # --- [HDR/03] load bridge JS (text) ---
     # Headers interceptor bridge to sync allow/ignore CDP with Fetch interceptor
-    headers_bridge_path = (SCRIPTS_PATCHES_STEALTH / "headers_bridge.js")
-    headers_bridge_js = headers_bridge_path.read_text("utf-8")
+    # headers_bridge_path = (SCRIPTS_PATCHES_STEALTH / "headers_bridge.js")
+    # headers_bridge_js = headers_bridge_path.read_text("utf-8")
 
-    # --- [HDR/04] CDP: register bridge for every NEW DOCUMENT ---
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
+    # # --- [HDR/04] CDP: register bridge for every NEW DOCUMENT ---
+    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
 
-    # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
-    fetch_rules = []
+    # # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
+    # fetch_rules = []
 
-    _install_fetch_interceptor(
-        driver,
-        fetch_rules,
-        extra_headers_fn=lambda url, method, rtype: safelisted_headers,
-        blocked_headers=[]
-    )
+    # _install_fetch_interceptor(
+    #     driver,
+    #     fetch_rules,
+    #     extra_headers_fn=lambda url, method, rtype: safelisted_headers,
+    #     blocked_headers=[]
+    # )
 
     logger.info("All fingerprint stealth  patches successfully injected into new document")
     logger.info("WebDriver launched successfully")
@@ -1046,7 +1046,7 @@ def main():
 
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/fonts.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.

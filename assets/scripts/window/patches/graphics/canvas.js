@@ -525,6 +525,24 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   //  Proxy TextMetrics
   function applyMeasureTextHook(nativeMetrics, text, font) {
     try {
+      // Cache-freeze root cause (by design): TextMetrics cache has no invalidation.
+      // If the first measureText() for a key happens before fonts are actually ready,
+      // the cached values can "cement" early/fallback metrics forever for that key.
+      //
+      // Mitigation (minimal, MDN/Chromium-consistent):
+      // - Do not create/use TextMetrics cache until fonts are ready.
+      // - Keep API-shape compatibility: do not synthesize values for properties absent on native TextMetrics.
+
+      const doc = (window && window.document);
+      const ffs = doc && doc.fonts;
+
+      const fontsReady =
+        (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')
+          ? (window.__FONTS_READY__ === true)
+          : false)
+        || (!!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded'));
+
+      if (!fontsReady) return nativeMetrics;
       // NOTE: widthNoise is intentionally applied ONLY here (post-read),
       // measureTextNoiseHook itself must not change returned metrics for consistency.
       const info = measureTextNoiseHook.call(this, nativeMetrics, text, font);
@@ -534,11 +552,13 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const key = (typeof info.key === 'string' && info.key.length) ? info.key : null;
       return new Proxy(nativeMetrics, {
         get(t, p) {
+          const hasProp = (p in t);
           if (key) {
             const cached = TM.cache.get(key);
-            if (cached && typeof cached[p] === 'number') return cached[p];
+            if (hasProp && cached && typeof cached[p] === 'number') return cached[p];
           }
           let v = Reflect.get(t, p, t);
+          if (!hasProp) return v;
           if (!(typeof v === 'number' && isFinite(v))) {
             const a = info.approx || {};
             if (p === 'width')                          v = a.width   ?? 1;
