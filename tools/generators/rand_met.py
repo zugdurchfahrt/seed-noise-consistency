@@ -20,9 +20,6 @@ logger = logger.getChild("rand_met")
 PROJECT_ROOT        = pathlib.Path(__file__).resolve().parents[2]
 ASSETS              = PROJECT_ROOT / 'assets'
 PROFILE_DATA_SOURCE     = PROJECT_ROOT / 'profile_data_source'
-DESIGNER_BY_FAMILY_PATH = PROFILE_DATA_SOURCE / 'FONTS_DESIGNER_BY_FAMILY_JSON.json'
-LICENSE_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_LICENSE_BY_FAMILY_JSON.json'
-VERSION_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_VERSION_BY_FAMILY_JSON.json'
 TOOLS               = PROJECT_ROOT / 'tools'
 GENERATORS          = TOOLS / 'generators'
 TEMPLATES           = ASSETS / 'templates'
@@ -73,48 +70,47 @@ PUA_RANGES = [
 ]
 
 
+_MANIFEST_SEED = None
+_META_RNG = None
+
+
+def _seed_env() -> str:
+    v = os.environ.get("__GLOBAL_SEED")
+    if v is None:
+        raise RuntimeError("[fonts] __GLOBAL_SEED env is required (missing)")
+    v = str(v).strip()
+    if not v:
+        raise RuntimeError("[fonts] __GLOBAL_SEED env is required (empty)")
+    return v
+
+
+def _seed_namespace() -> str:
+    raw = _seed_env()
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", raw).strip("._-")
+    if not safe:
+        raise RuntimeError("[fonts] __GLOBAL_SEED env is not usable for namespace (sanitized to empty)")
+    return safe
+
+
+def _rng_for_manifest(platform: str, all_names: list) -> random.Random:
+    global _MANIFEST_SEED
+    seed_env = _seed_env()
+    _seed_src = f"{seed_env}|{platform}|" + "|".join(sorted(all_names))
+    _MANIFEST_SEED = int(hashlib.md5(_seed_src.encode("utf-8")).hexdigest()[:8], 16)
+    return random.Random(_MANIFEST_SEED)
+
+
+def _meta_rng() -> random.Random:
+    if _META_RNG is None:
+        raise RuntimeError("[fonts] META_RNG is required (not initialized)")
+    return _META_RNG
+
+
 
 def _normalize_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", (value or "").strip())
 
 
-def _normalize_subfamily_value(value: str) -> str:
-    """
-    Canonicalize any incoming subfamily string to the project's known set.
-    Unknown/empty values degrade to Regular (if available).
-    """
-    default_sub = "Regular" if "Regular" in SUBFAMILIES else (SUBFAMILIES[0] if SUBFAMILIES else "")
-    s0 = _normalize_whitespace(value)
-    if not s0:
-        return default_sub
-    key = s0.lower().replace("-", " ").replace("_", " ")
-    key = _normalize_whitespace(key)
-
-    # Exact / alias mapping
-    if "bold" in key and (("italic" in key) or ("oblique" in key)):
-        return "Bold Italic" if "Bold Italic" in SUBFAMILIES else default_sub
-    if "bold" in key:
-        return "Bold" if "Bold" in SUBFAMILIES else default_sub
-    if ("italic" in key) or ("oblique" in key):
-        return "Italic" if "Italic" in SUBFAMILIES else default_sub
-    if "black" in key:
-        return "Black" if "Black" in SUBFAMILIES else default_sub
-    if "semibold" in key or "demibold" in key:
-        return "SemiBold" if "SemiBold" in SUBFAMILIES else default_sub
-    if "semilight" in key:
-        return "Semilight" if "Semilight" in SUBFAMILIES else default_sub
-    if "light" in key:
-        return "Light" if "Light" in SUBFAMILIES else default_sub
-    return default_sub
-
-def _derive_full_name(family: str, subfamily: str) -> str:
-    family = _normalize_whitespace(family)
-    subfamily = _normalize_whitespace(subfamily)
-    if not family:
-        return subfamily or ""
-    if not subfamily or subfamily == "Regular":
-        return family
-    return f"{family} {subfamily}"
 
 def _derive_css_family(family: str, fallback: str) -> str:
     family_norm = _normalize_whitespace(family)
@@ -124,17 +120,6 @@ def _derive_css_family(family: str, fallback: str) -> str:
     # If family is absent, keep cssFamily empty.
     return ""
 
-    
-
-def json_dict(path: pathlib.Path) -> dict:
-    """
-    Read a JSON file as dict.
-    """
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
 
 
 def get_target_dir_for(p: str) -> pathlib.Path:
@@ -157,7 +142,7 @@ def _atomic_write_json(path: pathlib.Path, obj: dict) -> None:
 
 def _cache_dir_for(platform: str) -> pathlib.Path:
     """Catalog for per-file base64-cache"""
-    return get_target_dir_for(platform) / "cache_data"
+    return get_target_dir_for(platform) / "cache_data" / _seed_namespace()
 
 def _b64_path_for(platform: str, md5: str) -> pathlib.Path:
     return _cache_dir_for(platform) / f"{md5}.b64"
@@ -204,8 +189,11 @@ def _cleanup_cache(platform: str, valid_md5s: _Set[str]) -> int:
     removed = 0
     for p in cdir.glob("*.b64"):
         if p.stem not in valid_md5s:
-            try: p.unlink(); removed += 1
-            except Exception: pass
+            try:
+                p.unlink()
+                removed += 1
+            except Exception as e:
+                logger.warning(f"[fonts] cache_data cleanup: can not remove orphan {p.name} ({e})")
     if removed: logger.info(f"[fonts] cache_data cleanup: removed {removed} orphan .b64")
     return removed
 
@@ -224,7 +212,8 @@ def _load_index(path: pathlib.Path, platform: str) -> dict:
         if "files" not in idx:
             idx["files"] = {}
         return idx
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[fonts] index load failed for {platform} at {path} ({e})")
         return {"version": 1, "platform": platform, "files": {}}
 
 def _md5_bytes(b: bytes) -> str:
@@ -308,7 +297,8 @@ def ensure_platform_index(platform: str) -> dict:
 
 def random_string(length=12):
     alphabet = string.ascii_letters + string.digits
-    return ''.join(random.choice(alphabet) for _ in range(length))
+    rng = _meta_rng()
+    return ''.join(rng.choice(alphabet) for _ in range(length))
 
 
 def _normalize_subfamilies(src):
@@ -331,8 +321,8 @@ def _normalize_subfamilies(src):
                 elif isinstance(v, (list, tuple, set)):
                     out.extend([s.strip() for s in v if isinstance(s, str) and s.strip()])
             return sorted(set(out)) or SUBFAMILIES
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[fonts] subfamilies normalization failed (type={type(src).__name__}) ({e})")
     return SUBFAMILIES
 
 def get_font_compare(woff2_path):
@@ -356,7 +346,8 @@ def path_iter_fonts(root: pathlib.Path):
 def get_best_cmap(tt: TTFont) -> Dict[int, str]:
     try:
         return tt.getBestCmap() or {}
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[fonts] getBestCmap failed ({e})")
         # fallback to cmap table directly
         if "cmap" in tt:
             for sub in tt["cmap"].tables:
@@ -386,11 +377,14 @@ def name_strings(tt: TTFont) -> str:
     vals = []
     if "name" not in tt: 
         return ""
+    warned = False
     for n in tt["name"].names:
         try:
             vals.append(str(n.toUnicode()).lower())
-        except Exception:
-            pass
+        except Exception as e:
+            if not warned:
+                warned = True
+                logger.warning(f"[fonts] name_strings: can not decode a name record ({e})")
     return " ".join(vals)
 
 def has_symbol_emoji_traits(tt: TTFont, cmap: Dict[int, str]) -> bool:
@@ -422,7 +416,8 @@ def fsType_restricts(tt: TTFont) -> bool:
         # 0 means installable embedding (good). Non-zero may restrict.
         # We consider "restricted license embedding" (bit 1) as reject.
         return (fsType & 0x0002) != 0
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[fonts] fsType check failed ({e})")
         return False
 
 
@@ -452,14 +447,15 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
         "SIL Open Font License (OFL)", "Apache License 2.0", "Creative Commons license",
     ]
 
-    family = random.choice(family_names)
-    subfamily = random.choice(subfamilies)
+    rng = _meta_rng()
+    family = rng.choice(family_names)
+    subfamily = rng.choice(subfamilies)
     unique_id = f"{family[:2]}-{random_string(12)}"
     full_name = f"{family} {subfamily}".strip()
-    version = f"Version {random.randint(1,5)}.{random.randint(0,9999)}"
+    version = f"Version {rng.randint(1,5)}.{rng.randint(0,9999)}"
     ps_name = f"{family}-{subfamily}".replace(" ", "")
-    designer = random.choice(designers)
-    license_desc = random.choice(licenses)
+    designer = rng.choice(designers)
+    license_desc = rng.choice(licenses)
 
     return {
         1: family,
@@ -494,6 +490,9 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         platform = "MacIntel"
     else:
         raise ValueError(f"[fonts] Unknown platform: {platform}")
+
+    # Fail-fast: seed is a required session parameter (before any filesystem mutations).
+    _seed_env()
 
     # === Step 1: Copy new files from fonts_raw → target_dir ===
     target_dir = get_target_dir_for(platform)
@@ -555,8 +554,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 if upm and ascent and descent and (ascent + descent) > 4 * upm:
                     logger.warning(f"[Skipped] {src_path.name} — anomal metrics (ascent+descent >> UPM).")
                     continue
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[Skipped] {src_path.name} — sanity metrics check failed ({e})")
 
             salt = hashlib.md5(data).hexdigest()[:6]
             platform_tag = "W32" if platform == "Win32" else "mac"
@@ -583,10 +582,10 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         return []
 
     # Stabilized seed for manifest(env + platform + file composition)
-    seed_env = os.environ.get("__GLOBAL_SEED", "0")
-    _seed_src = f"{seed_env}|{platform}|" + "|".join(sorted(all_names))
-    _seed = int(hashlib.md5(_seed_src.encode('utf-8')).hexdigest()[:8], 16)
-    _rng = random.Random(_seed)
+    _rng = _rng_for_manifest(platform, all_names)
+    _seed = _MANIFEST_SEED
+    if _seed is None:
+        raise RuntimeError("[fonts] _MANIFEST_SEED missing after _rng_for_manifest()")
 
 
     # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
@@ -615,9 +614,10 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     
   
     
-    _saved_state = random.getstate()
-    random.seed(_seed ^ 0x9E3779B1)
     try:
+        global _META_RNG
+        _prev_meta_rng = _META_RNG
+        _META_RNG = random.Random(_seed)
         for fname in fingerprint_names:
             rec = files_map.get(fname)
             if not rec:
@@ -685,7 +685,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 f"dst=({family}/{subfamily})"
             )
     finally:
-        random.setstate(_saved_state)
+        _META_RNG = _prev_meta_rng
 
     # === Step 5: create fonts-manifest.json for fingerprint_files =====
     os.makedirs(manifest_path.parent, exist_ok=True)
