@@ -99,6 +99,49 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return (typeof global !== 'undefined' && global.CanvasPatchHooks) ? global.CanvasPatchHooks : null;
   }
 
+  // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
+  // NOTE: this value is used as a stable fallback for hook keys (fontStr) when ctx.font is unreadable/empty.
+  const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
+    try {
+      const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+      if (cached && cached.trim()) return cached.trim();
+
+      const doc = global && global.document;
+      if (!doc || typeof doc.createElement !== 'function') {
+        throw new Error('[ContextPatch] document.createElement missing');
+      }
+      const canvas = doc.createElement('canvas');
+      const ctx = (canvas && typeof canvas.getContext === 'function') ? canvas.getContext('2d') : null;
+      const font = (ctx && typeof ctx.font === 'string' && ctx.font.trim()) ? ctx.font.trim() : '';
+      if (!font) throw new Error('[ContextPatch] default ctx2d.font missing/invalid');
+
+      try {
+        Object.defineProperty(C, '__DEFAULT_CTX2D_FONT__', {
+          value: font,
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      } catch (eDef) {
+        emitContextDiag('warn', 'context:ctx2d:guard:default_font_define_failed', eDef, {
+          stage: 'guard',
+          key: '__DEFAULT_CTX2D_FONT__',
+          type: 'browser structure missing data'
+        });
+        try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (_) {}
+      }
+      return font;
+    } catch (e) {
+      emitContextDiag('warn', 'context:ctx2d:guard:default_font_compute_failed', e, {
+        stage: 'guard',
+        key: 'ctx.font',
+        type: 'browser structure missing data'
+      });
+      const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+      return (cached && cached.trim()) ? cached.trim() : '16px sans-serif';
+    }
+  })();
+
   function corePreflight(owner, key, kind, diagTag) {
     const core = global && global.Core;
     if (!core || typeof core.preflightTarget !== 'function') {
@@ -600,7 +643,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
       const getFontStr = (self) => {
       try {
-        const f = self && typeof self.font === 'string' && self.font.trim() ? self.font : '16px sans-serif';
+        const f = self && typeof self.font === 'string' && self.font.trim() ? self.font : DEFAULT_CTX2D_FONT;
         return f;
       } catch (e) {
         emitContextDiag('warn', 'context:ctx2d:runtime:font_read_failed', e, {
@@ -608,7 +651,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: 'font',
           type: 'browser structure missing data'
         });
-        return '16px sans-serif';
+        return DEFAULT_CTX2D_FONT;
       }
     };
 
@@ -914,7 +957,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       // 2026-02-11: 'patchCanvasIHDRHook' disabled (non-wired runtime hook, kept out of required list).
       'patch2DNoise','patchToDataURLInjectNoise','masterToDataURLHook',
       'patchToBlobInjectNoise','patchConvertToBlobInjectNoise',
-      'measureTextNoiseHook','fillTextNoiseHook','strokeTextNoiseHook','fillRectNoiseHook',
+      'measureTextNoiseHook','applyMeasureTextHook','fillTextNoiseHook','strokeTextNoiseHook','fillRectNoiseHook',
       'applyDrawImageHook','addCanvasNoise'
     ].forEach(name => {
       if (typeof H[name] !== 'function') {

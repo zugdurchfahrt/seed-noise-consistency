@@ -1,7 +1,6 @@
     # datashell_win32.py
 data_4_win32 = {
     "os_options": [
-        {"platform": "Win32", "os_info": "Windows NT 10.0; Win64; x64", "os_name": "Windows 10 (64-bit)", "os_version": "10.0.0"},
         {"platform": "Win32", "os_info": "Windows NT 10.0; Win64; x64", "os_name": "Windows 11 (64-bit)", "os_version": "15.0.0"},
         {"platform": "Win32", "os_info": "Windows NT 10.0; Win64; x64", "os_name": "Windows 11 (64-bit)", "os_version": "19.0.0"},
     ],

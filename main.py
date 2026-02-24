@@ -690,7 +690,7 @@ def main():
             # Supported platforms List
             "enabled_platforms": ["Win32", "MacIntel"],
             # Setting probabilities (weight) of platform selection when generating a profile
-            "platform_weights": [1, 0],
+            "platform_weights": [0.98, 0.02],
             # Probabilities of browser selection for each platform:
             "browser_weights": {
                 "Win32": (["chrome", "firefox", "edge"], [0.8, 0.01, 0.19]),
@@ -726,9 +726,7 @@ def main():
             platform_version = _norm_ver(os_opt["os_version"])  # like "10.0.0" / "15.0.0" / "19.0.0"
         else:
             if platform == "Win32":
-                if "Windows 10" in os_name:
-                    platform_version = "10.0.0"
-                elif "Windows 11" in os_name:
+                if "Windows 11" in os_name:
                     platform_version = "19.0.0" if "19" in os_name else "15.0.0"
             elif platform == "MacIntel":
                 m = re.search(r"Mac OS X\s+([\d_\.]+)", os_info)
@@ -749,9 +747,8 @@ def main():
         )[0]
         # as Windows version branches are hard-pinned to kernel browser versions
         CHROMIUM_PREFIX_MAP = {
-            "10.0.0": ("134.","135."),
-            "15.0.0": ("135.", "136.", "137."),
-            "19.0.0": ("137.", "138.", "139.", "140."),
+            "15.0.0": ("142.",),
+            "19.0.0": ("143.", "144.", "145."),
         }
 
         def pick_chromium_major(platform_version: str) -> str:
@@ -1046,7 +1043,7 @@ def main():
 
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/fonts.html")
+        driver.get("https://browserleaks.com/fonts")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.

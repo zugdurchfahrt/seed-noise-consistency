@@ -22,14 +22,14 @@ Date: 2026-02-21
   Else → native `fillText`.
 - `strokeText`: same order with `applyStrokeTextHook` / `strokeTextNoiseHook`.
 
-4) Registration facts (facts from `sunami/assets/scripts/window/core/context.js`)
-- Required Canvas exports (hard-required by `registerAllHooks()`):
-  `patch2DNoise`, `patchToDataURLInjectNoise`, `masterToDataURLHook`,
-  `patchToBlobInjectNoise`, `patchConvertToBlobInjectNoise`,
-  `measureTextNoiseHook`, `fillTextNoiseHook`, `strokeTextNoiseHook`, `fillRectNoiseHook`,
-  `applyDrawImageHook`, `addCanvasNoise`.
-- `applyFillTextHook` / `applyStrokeTextHook` are OPTIONAL: not in the required list and not registered via `CanvasPatchContext`.
-  They only affect runtime if present, via wrapper precedence (see пункт 3).
+ 4) Registration facts (facts from `sunami/assets/scripts/window/core/context.js`)
+ - Required Canvas exports (hard-required by `registerAllHooks()`):
+   `patch2DNoise`, `patchToDataURLInjectNoise`, `masterToDataURLHook`,
+   `patchToBlobInjectNoise`, `patchConvertToBlobInjectNoise`,
+   `measureTextNoiseHook`, `applyMeasureTextHook`, `fillTextNoiseHook`, `strokeTextNoiseHook`, `fillRectNoiseHook`,
+   `applyDrawImageHook`, `addCanvasNoise`.
+ - `applyFillTextHook` / `applyStrokeTextHook` are OPTIONAL: not in the required list and not registered via `CanvasPatchContext`.
+   They only affect runtime if present, via wrapper precedence (see пункт 3).
 
 5) Local constraints for this module draft
 - Preserve all commented-out / disabled hooks exactly as-is (they are part of the operational contract).
@@ -71,6 +71,48 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     }
     d(eventCode, e, ctx);
   }
+
+  // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
+  const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
+    try {
+      const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+      if (cached && cached.trim()) return cached.trim();
+
+      const doc = window && window.document;
+      if (!doc || typeof doc.createElement !== 'function') {
+        throw new Error('[CanvasPatch] document.createElement missing');
+      }
+      const canvas = doc.createElement('canvas');
+      const ctx = (canvas && typeof canvas.getContext === 'function') ? canvas.getContext('2d') : null;
+      const font = (ctx && typeof ctx.font === 'string' && ctx.font.trim()) ? ctx.font.trim() : '';
+      if (!font) throw new Error('[CanvasPatch] default ctx2d.font missing/invalid');
+
+      try {
+        Object.defineProperty(C, '__DEFAULT_CTX2D_FONT__', {
+          value: font,
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      } catch (eDef) {
+        emitCanvasDiag('warn', 'canvas:ctx2d:guard:default_font_define_failed', eDef, {
+          stage: 'guard',
+          key: '__DEFAULT_CTX2D_FONT__',
+          type: 'browser structure missing data'
+        });
+        try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (_) {}
+      }
+      return font;
+    } catch (e) {
+      emitCanvasDiag('warn', 'canvas:ctx2d:guard:default_font_compute_failed', e, {
+        stage: 'guard',
+        key: 'ctx.font',
+        type: 'browser structure missing data'
+      });
+      const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+      return (cached && cached.trim()) ? cached.trim() : '16px sans-serif';
+    }
+  })();
 
   // === MODULE INITIALIZATION ===
   // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
@@ -494,7 +536,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const txt  = String(text ?? '');
     const fRaw = (typeof font === 'string' && font.trim())
       ? font
-      : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : '16px sans-serif';
+      : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : DEFAULT_CTX2D_FONT;
     const fStr = fRaw.replace(/\s+/g, ' ');
     const mm = fStr.match(/(\d+(?:\.\d+)?)px/i);
     const px = mm ? parseFloat(mm[1]) : 16;
@@ -536,13 +578,20 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const doc = (window && window.document);
       const ffs = doc && doc.fonts;
 
-      const fontsReady =
-        (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')
-          ? (window.__FONTS_READY__ === true)
-          : false)
-        || (!!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded'));
+       const fontsReadyFlag =
+         (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')
+           ? (window.__FONTS_READY__ === true)
+           : false);
 
-      if (!fontsReady) return nativeMetrics;
+       // If Fonts-patch is enabled (fontPatchConfigs present), avoid trusting FontFaceSet.status.
+       // `status === 'loaded'` can be true even before our injected fonts are actually ready,
+       // which would allow TextMetrics cache/Proxy to start too early and "freeze" fallback metrics.
+       const fontsPatchEnabled = Array.isArray(window.fontPatchConfigs);
+       const fontsReady = fontsPatchEnabled
+         ? fontsReadyFlag
+         : (fontsReadyFlag || (!!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded')));
+ 
+       if (!fontsReady) return nativeMetrics;
       // NOTE: widthNoise is intentionally applied ONLY here (post-read),
       // measureTextNoiseHook itself must not change returned metrics for consistency.
       const info = measureTextNoiseHook.call(this, nativeMetrics, text, font);
