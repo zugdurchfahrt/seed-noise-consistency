@@ -468,9 +468,11 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     const win = (typeof window !== 'undefined') ? window : G;
     const domPlat = win.__NAV_PLATFORM__;
     const cfgs = Array.isArray(win.fontPatchConfigs) ? win.fontPatchConfigs : [];
+    const hasPlatformDom = cfgs.some(f => f && typeof f.platform_dom === 'string');
+    const filteredCfgs = (domPlat && hasPlatformDom) ? cfgs.filter(f => f.platform_dom === domPlat) : cfgs;
     ALLOWED_FAMILIES = new Set(
-      (domPlat ? cfgs.filter(f => f.platform_dom === domPlat) : cfgs)
-        .flatMap(f => [f.cssFamily, f.family, f.name, f.fallback].filter(Boolean))
+      filteredCfgs
+        .flatMap(f => [f.cssFamily, f.family, f.name].filter(Boolean))
         .map(s => s.toLowerCase())
     );
     return ALLOWED_FAMILIES;
@@ -553,7 +555,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     return;
   }
 
-  const fonts = window.fontPatchConfigs.filter(f => f.platform_dom === domPlat);
+  const allFonts = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
+  const hasPlatformDom = allFonts.some(f => f && typeof f.platform_dom === 'string');
+  const fonts = (hasPlatformDom && domPlat) ? allFonts.filter(f => f.platform_dom === domPlat) : allFonts;
   if (!fonts.length) {
     __fontDiagPipeline('warn', 'fonts:filtered_empty', {
       stage: 'preflight',
@@ -596,7 +600,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     function run() {
       if (domPlat !== 'MacIntel') return;
 
-      const fonts = (window.fontPatchConfigs || []).filter(f => f.platform_dom === domPlat);
+      const allFonts = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
+      const hasPlatformDom = allFonts.some(f => f && typeof f.platform_dom === 'string');
+      const fonts = (hasPlatformDom && domPlat) ? allFonts.filter(f => f.platform_dom === domPlat) : allFonts;
       if (!fonts.length) {
         __fontDiagPipeline('warn', 'fonts:dom_override_filtered_empty', {
           stage: 'preflight',
