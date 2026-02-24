@@ -100,7 +100,20 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
           key: '__DEFAULT_CTX2D_FONT__',
           type: 'browser structure missing data'
         });
-        try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (_) {}
+        try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (eSet) {
+          if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
+            window.__DEGRADE__.diag('warn', 'canvas:ctx2d:guard:default_font_assign_failed', {
+              module: 'canvas',
+              diagTag: 'canvas',
+              surface: 'canvas',
+              stage: 'guard',
+              key: '__DEFAULT_CTX2D_FONT__',
+              type: 'browser structure missing data',
+              message: 'default font fallback assign failed',
+              data: null
+            }, eSet);
+          }
+        }
       }
       return font;
     } catch (e) {
@@ -126,14 +139,21 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       C.state.domReady = false;
       return; // нет DOM — выходим
     }
-    if (window.canvas && window.canvas.parentNode) {
+    const existingCanvas = window.canvas;
+    if (existingCanvas && existingCanvas.parentNode) {
       C.state.domReady = true;
       return;
     }
     const screenWidth = window.__WIDTH;
     const screenHeight = window.__HEIGHT;
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
-      throw new Error('[CanvasPatch] screenWidth / screenHeight not set');
+      emitCanvasDiag('warn', 'canvas:init:preflight:screen_dims_missing', null, {
+        stage: 'preflight',
+        key: '__WIDTH/__HEIGHT',
+        type: 'pipeline missing data',
+        data: { __WIDTH: screenWidth, __HEIGHT: screenHeight }
+      });
+      return;
     }
     const viewportWidth = (
       Number.isFinite(window.innerWidth) && window.innerWidth > 0
@@ -145,10 +165,20 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const baseCanvasHeight = 150;
     const div = document.createElement('div');
     if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED) {
-      throw new Error('[CanvasPatch] __GLOBAL_SEED missing');
+      emitCanvasDiag('warn', 'canvas:init:preflight:global_seed_missing', null, {
+        stage: 'preflight',
+        key: '__GLOBAL_SEED',
+        type: 'pipeline missing data'
+      });
+      return;
     }
     if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function') {
-      throw new Error('[CanvasPatch] strToSeed/mulberry32 missing');
+      emitCanvasDiag('warn', 'canvas:init:preflight:prng_helpers_missing', null, {
+        stage: 'preflight',
+        key: 'strToSeed/mulberry32',
+        type: 'pipeline missing data'
+      });
+      return;
     }
     const rng = G.mulberry32(G.strToSeed(G.__GLOBAL_SEED + '|canvasId'));
     const u1 = rng();
@@ -177,8 +207,25 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     canvas.style.background = 'transparent';
     div.appendChild(canvas);
 
-    window.canvas = canvas;
-    window.div = div;
+    try {
+      Object.defineProperty(window, 'canvas', { value: canvas, writable: true, configurable: true, enumerable: false });
+      Object.defineProperty(window, 'div', { value: div, writable: true, configurable: true, enumerable: false });
+    } catch (eSet) {
+      if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
+        window.__DEGRADE__.diag('warn', 'canvas:init:apply:dom_storage_define_failed', {
+          module: 'canvas',
+          diagTag: 'canvas',
+          surface: 'canvas',
+          stage: 'apply',
+          key: 'window.canvas/window.div',
+          type: 'browser structure missing data',
+          message: 'window canvas/div defineProperty failed; fallback assign used',
+          data: null
+        }, eSet);
+      }
+      window.canvas = canvas;
+      window.div = div;
+    }
     C.state.domReady = true;
   }
 
@@ -189,10 +236,33 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const screenWidth = window.__WIDTH;
     const screenHeight = window.__HEIGHT;
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
-      throw new Error('[CanvasPatch] screenWidth / screenHeight not set');
+      emitCanvasDiag('warn', 'canvas:init:preflight:screen_dims_missing', null, {
+        stage: 'preflight',
+        key: '__WIDTH/__HEIGHT',
+        type: 'pipeline missing data',
+        data: { __WIDTH: screenWidth, __HEIGHT: screenHeight }
+      });
+      return;
     }
-    if (!window.offscreenCanvas) {
-      window.offscreenCanvas = new window.OffscreenCanvas(screenWidth, screenHeight);
+    if (!(C && C.__OFFSCREEN_CANVAS__)) {
+      const osc = new window.OffscreenCanvas(screenWidth, screenHeight);
+      try {
+        Object.defineProperty(C, '__OFFSCREEN_CANVAS__', { value: osc, writable: true, configurable: true, enumerable: false });
+      } catch (eSet) {
+        if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
+          window.__DEGRADE__.diag('warn', 'canvas:init:apply:offscreen_storage_define_failed', {
+            module: 'canvas',
+            diagTag: 'canvas',
+            surface: 'canvas',
+            stage: 'apply',
+            key: '__OFFSCREEN_CANVAS__',
+            type: 'browser structure missing data',
+            message: 'offscreen defineProperty failed; fallback assign used',
+            data: null
+          }, eSet);
+        }
+        C.__OFFSCREEN_CANVAS__ = osc;
+      }
     }
     C.state.offscreenReady = true;
   }
@@ -809,7 +879,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
 
   // Keep native-shaped blob output here; draw/text noise remains in canvas pipeline.
-  async function patchToBlobInjectNoise(blob, ...args) {
+  function patchToBlobInjectNoise(blob, ...args) {
     try {
       if (!blob || !(blob instanceof Blob)) return;
 
@@ -832,7 +902,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   // Promise-ветка convertToBlob: post-process PNG bytes без decode/getImageData + IHDR fallback.
   // 2026-02-11: heavy PNG blob post-process disabled in convertToBlob path (CPU guard).
-  async function patchConvertToBlobInjectNoise(blob, options) {
+  function patchConvertToBlobInjectNoise(blob, options) {
     try {
       if (!blob || !(blob instanceof Blob)) return;
 
@@ -910,7 +980,20 @@ try {
   });
 } catch (e) {
   // Fallback: best-effort assignment. Do NOT allocate a new object here.
-  try { if (window.CanvasPatchHooks == null) window.CanvasPatchHooks = __CanvasPatchHooks__; } catch (_) {}
+  try { if (window.CanvasPatchHooks == null) window.CanvasPatchHooks = __CanvasPatchHooks__; } catch (eSet) {
+    if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
+      window.__DEGRADE__.diag('warn', 'canvas:CanvasPatchHooks:fallback_assign_failed', {
+        module: 'canvas',
+        diagTag: 'canvas',
+        surface: 'canvas',
+        stage: 'apply',
+        key: 'CanvasPatchHooks',
+        type: 'browser structure missing data',
+        message: 'CanvasPatchHooks fallback assign failed',
+        data: null
+      }, eSet);
+    }
+  }
   emitCanvasDiag('warn', 'canvas:CanvasPatchHooks:define_failed', e, {
     stage: 'apply',
     key: 'CanvasPatchHooks',

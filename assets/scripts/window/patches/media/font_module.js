@@ -472,7 +472,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     const filteredCfgs = (domPlat && hasPlatformDom) ? cfgs.filter(f => f.platform_dom === domPlat) : cfgs;
     ALLOWED_FAMILIES = new Set(
       filteredCfgs
-        .flatMap(f => [f.cssFamily, f.family, f.name].filter(Boolean))
+        .flatMap(f => [f.cssFamily, f.family].filter(Boolean))
         .map(s => s.toLowerCase())
     );
     return ALLOWED_FAMILIES;
@@ -617,6 +617,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       const testFam = (fonts[0].cssFamily || fonts[0].family);
       if (!testFam) return;
 
+      const testFamCss = JSON.stringify(String(testFam));
+
       // idempotent: не плодим несколько <style id="force-font-override">
       let el = document.getElementById('force-font-override');
       if (!el) {
@@ -637,7 +639,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
       el.textContent = `
         :root, body, * {
-          font-family: '${testFam}', Helvetica, Arial, sans-serif !important;
+          font-family: ${testFamCss}, Helvetica, Arial, sans-serif !important;
           font-synthesis: none !important;
         }`;
       __fontDiagPipeline('info', 'fonts:dom_override_applied', {
@@ -763,8 +765,15 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   (function injectCss(){
     let css = '';
     for (const f of fonts) {
+      if (!f || typeof f !== 'object') continue;
       const fam = (f.cssFamily || f.family);
-      css += `@font-face{font-family:'${fam}';src:url('${f.url}') format('woff2');font-weight:${f.weight||'normal'};font-style:${f.style||'normal'};font-display:swap;}`;
+      const url = f.url;
+      if (!fam || typeof fam !== 'string') continue;
+      if (!url || typeof url !== 'string') continue;
+
+      const famCss = JSON.stringify(String(fam));
+      const urlCss = JSON.stringify(String(url));
+      css += `@font-face{font-family:${famCss};src:url(${urlCss}) format("woff2");font-weight:${f.weight||"normal"};font-style:${f.style||"normal"};font-display:swap;}`;
     }
     const tagId = 'font-patch-styles';
     const apply = () => {
