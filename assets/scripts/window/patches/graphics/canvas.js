@@ -899,7 +899,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
 
   // Keep native-shaped blob output here; draw/text noise remains in canvas pipeline.
-  function patchToBlobInjectNoise(blob, ...args) {
+  async function patchToBlobInjectNoise(blob, ...args) {
     try {
       if (!blob || !(blob instanceof Blob)) return;
 
@@ -922,7 +922,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   // Promise-ветка convertToBlob: post-process PNG bytes без decode/getImageData + IHDR fallback.
   // 2026-02-11: heavy PNG blob post-process disabled in convertToBlob path (CPU guard).
-  function patchConvertToBlobInjectNoise(blob, options) {
+  async function patchConvertToBlobInjectNoise(blob, options) {
     try {
       if (!blob || !(blob instanceof Blob)) return;
 

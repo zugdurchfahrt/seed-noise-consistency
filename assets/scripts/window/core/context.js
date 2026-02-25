@@ -238,9 +238,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // 2026-02-11: TEMPORARILY DISABLED in one place (pipeline de-integration only).
   // Related implementations to revisit later:
   // assets/scripts/window/patches/graphics/canvas.js -> masterToDataURLHook, patchToBlobInjectNoise, patchConvertToBlobInjectNoise, addCanvasNoise
-  // if (C.registerHtmlCanvasToDataURLHook)    C.registerHtmlCanvasToDataURLHook(H.masterToDataURLHook);
-  // if (C.registerHtmlCanvasToBlobHook)       C.registerHtmlCanvasToBlobHook(H.patchToBlobInjectNoise);
-  // if (C.registerOffscreenConvertToBlobHook) C.registerOffscreenConvertToBlobHook(H.patchConvertToBlobInjectNoise);
+
   // if (C.registerCtx2DAddNoiseHook)          C.registerCtx2DAddNoiseHook(H.addCanvasNoise);
 
   C.registerWebGLGetContextHook               = fn => registerOnce(C.webglGetContextHooks, fn);
@@ -260,8 +258,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
     toBlob: true,
     convertToBlob: true
   };
+  // [ADD] guard: prevent nested readback while hooks are running (scratch canvas recursion)
+  let __canvasReadbackHookDepth = 0;
   function enterCanvasReadback(self, method) {
     if (!canvasReadbackGuard || !canvasReadbackMethods[method]) return null;
+
+    // [ADD] if we are inside a post-hook, skip hooking to avoid recursion
+    if (__canvasReadbackHookDepth > 0) return false;
+
+
     const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
     if (!isObj) return null;
     let active = canvasReadbackGuard.get(self);
@@ -547,74 +552,171 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (patchedMethods.has(orig)) return false;
 
     const getHooksList = () => (typeof hooksGetter === 'function') ? hooksGetter() : [];
-    const applyHooks = (self, blob, args) => {
+    const applyHooksAsync = async (self, blob, hookArgs) => {
       let b = blob;
       const hooks = getHooksList();
-      if (hooks && hooks.length) {
-        for (const hook of hooks) {
-          const r = hook.call(self, b, ...args);
-          if (r instanceof Blob) b = r;
+      if (!(hooks && hooks.length)) return b;
+
+      for (const hook of hooks) {
+        if (typeof hook !== 'function') continue;
+        try {
+          const r = hook.call(self, b, ...(hookArgs || []));
+          const out = (r && typeof r.then === 'function') ? await r : r;
+          if (out instanceof Blob) b = out;
+        } catch (e) {
+          // soft-fail: keep native contract, but not silent-swallow
+          try {
+            emitContextDiag('error', 'context:chain:hook:post_failed', e, {
+              key: method,
+              stage: 'hook',
+              data: { hook: hook && (hook.name || null) }
+            });
+          } catch (_e) {
+            if (global.__DEBUG__) console.error('[chainAsync][hook_failed]', method, hook && hook.name, e);
+          }
+          // keep b unchanged
         }
       }
       return b;
     };
 
-    if (method === 'toBlob') {
-      const wrapped = ({ toBlob(callback, type, quality) {
-        const self = this;
-        const args = arguments;
-        const readbackToken = enterCanvasReadback(self, method);
-        if (readbackToken === false) return Reflect.apply(orig, self, args);
-        if (typeof callback === 'function') {
+     if (method === 'toBlob') {
+       const wrapped = ({ toBlob(callback, type, quality) {
+         const self = this;
+         const args = arguments;
+         const readbackToken = enterCanvasReadback(self, method);
+         if (readbackToken === false) return Reflect.apply(orig, self, args);
+         if (typeof callback === 'function') {
+          let released = false;
+          const release = () => {
+            if (!released) {
+              released = true;
+              leaveCanvasReadback(self, readbackToken, method);
+            }
+          };
+
+          const done = (blob) => {
+            let out;
+            try {
+              out = applyHooksAsync(self, blob, args);
+            } catch (e) {
+              emitContextDiag('warn', 'context:chainAsync:hook_failed', e, {
+                stage: 'hook',
+                key: method
+              });
+              try { callback(blob); } finally { release(); }
+              return;
+            }
+
+            if (out && typeof out.then === 'function') {
+              out.then(
+                (b2) => { try { callback(b2); } finally { release(); } },
+                (e)  => {
+                  emitContextDiag('warn', 'context:chainAsync:hook_failed', e, {
+                    stage: 'hook',
+                    key: method
+                  });
+                  try { callback(blob); } finally { release(); }
+                }
+              );
+              return;
+            }
+
+            try { callback(out); } finally { release(); }
+          };
+
           try {
-            const done = (blob) => callback(applyHooks(self, blob, args));
             return Reflect.apply(orig, self, [done].concat(Array.prototype.slice.call(args, 1)));
-          } finally {
+          } catch (e) {
+            release();
+            throw e;
+          }
+         }
+         // 2026-02-11: keep native contract - toBlob without callback returns undefined.
+         try {
+           return Reflect.apply(orig, self, args);
+         } finally {
+           leaveCanvasReadback(self, readbackToken, method);
+         }
+       } }).toBlob;
+       const patched = markAsNative(wrapped, method);
+       definePatchedMethod(proto, method, patched);
+       patchedMethods.add(patched);
+       return true;
+     }
+ 
+     if (method === 'convertToBlob') {
+       const wrapped = ({ convertToBlob(options) {
+         const self = this;
+         const args = arguments;
+         const readbackToken = enterCanvasReadback(self, method);
+         if (readbackToken === false) return Reflect.apply(orig, self, args);
+        let released = false;
+        const release = () => {
+          if (!released) {
+            released = true;
             leaveCanvasReadback(self, readbackToken, method);
           }
-        }
-        // 2026-02-11: keep native contract - toBlob without callback returns undefined.
-        try {
-          return Reflect.apply(orig, self, args);
-        } finally {
-          leaveCanvasReadback(self, readbackToken, method);
-        }
-      } }).toBlob;
-      const patched = markAsNative(wrapped, method);
-      definePatchedMethod(proto, method, patched);
-      patchedMethods.add(patched);
-      return true;
-    }
+        };
 
-    if (method === 'convertToBlob') {
-      const wrapped = ({ convertToBlob(options) {
-        const self = this;
-        const args = arguments;
-        const readbackToken = enterCanvasReadback(self, method);
-        if (readbackToken === false) return Reflect.apply(orig, self, args);
+        let p;
         try {
-          const p = Reflect.apply(orig, self, args);
-          if (!(p && typeof p.then === 'function')) return p;
-          const hooks = getHooksList();
-          if (!(hooks && hooks.length)) return p;
-          return p.then((blob) => applyHooks(self, blob, args));
-        } finally {
-          leaveCanvasReadback(self, readbackToken, method);
+          p = Reflect.apply(orig, self, args);
+        } catch (e) {
+          release();
+          throw e;
         }
-      } }).convertToBlob;
-      const patched = markAsNative(wrapped, method);
-      definePatchedMethod(proto, method, patched);
-      patchedMethods.add(patched);
-      return true;
-    }
+
+        if (!(p && typeof p.then === 'function')) {
+          release();
+          return p;
+        }
+
+        const hooks = getHooksList();
+        if (!(hooks && hooks.length)) {
+          release();
+          return p;
+        }
+
+        return p.then(
+          (blob) => {
+            const out = applyHooksAsync(self, blob, args);
+            return Promise.resolve(out).then(
+              (b2) => { release(); return b2; },
+              (e)  => { release(); throw e; }
+            );
+          },
+          (e) => { release(); throw e; }
+        );
+       } }).convertToBlob;
+       const patched = markAsNative(wrapped, method);
+       definePatchedMethod(proto, method, patched);
+       patchedMethods.add(patched);
+       return true;
+     }
 
     const wrapped = ({ [method]() {
+      const self = this;
       const args = arguments;
-      const p = Reflect.apply(orig, this, args);
+      const p = Reflect.apply(orig, self, args);
       if (!(p && typeof p.then === 'function')) return p;
       const hooks = getHooksList();
       if (!(hooks && hooks.length)) return p;
-      return p.then((blob) => applyHooks(this, blob, args));
+      return p.then((blob) => {
+        __canvasReadbackHookDepth++;
+        return Promise.resolve(applyHooksAsync(self, blob, args))
+          .catch((e) => {
+            try {
+              emitContextDiag('error', 'context:chain:hook:post_failed', e, {
+                key: method,
+                stage: 'hook',
+                data: { hook: 'applyHooksAsync' }
+              });
+            } catch (_e) {}
+            return blob; // fallback
+          })
+          .finally(() => { __canvasReadbackHookDepth--; });
+      });
     } })[method];
     const patched = markAsNative(wrapped, method);
     definePatchedMethod(proto, method, patched);
@@ -979,6 +1081,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
     });
 
     // 4) Registration Canvas 2D
+    if (C.registerHtmlCanvasToDataURLHook)    C.registerHtmlCanvasToDataURLHook(H.masterToDataURLHook);
+    if (C.registerHtmlCanvasToBlobHook)       C.registerHtmlCanvasToBlobHook(H.patchToBlobInjectNoise);
+    if (C.registerOffscreenConvertToBlobHook) C.registerOffscreenConvertToBlobHook(H.patchConvertToBlobInjectNoise);
     if (C.registerCtx2DMeasureTextHook)       C.registerCtx2DMeasureTextHook(H.measureTextNoiseHook);
     if (C.registerCtx2DFillTextHook)          C.registerCtx2DFillTextHook(H.fillTextNoiseHook);
     if (C.registerCtx2DStrokeTextHook)        C.registerCtx2DStrokeTextHook(H.strokeTextNoiseHook);
