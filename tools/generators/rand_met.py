@@ -701,7 +701,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         {
             "name": c["name"],
             "family": c["family"],
-            "cssFamily": c["family"],  # ключ синхронизации = family
+            "cssFamily": c.get("cssFamily") or c.get("family"),  # runtime CSS family (prefer generated cssFamily)
             "url": c["url"],
             "platform_id": c["platform_id"],
             "platform_dom": c.get("platform_dom"),

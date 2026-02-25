@@ -128,7 +128,20 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: '__DEFAULT_CTX2D_FONT__',
           type: 'browser structure missing data'
         });
-        try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (_) {}
+        try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (eSet) {
+          if (global.__DEGRADE__ && typeof global.__DEGRADE__.diag === 'function') {
+            global.__DEGRADE__.diag('warn', 'context:ctx2d:guard:default_font_assign_failed', {
+              module: 'context',
+              diagTag: 'context',
+              surface: 'canvas',
+              stage: 'guard',
+              key: '__DEFAULT_CTX2D_FONT__',
+              type: 'browser structure missing data',
+              message: 'default font fallback assign failed',
+              data: null
+            }, eSet);
+          }
+        }
       }
       return font;
     } catch (e) {
@@ -357,8 +370,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // ===== WEBGL hook override logging: two toggles (ВКЛ/ВЫКЛ) =====
   // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override" (emitContextDiag + console.warn ниже),
   // НЕ отключают хук, НЕ отключают патчинг, НЕ трогают остальные warn/error.
-  const WEBGL_OVERRIDE_DIAG_LOG    = false;  // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
-  const WEBGL_OVERRIDE_CONSOLE_LOG = false;  // true=ВКЛ, false=ВЫКЛ (console.warn для override)
+  const WEBGL_OVERRIDE_DIAG_LOG    = true;  // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
+  const WEBGL_OVERRIDE_CONSOLE_LOG = true;  // true=ВКЛ, false=ВЫКЛ (console.warn для override)
 
   function patchMethod(proto, method, hooks) {
       if (!proto) {

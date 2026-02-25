@@ -1,10 +1,6 @@
 /*
 == CONTRACT (CURRENT PIPELINE FACTS) ==
 
-Draft target: `Canvas_blueprint2102/canvas_stucture_draft.js`
-Source base:  `sunami/assets/scripts/window/patches/graphics/canvas.js`
-Date: 2026-02-21
-
 1) Roles (single contract)
 - `window.CanvasPatchContext` — internal state/registries/queues (pipeline “bus”) used by `context.js`.
 - `window.CanvasPatchHooks` — export surface ONLY (functions) consumed by `context.js.registerAllHooks()` and by ctx2D wrappers
@@ -16,13 +12,13 @@ Date: 2026-02-21
 - Allowed pattern: ensure container exists, then assign properties onto the SAME object identity; optional `Object.defineProperty(...)`
   is OK only if `value` is that same existing object (non-enumerable export, like in `webgl.js`).
 
-3) ctx2D text pipeline order (facts from `sunami/assets/scripts/window/core/context.js`)
+3) ctx2D text pipeline order (facts from `/assets/scripts/window/core/context.js`)
 - `fillText`: if `typeof H.applyFillTextHook === 'function'` → runs FIRST and receives `(callOrig, text, x, y, ...rest)`.
   Else if `typeof H.fillTextNoiseHook === 'function'` → can rewrite args → then native `fillText`.
   Else → native `fillText`.
 - `strokeText`: same order with `applyStrokeTextHook` / `strokeTextNoiseHook`.
 
- 4) Registration facts (facts from `sunami/assets/scripts/window/core/context.js`)
+ 4) Registration facts (facts from `/assets/scripts/window/core/context.js`)
  - Required Canvas exports (hard-required by `registerAllHooks()`):
    `patch2DNoise`, `patchToDataURLInjectNoise`, `masterToDataURLHook`,
    `patchToBlobInjectNoise`, `patchConvertToBlobInjectNoise`,
@@ -35,7 +31,6 @@ Date: 2026-02-21
 - Preserve all commented-out / disabled hooks exactly as-is (they are part of the operational contract).
 - No silent-swallow: if something fails, either keep native untouched (atomic skip) + emit `__DEGRADE__.diag`, or fail-fast.
 
-== END CONTRACT ==
 */
 
 const CanvasPatchModule = function CanvasPatchModule(window) {
@@ -129,21 +124,64 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   // === MODULE INITIALIZATION ===
   // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
-  // Состояние модуля (общий контекст)
   C.state = C.state || { domReady: false, offscreenReady: false };
+
+  // keep internal handles inside CanvasPatchContext (non-enumerable),
+  // do not publish generic aliases like window.canvas/window.div/window.offscreenCanvas.
+  function __defineHidden__(obj, prop, value, diagCode, diagKey, message) {
+    try {
+      Object.defineProperty(obj, prop, {
+        value,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      return true;
+    } catch (eSet) {
+      if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
+        window.__DEGRADE__.diag('warn', diagCode, {
+          module: 'canvas',
+          diagTag: 'canvas',
+          surface: 'canvas',
+          stage: 'apply',
+          key: diagKey || prop,
+          type: 'browser structure missing data',
+          message: message || 'defineProperty failed; fallback assign used',
+          data: null
+        }, eSet);
+      }
+      try {
+        obj[prop] = value;
+        return true;
+      } catch (eAssign) {
+        emitCanvasDiag('warn', diagCode, eAssign, {
+          stage: 'apply',
+          key: diagKey || prop,
+          type: 'browser structure missing data'
+        });
+        return false;
+      }
+    }
+  }
 
   // создаём скрытый HTML-canvas в окне
   function _ensureDomOnce() {
     if (C.state.domReady) return;
-    if (typeof document === 'undefined' || !document.body) {
+
+    const doc = window && window.document;
+    if (!doc || !doc.body || typeof doc.createElement !== 'function') {
       C.state.domReady = false;
       return; // нет DOM — выходим
     }
-    const existingCanvas = window.canvas;
-    if (existingCanvas && existingCanvas.parentNode) {
+
+    // SSOT: CanvasPatchContext
+    const existingCanvas = (C && C.__DOM_CANVAS__);
+    const existingHost = (C && C.__DOM_CANVAS_HOST__);
+    if (existingCanvas && existingHost && existingHost.contains(existingCanvas) && existingHost.parentNode) {
       C.state.domReady = true;
       return;
     }
+
     const screenWidth = window.__WIDTH;
     const screenHeight = window.__HEIGHT;
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
@@ -163,7 +201,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     ) ? Math.round(window.innerHeight) : Math.round(screenHeight);
     const baseCanvasWidth = 300;
     const baseCanvasHeight = 150;
-    const div = document.createElement('div');
+    const div = doc.createElement('div');
     if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED) {
       emitCanvasDiag('warn', 'canvas:init:preflight:global_seed_missing', null, {
         stage: 'preflight',
@@ -196,9 +234,9 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     div.style.height = `${viewportHeight}px`;
     div.style.opacity = '0';
     div.style.pointerEvents = 'none';
-    (document.body || document.documentElement).appendChild(div);
+    (doc.body || doc.documentElement).appendChild(div);
 
-    const canvas = document.createElement('canvas');
+    const canvas = doc.createElement('canvas');
     canvas.width = baseCanvasWidth;
     canvas.height = baseCanvasHeight;
     canvas.style.width = viewportWidth + 'px';
@@ -207,25 +245,16 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     canvas.style.background = 'transparent';
     div.appendChild(canvas);
 
-    try {
-      Object.defineProperty(window, 'canvas', { value: canvas, writable: true, configurable: true, enumerable: false });
-      Object.defineProperty(window, 'div', { value: div, writable: true, configurable: true, enumerable: false });
-    } catch (eSet) {
-      if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
-        window.__DEGRADE__.diag('warn', 'canvas:init:apply:dom_storage_define_failed', {
-          module: 'canvas',
-          diagTag: 'canvas',
-          surface: 'canvas',
-          stage: 'apply',
-          key: 'window.canvas/window.div',
-          type: 'browser structure missing data',
-          message: 'window canvas/div defineProperty failed; fallback assign used',
-          data: null
-        }, eSet);
-      }
-      window.canvas = canvas;
-      window.div = div;
-    }
+    __defineHidden__(C, '__DOM_CANVAS__', canvas,
+      'canvas:init:apply:dom_storage_define_failed',
+      '__DOM_CANVAS__',
+      'DOM canvas defineProperty failed; fallback assign used'
+    );
+    __defineHidden__(C, '__DOM_CANVAS_HOST__', div,
+      'canvas:init:apply:dom_storage_define_failed',
+      '__DOM_CANVAS_HOST__',
+      'DOM host defineProperty failed; fallback assign used'
+    );
     C.state.domReady = true;
   }
 
@@ -233,6 +262,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   function _ensureOffscreenOnce() {
     if (C.state.offscreenReady) return;
     if (typeof window.OffscreenCanvas === 'undefined') return;
+
     const screenWidth = window.__WIDTH;
     const screenHeight = window.__HEIGHT;
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
@@ -246,23 +276,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     }
     if (!(C && C.__OFFSCREEN_CANVAS__)) {
       const osc = new window.OffscreenCanvas(screenWidth, screenHeight);
-      try {
-        Object.defineProperty(C, '__OFFSCREEN_CANVAS__', { value: osc, writable: true, configurable: true, enumerable: false });
-      } catch (eSet) {
-        if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
-          window.__DEGRADE__.diag('warn', 'canvas:init:apply:offscreen_storage_define_failed', {
-            module: 'canvas',
-            diagTag: 'canvas',
-            surface: 'canvas',
-            stage: 'apply',
-            key: '__OFFSCREEN_CANVAS__',
-            type: 'browser structure missing data',
-            message: 'offscreen defineProperty failed; fallback assign used',
-            data: null
-          }, eSet);
-        }
-        C.__OFFSCREEN_CANVAS__ = osc;
-      }
+      __defineHidden__(C, '__OFFSCREEN_CANVAS__', osc,
+        'canvas:init:apply:offscreen_storage_define_failed',
+        '__OFFSCREEN_CANVAS__',
+        'offscreen defineProperty failed; fallback assign used'
+      );
     }
     C.state.offscreenReady = true;
   }
@@ -277,7 +295,10 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     emitCanvasDiag('info', 'canvas:init:apply:real_init', null, {
       stage: 'apply',
       message: 'Canvas realInit done',
-      data: { hasCanvas: !!window.canvas }
+      data: {
+        hasCanvas: !!(C && C.__DOM_CANVAS__),
+        hasOffscreen: !!(C && C.__OFFSCREEN_CANVAS__)
+      }
     });
   }
 
@@ -438,7 +459,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     }
     m.set(tmp);
   }
-
 
   // --- 2D ImageData noise hook ---
   function patch2DNoise(img, type) {
@@ -970,7 +990,7 @@ if (!__CanvasPatchHooks__) {
   throw new Error('[CanvasPatch] CanvasPatchHooks contract violation (expected object)');
 }
 
-// Prefer hidden (non-enumerable) export like webglHooks, but keep the same object identity.
+// Prefer hidden (non-enumerable) export 
 try {
   Object.defineProperty(window, 'CanvasPatchHooks', {
     value: __CanvasPatchHooks__,
@@ -1016,7 +1036,6 @@ __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
 __CanvasPatchHooks__.addCanvasNoise = addCanvasNoise;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
 
-// optional masters (may be absent depending on build/guards)
 if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
 if (typeof applyStrokeTextHook === 'function') __CanvasPatchHooks__.applyStrokeTextHook = applyStrokeTextHook;
 }

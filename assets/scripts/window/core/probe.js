@@ -106,6 +106,15 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     "CanvasRenderingContext2D.prototype.strokeText",
     "CanvasRenderingContext2D.prototype.fillRect",
     "CanvasRenderingContext2D.prototype.drawImage",
+    "CanvasRenderingContext2D.prototype.getImageData",
+    "CanvasRenderingContext2D.prototype.putImageData",
+    "CanvasRenderingContext2D.prototype.translate",
+    "CanvasRenderingContext2D.prototype.setTransform",
+    "OffscreenCanvasRenderingContext2D.prototype.drawImage",
+    "OffscreenCanvasRenderingContext2D.prototype.getImageData",
+    "OffscreenCanvasRenderingContext2D.prototype.putImageData",
+    "OffscreenCanvasRenderingContext2D.prototype.translate",
+    "OffscreenCanvasRenderingContext2D.prototype.setTransform",
     "WebGLRenderingContext.prototype.getParameter",
     "WebGLRenderingContext.prototype.getSupportedExtensions",
     "WebGLRenderingContext.prototype.getExtension",
@@ -240,7 +249,32 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
           return null;
         }
       },
-      keys: ["measureText", "fillText", "strokeText", "fillRect", "drawImage"]
+      keys: [
+        "measureText",
+        "fillText",
+        "strokeText",
+        "fillRect",
+        "drawImage",
+        "getImageData",
+        "putImageData",
+        "translate",
+        "setTransform"
+      ]
+    },
+    {
+      label: "OffscreenCanvasRenderingContext2D.prototype",
+      getProto: () =>
+        typeof OffscreenCanvasRenderingContext2D !== "undefined" ? OffscreenCanvasRenderingContext2D.prototype : null,
+      getTarget: () => {
+        if (typeof OffscreenCanvas === "undefined") return null;
+        try {
+          const canvas = new OffscreenCanvas(1, 1);
+          return typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
+        } catch (_) {
+          return null;
+        }
+      },
+      keys: ["drawImage", "getImageData", "putImageData", "translate", "setTransform"]
     },
     {
       label: "WebGLRenderingContext.prototype",
@@ -1013,6 +1047,114 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
         drawImageArgs
       );
 
+      const ctx2dGetImageDataFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.getImageData
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.getImageData",
+        ctx2dGetImageDataFn,
+        ctx2d,
+        [0, 0, 1, 1],
+        {},
+        [0, 0, 1, 1]
+      );
+
+      let putImg = null;
+      try {
+        putImg = (typeof ImageData === "function") ? new ImageData(1, 1) : null;
+      } catch (_) {
+        putImg = null;
+      }
+      const ctx2dPutImageDataFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.putImageData
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.putImageData",
+        ctx2dPutImageDataFn,
+        ctx2d,
+        putImg ? [putImg, 0, 0] : [],
+        {},
+        putImg ? [putImg, 0, 0] : []
+      );
+
+      const ctx2dTranslateFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.translate
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.translate",
+        ctx2dTranslateFn,
+        ctx2d,
+        [0, 0],
+        {},
+        [0, 0]
+      );
+
+      const ctx2dSetTransformFn = (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype)
+        ? CanvasRenderingContext2D.prototype.setTransform
+        : null;
+      await pushRow(
+        "receiver: CanvasRenderingContext2D.prototype.setTransform",
+        ctx2dSetTransformFn,
+        ctx2d,
+        [1, 0, 0, 1, 0, 0],
+        {},
+        [1, 0, 0, 1, 0, 0]
+      );
+
+      let osc = null;
+      try {
+        osc = (typeof OffscreenCanvas !== "undefined") ? new OffscreenCanvas(1, 1) : null;
+      } catch (_) {
+        osc = null;
+      }
+      let octx2d = null;
+      try {
+        octx2d = osc && typeof osc.getContext === "function" ? osc.getContext("2d") : null;
+      } catch (_) {
+        octx2d = null;
+      }
+      const oP = octx2d ? Object.getPrototypeOf(octx2d) : null;
+
+      const off2dGetImageDataFn = oP && typeof oP.getImageData === "function" ? oP.getImageData : null;
+      await pushRow(
+        "receiver: OffscreenCanvasRenderingContext2D.prototype.getImageData",
+        off2dGetImageDataFn,
+        octx2d,
+        [0, 0, 1, 1],
+        {},
+        [0, 0, 1, 1]
+      );
+
+      const off2dPutImageDataFn = oP && typeof oP.putImageData === "function" ? oP.putImageData : null;
+      await pushRow(
+        "receiver: OffscreenCanvasRenderingContext2D.prototype.putImageData",
+        off2dPutImageDataFn,
+        octx2d,
+        putImg ? [putImg, 0, 0] : [],
+        {},
+        putImg ? [putImg, 0, 0] : []
+      );
+
+      const off2dTranslateFn = oP && typeof oP.translate === "function" ? oP.translate : null;
+      await pushRow(
+        "receiver: OffscreenCanvasRenderingContext2D.prototype.translate",
+        off2dTranslateFn,
+        octx2d,
+        [0, 0],
+        {},
+        [0, 0]
+      );
+
+      const off2dSetTransformFn = oP && typeof oP.setTransform === "function" ? oP.setTransform : null;
+      await pushRow(
+        "receiver: OffscreenCanvasRenderingContext2D.prototype.setTransform",
+        off2dSetTransformFn,
+        octx2d,
+        [1, 0, 0, 1, 0, 0],
+        {},
+        [1, 0, 0, 1, 0, 0]
+      );
+
       const AudioCtxCtor = (typeof AudioContext === "function")
         ? AudioContext
         : (typeof webkitAudioContext === "function" ? webkitAudioContext : null);
@@ -1477,6 +1619,10 @@ function printToStringCrossRealmChecks() {
     { p: "CanvasRenderingContext2D.prototype", k: "strokeText",      exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "CanvasRenderingContext2D.prototype", k: "fillRect",        exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "CanvasRenderingContext2D.prototype", k: "drawImage",       exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
+    { p: "CanvasRenderingContext2D.prototype", k: "getImageData",    exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
+    { p: "CanvasRenderingContext2D.prototype", k: "putImageData",    exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
+    { p: "CanvasRenderingContext2D.prototype", k: "translate",       exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
+    { p: "CanvasRenderingContext2D.prototype", k: "setTransform",    exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "WebGLRenderingContext.prototype", k: "getParameter",       exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "WebGLRenderingContext.prototype", k: "getSupportedExtensions", exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "WebGLRenderingContext.prototype", k: "getExtension",       exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
