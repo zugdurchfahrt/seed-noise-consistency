@@ -50,6 +50,49 @@ const LOGGingModule = function LOGGingModule() {
       byEntryType: {},
       lastCritical: []
     };
+    // DIAG dedup/throttle:
+    // - keeps the first N identical diag events and suppresses further duplicates;
+    // - improves log readability when one failing check emits the same event many times;
+    // - does NOT remove diagnostics entirely (first copies are still preserved for debugging).
+    // Tunables (optional, set before logger init):
+    //   window.__DIAG_DUP_LIMIT   -> how many equal events to keep (default: 2)
+    //   window.__DIAG_DUP_MAP_MAX -> max unique signatures before map reset (default: 2048)
+    const DIAG_DUP_LIMIT = toPosInt(global.__DIAG_DUP_LIMIT, 2);
+    const DIAG_DUP_MAP_MAX = toPosInt(global.__DIAG_DUP_MAP_MAX, 2048);
+    const DIAG_DUP_COUNTS = new Map();
+
+    // Signature defines what "same event" means for dedup.
+    // If these fields match, event copies after DIAG_DUP_LIMIT are suppressed.
+    function diagDupSignature(level, code, ctx, err) {
+      const c = (ctx && typeof ctx === "object") ? ctx : {};
+      const eName = (err && typeof err.name === "string") ? err.name : "";
+      const eMsg = (err && typeof err.message === "string") ? err.message : (err == null ? "" : String(err));
+      return [
+        String(level || "info"),
+        String(code || "unknown"),
+        (typeof c.module === "string") ? c.module : "",
+        (typeof c.diagTag === "string") ? c.diagTag : "",
+        (typeof c.surface === "string") ? c.surface : "",
+        (typeof c.key === "string" || c.key === null) ? String(c.key) : "",
+        (typeof c.stage === "string") ? c.stage : "",
+        (typeof c.message === "string") ? c.message : "",
+        (typeof c.type === "string") ? c.type : "",
+        eName,
+        eMsg
+      ].join("|");
+    }
+
+    // Returns true only for first N copies of the same signature.
+    function shouldEmitDiag(level, code, ctx, err) {
+      const sig = diagDupSignature(level, code, ctx, err);
+      const prev = DIAG_DUP_COUNTS.has(sig) ? DIAG_DUP_COUNTS.get(sig) : 0;
+      const next = prev + 1;
+      DIAG_DUP_COUNTS.set(sig, next);
+      if (DIAG_DUP_COUNTS.size > DIAG_DUP_MAP_MAX) {
+        DIAG_DUP_COUNTS.clear();
+      }
+      return next <= DIAG_DUP_LIMIT;
+    }
 
     function toPosInt(v, defVal) {
       const n = Number(v);
@@ -260,7 +303,7 @@ const LOGGingModule = function LOGGingModule() {
     G.__DEBUG__ =
       typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
       // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
-
+    
     global.env = global.env || {};
     // Toggle for *logger self-diagnostics visibility*.
     // IMPORTANT: must not change runtime behavior by throwing from the logger.
@@ -585,6 +628,11 @@ const LOGGingModule = function LOGGingModule() {
         message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
         data: safeData
       };
+
+      // Dedup gate: keeps early evidence, suppresses high-volume duplicate noise.
+      if (!shouldEmitDiag(normalizedLevel, normalizedCode, extraObj, err || null)) {
+        return;
+      }
 
       G.__DEGRADE__(normalizedCode, err, extraObj);
 
@@ -1015,7 +1063,7 @@ const LOGGingModule = function LOGGingModule() {
         try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
       }
     };
-
+    DIAG_SCREEN_ON({ includeData: true })
         // after all logger globals are assigned (Window realm only):
       if (W) {
         Object.defineProperty(W, "_logLevel",   { value: W._logLevel,   writable:true, configurable:true, enumerable:false });

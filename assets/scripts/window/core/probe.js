@@ -89,9 +89,11 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     "gpu.requestAdapter",
     "Intl.NumberFormat",
     "Intl.Collator",
+    "Intl.DateTimeFormat.prototype.resolvedOptions",
     "Intl.ListFormat",
     "Intl.PluralRules",
     "Intl.RelativeTimeFormat",
+    "Intl.RelativeTimeFormat.prototype.resolvedOptions",
     "Intl.DisplayNames",
     "Date.prototype.toLocaleDateString",
     "Date.prototype.toLocaleString",
@@ -946,6 +948,48 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
         [["platform"]],
         {},
         [["platform"]]
+      );
+
+      const intlDateTimeResolvedOptionsFn =
+        (typeof Intl !== "undefined" && Intl.DateTimeFormat && Intl.DateTimeFormat.prototype)
+          ? Intl.DateTimeFormat.prototype.resolvedOptions
+          : null;
+      let intlDateTimeFormat = null;
+      try {
+        intlDateTimeFormat = (typeof Intl !== "undefined" && typeof Intl.DateTimeFormat === "function")
+          ? new Intl.DateTimeFormat()
+          : null;
+      } catch (_) {
+        intlDateTimeFormat = null;
+      }
+      await pushRow(
+        "receiver: Intl.DateTimeFormat.prototype.resolvedOptions",
+        intlDateTimeResolvedOptionsFn,
+        intlDateTimeFormat,
+        [],
+        {},
+        []
+      );
+
+      const intlRelativeTimeResolvedOptionsFn =
+        (typeof Intl !== "undefined" && Intl.RelativeTimeFormat && Intl.RelativeTimeFormat.prototype)
+          ? Intl.RelativeTimeFormat.prototype.resolvedOptions
+          : null;
+      let intlRelativeTimeFormat = null;
+      try {
+        intlRelativeTimeFormat = (typeof Intl !== "undefined" && typeof Intl.RelativeTimeFormat === "function")
+          ? new Intl.RelativeTimeFormat()
+          : null;
+      } catch (_) {
+        intlRelativeTimeFormat = null;
+      }
+      await pushRow(
+        "receiver: Intl.RelativeTimeFormat.prototype.resolvedOptions",
+        intlRelativeTimeResolvedOptionsFn,
+        intlRelativeTimeFormat,
+        [],
+        {},
+        []
       );
 
       const getCtxFn = (typeof HTMLCanvasElement !== "undefined" && HTMLCanvasElement.prototype)

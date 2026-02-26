@@ -11,11 +11,11 @@
 
     const spoofedLocale = spoofedLocales ? spoofedLocales[0] : null;
 
-    const d = window.__DEGRADE__;
     const __tzTypePipeline = "pipeline missing data";
     const __tzTypeBrowser = "browser structure missing data";
     function diag(level, code, extra, err) {
-      if (typeof d !== "function") return;
+      const d = (window && window.__DEGRADE__) ? window.__DEGRADE__ : null;
+      if (!d) return;
       const rawLevel = String(level || "info");
       const normalizedCode = (typeof code === "string" && code) ? code : "tz:diag";
       const x = (extra && typeof extra === "object") ? extra : {};
@@ -45,11 +45,13 @@
         data: x
       }, x);
       if (typeof normalizedType === "string") ctx.type = normalizedType;
-      if (typeof d.diag === "function") {
+      if (d && typeof d.diag === "function") {
         d.diag(rawLevel, normalizedCode, ctx, err || null);
         return;
       }
-      d(normalizedCode, err || null, ctx);
+      if (typeof d === "function") {
+        d(normalizedCode, err || null, ctx);
+      }
     }
     function diagPipeline(level, code, extra, err) {
       const x = (extra && typeof extra === "object") ? extra : {};
@@ -69,18 +71,18 @@
         ? window.__safeDefine
         : function (obj, prop, desc) { Object.defineProperty(obj, prop, desc); };
 
-    // Fail-fast for critical prerequisites.
+    // Preflight: if critical prerequisites are missing, keep native untouched (atomic skip) + emit diag.
     if (!timezone || typeof timezone !== "string") {
       diagPipeline("error", "tz:missing_timezone", { stage: "preflight" }, null);
-      throw new Error("[patchTimeZone] missing timezone");
+      return;
     }
     if (typeof offsetMinutes !== "number") {
       diagPipeline("error", "tz:missing_offsetMinutes", { stage: "preflight", timezone }, null);
-      throw new Error("[patchTimeZone] missing offsetMinutes");
+      return;
     }
     if (!spoofedLocales || !spoofedLocales.length || typeof spoofedLocale !== "string" || !spoofedLocale) {
       diagPipeline("error", "tz:missing_normalizedLanguages", { stage: "preflight", timezone }, null);
-      throw new Error("[patchTimeZone] missing normalizedLanguages");
+      return;
     }
 
     const __coreApplyTargets = (window && window.Core && typeof window.Core.applyTargets === "function")
@@ -88,12 +90,12 @@
       : null;
     if (typeof __coreApplyTargets !== "function") {
       diagBrowser("warn", "tz:missing_core_applyTargets", { stage: "preflight", timezone }, null);
-      throw new Error("[patchTimeZone] missing Core.applyTargets");
+      return;
     }
     const __wrapNativeCtor = (window && typeof window.__wrapNativeCtor === "function") ? window.__wrapNativeCtor : null;
     if (typeof __wrapNativeCtor !== "function") {
       diagBrowser("warn", "tz:missing_wrapNativeCtor", { stage: "preflight", timezone }, null);
-      throw new Error("[patchTimeZone] missing __wrapNativeCtor");
+      return;
     }
 
     function sameDesc(actual, expected) {
@@ -200,7 +202,9 @@
       }
       const applied = applyCoreTargetsGroup(diagTag || ("tz:redefineValue:" + prop), [t], "throw");
       if (applied !== 1) {
-        throw new Error("[patchTimeZone] redefineValue failed: " + String(prop));
+        const e = new Error("[patchTimeZone] redefineValue failed: " + String(prop));
+        diagPipeline("error", "tz:redefineValue:apply_failed", { stage: "apply", key: String(prop), diagTag: (diagTag || null) }, e);
+        throw e;
       }
     }
 
@@ -210,11 +214,11 @@
       const nowOff = (new Date()).getTimezoneOffset();
       if (nowOff !== -offsetMinutes) {
         diagPipeline("error", "tz:offset_mismatch", { stage: "apply", nowOff, expected: -offsetMinutes, timezone }, null);
-        throw new Error("[patchTimeZone] timezone offset mismatch");
+        return;
       }
     } else {
       diagBrowser("warn", "tz:missing_getTimezoneOffset", { stage: "preflight", timezone }, null);
-      throw new Error("[patchTimeZone] Date.prototype.getTimezoneOffset missing");
+      return;
     }
 
     const restores = [];
@@ -246,6 +250,7 @@
     }
 
     // ---- Intl.DateTimeFormat: default locales + принудительный timeZone ----
+    let __tzAppliedOk = false;
     try {
       rememberValue(Intl, "DateTimeFormat");
       const OrigDTF = Intl.DateTimeFormat;
@@ -272,7 +277,10 @@
           policy: "throw",
           diagTag: "tz:DateTimeFormat:resolvedOptions",
           validThis(self) {
-            try { return !!(self && self instanceof OrigDTF); } catch (_) { return false; }
+            try { return !!(self && self instanceof OrigDTF); } catch (e) {
+              diagBrowser("warn", "tz:DateTimeFormat:resolvedOptions:guard_failed", { stage: "guard", timezone }, e);
+              return false;
+            }
           },
           invalidThis: "throw",
           invoke(orig, args) {
@@ -291,12 +299,18 @@
         if (!Intl || typeof Intl[ctorName] !== "function") return;
         rememberValue(Intl, ctorName);
         const OrigCtor = Intl[ctorName];
-        const PatchedCtor = __wrapNativeCtor(OrigCtor, ctorName, (argList) => {
-          let locales = (argList.length >= 1) ? argList[0] : undefined;
-          const options = (argList.length >= 2) ? argList[1] : undefined;
-          if (locales == null) locales = spoofedLocales;
-          return [locales, options];
-        });
+        let PatchedCtor = null;
+        try {
+          PatchedCtor = __wrapNativeCtor(OrigCtor, ctorName, (argList) => {
+            let locales = (argList.length >= 1) ? argList[0] : undefined;
+            const options = (argList.length >= 2) ? argList[1] : undefined;
+            if (locales == null) locales = spoofedLocales;
+            return [locales, options];
+          });
+        } catch (e) {
+          diagBrowser("error", "tz:wrapNativeCtor_failed", { stage: "apply", key: String(ctorName), timezone }, e);
+          throw e;
+        }
         redefineValue(Intl, ctorName, PatchedCtor, "tz:" + ctorName);
       }
 
@@ -322,7 +336,10 @@
           policy: "throw",
           diagTag: "tz:IntlResolvedOptions",
           validThis(self) {
-            try { return !!(self && self.constructor && self.constructor.prototype && self.constructor.prototype.isPrototypeOf(self)); } catch (_) { return false; }
+            try { return !!(self && self.constructor && self.constructor.prototype && self.constructor.prototype.isPrototypeOf(self)); } catch (e) {
+              diagBrowser("warn", "tz:IntlResolvedOptions:guard_failed", { stage: "guard", timezone }, e);
+              return false;
+            }
           },
           invalidThis: "throw",
           invoke(orig, args) {
@@ -361,7 +378,9 @@
       const origToLocaleDateString = Date.prototype.toLocaleDateString;
       const origToLocaleTimeString = Date.prototype.toLocaleTimeString;
       if (typeof origToLocaleString !== "function" || typeof origToLocaleDateString !== "function" || typeof origToLocaleTimeString !== "function") {
-        throw new Error("[patchTimeZone] Date.toLocale* originals missing");
+        const e = new Error("[patchTimeZone] Date.toLocale* originals missing");
+        diagBrowser("error", "tz:Date:toLocale*:missing_originals", { stage: "preflight", timezone }, e);
+        throw e;
       }
       applyCoreTargetsGroup("tz:Date:toLocale*", [
         {
@@ -373,7 +392,10 @@
           policy: "throw",
           diagTag: "tz:Date:toLocaleString",
           validThis(self) {
-            try { return !!(self && self instanceof Date); } catch (_) { return false; }
+            try { return !!(self && self instanceof Date); } catch (e) {
+              diagBrowser("warn", "tz:Date:toLocaleString:guard_failed", { stage: "guard", timezone }, e);
+              return false;
+            }
           },
           invalidThis: "throw",
           invoke(orig, args) {
@@ -393,7 +415,10 @@
           policy: "throw",
           diagTag: "tz:Date:toLocaleDateString",
           validThis(self) {
-            try { return !!(self && self instanceof Date); } catch (_) { return false; }
+            try { return !!(self && self instanceof Date); } catch (e) {
+              diagBrowser("warn", "tz:Date:toLocaleDateString:guard_failed", { stage: "guard", timezone }, e);
+              return false;
+            }
           },
           invalidThis: "throw",
           invoke(orig, args) {
@@ -413,7 +438,10 @@
           policy: "throw",
           diagTag: "tz:Date:toLocaleTimeString",
           validThis(self) {
-            try { return !!(self && self instanceof Date); } catch (_) { return false; }
+            try { return !!(self && self instanceof Date); } catch (e) {
+              diagBrowser("warn", "tz:Date:toLocaleTimeString:guard_failed", { stage: "guard", timezone }, e);
+              return false;
+            }
           },
           invalidThis: "throw",
           invoke(orig, args) {
@@ -426,12 +454,11 @@
         }
       ], "throw");
 
+      __tzAppliedOk = true;
       window.__TZ_PATCHED__ = true;
       diagPipeline("info", "tz:applied", { stage: "apply", timezone, offsetMinutes: Number(offsetMinutes), locale: spoofedLocale }, null);
-    } catch (e) {
-      rollback("tz:apply_failed");
-      diagPipeline("error", "tz:apply_failed", { stage: "apply", timezone, offsetMinutes }, e);
-      throw e;
+    } finally {
+      if (!__tzAppliedOk) rollback("tz:apply_failed");
     }
   };
 })();

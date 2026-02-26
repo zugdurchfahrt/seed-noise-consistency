@@ -307,37 +307,32 @@ def init_driver(
     # --- Initial fonts patch ---
     generate_font_manifest(MANIFEST_PATH, platform)
       
-    # cdp.SW_META = expected_client_hints
-    # cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
+    cdp.SW_META = expected_client_hints
+    cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
       
-    # sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
-    # sw_thread.start()
-    # logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
+    sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
+    sw_thread.start()
+    logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
 
-    # # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
-    # # if the CDP websocket drops mid-session, paused workers may remain paused.
-    # if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
-    #     cdp.enable_worker_seed_inject(global_seed)
-    #     worker_seed_thread = threading.Thread(
-    #         target=cdp.run_worker_seed,
-    #         daemon=True,
-    #         name="cdp_worker_seed_injector",
-    #     )
-    #     worker_seed_thread.start()
-    #     logger.info(
-    #         "Worker seed injector thread started name=%s ident=%s on port %s",
-    #         worker_seed_thread.name,
-    #         worker_seed_thread.ident,
-    #         cdp.PORT,
-    #     )
+    # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
+    # if the CDP websocket drops mid-session, paused workers may remain paused.
+    if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
+        cdp.enable_worker_seed_inject(global_seed)
+        worker_seed_thread = threading.Thread(
+            target=cdp.run_worker_seed,
+            daemon=True,
+            name="cdp_worker_seed_injector",
+        )
+        worker_seed_thread.start()
+        logger.info(
+            "Worker seed injector thread started name=%s ident=%s on port %s",
+            worker_seed_thread.name,
+            worker_seed_thread.ident,
+            cdp.PORT,
+        )
     cdp.log_cdp_runtime_diag("main_after_worker_seed_thread_start")
 
-        # reflect_js = Path(SCRIPTS_CORE / "BESTLOGgptV3.js").read_text(encoding="utf-8")
-        # driver.execute_cdp_cmd(
-        #     "Page.addScriptToEvaluateOnNewDocument",
-        #     {"source": reflect_js}
-        # )
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
@@ -357,9 +352,9 @@ def init_driver(
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
             # --- workers (bootstrap/hooks). No direct module call here unless you have one.
-            # Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
-            # "WrkModule(window);",
-            # --- env params ---
+            Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
+            "WrkModule(window);",
+            # --- rng params ---
             Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
             "RNGsetModule(window);",
             # --- nav total set ---
@@ -467,35 +462,35 @@ def init_driver(
     inject_uach_strip_window(driver, user_agent)
 
      # --- Workers Initial patch reading ---
-    # core = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
-    # logger.info("WORKER_PATCH_SRC.initated")
+    core = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
+    logger.info("WORKER_PATCH_SRC.initated")
 
     # --- publish worker core into __ENV_BRIDGE__ (stable for external worker_bootstrap.js) ---
-    # worker_bootstrap_env_js = f"""
-    # (() => {{
-    #     const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
-    #     if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-    #     const core = {json.dumps(core)};
-    #     if (!BR.inlinePatch) {{
-    #         BR.inlinePatch = core;
-    #     }} else if (BR.inlinePatch !== core) {{
-    #         throw new Error('WorkerBootstrap: inlinePatch already set');
-    #     }}
-    # }})();
-    # //# sourceURL=worker_bootstrap_env.js
-    # """
+    worker_bootstrap_env_js = f"""
+    (() => {{
+        const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
+        if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+        const core = {json.dumps(core)};
+        if (!BR.inlinePatch) {{
+            BR.inlinePatch = core;
+        }} else if (BR.inlinePatch !== core) {{
+            throw new Error('WorkerBootstrap: inlinePatch already set');
+        }}
+    }})();
+    //# sourceURL=worker_bootstrap_env.js
+    """
     # # --- prepare worker_bootstrap_js (reads __ENV_BRIDGE__.inlinePatch) ---
-    # worker_bootstrap_js = Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")
+    worker_bootstrap_js = Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")
 
     # Connect page_js (wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     
     # # Publish worker patch core early (used by external worker_bootstrap.js too)
-    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
 
     # # Connect worker_bootstrap_js AFTER page_js:
     # # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
-    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
     # =========================
     # [CH] Setting up Client hints (CDP-only) + __HEADERS__ (JS, NEW DOCUMENT)
@@ -617,11 +612,20 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         )
 
         def _inject_time_machine(driver):
+            tz_src = Path(SCRIPTS_PATCHES_STEALTH / "TimezoneOverride_source.js").read_text("utf-8")
+            geo_src = Path(SCRIPTS_PATCHES_STEALTH / "GeoOverride_source.js").read_text("utf-8")
+            call_tz = r'''
+            
+        Promise.resolve().then(() => {
+        if (typeof patchTimeZone === "function") patchTimeZone();
+        });
+        '''.strip()
             timegeo_js = "\n;\n".join([
-                Path(SCRIPTS_PATCHES_STEALTH / "TimezoneOverride_source.js").read_text("utf-8"),
-                "patchTimeZone();",
-                Path(SCRIPTS_PATCHES_STEALTH / "GeoOverride_source.js").read_text("utf-8"),
+                tz_src,
+                call_tz,
+                geo_src,
             ]) + "\n//# sourceURL=timegeo_bundle.js"
+
             driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": timegeo_js})
         _inject_time_machine(driver)
 
@@ -1040,10 +1044,8 @@ def main():
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
-
-
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/fonts")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/prototype.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.

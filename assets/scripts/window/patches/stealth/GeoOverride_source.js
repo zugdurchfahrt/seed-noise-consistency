@@ -3,7 +3,7 @@
 
   const Core = window && window.Core;
   if (!Core || typeof Core.applyTargets !== 'function') {
-    try { if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__('geo:core_missing', new Error('[GeoOverride] Core.applyTargets is required'), { stage: 'preflight' }); } catch (_) {}
+    degrade('geo:core_missing', new Error('[GeoOverride] Core.applyTargets is required'), { stage: 'preflight' });
     return;
   }
 
@@ -11,9 +11,31 @@
   const longitude = window.__LONGITUDE__;
 
   function degrade(code, err, extra) {
+    const d = window.__DEGRADE__;
     try {
-      if (typeof window.__DEGRADE__ === 'function') window.__DEGRADE__(code, err || null, extra || null);
-    } catch (_) {}
+      if (d && typeof d.diag === 'function') {
+        d.diag('warn', code, extra || null, err || null);
+        return;
+      }
+      if (typeof d === 'function') {
+        d(code, err || null, extra || null);
+        return;
+      }
+    } catch (e) {
+      try {
+        if (d && typeof d.diag === 'function') {
+          d.diag('error', String(code) + ':degrade_failed', { stage: 'runtime', code }, e);
+          return;
+        }
+      } catch (diagErr) {
+        if (typeof console !== 'undefined' && console && typeof console.error === 'function') {
+          console.error('[GeoOverride] __DEGRADE__.diag failed:', diagErr);
+        }
+      }
+      if (typeof console !== 'undefined' && console && typeof console.error === 'function') {
+        console.error('[GeoOverride] __DEGRADE__ failed:', e);
+      }
+    }
   }
 
   function cloneDesc(d) {
@@ -39,13 +61,11 @@
   }
 
   function applyTargetGroup(groupTag, targets, policy) {
-    const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
     let plans = [];
     try {
       plans = Core.applyTargets(targets, window.__PROFILE__, []);
     } catch (e) {
       degrade(groupTag + ':preflight_failed', e);
-      if (groupPolicy === 'throw') throw e;
       return 0;
     }
     if (!Array.isArray(plans) || !plans.length) {
@@ -61,12 +81,38 @@
         const p = plans[i];
         if (!p || p.skipApply) continue;
         if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
-          throw new Error('[GeoOverride] invalid plan item');
+          const e = new Error('[GeoOverride] invalid plan item');
+          degrade(groupTag + ':invalid_plan_item', e, { stage: 'contract' });
+          let rollbackErr = null;
+          for (let j = done.length - 1; j >= 0; j--) {
+            const q = done[j];
+            try {
+              if (q.origDesc) Object.defineProperty(q.owner, q.key, cloneDesc(q.origDesc));
+              else delete q.owner[q.key];
+            } catch (re) {
+              if (!rollbackErr) rollbackErr = re;
+              degrade(groupTag + ':rollback_failed', re, { key: q && q.key ? q.key : null });
+            }
+          }
+          return 0;
         }
         Object.defineProperty(p.owner, p.key, p.nextDesc);
         const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
         if (!isSameDescriptor(after, p.nextDesc)) {
-          throw new Error('[GeoOverride] descriptor post-check mismatch');
+          const e = new Error('[GeoOverride] descriptor post-check mismatch');
+          degrade(groupTag + ':descriptor_postcheck_mismatch', e, { stage: 'contract', key: p && p.key ? p.key : null });
+          let rollbackErr = null;
+          for (let j = done.length - 1; j >= 0; j--) {
+            const q = done[j];
+            try {
+              if (q.origDesc) Object.defineProperty(q.owner, q.key, cloneDesc(q.origDesc));
+              else delete q.owner[q.key];
+            } catch (re) {
+              if (!rollbackErr) rollbackErr = re;
+              degrade(groupTag + ':rollback_failed', re, { key: q && q.key ? q.key : null });
+            }
+          }
+          return 0;
         }
         done.push(p);
       }
@@ -84,11 +130,9 @@
         }
       }
       if (rollbackErr) {
-        if (groupPolicy === 'throw') throw rollbackErr;
         return 0;
       }
       degrade(groupTag + ':apply_failed', e);
-      if (groupPolicy === 'throw') throw e;
       return 0;
     }
   }
@@ -238,7 +282,11 @@
     ];
 
     try {
-      applyTargetGroup('geo:methods', targets, 'throw');
+      const applied = applyTargetGroup('geo:methods', targets, 'throw');
+      if (!applied) {
+        degrade('geo:apply_skipped', null, { stage: 'apply' });
+        return false;
+      }
     } catch (e) {
       degrade('geo:apply_failed', e);
       return false;

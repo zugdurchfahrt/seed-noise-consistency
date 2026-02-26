@@ -29,9 +29,9 @@ FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
 # ----------------------- UTILS -----------------------
 SYS_FONTS_WIN = [
-        'Arial','Verdana','Tahoma','Times New Roman','Courier New','Georgia',
+        'Arial', 'Aptos','Verdana','Tahoma','Times New Roman','Courier New','Georgia',
         'Palatino','Garamond','Comic Sans MS','Trebuchet MS','Impact',
-        'Lucida Sans','Segoe UI','Calibri','Consolas','Candara',
+        'Lucida Sans','Segoe UI','Segoe UI Symbol','Calibri','Consolas','Candara',
         'Franklin Gothic Medium','Constantia','Corbel','Century Gothic']
     
 SYS_FONTS_MAC = [
@@ -39,6 +39,7 @@ SYS_FONTS_MAC = [
         'Gill Sans','Avenir','Baskerville','Didot','Futura','Optima',
         'American Typewriter','Hoefler Text','Courier','Arial','Verdana',
         'Trebuchet MS','Comic Sans MS','Georgia']
+
 SUBFAMILIES = [
         "Thin", "Extra Light", "Light", "Regular", "Medium", "SemiBold", "Bold", "Extra Bold",
         "Black", "Italic", "Oblique", "Extended", "Narrow", "Expanded", "Ultra Light",
