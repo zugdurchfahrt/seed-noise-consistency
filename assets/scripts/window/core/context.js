@@ -47,9 +47,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
   const NOP = () => {};
   function emitContextDiag(level, code, err, extra) {
     const d = global && global.__DEGRADE__;
-    if (typeof d !== 'function') return;
+    const diag = (d && typeof d.diag === 'function') ? d.diag.bind(d) : null;
     const eventCode = (typeof code === 'string' && code) ? code : 'context:diag';
     const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
+    const x = (extra && typeof extra === 'object') ? extra : null;
+    const stage = (x && typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
+    const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+    const defaultType = (stage === 'runtime' || isIllegal) ? 'browser structure missing data' : 'pipeline missing data';
     const ctx = Object.assign({
       module: 'context',
       diagTag: 'context',
@@ -57,14 +61,28 @@ const ContextPatchModule = function ContextPatchModule(window) {
       key: null,
       stage: 'runtime',
       message: eventCode,
-      type: 'pipeline missing data',
+      type: defaultType,
       data: null
-    }, (extra && typeof extra === 'object') ? extra : null);
-    if (typeof d.diag === 'function') {
-      d.diag(level, eventCode, ctx, e);
+    }, x);
+    if (!ctx.type) ctx.type = defaultType;
+    if (isIllegal) ctx.type = 'browser structure missing data';
+    if (!ctx.data || typeof ctx.data !== 'object') ctx.data = {};
+    if (ctx.data.outcome !== 'return' &&
+        ctx.data.outcome !== 'skip' &&
+        ctx.data.outcome !== 'rollback' &&
+        ctx.data.outcome !== 'throw') {
+      if (ctx.stage === 'rollback') ctx.data.outcome = 'rollback';
+      else if (isIllegal) ctx.data.outcome = 'throw';
+      else if (ctx.stage === 'hook') ctx.data.outcome = 'skip';
+      else if (ctx.stage === 'apply' && level === 'info') ctx.data.outcome = 'return';
+      else if (level === 'error') ctx.data.outcome = 'throw';
+      else ctx.data.outcome = 'skip';
+    }
+    if (diag) {
+      diag(level, eventCode, ctx, e);
       return;
     }
-    d(eventCode, e, ctx);
+    if (typeof d === 'function') d(eventCode, e, ctx);
   }
 
   const patchedMethods = new WeakSet();
@@ -820,10 +838,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
           return Reflect.apply(target, thisArg, a);
         }
       } catch (e) {
-        emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, {
+        const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+        const isBadReceiver = !guardInstance(proto, thisArg);
+        const extra = {
           stage: 'hook',
-          key: 'fillText'
-        });
+          key: 'fillText',
+          data: {
+            outcome: (isIllegal || isBadReceiver) ? 'throw' : 'skip',
+            reason: isIllegal ? 'illegal_invocation' : (isBadReceiver ? 'invalid_receiver' : 'hook_exception')
+          }
+        };
+        if (isIllegal || isBadReceiver) extra.type = 'browser structure missing data';
+        emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, extra);
+        if (isIllegal || isBadReceiver) throw e;
       }
 
       return Reflect.apply(target, thisArg, [text, x, y, ...rest]);
@@ -848,10 +875,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
           return Reflect.apply(target, thisArg, a);
         }
       } catch (e) {
-        emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, {
+        const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+        const isBadReceiver = !guardInstance(proto, thisArg);
+        const extra = {
           stage: 'hook',
-          key: 'strokeText'
-        });
+          key: 'strokeText',
+          data: {
+            outcome: (isIllegal || isBadReceiver) ? 'throw' : 'skip',
+            reason: isIllegal ? 'illegal_invocation' : (isBadReceiver ? 'invalid_receiver' : 'hook_exception')
+          }
+        };
+        if (isIllegal || isBadReceiver) extra.type = 'browser structure missing data';
+        emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, extra);
+        if (isIllegal || isBadReceiver) throw e;
       }
 
       return Reflect.apply(target, thisArg, [text, x, y, ...rest]);
@@ -870,10 +906,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
           if (Array.isArray(a)) return Reflect.apply(target, thisArg, a);
         }
       } catch (e) {
-        emitContextDiag('warn', 'context:ctx2d:hook:fillRect_failed', e, {
+        const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+        const isBadReceiver = !guardInstance(proto, thisArg);
+        const extra = {
           stage: 'hook',
-          key: 'fillRect'
-        });
+          key: 'fillRect',
+          data: {
+            outcome: (isIllegal || isBadReceiver) ? 'throw' : 'skip',
+            reason: isIllegal ? 'illegal_invocation' : (isBadReceiver ? 'invalid_receiver' : 'hook_exception')
+          }
+        };
+        if (isIllegal || isBadReceiver) extra.type = 'browser structure missing data';
+        emitContextDiag('warn', 'context:ctx2d:hook:fillRect_failed', e, extra);
+        if (isIllegal || isBadReceiver) throw e;
       }
       return Reflect.apply(target, thisArg, [x, y, w, h]);
     });
@@ -888,10 +933,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
           return H.applyDrawImageHook.call(thisArg, callOrig, ...args);
         }
       } catch (e) {
-        emitContextDiag('warn', 'context:ctx2d:hook:drawImage_failed', e, {
+        const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+        const isBadReceiver = !guardInstance(proto, thisArg);
+        const extra = {
           stage: 'hook',
-          key: 'drawImage'
-        });
+          key: 'drawImage',
+          data: {
+            outcome: (isIllegal || isBadReceiver) ? 'throw' : 'skip',
+            reason: isIllegal ? 'illegal_invocation' : (isBadReceiver ? 'invalid_receiver' : 'hook_exception')
+          }
+        };
+        if (isIllegal || isBadReceiver) extra.type = 'browser structure missing data';
+        emitContextDiag('warn', 'context:ctx2d:hook:drawImage_failed', e, extra);
+        if (isIllegal || isBadReceiver) throw e;
       }
       return Reflect.apply(target, thisArg, args);
     });

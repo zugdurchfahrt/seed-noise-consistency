@@ -1,37 +1,17 @@
 const ScreenPatchModule = function ScreenPatchModule(window) {
-  if (!window.__PATCH_SCREEN__) {
-  
-  const C = window.CanvasPatchContext;
-  if (!C) {
-    const D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
-    if (D && typeof D.diag === 'function') {
-      try {
-        D.diag('fatal', 'screen:canvas_patch_context_missing', {
-          module: 'screen',
-          diagTag: 'screen',
-          surface: 'screen',
-          key: null,
-          stage: 'preflight',
-          message: 'CanvasPatchContext missing',
-          data: null,
-          type: 'pipeline missing data'
-        }, null);
-      } catch (_) {}
-    }
-    return;
-  }
-    
-  const SCREEN_WIDTH  = Number(window.__WIDTH);
-  const SCREEN_HEIGHT = Number(window.__HEIGHT);
-  const COLOR_DEPTH   = Number(window.__COLOR_DEPTH);
-  const DPR           = Number(window.__DPR);
   const __screenTypePipeline = 'pipeline missing data';
   const __screenTypeBrowser = 'browser structure missing data';
-
-  const __screenDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
-  const __screenDegradeDiag = (__screenDegrade && typeof __screenDegrade.diag === 'function')
-    ? __screenDegrade.diag.bind(__screenDegrade)
-    : null;
+  const __screenTypeContract = 'contract violation';
+  const __screenModule = 'screen';
+  const __screenSurface = 'screen';
+  const __D = window.__DEGRADE__;
+  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+  const __emit = (level, code, ctx, err) => {
+    try {
+      if (__diag) return __diag(level, code, ctx, err || null);
+      if (typeof __D === 'function') return __D(String(code), err || null, Object.assign({}, ctx, { level }));
+    } catch (_) {}
+  };
   function __screenDiag(level, code, extra, err) {
     const normalizedLevel = (level === 'warn' || level === 'error' || level === 'info' || level === 'fatal')
       ? level
@@ -48,39 +28,77 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     ) ? x.stage : 'runtime';
     const normalizedType = (
       x.type === __screenTypePipeline ||
-      x.type === __screenTypeBrowser
+      x.type === __screenTypeBrowser ||
+      x.type === __screenTypeContract
     ) ? x.type : __screenTypePipeline;
     const normalizedCode = code || 'screen';
+    const rawData = (x.data && typeof x.data === 'object') ? x.data : {};
+    const normalizedData = Object.assign({}, rawData);
+    if (typeof x.reason === 'string' && x.reason && !Object.prototype.hasOwnProperty.call(normalizedData, 'reason')) {
+      normalizedData.reason = x.reason;
+    }
+    if (typeof x.substage === 'string' && x.substage && !Object.prototype.hasOwnProperty.call(normalizedData, 'substage')) {
+      normalizedData.substage = x.substage;
+    }
+    if (normalizedData.outcome !== 'return' &&
+        normalizedData.outcome !== 'skip' &&
+        normalizedData.outcome !== 'rollback' &&
+        normalizedData.outcome !== 'throw') {
+      if (normalizedStage === 'rollback') normalizedData.outcome = 'rollback';
+      else if (normalizedLevel === 'error' || normalizedLevel === 'fatal') normalizedData.outcome = 'throw';
+      else if (normalizedLevel === 'info' && normalizedStage === 'apply') normalizedData.outcome = 'return';
+      else normalizedData.outcome = 'skip';
+    }
     const ctx = {
-      module: 'screen',
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'screen',
-      surface: 'screen',
+      module: __screenModule,
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __screenModule,
+      surface: __screenSurface,
       key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
       stage: normalizedStage,
       message: (typeof x.message === 'string' && x.message) ? x.message : normalizedCode,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      data: normalizedData,
       type: normalizedType
     };
-    if (__screenDegradeDiag) {
-      try { __screenDegradeDiag(normalizedLevel, normalizedCode, ctx, err || null); } catch (_) {}
-      return;
-    }
-    if (typeof __screenDegrade === 'function') {
-      try {
-        __screenDegrade(normalizedCode, err || null, {
-          level: normalizedLevel,
-          module: ctx.module,
-          diagTag: ctx.diagTag,
-          surface: ctx.surface,
-          key: ctx.key,
-          stage: ctx.stage,
-          message: ctx.message,
-          data: ctx.data,
-          type: ctx.type
-        });
-      } catch (_) {}
-    }
+    __emit(normalizedLevel, normalizedCode, ctx, err || null);
   }
+
+  if (window.__PATCH_SCREEN__) {
+    __screenDiag('info', 'screen:already_patched', {
+      stage: 'guard',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: null,
+      message: 'screen already patched',
+      data: {
+        outcome: 'skip',
+        reason: 'already_patched',
+        substage: 'module_guard'
+      }
+    }, null);
+    return;
+  }
+
+  const C = window.CanvasPatchContext;
+  if (!C) {
+    __screenDiag('warn', 'screen:canvas_patch_context_missing', {
+      stage: 'preflight',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: null,
+      message: 'CanvasPatchContext missing',
+      data: {
+        outcome: 'skip',
+        reason: 'missing_dep',
+        substage: 'CanvasPatchContext'
+      }
+    }, null);
+    return;
+  }
+
+  const SCREEN_WIDTH  = Number(window.__WIDTH);
+  const SCREEN_HEIGHT = Number(window.__HEIGHT);
+  const COLOR_DEPTH   = Number(window.__COLOR_DEPTH);
+  const DPR           = Number(window.__DPR);
 
   try {
   if (!Number.isFinite(SCREEN_WIDTH) || !Number.isFinite(SCREEN_HEIGHT)) {
@@ -156,7 +174,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           diagTag: 'screen',
           key: null,
           message: 'receiverMatchesTarget failed',
-          data: null
+          data: { outcome: 'skip', reason: 'exception', substage: 'receiverMatchesTarget' }
         }, e);
       }
       return false;
@@ -183,7 +201,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         type: __screenTypePipeline,
         diagTag: groupTag,
         key: groupKey,
-        message: 'Core.applyTargets preflight failed'
+        message: 'Core.applyTargets preflight failed',
+        data: {
+          outcome: groupPolicy === 'throw' ? 'throw' : 'skip',
+          reason: 'exception',
+          substage: 'Core.applyTargets(preflight)'
+        }
       }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
@@ -195,7 +218,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         type: __screenTypePipeline,
         diagTag: groupTag,
         key: groupKey,
-        message: reason
+        message: reason,
+        data: {
+          outcome: groupPolicy === 'throw' ? 'throw' : 'skip',
+          reason: String(reason),
+          substage: 'Core.applyTargets(plan)'
+        }
       }, null);
       if (groupPolicy === 'throw') {
         throw new Error('core plan skipped');
@@ -231,20 +259,29 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             type: __screenTypeBrowser,
             diagTag: groupTag,
             key: p.key || null,
-            message: 'rollback failed'
+            message: 'rollback failed',
+            data: {
+              outcome: 'throw',
+              reason: 'rollback_failed',
+              substage: 'rollback(Object.defineProperty/delete)'
+            }
           }, re);
         }
       }
       if (rollbackErr) {
-        if (groupPolicy === 'throw') throw rollbackErr;
-        return 0;
+        throw rollbackErr;
       }
       __screenDiag('error', groupTag + ':apply_failed', {
         stage: 'apply',
         type: __screenTypeBrowser,
         diagTag: groupTag,
         key: groupKey,
-        message: 'apply failed'
+        message: 'apply failed',
+        data: {
+          outcome: groupPolicy === 'throw' ? 'throw' : 'skip',
+          reason: (e && e.message) ? String(e.message) : 'apply_failed',
+          substage: 'apply(Object.defineProperty/postcheck)'
+        }
       }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
@@ -343,8 +380,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         owner: mqlProto,
         key: 'matches',
         kind: 'accessor',
-        wrapLayer: 'core_wrapper',
-        policy: 'throw',
+        wrapLayer: 'named_wrapper_strict',
+        policy: 'strict',
         diagTag: 'screen:mql_matches',
         validThis(self) {
           return receiverMatchesTarget(mqlProto, self);
@@ -354,7 +391,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           if (mqlMatches.has(this)) return mqlMatches.get(this);
           return Reflect.apply(origMatchesGet, this, []);
         }
-      }], 'throw');
+      }], 'skip');
     }
   }
   
@@ -372,7 +409,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           type: __screenTypeBrowser,
           diagTag: 'screen:matchMedia',
           key: 'matchMedia',
-          message: 'Window receiver check failed'
+          message: 'Window receiver check failed',
+          data: { outcome: 'skip', reason: 'exception', substage: 'isWindowThis' }
         }, e);
       }
       return false;
@@ -471,7 +509,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           type: __screenTypeBrowser,
           diagTag: 'screen:mql_matches',
           key: 'matches',
-          message: 'MediaQueryList cache set failed'
+          message: 'MediaQueryList cache set failed',
+          data: { outcome: 'skip', reason: 'exception', substage: 'mqlMatches.set' }
         }, e);
       }
     }
@@ -491,7 +530,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     policy: 'throw',
     diagTag: 'screen:matchMedia',
     validThis: isMatchMediaThis,
-    invalidThis: 'native',
+    invalidThis: 'throw',
     // validThis() {
     //   return true;
     // },
@@ -532,7 +571,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         type: __screenTypeBrowser,
         diagTag: 'screen',
         key: 'orientation.type',
-        message: 'orientation.type redefine failed'
+        message: 'orientation.type redefine failed',
+        data: { outcome: 'skip', reason: 'exception', substage: 'redefineProp(orientation.type)' }
       }, e);
     }
     try { setOrientation('angle', () => ZERO); }
@@ -542,7 +582,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         type: __screenTypeBrowser,
         diagTag: 'screen',
         key: 'orientation.angle',
-        message: 'orientation.angle redefine failed'
+        message: 'orientation.angle redefine failed',
+        data: { outcome: 'skip', reason: 'exception', substage: 'redefineProp(orientation.angle)' }
       }, e);
     }
   }
@@ -631,6 +672,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       key: null,
       message: 'patched viewport snapshot',
       data: {
+        outcome: 'return',
+        reason: 'snapshot',
+        substage: 'DOMContentLoaded',
         html:   { width:  document.documentElement.clientWidth,  height: document.documentElement.clientHeight },
         window: { width:  window.innerWidth,  height: window.innerHeight },
         screen: { width:  window.screen.width,  height: window.screen.height }
@@ -647,6 +691,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       key: null,
       message: 'document and div client sizes',
       data: {
+        outcome: 'return',
+        reason: 'snapshot',
+        substage: 'DOMContentLoaded',
         html: {
           width:  document.documentElement.clientWidth,
           height: document.documentElement.clientHeight
@@ -665,7 +712,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     diagTag: 'screen',
     key: null,
     message: 'screen patches applied',
-    data: null
+    data: {
+      outcome: 'return',
+      reason: 'patched',
+      substage: 'module_apply'
+    }
   });
   window.__PATCH_SCREEN__ = true;
   } catch (e) {
@@ -675,10 +726,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       diagTag: 'screen',
       key: null,
       message: 'fatal module error',
-      data: null
+      data: {
+        outcome: 'throw',
+        reason: 'fatal',
+        substage: 'module_try'
+      }
     }, e);
     return;
   }
-  } 
 }
   
