@@ -1786,22 +1786,28 @@ function printToStringCrossRealmChecks() {
 
 
 
-    const rows = last50.map((e, i) => ({
-      idx: i,
-      timestamp: e && e.timestamp ? e.timestamp : null,
-      code: e && e.code ? e.code : null,
-      level: e && e.extra && e.extra.level ? e.extra.level : null,
-      diagTag: e && e.extra && e.extra.diagTag ? e.extra.diagTag : null,
-      module: e && e.extra && e.extra.module ? e.extra.module : null,
-      stage: e && e.extra && e.extra.stage ? e.extra.stage : null,
-      key: e && e.extra && e.extra.key ? e.extra.key : null,
-      message: (e && e.extra && e.extra.message)
-        ? e.extra.message
-        : (e && e.error && typeof e.error === "object" && e.error && typeof e.error.message === "string")
-          ? e.error.message
-          : null,
-      err: (() => {
+    const rows = last50.map((e, i) => {
+      const probeExpectedErr = (() => {
         try {
+          const er = e ? e.error : null;
+          if (!er || typeof er !== "object") return false;
+          const name = (typeof er.name === "string") ? er.name : "";
+          const message = (typeof er.message === "string") ? er.message : "";
+          const stack = (typeof er.stack === "string") ? er.stack : "";
+          if (name !== "TypeError") return false;
+          if (!/Illegal invocation/i.test(message)) return false;
+          if (!stack) return false;
+          // Probe intentionally runs bad-receiver tests in printReceiverChecks(); those should not populate "err".
+          // Filter only by probe-owned markers to avoid accidental coupling to other helpers.
+          return /printReceiverChecks|__PROBE__/i.test(stack);
+        } catch (_) {
+          return false;
+        }
+      })();
+
+      const errCell = (() => {
+        try {
+          if (probeExpectedErr) return null;
           const er = e ? e.error : null;
           if (er == null) return null;
           if (typeof er === "string") return er;
@@ -1814,15 +1820,32 @@ function printToStringCrossRealmChecks() {
         } catch (_) {
           return null;
         }
-      })(),
-      data: (() => {
-        try {
-          const s = JSON.stringify(e?.extra?.data);
-          return (typeof s === "string") ? s : null;
-        }
-        catch (_) { return "[unserializable]"; }
-      })()
-    }));
+      })();
+
+      return {
+        idx: i,
+        timestamp: e && e.timestamp ? e.timestamp : null,
+        code: e && e.code ? e.code : null,
+        level: e && e.extra && e.extra.level ? e.extra.level : null,
+        diagTag: e && e.extra && e.extra.diagTag ? e.extra.diagTag : null,
+        module: e && e.extra && e.extra.module ? e.extra.module : null,
+        stage: e && e.extra && e.extra.stage ? e.extra.stage : null,
+        key: e && e.extra && e.extra.key ? e.extra.key : null,
+        message: (e && e.extra && e.extra.message)
+          ? e.extra.message
+          : (e && e.error && typeof e.error === "object" && e.error && typeof e.error.message === "string")
+            ? e.error.message
+            : null,
+        err: errCell,
+        data: (() => {
+          try {
+            const s = JSON.stringify(e?.extra?.data);
+            return (typeof s === "string") ? s : null;
+          }
+          catch (_) { return "[unserializable]"; }
+        })()
+      };
+    });
 
 
 

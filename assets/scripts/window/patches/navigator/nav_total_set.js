@@ -1,33 +1,29 @@
 const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
   if (!window.__PATCH_NAVTOTALSET__) {
-      window.__PATCH_NAVTOTALSET__ = true;
+    let __navGuardToken = null;
     const G = (typeof globalThis !== 'undefined' && globalThis)
       || (typeof self !== 'undefined' && self)
       || (typeof window !== 'undefined' && window)
       || {};
-    const __navD = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || null;
     const __navTypePipeline = 'pipeline missing data';
     const __navTypeBrowser = 'browser structure missing data';
-    function __navDiag(level, code, extra, err) {
-      const D = __navD;
+
+    // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
+    const __D = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || null;
+    const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+    const __emit = (level, code, ctx, err) => {
       try {
-        const rawLevel = String(level || 'info');
-        const normalizedCode = String(code || 'nav_total_set');
+        if (__diag) return __diag(String(level || 'info'), String(code || 'nav_total_set'), ctx, (typeof err === 'undefined') ? null : (err || null));
+        if (typeof __D === 'function') return __D(String(code || 'nav_total_set'), (typeof err === 'undefined') ? null : (err || null), Object.assign({ level: String(level || 'info') }, ctx));
+      } catch (_) {}
+    };
+    function __navDiag(level, code, extra, err) {
+      try {
         const x = (extra && typeof extra === 'object') ? extra : {};
-        const rawType = (typeof x.type === 'string') ? x.type : '';
-        const normalizedType = (rawType === __navTypePipeline || rawType === __navTypeBrowser) ? rawType : undefined;
-        const ctxKey = (typeof x.key === 'string' || x.key === null) ? x.key : undefined;
-        const ctxDiagTag = (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : undefined;
-        const rawStage = (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
-        const normalizedStage = (
-          rawStage === 'preflight' ||
-          rawStage === 'apply' ||
-          rawStage === 'rollback' ||
-          rawStage === 'contract' ||
-          rawStage === 'hook' ||
-          rawStage === 'runtime' ||
-          rawStage === 'guard'
-        ) ? rawStage : 'runtime';
+        const ctxKey = (typeof x.key === 'string' || x.key === null) ? x.key : null;
+        const ctxDiagTag = (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'nav_total_set';
+        const ctxStage = (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
+        const normalizedCode = String(code || 'nav_total_set');
         const ctxMessage = (typeof x.message === 'string' && x.message)
           ? x.message
           : ((err && typeof err.message === 'string' && err.message) ? err.message : normalizedCode);
@@ -37,77 +33,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           diagTag: ctxDiagTag,
           surface: 'navigator',
           key: ctxKey,
-          stage: normalizedStage,
+          stage: ctxStage,
           message: ctxMessage,
-          data: hasData ? x.data : undefined
+          data: hasData ? x.data : undefined,
+          type: (typeof x.type === 'string' && x.type) ? x.type : undefined
         };
-        if (typeof normalizedType === 'string') ctx.type = normalizedType;
-
-        if (D && typeof D.diag === 'function') {
-          D.diag(rawLevel, normalizedCode, ctx, err || null);
-          return;
-        }
-        if (typeof D === 'function') {
-          const extraObj = {
-            level: rawLevel,
-            module: ctx.module,
-            diagTag: ctx.diagTag,
-            surface: ctx.surface,
-            key: ctx.key,
-            stage: ctx.stage,
-            message: ctx.message,
-            data: ctx.data
-          };
-          if (typeof normalizedType === 'string') extraObj.type = normalizedType;
-           D(normalizedCode, err || null, extraObj);
-        }
-      } catch (diagErr) {
-        if (D && typeof D.diag === 'function') {
-          try {
-            D.diag('warn', 'nav_total_set:diag_failed', {
-              module: 'nav_total_set',
-              diagTag: 'nav_total_set',
-              surface: 'navigator',
-              key: null,
-              stage: 'guard',
-              message: '__navDiag failed',
-              type: __navTypeBrowser,
-              data: { failedCode: String(code || 'nav_total_set') }
-            }, diagErr || null);
-          } catch (fallbackErr) {
-            if (typeof D === 'function') {
-              try {
-                D('nav_total_set:diag_failed', fallbackErr || diagErr || null, {
-                  level: 'warn',
-                  module: 'nav_total_set',
-                  diagTag: 'nav_total_set',
-                  surface: 'navigator',
-                  key: null,
-                  stage: 'guard',
-                  message: '__navDiag failed',
-                  type: __navTypeBrowser,
-                  data: { failedCode: String(code || 'nav_total_set') }
-                });
-              } catch (_) {}
-            }
-          }
-          return;
-        }
-        if (typeof D === 'function') {
-          try {
-            D('nav_total_set:diag_failed', diagErr || null, {
-              level: 'warn',
-              module: 'nav_total_set',
-              diagTag: 'nav_total_set',
-              surface: 'navigator',
-              key: null,
-              stage: 'guard',
-              message: '__navDiag failed',
-              type: __navTypeBrowser,
-              data: { failedCode: String(code || 'nav_total_set') }
-            });
-          } catch (_) {}
-        }
+        __emit(level, normalizedCode, ctx, err);
+      } catch (_) {
+        // safe-noop
       }
     }
     function __navDiagPipeline(level, code, extra, err) {
@@ -122,12 +55,33 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'nav_total_set';
       __navDiag(level, code, x, err);
     }
+
+    try {
+      const __navCore = window.Core;
+      if (__navCore && typeof __navCore.guardFlag === 'function') {
+        __navGuardToken = __navCore.guardFlag('__PATCH_NAVTOTALSET__', 'nav_total_set');
+      }
+    } catch (_) {}
+    if (!__navGuardToken) {
+      __navDiagPipeline('warn', 'nav_total_set:guard_missing', {
+        stage: 'guard',
+        message: 'Core.guardFlag missing',
+        data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+      });
+      return;
+    }
     // Must run in Window realm (not Worker)
     if (typeof document === 'undefined' || !window || window.document !== document) {
       __navDiagBrowser('fatal', 'nav_total_set:not_window_realm', {
         stage: 'preflight',
         message: 'not in Window realm'
       });
+      try {
+        const __navCore = window.Core;
+        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+        }
+      } catch (_) {}
       return;
     }
 
@@ -156,6 +110,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: '__ensureMarkAsNative failed',
         data: { policy: 'skip', action: 'native' }
       }, e);
+      try {
+        const __navCore = window.Core;
+        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+        }
+      } catch (_) {}
       return;
     }
     if (typeof mark !== 'function') {
@@ -164,6 +124,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'markAsNative missing',
         data: { policy: 'skip', action: 'native' }
       });
+      try {
+        const __navCore = window.Core;
+        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+        }
+      } catch (_) {}
       return;
     }
     const __navMark = mark;
@@ -174,6 +140,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'wrapStrictAccessor missing',
         data: { policy: 'skip', action: 'native' }
       });
+      try {
+        const __navCore = window.Core;
+        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+        }
+      } catch (_) {}
       return;
     }
     function registerPatchedTarget(owner, key, tag) {
@@ -228,6 +200,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'bad __DPR',
         data: { dpr: dpr }
       });
+      try {
+        const __navCore = window.Core;
+        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+        }
+      } catch (_) {}
       return;
     }
 
@@ -236,20 +214,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navPatchedKeys = new Set();
     const __navSeen = new Set();
     let __navReceiverCheckDiagSent = false;
-    const __navLogPush = (function () {
-      const logArr = Array.isArray(window._myDebugLog) ? window._myDebugLog : null;
-      return function (entry) {
-        try { if (logArr) logArr.push(entry); } catch (e) {
-          __navDiag('error', 'nav_total_set:debuglog_push_failed', {
-            stage: 'runtime',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set',
-            message: 'debug log push failed',
-            data: { entryType: entry && entry.type || null }
-          }, e);
-        }
-      };
-    })();
     function __navRegisterKey(key) {
       if (key != null) __navPatchedKeys.add(String(key));
     }
@@ -264,7 +228,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const token = keyOk ? k : fn;
       if (__navSeen.has(token)) return;
       __navSeen.add(token);
-      __navLogPush({ type: 'nav_access', key: k || null, extra: extra || null, timestamp: new Date().toISOString() });
+      __navDiag('info', 'nav_total_set:nav_access', {
+        stage: 'runtime',
+        diagTag: 'nav_total_set',
+        key: k || null,
+        message: 'nav access',
+        data: { outcome: 'return', reason: 'nav_access', extra: extra || null }
+      });
     }
     const __isNavigatorThis = (self) => {
       try {
@@ -311,6 +281,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         key: 'platform',
         message: 'GENERATED_PLATFORM missing'
       });
+      try {
+        const __navCore = window.Core;
+        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+        }
+      } catch (_) {}
       return;
     }
     if (!navPlat) {
@@ -321,6 +297,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         key: 'platform',
         message: 'NAV_PLATFORM__ missing'
       });
+      try {
+        const __navCore = window.Core;
+        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+        }
+      } catch (_) {}
       return;
     }
 
@@ -337,6 +319,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: `CH.platform '${chPlatform}' is DOM-like; expected OS-string (e.g. 'Windows'/'macOS')`,
           data: { from: chPlatform, to: normalized }
         });
+        try {
+          const __navCore = window.Core;
+          if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+            __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+          }
+        } catch (_) {}
         return;
       } else {
         __navDiag('warn', 'nav_total_set:ch_platform_normalized', {
@@ -362,6 +350,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: msg,
           data: { navPlat, generatedPlatform: gen, expectedNavPlat }
         });
+        try {
+          const __navCore = window.Core;
+          if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+            __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+          }
+        } catch (_) {}
         return;
       } else {
         __navDiag('warn', 'nav_total_set:nav_platform_inconsistent', {
@@ -1010,63 +1004,43 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
              const fullVersionList = (meta && meta.fullVersionList != null)
                ? meta.fullVersionList
                : window.__FULL_VERSION_LIST;
-             const map = {
-               architecture: meta.architecture,
-               bitness: meta.bitness,
-               model: meta.model,
-               brands: meta.brands,
-               mobile: meta.mobile,
-               platform: chPlatform,
-               platformVersion: meta.platformVersion,
-               fullVersionList: fullVersionList,
-               deviceMemory: mem,
-               hardwareConcurrency: cpu,
-               wow64: meta.wow64,
-               formFactors: meta.formFactors
-             };
-            const result = {};
-            for (const hint of keys) {
-              if (typeof hint !== 'string' || !hint) {
-                __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_hint', {
-                  stage: 'runtime',
-                  type: __navTypePipeline,
-                  diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
-                  key: 'userAgentData.getHighEntropyValues',
-                  message: 'bad highEntropy key item',
-                  data: { outcome: 'return', reason: 'bad_hint' }
-                });
-                return nativeOut;
-              }
-              const val = map[hint];
-              if (val === undefined || val === null || (typeof val === 'string' && !val && hint !== 'model') || (Array.isArray(val) && !val.length)) {
-                __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_missing_value', {
-                  stage: 'runtime',
-                  type: __navTypePipeline,
-                  diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
-                  key: 'userAgentData.getHighEntropyValues',
-                  message: 'missing highEntropy value',
-                  data: { outcome: 'return', reason: 'missing_value', hint: hint }
-                });
-                return nativeOut;
-              }
-              result[hint] = val;
+              const map = {
+                architecture: meta.architecture,
+                bitness: meta.bitness,
+                model: meta.model,
+                brands: meta.brands,
+                mobile: meta.mobile,
+                platform: chPlatform,
+                platformVersion: meta.platformVersion,
+                fullVersionList: fullVersionList,
+                deviceMemory: mem,
+                hardwareConcurrency: cpu,
+                wow64: meta.wow64,
+                formFactors: meta.formFactors
+              };
+             const result = {};
+             for (const hint of keys) {
+               if (typeof hint !== 'string' || !hint) {
+                 __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_hint', {
+                   stage: 'runtime',
+                   type: __navTypePipeline,
+                   diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+                   key: 'userAgentData.getHighEntropyValues',
+                   message: 'bad highEntropy key item',
+                   data: { outcome: 'return', reason: 'bad_hint' }
+                 });
+                 return nativeOut;
+               }
+               const val = map[hint];
+               if (val === undefined || val === null || (typeof val === 'string' && !val && hint !== 'model') || (Array.isArray(val) && !val.length)) {
+                 continue;
+               }
+               result[hint] = val;
              }
              return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
                try {
                  const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : {};
                  const out = Object.assign({}, base, result);
-                 try {
-                   if (Object.prototype.hasOwnProperty.call(out, 'uaFullVersion')) delete out.uaFullVersion;
-                 } catch (eDrop) {
-                   __navDiag('warn', 'nav_total_set:userAgentData_getHighEntropyValues_drop_uafullversion_failed', {
-                     stage: 'runtime',
-                     type: __navTypeBrowser,
-                     diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
-                     key: 'uaFullVersion',
-                     message: 'failed to drop uaFullVersion',
-                     data: { outcome: 'return', reason: 'drop_failed' }
-                   }, eDrop);
-                 }
                  return out;
                } catch (e) {
                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
@@ -1080,9 +1054,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                  return nativeResolved;
                }
              });
-           }
-         }], 'throw');
-      }
+            }
+          }], 'throw');
+       }
 
       const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
       const origToJSON = toJsonDesc && toJsonDesc.value;
@@ -2073,7 +2047,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'fatal module error',
         data: { rollbackOk: !rollbackErr }
       }, rollbackErr || e);
+      try {
+        const __navCore = window.Core;
+        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, !rollbackErr, 'nav_total_set');
+        }
+      } catch (_) {}
       throw (rollbackErr || e);
     }
+  } else {
+    try {
+      const __navCore = window.Core;
+      if (__navCore && typeof __navCore.guardFlag === 'function') {
+        __navCore.guardFlag('__PATCH_NAVTOTALSET__', 'nav_total_set');
+      }
+    } catch (_) {}
   }
 }

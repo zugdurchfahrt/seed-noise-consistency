@@ -49,10 +49,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const d = global && global.__DEGRADE__;
     const diag = (d && typeof d.diag === 'function') ? d.diag.bind(d) : null;
     const eventCode = (typeof code === 'string' && code) ? code : 'context:diag';
-    const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
+    const e = (typeof err === 'undefined') ? null : err;
     const x = (extra && typeof extra === 'object') ? extra : null;
     const stage = (x && typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
-    const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+    const errName = (e && typeof e === 'object' && typeof e.name === 'string') ? e.name : '';
+    const errMsg = (e && typeof e === 'object' && typeof e.message === 'string')
+      ? e.message
+      : (typeof e === 'string' ? e : '');
+    const isIllegal = !!(errName === 'TypeError' && /Illegal invocation/i.test(errMsg || ''));
     const defaultType = (stage === 'runtime' || isIllegal) ? 'browser structure missing data' : 'pipeline missing data';
     const ctx = Object.assign({
       module: 'context',
@@ -82,7 +86,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       diag(level, eventCode, ctx, e);
       return;
     }
-    if (typeof d === 'function') d(eventCode, e, ctx);
+    if (typeof d === 'function') d(eventCode, e, Object.assign({ level }, ctx));
   }
 
   const patchedMethods = new WeakSet();

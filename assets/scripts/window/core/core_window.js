@@ -684,6 +684,78 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
       const knownWrapped = new WeakSet();
       const globalTargetRegistry = (Core.__targetRegistry instanceof WeakMap) ? Core.__targetRegistry : new WeakMap();
+      const __patchGuardSeq = new WeakMap();
+
+      function nextGuardToken(flagKey) {
+        let n = 0;
+        try {
+          n = __patchGuardSeq.get(window) || 0;
+          n = (n + 1) | 0;
+          __patchGuardSeq.set(window, n);
+        } catch (_) {
+          n = ((nextGuardToken.__n || 0) + 1) | 0;
+          nextGuardToken.__n = n;
+        }
+        return `g:${String(flagKey || 'flag')}:${String(n)}`;
+      }
+
+      function guardFlag(flagKey, codePrefix) {
+        const key = String(flagKey || '');
+        if (!key) return null;
+        try {
+          if (window[key]) {
+            const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
+            __emit('info', tag + ':already_patched', {
+              module: 'core',
+              diagTag: tag,
+              surface: 'core',
+              key,
+              stage: 'guard',
+              message: 'already patched (guard)',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'already_patched' }
+            }, null);
+            return null;
+          }
+        } catch (_) {
+          return null;
+        }
+        const token = nextGuardToken(key);
+        try {
+          window[key] = token;
+        } catch (_) {
+          return null;
+        }
+        return token;
+      }
+
+      function releaseGuardFlag(flagKey, token, rollbackOk, codePrefix) {
+        const key = String(flagKey || '');
+        if (!key) return false;
+        if (!rollbackOk) return false;
+        try {
+          if (window[key] !== token) return false;
+          try {
+            delete window[key];
+          } catch (_) {
+            window[key] = false;
+          }
+          const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
+          __emit('info', tag + ':guard_released', {
+            module: 'core',
+            diagTag: tag,
+            surface: 'core',
+            key,
+            stage: 'rollback',
+            message: 'guard released after rollback ok',
+            type: 'pipeline missing data',
+            data: { outcome: 'rollback', reason: 'rollback_ok' }
+          }, null);
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
 
       function getTargetBucket(owner, create) {
         if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return null;
@@ -1586,6 +1658,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
           registerPatchedTarget(owner, key);
           return true;
         },
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'guardFlag', {
+        value: guardFlag,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, 'releaseGuardFlag', {
+        value: releaseGuardFlag,
         writable: true,
         configurable: true,
         enumerable: false
