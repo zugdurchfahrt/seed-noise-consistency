@@ -74,7 +74,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (typeof document === 'undefined' || !window || window.document !== document) {
       __navDiagBrowser('fatal', 'nav_total_set:not_window_realm', {
         stage: 'preflight',
-        message: 'not in Window realm'
+        message: 'not in Window realm',
+        data: { outcome: 'skip', reason: 'not_window_realm' }
       });
       try {
         const __navCore = window.Core;
@@ -108,7 +109,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navDiagPipeline('error', 'nav_total_set:mark_as_native_failed', {
         stage: 'preflight',
         message: '__ensureMarkAsNative failed',
-        data: { policy: 'skip', action: 'native' }
+        data: { outcome: 'skip', reason: 'ensure_mark_as_native_failed', policy: 'skip', action: 'native' }
       }, e);
       try {
         const __navCore = window.Core;
@@ -122,7 +123,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navDiagPipeline('warn', 'nav_total_set:mark_as_native_missing', {
         stage: 'preflight',
         message: 'markAsNative missing',
-        data: { policy: 'skip', action: 'native' }
+        data: { outcome: 'skip', reason: 'missing_dep_mark_as_native', policy: 'skip', action: 'native' }
       });
       try {
         const __navCore = window.Core;
@@ -138,7 +139,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navDiagPipeline('warn', 'nav_total_set:wrap_strict_accessor_missing', {
         stage: 'preflight',
         message: 'wrapStrictAccessor missing',
-        data: { policy: 'skip', action: 'native' }
+        data: { outcome: 'skip', reason: 'missing_dep_wrap_strict_accessor', policy: 'skip', action: 'native' }
       });
       try {
         const __navCore = window.Core;
@@ -198,7 +199,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         stage: 'preflight',
         key: 'devicePixelRatio',
         message: 'bad __DPR',
-        data: { dpr: dpr }
+        data: { outcome: 'skip', reason: 'bad_dpr', dpr: dpr }
       });
       try {
         const __navCore = window.Core;
@@ -279,7 +280,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'platform',
-        message: 'GENERATED_PLATFORM missing'
+        message: 'GENERATED_PLATFORM missing',
+        data: { outcome: 'skip', reason: 'missing_generated_platform' }
       });
       try {
         const __navCore = window.Core;
@@ -295,7 +297,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'platform',
-        message: 'NAV_PLATFORM__ missing'
+        message: 'NAV_PLATFORM__ missing',
+        data: { outcome: 'skip', reason: 'missing_nav_platform' }
       });
       try {
         const __navCore = window.Core;
@@ -317,7 +320,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           diagTag: 'nav_total_set',
           key: 'userAgentData.platform',
           message: `CH.platform '${chPlatform}' is DOM-like; expected OS-string (e.g. 'Windows'/'macOS')`,
-          data: { from: chPlatform, to: normalized }
+          data: { outcome: 'skip', reason: 'ch_platform_dom_like', from: chPlatform, to: normalized }
         });
         try {
           const __navCore = window.Core;
@@ -348,7 +351,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           diagTag: 'nav_total_set',
           key: 'platform',
           message: msg,
-          data: { navPlat, generatedPlatform: gen, expectedNavPlat }
+          data: { outcome: 'skip', reason: 'nav_platform_inconsistent', navPlat, generatedPlatform: gen, expectedNavPlat }
         });
         try {
           const __navCore = window.Core;
@@ -578,7 +581,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           type: __navTypePipeline,
           diagTag: groupTag,
           key: groupKey,
-          message: 'Core.applyTargets missing'
+          message: 'Core.applyTargets missing',
+          data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'core_missing' }
         }, err);
         if (groupPolicy === 'throw') throw err;
         return 0;
@@ -602,7 +606,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: groupTag,
-          key: groupKey
+          key: groupKey,
+          data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'preflight_exception' }
         }, e);
         if (groupPolicy === 'throw') throw e;
         return 0;
@@ -614,7 +619,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           type: __navTypePipeline,
           diagTag: groupTag,
           key: groupKey,
-          data: { reason }
+          data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: String(reason) }
         }, null);
         if (groupPolicy === 'throw') {
           throw new Error('target group skipped');
@@ -660,19 +665,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               stage: 'rollback',
               type: __navTypeBrowser,
               diagTag: groupTag,
-              key: p.key || null
+              key: p.key || null,
+              data: { outcome: 'rollback', reason: 'rollback_failed' }
             }, re);
           }
         }
         if (rollbackErr) {
-          if (groupPolicy === 'throw') throw rollbackErr;
-          return 0;
+          throw rollbackErr;
         }
         __navDiag('error', groupTag + ':apply_failed', {
           stage: 'apply',
           type: __navTypeBrowser,
           diagTag: groupTag,
-          key: activeKey
+          key: activeKey,
+          data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'apply_failed' }
         }, e);
         if (groupPolicy === 'throw') throw e;
         return 0;
@@ -693,14 +699,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: navProto,
           key: key,
           kind: 'accessor',
-          wrapLayer: 'named_wrapper',
-          policy: 'throw',
+          wrapLayer: 'named_wrapper_strict',
+          policy: 'strict',
           diagTag: 'nav_total_set:critical',
           allowCreate: false,
           configurable: !!d.configurable,
           enumerable: !!d.enumerable,
           validThis: __isNavigatorThis,
-          invalidThis: 'native',
+          invalidThis: 'throw',
           getImpl: function navCriticalGetImpl() {
             __navLogAccess(key, null);
             return getter.call(this);
@@ -967,8 +973,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: uadProto,
           key: 'getHighEntropyValues',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
           validThis: isUadThis,
@@ -1075,8 +1082,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: uadProto,
           key: 'toJSON',
           kind: 'method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:userAgentData.toJSON',
           validThis: isUadThis,
@@ -1398,8 +1406,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: permProto,
         key: 'query',
         kind: 'promise_method',
-        wrapLayer: 'named_wrapper',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
+        wrapperClass: 'core_proxy',
         policy: 'throw',
         diagTag: 'nav_total_set:permissions.query',
         validThis(self) {
@@ -1480,8 +1489,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: mediaProto,
         key: 'enumerateDevices',
         kind: 'promise_method',
-        wrapLayer: 'named_wrapper',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
+        wrapperClass: 'core_proxy',
         policy: 'throw',
         diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
         validThis(self) {
@@ -1597,8 +1607,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: storageProto,
         key: 'estimate',
         kind: 'promise_method',
-        wrapLayer: 'named_wrapper',
+        wrapLayer: 'core_wrapper',
         invokeClass: 'brand_strict',
+        wrapperClass: 'core_proxy',
         policy: 'throw',
         diagTag: 'nav_total_set:storage.estimate',
         validThis(self) {
@@ -1631,8 +1642,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: tmpProto,
           key: 'queryUsageAndQuota',
           kind: 'method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
           validThis(self) {
@@ -1684,8 +1696,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: storageProto,
           key: 'persist',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persist',
           validThis(self) {
@@ -1718,8 +1731,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: storageProto,
           key: 'persisted',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persisted',
           validThis(self) {
@@ -1821,8 +1835,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: credProto,
           key: 'create',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:credentials.create',
           validThis(self) {
@@ -1844,8 +1859,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: credProto,
           key: 'get',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:credentials.get',
           validThis(self) {
@@ -2028,7 +2044,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     __navDiag('info', 'nav_total_set:applied', {
       stage: 'apply',
       type: __navTypePipeline,
-      diagTag: 'nav_total_set'
+      diagTag: 'nav_total_set',
+      data: { outcome: 'return', reason: 'patched' }
     });
   }
 
@@ -2045,7 +2062,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         diagTag: 'nav_total_set',
         key: null,
         message: 'fatal module error',
-        data: { rollbackOk: !rollbackErr }
+        data: { outcome: 'throw', reason: 'fatal', rollbackOk: !rollbackErr }
       }, rollbackErr || e);
       try {
         const __navCore = window.Core;
@@ -2055,12 +2072,5 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       } catch (_) {}
       throw (rollbackErr || e);
     }
-  } else {
-    try {
-      const __navCore = window.Core;
-      if (__navCore && typeof __navCore.guardFlag === 'function') {
-        __navCore.guardFlag('__PATCH_NAVTOTALSET__', 'nav_total_set');
-      }
-    } catch (_) {}
   }
 }
