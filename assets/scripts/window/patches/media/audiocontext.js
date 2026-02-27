@@ -1,16 +1,23 @@
 const AudioContextModule = function AudioContextModule(window) {
-  if (globalThis.__AUDIO_CTX_PATCH_APPLIED__) return;
-
   const __audioTypePipeline = 'pipeline missing data';
   const __audioTypeBrowser = 'browser structure missing data';
-  const __audioDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
-  const __audioDegradeDiag = (__audioDegrade && typeof __audioDegrade.diag === 'function')
-    ? __audioDegrade.diag.bind(__audioDegrade)
+  const __audioDegradeAny = window.__DEGRADE__;
+  const __audioDegrade = (typeof __audioDegradeAny === 'function') ? __audioDegradeAny : null;
+  const __audioDegradeDiag = (__audioDegradeAny && typeof __audioDegradeAny.diag === 'function')
+    ? __audioDegradeAny.diag.bind(__audioDegradeAny)
     : null;
+  const __audioAllowedStages = {
+    preflight: true,
+    apply: true,
+    rollback: true,
+    contract: true,
+    hook: true,
+    runtime: true,
+    guard: true
+  };
 
   function emitDegrade(level, code, err, extra) {
     const d = __audioDegrade;
-    if (typeof d !== 'function') return;
 
     const e = (err instanceof Error)
       ? err
@@ -21,15 +28,27 @@ const AudioContextModule = function AudioContextModule(window) {
       ? level
       : 'info';
     const normalizedCode = code || 'audiocontext';
+    const rawStage = (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
+    const normalizedStage = __audioAllowedStages[rawStage] ? rawStage : 'runtime';
+    const data = (x.data && typeof x.data === 'object' && !Array.isArray(x.data))
+      ? Object.assign({}, x.data)
+      : (x.data == null ? {} : { detail: x.data });
+    if (!data.outcome) {
+      if (normalizedStage === 'rollback') data.outcome = 'rollback';
+      else if (normalizedLevel === 'error' || normalizedLevel === 'fatal') data.outcome = 'throw';
+      else if (normalizedLevel === 'info') data.outcome = 'return';
+      else data.outcome = 'skip';
+    }
+    if (!__audioAllowedStages[rawStage]) data.substage = rawStage;
 
     const ctx = {
       module: 'audiocontext',
       diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'audiocontext',
       surface: 'audio',
       key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+      stage: normalizedStage,
       message: (typeof x.message === 'string' && x.message) ? x.message : normalizedCode,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      data,
       type: (typeof x.type === 'string' && x.type) ? x.type : __audioTypePipeline
     };
 
@@ -44,23 +63,19 @@ const AudioContextModule = function AudioContextModule(window) {
             diagTag: ctx.diagTag,
             surface: ctx.surface,
             key: ctx.key,
-            stage: 'diag',
+            stage: 'runtime',
             message: '__DEGRADE__.diag failed',
-            data: { originalCode: normalizedCode },
+            data: { originalCode: normalizedCode, outcome: 'skip', substage: 'diag' },
             type: __audioTypePipeline
           });
-        } catch (fallbackErr) {
-          globalThis.__AUDIO_CTX_LAST_DEGRADE_EMIT_ERROR__ = {
-            stage: 'diag_fallback',
-            code: normalizedCode,
-            diagError: String(diagErr && diagErr.message ? diagErr.message : diagErr),
-            fallbackError: String(fallbackErr && fallbackErr.message ? fallbackErr.message : fallbackErr),
-            at: Date.now()
-          };
+        } catch (_) {
+          return;
         }
       }
       return;
     }
+
+    if (typeof d !== 'function') return;
 
     try {
       d(normalizedCode, e || null, {
@@ -74,13 +89,8 @@ const AudioContextModule = function AudioContextModule(window) {
         data: ctx.data,
         type: ctx.type
       });
-    } catch (emitErr) {
-      globalThis.__AUDIO_CTX_LAST_DEGRADE_EMIT_ERROR__ = {
-        stage: 'emit',
-        code: normalizedCode,
-        emitError: String(emitErr && emitErr.message ? emitErr.message : emitErr),
-        at: Date.now()
-      };
+    } catch (_) {
+      return;
     }
   }
 
@@ -92,13 +102,24 @@ const AudioContextModule = function AudioContextModule(window) {
     emitDegrade(lvl, code, err, x);
   }
 
+  if (globalThis.__AUDIO_CTX_PATCH_APPLIED__) {
+    degrade('audiocontext:already_patched', null, {
+      stage: 'guard',
+      level: 'info',
+      type: __audioTypePipeline,
+      data: { outcome: 'skip', reason: 'already_patched' }
+    });
+    return;
+  }
+
   const C = window.CanvasPatchContext;
   if (!C) {
     degrade('audiocontext:canvas_patch_context_missing', new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: 'CanvasPatchContext'
+      key: 'CanvasPatchContext',
+      data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
     });
     return;
   }
@@ -109,7 +130,8 @@ const AudioContextModule = function AudioContextModule(window) {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: 'rand.use'
+      key: 'rand.use',
+      data: { outcome: 'skip', reason: 'rand_missing' }
     });
     return;
   }
@@ -117,7 +139,13 @@ const AudioContextModule = function AudioContextModule(window) {
   try {
     R = rand.use('audio');
   } catch (e) {
-    degrade('audiocontext:rand_use_failed', e, { stage: 'preflight', level: 'fatal', type: __audioTypePipeline, key: 'rand.use(audio)' });
+    degrade('audiocontext:rand_use_failed', e, {
+      stage: 'preflight',
+      level: 'fatal',
+      type: __audioTypePipeline,
+      key: 'rand.use(audio)',
+      data: { outcome: 'skip', reason: 'rand_use_failed' }
+    });
     return;
   }
   if (typeof R !== 'function') {
@@ -125,7 +153,8 @@ const AudioContextModule = function AudioContextModule(window) {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: 'rand.use(audio)'
+      key: 'rand.use(audio)',
+      data: { outcome: 'skip', reason: 'rand_use_not_function' }
     });
     return;
   }
@@ -138,7 +167,8 @@ const AudioContextModule = function AudioContextModule(window) {
         stage: 'preflight',
         level: 'fatal',
         type: __audioTypePipeline,
-        key: 'markAsNative'
+        key: 'markAsNative',
+        data: { outcome: 'skip', reason: 'mark_native_missing' }
       });
       return null;
     }
@@ -159,7 +189,8 @@ const AudioContextModule = function AudioContextModule(window) {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: '__safeDefine'
+      key: '__safeDefine',
+      data: { outcome: 'skip', reason: 'safe_define_missing' }
     });
     return;
   }
@@ -168,7 +199,8 @@ const AudioContextModule = function AudioContextModule(window) {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: '__wrapNativeApply'
+      key: '__wrapNativeApply',
+      data: { outcome: 'skip', reason: 'wrap_native_apply_missing' }
     });
     return;
   }
@@ -177,7 +209,8 @@ const AudioContextModule = function AudioContextModule(window) {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: '__wrapNativeAccessor'
+      key: '__wrapNativeAccessor',
+      data: { outcome: 'skip', reason: 'wrap_native_accessor_missing' }
     });
     return;
   }
@@ -186,7 +219,8 @@ const AudioContextModule = function AudioContextModule(window) {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: 'Core.applyTargets'
+      key: 'Core.applyTargets',
+      data: { outcome: 'skip', reason: 'core_apply_targets_missing' }
     });
     return;
   }
@@ -212,7 +246,7 @@ const AudioContextModule = function AudioContextModule(window) {
       key,
       stage: 'guard',
       message: key,
-      data: detail || null,
+      data: { outcome: 'skip', detail: detail || null },
       type
     });
   }
@@ -230,7 +264,14 @@ const AudioContextModule = function AudioContextModule(window) {
         diagTag: tag
       });
     } catch (e) {
-      degrade('audiocontext:preflight_exception', e, { stage: 'preflight', level: 'error', type: __audioTypePipeline, diagTag: tag, key: String(key) });
+      degrade('audiocontext:preflight_exception', e, {
+        stage: 'preflight',
+        level: 'error',
+        type: __audioTypePipeline,
+        diagTag: tag,
+        key: String(key),
+        data: { outcome: 'skip', reason: 'preflight_exception', kind: kind, ctxName: ctxName || null }
+      });
       return false;
     }
     if (!pre || pre.ok !== true) {
@@ -242,7 +283,7 @@ const AudioContextModule = function AudioContextModule(window) {
         type: __audioTypeBrowser,
         diagTag: tag,
         key: String(key),
-        data: { reason: reason, kind: kind, ctxName: ctxName || null }
+        data: { outcome: 'skip', reason: reason, kind: kind, ctxName: ctxName || null }
       });
       return false;
     }
@@ -317,7 +358,14 @@ const AudioContextModule = function AudioContextModule(window) {
     try {
       plans = __coreApplyTargets(targets, window.__PROFILE__, []);
     } catch (e) {
-      degrade(groupTag + ':preflight_failed', e, { stage: 'preflight', level: 'error', type: __audioTypePipeline, diagTag: groupTag, key: null });
+      degrade(groupTag + ':preflight_failed', e, {
+        stage: 'preflight',
+        level: 'error',
+        type: __audioTypePipeline,
+        diagTag: groupTag,
+        key: null,
+        data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
+      });
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
@@ -325,7 +373,14 @@ const AudioContextModule = function AudioContextModule(window) {
     if (!Array.isArray(plans) || !plans.length) {
       const reason = plans && plans.reason ? plans.reason : 'group_skipped';
       const err = new Error('[AudioContextPatch] target group skipped: ' + reason);
-      degrade(groupTag + ':' + reason, err, { stage: 'preflight', level: 'warn', type: __audioTypeBrowser, diagTag: groupTag, key: null, data: { reason: reason } });
+      degrade(groupTag + ':' + reason, err, {
+        stage: 'preflight',
+        level: 'warn',
+        type: __audioTypeBrowser,
+        diagTag: groupTag,
+        key: null,
+        data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: reason, policy: groupPolicy }
+      });
       if (groupPolicy === 'throw') throw err;
       return 0;
     }
@@ -346,6 +401,14 @@ const AudioContextModule = function AudioContextModule(window) {
         applied.push(p);
       }
     } catch (e) {
+      degrade(groupTag + ':rollback', null, {
+        stage: 'rollback',
+        level: 'warn',
+        type: __audioTypeBrowser,
+        diagTag: groupTag,
+        key: null,
+        data: { outcome: 'rollback', policy: groupPolicy }
+      });
       let rollbackErr = null;
       for (let i = applied.length - 1; i >= 0; i--) {
         const p = applied[i];
@@ -354,14 +417,26 @@ const AudioContextModule = function AudioContextModule(window) {
           else delete p.owner[p.key];
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
-          degrade(groupTag + ':rollback_failed', re, { stage: 'rollback', level: 'error', type: __audioTypeBrowser, diagTag: groupTag, key: p.key });
+          degrade(groupTag + ':rollback_failed', re, {
+            stage: 'rollback',
+            level: 'error',
+            type: __audioTypeBrowser,
+            diagTag: groupTag,
+            key: p.key,
+            data: { outcome: 'throw', policy: groupPolicy, reason: 'rollback_failed' }
+          });
         }
       }
-      degrade(groupTag + ':apply_failed', e, { stage: 'apply', level: 'error', type: __audioTypeBrowser, diagTag: groupTag, key: null });
-      if (groupPolicy === 'throw') {
-        if (rollbackErr) throw rollbackErr;
-        throw e;
-      }
+      degrade(groupTag + ':apply_failed', e, {
+        stage: 'apply',
+        level: 'error',
+        type: __audioTypeBrowser,
+        diagTag: groupTag,
+        key: null,
+        data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
+      });
+      if (rollbackErr) throw rollbackErr;
+      if (groupPolicy === 'throw') throw e;
       return 0;
     }
     return applied.length;
@@ -475,30 +550,46 @@ const AudioContextModule = function AudioContextModule(window) {
       // --- Byte Spectrum: discrete ±1/0 with compensation of the summ ---
       const origByte = analyser.getByteFrequencyData;
       if (typeof origByte === 'function') {
-        analyser.getByteFrequencyData = markAsNative(makeMethod('getByteFrequencyData', function(array) {
-          Reflect.apply(origByte, this, [array]);
-          if (!AUDIO_NOISE_ENABLED) return;
+        const wrappedByte = markAsNative(__wrapNativeApply(origByte, 'getByteFrequencyData', function(target, thisArg, argList) {
+          const input = Array.isArray(argList) ? argList : [];
+          const array = input[0];
+          const result = Reflect.apply(target, thisArg, input);
+          if (!AUDIO_NOISE_ENABLED) return result;
           try {
             let delta = 0;
             const n = array.length | 0;
             for (let i = 0; i < n; i++) {
               const r = R();
-              let d = (r < 1/3) ? -1 : (r > 2/3 ? 1 : 0);
+              let d = (r < 1 / 3) ? -1 : (r > 2 / 3 ? 1 : 0);
               const v = array[i], nv = v + d;
               if (nv >= 0 && nv <= 255) { array[i] = nv; delta += d; }
             }
             if (delta !== 0) {
-              if (delta > 0) { // take away
+              if (delta > 0) {
                 for (let i = 0; i < n && delta > 0; i++) if (array[i] > 0) { array[i] -= 1; delta--; }
-              } else { // add
+              } else {
                 delta = -delta;
                 for (let i = 0; i < n && delta > 0; i++) if (array[i] < 255) { array[i] += 1; delta--; }
               }
             }
           } catch (e) {
-            degrade('audiocontext:analyser:byte_freq_noise_failed', e, { stage: 'runtime', level: 'warn', type: __audioTypePipeline, diagTag: `audio:${CTX_NAME}:analyser`, key: 'AnalyserNode.getByteFrequencyData' });
+            degrade('audiocontext:analyser:byte_freq_noise_failed', e, {
+              stage: 'hook',
+              level: 'warn',
+              type: __audioTypePipeline,
+              diagTag: `audio:${CTX_NAME}:analyser`,
+              key: 'AnalyserNode.getByteFrequencyData',
+              data: { outcome: 'skip', reason: 'byte_freq_noise_failed' }
+            });
           }
+          return result;
         }), 'getByteFrequencyData');
+        safeDefine(analyser, 'getByteFrequencyData', {
+          value: wrappedByte,
+          configurable: true,
+          enumerable: false,
+          writable: true
+        });
       } else {
         noteIssue('missing_method:getByteFrequencyData', CTX_NAME);
       }
@@ -506,43 +597,54 @@ const AudioContextModule = function AudioContextModule(window) {
       // --- Float Spectrum: pair of zero summary noise, without going out for [min,max] ---
       const origFloat = analyser.getFloatFrequencyData;
       if (typeof origFloat === 'function') {
-        analyser.getFloatFrequencyData = markAsNative(makeMethod('getFloatFrequencyData', function(array) {
-          Reflect.apply(origFloat, this, [array]);
-          if (!AUDIO_NOISE_ENABLED) return;
+        const wrappedFloat = markAsNative(__wrapNativeApply(origFloat, 'getFloatFrequencyData', function(target, thisArg, argList) {
+          const input = Array.isArray(argList) ? argList : [];
+          const array = input[0];
+          const result = Reflect.apply(target, thisArg, input);
+          if (!AUDIO_NOISE_ENABLED) return result;
           try {
-            const lo = (typeof this.minDecibels === 'number') ? this.minDecibels : -100;
-            const hi = (typeof this.maxDecibels === 'number') ? this.maxDecibels : -30;
+            const lo = (typeof thisArg.minDecibels === 'number') ? thisArg.minDecibels : -100;
+            const hi = (typeof thisArg.maxDecibels === 'number') ? thisArg.maxDecibels : -30;
             const n  = array.length | 0;
-            if (!n) return;
+            if (!n) return result;
 
-            //The amplitude of the noise expressed through its own parameters of the node
             const range = Math.max(1e-9, hi - lo);
-            const baseAmp = range * (typeof this.smoothingTimeConstant === 'number' ? this.smoothingTimeConstant : 0.8)
-                                  / Math.max(1, (this.fftSize || 2048) * 0.5);
+            const baseAmp = range * (typeof thisArg.smoothingTimeConstant === 'number' ? thisArg.smoothingTimeConstant : 0.8)
+                                  / Math.max(1, (thisArg.fftSize || 2048) * 0.5);
 
-            // pair scheme: delta_i = -delta_j => the amount is exactly 0; additionly, limiting the local gap to the boundaries
-            const tiny = range / 1e6; //technically "do not touch" the edge - from the same units as the data
+            const tiny = range / 1e6;
             for (let i = 0, j = n - 1; i < j; i++, j--) {
               const vi = array[i], vj = array[j];
-              // local permited step so as not to touch the boundaries
               const lim_i = Math.max(0, Math.min(vi - lo, hi - vi) - tiny);
               const lim_j = Math.max(0, Math.min(vj - lo, hi - vj) - tiny);
               const amp   = Math.min(baseAmp, lim_i, lim_j);
               if (amp <= 0) continue;
 
-              const d = (R() - 0.5) * 2 * amp; // Symmetric noise
+              const d = (R() - 0.5) * 2 * amp;
               array[i] = vi + d;
-              array[j] = vj - d;               // Antinoise - total is 0
+              array[j] = vj - d;
 
-              //numerical error insurance at the very edges
               if (array[i] < lo) array[i] = lo; else if (array[i] > hi) array[i] = hi;
               if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
             }
-            //The odd middle — without noise (as not to break the zero amount)
           } catch (e) {
-            degrade('audiocontext:analyser:float_freq_noise_failed', e, { stage: 'runtime', level: 'warn', type: __audioTypePipeline, diagTag: `audio:${CTX_NAME}:analyser`, key: 'AnalyserNode.getFloatFrequencyData' });
+            degrade('audiocontext:analyser:float_freq_noise_failed', e, {
+              stage: 'hook',
+              level: 'warn',
+              type: __audioTypePipeline,
+              diagTag: `audio:${CTX_NAME}:analyser`,
+              key: 'AnalyserNode.getFloatFrequencyData',
+              data: { outcome: 'skip', reason: 'float_freq_noise_failed' }
+            });
           }
+          return result;
         }), 'getFloatFrequencyData');
+        safeDefine(analyser, 'getFloatFrequencyData', {
+          value: wrappedFloat,
+          configurable: true,
+          enumerable: false,
+          writable: true
+        });
       } else {
         noteIssue('missing_method:getFloatFrequencyData', CTX_NAME);
       }
@@ -550,22 +652,22 @@ const AudioContextModule = function AudioContextModule(window) {
       // --- Byte time-domain: paired±1 (The sum preserved) carefully [0..255] ---
       const origByteTD = analyser.getByteTimeDomainData;
       if (typeof origByteTD === 'function') {
-        analyser.getByteTimeDomainData = markAsNative(makeMethod('getByteTimeDomainData', function(array) {
-          Reflect.apply(origByteTD, this, [array]);
-          if (!AUDIO_NOISE_ENABLED) return;
+        const wrappedByteTD = markAsNative(__wrapNativeApply(origByteTD, 'getByteTimeDomainData', function(target, thisArg, argList) {
+          const input = Array.isArray(argList) ? argList : [];
+          const array = input[0];
+          const result = Reflect.apply(target, thisArg, input);
+          if (!AUDIO_NOISE_ENABLED) return result;
           try {
             const n = array.length | 0;
             for (let i = 0, j = n - 1; i < j; i++, j--) {
               const vi = array[i], vj = array[j];
-              //Choose a sign so that not one goes beyond
               let s = (R() < 0.5) ? 1 : -1;
               const can_i = (vi + s) >= 0 && (vi + s) <= 255;
               const can_j = (vj - s) >= 0 && (vj - s) <= 255;
               if (can_i && can_j) {
                 array[i] = vi + s;
-                array[j] = vj - s; // сумма по паре = 0
+                array[j] = vj - s;
               } else {
-                // пробуем обратный знак
                 s = -s;
                 const can_i2 = (vi + s) >= 0 && (vi + s) <= 255;
                 const can_j2 = (vj - s) >= 0 && (vj - s) <= 255;
@@ -573,32 +675,45 @@ const AudioContextModule = function AudioContextModule(window) {
                   array[i] = vi + s;
                   array[j] = vj - s;
                 }
-                // If not, we miss a couple
               }
             }
           } catch (e) {
-            degrade('audiocontext:analyser:byte_time_noise_failed', e, { stage: 'runtime', level: 'warn', type: __audioTypePipeline, diagTag: `audio:${CTX_NAME}:analyser`, key: 'AnalyserNode.getByteTimeDomainData' });
+            degrade('audiocontext:analyser:byte_time_noise_failed', e, {
+              stage: 'hook',
+              level: 'warn',
+              type: __audioTypePipeline,
+              diagTag: `audio:${CTX_NAME}:analyser`,
+              key: 'AnalyserNode.getByteTimeDomainData',
+              data: { outcome: 'skip', reason: 'byte_time_noise_failed' }
+            });
           }
+          return result;
         }), 'getByteTimeDomainData');
+        safeDefine(analyser, 'getByteTimeDomainData', {
+          value: wrappedByteTD,
+          configurable: true,
+          enumerable: false,
+          writable: true
+        });
       }
 
       // --- Float time-domain: pair zero-summary noise within [-1..1] ---
       const origFloatTD = analyser.getFloatTimeDomainData;
       if (typeof origFloatTD === 'function') {
-        analyser.getFloatTimeDomainData = markAsNative(makeMethod('getFloatTimeDomainData', function(array) {
-          Reflect.apply(origFloatTD, this, [array]);
-          if (!AUDIO_NOISE_ENABLED) return;
+        const wrappedFloatTD = markAsNative(__wrapNativeApply(origFloatTD, 'getFloatTimeDomainData', function(target, thisArg, argList) {
+          const input = Array.isArray(argList) ? argList : [];
+          const array = input[0];
+          const result = Reflect.apply(target, thisArg, input);
+          if (!AUDIO_NOISE_ENABLED) return result;
           const n = array.length | 0;
-          if (!n) return;
+          if (!n) return result;
 
-          // amplitude "from content": The wider the current scope, the more you can make noise,
-          // normalize through fftSize/smoothingTimeConstant
           try {
             let vmin = Infinity, vmax = -Infinity;
             for (let k = 0; k < n; k++) { const v = array[k]; if (v < vmin) vmin = v; if (v > vmax) vmax = v; }
             const span   = Math.max(1e-9, vmax - vmin);
-            const base   = (typeof this.smoothingTimeConstant === 'number' ? this.smoothingTimeConstant : 0.8);
-            const amp0   = span * base / Math.max(1, this.fftSize || 2048);
+            const base   = (typeof thisArg.smoothingTimeConstant === 'number' ? thisArg.smoothingTimeConstant : 0.8);
+            const amp0   = span * base / Math.max(1, thisArg.fftSize || 2048);
             const lo = -1, hi = 1;
             const tiny = 1 / 1e6;
 
@@ -617,9 +732,23 @@ const AudioContextModule = function AudioContextModule(window) {
               if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
             }
           } catch (e) {
-            degrade('audiocontext:analyser:float_time_noise_failed', e, { stage: 'runtime', level: 'warn', type: __audioTypePipeline, diagTag: `audio:${CTX_NAME}:analyser`, key: 'AnalyserNode.getFloatTimeDomainData' });
+            degrade('audiocontext:analyser:float_time_noise_failed', e, {
+              stage: 'hook',
+              level: 'warn',
+              type: __audioTypePipeline,
+              diagTag: `audio:${CTX_NAME}:analyser`,
+              key: 'AnalyserNode.getFloatTimeDomainData',
+              data: { outcome: 'skip', reason: 'float_time_noise_failed' }
+            });
           }
+          return result;
         }), 'getFloatTimeDomainData');
+        safeDefine(analyser, 'getFloatTimeDomainData', {
+          value: wrappedFloatTD,
+          configurable: true,
+          enumerable: false,
+          writable: true
+        });
       }
 
       return analyser;

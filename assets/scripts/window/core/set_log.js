@@ -610,12 +610,14 @@ const LOGGingModule = function LOGGingModule() {
       const rawType = (safeCtx && typeof safeCtx.type === "string") ? safeCtx.type : undefined;
       const validatedType = rawType; // keep as-is; undefined if not provided
 
-      // ensure data is never null (so you can debug centrally)
+      // Preserve `null` as a distinct value; only coerce truly invalid types.
+      // `data` is allowed to be `object|function|null` (arrays are ok).
       let dataIn = safeCtx && safeCtx.data;
-      if (dataIn == null || (typeof dataIn !== "object" && typeof dataIn !== "function")) {
-        dataIn = {}; // or { _missingData: true } if you want an explicit marker
+      if (dataIn === undefined) dataIn = {};
+      if (dataIn !== null && (typeof dataIn !== "object" && typeof dataIn !== "function")) {
+        dataIn = {};
       }
-      const safeData = normalizeForJSON(dataIn);
+      const safeData = (dataIn === null) ? null : normalizeForJSON(dataIn);
 
       const extraObj = {
         level: normalizedLevel,
