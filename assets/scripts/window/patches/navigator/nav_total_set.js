@@ -13,8 +13,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
     const __emit = (level, code, ctx, err) => {
       try {
-        if (__diag) return __diag(String(level || 'info'), String(code || 'nav_total_set'), ctx, (typeof err === 'undefined') ? null : (err || null));
-        if (typeof __D === 'function') return __D(String(code || 'nav_total_set'), (typeof err === 'undefined') ? null : (err || null), Object.assign({ level: String(level || 'info') }, ctx));
+        const _err = (typeof err === 'undefined') ? null : err;
+        if (__diag) return __diag(level, code, ctx || null, _err);
+        if (typeof __D === 'function') {
+          const extra = (ctx && typeof ctx === 'object') ? Object.assign({ level }, ctx) : (ctx || { level });
+          return __D(code, _err, extra || null);
+        }
       } catch (_) {}
     };
     function __navDiag(level, code, extra, err) {
@@ -23,11 +27,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const ctxKey = (typeof x.key === 'string' || x.key === null) ? x.key : null;
         const ctxDiagTag = (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'nav_total_set';
         const ctxStage = (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
-        const normalizedCode = String(code || 'nav_total_set');
-        const ctxMessage = (typeof x.message === 'string' && x.message)
-          ? x.message
-          : ((err && typeof err.message === 'string' && err.message) ? err.message : normalizedCode);
-        const hasData = Object.prototype.hasOwnProperty.call(x, 'data');
+        const ctxMessage = (typeof x.message === 'string' && x.message) ? x.message : String(code || 'nav_total_set');
+        const ctxType = (typeof x.type === 'string' && x.type) ? x.type : __navTypePipeline;
+        let ctxData = Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null;
+        if (!ctxData || typeof ctxData !== 'object') {
+          ctxData = { outcome: 'return' };
+        } else if (typeof ctxData.outcome !== 'string' || !ctxData.outcome) {
+          ctxData = Object.assign({ outcome: 'return' }, ctxData);
+        }
         const ctx = {
           module: 'nav_total_set',
           diagTag: ctxDiagTag,
@@ -35,10 +42,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: ctxKey,
           stage: ctxStage,
           message: ctxMessage,
-          data: hasData ? x.data : undefined,
-          type: (typeof x.type === 'string' && x.type) ? x.type : undefined
+          data: ctxData,
+          type: ctxType
         };
-        __emit(level, normalizedCode, ctx, err);
+        __emit(level, code, ctx, err);
       } catch (_) {
         // safe-noop
       }
