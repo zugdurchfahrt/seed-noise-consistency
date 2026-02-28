@@ -21,7 +21,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         key: null,
         stage: 'preflight',
         message: 'CanvasPatchContext missing',
-        data: null,
+        data: { outcome: 'skip', reason: 'missing_canvas_patch_context' },
         type: 'pipeline missing data'
       }, null);
     } else if (typeof D === 'function') {
@@ -33,7 +33,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         key: null,
         stage: 'preflight',
         message: 'CanvasPatchContext missing',
-        data: null,
+        data: { outcome: 'skip', reason: 'missing_canvas_patch_context' },
         type: 'pipeline missing data'
       });
     }
@@ -51,7 +51,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         key: null,
         stage: 'preflight',
         message: 'Core.applyTargets missing',
-        data: null,
+        data: { outcome: 'skip', reason: 'missing_core_apply_targets' },
         type: 'pipeline missing data'
       }, null);
     } else if (typeof D === 'function') {
@@ -63,7 +63,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         key: null,
         stage: 'preflight',
         message: 'Core.applyTargets missing',
-        data: null,
+        data: { outcome: 'skip', reason: 'missing_core_apply_targets' },
         type: 'pipeline missing data'
       });
     }
@@ -74,84 +74,49 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   const __fontTypeBrowser = 'browser structure missing data';
   function __fontDiag(level, code, extra, err) {
     try {
-      const normalizedLevel = (level === 'info' || level === 'warn' || level === 'error' || level === 'fatal')
-        ? level
-        : 'info';
-      const normalizedCode = String(code || 'fonts');
-      const x = (extra && typeof extra === 'object') ? extra : {};
-      const normalizedStage = (
-        x.stage === 'preflight' ||
-        x.stage === 'apply' ||
-        x.stage === 'rollback' ||
-        x.stage === 'contract' ||
-        x.stage === 'hook' ||
-        x.stage === 'runtime' ||
-        x.stage === 'guard'
-      ) ? x.stage : 'runtime';
-      const normalizedType = (
-        x.type === __fontTypePipeline ||
-        x.type === __fontTypeBrowser
-      ) ? x.type : __fontTypePipeline;
-      const key = (typeof x.key === 'string' || x.key === null) ? x.key : null;
-      const diagTag = (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'fonts';
-      const message = (typeof x.message === 'string' && x.message) ? x.message : normalizedCode;
-      const data = Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null;
-      const ctx = {
-        module: 'fonts',
-        diagTag: diagTag,
-        surface: 'fonts',
-        key: key,
-        stage: normalizedStage,
-        message: message,
-        data: data,
-        type: normalizedType
-      };
       const D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+      const emitCode = String(code || 'fonts');
+      const ctx = (extra && typeof extra === 'object') ? extra : null;
       if (D && typeof D.diag === 'function') {
-        D.diag(normalizedLevel, normalizedCode, ctx, err || null);
+        D.diag(level, emitCode, ctx, err || null);
         return;
       }
       if (typeof D === 'function') {
-        D(normalizedCode, err || null, {
-          level: normalizedLevel,
-          module: ctx.module,
-          diagTag: ctx.diagTag,
-          surface: ctx.surface,
-          key: ctx.key,
-          stage: ctx.stage,
-          message: ctx.message,
-          data: ctx.data,
-          type: ctx.type
-        });
+        if (ctx && typeof ctx === 'object') {
+          D(emitCode, err || null, Object.assign({ level: level }, ctx));
+          return;
+        }
+        D(emitCode, err || null, { level: level });
       }
-    } catch (diagErr) {
-      const D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
-      if (typeof D === 'function') {
-        D('fonts:diag_adapter_failed', diagErr || null, {
-          level: 'warn',
-          module: 'fonts',
-          diagTag: 'fonts',
-          surface: 'fonts',
-          key: null,
-          stage: 'guard',
-          message: 'font diag adapter failed',
-          data: null,
-          type: __fontTypePipeline
-        });
-      }
+    } catch (_) {
+      return;
     }
   }
   function __fontDiagPipeline(level, code, extra, err) {
     const x = (extra && typeof extra === 'object') ? extra : {};
-    if (typeof x.type !== 'string' || !x.type) x.type = __fontTypePipeline;
-    if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'fonts';
-    __fontDiag(level, code, x, err);
+    __fontDiag(level, code, {
+      module: (typeof x.module === 'string' && x.module) ? x.module : 'fonts',
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'fonts',
+      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'fonts',
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+      message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'fonts'),
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: (typeof x.type === 'string' && x.type) ? x.type : __fontTypePipeline
+    }, err);
   }
   function __fontDiagBrowser(level, code, extra, err) {
     const x = (extra && typeof extra === 'object') ? extra : {};
-    if (typeof x.type !== 'string' || !x.type) x.type = __fontTypeBrowser;
-    if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'fonts';
-    __fontDiag(level, code, x, err);
+    __fontDiag(level, code, {
+      module: (typeof x.module === 'string' && x.module) ? x.module : 'fonts',
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'fonts',
+      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'fonts',
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+      message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'fonts'),
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: (typeof x.type === 'string' && x.type) ? x.type : __fontTypeBrowser
+    }, err);
   }
   function degrade(code, err, extra) {
     const x = (extra && typeof extra === 'object') ? extra : {};
@@ -202,6 +167,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             key: target && target.key ? target.key : null,
             message: 'target preflight failed',
             data: {
+              outcome: (groupPolicy === 'throw') ? 'throw' : 'skip',
               index: i,
               reason: reason,
               kind: target && target.kind ? target.kind : null
@@ -221,7 +187,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         diagTag: groupTag,
         key: groupKey,
         message: 'Core.applyTargets preflight failed',
-        data: null
+        data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'core_apply_targets_preflight_failed' }
       }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
@@ -235,8 +201,16 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           diagTag: groupTag,
           key: groupKey,
           message: 'target group skipped',
-          data: { reason: plans.reason || null }
+          data: { outcome: 'skip', reason: plans.reason || 'group_skipped' }
         }, e);
+      } else {
+        __fontDiagPipeline('warn', groupTag + ':group_skipped', {
+          stage: 'preflight',
+          diagTag: groupTag,
+          key: groupKey,
+          message: 'target group skipped',
+          data: { outcome: 'skip', reason: 'empty_plan' }
+        }, null);
       }
       return 0;
     }
@@ -253,7 +227,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             diagTag: groupTag,
             key: p && typeof p.key === 'string' ? p.key : groupKey,
             message: 'invalid execution plan item',
-            data: null
+            data: { outcome: 'throw', reason: 'invalid_execution_plan_item' }
           }, e);
           throw e;
         }
@@ -266,13 +240,20 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             diagTag: groupTag,
             key: p.key || groupKey,
             message: 'descriptor post-check mismatch',
-            data: null
+            data: { outcome: 'throw', reason: 'descriptor_post_check_mismatch' }
           }, e);
           throw e;
         }
         p.applied = true;
         done.push(p);
       }
+      __fontDiagPipeline('info', groupTag + ':group_applied', {
+        stage: 'apply',
+        diagTag: groupTag,
+        key: groupKey,
+        message: 'target group applied',
+        data: { outcome: 'return', applied: done.length }
+      }, null);
       return done.length;
     } catch (e) {
       let rollbackErr = null;
@@ -288,7 +269,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             diagTag: groupTag,
             key: p && p.key ? p.key : groupKey,
             message: 'rollback failed',
-            data: null
+            data: { outcome: 'rollback', reason: 'rollback_failed' }
           }, re);
         }
       }
@@ -297,7 +278,11 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         diagTag: groupTag,
         key: groupKey,
         message: 'apply failed',
-        data: null
+        data: {
+          outcome: (groupPolicy === 'throw') ? 'throw' : 'skip',
+          reason: 'apply_failed',
+          rollbackFailed: !!rollbackErr
+        }
       }, e);
       if (groupPolicy === 'throw') throw (rollbackErr || e);
       return 0;
@@ -305,16 +290,72 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }
 
   // === Fonts module local guard (window & worker) ===
-  if (!Array.isArray(window.fontPatchConfigs)) {
-    __fontDiagPipeline('warn', 'fonts:configs_missing_or_invalid', {
-      stage: 'preflight',
-      diagTag: 'fonts',
-      key: 'fontPatchConfigs',
-      message: 'fontPatchConfigs missing/invalid (skip font patch)',
-      data: { typeof: typeof window.fontPatchConfigs }
-    }, null);
+  const __core = Core;
+  const __flagKey = '__PATCH_FONTS__';
+  const __tag = 'fonts';
+  const __surface = 'fonts';
+  let __guardToken = null;
+  try {
+    if (!__core || typeof __core.guardFlag !== 'function') {
+      __fontDiagPipeline('warn', 'fonts:guard_missing', {
+        stage: 'guard',
+        diagTag: __tag,
+        surface: __surface,
+        key: __flagKey,
+        message: 'Core.guardFlag missing',
+        data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+      }, null);
+      return;
+    }
+    __guardToken = __core.guardFlag(__flagKey, __tag);
+  } catch (e) {
+    __fontDiagPipeline('warn', 'fonts:guard_failed', {
+      stage: 'guard',
+      diagTag: __tag,
+      surface: __surface,
+      key: __flagKey,
+      message: 'guardFlag threw',
+      data: { outcome: 'skip', reason: 'guard_failed' }
+    }, e);
     return;
   }
+  if (!__guardToken) return; // already_patched: Core emits fonts:already_patched
+
+  const __rollbackSnapshot = {
+    awaitFontsReadyOwn: Object.prototype.hasOwnProperty.call(window, 'awaitFontsReady'),
+    awaitFontsReadyDesc: Object.getOwnPropertyDescriptor(window, 'awaitFontsReady') || null,
+    fontsReadyOwn: Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__'),
+    fontsReadyDesc: Object.getOwnPropertyDescriptor(window, '__FONTS_READY__') || null,
+    fontsErrorOwn: Object.prototype.hasOwnProperty.call(window, '__FONTS_ERROR__'),
+    fontsErrorDesc: Object.getOwnPropertyDescriptor(window, '__FONTS_ERROR__') || null
+  };
+  let __applyStarted = false;
+  try {
+    if (!Array.isArray(window.fontPatchConfigs)) {
+      __fontDiagPipeline('warn', 'fonts:configs_missing_or_invalid', {
+        stage: 'preflight',
+        diagTag: 'fonts',
+        key: 'fontPatchConfigs',
+        message: 'fontPatchConfigs missing/invalid (skip font patch)',
+        data: { outcome: 'skip', reason: 'configs_missing_or_invalid', typeof: typeof window.fontPatchConfigs }
+      }, null);
+      try {
+        if (__core && typeof __core.releaseGuardFlag === 'function') {
+          __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
+        }
+      } catch (eRelease) {
+        __fontDiagPipeline('warn', 'fonts:guard_release_failed', {
+          stage: 'rollback',
+          diagTag: __tag,
+          surface: __surface,
+          key: __flagKey,
+          message: 'releaseGuardFlag threw on preflight skip',
+          data: { outcome: 'skip', reason: 'guard_release_failed' }
+        }, eRelease);
+      }
+      return;
+    }
+    __applyStarted = true;
 
 
   // expose awaitFontsReady in window and in the Worker env
@@ -361,15 +402,14 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       diagTag: 'fonts:data:awaitFontsReady'
     }], 'throw');
   } catch (e) {
-    // policy:'throw' соблюдена (fail-fast для шага), но "наружу" не бросаем: выходим с нативным fallback
     __fontDiagBrowser('fatal', 'fonts:data:critical_failed', {
       stage: 'apply',
       diagTag: 'fonts:data:awaitFontsReady',
       key: 'awaitFontsReady',
-      message: 'critical data patch failed (suppressed throw)',
-      data: null
+      message: 'critical data patch failed',
+      data: { outcome: 'throw', reason: 'critical_data_patch_failed' }
     }, e);
-    return;
+    throw e;
   }
 
   // data group: optional runtime flags
@@ -410,10 +450,28 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
   // FontFaceSet в текущем окружении (window/worker)
   const FFS = (G.document && G.document.fonts) || G.fonts || null;
-  if (!FFS) return;
+  if (!FFS) {
+    __fontDiagPipeline('warn', 'fonts:ffs_missing', {
+      stage: 'preflight',
+      diagTag: 'fonts',
+      key: 'FontFaceSet',
+      message: 'FontFaceSet missing (skip patch)',
+      data: { outcome: 'skip', reason: 'missing_fontfaceset' }
+    }, null);
+    return;
+  }
 
   const proto = Object.getPrototypeOf(FFS);
-  if (!proto) return;
+  if (!proto) {
+    __fontDiagPipeline('warn', 'fonts:proto_missing', {
+      stage: 'preflight',
+      diagTag: 'fonts',
+      key: 'FontFaceSet.prototype',
+      message: 'FontFaceSet prototype missing (skip patch)',
+      data: { outcome: 'skip', reason: 'missing_prototype' }
+    }, null);
+    return;
+  }
 
   // accessor group: ready
   applyTargetGroup('fonts:accessor', [{
@@ -543,7 +601,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       diagTag: 'fonts',
       key: '__NAV_PLATFORM__',
       message: '__NAV_PLATFORM__ missing (skip font patch)',
-      data: null
+      data: { outcome: 'skip', reason: 'missing_nav_platform' }
     }, null);
     try {
       if (typeof document === 'object' && document && document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
@@ -591,7 +649,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         diagTag: 'fonts',
         key: '__NAV_PLATFORM__',
         message: '__NAV_PLATFORM__ missing (skip dom override)',
-        data: null
+        data: { outcome: 'skip', reason: 'missing_nav_platform' }
       }, null);
       return;
     }
@@ -690,6 +748,13 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             return fam;
           });
         } catch (e) {
+          __fontDiagBrowser('warn', 'fonts:load_item_failed', {
+            stage: 'runtime',
+            diagTag: 'fonts',
+            key: 'fontPatchConfigs',
+            message: 'font item build failed',
+            data: { outcome: 'skip', reason: 'font_item_build_failed' }
+          }, e);
           return Promise.reject(e);
         }
       })
@@ -719,7 +784,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
               diagTag: 'fonts',
               key: 'document.fonts',
               message: 'font load settled with failures',
-              data: { loaded: loaded, failed: failed }
+              data: { outcome: 'skip', reason: 'load_settled_with_failures', loaded: loaded, failed: failed }
             }, err);
             return;
           }
@@ -736,9 +801,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
              diagTag: 'fonts',
              key: 'document.fonts',
              message: 'font load settled',
-             data: { loaded: loaded, failed: failed }
+             data: { outcome: 'return', loaded: loaded, failed: failed }
            }, null);
-         });
+          });
     }).catch((e) => {
       // no "наружу": перехватываем неожиданные промис-ошибки и оставляем нативное состояние
       window.__FONTS_READY__ = false;
@@ -757,7 +822,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         diagTag: 'fonts',
         key: 'document.fonts',
         message: 'unexpected rejection in font load pipeline',
-        data: null
+        data: { outcome: 'skip', reason: 'unexpected_rejection' }
       }, e);
     });
   
@@ -794,9 +859,68 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       apply();
     }
   })();
-}
+  }
+  } catch (e) {
+    let rollbackErr = null;
+    if (__applyStarted) {
+      try {
+        if (__rollbackSnapshot.awaitFontsReadyOwn) {
+          if (__rollbackSnapshot.awaitFontsReadyDesc) {
+            Object.defineProperty(window, 'awaitFontsReady', __rollbackSnapshot.awaitFontsReadyDesc);
+          }
+        } else {
+          delete window.awaitFontsReady;
+        }
+        if (__rollbackSnapshot.fontsReadyOwn) {
+          if (__rollbackSnapshot.fontsReadyDesc) {
+            Object.defineProperty(window, '__FONTS_READY__', __rollbackSnapshot.fontsReadyDesc);
+          }
+        } else {
+          delete window.__FONTS_READY__;
+        }
+        if (__rollbackSnapshot.fontsErrorOwn) {
+          if (__rollbackSnapshot.fontsErrorDesc) {
+            Object.defineProperty(window, '__FONTS_ERROR__', __rollbackSnapshot.fontsErrorDesc);
+          }
+        } else {
+          delete window.__FONTS_ERROR__;
+        }
+      } catch (re) {
+        rollbackErr = re;
+        __fontDiagBrowser('error', 'fonts:rollback_failed', {
+          stage: 'rollback',
+          diagTag: __tag,
+          surface: __surface,
+          key: null,
+          message: 'rollback failed',
+          data: { outcome: 'rollback', reason: 'rollback_failed' }
+        }, re);
+      }
+    }
 
-
-
-
+    const rollbackOk = __applyStarted ? !rollbackErr : true;
+    __fontDiagBrowser('error', 'fonts:fatal', {
+      stage: 'apply',
+      diagTag: __tag,
+      surface: __surface,
+      key: null,
+      message: 'fatal module error',
+      data: { outcome: 'throw', reason: 'fatal', rollbackOk: rollbackOk }
+    }, rollbackErr || e);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __tag);
+      }
+    } catch (eRelease) {
+      __fontDiagPipeline('warn', 'fonts:guard_release_failed', {
+        stage: 'rollback',
+        diagTag: __tag,
+        surface: __surface,
+        key: __flagKey,
+        message: 'releaseGuardFlag threw after apply failure',
+        data: { outcome: rollbackOk ? 'rollback' : 'skip', reason: 'guard_release_failed' }
+      }, eRelease);
+    }
+    throw (rollbackErr || e);
+  }
 }

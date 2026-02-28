@@ -312,13 +312,58 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
         getPrototypeOf(target) {
           return Reflect.getPrototypeOf(target);
         },
-        get(target, prop) {
-          if (typeof prop === 'string' && !__WL_LIMITS__.has(prop)) return undefined;
+        get(target, prop, receiver) {
+          if (receiver !== proxy && receiver !== target) {
+            return Reflect.get(target, prop, receiver);
+          }
+          if (typeof prop === 'string'
+              && Object.prototype.hasOwnProperty.call(target, prop)
+              && !__WL_LIMITS__.has(prop)) {
+            const desc = Reflect.getOwnPropertyDescriptor(target, prop);
+            if (!Reflect.isExtensible(target) || (desc && desc.configurable === false)) {
+              return Reflect.get(target, prop, target);
+            }
+            return undefined;
+          }
           return Reflect.get(target, prop, target);
         },
         has(target, prop) {
-          if (typeof prop === 'string') return __WL_LIMITS__.has(prop) && Reflect.has(target, prop);
+          if (!Reflect.has(target, prop)) return false;
+          if (typeof prop === 'string'
+              && Object.prototype.hasOwnProperty.call(target, prop)
+              && !__WL_LIMITS__.has(prop)) {
+            const desc = Reflect.getOwnPropertyDescriptor(target, prop);
+            if (!Reflect.isExtensible(target) || (desc && desc.configurable === false)) return true;
+            return false;
+          }
           return Reflect.has(target, prop);
+        },
+        getOwnPropertyDescriptor(target, prop) {
+          const desc = Reflect.getOwnPropertyDescriptor(target, prop);
+          if (!desc) return desc;
+          if (typeof prop === 'string'
+              && Object.prototype.hasOwnProperty.call(target, prop)
+              && !__WL_LIMITS__.has(prop)
+              && desc.configurable !== false
+              && Reflect.isExtensible(target)) {
+            return undefined;
+          }
+          return desc;
+        },
+        ownKeys(target) {
+          const keys = Reflect.ownKeys(target);
+          if (!Reflect.isExtensible(target)) return keys;
+          const out = [];
+          for (let i = 0; i < keys.length; i++) {
+            const k = keys[i];
+            if (typeof k === 'string' && !__WL_LIMITS__.has(k)) {
+              const desc = Reflect.getOwnPropertyDescriptor(target, k);
+              if (desc && desc.configurable === false) out.push(k);
+              continue;
+            }
+            out.push(k);
+          }
+          return out;
         }
       });
 
@@ -326,59 +371,89 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       return proxy;
     }
 
-    const __MaskedFeaturesCache__ = new WeakMap();
-    function __collectAllowedFeatures(nativeFeatures) {
-      const allowed = new Set();
-      for (const f of nativeFeatures) {
-        if (__WL_FEATURES__.has(f)) allowed.add(f);
+      const __MaskedFeaturesCache__ = new WeakMap();
+      function __collectAllowedFeatures(nativeFeatures) {
+        const allowed = new Set();
+        for (const f of nativeFeatures) {
+          if (__WL_FEATURES__.has(f)) allowed.add(f);
+        }
+        return allowed;
       }
-      return allowed;
-    }
 
-    function __maskFeatures(nativeFeatures) {
-      if (!nativeFeatures || typeof nativeFeatures !== 'object' || __WL_FEATURES__.size === 0) return nativeFeatures;
-      if (__MaskedFeaturesCache__.has(nativeFeatures)) return __MaskedFeaturesCache__.get(nativeFeatures);
+      function __maskFeatures(nativeFeatures) {
+        if (!nativeFeatures || typeof nativeFeatures !== 'object' || __WL_FEATURES__.size === 0) return nativeFeatures;
+        if (__MaskedFeaturesCache__.has(nativeFeatures)) return __MaskedFeaturesCache__.get(nativeFeatures);
+      const methodCache = Object.create(null);
 
       const proxy = new Proxy(nativeFeatures, {
         getPrototypeOf(target) {
           return Reflect.getPrototypeOf(target);
         },
-        get(target, prop) {
+        get(target, prop, receiver) {
+          if (receiver !== proxy && receiver !== target) {
+            return Reflect.get(target, prop, receiver);
+          }
           if (prop === 'has') {
-            const nativeHas = Reflect.get(target, 'has', target);
-            if (typeof nativeHas !== 'function') {
-              degrade('warn', 'webgpu:features:has_missing', new Error('[WebGPU] GPUSupportedFeatures.has missing'), {
-                stage: 'contract',
-                type: __webgpuTypeBrowser,
-                diagTag: 'webgpu',
-                key: 'GPUSupportedFeatures.has',
-                message: 'GPUSupportedFeatures.has missing',
-                data: { outcome: 'skip', reason: 'missing_features_has' }
-              });
-              return nativeHas;
+            if (!methodCache.has) {
+              const nativeHas = Reflect.get(target, 'has', target);
+              if (typeof nativeHas !== 'function') {
+                degrade('warn', 'webgpu:features:has_missing', new Error('[WebGPU] GPUSupportedFeatures.has missing'), {
+                  stage: 'contract',
+                  type: __webgpuTypeBrowser,
+                  diagTag: 'webgpu',
+                  key: 'GPUSupportedFeatures.has',
+                  message: 'GPUSupportedFeatures.has missing',
+                  data: { outcome: 'skip', reason: 'missing_features_has' }
+                });
+                return nativeHas;
+              }
+              methodCache.has = markNative(function has(feature) {
+                if (this !== proxy && this !== target) return Reflect.apply(nativeHas, this, [feature]);
+                return __WL_FEATURES__.has(feature) && Reflect.apply(nativeHas, target, [feature]);
+              }, 'has');
             }
-            return markNative(function has(feature) {
-              return __WL_FEATURES__.has(feature) && Reflect.apply(nativeHas, target, [feature]);
-            }, 'has');
+            return methodCache.has;
           }
           if (prop === 'forEach') {
-            return markNative(function forEach(cb, thisArg) {
-              const allowed = __collectAllowedFeatures(target);
-              for (const v of allowed) cb.call(thisArg, v, v, target);
-            }, 'forEach');
+            if (!methodCache.forEach) {
+              const nativeForEach = Reflect.get(target, 'forEach', target);
+              methodCache.forEach = markNative(function forEach(cb, thisArg) {
+                if (this !== proxy && this !== target) {
+                  if (typeof nativeForEach === 'function') return Reflect.apply(nativeForEach, this, [cb, thisArg]);
+                }
+                const allowed = __collectAllowedFeatures(target);
+                for (const v of allowed) cb.call(thisArg, v, v, proxy);
+              }, 'forEach');
+            }
+            return methodCache.forEach;
           }
           if (prop === Symbol.iterator || prop === 'values' || prop === 'keys') {
-            const name = prop === 'keys' ? 'keys' : 'values';
-            return markNative(function* iterator() {
-              const allowed = __collectAllowedFeatures(target);
-              for (const v of allowed) yield v;
-            }, name);
+            const key = (prop === 'keys') ? 'keys' : ((prop === 'values') ? 'values' : 'iterator');
+            if (!methodCache[key]) {
+              const name = prop === 'keys' ? 'keys' : 'values';
+              const nativeIter = Reflect.get(target, prop, target);
+              methodCache[key] = markNative(function* iterator() {
+                if (this !== proxy && this !== target) {
+                  if (typeof nativeIter === 'function') return yield* Reflect.apply(nativeIter, this, []);
+                }
+                const allowed = __collectAllowedFeatures(target);
+                for (const v of allowed) yield v;
+              }, name);
+            }
+            return methodCache[key];
           }
           if (prop === 'entries') {
-            return markNative(function* entries() {
-              const allowed = __collectAllowedFeatures(target);
-              for (const v of allowed) yield [v, v];
-            }, 'entries');
+            if (!methodCache.entries) {
+              const nativeEntries = Reflect.get(target, 'entries', target);
+              methodCache.entries = markNative(function* entries() {
+                if (this !== proxy && this !== target) {
+                  if (typeof nativeEntries === 'function') return yield* Reflect.apply(nativeEntries, this, []);
+                }
+                const allowed = __collectAllowedFeatures(target);
+                for (const v of allowed) yield [v, v];
+              }, 'entries');
+            }
+            return methodCache.entries;
           }
           if (prop === 'size') {
             return __collectAllowedFeatures(target).size;
@@ -386,7 +461,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           return Reflect.get(target, prop, target);
         },
         has(target, prop) {
-          if (typeof prop === 'string') return __WL_FEATURES__.has(prop) && Reflect.has(target, prop);
+          if (!Reflect.has(target, prop)) return false;
+          if (typeof prop === 'string' && Object.prototype.hasOwnProperty.call(target, prop)) {
+            if (!Reflect.isExtensible(target)) return true;
+            return __WL_FEATURES__.has(prop);
+          }
           return Reflect.has(target, prop);
         }
       });
