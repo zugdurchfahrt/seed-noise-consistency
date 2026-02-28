@@ -14,13 +14,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
   }
   if (window.__CORE_WINDOW_LOADED__) return;
 
-  // [MANDATORY MODULE PRELUDE] unified adapter to window.__DEGRADE__ (module_align.md)
-  const __D = window.__DEGRADE__;
+  // [MANDATORY MODULE PRELUDE] [NORMATIVE] unified adapter to window.__DEGRADE__ (module_NORMATIVE_align.md)
+  const __D = (window && window.__DEGRADE__) || null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __emit = (level, code, ctx, err) => {
     try {
-      if (__diag) return __diag(String(level || 'info'), String(code || 'core_window'), ctx || null, err || null);
-      if (typeof __D === 'function') return __D(String(code || 'core_window'), err || null, Object.assign({}, (ctx || null), { level: String(level || 'info') }));
+      const _err = (typeof err === 'undefined') ? null : err;
+      if (__diag) return __diag(level, code, ctx || null, _err);
+      if (typeof __D === 'function') {
+        const extra = (ctx && typeof ctx === 'object') ? Object.assign({ level }, ctx) : (ctx || { level });
+        return __D(code, _err, extra || null);
+      }
     } catch (_) {}
   };
   const __exit = (level, code, ctx, ret) => (__emit(level, code, ctx, null), ret);
@@ -29,12 +33,22 @@ const CoreWindowModule = function CoreWindowModule(window) {
   // --- nativization provider  ---
   function safeDefine(obj, prop, descriptor) {
     try {
-      if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
       Object.defineProperty(obj, prop, descriptor);
     } catch (e) {
-      console.warn(`[stealth] safeDefine failed for ${prop}:`, e);
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:safeDefine:define_failed", e);
-      throw e;
+      const key = (typeof prop === 'string') ? prop : ((prop === null || typeof prop === 'undefined') ? null : String(prop));
+      const targetOk = !!(obj && (typeof obj === 'object' || typeof obj === 'function'));
+      __throw("core_window:safeDefine:define_failed", {
+        module: "core_window",
+        diagTag: "core_window",
+        surface: "core_window",
+        key,
+        stage: targetOk ? "apply" : "guard",
+        message: targetOk ? "Object.defineProperty failed in safeDefine" : "safeDefine target missing",
+        type: targetOk ? "browser structure missing data" : "pipeline missing data",
+        data: targetOk
+          ? { outcome: "throw" }
+          : { outcome: "throw", targetType: (obj === null) ? "null" : typeof obj }
+      }, e);
     }
   }
 
@@ -607,13 +621,15 @@ const CoreWindowModule = function CoreWindowModule(window) {
   // Methodology: Core controls preflight/dispatch/nativization/diag. Module applies descriptors.
   (function installCoreApplyTargets(){
     function diagDegrade(code, err, extra) {
-      if (typeof window.__DEGRADE__ !== 'function') return;
       try {
-        window.__DEGRADE__(code, err, extra);
-      } catch (diagErr) {
-        try { console.error('[CoreWindow] __DEGRADE__ failed:', diagErr); } catch (_) {}
-        throw diagErr;
-      }
+        const D = window.__DEGRADE__;
+        const _err = (typeof err === 'undefined') ? null : err;
+        if (D && typeof D.diag === 'function') return D.diag('error', code, extra || null, _err);
+        if (typeof D === 'function') {
+          const x = (extra && typeof extra === 'object') ? Object.assign({ level: 'error' }, extra) : { level: 'error' };
+          return D(code, _err, x || null);
+        }
+      } catch (_) {}
     }
     function normalizePolicy(v) {
       if (v === undefined || v === null || v === '') return 'skip';
@@ -702,9 +718,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
       function guardFlag(flagKey, codePrefix) {
         const key = String(flagKey || '');
         if (!key) return null;
+        const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
           if (window[key]) {
-            const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
             __emit('info', tag + ':already_patched', {
               module: 'core',
               diagTag: tag,
@@ -717,13 +733,37 @@ const CoreWindowModule = function CoreWindowModule(window) {
             }, null);
             return null;
           }
-        } catch (_) {
+        } catch (e) {
+          try {
+            __emit('warn', tag + ':guard_exception', {
+              module: 'core',
+              diagTag: tag,
+              surface: 'core',
+              key,
+              stage: 'guard',
+              message: 'guard read failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'guard_exception' }
+            }, e);
+          } catch (_) {}
           return null;
         }
         const token = nextGuardToken(key);
         try {
           window[key] = token;
-        } catch (_) {
+        } catch (e) {
+          try {
+            __emit('warn', tag + ':guard_write_failed', {
+              module: 'core',
+              diagTag: tag,
+              surface: 'core',
+              key,
+              stage: 'guard',
+              message: 'guard write failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'guard_write_failed' }
+            }, e);
+          } catch (_) {}
           return null;
         }
         return token;
@@ -733,14 +773,14 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const key = String(flagKey || '');
         if (!key) return false;
         if (!rollbackOk) return false;
+        const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
           if (window[key] !== token) return false;
           try {
             delete window[key];
           } catch (_) {
-            window[key] = false;
+            try { window[key] = false; } catch (_) {}
           }
-          const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
           __emit('info', tag + ':guard_released', {
             module: 'core',
             diagTag: tag,
@@ -752,7 +792,19 @@ const CoreWindowModule = function CoreWindowModule(window) {
             data: { outcome: 'rollback', reason: 'rollback_ok' }
           }, null);
           return true;
-        } catch (_) {
+        } catch (e) {
+          try {
+            __emit('warn', tag + ':guard_release_exception', {
+              module: 'core',
+              diagTag: tag,
+              surface: 'core',
+              key,
+              stage: 'rollback',
+              message: 'guard release failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'guard_release_exception' }
+            }, e);
+          } catch (_) {}
           return false;
         }
       }
