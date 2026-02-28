@@ -1,10 +1,84 @@
 const WEBglDICKts = function WEBglDICKts(window) {
-    if (!window.__PATCH_WEBGLSTORAGE__) {
-    window.__PATCH_WEBGLSTORAGE__ = true;
+    const __tag = 'webglstorage';
+    const __surface = 'webgl';
+    const __typePipeline = 'pipeline missing data';
+    const __typeBrowser = 'browser structure missing data';
+    const __D = (window && window.__DEGRADE__) || null;
+    const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+
+    function diag(level, code, extra, err) {
+        const x = (extra && typeof extra === 'object') ? extra : {};
+        const ctx = {
+            module: 'webgl',
+            diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag,
+            surface: (typeof x.surface === 'string' && x.surface) ? x.surface : __surface,
+            key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+            stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+            message: (typeof x.message === 'string' && x.message) ? x.message : String(code || ''),
+            type: (typeof x.type === 'string' && x.type) ? x.type : __typePipeline,
+            data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null
+        };
+        if (__diag) {
+            try { __diag(level, code, ctx, err || null); } catch (_) {}
+            return;
+        }
+        if (typeof __D === 'function') {
+            try {
+                __D(code, err || null, {
+                    level: String(level || 'info'),
+                    module: ctx.module,
+                    diagTag: ctx.diagTag,
+                    surface: ctx.surface,
+                    key: ctx.key,
+                    stage: ctx.stage,
+                    message: ctx.message,
+                    data: ctx.data,
+                    type: ctx.type
+                });
+            } catch (_) {}
+        }
+    }
+
     const C = window.CanvasPatchContext;
     if (!C) {
+        diag('fatal', 'webglstorage:canvas_patch_context_missing', {
+            stage: 'preflight',
+            key: null,
+            message: 'CanvasPatchContext is undefined — no further execution',
+            type: __typePipeline,
+            data: { outcome: 'throw' }
+        }, null);
         throw new Error('[CanvasPatch] CanvasPatchContext is undefined — no futher execution');
     }
+
+    const __core = window.Core;
+    const __flagKey = '__PATCH_WEBGLSTORAGE__';
+    let __guardToken = null;
+    try {
+        if (!__core || typeof __core.guardFlag !== 'function') {
+            diag('fatal', 'webglstorage:guard_missing', {
+                stage: 'guard',
+                key: __flagKey,
+                message: 'Core.guardFlag missing',
+                type: __typePipeline,
+                data: { outcome: 'throw' }
+            }, null);
+            throw new Error('Core.guardFlag missing');
+        }
+        __guardToken = __core.guardFlag(__flagKey, __tag);
+    } catch (e) {
+        diag('fatal', 'webglstorage:guard_failed', {
+            stage: 'guard',
+            key: __flagKey,
+            message: 'guardFlag failed',
+            type: __typePipeline,
+            data: { outcome: 'throw' }
+        }, e);
+        throw e;
+    }
+    if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
+
+    try {
     const WebGLRenderingContext = window.WebGLRenderingContext || {};
     const WebGL2RenderingContext = window.WebGL2RenderingContext || {};
     
@@ -907,6 +981,31 @@ const WEBglDICKts = function WEBglDICKts(window) {
     "WEBGL_stencil_texturing"
     ];
     // Object.freeze(window.__EXTENSIONS_WHITELIST__);
-    console.log('[WebGLPatchModule] Whitelist loaded');
-}}  
+    diag('info', 'webglstorage:whitelist_loaded', {
+        stage: 'apply',
+        key: null,
+        message: 'Whitelist loaded',
+        type: __typePipeline,
+        data: { outcome: 'return' }
+    }, null);
+    } catch (e) {
+        let rollbackOk = true;
+        try { delete window.__WEBGL_PARAM_WHITELIST__; } catch (_) { rollbackOk = false; }
+        try { delete window.__EXTENSIONS_WHITELIST__; } catch (_) { rollbackOk = false; }
 
+        diag('error', 'webglstorage:apply_failed', {
+            stage: 'apply',
+            key: null,
+            message: 'Whitelist apply failed',
+            type: __typeBrowser,
+            data: { outcome: 'throw', rollbackOk: rollbackOk }
+        }, e);
+
+        try {
+            if (__core && typeof __core.releaseGuardFlag === 'function') {
+                __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __tag);
+            }
+        } catch (_) {}
+        throw e;
+    }
+}  

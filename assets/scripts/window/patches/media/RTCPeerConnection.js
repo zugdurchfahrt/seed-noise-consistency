@@ -6,19 +6,22 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         || (typeof window     !== 'undefined' && window)
         || (typeof global     !== 'undefined' && global)
         || {};
+  const __MODULE = 'rtc';
+  const __SURFACE = 'rtcp';
+  const __FLAG_KEY = '__PATCH_RTCPEERCONNECTION__';
   const __rtcDegrade = (window && typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
   function __rtcDiag(level, code, extra, err) {
     try {
       const x = (extra && typeof extra === 'object') ? extra : {};
       const ctx = {
-        module: 'rtc',
-        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'rtc',
-        surface: 'webrtc',
+        module: __MODULE,
+        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+        surface: __SURFACE,
         key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-        stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
-        message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'rtc'),
+        stage: x.stage,
+        message: x.message,
         data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-        type: (typeof x.type === 'string' && x.type) ? x.type : 'pipeline missing data'
+        type: x.type
       };
       if (__rtcDegrade && typeof __rtcDegrade.diag === 'function') {
         __rtcDegrade.diag(String(level || 'info'), String(code || 'rtc'), ctx, err || null);
@@ -27,7 +30,26 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       if (typeof __rtcDegrade === 'function') {
         __rtcDegrade(String(code || 'rtc'), err || null, Object.assign({ level: String(level || 'info') }, ctx));
       }
-    } catch (_) {}
+    } catch (emitErr) {
+      if (typeof __rtcDegrade === 'function') {
+        try {
+          __rtcDegrade('rtc:diag_emit_failed', emitErr || null, {
+            level: 'warn',
+            module: __MODULE,
+            diagTag: __MODULE,
+            surface: __SURFACE,
+            key: '__DEGRADE__',
+            stage: 'runtime',
+            message: 'rtc diag emit failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'diag_emit_failed' }
+          });
+        } catch (fallbackErr) {
+          return fallbackErr;
+        }
+      }
+      return undefined;
+    }
   }
 
   if (!window.__CORE_WINDOW_LOADED__) {
@@ -35,8 +57,44 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       stage: 'preflight',
       key: 'core_window',
       message: 'core_window.js not loaded - must load BEFORE RTCPeerConnection.js',
-      type: 'pipeline missing data'
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'missing_dep_core_window' }
     }, new Error('[RTC] core_window.js not loaded'));
+    return;
+  }
+
+  const __core = window.Core;
+  let __guardToken = null;
+  if (!__core || typeof __core.guardFlag !== 'function') {
+    __rtcDiag('warn', 'rtc:guard_missing', {
+      stage: 'guard',
+      key: __FLAG_KEY,
+      message: 'Core.guardFlag missing',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+    }, null);
+    return;
+  }
+  try {
+    __guardToken = __core.guardFlag(__FLAG_KEY, __MODULE);
+  } catch (e) {
+    __rtcDiag('warn', 'rtc:guard_failed', {
+      stage: 'guard',
+      key: __FLAG_KEY,
+      message: 'guardFlag threw',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'guard_failed' }
+    }, e);
+    return;
+  }
+  if (!__guardToken) {
+    __rtcDiag('info', 'rtc:already_patched', {
+      stage: 'guard',
+      key: __FLAG_KEY,
+      message: 'already patched (guard)',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'already_patched' }
+    }, null);
     return;
   }
 
@@ -50,8 +108,22 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       stage: 'preflight',
       key: '__safeDefine',
       message: 'safeDefine missing',
-      type: 'pipeline missing data'
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'missing_dep_safe_define' }
     }, new Error('[RTC] safeDefine missing'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on safeDefine preflight skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
     return;
   }
 
@@ -65,8 +137,22 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       stage: 'preflight',
       key: '__wrapNativeApply',
       message: '__wrapNativeApply missing',
-      type: 'pipeline missing data'
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'missing_dep_wrap_native_apply' }
     }, new Error('[RTC] __wrapNativeApply missing'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on wrapApply preflight skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
     return;
   }
 
@@ -80,24 +166,73 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       stage: 'preflight',
       key: '__wrapNativeAccessor',
       message: '__wrapNativeAccessor missing',
-      type: 'pipeline missing data'
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'missing_dep_wrap_native_accessor' }
     }, new Error('[RTC] __wrapNativeAccessor missing'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on wrapAcc preflight skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
     return;
   }
 
   const Orig = window.RTCPeerConnection;
-  if (!Orig) return;
+  if (!Orig) {
+    __rtcDiag('info', 'rtc:skip_no_api', {
+      stage: 'preflight',
+      key: 'RTCPeerConnection',
+      message: 'RTCPeerConnection not available',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'missing_api' }
+    }, null);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on missing API skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
+    return;
+  }
 
-  if (Orig.__PATCH_RTCPEERCONNECTION__) return;
-  safeDefine(Orig, '__PATCH_RTCPEERCONNECTION__', {
-    value: true,
-    writable: false,
-    configurable: true,
-    enumerable: false
-  });
-  try {
-    if (Object.prototype.hasOwnProperty.call(window, '__PATCH_RTCPEERCONNECTION__')) delete window.__PATCH_RTCPEERCONNECTION__;
-  } catch (_) {}
+  if (Orig.__PATCH_RTCPEERCONNECTION__) {
+    __rtcDiag('info', 'rtc:already_patched_marker', {
+      stage: 'guard',
+      key: 'RTCPeerConnection',
+      message: 'RTCPeerConnection already patched by marker',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'already_patched_marker' }
+    }, null);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on already patched marker skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
+    return;
+  }
 
   function filterSDP(sdp) {
     return sdp
@@ -146,6 +281,12 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const origOnIceDesc = Object.getOwnPropertyDescriptor(Orig.prototype, 'onicecandidate') || null;
 
   try {
+  safeDefine(Orig, '__PATCH_RTCPEERCONNECTION__', {
+    value: true,
+    writable: false,
+    configurable: true,
+    enumerable: false
+  });
   // --- patch prototype methods via Core wrapper (Proxy/apply)
   if (typeof origCreateOffer === 'function') {
     Orig.prototype.createOffer = wrapApply(origCreateOffer, 'createOffer', function(nativeFn, thisArg, args) {
@@ -321,29 +462,143 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     stage: 'apply',
     key: 'RTCPeerConnection',
     message: 'RTC patch applied',
-    type: 'pipeline missing data',
-    data: null
+    type: 'ok',
+    data: { outcome: 'return', reason: 'patched' }
   }, null);
   } catch (e) {
-    try { if (typeof origCreateOffer === 'function') Orig.prototype.createOffer = origCreateOffer; } catch (_) {}
-    try { if (typeof origCreateAnswer === 'function') Orig.prototype.createAnswer = origCreateAnswer; } catch (_) {}
-    try { if (typeof origSetLocalDescription === 'function') Orig.prototype.setLocalDescription = origSetLocalDescription; } catch (_) {}
-    try { if (typeof origAddIceCandidate === 'function') Orig.prototype.addIceCandidate = origAddIceCandidate; } catch (_) {}
-    try { if (typeof origSetConfiguration === 'function') Orig.prototype.setConfiguration = origSetConfiguration; } catch (_) {}
-    try { if (typeof origAddEventListener === 'function') Orig.prototype.addEventListener = origAddEventListener; } catch (_) {}
-    try { if (typeof origRemoveEventListener === 'function') Orig.prototype.removeEventListener = origRemoveEventListener; } catch (_) {}
+    let rollbackErr = null;
+    try {
+      if (typeof origCreateOffer === 'function') Orig.prototype.createOffer = origCreateOffer;
+    } catch (re) {
+      if (!rollbackErr) rollbackErr = re;
+      __rtcDiag('error', 'rtc:rollback_failed', {
+        stage: 'rollback',
+        key: 'createOffer',
+        message: 'rollback restore failed for createOffer',
+        type: 'browser structure missing data',
+        data: { outcome: 'rollback', reason: 'restore_createOffer_failed' }
+      }, re);
+    }
+    try {
+      if (typeof origCreateAnswer === 'function') Orig.prototype.createAnswer = origCreateAnswer;
+    } catch (re) {
+      if (!rollbackErr) rollbackErr = re;
+      __rtcDiag('error', 'rtc:rollback_failed', {
+        stage: 'rollback',
+        key: 'createAnswer',
+        message: 'rollback restore failed for createAnswer',
+        type: 'browser structure missing data',
+        data: { outcome: 'rollback', reason: 'restore_createAnswer_failed' }
+      }, re);
+    }
+    try {
+      if (typeof origSetLocalDescription === 'function') Orig.prototype.setLocalDescription = origSetLocalDescription;
+    } catch (re) {
+      if (!rollbackErr) rollbackErr = re;
+      __rtcDiag('error', 'rtc:rollback_failed', {
+        stage: 'rollback',
+        key: 'setLocalDescription',
+        message: 'rollback restore failed for setLocalDescription',
+        type: 'browser structure missing data',
+        data: { outcome: 'rollback', reason: 'restore_setLocalDescription_failed' }
+      }, re);
+    }
+    try {
+      if (typeof origAddIceCandidate === 'function') Orig.prototype.addIceCandidate = origAddIceCandidate;
+    } catch (re) {
+      if (!rollbackErr) rollbackErr = re;
+      __rtcDiag('error', 'rtc:rollback_failed', {
+        stage: 'rollback',
+        key: 'addIceCandidate',
+        message: 'rollback restore failed for addIceCandidate',
+        type: 'browser structure missing data',
+        data: { outcome: 'rollback', reason: 'restore_addIceCandidate_failed' }
+      }, re);
+    }
+    try {
+      if (typeof origSetConfiguration === 'function') Orig.prototype.setConfiguration = origSetConfiguration;
+    } catch (re) {
+      if (!rollbackErr) rollbackErr = re;
+      __rtcDiag('error', 'rtc:rollback_failed', {
+        stage: 'rollback',
+        key: 'setConfiguration',
+        message: 'rollback restore failed for setConfiguration',
+        type: 'browser structure missing data',
+        data: { outcome: 'rollback', reason: 'restore_setConfiguration_failed' }
+      }, re);
+    }
+    try {
+      if (typeof origAddEventListener === 'function') Orig.prototype.addEventListener = origAddEventListener;
+    } catch (re) {
+      if (!rollbackErr) rollbackErr = re;
+      __rtcDiag('error', 'rtc:rollback_failed', {
+        stage: 'rollback',
+        key: 'addEventListener',
+        message: 'rollback restore failed for addEventListener',
+        type: 'browser structure missing data',
+        data: { outcome: 'rollback', reason: 'restore_addEventListener_failed' }
+      }, re);
+    }
+    try {
+      if (typeof origRemoveEventListener === 'function') Orig.prototype.removeEventListener = origRemoveEventListener;
+    } catch (re) {
+      if (!rollbackErr) rollbackErr = re;
+      __rtcDiag('error', 'rtc:rollback_failed', {
+        stage: 'rollback',
+        key: 'removeEventListener',
+        message: 'rollback restore failed for removeEventListener',
+        type: 'browser structure missing data',
+        data: { outcome: 'rollback', reason: 'restore_removeEventListener_failed' }
+      }, re);
+    }
     try {
       if (origOnIceDesc) Object.defineProperty(Orig.prototype, 'onicecandidate', origOnIceDesc);
-      else { try { delete Orig.prototype.onicecandidate; } catch (_) {} }
-    } catch (_) {}
-    try { delete Orig.__PATCH_RTCPEERCONNECTION__; } catch (_) {}
+      else delete Orig.prototype.onicecandidate;
+    } catch (re) {
+      if (!rollbackErr) rollbackErr = re;
+      __rtcDiag('error', 'rtc:rollback_failed', {
+        stage: 'rollback',
+        key: 'onicecandidate',
+        message: 'rollback restore failed for onicecandidate',
+        type: 'browser structure missing data',
+        data: { outcome: 'rollback', reason: 'restore_onicecandidate_failed' }
+      }, re);
+    }
+    if (!rollbackErr) {
+      try {
+        delete Orig.__PATCH_RTCPEERCONNECTION__;
+      } catch (re) {
+        rollbackErr = re;
+        __rtcDiag('error', 'rtc:rollback_failed', {
+          stage: 'rollback',
+          key: '__PATCH_RTCPEERCONNECTION__',
+          message: 'rollback restore failed for marker',
+          type: 'browser structure missing data',
+          data: { outcome: 'rollback', reason: 'restore_patch_marker_failed' }
+        }, re);
+      }
+    }
+    const rollbackOk = !rollbackErr;
     __rtcDiag('fatal', 'rtc:apply_failed', {
       stage: 'apply',
       key: 'RTCPeerConnection',
       message: 'RTC patch apply failed (rolled back)',
       type: 'browser structure missing data',
-      data: null
+      data: { outcome: rollbackOk ? 'rollback' : 'throw', reason: 'apply_failed', rollbackOk }
     }, e);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, rollbackOk, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw after apply failure',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: !!rollbackOk }
+      }, releaseErr);
+    }
     return;
   }
 }

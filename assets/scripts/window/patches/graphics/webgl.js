@@ -1,7 +1,4 @@
 const WebglPatchModule = function WebglPatchModule(window) {
-    if (!window.__PATCH_WEBGL__) {
-    window.__PATCH_WEBGL__ = true;
-
     const C = window.CanvasPatchContext;
     const G = (typeof globalThis !== 'undefined' && globalThis)
           || (typeof self       !== 'undefined' && self)
@@ -14,74 +11,79 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const __webglDegradeDiag = (__webglDegrade && typeof __webglDegrade.diag === 'function')
       ? __webglDegrade.diag.bind(__webglDegrade)
       : null;
+    function __emit(level, code, ctx, err) {
+      try {
+        if (__webglDegradeDiag) return __webglDegradeDiag(level, code, ctx, err || null);
+        if (typeof __webglDegrade === 'function') {
+          const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
+          return __webglDegrade(code, err || null, Object.assign({}, safeCtx, { level: level || 'info' }));
+        }
+      } catch (emitErr) {
+        return undefined;
+      }
+      return undefined;
+    }
     function __webglDiag(level, code, extra, err) {
-      const normalizedLevel = (level === 'info' || level === 'warn' || level === 'error' || level === 'fatal')
-        ? level
-        : 'info';
       const x = (extra && typeof extra === 'object') ? extra : {};
-      const normalizedStage = (
-        x.stage === 'preflight' ||
-        x.stage === 'apply' ||
-        x.stage === 'rollback' ||
-        x.stage === 'contract' ||
-        x.stage === 'hook' ||
-        x.stage === 'runtime' ||
-        x.stage === 'guard'
-      ) ? x.stage : 'runtime';
-      const normalizedType = (
-        x.type === __webglTypePipeline ||
-        x.type === __webglTypeBrowser
-      ) ? x.type : __webglTypePipeline;
-      const normalizedCode = code || 'webgl';
-      const ctx = {
+      return __emit(level, code, {
         module: 'webgl',
         diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'webgl',
         surface: 'webgl',
         key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-        stage: normalizedStage,
-        message: (typeof x.message === 'string' && x.message) ? x.message : normalizedCode,
+        stage: x.stage,
+        message: x.message,
         data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-        type: normalizedType
-      };
-      if (__webglDegradeDiag) {
-        try { __webglDegradeDiag(normalizedLevel, normalizedCode, ctx, err || null); } catch (_) {}
-        return;
-      }
-      if (typeof __webglDegrade === 'function') {
-        try {
-          __webglDegrade(normalizedCode, err || null, {
-            level: normalizedLevel,
-            module: ctx.module,
-            diagTag: ctx.diagTag,
-            surface: ctx.surface,
-            key: ctx.key,
-            stage: ctx.stage,
-            message: ctx.message,
-            data: ctx.data,
-            type: ctx.type
-          });
-        } catch (_) {}
-      }
+        type: x.type
+      }, err || null);
     }
     function __webglDiagPipeline(level, code, extra, err) {
-      const x = (extra && typeof extra === 'object') ? extra : {};
+      const x0 = (extra && typeof extra === 'object') ? extra : {};
+      const x = Object.assign({}, x0);
       if (typeof x.type !== 'string' || !x.type) x.type = __webglTypePipeline;
       if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'webgl';
       __webglDiag(level, code, x, err);
     }
     function __webglDiagBrowser(level, code, extra, err) {
-      const x = (extra && typeof extra === 'object') ? extra : {};
+      const x0 = (extra && typeof extra === 'object') ? extra : {};
+      const x = Object.assign({}, x0);
       if (typeof x.type !== 'string' || !x.type) x.type = __webglTypeBrowser;
       if (typeof x.diagTag !== 'string' || !x.diagTag) x.diagTag = 'webgl';
       __webglDiag(level, code, x, err);
     }
+
+    const __core = window.Core;
+    const __flagKey = '__PATCH_WEBGL__';
+    let __guardToken = null;
+    try {
+      if (!__core || typeof __core.guardFlag !== 'function') {
+        __webglDiagPipeline('fatal', 'webgl:guard_missing', {
+          stage: 'guard',
+          key: __flagKey,
+          message: 'Core.guardFlag missing',
+          data: { outcome: 'throw' }
+        }, null);
+        throw new Error('Core.guardFlag missing');
+      }
+      __guardToken = __core.guardFlag(__flagKey, 'webgl');
+    } catch (e) {
+      __webglDiagPipeline('fatal', 'webgl:guard_failed', {
+        stage: 'guard',
+        key: __flagKey,
+        message: 'guardFlag failed',
+        data: { outcome: 'throw' }
+      }, e);
+      throw e;
+    }
+    if (!__guardToken) return; // already_patched: Core emits webgl:already_patched
+
     if (!C) {
       __webglDiagPipeline('fatal', 'webgl:canvas_patch_context_missing', {
         stage: 'preflight',
         key: null,
-        message: 'CanvasPatchContext missing'
+        message: 'CanvasPatchContext missing',
+        data: { outcome: 'throw' }
       });
-      return;
+      throw new Error('CanvasPatchContext missing');
     }
 
     // basic random from the existing seed initialization
@@ -90,9 +92,10 @@ const WebglPatchModule = function WebglPatchModule(window) {
       __webglDiagPipeline('fatal', 'webgl:rand_missing', {
         stage: 'preflight',
         key: null,
-        message: 'rand source missing'
+        message: 'rand source missing',
+        data: { outcome: 'throw' }
       });
-      return;
+      throw new Error('rand source missing');
     }
     
     // Internal markers: avoid leaving visible properties on WebGL instances/objects
@@ -105,9 +108,10 @@ const WebglPatchModule = function WebglPatchModule(window) {
       __webglDiagBrowser('fatal', 'webgl:weak_structures_missing', {
         stage: 'preflight',
         key: null,
-        message: 'WeakMap/WeakSet are required'
+        message: 'WeakMap/WeakSet are required',
+        data: { outcome: 'throw' }
       });
-      return;
+      throw new Error('WeakMap/WeakSet are required');
     }
 
     let markNative = null;
@@ -124,9 +128,10 @@ const WebglPatchModule = function WebglPatchModule(window) {
       __webglDiagPipeline('fatal', 'webgl:mark_native_missing', {
         stage: 'preflight',
         key: null,
-        message: 'markAsNative missing'
+        message: 'markAsNative missing',
+        data: { outcome: 'throw' }
       }, e);
-      return;
+      throw e;
     }
 
     
@@ -486,9 +491,10 @@ const WebglPatchModule = function WebglPatchModule(window) {
       __webglDiagBrowser('fatal', 'webgl:webglHooks:fallback_invalid', {
         stage: 'apply',
         key: 'webglHooks',
-        message: 'webglHooks fallback invalid'
+        message: 'webglHooks fallback invalid',
+        data: { outcome: 'throw' }
       }, e);
-      return;
+      throw e;
     }
   }
     __webglDiag('info', 'webgl:patches_applied', {
@@ -496,9 +502,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
       type: __webglTypePipeline,
       key: null,
       message: 'webgl patches applied',
-      data: null
+      data: { outcome: 'return' }
     });
-}
 }
 
 
