@@ -700,7 +700,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
       const knownWrapped = new WeakSet();
       const globalTargetRegistry = (Core.__targetRegistry instanceof WeakMap) ? Core.__targetRegistry : new WeakMap();
-      const __patchGuardSeq = new WeakMap();
+      const __patchGuardSeq = (Core.__patchGuardSeq instanceof WeakMap) ? Core.__patchGuardSeq : new WeakMap();
 
       function nextGuardToken(flagKey) {
         let n = 0;
@@ -1711,6 +1711,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return true;
         },
         writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__patchGuardSeq', {
+        value: __patchGuardSeq,
+        writable: false,
         configurable: true,
         enumerable: false
       });
