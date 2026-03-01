@@ -1859,35 +1859,177 @@ function printToStringCrossRealmChecks() {
     return { total: all.length, last50Count: last50.length, rows, raw: last50 };
   }
 
-  // ===== [probe] module check (static slots; filled from __DEGRADE__ buffer) =====
+  // ===== [probe] module check (static module inventory + runtime rows from __DEGRADE__) =====
   // IMPORTANT:
-  // - this is intentionally static to match what main.py injects/calls;
-  // - a slot is "filled" only if the module actually emits __DEGRADE__.diag/.__DEGRADE__ events.
+  // - inventory stays static and follows main.py / assignmnets/array.md;
+  // - runtime rows are built only from __DEGRADE__ buffer;
+  // - patch rows are shown only for modules that already emit grouped patch diagnostics.
   const PROBE_MODULE_CHECK_SLOTS = [
-    { diagTag: "core_window", module: "core_window" },
-    { diagTag: "core", module: "core" },
-    { diagTag: "rtc", module: "rtc" },
-    { diagTag: "hide_webdriver", module: "hide_webdriver" },
-    { diagTag: "wrk", module: "wrk" },
-    { diagTag: "rng_set", module: "rng_set" },
-    { diagTag: "nav_total_set", module: "nav_total_set" },
-    { diagTag: "screen", module: "screen" },
-    { diagTag: "fonts", module: "fonts" },
-    { diagTag: "canvas", module: "canvas" },
-    { diagTag: "webgl", module: "webgl" },
-    { diagTag: "webgpu_wl", module: "webgpu_wl" },
-    { diagTag: "webgpu", module: "webgpu" },
-    { diagTag: "audiocontext", module: "audiocontext" },
-    { diagTag: "context", module: "context" },
-    // CDP-injected standalone modules (main.py configure_profile / UA override / worker bootstrap)
-    { diagTag: "tz", module: "tz" },
-    { diagTag: "geo:patched", module: "GeoOverride" },
-    { diagTag: "uad_override", module: "uad_override" },
-    { diagTag: "headers_interceptor", module: "headers_interceptor" },
-    { diagTag: "headers_bridge", module: "headers_bridge" },
-    { diagTag: "worker_patch", module: "WORKER_PATCH_SRC" },
-    { diagTag: "worker_bootstrap", module: "worker_bootstrap" }
+    { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "missing", functions: "none" },
+    { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none" },
+    { module: "core_window", diagTag: "core_window", codePrefix: "core_window", source: "bundle", emitter: "diag", functions: "none" },
+    { module: "rtc", diagTag: "rtc", codePrefix: "rtc", source: "bundle", emitter: "diag", functions: "auto" },
+    { module: "hide_webdriver", diagTag: "hide_webdriver", codePrefix: "hide_webdriver", source: "bundle", emitter: "diag", functions: "auto" },
+    { module: "wrk", diagTag: "wrk", codePrefix: "wrk", source: "bundle", emitter: "diag", functions: "none" },
+    { module: "rng_set", diagTag: "rng_set", codePrefix: "rng_set", source: "bundle", emitter: "diag", functions: "none" },
+    { module: "nav_total_set", diagTag: "nav_total_set", codePrefix: "nav_total_set", source: "bundle", emitter: "diag", functions: "auto" },
+    { module: "screen", diagTag: "screen", codePrefix: "screen", source: "bundle", emitter: "diag", functions: "auto" },
+    { module: "fonts", diagTag: "fonts", codePrefix: "fonts", source: "bundle", emitter: "diag", functions: "auto" },
+    { module: "canvas", diagTag: "canvas", codePrefix: "canvas", source: "bundle", emitter: "diag", functions: "auto" },
+    { module: "webgl", diagTag: "webgl", codePrefix: "webgl", source: "bundle", emitter: "diag", functions: "auto", aliases: ["webglstorage"] },
+    { module: "webgpu_wl", diagTag: "webgpu_wl", codePrefix: "webgpu_wl", source: "bundle", emitter: "diag", functions: "auto" },
+    { module: "webgpu", diagTag: "webgpu", codePrefix: "webgpu", source: "bundle", emitter: "diag", functions: "auto" },
+    { module: "audiocontext", diagTag: "audiocontext", codePrefix: "audiocontext", source: "bundle", emitter: "diag", functions: "auto", aliases: ["audio"] },
+    { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none" },
+    { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto" },
+    { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto" },
+    { module: "uad_override", diagTag: "uad_override", codePrefix: "uad_override", source: "cdp", emitter: "diag", functions: "auto" },
+    { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto" },
+    { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto" },
+    { module: "WORKER_PATCH_SRC", diagTag: "worker_patch", codePrefix: "worker_patch_src", source: "cdp", emitter: "diag", functions: "none", aliases: ["WORKER_PATCH_SRC"] },
+    { module: "worker_bootstrap", diagTag: "worker_bootstrap", codePrefix: "worker_bootstrap", source: "cdp", emitter: "diag", functions: "none" }
   ];
+
+  function __probeModulePrefixes(slot) {
+    const out = [];
+    if (slot && typeof slot.diagTag === "string" && slot.diagTag) out.push(slot.diagTag);
+    if (slot && typeof slot.codePrefix === "string" && slot.codePrefix) out.push(slot.codePrefix);
+    if (slot && Array.isArray(slot.aliases)) {
+      for (let i = 0; i < slot.aliases.length; i++) {
+        const v = slot.aliases[i];
+        if (typeof v === "string" && v) out.push(v);
+      }
+    }
+    return out;
+  }
+
+  function __probePrefixMatch(value, prefix) {
+    if (typeof value !== "string" || !value || typeof prefix !== "string" || !prefix) return false;
+    return value === prefix || value.indexOf(prefix + ":") === 0;
+  }
+
+  function __probeSummaryCode(code) {
+    if (typeof code !== "string" || !code) return false;
+    return (
+      code.endsWith(":ready") ||
+      code.endsWith(":applied") ||
+      code.endsWith(":patched") ||
+      code.endsWith(":patches_applied") ||
+      code.endsWith(":whitelist_loaded") ||
+      code.endsWith(":group_applied")
+    );
+  }
+
+  function __probeErrCell(entry) {
+    try {
+      const er = entry ? entry.error : null;
+      if (er == null) return null;
+      if (typeof er === "string") return er;
+      if (typeof er === "object") {
+        if (typeof er.name === "string" && er.name) return er.name;
+        if (typeof er.message === "string" && er.message) return er.message;
+        return null;
+      }
+      return String(er);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function __probeDataCell(entry) {
+    try {
+      const s = JSON.stringify(entry?.extra?.data);
+      return (typeof s === "string") ? s : null;
+    } catch (_) {
+      return "[unserializable]";
+    }
+  }
+
+  function __probeRowStatus(slot, entry) {
+    if (slot && slot.emitter === "missing") return "missing_emitter";
+    if (!entry) {
+      return (slot && slot.source === "disabled") ? "disabled" : "not_emitted";
+    }
+    const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+    const level = (extra && typeof extra.level === "string") ? extra.level : null;
+    if (level === "fatal" || level === "error") return "error";
+    if (level === "warn") return "warn";
+    return __probeSummaryCode(entry.code) ? "ok" : "seen";
+  }
+
+  function __probeMakeRow(index, slot, entry, kind, unit, status) {
+    const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+    return {
+      idx: index,
+      kind: kind,
+      unit: unit,
+      status: status,
+      source: slot && typeof slot.source === "string" ? slot.source : null,
+      emitter: slot && typeof slot.emitter === "string" ? slot.emitter : null,
+      timestamp: entry && typeof entry.timestamp === "string" ? entry.timestamp : null,
+      code: entry && typeof entry.code === "string" ? entry.code : null,
+      level: extra && typeof extra.level === "string" ? extra.level : null,
+      diagTag: extra && typeof extra.diagTag === "string"
+        ? extra.diagTag
+        : (slot && typeof slot.diagTag === "string" ? slot.diagTag : null),
+      module: slot && typeof slot.module === "string"
+        ? slot.module
+        : (extra && typeof extra.module === "string" ? extra.module : null),
+      stage: extra && typeof extra.stage === "string" ? extra.stage : null,
+      key: extra && (typeof extra.key === "string" || extra.key === null) ? extra.key : null,
+      message: (extra && typeof extra.message === "string")
+        ? extra.message
+        : (entry && entry.error && typeof entry.error === "object" && typeof entry.error.message === "string")
+          ? entry.error.message
+          : null,
+      err: __probeErrCell(entry),
+      data: __probeDataCell(entry)
+    };
+  }
+
+  function __probeEventMatchesSlot(slot, entry) {
+    if (!slot || !entry || typeof entry !== "object" || entry.type !== "degrade") return false;
+    const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+    const moduleName = (extra && typeof extra.module === "string" && extra.module) ? extra.module : null;
+    const diagTag = (extra && typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
+    const code = (typeof entry.code === "string" && entry.code) ? entry.code : null;
+    if (slot.module && moduleName === slot.module) return true;
+    const prefixes = __probeModulePrefixes(slot);
+    for (let i = 0; i < prefixes.length; i++) {
+      const prefix = prefixes[i];
+      if (__probePrefixMatch(diagTag, prefix) || __probePrefixMatch(code, prefix)) return true;
+    }
+    return false;
+  }
+
+  function __probePickModuleEvent(slot, events) {
+    if (!Array.isArray(events) || !events.length) return null;
+    let fallback = null;
+    for (let i = events.length - 1; i >= 0; i--) {
+      const entry = events[i];
+      const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+      const diagTag = (extra && typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
+      const moduleName = (extra && typeof extra.module === "string" && extra.module) ? extra.module : null;
+      if (!fallback) fallback = entry;
+      if ((diagTag && diagTag === slot.diagTag) || (moduleName && moduleName === slot.module)) {
+        if (__probeSummaryCode(entry.code)) return entry;
+        return entry;
+      }
+    }
+    return fallback;
+  }
+
+  function __probePatchUnit(slot, entry) {
+    if (!slot || slot.functions === "none" || !entry || typeof entry !== "object") return null;
+    const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+    if (!extra) return null;
+    const code = (typeof entry.code === "string" && entry.code) ? entry.code : null;
+    const diagTag = (typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
+    if (code && (code.indexOf(":nav_access") >= 0 || extra.message === "nav access")) return null;
+    if (diagTag && diagTag !== slot.diagTag) return diagTag;
+    if (code && !__probeSummaryCode(code)) return code;
+    return null;
+  }
 
   function printModuleCheck() {
     const rows = [];
@@ -1895,66 +2037,35 @@ function printToStringCrossRealmChecks() {
       const degrade = globalThis.__DEGRADE__;
       const buf = (typeof degrade === "function" && typeof degrade.getBuffer === "function") ? degrade.getBuffer() : [];
       const arr = Array.isArray(buf) ? buf : [];
+      let rowIndex = 0;
 
       for (let i = 0; i < PROBE_MODULE_CHECK_SLOTS.length; i++) {
         const slot = PROBE_MODULE_CHECK_SLOTS[i];
-        const wantMod = slot && typeof slot.module === "string" ? slot.module : null;
-        const wantTag = slot && typeof slot.diagTag === "string" ? slot.diagTag : null;
-
-        let e = null;
-        for (let j = arr.length - 1; j >= 0; j--) {
-          const x = arr[j];
-          if (!x || typeof x !== "object" || x.type !== "degrade") continue;
-          const extra = (x.extra && typeof x.extra === "object") ? x.extra : null;
-          if (!extra) continue;
-          const m = (typeof extra.module === "string" && extra.module) ? extra.module : null;
-          const t = (typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
-          if ((wantMod && m === wantMod) || (wantTag && t === wantTag)) {
-            e = x;
-            break;
-          }
+        const events = [];
+        for (let j = 0; j < arr.length; j++) {
+          const entry = arr[j];
+          if (__probeEventMatchesSlot(slot, entry)) events.push(entry);
         }
 
-        const errCell = (() => {
-          try {
-            const er = e ? e.error : null;
-            if (er == null) return null;
-            if (typeof er === "string") return er;
-            if (typeof er === "object") {
-              if (typeof er.name === "string" && er.name) return er.name;
-              if (typeof er.message === "string" && er.message) return er.message;
-              return null;
-            }
-            return String(er);
-          } catch (_) {
-            return null;
-          }
-        })();
+        const moduleEvent = __probePickModuleEvent(slot, events);
+        const moduleStatus = __probeRowStatus(slot, moduleEvent);
+        rows.push(__probeMakeRow(rowIndex++, slot, moduleEvent, "module", slot.module, moduleStatus));
 
-        rows.push({
-          idx: i,
-          timestamp: e && typeof e.timestamp === "string" ? e.timestamp : null,
-          code: e && typeof e.code === "string" ? e.code : null,
-          level: e && e.extra && typeof e.extra.level === "string" ? e.extra.level : null,
-          diagTag: e && e.extra && typeof e.extra.diagTag === "string" ? e.extra.diagTag : wantTag,
-          module: e && e.extra && typeof e.extra.module === "string" ? e.extra.module : wantMod,
-          stage: e && e.extra && typeof e.extra.stage === "string" ? e.extra.stage : null,
-          key: e && e.extra && (typeof e.extra.key === "string" || e.extra.key === null) ? e.extra.key : null,
-          message: (e && e.extra && typeof e.extra.message === "string")
-            ? e.extra.message
-            : (e && e.error && typeof e.error === "object" && e.error && typeof e.error.message === "string")
-              ? e.error.message
-              : null,
-          err: errCell,
-          data: (() => {
-            try {
-              const s = JSON.stringify(e?.extra?.data);
-              return (typeof s === "string") ? s : null;
-            } catch (_) {
-              return "[unserializable]";
-            }
-          })()
-        });
+        if (slot.functions !== "none") {
+          const latestByUnit = Object.create(null);
+          for (let j = events.length - 1; j >= 0; j--) {
+            const entry = events[j];
+            const unit = __probePatchUnit(slot, entry);
+            if (typeof unit !== "string" || !unit || latestByUnit[unit]) continue;
+            latestByUnit[unit] = entry;
+          }
+          const patchUnits = Object.keys(latestByUnit).sort();
+          for (let j = 0; j < patchUnits.length; j++) {
+            const unit = patchUnits[j];
+            const entry = latestByUnit[unit];
+            rows.push(__probeMakeRow(rowIndex++, slot, entry, "patch", unit, __probeRowStatus(slot, entry)));
+          }
+        }
       }
     } catch (_) {}
 
@@ -2181,7 +2292,6 @@ try {
 
 return result;
 }, configurable: true });
-
 
 
 

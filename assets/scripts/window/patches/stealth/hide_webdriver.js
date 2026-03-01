@@ -49,6 +49,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       type: __typePipeline,
       data: { outcome: 'skip', reason: 'canvas_patch_context_missing', missing: 'CanvasPatchContext' }
     });
+    return;
   }
 
   const Core = window && window.Core;
@@ -95,30 +96,28 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   let __guardToken = null;
   try {
     if (!__core || typeof __core.guardFlag !== 'function') {
-      window.__DEGRADE__?.diag?.('warn', __tag + ':guard_missing', {
-        module: __tag,
+      degrade(__tag + ':guard_missing', null, {
+        level: 'warn',
         diagTag: __tag,
-        surface: __surface,
         key: __flagKey,
         stage: 'guard',
         message: 'Core.guardFlag missing',
         type: __typePipeline,
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
-      }, null);
+      });
       return;
     }
     __guardToken = __core.guardFlag(__flagKey, __tag);
   } catch (e) {
-    window.__DEGRADE__?.diag?.('warn', __tag + ':guard_failed', {
-      module: __tag,
+    degrade(__tag + ':guard_failed', e, {
+      level: 'warn',
       diagTag: __tag,
-      surface: __surface,
       key: __flagKey,
       stage: 'guard',
       message: 'guardFlag threw',
       type: __typePipeline,
       data: { outcome: 'skip', reason: 'guard_failed' }
-    }, e);
+    });
     return;
   }
   if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
@@ -223,7 +222,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
             level: 'warn',
             diagTag: groupTag,
             key: p && p.key ? p.key : null,
-            stage: 'finalize',
+            stage: 'apply',
             message: 'Core.registerPatchedTarget failed',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'registry_failed' }
@@ -293,7 +292,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
           level: 'warn',
           diagTag: __tag,
           key: __flagKey,
-          stage: 'rollback',
+          stage: 'guard',
           message: 'releaseGuardFlag threw on preflight skip',
           type: __typePipeline,
           data: { outcome: 'skip', reason: 'guard_release_failed' }
@@ -322,7 +321,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
             level: 'warn',
             diagTag: __tag,
             key: __flagKey,
-            stage: 'rollback',
+            stage: 'guard',
             message: 'releaseGuardFlag threw on preflight skip',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'guard_release_failed' }
@@ -359,7 +358,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
             level: 'warn',
             diagTag: __tag,
             key: __flagKey,
-            stage: 'rollback',
+            stage: 'guard',
             message: 'releaseGuardFlag threw on preflight skip',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'guard_release_failed' }
@@ -399,6 +398,15 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   }
 
   // Success: per GuardFlag policy, do not release guard on success.
+  degrade('hide_webdriver:ready', null, {
+    level: 'info',
+    diagTag: __tag,
+    key: 'webdriver',
+    stage: 'apply',
+    message: 'hide_webdriver ready',
+    type: 'ok',
+    data: { outcome: 'return', reason: 'ready' }
+  });
 
   } catch (e) {
     degrade('hide_webdriver:fatal_unhandled', e, {

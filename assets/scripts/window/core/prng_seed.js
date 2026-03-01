@@ -8,10 +8,6 @@
           || (typeof global     !== 'undefined' && global)
           || {};
 
-    // Idempotent‑guard For the whole module
-    if (G.__PATCH_ENVPARAMS__) return; // why: Protection against re -initialization
-    G.__PATCH_ENVPARAMS__ = true;
-
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
     const __D = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -26,24 +22,41 @@
       } catch (_) {}
     };
 
-    // Fallbacks (do not interfere, if already defined)
-    if (typeof G.mulberry32 !== 'function') {
-      G.mulberry32 = function (seed) {
-        return function () {
-          let t = (seed += 0x6d2b79f5);
-          t = Math.imul(t ^ (t >>> 15), t | 1);
-          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        };
-      };
+    // ===== MODULE: canonical guard client (GuardFlag.md) =====
+    const __core = window && window.Core;
+    const __flagKey = '__PATCH_RNG_SET__';
+    const __tag = 'rng_set';
+    const __surface = 'rng_set';
+    let __guardToken = null;
+    try {
+      if (!__core || typeof __core.guardFlag !== 'function') {
+        __emit('warn', 'rng_set:guard_missing', {
+          module: __tag,
+          diagTag: __tag,
+          surface: __surface,
+          key: __flagKey,
+          stage: 'guard',
+          message: 'Core.guardFlag missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+        }, null);
+        return;
+      }
+      __guardToken = __core.guardFlag(__flagKey, __tag);
+    } catch (e) {
+      __emit('warn', 'rng_set:guard_failed', {
+        module: __tag,
+        diagTag: __tag,
+        surface: __surface,
+        key: __flagKey,
+        stage: 'guard',
+        message: 'guardFlag threw',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_failed' }
+      }, e);
+      return;
     }
-    if (typeof G.strToSeed !== 'function') {
-      G.strToSeed = function (str) {
-        let h = 5381; str = String(str);
-        for (let i = 0; i < str.length; i++) h = ((h << 5) + h) + str.charCodeAt(i);
-        return h >>> 0;
-      };
-    }
+    if (!__guardToken) return; // already_patched: Core emits rng_set:already_patched
 
     // Utilities
     function toBool(v) {
@@ -60,6 +73,25 @@
     function installRand() {
       if (G.rand && G.rand.__marker === 'envrand' && typeof G.rand.use === 'function') return true;
       if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED) return false; // why: waiting for the seed
+
+      // Fallbacks (do not interfere, if already defined)
+      if (typeof G.mulberry32 !== 'function') {
+        G.mulberry32 = function (seed) {
+          return function () {
+            let t = (seed += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        };
+      }
+      if (typeof G.strToSeed !== 'function') {
+        G.strToSeed = function (str) {
+          let h = 5381; str = String(str);
+          for (let i = 0; i < str.length; i++) h = ((h << 5) + h) + str.charCodeAt(i);
+          return h >>> 0;
+        };
+      }
 
       const LOG_SEED = toBool(G.__LOG_SEED);
       const LOG_POOLS = toBool(G.__LOG_POOLS);
@@ -159,22 +191,35 @@
 
     (function boot() {
       try {
-        if (installRand()) return; // Everything is ready
+        if (installRand()) {
+          __emit('info', 'rng_set:ready', {
+            module: __tag,
+            diagTag: __tag,
+            surface: __surface,
+            key: 'rand',
+            stage: 'apply',
+            message: 'rand ready',
+            type: 'ok',
+            data: { outcome: 'return', reason: 'ready' }
+          }, null);
+          return; // Everything is ready
+        }
         __emit('warn', 'rng_set:preflight:global_seed_missing', {
-          module: 'rng_set',
-          diagTag: 'rng_set',
-          surface: 'rng_set',
+          module: __tag,
+          diagTag: __tag,
+          surface: __surface,
           key: '__GLOBAL_SEED',
           stage: 'preflight',
           message: '__GLOBAL_SEED missing; rand not installed',
           type: 'pipeline missing data',
-          data: { outcome: 'rollback', action: 'native' }
+          // Policy exception: for seed we keep the guard (do NOT release) to prevent late seed replacement.
+          data: { outcome: 'return', reason: 'global_seed_missing', action: 'native', guard: 'locked' }
         }, null);
       } catch (e) {
         __emit('fatal', 'rng_set:boot_failed', {
-          module: 'rng_set',
-          diagTag: 'rng_set',
-          surface: 'rng_set',
+          module: __tag,
+          diagTag: __tag,
+          surface: __surface,
           key: null,
           stage: 'runtime',
           message: 'boot failed',
