@@ -57,6 +57,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'nav_total_set'
       }), err);
     }
+    const __navResolveDescriptor = (window.Core && typeof window.Core.resolveDescriptor === 'function')
+      ? window.Core.resolveDescriptor.bind(window.Core)
+      : null;
 
     let __navHasGuard = false;
     try {
@@ -989,13 +992,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
           const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
           const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
+          const dBrandsResolved = __navResolveDescriptor ? __navResolveDescriptor(uadProto, 'brands', { mode: 'proto_chain' }) : null;
+          const dMobileResolved = __navResolveDescriptor ? __navResolveDescriptor(uadProto, 'mobile', { mode: 'proto_chain' }) : null;
+          const dPlatformResolved = __navResolveDescriptor ? __navResolveDescriptor(uadProto, 'platform', { mode: 'proto_chain' }) : null;
           if (!dBrands || !dMobile || !dPlatform) {
             __navDiag('error', 'nav_total_set:userAgentData_descriptor_missing', {
               stage: 'preflight',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:userAgentData',
               key: 'userAgentData',
-              message: 'window navigator.userAgentData descriptor missing'
+              message: 'window navigator.userAgentData descriptor missing',
+              data: {
+                outcome: 'skip',
+                reason: 'descriptor_missing',
+                protoChainFound: {
+                  brands: !!(dBrandsResolved && dBrandsResolved.desc),
+                  mobile: !!(dMobileResolved && dMobileResolved.desc),
+                  platform: !!(dPlatformResolved && dPlatformResolved.desc)
+                }
+              }
             });
           } else {
             const uadOwner = uadProto;
@@ -1262,13 +1277,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // IMPORTANT: getter — on PROTOTYPE, without own-fallback
     const dUaData = Object.getOwnPropertyDescriptor(navProto, 'userAgentData');
+    const dUaDataResolved = __navResolveDescriptor ? __navResolveDescriptor(navProto, 'userAgentData', { mode: 'proto_chain' }) : null;
     if (!dUaData) {
       __navDiag('error', 'nav_total_set:userAgentData_getter_descriptor_missing', {
         stage: 'preflight',
         type: __navTypeBrowser,
         diagTag: 'nav_total_set:userAgentData',
         key: 'userAgentData',
-        message: 'userAgentData descriptor missing'
+        message: 'userAgentData descriptor missing',
+        data: {
+          outcome: 'skip',
+          reason: 'descriptor_missing',
+          protoChainFound: !!(dUaDataResolved && dUaDataResolved.desc),
+          protoChainOnExpectedOwner: !!(dUaDataResolved && dUaDataResolved.owner === navProto)
+        }
       });
     } else {
       __navRegisterKey('userAgentData');
@@ -1543,8 +1565,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— H. permissions.query ———
     if ('permissions' in navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
       const permProto = Object.getPrototypeOf(navigator.permissions) || navigator.permissions;
-      const permDesc = Object.getOwnPropertyDescriptor(permProto, 'query')
-        || Object.getOwnPropertyDescriptor(navigator.permissions, 'query');
+      const permResolved = __navResolveDescriptor
+        ? __navResolveDescriptor(permProto, 'query', { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(permProto, 'query') ? permProto : navigator.permissions,
+            desc: Object.getOwnPropertyDescriptor(permProto, 'query')
+              || Object.getOwnPropertyDescriptor(navigator.permissions, 'query')
+              || null
+          };
+      const permDesc = permResolved ? permResolved.desc : null;
+      const permOwner = (permResolved && permResolved.owner) ? permResolved.owner : permProto;
       if (!permDesc) {
         __navDiag('error', 'nav_total_set:permissions_query_descriptor_missing', {
           stage: 'preflight',
@@ -1553,11 +1583,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'permissions.query',
           message: 'permissions.query descriptor missing'
         });
+      } else if (permOwner === navigator.permissions) {
+        __navDiag('error', 'nav_total_set:permissions_query_owner_mismatch', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:permissions.query',
+          key: 'permissions.query',
+          message: 'permissions.query resolved to instance owner',
+          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+        });
       } else {
         __navRegisterKey('permissions.query');
         applyCoreTargetsGroup('nav_total_set:permissions.query', [{
-        owner: permProto,
+        owner: permOwner,
         key: 'query',
+        resolve: 'proto_chain',
         kind: 'promise_method',
         wrapLayer: 'named_wrapper',
         invokeClass: 'brand_strict',
@@ -1626,8 +1666,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— I. mediaDevices.enumerateDevices ———
     if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
       const mediaProto = Object.getPrototypeOf(navigator.mediaDevices) || navigator.mediaDevices;
-      const mediaDesc = Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
-        || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices');
+      const mediaResolved = __navResolveDescriptor
+        ? __navResolveDescriptor(mediaProto, 'enumerateDevices', { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices') ? mediaProto : navigator.mediaDevices,
+            desc: Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
+              || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices')
+              || null
+          };
+      const mediaDesc = mediaResolved ? mediaResolved.desc : null;
+      const mediaOwner = (mediaResolved && mediaResolved.owner) ? mediaResolved.owner : mediaProto;
       if (!mediaDesc) {
         __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_descriptor_missing', {
           stage: 'preflight',
@@ -1636,11 +1684,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'mediaDevices.enumerateDevices',
           message: 'mediaDevices.enumerateDevices descriptor missing'
         });
+      } else if (mediaOwner === navigator.mediaDevices) {
+        __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_owner_mismatch', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+          key: 'mediaDevices.enumerateDevices',
+          message: 'mediaDevices.enumerateDevices resolved to instance owner',
+          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+        });
       } else {
         __navRegisterKey('mediaDevices.enumerateDevices');
         applyCoreTargetsGroup('nav_total_set:mediaDevices.enumerateDevices', [{
-        owner: mediaProto,
+        owner: mediaOwner,
         key: 'enumerateDevices',
+        resolve: 'proto_chain',
         kind: 'promise_method',
         wrapLayer: 'named_wrapper',
         invokeClass: 'brand_strict',
@@ -1720,8 +1778,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
      // Конфигурация: берём из глобалов (как и прочие параметры в модуле), иначе безопасные дефолты
     if (navigator.storage && typeof navigator.storage.estimate === 'function') {
       const storageProto = Object.getPrototypeOf(navigator.storage) || navigator.storage;
-      const storageDesc = Object.getOwnPropertyDescriptor(storageProto, 'estimate')
-        || Object.getOwnPropertyDescriptor(navigator.storage, 'estimate');
+      const storageResolved = __navResolveDescriptor
+        ? __navResolveDescriptor(storageProto, 'estimate', { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(storageProto, 'estimate') ? storageProto : navigator.storage,
+            desc: Object.getOwnPropertyDescriptor(storageProto, 'estimate')
+              || Object.getOwnPropertyDescriptor(navigator.storage, 'estimate')
+              || null
+          };
+      const storageDesc = storageResolved ? storageResolved.desc : null;
+      const storageOwner = (storageResolved && storageResolved.owner) ? storageResolved.owner : storageProto;
         if (!storageDesc) {
           __navDiag('error', 'nav_total_set:storage_estimate_descriptor_missing', {
             surface: 'navigator',
@@ -1730,6 +1796,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             diagTag: 'nav_total_set:storage.estimate',
           key: 'storage.estimate',
           message: 'storage.estimate descriptor missing'
+        });
+      } else if (storageOwner === navigator.storage) {
+        __navDiag('error', 'nav_total_set:storage_estimate_owner_mismatch', {
+          surface: 'navigator',
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:storage.estimate',
+          key: 'storage.estimate',
+          message: 'storage.estimate resolved to instance owner',
+          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
         });
       } else {
       const QUOTA_MB   = Number(window.__STORAGE_QUOTA_MB   ?? 120);
@@ -1757,8 +1833,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       } else {
         __navRegisterKey('storage.estimate');
         applyCoreTargetsGroup('nav_total_set:storage.estimate', [{
-        owner: storageProto,
+        owner: storageOwner,
         key: 'estimate',
+        resolve: 'proto_chain',
         kind: 'promise_method',
         wrapLayer: 'named_wrapper',
         invokeClass: 'brand_strict',
@@ -1778,8 +1855,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       if (navigator.webkitTemporaryStorage) {
         const tmpProto = Object.getPrototypeOf(navigator.webkitTemporaryStorage) || navigator.webkitTemporaryStorage;
-        const tmpDesc = Object.getOwnPropertyDescriptor(tmpProto, 'queryUsageAndQuota')
-          || Object.getOwnPropertyDescriptor(navigator.webkitTemporaryStorage, 'queryUsageAndQuota');
+        const tmpResolved = __navResolveDescriptor
+          ? __navResolveDescriptor(tmpProto, 'queryUsageAndQuota', { mode: 'proto_chain' })
+          : {
+              owner: Object.getOwnPropertyDescriptor(tmpProto, 'queryUsageAndQuota') ? tmpProto : navigator.webkitTemporaryStorage,
+              desc: Object.getOwnPropertyDescriptor(tmpProto, 'queryUsageAndQuota')
+                || Object.getOwnPropertyDescriptor(navigator.webkitTemporaryStorage, 'queryUsageAndQuota')
+                || null
+            };
+        const tmpDesc = tmpResolved ? tmpResolved.desc : null;
+        const tmpOwner = (tmpResolved && tmpResolved.owner) ? tmpResolved.owner : tmpProto;
         if (!tmpDesc) {
           __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota_descriptor_missing', {
             surface: 'navigator',
@@ -1789,11 +1874,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             key: 'webkitTemporaryStorage.queryUsageAndQuota',
             message: 'webkitTemporaryStorage.queryUsageAndQuota descriptor missing'
           });
+        } else if (tmpOwner === navigator.webkitTemporaryStorage) {
+          __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota_owner_mismatch', {
+            surface: 'navigator',
+            stage: 'preflight',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
+            key: 'webkitTemporaryStorage.queryUsageAndQuota',
+            message: 'webkitTemporaryStorage.queryUsageAndQuota resolved to instance owner',
+            data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+          });
         } else {
           __navRegisterKey('webkitTemporaryStorage.queryUsageAndQuota');
           applyCoreTargetsGroup('nav_total_set:webkitTemporaryStorage.queryUsageAndQuota', [{
-          owner: tmpProto,
+          owner: tmpOwner,
           key: 'queryUsageAndQuota',
+          resolve: 'proto_chain',
           kind: 'method',
           wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
@@ -1832,8 +1928,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
       // Consistent “persistence”
       if (typeof navigator.storage.persist   === 'function') {
-        const persistDesc = Object.getOwnPropertyDescriptor(storageProto, 'persist')
-          || Object.getOwnPropertyDescriptor(navigator.storage, 'persist');
+        const persistResolved = __navResolveDescriptor
+          ? __navResolveDescriptor(storageProto, 'persist', { mode: 'proto_chain' })
+          : {
+              owner: Object.getOwnPropertyDescriptor(storageProto, 'persist') ? storageProto : navigator.storage,
+              desc: Object.getOwnPropertyDescriptor(storageProto, 'persist')
+                || Object.getOwnPropertyDescriptor(navigator.storage, 'persist')
+                || null
+            };
+        const persistDesc = persistResolved ? persistResolved.desc : null;
+        const persistOwner = (persistResolved && persistResolved.owner) ? persistResolved.owner : storageProto;
         if (!persistDesc) {
           __navDiag('error', 'nav_total_set:storage_persist_descriptor_missing', {
             surface: 'navigator',
@@ -1843,11 +1947,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             key: 'storage.persist',
             message: 'storage.persist descriptor missing'
           });
+        } else if (persistOwner === navigator.storage) {
+          __navDiag('error', 'nav_total_set:storage_persist_owner_mismatch', {
+            surface: 'navigator',
+            stage: 'preflight',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:storage.persist',
+            key: 'storage.persist',
+            message: 'storage.persist resolved to instance owner',
+            data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+          });
         } else {
           __navRegisterKey('storage.persist');
           applyCoreTargetsGroup('nav_total_set:storage.persist', [{
-          owner: storageProto,
+          owner: persistOwner,
           key: 'persist',
+          resolve: 'proto_chain',
           kind: 'promise_method',
           wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
@@ -1867,8 +1982,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       }
       if (typeof navigator.storage.persisted === 'function') {
-        const persistedDesc = Object.getOwnPropertyDescriptor(storageProto, 'persisted')
-          || Object.getOwnPropertyDescriptor(navigator.storage, 'persisted');
+        const persistedResolved = __navResolveDescriptor
+          ? __navResolveDescriptor(storageProto, 'persisted', { mode: 'proto_chain' })
+          : {
+              owner: Object.getOwnPropertyDescriptor(storageProto, 'persisted') ? storageProto : navigator.storage,
+              desc: Object.getOwnPropertyDescriptor(storageProto, 'persisted')
+                || Object.getOwnPropertyDescriptor(navigator.storage, 'persisted')
+                || null
+            };
+        const persistedDesc = persistedResolved ? persistedResolved.desc : null;
+        const persistedOwner = (persistedResolved && persistedResolved.owner) ? persistedResolved.owner : storageProto;
         if (!persistedDesc) {
           __navDiag('error', 'nav_total_set:storage_persisted_descriptor_missing', {
             surface: 'navigator',
@@ -1878,11 +2001,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             key: 'storage.persisted',
             message: 'storage.persisted descriptor missing'
           });
+        } else if (persistedOwner === navigator.storage) {
+          __navDiag('error', 'nav_total_set:storage_persisted_owner_mismatch', {
+            surface: 'navigator',
+            stage: 'preflight',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:storage.persisted',
+            key: 'storage.persisted',
+            message: 'storage.persisted resolved to instance owner',
+            data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+          });
         } else {
           __navRegisterKey('storage.persisted');
           applyCoreTargetsGroup('nav_total_set:storage.persisted', [{
-          owner: storageProto,
+          owner: persistedOwner,
           key: 'persisted',
+          resolve: 'proto_chain',
           kind: 'promise_method',
           wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
@@ -1913,6 +2047,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (perfProto) {
       const dm0 = Number(navigator.deviceMemory);
       if (typeof dm0 === 'number' && isFinite(dm0)) {
+        const perfMemoryResolved = __navResolveDescriptor
+          ? __navResolveDescriptor(perfProto, 'memory', { mode: 'proto_chain' })
+          : {
+              owner: Object.getOwnPropertyDescriptor(perfProto, 'memory') ? perfProto : performance,
+              desc: Object.getOwnPropertyDescriptor(perfProto, 'memory')
+                || Object.getOwnPropertyDescriptor(performance, 'memory')
+                || null
+            };
+        const perfMemoryOwner = (perfMemoryResolved && perfMemoryResolved.owner) ? perfMemoryResolved.owner : perfProto;
 
         const heapFromDM = __navMark(function heapFromDM(dm) {
           if (!(typeof dm === 'number' && isFinite(dm))) return null;
@@ -1926,8 +2069,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           const dm = Number(navigator.deviceMemory);
           const limit = heapFromDM(dm);
           if (limit == null) {
-            const d = Object.getOwnPropertyDescriptor(perfProto, 'memory')
-                    || Object.getOwnPropertyDescriptor(performance, 'memory');
+            const d = perfMemoryResolved ? perfMemoryResolved.desc : null;
             return d && d.get ? d.get.call(performance) : undefined;
           }
           const total = Math.floor(limit * 0.25);
@@ -1937,7 +2079,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }, 'get memory');
 
         try {
-          redefineAcc(perfProto, 'memory', getMemory);
+          if (perfMemoryOwner === performance) {
+            __navDiag('warn', 'nav_total_set:performance_memory_owner_mismatch', {
+              surface: 'navigator',
+              stage: 'preflight',
+              type: __navTypeBrowser,
+              diagTag: 'nav_total_set:performance.memory',
+              key: 'performance.memory',
+              message: 'performance.memory resolved to instance owner',
+              data: { outcome: 'skip', reason: 'instance_owner_resolved', policy: 'skip', action: 'native' }
+            });
+          } else {
+            redefineAcc(perfMemoryOwner, 'memory', getMemory);
+          }
         } catch (e) {
           __navDiag('warn', 'nav_total_set:performance_memory_proto', {
             surface: 'navigator',
@@ -1967,10 +2121,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const origCreate = navigator.credentials.create;
       const origGet    = navigator.credentials.get;
       const credProto = Object.getPrototypeOf(navigator.credentials) || navigator.credentials;
-      const createDesc = Object.getOwnPropertyDescriptor(credProto, 'create')
-        || Object.getOwnPropertyDescriptor(navigator.credentials, 'create');
-      const getDesc = Object.getOwnPropertyDescriptor(credProto, 'get')
-        || Object.getOwnPropertyDescriptor(navigator.credentials, 'get');
+      const createResolved = __navResolveDescriptor
+        ? __navResolveDescriptor(credProto, 'create', { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(credProto, 'create') ? credProto : navigator.credentials,
+            desc: Object.getOwnPropertyDescriptor(credProto, 'create')
+              || Object.getOwnPropertyDescriptor(navigator.credentials, 'create')
+              || null
+          };
+      const getResolved = __navResolveDescriptor
+        ? __navResolveDescriptor(credProto, 'get', { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(credProto, 'get') ? credProto : navigator.credentials,
+            desc: Object.getOwnPropertyDescriptor(credProto, 'get')
+              || Object.getOwnPropertyDescriptor(navigator.credentials, 'get')
+              || null
+          };
+      const createDesc = createResolved ? createResolved.desc : null;
+      const getDesc = getResolved ? getResolved.desc : null;
+      const createOwner = (createResolved && createResolved.owner) ? createResolved.owner : credProto;
+      const getOwner = (getResolved && getResolved.owner) ? getResolved.owner : credProto;
       if (!createDesc || !getDesc) {
         __navDiag('error', 'nav_total_set:credentials_descriptor_missing', {
           surface: 'navigator',
@@ -1980,13 +2150,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: !createDesc ? 'credentials.create' : 'credentials.get',
           message: 'credentials descriptor missing'
         });
+      } else if (createOwner === navigator.credentials || getOwner === navigator.credentials) {
+        __navDiag('error', 'nav_total_set:credentials_owner_mismatch', {
+          surface: 'navigator',
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:credentials',
+          key: (createOwner === navigator.credentials) ? 'credentials.create' : 'credentials.get',
+          message: 'credentials resolved to instance owner',
+          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+        });
       } else {
         __navRegisterKey('credentials.create');
         __navRegisterKey('credentials.get');
         applyCoreTargetsGroup('nav_total_set:credentials', [
         {
-          owner: credProto,
+          owner: createOwner,
           key: 'create',
+          resolve: 'proto_chain',
           kind: 'promise_method',
           wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
@@ -2009,8 +2190,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           }
         },
         {
-          owner: credProto,
+          owner: getOwner,
           key: 'get',
+          resolve: 'proto_chain',
           kind: 'promise_method',
           wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',

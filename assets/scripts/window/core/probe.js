@@ -1859,6 +1859,111 @@ function printToStringCrossRealmChecks() {
     return { total: all.length, last50Count: last50.length, rows, raw: last50 };
   }
 
+  // ===== [probe] module check (static slots; filled from __DEGRADE__ buffer) =====
+  // IMPORTANT:
+  // - this is intentionally static to match what main.py injects/calls;
+  // - a slot is "filled" only if the module actually emits __DEGRADE__.diag/.__DEGRADE__ events.
+  const PROBE_MODULE_CHECK_SLOTS = [
+    { diagTag: "core_window", module: "core_window" },
+    { diagTag: "core", module: "core" },
+    { diagTag: "rtc", module: "rtc" },
+    { diagTag: "hide_webdriver", module: "hide_webdriver" },
+    { diagTag: "wrk", module: "wrk" },
+    { diagTag: "rng_set", module: "rng_set" },
+    { diagTag: "nav_total_set", module: "nav_total_set" },
+    { diagTag: "screen", module: "screen" },
+    { diagTag: "fonts", module: "fonts" },
+    { diagTag: "canvas", module: "canvas" },
+    { diagTag: "webgl", module: "webgl" },
+    { diagTag: "webgpu_wl", module: "webgpu_wl" },
+    { diagTag: "webgpu", module: "webgpu" },
+    { diagTag: "audiocontext", module: "audiocontext" },
+    { diagTag: "context", module: "context" },
+    // CDP-injected standalone modules (main.py configure_profile / UA override / worker bootstrap)
+    { diagTag: "tz", module: "tz" },
+    { diagTag: "geo:patched", module: "GeoOverride" },
+    { diagTag: "uad_override", module: "uad_override" },
+    { diagTag: "headers_interceptor", module: "headers_interceptor" },
+    { diagTag: "headers_bridge", module: "headers_bridge" },
+    { diagTag: "worker_patch", module: "WORKER_PATCH_SRC" },
+    { diagTag: "worker_bootstrap", module: "worker_bootstrap" }
+  ];
+
+  function printModuleCheck() {
+    const rows = [];
+    try {
+      const degrade = globalThis.__DEGRADE__;
+      const buf = (typeof degrade === "function" && typeof degrade.getBuffer === "function") ? degrade.getBuffer() : [];
+      const arr = Array.isArray(buf) ? buf : [];
+
+      for (let i = 0; i < PROBE_MODULE_CHECK_SLOTS.length; i++) {
+        const slot = PROBE_MODULE_CHECK_SLOTS[i];
+        const wantMod = slot && typeof slot.module === "string" ? slot.module : null;
+        const wantTag = slot && typeof slot.diagTag === "string" ? slot.diagTag : null;
+
+        let e = null;
+        for (let j = arr.length - 1; j >= 0; j--) {
+          const x = arr[j];
+          if (!x || typeof x !== "object" || x.type !== "degrade") continue;
+          const extra = (x.extra && typeof x.extra === "object") ? x.extra : null;
+          if (!extra) continue;
+          const m = (typeof extra.module === "string" && extra.module) ? extra.module : null;
+          const t = (typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
+          if ((wantMod && m === wantMod) || (wantTag && t === wantTag)) {
+            e = x;
+            break;
+          }
+        }
+
+        const errCell = (() => {
+          try {
+            const er = e ? e.error : null;
+            if (er == null) return null;
+            if (typeof er === "string") return er;
+            if (typeof er === "object") {
+              if (typeof er.name === "string" && er.name) return er.name;
+              if (typeof er.message === "string" && er.message) return er.message;
+              return null;
+            }
+            return String(er);
+          } catch (_) {
+            return null;
+          }
+        })();
+
+        rows.push({
+          idx: i,
+          timestamp: e && typeof e.timestamp === "string" ? e.timestamp : null,
+          code: e && typeof e.code === "string" ? e.code : null,
+          level: e && e.extra && typeof e.extra.level === "string" ? e.extra.level : null,
+          diagTag: e && e.extra && typeof e.extra.diagTag === "string" ? e.extra.diagTag : wantTag,
+          module: e && e.extra && typeof e.extra.module === "string" ? e.extra.module : wantMod,
+          stage: e && e.extra && typeof e.extra.stage === "string" ? e.extra.stage : null,
+          key: e && e.extra && (typeof e.extra.key === "string" || e.extra.key === null) ? e.extra.key : null,
+          message: (e && e.extra && typeof e.extra.message === "string")
+            ? e.extra.message
+            : (e && e.error && typeof e.error === "object" && e.error && typeof e.error.message === "string")
+              ? e.error.message
+              : null,
+          err: errCell,
+          data: (() => {
+            try {
+              const s = JSON.stringify(e?.extra?.data);
+              return (typeof s === "string") ? s : null;
+            } catch (_) {
+              return "[unserializable]";
+            }
+          })()
+        });
+      }
+    } catch (_) {}
+
+    console.group("[probe] module check");
+    console.table(rows);
+    console.groupEnd();
+    return rows;
+  }
+
   const result = {
     ok: true,
     timestamp: new Date().toISOString(),
@@ -1868,7 +1973,8 @@ function printToStringCrossRealmChecks() {
     receiverChecks: await printReceiverChecks(),
     prototypeInvariants: printPrototypeInvariantChecks(),
     toStringCrossRealm: printToStringCrossRealmChecks(),
-    degrade: printLastDegradeEvents()
+    degrade: printLastDegradeEvents(),
+    moduleCheck: printModuleCheck()
   };
 
   result.descriptorExpectations = printDescriptorExpectations(result);
@@ -2079,9 +2185,3 @@ return result;
 
 
 
-
-
-// Скрипт печатает данные и сохраняет результат в JSON.
-
-
-// вызвать один раз:__probeDownloadHtmlReport(window.__PROBE_OUTPUT__);

@@ -837,14 +837,30 @@ const LOGGingModule = function LOGGingModule() {
       }
       return false; // do not swallow (DevTools still shows it)
     };
+    const __loggerOnError = global.onerror;
 
     // 5.2 resource errors (capture=true catches <script src> load fails etc.)
     global.addEventListener(
       "error",
       function (e) {
         try {
-          // If it has e.error, window.onerror already recorded it; avoid duplicates
-          if (e && e.error) return;
+          // If it has e.error, it is usually a runtime ErrorEvent.
+          // If our window.onerror is still installed, it already recorded it; avoid duplicates.
+          // If the page overwrote window.onerror, record it here to avoid losing uncaught errors.
+          if (e && e.error) {
+            if (global.onerror === __loggerOnError) return;
+            const err = e.error;
+            pushEntry({
+              type: "onerror",
+              message: (typeof e.message === "string" && e.message) ? e.message : (err && err.message ? String(err.message) : "Error"),
+              source: (typeof e.filename === "string" && e.filename) ? e.filename : null,
+              lineno: (typeof e.lineno === "number") ? e.lineno : null,
+              colno: (typeof e.colno === "number") ? e.colno : null,
+              stack: err && err.stack ? String(err.stack) : null,
+              timestamp: new Date().toISOString(),
+            });
+            return;
+          }
 
           const target = e && e.target ? e.target : null;
           const url =

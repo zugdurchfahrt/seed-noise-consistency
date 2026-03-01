@@ -426,6 +426,8 @@ const AudioContextModule = function AudioContextModule(window) {
   ].filter(Boolean);
 
   const __seenProtos = new WeakSet();
+  let __totalTargets = 0;
+  let __totalApplied = 0;
 
   for (const CTX of CTX_CLASSES) {
     const proto = CTX.prototype;
@@ -729,8 +731,17 @@ const AudioContextModule = function AudioContextModule(window) {
   }
 
 
-    applyCoreTargetsGroup(`audiocontext:${CTX_NAME}:proto`, targets, 'skip');
+    __totalTargets += targets.length;
+    __totalApplied += applyCoreTargetsGroup(`audiocontext:${CTX_NAME}:proto`, targets, 'skip');
   }
+
+    emitDegrade('info', __tag + ':ready', null, {
+      stage: 'apply',
+      key: null,
+      message: 'ok',
+      type: 'ok',
+      data: { outcome: 'return', ctxClasses: CTX_CLASSES.length, targets: __totalTargets, applied: __totalApplied }
+    });
   } catch (e) {
     const rollbackErr = e;
     window.__DEGRADE__?.diag?.('error', __tag + ':fatal', {
