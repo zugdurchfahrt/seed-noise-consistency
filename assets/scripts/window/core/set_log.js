@@ -818,6 +818,7 @@ const LOGGingModule = function LOGGingModule() {
     // ===== 5) Uncaught errors + unhandled rejections (consistent, no logError) =====
 
     // 5.1 window.onerror (script errors)
+    const prevOnError = (typeof global.onerror === "function") ? global.onerror : null;
     global.onerror = function (message, source, lineno, colno, error) {
       try {
         pushEntry({
@@ -835,7 +836,16 @@ const LOGGingModule = function LOGGingModule() {
           try { recordLoggerError(e, "onerror"); } catch (_) {}
         }
       }
-      return false; // do not swallow (DevTools still shows it)
+      let swallow = false;
+      try {
+        if (prevOnError) {
+          const r = prevOnError.apply(global, arguments);
+          if (r === true) swallow = true;
+        }
+      } catch (e) {
+        try { recordLoggerError(e, "onerror_prev"); } catch (_) {}
+      }
+      return swallow ? true : false;
     };
     const __loggerOnError = global.onerror;
 

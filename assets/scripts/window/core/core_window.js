@@ -709,13 +709,35 @@ const CoreWindowModule = function CoreWindowModule(window) {
   (function installCoreApplyTargets(){
     function diagDegrade(code, err, extra) {
       try {
-        const D = window.__DEGRADE__;
-        const _err = (typeof err === 'undefined') ? null : err;
-        if (D && typeof D.diag === 'function') return D.diag('error', code, extra || null, _err);
-        if (typeof D === 'function') {
-          const x = (extra && typeof extra === 'object') ? Object.assign({ level: 'error' }, extra) : { level: 'error' };
-          return D(code, _err, x || null);
+        const x = (extra && typeof extra === 'object') ? extra : null;
+        const policy = (x && typeof x.policy === 'string') ? x.policy : null;
+        const level = (policy === 'skip')
+          ? 'warn'
+          : ((policy === 'throw' || policy === 'strict')
+            ? 'error'
+            : ((x && (x.level === 'info' || x.level === 'warn' || x.level === 'error' || x.level === 'fatal')) ? x.level : 'error'));
+
+        const ctx = {
+          module: (x && typeof x.module === 'string' && x.module) ? x.module : 'core_window',
+          diagTag: (x && typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'core_window',
+          surface: (x && typeof x.surface === 'string' && x.surface) ? x.surface : 'core',
+          key: (x && (typeof x.key === 'string' || x.key === null)) ? x.key : null,
+          stage: (x && typeof x.stage === 'string' && x.stage) ? x.stage : 'apply',
+          message: (x && typeof x.message === 'string' && x.message) ? x.message : String(code || 'core_window:diag'),
+          type: (x && typeof x.type === 'string' && x.type) ? x.type : null,
+          data: (x && x.data && typeof x.data === 'object') ? x.data : null
+        };
+        if (!ctx.data || typeof ctx.data !== 'object') ctx.data = {};
+        if (!Object.prototype.hasOwnProperty.call(ctx.data, 'outcome')) {
+          ctx.data.outcome = (policy === 'skip')
+            ? 'skip'
+            : ((policy === 'throw' || policy === 'strict') ? 'throw' : 'return');
         }
+        if (policy && !Object.prototype.hasOwnProperty.call(ctx.data, 'policy')) {
+          ctx.data.policy = policy;
+        }
+
+        return __emit(level, code, ctx, (typeof err === 'undefined') ? null : err);
       } catch (_) {}
     }
     function normalizePolicy(v) {
@@ -807,7 +829,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (!key) return null;
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
-          if (window[key]) {
+          if (Object.prototype.hasOwnProperty.call(window, key)) {
             __emit('info', tag + ':already_patched', {
               module: 'core',
               diagTag: tag,
@@ -863,20 +885,36 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
           if (window[key] !== token) return false;
+          let deleteErr = null;
+          let deleted = false;
           try {
-            delete window[key];
-          } catch (_) {
-            try { window[key] = false; } catch (_) {}
+            deleted = delete window[key];
+          } catch (e) {
+            deleteErr = e;
+            deleted = false;
+          }
+          if (!deleted) {
+            __emit('warn', tag + ':guard_release_failed', {
+              module: 'core',
+              diagTag: tag,
+              surface: 'core',
+              key,
+              stage: 'guard',
+              message: 'guard delete failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'guard_release_failed' }
+            }, deleteErr);
+            return false;
           }
           __emit('info', tag + ':guard_released', {
             module: 'core',
             diagTag: tag,
             surface: 'core',
             key,
-            stage: 'rollback',
-            message: 'guard released after rollback ok',
+            stage: 'guard',
+            message: 'guard released',
             type: 'pipeline missing data',
-            data: { outcome: 'rollback', reason: 'rollback_ok' }
+            data: { outcome: 'return', reason: 'guard_released' }
           }, null);
           return true;
         } catch (e) {
@@ -886,8 +924,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
               diagTag: tag,
               surface: 'core',
               key,
-              stage: 'rollback',
-              message: 'guard release failed',
+              stage: 'guard',
+              message: 'guard release threw',
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'guard_release_exception' }
             }, e);
@@ -1644,9 +1682,30 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
         const markAsNative = ensureMarkAsNative();
         const seenOwners = new WeakMap();
+        const failDedupe = new Set();
 
         function fail(policy, tag, code, err, extra) {
-          diagDegrade(tag + ':' + code, err, extra);
+          const x = (extra && typeof extra === 'object') ? extra : {};
+          const k = Object.prototype.hasOwnProperty.call(x, 'key') ? x.key : null;
+          const tid = Object.prototype.hasOwnProperty.call(x, 'targetId') ? x.targetId : null;
+          const dedupeKey = String(tag || 'core:applyTargets') + ':' + String(code || 'failed') + ':' + String(k || '') + ':' + String(tid || '');
+          if (!failDedupe.has(dedupeKey)) {
+            failDedupe.add(dedupeKey);
+            diagDegrade(tag + ':' + code, err, Object.assign({}, x, {
+              module: 'core_window',
+              diagTag: tag,
+              surface: 'core',
+              policy: policy,
+              stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'apply',
+              message: (typeof x.message === 'string' && x.message) ? x.message : 'Core.applyTargets failed',
+              type: (typeof x.type === 'string' && x.type) ? x.type : (
+                (code === 'descriptor_missing' || code === 'kind_mismatch' || code === 'non_configurable' || code === 'strict_contract_violation')
+                  ? 'browser structure missing data'
+                  : 'pipeline missing data'
+              ),
+              data: (x.data && typeof x.data === 'object') ? x.data : { reason: code }
+            }));
+          }
           if (policy === 'throw' || policy === 'strict') throw err;
           planned.length = 0;
           planned.ok = false;
@@ -1662,7 +1721,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
             return fail(preflight.policy, preflight.tag, preflight.reason, preflight.error, {
               key: preflight.key || null,
               kind: preflight.kind || null,
-              targetId: preflight.targetId
+              targetId: preflight.targetId,
+              stage: 'preflight',
+              message: 'Core.applyTargets preflight failed',
+              data: { reason: preflight.reason }
             });
           }
           const owner = preflight.descriptorOwner || preflight.owner;
@@ -1858,4 +1920,14 @@ const CoreWindowModule = function CoreWindowModule(window) {
   })();
 
   window.__CORE_WINDOW_LOADED__ = true;
+  __emit('info', 'core_window:ready', {
+    module: 'core_window',
+    diagTag: 'core_window',
+    surface: 'core',
+    key: null,
+    stage: 'apply',
+    message: 'core_window ready',
+    type: null,
+    data: { outcome: 'return', ok: true }
+  }, null);
 }
