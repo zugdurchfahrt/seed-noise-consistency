@@ -1,97 +1,43 @@
 const AudioContextModule = function AudioContextModule(window) {
   const __audioTypePipeline = 'pipeline missing data';
   const __audioTypeBrowser = 'browser structure missing data';
-  const __audioDegradeAny = window.__DEGRADE__;
-  const __audioDegrade = (typeof __audioDegradeAny === 'function') ? __audioDegradeAny : null;
-  const __audioDegradeDiag = (__audioDegradeAny && typeof __audioDegradeAny.diag === 'function')
-    ? __audioDegradeAny.diag.bind(__audioDegradeAny)
-    : null;
-  const __audioAllowedStages = {
-    preflight: true,
-    apply: true,
-    rollback: true,
-    contract: true,
-    hook: true,
-    runtime: true,
-    guard: true
-  };
+
+  const __MODULE = 'audiocontext';
+  const __SURFACE = 'audio';
+
+  const __D = window.__DEGRADE__;
+  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+  function __emit(level, code, ctx, err) {
+    try {
+      if (__diag) return __diag(level, code, ctx, err);
+      if (typeof __D === 'function') {
+        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
+        const safeLevel = (level === undefined || level === null) ? 'info' : level;
+        const safeErr = (err === undefined || err === null) ? null : err;
+        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
+      }
+    } catch (emitErr) {
+      return undefined;
+    }
+  }
+
+  function __moduleDiag(level, code, extra, err) {
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const ctx = {
+      module: __MODULE,
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+      surface: __SURFACE,
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: x.stage, // no local normalization/re-classification
+      message: x.message,
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: x.type // no local normalization/re-classification
+    };
+    return __emit(level, code, ctx, err);
+  }
 
   function emitDegrade(level, code, err, extra) {
-    const d = __audioDegrade;
-
-    const e = (err instanceof Error)
-      ? err
-      : (err == null ? null : new Error(String(err)));
-
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const normalizedLevel = (level === 'info' || level === 'warn' || level === 'error' || level === 'fatal')
-      ? level
-      : 'info';
-    const normalizedCode = code || 'audiocontext';
-    const rawStage = (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
-    const normalizedStage = __audioAllowedStages[rawStage] ? rawStage : 'runtime';
-    const data = (x.data && typeof x.data === 'object' && !Array.isArray(x.data))
-      ? Object.assign({}, x.data)
-      : (x.data == null ? {} : { detail: x.data });
-    if (!data.outcome) {
-      if (normalizedStage === 'rollback') data.outcome = 'rollback';
-      else if (normalizedLevel === 'error' || normalizedLevel === 'fatal') data.outcome = 'throw';
-      else if (normalizedLevel === 'info') data.outcome = 'return';
-      else data.outcome = 'skip';
-    }
-    if (!__audioAllowedStages[rawStage]) data.substage = rawStage;
-
-    const ctx = {
-      module: 'audiocontext',
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'audiocontext',
-      surface: 'audio',
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: normalizedStage,
-      message: (typeof x.message === 'string' && x.message) ? x.message : normalizedCode,
-      data,
-      type: (typeof x.type === 'string' && x.type) ? x.type : __audioTypePipeline
-    };
-
-    if (__audioDegradeDiag) {
-      try {
-        __audioDegradeDiag(normalizedLevel, normalizedCode, ctx, e || null);
-      } catch (diagErr) {
-        try {
-          d('audiocontext:degrade_diag_failed', (diagErr instanceof Error) ? diagErr : new Error(String(diagErr)), {
-            level: 'error',
-            module: ctx.module,
-            diagTag: ctx.diagTag,
-            surface: ctx.surface,
-            key: ctx.key,
-            stage: 'runtime',
-            message: '__DEGRADE__.diag failed',
-            data: { originalCode: normalizedCode, outcome: 'skip', substage: 'diag' },
-            type: __audioTypePipeline
-          });
-        } catch (_) {
-          return;
-        }
-      }
-      return;
-    }
-
-    if (typeof d !== 'function') return;
-
-    try {
-      d(normalizedCode, e || null, {
-        level: normalizedLevel,
-        module: ctx.module,
-        diagTag: ctx.diagTag,
-        surface: ctx.surface,
-        key: ctx.key,
-        stage: ctx.stage,
-        message: ctx.message,
-        data: ctx.data,
-        type: ctx.type
-      });
-    } catch (_) {
-      return;
-    }
+    return __moduleDiag(level, code, extra, err);
   }
 
   function degrade(code, err, extra) {
@@ -100,16 +46,6 @@ const AudioContextModule = function AudioContextModule(window) {
       ? x.level
       : 'warn';
     emitDegrade(lvl, code, err, x);
-  }
-
-  if (globalThis.__AUDIO_CTX_PATCH_APPLIED__) {
-    degrade('audiocontext:already_patched', null, {
-      stage: 'guard',
-      level: 'info',
-      type: __audioTypePipeline,
-      data: { outcome: 'skip', reason: 'already_patched' }
-    });
-    return;
   }
 
   const C = window.CanvasPatchContext;
@@ -178,6 +114,7 @@ const AudioContextModule = function AudioContextModule(window) {
   const safeDefine = (typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
   const __wrapNativeApply = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
   const __wrapNativeAccessor = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
+  const __core = window.Core;
   const __corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
     ? window.Core.preflightTarget
     : null;
@@ -226,7 +163,42 @@ const AudioContextModule = function AudioContextModule(window) {
   }
   const AUDIO_NOISE_ENABLED = true;
 
-  globalThis.__AUDIO_CTX_PATCH_APPLIED__ = true;
+  // ===== MODULE: canonical guard client (GuardFlag.md) =====
+  const __flagKey = '__PATCH_AUDIOCONTEXT__';
+  const __tag = 'audiocontext';
+  const __surface = 'audio';
+  let __guardToken = null;
+  try {
+    if (!__core || typeof __core.guardFlag !== 'function') {
+      window.__DEGRADE__?.diag?.('warn', __tag + ':guard_missing', {
+        module: __tag,
+        diagTag: __tag,
+        surface: __surface,
+        key: __flagKey,
+        stage: 'guard',
+        message: 'Core.guardFlag missing',
+        type: __audioTypePipeline,
+        data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+      }, null);
+      return;
+    }
+    __guardToken = __core.guardFlag(__flagKey, __tag);
+  } catch (e) {
+    window.__DEGRADE__?.diag?.('warn', __tag + ':guard_failed', {
+      module: __tag,
+      diagTag: __tag,
+      surface: __surface,
+      key: __flagKey,
+      stage: 'guard',
+      message: 'guardFlag threw',
+      type: __audioTypePipeline,
+      data: { outcome: 'skip', reason: 'guard_failed' }
+    }, e);
+    return;
+  }
+  if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
+
+  try {
 
   const GUARD = globalThis.__AUDIO_CTX_GUARD__ || (globalThis.__AUDIO_CTX_GUARD__ = {
     counts: {},
@@ -260,7 +232,7 @@ const AudioContextModule = function AudioContextModule(window) {
         key,
         kind,
         resolve: 'proto_chain',
-        policy: 'throw',
+        policy: 'skip',
         diagTag: tag
       });
     } catch (e) {
@@ -472,7 +444,7 @@ const AudioContextModule = function AudioContextModule(window) {
         kind: 'accessor',
         wrapLayer: 'core_wrapper',
         resolve: 'proto_chain',
-        policy: 'throw',
+        policy: 'skip',
         diagTag: `audio:${CTX_NAME}:sampleRate`,
         allowCreate: true,
         configurable: sampleRateDesc ? !!sampleRateDesc.configurable : true,
@@ -494,7 +466,7 @@ const AudioContextModule = function AudioContextModule(window) {
           kind: 'accessor',
           wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
-          policy: 'throw',
+          policy: 'skip',
           diagTag: `audio:${CTX_NAME}:baseLatency`,
           allowCreate: true,
           configurable: baseLatencyDesc ? !!baseLatencyDesc.configurable : true,
@@ -518,7 +490,7 @@ const AudioContextModule = function AudioContextModule(window) {
         kind: 'method',
         wrapLayer: 'core_wrapper',
         resolve: 'proto_chain',
-        policy: 'throw',
+        policy: 'skip',
         diagTag: `audio:${CTX_NAME}:createBuffer`,
         allowCreate: true,
         invalidThis: 'throw',
@@ -538,7 +510,7 @@ const AudioContextModule = function AudioContextModule(window) {
       kind: 'method',
       wrapLayer: 'core_wrapper',
       resolve: 'proto_chain',
-      policy: 'throw',
+      policy: 'skip',
       diagTag: `audio:${CTX_NAME}:createAnalyser`,
       allowCreate: true,
       invalidThis: 'throw',
@@ -758,6 +730,36 @@ const AudioContextModule = function AudioContextModule(window) {
 
 
     applyCoreTargetsGroup(`audiocontext:${CTX_NAME}:proto`, targets, 'skip');
+  }
+  } catch (e) {
+    const rollbackErr = e;
+    window.__DEGRADE__?.diag?.('error', __tag + ':fatal', {
+      module: __tag,
+      diagTag: __tag,
+      surface: __surface,
+      key: null,
+      stage: 'apply',
+      message: 'fatal module error',
+      type: __audioTypeBrowser,
+      data: { outcome: 'throw', reason: 'fatal', rollbackOk: false }
+    }, rollbackErr);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, false, __tag);
+      }
+    } catch (eRelease) {
+      window.__DEGRADE__?.diag?.('warn', __tag + ':guard_release_failed', {
+        module: __tag,
+        diagTag: __tag,
+        surface: __surface,
+        key: __flagKey,
+        stage: 'rollback',
+        message: 'releaseGuardFlag threw after apply failure',
+        type: __audioTypePipeline,
+        data: { outcome: 'skip', reason: 'guard_release_failed' }
+      }, eRelease);
+    }
+    throw rollbackErr;
   }
 
   // Snapshot variant: do not touch OfflineAudioContext.startRendering.
