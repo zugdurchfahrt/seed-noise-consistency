@@ -95,9 +95,59 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
+  let iframeOracleToString = null;
+  if (!sharedCoreToStringStateOk) {
+    let oracleFrame = null;
+    try {
+      const doc = window && window.document;
+      const root = doc && (doc.documentElement || doc.head || doc.body);
+      if (doc && root && typeof doc.createElement === 'function' && typeof root.appendChild === 'function') {
+        oracleFrame = doc.createElement('iframe');
+        oracleFrame.setAttribute('aria-hidden', 'true');
+        oracleFrame.style.display = 'none';
+        root.appendChild(oracleFrame);
+        const oracleWin = oracleFrame.contentWindow;
+        const candidate = oracleWin && oracleWin.Function
+          && oracleWin.Function.prototype
+          && oracleWin.Function.prototype.toString;
+        if (typeof candidate === 'function') {
+          iframeOracleToString = candidate;
+        }
+      }
+    } catch (e) {
+      __emit('warn', 'core_window:toString_oracle_acquire_failed', {
+        module: 'core',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: 'Function.prototype.toString',
+        stage: 'preflight',
+        message: 'iframe oracle acquisition failed; nativeToString stays local',
+        type: 'browser structure missing data',
+        data: { outcome: 'return', fallback: 'local', stx: (e && e.stack) ? String(e.stack) : null }
+      }, e);
+    } finally {
+      if (oracleFrame) {
+        try {
+          oracleFrame.remove();
+        } catch (removeErr) {
+          __emit('warn', 'core_window:toString_oracle_cleanup_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: 'Function.prototype.toString',
+            stage: 'rollback',
+            message: 'iframe oracle cleanup failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'return', stx: (removeErr && removeErr.stack) ? String(removeErr.stack) : null }
+          }, removeErr);
+        }
+      }
+    }
+  }
+
   const nativeToString = sharedCoreToStringStateOk
     ? sharedCoreToStringState.nativeToString
-    : (existingToString || Function.prototype.toString);
+    : (iframeOracleToString || existingToString || Function.prototype.toString);
   if (typeof nativeToString !== 'function') {
     throw new Error('[CoreWindow] Function.prototype.toString missing');
   }
@@ -385,7 +435,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const currentToString = toStringDesc && toStringDesc.value;
 
     let skipToStringInstall = false;
-    if (existingCoreToStringStateOk) {
+    if (sharedCoreToStringStateOk) {
       const markAsNative = ensureMarkAsNative();
       const probe = function probe(){};
       markAsNative(probe);
@@ -409,6 +459,43 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
       // Already installed and consistent: do not re-install another Proxy layer.
       skipToStringInstall = true;
+    } else if (typeof iframeOracleToString === 'function' && typeof currentToString === 'function') {
+      let oracleNativeSelf = null;
+      let oracleCurrentSelf = null;
+      try {
+        oracleNativeSelf = Reflect.apply(iframeOracleToString, nativeToString, []);
+        oracleCurrentSelf = Reflect.apply(iframeOracleToString, currentToString, []);
+      } catch (e) {
+        __emit('error', 'core_window:toString_oracle_probe_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'preflight',
+          message: 'iframe oracle probe failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', stx: (e && e.stack) ? String(e.stack) : null }
+        }, e);
+        throw e;
+      }
+      if (oracleCurrentSelf !== oracleNativeSelf) {
+        const e = new Error('[CoreWindow] Function.prototype.toString already wrapped without CORE state');
+        __emit('error', 'core_window:toString_rewrap_blocked', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'preflight',
+          message: 'repeat toString install blocked: current Function.prototype.toString differs from oracle',
+          type: 'contract violation',
+          data: {
+            outcome: 'throw',
+            oracleCurrentSelf: String(oracleCurrentSelf),
+            oracleNativeSelf: String(oracleNativeSelf)
+          }
+        }, e);
+        throw e;
+      }
     }
 
     if (skipToStringInstall) {
