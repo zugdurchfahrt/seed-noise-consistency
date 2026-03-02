@@ -28,6 +28,7 @@ WORKER_SEED_INJECT_ENABLED = False
 WORKER_GLOBAL_SEED = None
 _RUNNING_WORKER_SEED = False
 _RUNNING = False
+_SW_DIAG_BINDING = "__SW_REPORT_DIAG__"
 
 
 def _is_ws_disconnect_error(err) -> bool:
@@ -105,6 +106,29 @@ def log_cdp_runtime_diag(tag: str):
         ",".join(pid_parts) if pid_parts else "none",
         len(clients_by_pid),
     )
+
+
+def _log_sw_relay_diag(session_id: str, target_id: str, payload):
+    record = payload if isinstance(payload, dict) else {}
+    level = str(record.get("level") or "info").lower()
+    code = str(record.get("code") or "sw_relay:unknown")
+    ctx = record.get("ctx") if isinstance(record.get("ctx"), dict) else {}
+    err = record.get("error") if isinstance(record.get("error"), dict) else None
+    row = {
+        "sessionId": session_id,
+        "targetId": target_id,
+        "level": level,
+        "code": code,
+        "ctx": ctx,
+        "error": err,
+    }
+    line = json.dumps(row, ensure_ascii=False, sort_keys=True)
+    if level in ("error", "fatal"):
+        logger.error("SW relay diag: %s", line)
+    elif level == "warn":
+        logger.warning("SW relay diag: %s", line)
+    else:
+        logger.info("SW relay diag: %s", line)
 
 
 
@@ -348,6 +372,7 @@ def run():
 
     pending = {}
     pending_sess = {}  # (sessionId, innerId) -> str tag
+    session_targets = {}
 
     fatal = {"err": None, "disconnect": False}
 
@@ -482,6 +507,33 @@ def run():
                         _fatal(ws, "sw sanity: parse/compare failed", e)
             return
 
+        if msg.get("method") == "Runtime.bindingCalled":
+            params = msg.get("params") or {}
+            sid = msg.get("sessionId")
+            if params.get("name") != _SW_DIAG_BINDING or not sid:
+                return
+            target_info = session_targets.get(sid) or {}
+            try:
+                payload = json.loads(params.get("payload") or "{}")
+            except Exception as e:
+                logger.warning(
+                    "SW relay diag: payload parse failed sessionId=%s targetId=%s err=%r raw=%r",
+                    sid,
+                    target_info.get("targetId"),
+                    e,
+                    params.get("payload"),
+                )
+                return
+            _log_sw_relay_diag(sid, target_info.get("targetId"), payload)
+            return
+
+        if msg.get("method") == "Target.detachedFromTarget":
+            params = msg.get("params") or {}
+            sid = params.get("sessionId") or msg.get("sessionId")
+            if sid:
+                session_targets.pop(sid, None)
+            return
+
         if msg.get("method") != "Target.attachedToTarget":
             return
 
@@ -510,12 +562,16 @@ def run():
             return
 
         injected.add(tid)
+        session_targets[sessionId] = {"targetId": tid, "url": turl}
         logger.info("SW inject: attached service_worker targetId=%s sessionId=%s url=%r", tid, sessionId, turl)
 
         if do_prelude:
             try:
                 logger.info("SW inject: injecting prelude+sanity targetId=%s sessionId=%s", tid, sessionId)
                 send_sess(ws, sessionId, "Runtime.enable")
+                send_sess(ws, sessionId, "Runtime.addBinding", {
+                    "name": _SW_DIAG_BINDING
+                })
                 send_sess(ws, sessionId, "Runtime.evaluate", {
                     "expression": sw_prelude,
                     "awaitPromise": True

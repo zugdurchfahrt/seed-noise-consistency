@@ -48,6 +48,44 @@ const WrkModule = function WrkModule(window) {
     }
   }
 
+  function relayWorkerDiagEnvelope(G, scope, payload) {
+    const d = G && G.__DEGRADE__;
+    if (typeof d !== 'function' || !payload || typeof payload !== 'object') return false;
+    const rawCtx = (payload.ctx && typeof payload.ctx === 'object') ? payload.ctx : {};
+    const rawData = Object.prototype.hasOwnProperty.call(rawCtx, 'data') ? rawCtx.data : null;
+    let nextData = rawData;
+    if (rawData && typeof rawData === 'object') {
+      nextData = Object.assign({}, rawData, { scope: scope || null });
+    } else if (scope) {
+      nextData = { scope: scope || null };
+    }
+    const ctx = {
+      module: (typeof rawCtx.module === 'string' && rawCtx.module) ? rawCtx.module : 'wrk',
+      diagTag: (typeof rawCtx.diagTag === 'string' && rawCtx.diagTag) ? rawCtx.diagTag : 'wrk',
+      surface: (typeof rawCtx.surface === 'string' && rawCtx.surface) ? rawCtx.surface : 'worker',
+      key: (typeof rawCtx.key === 'string' || rawCtx.key === null) ? rawCtx.key : null,
+      stage: (typeof rawCtx.stage === 'string' && rawCtx.stage) ? rawCtx.stage : 'runtime',
+      message: (typeof rawCtx.message === 'string' && rawCtx.message) ? rawCtx.message : String(payload.code || 'wrk:worker_diag'),
+      data: nextData,
+      type: (typeof rawCtx.type === 'string' && rawCtx.type) ? rawCtx.type : 'pipeline missing data'
+    };
+    const errObj = (payload.error && typeof payload.error === 'object') ? payload.error : null;
+    let err = null;
+    if (errObj) {
+      err = new Error(String(errObj.message || payload.code || 'worker relay error'));
+      if (typeof errObj.name === 'string' && errObj.name) err.name = errObj.name;
+      if (typeof errObj.stack === 'string' && errObj.stack) err.stack = errObj.stack;
+    }
+    if (typeof d.diag === 'function') {
+      d.diag((typeof payload.level === 'string' && payload.level) ? payload.level : 'info', String(payload.code || 'wrk:worker_diag'), ctx, err);
+      return true;
+    }
+    d(String(payload.code || 'wrk:worker_diag'), err, Object.assign({}, ctx, {
+      level: (typeof payload.level === 'string' && payload.level) ? payload.level : 'info'
+    }));
+    return true;
+  }
+
   const __core = window && window.Core;
   let __guardToken = null;
   try {
@@ -482,33 +520,87 @@ function mkModuleWorkerSource(snapshot, absUrl){
       'use strict';
       self.__GW_BOOTSTRAP__ = true;
       var __ENV_EMIT_Q__ = [];
+      var __ENV_DIAG_RELAY_ACTIVE__ = false;
+      var __serializeDiagErr = function(err){
+        if (!err) return null;
+        var out = {};
+        try { if (typeof err.name === 'string' && err.name) out.name = err.name; } catch(_e) {}
+        try { if (typeof err.message === 'string' && err.message) out.message = err.message; } catch(_e) {}
+        try { if (typeof err.stack === 'string' && err.stack) out.stack = err.stack; } catch(_e) {}
+        if (!Object.keys(out).length) {
+          try { out.message = String(err); } catch(_e) { out.message = 'worker bootstrap relay error'; }
+        }
+        return out;
+      };
+      var __sendRelayMsg = function(msg){
+        var sent = false;
+        try { if (typeof self.postMessage === 'function') { self.postMessage(msg); sent = true; } } catch(_e) {}
+        try {
+          if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
+            for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
+              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) {}
+            }
+          }
+        } catch(_e) {}
+        if (!sent) {
+          try { __ENV_EMIT_Q__.push(msg); } catch(_e) {}
+        }
+      };
+      var __relayDiag = function(level, code, ctx, err){
+        if (__ENV_DIAG_RELAY_ACTIVE__) return;
+        __ENV_DIAG_RELAY_ACTIVE__ = true;
+        try {
+          var x = (ctx && typeof ctx === 'object') ? ctx : {};
+          __sendRelayMsg({
+            __ENV_DIAG__: {
+              level: (typeof level === 'string' && level) ? level : 'info',
+              code: String(code || 'worker_bootstrap:diag'),
+              ctx: {
+                module: (typeof x.module === 'string' && x.module) ? x.module : 'wrk',
+                diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'wrk',
+                surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'worker_bootstrap',
+                key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+                stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+                message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'worker bootstrap diag'),
+                data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+                type: (typeof x.type === 'string' && x.type) ? x.type : 'pipeline missing data'
+              },
+              error: __serializeDiagErr(err)
+            }
+          });
+        } finally {
+          __ENV_DIAG_RELAY_ACTIVE__ = false;
+        }
+      };
       var __emitDiag = function(code, err, extra){
+        var e = (err && typeof err === 'object') ? err : new Error(String(err || code));
+        var ctx = {
+          type: 'pipeline missing data',
+          stage: 'apply',
+          module: 'wrk',
+          diagTag: 'wrk',
+          surface: 'worker_bootstrap',
+          key: '__ENV_BOOTSTRAP_ERROR__',
+          message: 'worker bootstrap emit failed',
+          data: { outcome: 'throw', reason: 'worker_bootstrap_emit_failed' },
+          policy: 'throw',
+          action: 'throw'
+        };
         try {
           var d = self && self.__DEGRADE__;
-          if (typeof d !== 'function') return;
-          var e = (err && typeof err === 'object') ? err : new Error(String(err || code));
-          var ctx = {
-            type: 'pipeline missing data',
-            stage: 'apply',
-            module: 'wrk',
-            diagTag: 'wrk',
-            surface: 'worker_bootstrap',
-            key: '__ENV_BOOTSTRAP_ERROR__',
-            message: 'worker bootstrap emit failed',
-            data: { outcome: 'throw', reason: 'worker_bootstrap_emit_failed' },
-            policy: 'throw',
-            action: 'throw'
-          };
           if (extra && typeof extra === 'object') {
             for (var k in extra) {
               if (Object.prototype.hasOwnProperty.call(extra, k)) ctx[k] = extra[k];
             }
           }
-          if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
-          else d(code, e, ctx);
+          if (typeof d === 'function') {
+            if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
+            else d(code, e, ctx);
+          }
         } catch(__diagErr) {
           try { self.__ENV_DIAG_ERROR__ = String((__diagErr && (__diagErr.stack || __diagErr.message)) || __diagErr); } catch(__diagStoreErr) { self.__ENV_DIAG_STORE_ERROR__ = String((__diagStoreErr && (__diagStoreErr.stack || __diagStoreErr.message)) || __diagStoreErr); }
         }
+        __relayDiag('error', code, ctx, e);
       };
       var __emit = function(msg){
         var sent = false;
@@ -526,6 +618,14 @@ function mkModuleWorkerSource(snapshot, absUrl){
           try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue' }); }
         }
       };
+      try {
+        Object.defineProperty(self, '__ENV_RELAY_DIAG__', {
+          value: function(level, code, ctx, err){ __relayDiag(level, code, ctx, err); },
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
       try {
         if (!self.__ENV_SHARED_PORTS__) self.__ENV_SHARED_PORTS__ = [];
         // SharedWorker needs port-based signalling; do not rely on onconnect (user code can overwrite it).
@@ -660,33 +760,87 @@ function mkClassicWorkerSource(snapshot, absUrl){
       'use strict';
       self.__GW_BOOTSTRAP__ = true;
       var __ENV_EMIT_Q__ = [];
+      var __ENV_DIAG_RELAY_ACTIVE__ = false;
+      var __serializeDiagErr = function(err){
+        if (!err) return null;
+        var out = {};
+        try { if (typeof err.name === 'string' && err.name) out.name = err.name; } catch(_e) {}
+        try { if (typeof err.message === 'string' && err.message) out.message = err.message; } catch(_e) {}
+        try { if (typeof err.stack === 'string' && err.stack) out.stack = err.stack; } catch(_e) {}
+        if (!Object.keys(out).length) {
+          try { out.message = String(err); } catch(_e) { out.message = 'worker bootstrap relay error'; }
+        }
+        return out;
+      };
+      var __sendRelayMsg = function(msg){
+        var sent = false;
+        try { if (typeof self.postMessage === 'function') { self.postMessage(msg); sent = true; } } catch(_e) {}
+        try {
+          if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
+            for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
+              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) {}
+            }
+          }
+        } catch(_e) {}
+        if (!sent) {
+          try { __ENV_EMIT_Q__.push(msg); } catch(_e) {}
+        }
+      };
+      var __relayDiag = function(level, code, ctx, err){
+        if (__ENV_DIAG_RELAY_ACTIVE__) return;
+        __ENV_DIAG_RELAY_ACTIVE__ = true;
+        try {
+          var x = (ctx && typeof ctx === 'object') ? ctx : {};
+          __sendRelayMsg({
+            __ENV_DIAG__: {
+              level: (typeof level === 'string' && level) ? level : 'info',
+              code: String(code || 'worker_bootstrap:diag'),
+              ctx: {
+                module: (typeof x.module === 'string' && x.module) ? x.module : 'wrk',
+                diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'wrk',
+                surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'worker_bootstrap',
+                key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+                stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+                message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'worker bootstrap diag'),
+                data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+                type: (typeof x.type === 'string' && x.type) ? x.type : 'pipeline missing data'
+              },
+              error: __serializeDiagErr(err)
+            }
+          });
+        } finally {
+          __ENV_DIAG_RELAY_ACTIVE__ = false;
+        }
+      };
       var __emitDiag = function(code, err, extra){
+        var e = (err && typeof err === 'object') ? err : new Error(String(err || code));
+        var ctx = {
+          type: 'pipeline missing data',
+          stage: 'apply',
+          module: 'wrk',
+          diagTag: 'wrk',
+          surface: 'worker_bootstrap',
+          key: '__ENV_BOOTSTRAP_ERROR__',
+          message: 'worker bootstrap emit failed',
+          data: { outcome: 'throw', reason: 'worker_bootstrap_emit_failed' },
+          policy: 'throw',
+          action: 'throw'
+        };
         try {
           var d = self && self.__DEGRADE__;
-          if (typeof d !== 'function') return;
-          var e = (err && typeof err === 'object') ? err : new Error(String(err || code));
-          var ctx = {
-            type: 'pipeline missing data',
-            stage: 'apply',
-            module: 'wrk',
-            diagTag: 'wrk',
-            surface: 'worker_bootstrap',
-            key: '__ENV_BOOTSTRAP_ERROR__',
-            message: 'worker bootstrap emit failed',
-            data: { outcome: 'throw', reason: 'worker_bootstrap_emit_failed' },
-            policy: 'throw',
-            action: 'throw'
-          };
           if (extra && typeof extra === 'object') {
             for (var k in extra) {
               if (Object.prototype.hasOwnProperty.call(extra, k)) ctx[k] = extra[k];
             }
           }
-          if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
-          else d(code, e, ctx);
+          if (typeof d === 'function') {
+            if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
+            else d(code, e, ctx);
+          }
         } catch(__diagErr) {
           try { self.__ENV_DIAG_ERROR__ = String((__diagErr && (__diagErr.stack || __diagErr.message)) || __diagErr); } catch(__diagStoreErr) { self.__ENV_DIAG_STORE_ERROR__ = String((__diagStoreErr && (__diagStoreErr.stack || __diagStoreErr.message)) || __diagStoreErr); }
         }
+        __relayDiag('error', code, ctx, e);
       };
       var __emit = function(msg){
         var sent = false;
@@ -704,6 +858,14 @@ function mkClassicWorkerSource(snapshot, absUrl){
           try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue' }); }
         }
       };
+      try {
+        Object.defineProperty(self, '__ENV_RELAY_DIAG__', {
+          value: function(level, code, ctx, err){ __relayDiag(level, code, ctx, err); },
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
       try {
         if (!self.__ENV_SHARED_PORTS__) self.__ENV_SHARED_PORTS__ = [];
         // SharedWorker needs port-based signalling; do not rely on onconnect (user code can overwrite it).
@@ -1013,6 +1175,21 @@ function emitWorkerBootstrapDegrade(G, scope, bootErr) {
   d('wrk:worker_bootstrap:apply:error', err, ctx);
 }
 
+function relayWorkerScopeDiag(G, scope, payload) {
+  try {
+    return relayWorkerDiagEnvelope(G, scope, payload);
+  } catch (e) {
+    __wrkDiag('warn', 'wrk:worker_diag_relay_failed', {
+      stage: 'runtime',
+      key: '__ENV_DIAG__',
+      message: 'worker diag relay failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'worker_diag_relay_failed', scope: scope || null }
+    }, e);
+    return false;
+  }
+}
+
 
 function SafeWorkerOverride(G){
   if (!G || !G.Worker) throw new Error('[WorkerOverride] Worker missing');
@@ -1091,6 +1268,18 @@ function SafeWorkerOverride(G){
 
     const onMsg = (ev) => {
       const data = ev && ev.data;
+      const relayDiag = data && typeof data === 'object' ? data.__ENV_DIAG__ : null;
+      if (relayDiag && typeof relayDiag === 'object') {
+        relayWorkerScopeDiag(G, 'Worker', relayDiag);
+        __wrkBestEffort('wrk:worker_diag_stop_propagation_failed', {
+          stage: 'runtime',
+          key: 'message',
+          message: 'worker diag stop propagation failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'worker_diag_stop_propagation_failed' }
+        }, () => { ev.stopImmediatePropagation(); ev.stopPropagation(); });
+        return;
+      }
 
       const bootErr = data && typeof data === 'object' && data.__ENV_BOOTSTRAP_ERROR__;
       if (bootErr) {
@@ -1255,6 +1444,11 @@ function SafeSharedWorkerOverride(G){
           const data = ev && ev.data;
           if (!data || typeof data !== 'object') return;
           let internal = false;
+          const relayDiag = data.__ENV_DIAG__;
+          if (relayDiag && typeof relayDiag === 'object') {
+            internal = true;
+            relayWorkerScopeDiag(G, 'SharedWorker', relayDiag);
+          }
           const bootErr = data.__ENV_BOOTSTRAP_ERROR__;
           if (bootErr) {
             internal = true;

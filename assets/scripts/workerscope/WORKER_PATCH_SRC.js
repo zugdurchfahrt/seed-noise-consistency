@@ -31,6 +31,7 @@
     const cache = { snap:null };
     const emitDegrade = (level, code, ctx, err) => {
       const d = (typeof __DEGRADE__ === "function") ? __DEGRADE__ : null;
+      const relay = (typeof self.__ENV_RELAY_DIAG__ === 'function') ? self.__ENV_RELAY_DIAG__ : null;
       const x = (ctx && typeof ctx === 'object') ? ctx : {};
       const normalizedCtx = {
         module: 'WORKER_PATCH_SRC',
@@ -48,12 +49,16 @@
             },
         type: x.type
       };
-      if (!d) return;
-      if (typeof d.diag === "function") {
-        d.diag(level, code, normalizedCtx, err || null);
-        return;
+      if (d) {
+        if (typeof d.diag === "function") {
+          d.diag(level, code, normalizedCtx, err || null);
+        } else {
+          d(code, err || null, Object.assign({}, normalizedCtx, { level: level || 'info' }));
+        }
       }
-      d(code, err || null, Object.assign({}, normalizedCtx, { level: level || 'info' }));
+      if (relay) {
+        relay(level, code, normalizedCtx, err || null);
+      }
     };
     const appliedDescriptors = [];
     const trackedDefineProperty = (obj, key, desc) => {

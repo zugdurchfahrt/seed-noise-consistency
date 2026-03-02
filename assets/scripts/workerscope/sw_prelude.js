@@ -8,17 +8,64 @@
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __applied = [];
 
+  function __serializeRelayErr(err) {
+    if (!err) return null;
+    const out = {};
+    try { if (typeof err.name === 'string' && err.name) out.name = err.name; } catch (e) {}
+    try { if (typeof err.message === 'string' && err.message) out.message = err.message; } catch (e) {}
+    try { if (typeof err.stack === 'string' && err.stack) out.stack = err.stack; } catch (e) {}
+    if (!Object.keys(out).length) {
+      try { out.message = String(err); } catch (e) { out.message = 'service worker relay error'; }
+    }
+    return out;
+  }
+
+  function __relaySWDiag(level, code, ctx, err) {
+    try {
+      const reporter = G && G.__SW_REPORT_DIAG__;
+      if (typeof reporter !== 'function') return;
+      const x = (ctx && typeof ctx === 'object') ? ctx : {};
+      reporter(JSON.stringify({
+        level: (typeof level === 'string' && level) ? level : 'info',
+        code: String(code || 'sw_prelude:diag'),
+        ctx: {
+          module: (typeof x.module === 'string' && x.module) ? x.module : __MODULE,
+          diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+          surface: (typeof x.surface === 'string' && x.surface) ? x.surface : __SURFACE,
+          key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+          stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+          message: (typeof x.message === 'string' && x.message) ? x.message : String(code || __MODULE),
+          data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+          type: (typeof x.type === 'string' && x.type) ? x.type : 'pipeline missing data'
+        },
+        error: __serializeRelayErr(err)
+      }));
+    } catch (relayErr) {
+      try {
+        G.__SW_REPORT_DIAG_ERROR__ = String((relayErr && (relayErr.stack || relayErr.message)) || relayErr);
+      } catch (storeErr) {
+        G.__SW_REPORT_DIAG_STORE_ERROR__ = String((storeErr && (storeErr.stack || storeErr.message)) || storeErr);
+      }
+    }
+  }
+
   function __emit(level, code, ctx, err) {
     try {
-      if (__diag) return __diag(level, code, ctx, err);
-      if (typeof __D === 'function') {
+      if (__diag) {
+        __diag(level, code, ctx, err);
+      } else if (typeof __D === 'function') {
         const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
         const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, safeCtx, { level: level || 'info' }));
+        __D(code, safeErr, Object.assign({}, safeCtx, { level: level || 'info' }));
       }
     } catch (emitErr) {
-      return undefined;
+      try {
+        G.__SW_EMIT_ERROR__ = String((emitErr && (emitErr.stack || emitErr.message)) || emitErr);
+      } catch (storeErr) {
+        G.__SW_EMIT_STORE_ERROR__ = String((storeErr && (storeErr.stack || storeErr.message)) || storeErr);
+      }
     }
+    __relaySWDiag(level, code, ctx, err);
     return undefined;
   }
 
