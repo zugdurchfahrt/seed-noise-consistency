@@ -415,7 +415,28 @@ const SEED_NATIVIZATION_SRC = `
         const toString = new Proxy(nativeToString, {
           apply(target, thisArg, argList) {
             if (typeof thisArg !== 'function') {
-              return Reflect.apply(target, thisArg, argList);
+              try {
+                return Reflect.apply(target, thisArg, argList);
+              } catch (e) {
+                try {
+                  var d = self && self.__DEGRADE__;
+                  if (typeof d === 'function') {
+                    var ctx = {
+                      type: 'browser structure missing data',
+                      stage: 'runtime',
+                      module: 'wrk',
+                      diagTag: 'wrk',
+                      surface: 'worker_bootstrap',
+                      key: 'Function.prototype.toString',
+                      message: 'Function.prototype.toString illegal invocation',
+                      data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+                    };
+                    if (typeof d.diag === 'function') d.diag('warn', 'wrk:toString_illegal_invocation', ctx, e);
+                    else d('wrk:toString_illegal_invocation', e, Object.assign({}, ctx, { level: 'warn' }));
+                  }
+                } catch (_e) {}
+                throw e;
+              }
             }
             const v = toStringOverrideMap.get(thisArg);
             if (v !== undefined) return v;

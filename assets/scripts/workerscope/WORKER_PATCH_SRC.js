@@ -359,10 +359,37 @@
     const origBrandsGet = dBrands && dBrands.get;
     const origMobileGet = dMobile && dMobile.get;
     const origPlatformGet = dPlatform && dPlatform.get;
+    const origBrandsDataValue = (dBrands
+      && Object.prototype.hasOwnProperty.call(dBrands, 'value')
+      && !dBrands.get
+      && !dBrands.set) ? dBrands.value : undefined;
+    const origMobileDataValue = (dMobile
+      && Object.prototype.hasOwnProperty.call(dMobile, 'value')
+      && !dMobile.get
+      && !dMobile.set) ? dMobile.value : undefined;
+    const origPlatformDataValue = (dPlatform
+      && Object.prototype.hasOwnProperty.call(dPlatform, 'value')
+      && !dPlatform.get
+      && !dPlatform.set) ? dPlatform.value : undefined;
     trackedDefineProperties(uadProto, {
       brands:   { get: markAsNative(function getBrands(){
                         if (!isUadThis(this)) {
-                          if (typeof origBrandsGet === 'function') return origBrandsGet.call(this);
+                          if (typeof origBrandsGet === 'function') {
+                            try {
+                              return origBrandsGet.call(this);
+                            } catch (e) {
+                              emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+                                stage: 'runtime',
+                                surface: 'WorkerNavigatorUAData',
+                                key: 'brands',
+                                message: 'brands illegal invocation',
+                                type: 'browser structure missing data',
+                                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+                              }, e);
+                              throw e;
+                            }
+                          }
+                          if (origBrandsDataValue !== undefined) return origBrandsDataValue;
                           throw new TypeError('Illegal invocation');
                         }
                         try {
@@ -385,7 +412,22 @@
                       }, 'get brands'), enumerable: !!dBrands.enumerable, configurable: !!dBrands.configurable, set: dBrands.set },
       mobile:   { get: markAsNative(function getMobile(){
                         if (!isUadThis(this)) {
-                          if (typeof origMobileGet === 'function') return origMobileGet.call(this);
+                          if (typeof origMobileGet === 'function') {
+                            try {
+                              return origMobileGet.call(this);
+                            } catch (e) {
+                              emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+                                stage: 'runtime',
+                                surface: 'WorkerNavigatorUAData',
+                                key: 'mobile',
+                                message: 'mobile illegal invocation',
+                                type: 'browser structure missing data',
+                                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+                              }, e);
+                              throw e;
+                            }
+                          }
+                          if (origMobileDataValue !== undefined) return origMobileDataValue;
                           throw new TypeError('Illegal invocation');
                         }
                         try {
@@ -409,7 +451,22 @@
                       }, 'get mobile'),       enumerable: !!dMobile.enumerable, configurable: !!dMobile.configurable, set: dMobile.set },
       platform: { get: markAsNative(function getPlatform(){
                         if (!isUadThis(this)) {
-                          if (typeof origPlatformGet === 'function') return origPlatformGet.call(this);
+                          if (typeof origPlatformGet === 'function') {
+                            try {
+                              return origPlatformGet.call(this);
+                            } catch (e) {
+                              emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+                                stage: 'runtime',
+                                surface: 'WorkerNavigatorUAData',
+                                key: 'platform',
+                                message: 'platform illegal invocation',
+                                type: 'browser structure missing data',
+                                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+                              }, e);
+                              throw e;
+                            }
+                          }
+                          if (origPlatformDataValue !== undefined) return origPlatformDataValue;
                           throw new TypeError('Illegal invocation');
                         }
                         try {
@@ -436,9 +493,28 @@
     });
     const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList');
     const origFullGet = dFull && dFull.get;
+    const origFullDataValue = (dFull
+      && Object.prototype.hasOwnProperty.call(dFull, 'value')
+      && !dFull.get
+      && !dFull.set) ? dFull.value : undefined;
     const getFullVersionList = markAsNative(function getFullVersionList(){
       if (!isUadThis(this)) {
-        if (typeof origFullGet === 'function') return origFullGet.call(this);
+        if (typeof origFullGet === 'function') {
+          try {
+            return origFullGet.call(this);
+          } catch (e) {
+            emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+              stage: 'runtime',
+              surface: 'WorkerNavigatorUAData',
+              key: 'fullVersionList',
+              message: 'fullVersionList illegal invocation',
+              type: 'browser structure missing data',
+              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+            }, e);
+            throw e;
+          }
+        }
+        if (origFullDataValue !== undefined) return origFullDataValue;
         throw new TypeError('Illegal invocation');
       }
       try {
@@ -472,7 +548,21 @@
     const origToJSON = dToJSON && dToJSON.value;
     const toJSON = markAsNative(function toJSON(){
       if (!isUadThis(this)) {
-        if (typeof origToJSON === 'function') return origToJSON.call(this);
+        if (typeof origToJSON === 'function') {
+          try {
+            return origToJSON.call(this);
+          } catch (e) {
+            emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+              stage: 'runtime',
+              surface: 'WorkerNavigatorUAData',
+              key: 'toJSON',
+              message: 'toJSON illegal invocation',
+              type: 'browser structure missing data',
+              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+            }, e);
+            throw e;
+          }
+        }
         throw new TypeError('Illegal invocation');
       }
       return {brands:this.brands, mobile:this.mobile, platform:this.platform};
@@ -487,14 +577,56 @@
     const origGHEV = dGHEV && dGHEV.value;
     const getHighEntropyValues = markAsNative(function getHighEntropyValues(keys){
         if (!isUadThis(this)) {
-          if (typeof origGHEV === 'function') return origGHEV.call(this, keys);
+          if (typeof origGHEV === 'function') {
+            try {
+              return origGHEV.call(this, keys);
+            } catch (e) {
+              emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+                stage: 'runtime',
+                surface: 'WorkerNavigatorUAData',
+                key: 'getHighEntropyValues',
+                message: 'getHighEntropyValues illegal invocation',
+                type: 'browser structure missing data',
+                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+              }, e);
+              throw e;
+            }
+          }
           throw new TypeError('Illegal invocation');
         }
         try {
           if (!cache.snap) throw new Error('UACHPatch: no snap');
-          if (!Array.isArray(keys)) return origGHEV.call(this, keys);
+          if (!Array.isArray(keys)) {
+            try {
+              return origGHEV.call(this, keys);
+            } catch (e) {
+              emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+                stage: 'runtime',
+                surface: 'WorkerNavigatorUAData',
+                key: 'getHighEntropyValues',
+                message: 'getHighEntropyValues illegal invocation',
+                type: 'browser structure missing data',
+                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+              }, e);
+              throw e;
+            }
+          }
           for (const k of keys) {
-            if (typeof k !== 'string' || !k) return origGHEV.call(this, keys);
+            if (typeof k !== 'string' || !k) {
+              try {
+                return origGHEV.call(this, keys);
+              } catch (e) {
+                emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+                  stage: 'runtime',
+                  surface: 'WorkerNavigatorUAData',
+                  key: 'getHighEntropyValues',
+                  message: 'getHighEntropyValues illegal invocation',
+                  type: 'browser structure missing data',
+                  data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+                }, e);
+                throw e;
+              }
+            }
           }
           const s = cache.snap;
           const le = s.uaData;
@@ -572,7 +704,19 @@
             return Reflect.apply(origGet, recv, []);
           }
         }
-        return Reflect.apply(origGet, recv, []);
+        try {
+          return Reflect.apply(origGet, recv, []);
+        } catch (e) {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_illegal_invocation', {
+            stage: 'runtime',
+            surface: 'WorkerNavigator',
+            key: k,
+            message: 'worker navigator getter illegal invocation',
+            type: 'browser structure missing data',
+            data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+          }, e);
+          throw e;
+        }
       };
 
       // IMPORTANT: native getters have stable `name` like "get hardwareConcurrency".

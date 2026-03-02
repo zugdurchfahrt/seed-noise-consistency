@@ -51,6 +51,18 @@ def setup_logger(child_levels=None):
         proxy_logger = logger.getChild("proxy")
         proxy_logger.setLevel(logging.INFO)
         proxy_logger.addHandler(proxy_fh)
+
+        # --- ServiceWorker relay diag (CDP binding) ---
+        # Keep SW relay noise out of the main intention_entitled.log file.
+        # Route it into a dedicated file via a non-propagating child logger.
+        sw_relay_log_file = PROJECT_ROOT / 'logs' / 'sw_relay.log'
+        sw_relay_fh = logging.FileHandler(sw_relay_log_file, encoding="utf-8")
+        sw_relay_fh.setLevel(logging.INFO)
+        sw_relay_fh.setFormatter(formatter)
+        sw_relay_logger = logger.getChild("cdp_catapult.sw_relay")
+        sw_relay_logger.setLevel(logging.INFO)
+        sw_relay_logger.propagate = False
+        sw_relay_logger.addHandler(sw_relay_fh)
         
         # StreamHandler To log in the console
         ch = logging.StreamHandler(sys.stdout)
@@ -74,6 +86,7 @@ def setup_logger(child_levels=None):
 
 # Экспортируем всё необходимое
 logger = setup_logger()
+
 
 
 

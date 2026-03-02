@@ -11,6 +11,7 @@ from tools.tools_infra.overseer import logger
 
 # Use the project's existing logging pipeline (overseer.setup_logger -> intention_entitled.log).
 logger = logger.getChild("cdp_catapult")
+sw_relay_logger = logger.getChild("sw_relay")
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -124,11 +125,11 @@ def _log_sw_relay_diag(session_id: str, target_id: str, payload):
     }
     line = json.dumps(row, ensure_ascii=False, sort_keys=True)
     if level in ("error", "fatal"):
-        logger.error("SW relay diag: %s", line)
+        sw_relay_logger.error("SW relay diag: %s", line)
     elif level == "warn":
-        logger.warning("SW relay diag: %s", line)
+        sw_relay_logger.warning("SW relay diag: %s", line)
     else:
-        logger.info("SW relay diag: %s", line)
+        sw_relay_logger.info("SW relay diag: %s", line)
 
 
 

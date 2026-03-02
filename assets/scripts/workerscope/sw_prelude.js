@@ -392,7 +392,14 @@
         }, new Error('SW ' + key + ' non-configurable'));
       }
       const owner = resolved.owner || proto;
-      const origGet = resolved.desc && (typeof resolved.desc.get === 'function') ? resolved.desc.get : null;
+      let origGet = resolved.desc && (typeof resolved.desc.get === 'function') ? resolved.desc.get : null;
+      if (!origGet && resolved.desc
+        && Object.prototype.hasOwnProperty.call(resolved.desc, 'value')
+        && !resolved.desc.get
+        && !resolved.desc.set) {
+        const nativeValue = resolved.desc.value;
+        origGet = function nativeDataGetterFallback() { return nativeValue; };
+      }
       const guardedGet = function() {
         const recv = this;
         if (recv === nav) {
@@ -418,9 +425,7 @@
             throw e;
           }
         }
-        const illegalInvocationErr = new TypeError('Illegal invocation');
-        __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker getter illegal invocation', illegalInvocationErr);
-        throw illegalInvocationErr;
+        return undefined;
       };
       __trackDefineProperty(owner, key, {
         get: guardedGet,
@@ -443,9 +448,7 @@
           }
         }
         if (origValue !== undefined) return origValue;
-        const illegalInvocationErr = new TypeError('Illegal invocation');
-        __reportNativeThrow('sw_prelude:illegal_invocation', null, 'service worker uaData illegal invocation', illegalInvocationErr);
-        throw illegalInvocationErr;
+        return undefined;
       };
     }
 

@@ -1091,7 +1091,10 @@ const LOGGingModule = function LOGGingModule() {
         try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
       }
     };
-    DIAG_SCREEN_ON({ includeData: true })
+    // DIAG_SCREEN_ON({ includeData: true })
+
+
+
         // after all logger globals are assigned (Window realm only):
       if (W) {
         Object.defineProperty(W, "_logLevel",   { value: W._logLevel,   writable:true, configurable:true, enumerable:false });
