@@ -25,7 +25,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const extra = (ctx && typeof ctx === 'object') ? Object.assign({ level }, ctx) : (ctx || { level });
         return __D(code, _err, extra || null);
       }
-    } catch (_) {}
+    } catch (emitErr) {
+      return undefined;
+    }
+    return undefined;
   };
   const __exit = (level, code, ctx, ret) => (__emit(level, code, ctx, null), ret);
   const __throw = (code, ctx, err) => (__emit('error', code, ctx, err), (() => { throw err; })());
@@ -91,7 +94,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
       }
     } catch (e) {
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_parent_state_access_failed", e);
+      __emit('warn', 'core_window:toString_parent_state_access_failed', {
+        module: 'core',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: '__CORE_TOSTRING_STATE__',
+        stage: 'preflight',
+        message: 'parent state access failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'return', fallback: 'local' }
+      }, e);
     }
   }
 
@@ -169,7 +181,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const label = n ? `function ${n}() { [native code] }` : 'function () { [native code] }';
       toStringOverrideMap.set(func, label);
     } catch (e) {
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:WeakMap.set", e);
+      __emit('error', 'core_window:WeakMap.set', {
+        module: 'core',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: 'Function.prototype.toString',
+        stage: 'apply',
+        message: 'WeakMap.set failed in toString override map',
+        type: 'apply_failed',
+        data: { outcome: 'throw' }
+      }, e);
       throw e;
     }
     return func;
@@ -324,7 +345,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
         throw new Error('[CoreWindow] __wrapNativeCtor: bridge registration failed');
       }
     } catch (e) {
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:wrapNativeCtor:mark_failed", e);
+      __emit('error', 'core_window:wrapNativeCtor:mark_failed', {
+        module: 'core',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: '__wrapNativeCtor',
+        stage: 'apply',
+        message: '__wrapNativeCtor native mark/bridge registration failed',
+        type: 'apply_failed',
+        data: { outcome: 'throw' }
+      }, e);
       throw e;
     }
     return wrapped;
@@ -439,23 +469,50 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const markAsNative = ensureMarkAsNative();
       const probe = function probe(){};
       markAsNative(probe);
-      const expected = toStringOverrideMap.get(probe);
-      if (expected === undefined) {
-        const e = new Error('[CoreWindow] toString probe missing label');
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_probe_missing", e);
-        throw e;
-      }
-      if (typeof currentToString !== 'function') {
-        const e = new Error('[CoreWindow] Function.prototype.toString missing');
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_missing", e);
-        throw e;
-      }
-      const actual = currentToString.call(probe);
-      if (actual !== expected) {
-        const e = new Error('[CoreWindow] toString bridge mismatch');
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_bridge_mismatch", e);
-        throw e;
-      }
+       const expected = toStringOverrideMap.get(probe);
+       if (expected === undefined) {
+         const e = new Error('[CoreWindow] toString probe missing label');
+         __emit('error', 'core_window:toString_probe_missing', {
+           module: 'core',
+           diagTag: 'core_window',
+           surface: 'core',
+           key: 'Function.prototype.toString',
+           stage: 'contract',
+           message: 'toString probe missing label in overrideMap',
+           type: 'contract_violation',
+           data: { outcome: 'throw' }
+         }, e);
+         throw e;
+       }
+       if (typeof currentToString !== 'function') {
+         const e = new Error('[CoreWindow] Function.prototype.toString missing');
+         __emit('error', 'core_window:toString_missing', {
+           module: 'core',
+           diagTag: 'core_window',
+           surface: 'core',
+           key: 'Function.prototype.toString',
+           stage: 'preflight',
+           message: 'Function.prototype.toString missing',
+           type: 'browser structure missing data',
+           data: { outcome: 'throw' }
+         }, e);
+         throw e;
+       }
+       const actual = currentToString.call(probe);
+       if (actual !== expected) {
+         const e = new Error('[CoreWindow] toString bridge mismatch');
+         __emit('error', 'core_window:toString_bridge_mismatch', {
+           module: 'core',
+           diagTag: 'core_window',
+           surface: 'core',
+           key: 'Function.prototype.toString',
+           stage: 'contract',
+           message: 'existing toString does not honor shared overrideMap labels',
+           type: 'contract_violation',
+           data: { outcome: 'throw' }
+         }, e);
+         throw e;
+       }
 
       // Already installed and consistent: do not re-install another Proxy layer.
       skipToStringInstall = true;
@@ -670,7 +727,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
         toStringProxyTargetMap.delete(toString);
         toStringOverrideMap.delete(toString);
       } catch (mapErr) {
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_maps_restore_failed", mapErr);
+        __emit('error', 'core_window:toString_maps_restore_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'rollback',
+          message: 'toString rollback: WeakMap restore failed',
+          type: 'rollback_failed',
+          data: { outcome: 'return' }
+        }, mapErr);
       }
 
       try {
@@ -683,7 +749,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
           });
         }
       } catch (restoreErr) {
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_restore_failed", restoreErr);
+        __emit('error', 'core_window:toString_restore_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'rollback',
+          message: 'toString rollback: restoring Function.prototype.toString failed',
+          type: 'rollback_failed',
+          data: { outcome: 'throw' }
+        }, restoreErr);
         throw restoreErr;
       }
 
@@ -694,11 +769,29 @@ const CoreWindowModule = function CoreWindowModule(window) {
           delete window.__CORE_TOSTRING_STATE__;
         }
       } catch (stateErr) {
-        if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_state_restore_failed", stateErr);
+        __emit('error', 'core_window:toString_state_restore_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: '__CORE_TOSTRING_STATE__',
+          stage: 'rollback',
+          message: 'toString rollback: restoring __CORE_TOSTRING_STATE__ failed',
+          type: 'rollback_failed',
+          data: { outcome: 'throw' }
+        }, stateErr);
         throw stateErr;
       }
 
-      if (typeof __DEGRADE__ === "function") __DEGRADE__("core_window:toString_install_failed", e);
+      __emit('error', 'core_window:toString_install_failed', {
+        module: 'core',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: 'Function.prototype.toString',
+        stage: 'apply',
+        message: 'toString install failed',
+        type: 'apply_failed',
+        data: { outcome: 'throw' }
+      }, e);
       throw e;
     }
     }
@@ -738,7 +831,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
 
         return __emit(level, code, ctx, (typeof err === 'undefined') ? null : err);
-      } catch (_) {}
+      } catch (diagErr) {
+        return undefined;
+      }
     }
     function normalizePolicy(v) {
       if (v === undefined || v === null || v === '') return 'skip';
@@ -843,36 +938,32 @@ const CoreWindowModule = function CoreWindowModule(window) {
             return null;
           }
         } catch (e) {
-          try {
-            __emit('warn', tag + ':guard_exception', {
-              module: 'core',
-              diagTag: tag,
-              surface: 'core',
-              key,
-              stage: 'guard',
-              message: 'guard read failed',
-              type: 'pipeline missing data',
-              data: { outcome: 'skip', reason: 'guard_exception' }
-            }, e);
-          } catch (_) {}
+          __emit('warn', tag + ':guard_exception', {
+            module: 'core',
+            diagTag: tag,
+            surface: 'core',
+            key,
+            stage: 'guard',
+            message: 'guard read failed',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'guard_exception' }
+          }, e);
           return null;
         }
         const token = nextGuardToken(key);
         try {
           window[key] = token;
         } catch (e) {
-          try {
-            __emit('warn', tag + ':guard_write_failed', {
-              module: 'core',
-              diagTag: tag,
-              surface: 'core',
-              key,
-              stage: 'guard',
-              message: 'guard write failed',
-              type: 'pipeline missing data',
-              data: { outcome: 'skip', reason: 'guard_write_failed' }
-            }, e);
-          } catch (_) {}
+          __emit('warn', tag + ':guard_write_failed', {
+            module: 'core',
+            diagTag: tag,
+            surface: 'core',
+            key,
+            stage: 'guard',
+            message: 'guard write failed',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'guard_write_failed' }
+          }, e);
           return null;
         }
         return token;
@@ -918,18 +1009,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
           }, null);
           return true;
         } catch (e) {
-          try {
-            __emit('warn', tag + ':guard_release_exception', {
-              module: 'core',
-              diagTag: tag,
-              surface: 'core',
-              key,
-              stage: 'guard',
-              message: 'guard release threw',
-              type: 'pipeline missing data',
-              data: { outcome: 'skip', reason: 'guard_release_exception' }
-            }, e);
-          } catch (_) {}
+          __emit('warn', tag + ':guard_release_exception', {
+            module: 'core',
+            diagTag: tag,
+            surface: 'core',
+            key,
+            stage: 'guard',
+            message: 'guard release threw',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'guard_release_exception' }
+          }, e);
           return false;
         }
       }
@@ -959,8 +1048,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
       function onInvalidThis(invalidPolicy, origFn, self, args) {
         if (typeof invalidPolicy === 'function') return invalidPolicy.call(self, origFn, args);
-        if (invalidPolicy === 'throw') throw new TypeError();
+        // [NORMATIVE] Keep engine behavior for incompatible receiver:
+        // call the original function/getter with the provided receiver and rethrow its exception.
         if (typeof origFn === 'function') return Reflect.apply(origFn, self, args || []);
+        if (invalidPolicy === 'throw') throw new TypeError();
         throw new TypeError();
       }
 

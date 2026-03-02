@@ -482,15 +482,14 @@ def init_driver(
     # # --- prepare worker_bootstrap_js (reads __ENV_BRIDGE__.inlinePatch) ---
     worker_bootstrap_js = Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")
 
-    # Connect page_js (wrk.js and so on)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-    
-    # # Publish worker patch core early (used by external worker_bootstrap.js too)
+    # Publish worker patch core first:
+    # - worker_bootstrap_env_js sets __ENV_BRIDGE__.inlinePatch (source text)
+    # This order avoids a transient state where Worker overrides exist but bridge URLs aren't ready yet.
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
-
-    # # Connect worker_bootstrap_js AFTER page_js:
-    # # it materializes __ENV_BRIDGE__.urls (blob URLs for worker patch) and wires initAll() when hooks appear.
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
+
+    # Connect page_js (core + targets + wrk.js and so on)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
 
     # =========================
     # [CH] Setting up Client hints (CDP-only) + __HEADERS__ (JS, NEW DOCUMENT)
@@ -1045,7 +1044,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.

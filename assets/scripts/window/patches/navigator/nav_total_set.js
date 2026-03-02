@@ -35,9 +35,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
           stage: x.stage,
           message: x.message,
-          data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
           type: x.type
         };
+        if (x.stage === 'apply' && (typeof ctx.message !== 'string' || !ctx.message)) {
+          ctx.message = code;
+        }
+        if (Object.prototype.hasOwnProperty.call(x, 'data')) {
+          ctx.data = x.data;
+        } else if (x.stage === 'apply' && level === 'info' && (err === undefined || err === null)) {
+          ctx.data = { outcome: 'return' };
+        }
         return __emit(level, code, ctx, err);
       } catch (diagErr) {
         return undefined;
@@ -473,12 +480,37 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const d = Object.getOwnPropertyDescriptor(target, key);
       if (d && d.configurable === false) {
         const err = new TypeError(`${key}: non-configurable`);
+        let resolved = null;
+        let resolveErr = null;
+        try {
+          resolved = __navResolveDescriptor ? __navResolveDescriptor(target, key, { mode: 'proto_chain' }) : null;
+        } catch (e) {
+          resolveErr = e;
+        }
         __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_non_configurable', {
           stage: 'preflight',
           diagTag: 'nav_total_set:safeDefineAcc',
           key: key || null,
           message: err.message,
-          data: { outcome: 'throw', reason: 'non_configurable' }
+          data: {
+            outcome: 'throw',
+            reason: 'non_configurable',
+            targetTag: Object.prototype.toString.call(target),
+            targetIsNavProto: target === navProto,
+            ownDesc: {
+              configurable: !!d.configurable,
+              enumerable: !!d.enumerable,
+              writable: Object.prototype.hasOwnProperty.call(d, 'writable') ? !!d.writable : undefined,
+              hasGet: typeof d.get === 'function',
+              hasSet: typeof d.set === 'function',
+              hasValue: Object.prototype.hasOwnProperty.call(d, 'value')
+            },
+            protoChainFound: !!(resolved && resolved.desc),
+            protoChainOwnerIsTarget: !!(resolved && resolved.owner === target),
+            protoChainOwnerTag: (resolved && resolved.owner) ? Object.prototype.toString.call(resolved.owner) : undefined,
+            protoChainDescConfigurable: (resolved && resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'configurable')) ? !!resolved.desc.configurable : undefined,
+            resolveDescriptorError: resolveErr ? String(resolveErr && (resolveErr.message || resolveErr)) : undefined
+          }
         }, err);
         throw err;
       }
@@ -560,12 +592,37 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const d = Object.getOwnPropertyDescriptor(proto, key);
       if (d && d.configurable === false) {
         const err = new TypeError(`${key}: non-configurable`);
+        let resolved = null;
+        let resolveErr = null;
+        try {
+          resolved = __navResolveDescriptor ? __navResolveDescriptor(proto, key, { mode: 'proto_chain' }) : null;
+        } catch (e) {
+          resolveErr = e;
+        }
         __navDiagBrowser('error', 'nav_total_set:redefineAcc_non_configurable', {
           stage: 'preflight',
           diagTag: 'nav_total_set:redefineAcc',
           key: key || null,
           message: err.message,
-          data: { outcome: 'throw', reason: 'non_configurable' }
+          data: {
+            outcome: 'throw',
+            reason: 'non_configurable',
+            targetTag: Object.prototype.toString.call(proto),
+            targetIsNavProto: proto === navProto,
+            ownDesc: {
+              configurable: !!d.configurable,
+              enumerable: !!d.enumerable,
+              writable: Object.prototype.hasOwnProperty.call(d, 'writable') ? !!d.writable : undefined,
+              hasGet: typeof d.get === 'function',
+              hasSet: typeof d.set === 'function',
+              hasValue: Object.prototype.hasOwnProperty.call(d, 'value')
+            },
+            protoChainFound: !!(resolved && resolved.desc),
+            protoChainOwnerIsTarget: !!(resolved && resolved.owner === proto),
+            protoChainOwnerTag: (resolved && resolved.owner) ? Object.prototype.toString.call(resolved.owner) : undefined,
+            protoChainDescConfigurable: (resolved && resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'configurable')) ? !!resolved.desc.configurable : undefined,
+            resolveDescriptorError: resolveErr ? String(resolveErr && (resolveErr.message || resolveErr)) : undefined
+          }
         }, err);
         throw err;
       }
@@ -888,27 +945,29 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ['globalPrivacyControl', () => false],
       ['vendorSub',            () => ""]
     ];
-    navigatorPatches.forEach(([prop, getter]) => {
-      if (critical.has(prop)) return; 
-      if (!(prop in navProto)) return;
-      const d = Object.getOwnPropertyDescriptor(navProto, prop);
-      const isData = !!(d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set);
-      if (d && !isData) {
-        __navRegisterKey(prop);
-        const namedGet = Object.getOwnPropertyDescriptor(({ get [prop]() {
-          __navLogAccess(prop, namedGet);
-          if (!__isNavigatorThis(this)) {
-            throw new TypeError();
-          }
-          return getter.call(this);
-        }}), prop).get;
-        __navRegisterFn(namedGet);
-        safeDefineAcc(navProto, prop, namedGet);
-      } else {
-        const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
-        safeDefineAcc(navProto, prop, wrapped);
-      }
-    });
+      navigatorPatches.forEach(([prop, getter]) => {
+        if (critical.has(prop)) return; 
+        if (!(prop in navProto)) return;
+        const d = Object.getOwnPropertyDescriptor(navProto, prop);
+        const isData = !!(d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set);
+        if (d && !isData) {
+          __navRegisterKey(prop);
+          const origGet = (d && typeof d.get === 'function') ? d.get : null;
+          const namedGet = Object.getOwnPropertyDescriptor(({ get [prop]() {
+            __navLogAccess(prop, namedGet);
+            if (!__isNavigatorThis(this)) {
+              if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
+              throw new TypeError();
+            }
+            return getter.call(this);
+          }}), prop).get;
+          __navRegisterFn(namedGet);
+          safeDefineAcc(navProto, prop, namedGet);
+        } else {
+          const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
+          safeDefineAcc(navProto, prop, wrapped);
+        }
+      });
 
     // ——— D. devicePixelRatio & screen.* ———
     // dpr: first we try to redefine own in window (often own), then — prototype
@@ -1297,6 +1356,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const getUserAgentData = Object.getOwnPropertyDescriptor(({ get userAgentData() {
         __navLogAccess('userAgentData', getUserAgentData);
         if (!__isNavigatorThis(this)) {
+          const origGet = (dUaData && typeof dUaData.get === 'function') ? dUaData.get : null;
+          if (origGet) {
+            try {
+              return Reflect.apply(origGet, this, []);
+            } catch (e) {
+              __navDiag('warn', 'nav_total_set:userAgentData_illegal_invocation', {
+                stage: 'runtime',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:userAgentData',
+                key: 'userAgentData',
+                message: 'userAgentData illegal invocation',
+                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+              }, e);
+              throw e;
+            }
+          }
           throw new TypeError();
         }
         return nativeUAD;
@@ -1350,7 +1425,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           stage: 'apply',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:userAgentData',
-          key: 'userAgentData'
+          key: 'userAgentData',
+          message: 'userAgentData ready',
+          data: { outcome: 'return', reason: 'ready' }
         });
       }
     }
@@ -2220,7 +2297,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     __navDiag('info', 'nav_total_set:webauthn_mock_applied', {
       stage: 'apply',
       type: __navTypePipeline,
-      diagTag: 'nav_total_set'
+      diagTag: 'nav_total_set',
+      message: 'webauthn mock applied',
+      data: { outcome: 'return', reason: 'webauthn_mock_applied' }
     });
 
     // ——— L. Plugins & MimeTypes ———
