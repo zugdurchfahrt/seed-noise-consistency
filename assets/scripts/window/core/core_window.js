@@ -1050,7 +1050,27 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (typeof invalidPolicy === 'function') return invalidPolicy.call(self, origFn, args);
         // [NORMATIVE] Keep engine behavior for incompatible receiver:
         // call the original function/getter with the provided receiver and rethrow its exception.
-        if (typeof origFn === 'function') return Reflect.apply(origFn, self, args || []);
+        if (typeof origFn === 'function') {
+          try {
+            return Reflect.apply(origFn, self, args || []);
+          } catch (e) {
+            diagDegrade('core:onInvalidThis:native_throw', e, {
+              module: 'core_window',
+              diagTag: 'core:onInvalidThis',
+              surface: 'core',
+              key: null,
+              stage: 'runtime',
+              type: 'browser structure missing data',
+              message: 'native invalid-this invocation threw',
+              data: {
+                outcome: 'throw',
+                reason: 'native_throw',
+                invalidPolicy: (typeof invalidPolicy === 'string' || invalidPolicy === null) ? invalidPolicy : typeof invalidPolicy
+              }
+            });
+            throw e;
+          }
+        }
         if (invalidPolicy === 'throw') throw new TypeError();
         throw new TypeError();
       }
@@ -1456,9 +1476,24 @@ const CoreWindowModule = function CoreWindowModule(window) {
           if (validThis && !validThis(self)) {
             return onInvalidThis(invalidThis, orig, self, args);
           }
-          const out = invoke
-            ? invoke.call(self, orig, args)
-            : Reflect.apply(orig, self, args);
+          let out;
+          try {
+            out = invoke
+              ? invoke.call(self, orig, args)
+              : Reflect.apply(orig, self, args);
+          } catch (e) {
+            diagDegrade(planItem.tag + ':native_throw', e, {
+              key,
+              kind: planItem.kind,
+              targetId: planItem.targetId,
+              invokeClass: invokeClass,
+              stage: 'runtime',
+              type: 'browser structure missing data',
+              message: 'native invocation threw',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            });
+            throw e;
+          }
           if (!hooksPost.length || typeof out !== 'string') return out;
           let res = out;
           for (let j = 0; j < hooksPost.length; j++) {
@@ -1562,9 +1597,24 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         function invokePromisePath(self, inputArgs) {
           const args = Array.prototype.slice.call(inputArgs || []);
-          const out = (validThis && !validThis(self))
-            ? onInvalidThis(invalidThis, orig, self, args)
-            : (invoke ? invoke.call(self, orig, args) : Reflect.apply(orig, self, args));
+          let out;
+          try {
+            out = (validThis && !validThis(self))
+              ? onInvalidThis(invalidThis, orig, self, args)
+              : (invoke ? invoke.call(self, orig, args) : Reflect.apply(orig, self, args));
+          } catch (e) {
+            diagDegrade(planItem.tag + ':native_throw', e, {
+              key,
+              kind: planItem.kind,
+              targetId: planItem.targetId,
+              invokeClass: invokeClass,
+              stage: 'runtime',
+              type: 'browser structure missing data',
+              message: 'native invocation threw',
+              data: { outcome: 'throw', reason: 'native_throw', promise_method: true }
+            });
+            throw e;
+          }
 
           if (!isPromiseLike(out)) {
             const e = new TypeError();

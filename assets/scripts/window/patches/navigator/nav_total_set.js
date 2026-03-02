@@ -953,11 +953,38 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (d && !isData) {
           __navRegisterKey(prop);
           const origGet = (d && typeof d.get === 'function') ? d.get : null;
+          const resolved = (!origGet && __navResolveDescriptor)
+            ? __navResolveDescriptor(navProto, prop, { mode: 'proto_chain' })
+            : null;
+          const nativeGet = origGet || ((resolved && resolved.desc && typeof resolved.desc.get === 'function') ? resolved.desc.get : null);
           const namedGet = Object.getOwnPropertyDescriptor(({ get [prop]() {
             __navLogAccess(prop, namedGet);
             if (!__isNavigatorThis(this)) {
-              if (typeof origGet === 'function') return Reflect.apply(origGet, this, arguments);
-              throw new TypeError();
+              if (typeof nativeGet === 'function') {
+                try {
+                  return Reflect.apply(nativeGet, this, arguments);
+                } catch (e) {
+                  __navDiag('warn', 'nav_total_set:' + String(prop) + '_illegal_invocation', {
+                    stage: 'runtime',
+                    type: __navTypeBrowser,
+                    diagTag: 'nav_total_set:' + String(prop),
+                    key: String(prop),
+                    message: String(prop) + ' illegal invocation',
+                    data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+                  }, e);
+                  throw e;
+                }
+              }
+              const e = new TypeError();
+              __navDiag('error', 'nav_total_set:' + String(prop) + '_native_get_missing', {
+                stage: 'runtime',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:' + String(prop),
+                key: String(prop),
+                message: String(prop) + ' native getter missing on invalid receiver',
+                data: { outcome: 'throw', reason: 'native_get_missing' }
+              }, e);
+              throw e;
             }
             return getter.call(this);
           }}), prop).get;
@@ -1357,9 +1384,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         __navLogAccess('userAgentData', getUserAgentData);
         if (!__isNavigatorThis(this)) {
           const origGet = (dUaData && typeof dUaData.get === 'function') ? dUaData.get : null;
-          if (origGet) {
+          const resolvedGet = (dUaDataResolved && dUaDataResolved.desc && typeof dUaDataResolved.desc.get === 'function')
+            ? dUaDataResolved.desc.get
+            : null;
+          const nativeGet = origGet || resolvedGet;
+          if (nativeGet) {
             try {
-              return Reflect.apply(origGet, this, []);
+              return Reflect.apply(nativeGet, this, []);
             } catch (e) {
               __navDiag('warn', 'nav_total_set:userAgentData_illegal_invocation', {
                 stage: 'runtime',
@@ -1372,7 +1403,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               throw e;
             }
           }
-          throw new TypeError();
+          const e = new TypeError();
+          __navDiag('error', 'nav_total_set:userAgentData_native_get_missing', {
+            stage: 'runtime',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:userAgentData',
+            key: 'userAgentData',
+            message: 'userAgentData native getter missing on invalid receiver',
+            data: { outcome: 'throw', reason: 'native_get_missing' }
+          }, e);
+          throw e;
         }
         return nativeUAD;
       }}), 'userAgentData').get;
@@ -1438,10 +1478,42 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— F. deviceMemory/hardwareConcurrency ———
     const hasDeviceMemory = ('deviceMemory' in navigator);
     const dDeviceMemory = Object.getOwnPropertyDescriptor(navProto, 'deviceMemory');
+    const dDeviceMemoryResolved = __navResolveDescriptor
+      ? __navResolveDescriptor(navProto, 'deviceMemory', { mode: 'proto_chain' })
+      : null;
+    const nativeDeviceMemoryGet = (dDeviceMemory && typeof dDeviceMemory.get === 'function')
+      ? dDeviceMemory.get
+      : ((dDeviceMemoryResolved && dDeviceMemoryResolved.desc && typeof dDeviceMemoryResolved.desc.get === 'function')
+        ? dDeviceMemoryResolved.desc.get
+        : null);
     const getDeviceMemory = Object.getOwnPropertyDescriptor(({ get deviceMemory() {
       __navLogAccess('deviceMemory', getDeviceMemory);
       if (!__isNavigatorThis(this)) {
-        throw new TypeError();
+        if (typeof nativeDeviceMemoryGet === 'function') {
+          try {
+            return Reflect.apply(nativeDeviceMemoryGet, this, []);
+          } catch (e) {
+            __navDiag('warn', 'nav_total_set:deviceMemory_illegal_invocation', {
+              stage: 'runtime',
+              type: __navTypeBrowser,
+              diagTag: 'nav_total_set:deviceMemory',
+              key: 'deviceMemory',
+              message: 'deviceMemory illegal invocation',
+              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+            }, e);
+            throw e;
+          }
+        }
+        const e = new TypeError();
+        __navDiag('error', 'nav_total_set:deviceMemory_native_get_missing', {
+          stage: 'runtime',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:deviceMemory',
+          key: 'deviceMemory',
+          message: 'deviceMemory native getter missing on invalid receiver',
+          data: { outcome: 'throw', reason: 'native_get_missing' }
+        }, e);
+        throw e;
       }
       return mem;
     }}), 'deviceMemory').get;
@@ -1488,10 +1560,42 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
     const dHardwareConcurrency = Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency');
+    const dHardwareConcurrencyResolved = __navResolveDescriptor
+      ? __navResolveDescriptor(navProto, 'hardwareConcurrency', { mode: 'proto_chain' })
+      : null;
+    const nativeHardwareConcurrencyGet = (dHardwareConcurrency && typeof dHardwareConcurrency.get === 'function')
+      ? dHardwareConcurrency.get
+      : ((dHardwareConcurrencyResolved && dHardwareConcurrencyResolved.desc && typeof dHardwareConcurrencyResolved.desc.get === 'function')
+        ? dHardwareConcurrencyResolved.desc.get
+        : null);
     const getHardwareConcurrency = Object.getOwnPropertyDescriptor(({ get hardwareConcurrency() {
       __navLogAccess('hardwareConcurrency', getHardwareConcurrency);
       if (!__isNavigatorThis(this)) {
-        throw new TypeError();
+        if (typeof nativeHardwareConcurrencyGet === 'function') {
+          try {
+            return Reflect.apply(nativeHardwareConcurrencyGet, this, []);
+          } catch (e) {
+            __navDiag('warn', 'nav_total_set:hardwareConcurrency_illegal_invocation', {
+              stage: 'runtime',
+              type: __navTypeBrowser,
+              diagTag: 'nav_total_set:hardwareConcurrency',
+              key: 'hardwareConcurrency',
+              message: 'hardwareConcurrency illegal invocation',
+              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+            }, e);
+            throw e;
+          }
+        }
+        const e = new TypeError();
+        __navDiag('error', 'nav_total_set:hardwareConcurrency_native_get_missing', {
+          stage: 'runtime',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:hardwareConcurrency',
+          key: 'hardwareConcurrency',
+          message: 'hardwareConcurrency native getter missing on invalid receiver',
+          data: { outcome: 'throw', reason: 'native_get_missing' }
+        }, e);
+        throw e;
       }
       return cpu;
     }}), 'hardwareConcurrency').get;
@@ -1539,10 +1643,42 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— G. language(s) ———
     const hasLanguage = ('language' in navigator);
     const dLanguage = Object.getOwnPropertyDescriptor(navProto, 'language');
+    const dLanguageResolved = __navResolveDescriptor
+      ? __navResolveDescriptor(navProto, 'language', { mode: 'proto_chain' })
+      : null;
+    const nativeLanguageGet = (dLanguage && typeof dLanguage.get === 'function')
+      ? dLanguage.get
+      : ((dLanguageResolved && dLanguageResolved.desc && typeof dLanguageResolved.desc.get === 'function')
+        ? dLanguageResolved.desc.get
+        : null);
     const getLanguage = Object.getOwnPropertyDescriptor(({ get language() {
       __navLogAccess('language', getLanguage);
       if (!__isNavigatorThis(this)) {
-        throw new TypeError();
+        if (typeof nativeLanguageGet === 'function') {
+          try {
+            return Reflect.apply(nativeLanguageGet, this, []);
+          } catch (e) {
+            __navDiag('warn', 'nav_total_set:language_illegal_invocation', {
+              stage: 'runtime',
+              type: __navTypeBrowser,
+              diagTag: 'nav_total_set:language',
+              key: 'language',
+              message: 'language illegal invocation',
+              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+            }, e);
+            throw e;
+          }
+        }
+        const e = new TypeError();
+        __navDiag('error', 'nav_total_set:language_native_get_missing', {
+          stage: 'runtime',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:language',
+          key: 'language',
+          message: 'language native getter missing on invalid receiver',
+          data: { outcome: 'throw', reason: 'native_get_missing' }
+        }, e);
+        throw e;
       }
       return window.__primaryLanguage;
     }}), 'language').get;
@@ -1589,10 +1725,42 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     const hasLanguages = ('languages' in navigator);
     const dLanguages = Object.getOwnPropertyDescriptor(navProto, 'languages');
+    const dLanguagesResolved = __navResolveDescriptor
+      ? __navResolveDescriptor(navProto, 'languages', { mode: 'proto_chain' })
+      : null;
+    const nativeLanguagesGet = (dLanguages && typeof dLanguages.get === 'function')
+      ? dLanguages.get
+      : ((dLanguagesResolved && dLanguagesResolved.desc && typeof dLanguagesResolved.desc.get === 'function')
+        ? dLanguagesResolved.desc.get
+        : null);
     const getLanguages = Object.getOwnPropertyDescriptor(({ get languages() {
       __navLogAccess('languages', getLanguages);
       if (!__isNavigatorThis(this)) {
-        throw new TypeError();
+        if (typeof nativeLanguagesGet === 'function') {
+          try {
+            return Reflect.apply(nativeLanguagesGet, this, []);
+          } catch (e) {
+            __navDiag('warn', 'nav_total_set:languages_illegal_invocation', {
+              stage: 'runtime',
+              type: __navTypeBrowser,
+              diagTag: 'nav_total_set:languages',
+              key: 'languages',
+              message: 'languages illegal invocation',
+              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+            }, e);
+            throw e;
+          }
+        }
+        const e = new TypeError();
+        __navDiag('error', 'nav_total_set:languages_native_get_missing', {
+          stage: 'runtime',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:languages',
+          key: 'languages',
+          message: 'languages native getter missing on invalid receiver',
+          data: { outcome: 'throw', reason: 'native_get_missing' }
+        }, e);
+        throw e;
       }
       return window.__normalizedLanguages;
     }}), 'languages').get;

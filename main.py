@@ -1045,6 +1045,25 @@ def main():
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/")
+        # if os.getenv("WINDOW_DIAG_RELAY", "1") == "1":
+        #     window_diag_thread = threading.Thread(
+        #         target=cdp.run_window_diag_relay,
+        #         kwargs={
+        #             "driver": driver,
+        #             "poll_interval_sec": 0.75,
+        #             "critical_only": True,
+        #             "limit": 200,
+        #             "include_data": True,
+        #         },
+        #         daemon=True,
+        #         name="window_diag_relay",
+        #     )
+        #     window_diag_thread.start()
+        #     logger.info(
+        #         "Window diag relay thread started name=%s ident=%s",
+        #         window_diag_thread.name,
+        #         window_diag_thread.ident,
+        #     )
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.
