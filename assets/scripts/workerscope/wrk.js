@@ -6,15 +6,83 @@ const WrkModule = function WrkModule(window) {
     || (typeof window     !== 'undefined' && window)
     || (typeof global     !== 'undefined' && global)
     || {};
+  const __MODULE = 'wrk';
+  const __SURFACE = 'wrk';
+  const __D = G && G.__DEGRADE__;
+  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
 
-  const mark = (function() {
-    const ensure = (G && typeof G.__ensureMarkAsNative === 'function') ? G.__ensureMarkAsNative : null;
-    const m = ensure ? ensure() : null;
-    if (typeof m !== 'function') {
-      throw new Error('[WrkModule] markAsNative missing');
+  function __wrkEmit(level, code, ctx, err) {
+    try {
+      if (__diag) return __diag(level, code, ctx, err);
+      if (typeof __D === 'function') {
+        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
+        const safeErr = (err === undefined || err === null) ? null : err;
+        return __D(code, safeErr, Object.assign({}, safeCtx, { level: level || 'info' }));
+      }
+    } catch (emitErr) {
+      return undefined;
     }
-    return m;
-  })();
+    return undefined;
+  }
+
+  function __wrkDiag(level, code, extra, err) {
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    return __wrkEmit(level, code, {
+      module: __MODULE,
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : __SURFACE,
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: x.stage,
+      message: x.message,
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: x.type
+    }, err || null);
+  }
+
+  function __wrkBestEffort(code, extra, fn) {
+    try {
+      return fn();
+    } catch (e) {
+      __wrkDiag('warn', code, extra, e);
+      return undefined;
+    }
+  }
+
+  const __core = window && window.Core;
+  let __guardToken = null;
+  try {
+    if (!__core || typeof __core.guardFlag !== 'function') {
+      __wrkDiag('warn', __MODULE + ':guard_missing', {
+        stage: 'guard',
+        key: '__PATCH_WRK__',
+        message: 'Core.guardFlag missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+      }, null);
+      return;
+    }
+    __guardToken = __core.guardFlag('__PATCH_WRK__', __MODULE);
+  } catch (e) {
+    __wrkDiag('warn', __MODULE + ':guard_failed', {
+      stage: 'guard',
+      key: '__PATCH_WRK__',
+      message: 'guardFlag threw',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'guard_failed' }
+    }, e);
+    return;
+  }
+  if (!__guardToken) return;
+
+  try {
+    const mark = (function() {
+      const ensure = (G && typeof G.__ensureMarkAsNative === 'function') ? G.__ensureMarkAsNative : null;
+      const m = ensure ? ensure() : null;
+      if (typeof m !== 'function') {
+        throw new Error('[WrkModule] markAsNative missing');
+      }
+      return m;
+    })();
 
 // 1) Источник снапшотов
 function EnvBus(G){
@@ -52,26 +120,26 @@ function EnvBus(G){
 
     const uaData = (() => {
       const platform = (typeof UAD.platform === 'string' && UAD.platform) ? UAD.platform : null;
-      if (!platform) throw new Error('THW: uaData.platform missing');
+      if (!platform) throw new Error('EnvBus: uaData.platform missing');
       const brandsSrc = Array.isArray(UAD.brands) ? UAD.brands : null;
-      if (!brandsSrc) throw new Error('THW: uaData.brands missing');
+      if (!brandsSrc) throw new Error('EnvBus: uaData.brands missing');
       const brands = brandsSrc.map(x => {
-        if (!x || typeof x !== 'object') throw new Error('THW: uaData.brand entry');
+        if (!x || typeof x !== 'object') throw new Error('EnvBus: uaData.brand entry');
         const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
                     : (typeof x.name === 'string' && x.name) ? x.name
                     : null;
-        if (!brand) throw new Error('THW: uaData.brand missing');
+        if (!brand) throw new Error('EnvBus: uaData.brand missing');
         let versionRaw = null;
         if (typeof x.version === 'string') {
-          if (!x.version) throw new Error('THW: uaData.brand version missing');
+          if (!x.version) throw new Error('EnvBus: uaData.brand version missing');
           versionRaw = x.version;
         } else if (typeof x.version === 'number' && Number.isFinite(x.version)) {
           versionRaw = String(x.version);
         } else {
-          throw new Error('THW: uaData.brand version missing');
+          throw new Error('EnvBus: uaData.brand version missing');
         }
         const major = String(versionRaw).split('.')[0];
-        if (!major) throw new Error('THW: uaData.brand version missing');
+        if (!major) throw new Error('EnvBus: uaData.brand version missing');
         return { brand: String(brand), version: String(major) };
       });
       return { platform, brands, mobile: !!UAD.mobile };
@@ -107,7 +175,13 @@ function EnvBus(G){
       const sameBrands = (expNorm.length === curNorm.length) && expNorm.every((x, i) => x[0] === curNorm[i][0] && x[1] === curNorm[i][1]);
       if (uaData.platform !== expPlatform || !!uaData.mobile !== expMobile || !sameBrands) {
         const e = new Error('EnvBus: UAData LE mismatch vs contract');
-        if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:uadata_le_mismatch', e, { expPlatform, expMobile });
+        __wrkDiag('error', 'wrk:uadata_le_mismatch', {
+          stage: 'contract',
+          key: 'userAgentData',
+          message: 'UAData low entropy mismatch vs contract',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', expPlatform, expMobile }
+        }, e);
         throw e;
       }
     })();
@@ -396,10 +470,10 @@ const SEED_NATIVIZATION_SRC = `
 
 
 function mkModuleWorkerSource(snapshot, absUrl){
-  if (!snapshot || typeof snapshot !== 'object') throw new Error('THW: mkModuleWorkerSource bad snapshot');
-  if (typeof absUrl !== 'string' || !absUrl) throw new Error('THW: mkModuleWorkerSource bad absUrl');
+  if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkModuleWorkerSource bad snapshot');
+  if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkModuleWorkerSource bad absUrl');
   const patchUrl = global.__ENV_BRIDGE__ && global.__ENV_BRIDGE__.urls && global.__ENV_BRIDGE__.urls.workerPatchModule;
-  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('THW: mkModuleWorkerSource bad workerPatchModule url');
+  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkModuleWorkerSource bad workerPatchModule url');
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
   const PATCH_URL = JSON.stringify(patchUrl);
@@ -417,8 +491,11 @@ function mkModuleWorkerSource(snapshot, absUrl){
             type: 'pipeline missing data',
             stage: 'apply',
             module: 'wrk',
+            diagTag: 'wrk',
             surface: 'worker_bootstrap',
             key: '__ENV_BOOTSTRAP_ERROR__',
+            message: 'worker bootstrap emit failed',
+            data: { outcome: 'throw', reason: 'worker_bootstrap_emit_failed' },
             policy: 'throw',
             action: 'throw'
           };
@@ -429,7 +506,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
           }
           if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
           else d(code, e, ctx);
-        } catch(__diagErr) {}
+        } catch(__diagErr) {
+          try { self.__ENV_DIAG_ERROR__ = String((__diagErr && (__diagErr.stack || __diagErr.message)) || __diagErr); } catch(__diagStoreErr) { self.__ENV_DIAG_STORE_ERROR__ = String((__diagStoreErr && (__diagStoreErr.stack || __diagStoreErr.message)) || __diagStoreErr); }
+        }
       };
       var __emit = function(msg){
         var sent = false;
@@ -569,10 +648,10 @@ function mkModuleWorkerSource(snapshot, absUrl){
 }
 
 function mkClassicWorkerSource(snapshot, absUrl){
-  if (!snapshot || typeof snapshot !== 'object') throw new Error('THW: mkClassicWorkerSource bad snapshot');
-  if (typeof absUrl !== 'string' || !absUrl) throw new Error('THW: mkClassicWorkerSource bad absUrl');
+  if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkClassicWorkerSource bad snapshot');
+  if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkClassicWorkerSource bad absUrl');
   const patchUrl = global.__ENV_BRIDGE__ && global.__ENV_BRIDGE__.urls && global.__ENV_BRIDGE__.urls.workerPatchClassic;
-  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('THW: mkClassicWorkerSource bad workerPatchClassic url');
+  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkClassicWorkerSource bad workerPatchClassic url');
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
   const PATCH_URL = JSON.stringify(patchUrl);
@@ -590,8 +669,11 @@ function mkClassicWorkerSource(snapshot, absUrl){
             type: 'pipeline missing data',
             stage: 'apply',
             module: 'wrk',
+            diagTag: 'wrk',
             surface: 'worker_bootstrap',
             key: '__ENV_BOOTSTRAP_ERROR__',
+            message: 'worker bootstrap emit failed',
+            data: { outcome: 'throw', reason: 'worker_bootstrap_emit_failed' },
             policy: 'throw',
             action: 'throw'
           };
@@ -602,7 +684,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
           }
           if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
           else d(code, e, ctx);
-        } catch(__diagErr) {}
+        } catch(__diagErr) {
+          try { self.__ENV_DIAG_ERROR__ = String((__diagErr && (__diagErr.stack || __diagErr.message)) || __diagErr); } catch(__diagStoreErr) { self.__ENV_DIAG_STORE_ERROR__ = String((__diagStoreErr && (__diagStoreErr.stack || __diagStoreErr.message)) || __diagStoreErr); }
+        }
       };
       var __emit = function(msg){
         var sent = false;
@@ -950,7 +1034,13 @@ function SafeWorkerOverride(G){
       || typeof bridge.publishSnapshot !== 'function'
       || typeof bridge.envSnapshot !== 'function') {
     const e = new Error('[WorkerOverride] FAIL_FAST: __ENV_BRIDGE__ not ready');
-    if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:worker_override_bridge_not_ready', e);
+    __wrkDiag('error', 'wrk:worker_override_bridge_not_ready', {
+      stage: 'preflight',
+      key: '__ENV_BRIDGE__',
+      message: 'worker override bridge not ready',
+      type: 'pipeline missing data',
+      data: { outcome: 'throw', reason: 'bridge_not_ready' }
+    }, e);
     throw e;
   }
   const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
@@ -970,12 +1060,30 @@ function SafeWorkerOverride(G){
   const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
   const w = new NativeWorker(blobURL, { ...(opts), type: workerType });
 
-  if (w && typeof w.addEventListener === 'function') {
-    const cleanup = () => {
-      try { URL.revokeObjectURL(blobURL); } catch(_) {}
-      try { w.removeEventListener('message', onMsg); } catch(_) {}
-      try { w.removeEventListener('error', onErr); } catch(_) {}
-    };
+    if (w && typeof w.addEventListener === 'function') {
+      const cleanup = () => {
+        __wrkBestEffort('wrk:worker_cleanup_revoke_failed', {
+          stage: 'runtime',
+          key: 'blobURL',
+          message: 'worker cleanup revoke failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'worker_cleanup_revoke_failed' }
+        }, () => URL.revokeObjectURL(blobURL));
+        __wrkBestEffort('wrk:worker_cleanup_remove_message_failed', {
+          stage: 'runtime',
+          key: 'message',
+          message: 'worker cleanup remove message listener failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'worker_cleanup_remove_message_failed' }
+        }, () => w.removeEventListener('message', onMsg));
+        __wrkBestEffort('wrk:worker_cleanup_remove_error_failed', {
+          stage: 'runtime',
+          key: 'error',
+          message: 'worker cleanup remove error listener failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'worker_cleanup_remove_error_failed' }
+        }, () => w.removeEventListener('error', onErr));
+      };
 
     const onErr = () => {
       cleanup();
@@ -986,10 +1094,28 @@ function SafeWorkerOverride(G){
 
       const bootErr = data && typeof data === 'object' && data.__ENV_BOOTSTRAP_ERROR__;
       if (bootErr) {
-        try { G.__LAST_WORKER_BOOTSTRAP_ERROR__ = bootErr; } catch(_) {}
+        __wrkBestEffort('wrk:worker_bootstrap_error_store_failed', {
+          stage: 'runtime',
+          key: '__LAST_WORKER_BOOTSTRAP_ERROR__',
+          message: 'worker bootstrap error store failed',
+          type: 'pipeline missing data',
+          data: { outcome: 'skip', reason: 'worker_bootstrap_error_store_failed' }
+        }, () => { G.__LAST_WORKER_BOOTSTRAP_ERROR__ = bootErr; });
         emitWorkerBootstrapDegrade(G, 'Worker', bootErr);
-        try { ev.stopImmediatePropagation(); ev.stopPropagation(); } catch(_) {}
-        try { if (w && typeof w.terminate === 'function') w.terminate(); } catch(_) {}
+        __wrkBestEffort('wrk:worker_bootstrap_stop_propagation_failed', {
+          stage: 'runtime',
+          key: 'message',
+          message: 'worker bootstrap stop propagation failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'worker_bootstrap_stop_propagation_failed' }
+        }, () => { ev.stopImmediatePropagation(); ev.stopPropagation(); });
+        __wrkBestEffort('wrk:worker_terminate_failed', {
+          stage: 'runtime',
+          key: 'terminate',
+          message: 'worker terminate failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'worker_terminate_failed' }
+        }, () => { if (w && typeof w.terminate === 'function') w.terminate(); });
         cleanup();
         return;
       }
@@ -1000,12 +1126,30 @@ function SafeWorkerOverride(G){
           : null;
 
       if (loaded) {
-        try { G.__LAST_WORKER_USER_URL_LOADED__ = loaded; } catch(_) {}
+        __wrkBestEffort('wrk:worker_loaded_store_failed', {
+          stage: 'runtime',
+          key: '__LAST_WORKER_USER_URL_LOADED__',
+          message: 'worker loaded url store failed',
+          type: 'pipeline missing data',
+          data: { outcome: 'skip', reason: 'worker_loaded_store_failed' }
+        }, () => { G.__LAST_WORKER_USER_URL_LOADED__ = loaded; });
         // скрываем внутренний сигнал от внешних слушателей
-        try { ev.stopImmediatePropagation(); ev.stopPropagation(); } catch(_) {}
+        __wrkBestEffort('wrk:worker_loaded_stop_propagation_failed', {
+          stage: 'runtime',
+          key: 'message',
+          message: 'worker loaded stop propagation failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'worker_loaded_stop_propagation_failed' }
+        }, () => { ev.stopImmediatePropagation(); ev.stopPropagation(); });
 
         if (loaded === userURL && userURL !== abs) {
-          try { URL.revokeObjectURL(userURL); } catch(_) {}
+          __wrkBestEffort('wrk:worker_user_url_revoke_failed', {
+            stage: 'runtime',
+            key: 'userURL',
+            message: 'worker user url revoke failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'worker_user_url_revoke_failed' }
+          }, () => URL.revokeObjectURL(userURL));
         }
 
         cleanup();
@@ -1023,10 +1167,22 @@ function SafeWorkerOverride(G){
   definePatchedValue(G, 'Worker', WrappedWorker, 'Worker');
 
   G.Worker.__ENV_WRAPPED__ = true;
-    // маркер для диагностики
   if (G.__DEBUG__) {
-    try { G.__PATCHED_SAFE_WORKER__ = true; console.info('SafeWorker installed'); } catch(_){}
-}
+    __wrkBestEffort('wrk:worker_debug_mark_failed', {
+      stage: 'apply',
+      key: 'Worker',
+      message: 'worker debug mark failed',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'worker_debug_mark_failed' }
+    }, () => { G.__PATCHED_SAFE_WORKER__ = true; });
+    __wrkDiag('info', 'wrk:worker_installed', {
+      stage: 'apply',
+      key: 'Worker',
+      message: 'SafeWorker installed',
+      type: 'pipeline missing data',
+      data: { outcome: 'return' }
+    }, null);
+  }
 }
 window.SafeWorkerOverride = SafeWorkerOverride;
 
@@ -1102,29 +1258,73 @@ function SafeSharedWorkerOverride(G){
           const bootErr = data.__ENV_BOOTSTRAP_ERROR__;
           if (bootErr) {
             internal = true;
-            try { G.__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__ = bootErr; } catch(_) {}
+            __wrkBestEffort('wrk:shared_worker_bootstrap_error_store_failed', {
+              stage: 'runtime',
+              key: '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
+              message: 'shared worker bootstrap error store failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'shared_worker_bootstrap_error_store_failed' }
+            }, () => { G.__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__ = bootErr; });
             emitWorkerBootstrapDegrade(G, 'SharedWorker', bootErr);
           }
           const loaded = data.__ENV_USER_URL_LOADED__;
           if (typeof loaded === 'string') {
             internal = true;
-            try { G.__LAST_SHARED_WORKER_USER_URL_LOADED__ = loaded; } catch(_) {}
+            __wrkBestEffort('wrk:shared_worker_loaded_store_failed', {
+              stage: 'runtime',
+              key: '__LAST_SHARED_WORKER_USER_URL_LOADED__',
+              message: 'shared worker loaded url store failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'shared_worker_loaded_store_failed' }
+            }, () => { G.__LAST_SHARED_WORKER_USER_URL_LOADED__ = loaded; });
           }
           const ok = data.__ENV_PATCH_OK__;
           if (ok === true) {
             internal = true;
-            try { G.__LAST_SHARED_WORKER_PATCH_OK__ = true; } catch(_) {}
+            __wrkBestEffort('wrk:shared_worker_patch_ok_store_failed', {
+              stage: 'runtime',
+              key: '__LAST_SHARED_WORKER_PATCH_OK__',
+              message: 'shared worker patch-ok store failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'shared_worker_patch_ok_store_failed' }
+            }, () => { G.__LAST_SHARED_WORKER_PATCH_OK__ = true; });
           }
           if (internal) {
-            try { ev.stopImmediatePropagation(); ev.stopPropagation(); } catch(_) {}
+            __wrkBestEffort('wrk:shared_worker_stop_propagation_failed', {
+              stage: 'runtime',
+              key: 'message',
+              message: 'shared worker stop propagation failed',
+              type: 'browser structure missing data',
+              data: { outcome: 'skip', reason: 'shared_worker_stop_propagation_failed' }
+            }, () => { ev.stopImmediatePropagation(); ev.stopPropagation(); });
           }
         };
         port.addEventListener('message', onMsg);
-        try { if (typeof port.start === 'function') port.start(); } catch(_) {}
+        __wrkBestEffort('wrk:shared_worker_port_start_failed', {
+          stage: 'runtime',
+          key: 'port.start',
+          message: 'shared worker port start failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'shared_worker_port_start_failed' }
+        }, () => { if (typeof port.start === 'function') port.start(); });
       }
-    } catch(_) {}
+    } catch(e) {
+      __wrkDiag('warn', 'wrk:shared_worker_handshake_failed', {
+        stage: 'runtime',
+        key: 'SharedWorker.port',
+        message: 'shared worker handshake failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'shared_worker_handshake_failed' }
+      }, e);
+    }
     // Post-create resync via BroadcastChannel (avoids interfering with user port messaging)
-    try { bridge && bridge.publishSnapshot && bridge.publishSnapshot(snap); } catch(_) {}
+    __wrkBestEffort('wrk:shared_worker_publish_snapshot_failed', {
+      stage: 'runtime',
+      key: 'publishSnapshot',
+      message: 'shared worker publish snapshot failed',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'shared_worker_publish_snapshot_failed' }
+    }, () => { bridge && bridge.publishSnapshot && bridge.publishSnapshot(snap); });
     return sw;
   }, 'SharedWorker');
   
@@ -1133,8 +1333,21 @@ function SafeSharedWorkerOverride(G){
   definePatchedValue(G, 'SharedWorker', WrappedSharedWorker, 'SharedWorker');
   G.SharedWorker.__ENV_WRAPPED__ = true;
   if (G.__DEBUG__) {
-    try { G.__PATCHED_SHARED_WORKER__ = true; console.info('SharedWorker installed'); } catch(_){}
-}
+    __wrkBestEffort('wrk:shared_worker_debug_mark_failed', {
+      stage: 'apply',
+      key: 'SharedWorker',
+      message: 'shared worker debug mark failed',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'shared_worker_debug_mark_failed' }
+    }, () => { G.__PATCHED_SHARED_WORKER__ = true; });
+    __wrkDiag('info', 'wrk:shared_worker_installed', {
+      stage: 'apply',
+      key: 'SharedWorker',
+      message: 'SharedWorker installed',
+      type: 'pipeline missing data',
+      data: { outcome: 'return' }
+    }, null);
+  }
 }
 window.SafeSharedWorkerOverride = SafeSharedWorkerOverride;
 
@@ -1144,24 +1357,36 @@ window.SafeSharedWorkerOverride = SafeSharedWorkerOverride;
 function ServiceWorkerOverride(G){
   'use strict';
   if (!G || !G.navigator) {
-    if (G && G.__DEBUG__) {
-      try { console.info('ServiceWorkerOverride: navigator missing'); } catch(_){}
-    }
+    __wrkDiag('warn', 'wrk:service_worker_navigator_missing', {
+      stage: 'preflight',
+      key: 'navigator',
+      message: 'navigator missing',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'navigator_missing' }
+    }, null);
     return;
   }
   if (G.isSecureContext === false) {
     return;
   }
   if (!('serviceWorker' in G.navigator)) {
-    if (G.__DEBUG__) {
-      try { console.info('ServiceWorkerOverride: navigator.serviceWorker missing'); } catch(_){}
-    }
+    __wrkDiag('warn', 'wrk:service_worker_missing', {
+      stage: 'preflight',
+      key: 'serviceWorker',
+      message: 'navigator.serviceWorker missing',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'service_worker_missing' }
+    }, null);
     return;
   }
   if (!G.navigator.serviceWorker) {
-    if (G.__DEBUG__) {
-      try { console.info('ServiceWorkerOverride: navigator.serviceWorker unavailable'); } catch(_){}
-    }
+    __wrkDiag('warn', 'wrk:service_worker_unavailable', {
+      stage: 'preflight',
+      key: 'serviceWorker',
+      message: 'navigator.serviceWorker unavailable',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'service_worker_unavailable' }
+    }, null);
     return;
   }
 
@@ -1180,11 +1405,32 @@ function ServiceWorkerOverride(G){
        (proto.getRegistration.__ENV_WRAPPED__ === true || /\bWrappedSWGetRegistration\b/.test(String(proto.getRegistration))));
     if (already) {
       if (G.__DEBUG__) {
-        try { G.__PATCHED_SERVICE_WORKER__ = true; console.info('ServiceWorker already installed'); } catch(_){}
+        __wrkBestEffort('wrk:service_worker_already_mark_failed', {
+          stage: 'apply',
+          key: 'serviceWorker',
+          message: 'service worker already-installed mark failed',
+          type: 'pipeline missing data',
+          data: { outcome: 'skip', reason: 'service_worker_already_mark_failed' }
+        }, () => { G.__PATCHED_SERVICE_WORKER__ = true; });
       }
+      __wrkDiag('info', 'wrk:service_worker_already_installed', {
+        stage: 'guard',
+        key: 'serviceWorker',
+        message: 'ServiceWorker already installed',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'already_installed' }
+      }, null);
       return;
     }
-  } catch(_) {}
+  } catch(e) {
+    __wrkDiag('warn', 'wrk:service_worker_preflight_failed', {
+      stage: 'preflight',
+      key: 'serviceWorker',
+      message: 'service worker preflight failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'service_worker_preflight_failed' }
+    }, e);
+  }
 
   const SWC   = G.navigator.serviceWorker;
   const proto = Object.getPrototypeOf(SWC) || SWC;
@@ -1225,7 +1471,7 @@ function ServiceWorkerOverride(G){
       const emsg =
         (e && typeof e === 'object' && 'message' in e) ? e.message : String(e);
       throw new Error(
-        `THW: hostOf failed (u=${String(u)}, base=${String(base)}): ${emsg}`
+        `ServiceWorker host resolve failed (u=${String(u)}, base=${String(base)}): ${emsg}`
       );
     }
   };
@@ -1248,41 +1494,41 @@ function ServiceWorkerOverride(G){
 
   function makeFakeServiceWorker(scriptURL, scope) {
     if (typeof scriptURL !== 'string' || !scriptURL) {
-      throw new Error('THW: makeFakeServiceWorker missing scriptURL');
+      throw new Error('ServiceWorker fake missing scriptURL');
     }
     if (typeof scope !== 'string' || !scope) {
-      throw new Error('THW: makeFakeServiceWorker missing scope');
+      throw new Error('ServiceWorker fake missing scope');
     }
     return {
       scriptURL,
       state: 'activated',
       onstatechange: null,
-      postMessage() { throw new Error('THW: ServiceWorker.postMessage'); },
-      addEventListener() { throw new Error('THW: ServiceWorker.addEventListener'); },
-      removeEventListener() { throw new Error('THW: ServiceWorker.removeEventListener'); }
+      postMessage() { throw new Error('ServiceWorker.postMessage unavailable'); },
+      addEventListener() { throw new Error('ServiceWorker.addEventListener unavailable'); },
+      removeEventListener() { throw new Error('ServiceWorker.removeEventListener unavailable'); }
     };
   }
 
   function makeFakeRegistration(options, scriptURL) {
     if (!options || typeof options !== 'object') {
-      throw new Error('THW: makeFakeRegistration missing options');
+      throw new Error('ServiceWorker fake registration missing options');
     }
     const scope = options.scope;
     if (typeof scope !== 'string' || !scope) {
-      throw new Error('THW: makeFakeRegistration missing options.scope');
+      throw new Error('ServiceWorker fake registration missing options.scope');
     }
     const active = makeFakeServiceWorker(scriptURL, scope);
     return {
       scope, installing: null, waiting: null, active,
       navigationPreload: {
-        enable: async () => { throw new Error('THW: navigationPreload.enable'); },
-        disable: async () => { throw new Error('THW: navigationPreload.disable'); },
-        getState: async () => { throw new Error('THW: navigationPreload.getState'); }
+        enable: async () => { throw new Error('navigationPreload.enable unavailable'); },
+        disable: async () => { throw new Error('navigationPreload.disable unavailable'); },
+        getState: async () => { throw new Error('navigationPreload.getState unavailable'); }
       },
-      addEventListener() { throw new Error('THW: registration.addEventListener'); },
-      removeEventListener() { throw new Error('THW: registration.removeEventListener'); },
-      update: async () => { throw new Error('THW: registration.update'); },
-      unregister: async () => { throw new Error('THW: registration.unregister'); }
+      addEventListener() { throw new Error('registration.addEventListener unavailable'); },
+      removeEventListener() { throw new Error('registration.removeEventListener unavailable'); },
+      update: async () => { throw new Error('registration.update unavailable'); },
+      unregister: async () => { throw new Error('registration.unregister unavailable'); }
     };
   }
 
@@ -1307,7 +1553,13 @@ function ServiceWorkerOverride(G){
       return Native.register.call(this, url);
 
     }, 'register');
-    try { Object.defineProperty(WrappedServiceWorkerRegister, 'name', { value: 'WrappedServiceWorkerRegister' }); } catch(_){}
+    __wrkBestEffort('wrk:service_worker_register_name_failed', {
+      stage: 'apply',
+      key: 'register.name',
+      message: 'service worker register name define failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'service_worker_register_name_failed' }
+    }, () => Object.defineProperty(WrappedServiceWorkerRegister, 'name', { value: 'WrappedServiceWorkerRegister' }));
     WrappedServiceWorkerRegister.__ENV_WRAPPED__ = true;
     Object.defineProperty(proto, 'register', {
       configurable: desc.configurable,
@@ -1334,7 +1586,17 @@ function ServiceWorkerOverride(G){
           out.push(r);
         } else {
           if (wantClean() && !CLEANED.has(sc)) {
-            try { await r.unregister(); } catch(_) {}
+            try {
+              await r.unregister();
+            } catch (e) {
+              __wrkDiag('warn', 'wrk:service_worker_unregister_failed', {
+                stage: 'runtime',
+                key: sc,
+                message: 'service worker unregister failed',
+                type: 'browser structure missing data',
+                data: { outcome: 'skip', reason: 'service_worker_unregister_failed' }
+              }, e);
+            }
             CLEANED.add(sc);
           }
           if (wantFake()) out.push(makeFakeRegistration({ scope: sc }, url));
@@ -1342,7 +1604,13 @@ function ServiceWorkerOverride(G){
       }
       return out;
     }, 'getRegistrations');
-    try { Object.defineProperty(WrappedSWGetRegistrations, 'name', { value: 'WrappedSWGetRegistrations' }); } catch(_){}
+    __wrkBestEffort('wrk:service_worker_getregistrations_name_failed', {
+      stage: 'apply',
+      key: 'getRegistrations.name',
+      message: 'getRegistrations name define failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'service_worker_getregistrations_name_failed' }
+    }, () => Object.defineProperty(WrappedSWGetRegistrations, 'name', { value: 'WrappedSWGetRegistrations' }));
     WrappedSWGetRegistrations.__ENV_WRAPPED__ = true;
     Object.defineProperty(proto, 'getRegistrations', {
       configurable: desc.configurable, enumerable: desc.enumerable, writable: desc.writable, value: WrappedSWGetRegistrations
@@ -1365,12 +1633,28 @@ function ServiceWorkerOverride(G){
       if (isAllowed(url, sc)) return r;
 
       if (wantClean() && !CLEANED.has(sc)) {
-        try { await r.unregister(); } catch(_) {}
+        try {
+          await r.unregister();
+        } catch (e) {
+          __wrkDiag('warn', 'wrk:service_worker_unregister_failed', {
+            stage: 'runtime',
+            key: sc,
+            message: 'service worker unregister failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'service_worker_unregister_failed' }
+          }, e);
+        }
         CLEANED.add(sc);
       }
       return wantFake() ? makeFakeRegistration({ scope: sc }, url) : undefined;
     }, 'getRegistration');
-    try { Object.defineProperty(WrappedSWGetRegistration, 'name', { value: 'WrappedSWGetRegistration' }); } catch(_){}
+    __wrkBestEffort('wrk:service_worker_getregistration_name_failed', {
+      stage: 'apply',
+      key: 'getRegistration.name',
+      message: 'getRegistration name define failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'service_worker_getregistration_name_failed' }
+    }, () => Object.defineProperty(WrappedSWGetRegistration, 'name', { value: 'WrappedSWGetRegistration' }));
     WrappedSWGetRegistration.__ENV_WRAPPED__ = true;
     Object.defineProperty(proto, 'getRegistration', {
       configurable: desc.configurable, enumerable: desc.enumerable, writable: desc.writable, value: WrappedSWGetRegistration
@@ -1379,8 +1663,21 @@ function ServiceWorkerOverride(G){
 
   //Diagnostics
   if (G.__DEBUG__) {
-    try { G.__PATCHED_SERVICE_WORKER__ = true; console.info('ServiceWorker installed'); } catch(_){}
-}
+    __wrkBestEffort('wrk:service_worker_debug_mark_failed', {
+      stage: 'apply',
+      key: 'serviceWorker',
+      message: 'service worker debug mark failed',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'service_worker_debug_mark_failed' }
+    }, () => { G.__PATCHED_SERVICE_WORKER__ = true; });
+  }
+  __wrkDiag('info', 'wrk:service_worker_installed', {
+    stage: 'apply',
+    key: 'serviceWorker',
+    message: 'ServiceWorker installed',
+    type: 'pipeline missing data',
+    data: { outcome: 'return' }
+  }, null);
 }
 window.ServiceWorkerOverride = ServiceWorkerOverride;
 
@@ -1451,7 +1748,13 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
         G.__UACH_HE_PROMISE__ = p;
         return p;
       } catch (e) {
-        if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:uadata_he_contract_mismatch', e);
+        __wrkDiag('error', 'wrk:uadata_he_contract_mismatch', {
+          stage: 'contract',
+          key: '__EXPECTED_CLIENT_HINTS',
+          message: 'high entropy contract mismatch',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'uadata_he_contract_mismatch' }
+        }, e);
         throw e;
       }
     }
@@ -1508,9 +1811,13 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 
 
   window.WorkerPatchHooks = G.WorkerPatchHooks;
-  if (G.__DEBUG__) {
-    console.info('[WorkerInit] WorkerPatchHooks ready');
-  }
+  __wrkDiag('info', 'wrk:worker_patch_hooks_ready', {
+    stage: 'apply',
+    key: 'WorkerPatchHooks',
+    message: 'WorkerPatchHooks ready',
+    type: 'pipeline missing data',
+    data: { outcome: 'return' }
+  }, null);
 
   // reduce visibility of pipeline globals in Window realm (non-enumerable)
   try {
@@ -1528,7 +1835,13 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
         if (!d || d.enumerable === false) continue;
         if (d.configurable === false) {
           const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
-          if (typeof win.__DEGRADE__ === 'function') win.__DEGRADE__('wrk:hide_pipeline_surface_nonconfigurable', e);
+          __wrkDiag('warn', 'wrk:hide_pipeline_surface_nonconfigurable', {
+            stage: 'apply',
+            key: k,
+            message: 'hide pipeline surface skipped: non-configurable',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'hide_pipeline_surface_nonconfigurable' }
+          }, e);
           continue;
         }
         if ('value' in d) {
@@ -1539,10 +1852,40 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
       }
     }
   } catch (e) {
-    if (typeof G.__DEGRADE__ === 'function') G.__DEGRADE__('wrk:hide_pipeline_surface_failed', e);
+    __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
+      stage: 'apply',
+      key: '__ENV_BRIDGE__',
+      message: 'hide pipeline surface failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }
+    }, e);
   }
-
-
+    __wrkDiag('info', 'wrk:init:return', {
+      stage: 'apply',
+      key: '__PATCH_WRK__',
+      message: 'WrkModule initialized',
+      type: 'pipeline missing data',
+      data: { outcome: 'return' }
+    }, null);
+  } catch (e) {
+    __wrkDiag('error', 'wrk:fatal', {
+      stage: 'apply',
+      key: '__PATCH_WRK__',
+      message: 'WrkModule fatal',
+      type: 'browser structure missing data',
+      data: { outcome: 'throw', reason: 'fatal', rollbackOk: false }
+    }, e);
+    __wrkBestEffort('wrk:guard_release_failed', {
+      stage: 'guard',
+      key: '__PATCH_WRK__',
+      message: 'releaseGuardFlag failed',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'guard_release_failed' }
+    }, () => (__core && typeof __core.releaseGuardFlag === 'function')
+      ? __core.releaseGuardFlag('__PATCH_WRK__', __guardToken, false, __MODULE)
+      : false);
+    throw e;
+  }
 }; // <-- закрыли WrkModule
 
 // --- export WrkModule globally (stable regardless of load order) ---

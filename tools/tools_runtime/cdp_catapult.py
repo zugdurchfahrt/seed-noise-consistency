@@ -160,13 +160,29 @@ def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_c
 (() => {{
   'use strict';
   const G = globalThis;
-  G.__SW_ENV__ = {{
+  const nextEnv = {{
     primary: {json.dumps(language, ensure_ascii=False)},
     langs: {json.dumps(normalized_languages, ensure_ascii=False)},
     hc: {json.dumps(hardware_concurrency)},
     dm: {json.dumps(device_memory)},
     meta: {json.dumps(SW_META, ensure_ascii=False)}
   }};
+  const prev = Object.getOwnPropertyDescriptor(G, '__SW_ENV__');
+  if (prev && prev.configurable === false) {{
+    const cur = ('value' in prev) ? prev.value : G.__SW_ENV__;
+    const curJson = JSON.stringify(cur);
+    const nextJson = JSON.stringify(nextEnv);
+    if (curJson !== nextJson) {{
+      throw new Error('SW inject: __SW_ENV__ non-configurable mismatch');
+    }}
+    return;
+  }}
+  Object.defineProperty(G, '__SW_ENV__', {{
+    value: nextEnv,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  }});
 }})();
 //# sourceURL=sw_prelude_env.js
 """
@@ -181,17 +197,13 @@ def _build_worker_seed_prelude(global_seed: str) -> str:
   'use strict';
   const G = globalThis;
   const seed = {json.dumps(global_seed, ensure_ascii=False)};
-  try {{
-    const d = Object.getOwnPropertyDescriptor(G, 'CDP_GLOBAL_SEED');
-    if (d && d.configurable === false) {{
-      const cur = ('value' in d) ? d.value : G.CDP_GLOBAL_SEED;
-      if (String(cur) !== String(seed)) {{
-        throw new Error('WorkerSeed: CDP_GLOBAL_SEED non-configurable mismatch');
-      }}
-      return;
+  const d = Object.getOwnPropertyDescriptor(G, 'CDP_GLOBAL_SEED');
+  if (d && d.configurable === false) {{
+    const cur = ('value' in d) ? d.value : G.CDP_GLOBAL_SEED;
+    if (String(cur) !== String(seed)) {{
+      throw new Error('WorkerSeed: CDP_GLOBAL_SEED non-configurable mismatch');
     }}
-  }} catch (e) {{
-    // fallthrough
+    return;
   }}
   try {{
     Object.defineProperty(G, 'CDP_GLOBAL_SEED', {{
@@ -201,7 +213,32 @@ def _build_worker_seed_prelude(global_seed: str) -> str:
       enumerable: false
     }});
   }} catch (e) {{
-    try {{ G.CDP_GLOBAL_SEED = String(seed); }} catch (_e) {{}}
+    const writer = (typeof G.__DEGRADE__ === 'function') ? G.__DEGRADE__ : null;
+    if (writer && typeof writer.diag === 'function') {{
+      writer.diag('error', 'worker_seed_env:apply:define_failed', {{
+        module: 'worker_seed_env',
+        diagTag: 'worker_seed_env',
+        surface: 'worker_seed_env',
+        key: 'CDP_GLOBAL_SEED',
+        stage: 'apply',
+        message: 'CDP_GLOBAL_SEED define failed',
+        type: 'browser structure missing data',
+        data: {{ outcome: 'throw', reason: 'define_failed' }}
+      }}, e);
+    }} else if (writer) {{
+      writer('worker_seed_env:apply:define_failed', e, {{
+        level: 'error',
+        module: 'worker_seed_env',
+        diagTag: 'worker_seed_env',
+        surface: 'worker_seed_env',
+        key: 'CDP_GLOBAL_SEED',
+        stage: 'apply',
+        message: 'CDP_GLOBAL_SEED define failed',
+        type: 'browser structure missing data',
+        data: {{ outcome: 'throw', reason: 'define_failed' }}
+      }});
+    }}
+    throw e;
   }}
 }})();
 //# sourceURL=worker_seed_env.js

@@ -31,12 +31,52 @@
     const cache = { snap:null };
     const emitDegrade = (level, code, ctx, err) => {
       const d = (typeof __DEGRADE__ === "function") ? __DEGRADE__ : null;
+      const x = (ctx && typeof ctx === 'object') ? ctx : {};
+      const normalizedCtx = {
+        module: 'WORKER_PATCH_SRC',
+        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'worker_patch',
+        surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'worker',
+        key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+        stage: x.stage,
+        message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'worker_patch_src'),
+        data: Object.prototype.hasOwnProperty.call(x, 'data')
+          ? x.data
+          : {
+              outcome: (x.action === 'throw')
+                ? 'throw'
+                : ((x.action === 'native' || x.action === 'skip') ? 'skip' : (level === 'info' ? 'return' : 'skip'))
+            },
+        type: x.type
+      };
       if (!d) return;
       if (typeof d.diag === "function") {
-        d.diag(level, code, ctx || null, err || null);
+        d.diag(level, code, normalizedCtx, err || null);
         return;
       }
-      d(code, err || null, ctx || null);
+      d(code, err || null, Object.assign({}, normalizedCtx, { level: level || 'info' }));
+    };
+    const appliedDescriptors = [];
+    const trackedDefineProperty = (obj, key, desc) => {
+      const hadOwn = Object.prototype.hasOwnProperty.call(obj, key);
+      const prevDesc = hadOwn ? Object.getOwnPropertyDescriptor(obj, key) : null;
+      Object.defineProperty(obj, key, desc);
+      appliedDescriptors.push({ obj, key, hadOwn, prevDesc });
+    };
+    const trackedDefineProperties = (obj, descriptors) => {
+      for (const key of Object.keys(descriptors || {})) {
+        trackedDefineProperty(obj, key, descriptors[key]);
+      }
+    };
+    const rollbackAppliedDescriptors = () => {
+      for (let i = appliedDescriptors.length - 1; i >= 0; i -= 1) {
+        const item = appliedDescriptors[i];
+        if (!item || !item.obj) continue;
+        if (item.hadOwn && item.prevDesc) {
+          Object.defineProperty(item.obj, item.key, item.prevDesc);
+        } else {
+          delete item.obj[item.key];
+        }
+      }
     };
     const validDpr = v => Number.isFinite(v) && v > 0;
     const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
@@ -246,6 +286,7 @@
     markAsNative(seedEnsure, '__ensureMarkAsNative');
 
 
+    try {
     const getDevicePixelRatio = markAsNative(function getDevicePixelRatio(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!('dpr' in cache.snap)) throw new Error('UACHPatch: no dpr');
@@ -262,14 +303,14 @@
     if (dprTarget && !(dprDesc && dprDesc.configurable === false)) {
       const isData = dprDesc && Object.prototype.hasOwnProperty.call(dprDesc, 'value') && !dprDesc.get && !dprDesc.set;
       if (isData) {
-        Object.defineProperty(dprTarget, 'devicePixelRatio', {
+        trackedDefineProperty(dprTarget, 'devicePixelRatio', {
           value: getDevicePixelRatio(),
           writable: !!dprDesc.writable,
           configurable: !!dprDesc.configurable,
           enumerable: !!dprDesc.enumerable
         });
       } else {
-        Object.defineProperty(dprTarget, 'devicePixelRatio', {
+        trackedDefineProperty(dprTarget, 'devicePixelRatio', {
           configurable: dprDesc ? !!dprDesc.configurable : true,
           enumerable: dprDesc ? !!dprDesc.enumerable : false,
           get: getDevicePixelRatio,
@@ -280,73 +321,112 @@
 
     const deep = v => v==null ? v : JSON.parse(JSON.stringify(v));
     const toBrands = a => {
-      if (!Array.isArray(a)) throw new Error('THW: uaData.brands missing');
+      if (!Array.isArray(a)) throw new Error('worker_patch_src: uaData.brands missing');
       return a.map(x => {
-        if (!x || typeof x !== 'object') throw new Error('THW: uaData.brand entry');
+        if (!x || typeof x !== 'object') throw new Error('worker_patch_src: uaData.brand entry');
         const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
                     : (typeof x.name === 'string' && x.name) ? x.name
                     : null;
-        if (!brand) throw new Error('THW: uaData.brand missing');
+        if (!brand) throw new Error('worker_patch_src: uaData.brand missing');
         let versionRaw = null;
         if (typeof x.version === 'string') {
-          if (!x.version) throw new Error('THW: uaData.brand version missing');
+          if (!x.version) throw new Error('worker_patch_src: uaData.brand version missing');
           versionRaw = x.version;
         } else if (typeof x.version === 'number' && Number.isFinite(x.version)) {
           versionRaw = String(x.version);
         } else {
-          throw new Error('THW: uaData.brand version missing');
+          throw new Error('worker_patch_src: uaData.brand version missing');
         }
         const major = String(versionRaw).split('.')[0];
-        if (!major) throw new Error('THW: uaData.brand version missing');
+        if (!major) throw new Error('worker_patch_src: uaData.brand version missing');
         return { brand: String(brand), version: String(major) };
       });
     };
     const nativeUAD = nav && nav.userAgentData;
-    if (!nativeUAD) throw new Error('THW: worker navigator.userAgentData missing');
+    if (!nativeUAD) throw new Error('worker_patch_src: worker navigator.userAgentData missing');
     const uadProto = Object.getPrototypeOf(nativeUAD);
-    if (!uadProto) throw new Error('THW: worker navigator.userAgentData proto missing');
+    if (!uadProto) throw new Error('worker_patch_src: worker navigator.userAgentData proto missing');
     const isUadThis = (self) => (self === nativeUAD);
     const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
     const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
     const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
-    if (!dBrands || !dMobile || !dPlatform) throw new Error('THW: worker navigator.userAgentData descriptor missing');
+    if (!dBrands || !dMobile || !dPlatform) throw new Error('worker_patch_src: worker navigator.userAgentData descriptor missing');
     const origBrandsGet = dBrands && dBrands.get;
     const origMobileGet = dMobile && dMobile.get;
     const origPlatformGet = dPlatform && dPlatform.get;
-    Object.defineProperties(uadProto, {
+    trackedDefineProperties(uadProto, {
       brands:   { get: markAsNative(function getBrands(){
                         if (!isUadThis(this)) {
                           if (typeof origBrandsGet === 'function') return origBrandsGet.call(this);
                           throw new TypeError('Illegal invocation');
                         }
-                        if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le = cache.snap.uaData;
-                        if (!le) throw new Error('UACHPatch: missing userAgentData');
-                        return toBrands(le && le.brands);
+                        try {
+                          if (!cache.snap) throw new Error('UACHPatch: no snap');
+                          const le = cache.snap.uaData;
+                          if (!le) throw new Error('UACHPatch: missing userAgentData');
+                          return toBrands(le && le.brands);
+                        } catch (e) {
+                          emitDegrade('warn', 'worker_patch_src:uadata:getter_native_fallback', {
+                            stage: 'runtime',
+                            surface: 'WorkerNavigatorUAData',
+                            key: 'brands',
+                            message: 'brands getter fallback to native',
+                            type: 'pipeline missing data',
+                            data: { outcome: 'skip', reason: 'uadata_getter_native_fallback' }
+                          }, e);
+                          if (typeof origBrandsGet === 'function') return origBrandsGet.call(this);
+                          throw e;
+                        }
                       }, 'get brands'), enumerable: !!dBrands.enumerable, configurable: !!dBrands.configurable, set: dBrands.set },
       mobile:   { get: markAsNative(function getMobile(){
                         if (!isUadThis(this)) {
                           if (typeof origMobileGet === 'function') return origMobileGet.call(this);
                           throw new TypeError('Illegal invocation');
                         }
-                        if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le = cache.snap.uaData;
-                        if (!le) throw new Error('UACHPatch: missing userAgentData');
-                        if (typeof le.mobile !== 'boolean') throw new Error('THW: uaData.mobile missing');
-                        return le.mobile;
+                        try {
+                          if (!cache.snap) throw new Error('UACHPatch: no snap');
+                          const le = cache.snap.uaData;
+                          if (!le) throw new Error('UACHPatch: missing userAgentData');
+                          if (typeof le.mobile !== 'boolean') throw new Error('worker_patch_src: uaData.mobile missing');
+                          return le.mobile;
+                        } catch (e) {
+                          emitDegrade('warn', 'worker_patch_src:uadata:getter_native_fallback', {
+                            stage: 'runtime',
+                            surface: 'WorkerNavigatorUAData',
+                            key: 'mobile',
+                            message: 'mobile getter fallback to native',
+                            type: 'pipeline missing data',
+                            data: { outcome: 'skip', reason: 'uadata_getter_native_fallback' }
+                          }, e);
+                          if (typeof origMobileGet === 'function') return origMobileGet.call(this);
+                          throw e;
+                        }
                       }, 'get mobile'),       enumerable: !!dMobile.enumerable, configurable: !!dMobile.configurable, set: dMobile.set },
       platform: { get: markAsNative(function getPlatform(){
                         if (!isUadThis(this)) {
                           if (typeof origPlatformGet === 'function') return origPlatformGet.call(this);
                           throw new TypeError('Illegal invocation');
                         }
-                        if (!cache.snap) throw new Error('UACHPatch: no snap');
-                        const le = cache.snap.uaData;
-                        if (!le) throw new Error('UACHPatch: missing userAgentData');
-                        if (typeof le.platform !== 'string' || !le.platform) {
-                          throw new Error('THW: uaData.platform missing');
+                        try {
+                          if (!cache.snap) throw new Error('UACHPatch: no snap');
+                          const le = cache.snap.uaData;
+                          if (!le) throw new Error('UACHPatch: missing userAgentData');
+                          if (typeof le.platform !== 'string' || !le.platform) {
+                            throw new Error('worker_patch_src: uaData.platform missing');
+                          }
+                          return le.platform;
+                        } catch (e) {
+                          emitDegrade('warn', 'worker_patch_src:uadata:getter_native_fallback', {
+                            stage: 'runtime',
+                            surface: 'WorkerNavigatorUAData',
+                            key: 'platform',
+                            message: 'platform getter fallback to native',
+                            type: 'pipeline missing data',
+                            data: { outcome: 'skip', reason: 'uadata_getter_native_fallback' }
+                          }, e);
+                          if (typeof origPlatformGet === 'function') return origPlatformGet.call(this);
+                          throw e;
                         }
-                        return le.platform;
                       }, 'get platform'), enumerable: !!dPlatform.enumerable, configurable: !!dPlatform.configurable, set: dPlatform.set },
     });
     const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList');
@@ -356,14 +436,27 @@
         if (typeof origFullGet === 'function') return origFullGet.call(this);
         throw new TypeError('Illegal invocation');
       }
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
-      const le = cache.snap.uaData;
-      if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
-      if (!Array.isArray(le.he.fullVersionList)) throw new Error('UACHPatch: bad highEntropy.fullVersionList');
-      return deep(le.he.fullVersionList);
+      try {
+        if (!cache.snap) throw new Error('UACHPatch: no snap');
+        const le = cache.snap.uaData;
+        if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
+        if (!Array.isArray(le.he.fullVersionList)) throw new Error('UACHPatch: bad highEntropy.fullVersionList');
+        return deep(le.he.fullVersionList);
+      } catch (e) {
+        emitDegrade('warn', 'worker_patch_src:uadata:getter_native_fallback', {
+          stage: 'runtime',
+          surface: 'WorkerNavigatorUAData',
+          key: 'fullVersionList',
+          message: 'fullVersionList getter fallback to native',
+          type: 'pipeline missing data',
+          data: { outcome: 'skip', reason: 'uadata_getter_native_fallback' }
+        }, e);
+        if (typeof origFullGet === 'function') return origFullGet.call(this);
+        throw e;
+      }
     }, 'get fullVersionList');
     if (dFull) {
-      Object.defineProperty(uadProto, 'fullVersionList', {
+      trackedDefineProperty(uadProto, 'fullVersionList', {
         configurable: !!dFull.configurable,
         enumerable: !!dFull.enumerable,
         get: getFullVersionList,
@@ -379,7 +472,7 @@
       }
       return {brands:this.brands, mobile:this.mobile, platform:this.platform};
     }, 'toJSON');
-    Object.defineProperty(uadProto, 'toJSON', {
+    trackedDefineProperty(uadProto, 'toJSON', {
       configurable: dToJSON ? !!dToJSON.configurable : true,
       enumerable: dToJSON ? !!dToJSON.enumerable : false,
       writable: dToJSON && Object.prototype.hasOwnProperty.call(dToJSON, 'writable') ? dToJSON.writable : true,
@@ -392,40 +485,61 @@
           if (typeof origGHEV === 'function') return origGHEV.call(this, keys);
           throw new TypeError('Illegal invocation');
         }
-        if (!cache.snap) throw new Error('UACHPatch: no snap');
-        if (!Array.isArray(keys)) throw new Error('THW: bad keys');
-        for (const k of keys) {
-          if (typeof k !== 'string' || !k) throw new Error('THW: bad keys');
+        try {
+          if (!cache.snap) throw new Error('UACHPatch: no snap');
+          if (!Array.isArray(keys)) return origGHEV.call(this, keys);
+          for (const k of keys) {
+            if (typeof k !== 'string' || !k) return origGHEV.call(this, keys);
+          }
+          const s = cache.snap;
+          const le = s.uaData;
+          if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
+          const src = s.highEntropy;
+          if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
+          const map = {
+            brands: le.brands,
+            mobile: le.mobile,
+            platform: le.platform,
+            architecture: src.architecture,
+            bitness: src.bitness,
+            model: src.model,
+            platformVersion: src.platformVersion,
+            fullVersionList: src.fullVersionList,
+            wow64: src.wow64,
+            formFactors: src.formFactors
+          };
+          const out = {};
+          for (const k of keys) {
+            if (!(k in map)) continue;
+            const v = map[k];
+            if (v === undefined || v === null || (typeof v === 'string' && !v && k !== 'model') || (Array.isArray(v) && !v.length)) {
+              emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_native_fallback', {
+                stage: 'runtime',
+                surface: 'WorkerNavigatorUAData',
+                key: k,
+                message: 'getHighEntropyValues fallback to native',
+                type: 'pipeline missing data',
+                data: { outcome: 'skip', reason: 'get_high_entropy_values_native_fallback' }
+              }, null);
+              return origGHEV.call(this, keys);
+            }
+            out[k] = deep(v);
+          }
+          return Promise.resolve(out);
+        } catch (e) {
+          emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_native_fallback', {
+            stage: 'runtime',
+            surface: 'WorkerNavigatorUAData',
+            key: 'getHighEntropyValues',
+            message: 'getHighEntropyValues fallback to native',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'get_high_entropy_values_native_fallback' }
+          }, e);
+          if (typeof origGHEV === 'function') return origGHEV.call(this, keys);
+          throw e;
         }
-        const s = cache.snap;
-        const le = s.uaData;
-        if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
-        const src = s.highEntropy;
-        if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
-        const map = {
-          brands: le.brands,
-          mobile: le.mobile,
-          platform: le.platform,
-          architecture: src.architecture,
-          bitness: src.bitness,
-          model: src.model,
-          platformVersion: src.platformVersion,
-          fullVersionList: src.fullVersionList,
-          wow64: src.wow64,
-          formFactors: src.formFactors
-        };
-        const out = {};
-        for (const k of keys) {
-          if (!(k in map)) continue;
-          const v = map[k];
-          if (v === undefined || v === null) throw new Error(`THW: missing highEntropy.${k}`);
-          if (typeof v === 'string' && !v && k !== 'model') throw new Error(`THW: missing highEntropy.${k}`);
-          if (Array.isArray(v) && !v.length) throw new Error(`THW: missing highEntropy.${k}`);
-          out[k] = deep(v);
-        }
-        return Promise.resolve(out);
       }, 'getHighEntropyValues');
-    Object.defineProperty(uadProto, 'getHighEntropyValues', {
+    trackedDefineProperty(uadProto, 'getHighEntropyValues', {
       configurable: dGHEV ? !!dGHEV.configurable : true,
       enumerable: dGHEV ? !!dGHEV.enumerable : false,
       writable: dGHEV && Object.prototype.hasOwnProperty.call(dGHEV, 'writable') ? dGHEV.writable : true,
@@ -439,7 +553,19 @@
       const impl = function(){
         const recv = this;
         if (recv === nav) {
-          return Reflect.apply(patchedGet, recv, []);
+          try {
+            return Reflect.apply(patchedGet, recv, []);
+          } catch (e) {
+            emitDegrade('warn', 'worker_patch_src:getter_native_fallback', {
+              stage: 'runtime',
+              surface: 'WorkerNavigator',
+              key: k,
+              message: 'worker navigator getter fallback to native',
+              type: 'pipeline missing data',
+              data: { outcome: 'skip', reason: 'getter_native_fallback' }
+            }, e);
+            return Reflect.apply(origGet, recv, []);
+          }
         }
         return Reflect.apply(origGet, recv, []);
       };
@@ -493,7 +619,7 @@
         }
         const ownOrigGet = resolveNativeGetter(own, 'navigator');
         const ownGuardedGet = makeGuardedGetter(k, nav, getter, ownOrigGet);
-        Object.defineProperty(nav, k, {
+        trackedDefineProperty(nav, k, {
           configurable: !!own.configurable,
           enumerable: !!own.enumerable,
           get: ownGuardedGet,
@@ -519,7 +645,7 @@
         }
         const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
         const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet);
-        Object.defineProperty(owner, k, {
+        trackedDefineProperty(owner, k, {
           configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable,
           get: protoGuardedGet,
@@ -535,7 +661,7 @@
       const err = new Error(message);
       emitDegrade('error', code, {
         type: 'browser structure missing data',
-        stage: 'sanity',
+        stage: 'contract',
         module: 'WORKER_PATCH_SRC',
         surface: 'WorkerNavigator',
         key: key || null,
@@ -706,13 +832,13 @@
         // Early revoke can surface as `importScripts(blob:...) failed to load` in real sites.
         return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
       }, 'Worker');
-      Object.defineProperty(self, 'Worker', {
+      trackedDefineProperty(self, 'Worker', {
         configurable: dWorker.configurable,
         enumerable: dWorker.enumerable,
         writable: dWorker.writable,
         value: WrappedWorker
       });
-      Object.defineProperty(self.Worker, '__ENV_WRAPPED__', {
+      trackedDefineProperty(self.Worker, '__ENV_WRAPPED__', {
         value: true,
         writable: false,
         configurable: true,
@@ -779,10 +905,23 @@
       },
       type: "pipeline missing data"
     };
-    if (__workerDegradeDiag) {
-      try { __workerDegradeDiag("info", "WORKER_PATCH_SRC:worker_patch", __workerCtx, null); } catch (_) {}
-    } else if (typeof __workerDegrade === "function") {
-      try { __workerDegrade("WORKER_PATCH_SRC:worker_patch", null, __workerCtx); } catch (_) {}
+    emitDegrade('info', 'WORKER_PATCH_SRC:worker_patch', __workerCtx, null);
+    } catch (e) {
+      let rollbackErr = null;
+      try {
+        rollbackAppliedDescriptors();
+      } catch (re) {
+        rollbackErr = re;
+      }
+      emitDegrade('error', 'worker_patch_src:apply:rollback', {
+        stage: rollbackErr ? 'rollback' : 'apply',
+        surface: 'worker',
+        key: 'installWorkerUACHMirror',
+        message: rollbackErr ? 'worker patch rollback failed' : 'worker patch apply failed',
+        type: 'browser structure missing data',
+        data: { outcome: rollbackErr ? 'throw' : 'rollback', reason: rollbackErr ? 'rollback_failed' : 'apply_failed', rollbackOk: !rollbackErr }
+      }, rollbackErr || e);
+      throw (rollbackErr || e);
     }
   };
 })();
