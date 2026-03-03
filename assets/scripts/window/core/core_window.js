@@ -157,19 +157,55 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
-  const nativeToString = sharedCoreToStringStateOk
-    ? sharedCoreToStringState.nativeToString
-    : (iframeOracleToString || existingToString || Function.prototype.toString);
-  if (typeof nativeToString !== 'function') {
-    throw new Error('[CoreWindow] Function.prototype.toString missing');
-  }
-
   const toStringOverrideMap = sharedCoreToStringStateOk
     ? sharedCoreToStringState.overrideMap
     : new WeakMap();
   const toStringProxyTargetMap = sharedCoreToStringStateOk
     ? sharedCoreToStringState.proxyTargetMap
     : new WeakMap();
+
+  const currentRealmToString = (typeof existingToString === 'function')
+    ? existingToString
+    : Function.prototype.toString;
+
+  function resolveToStringBridgeTarget(candidate) {
+    if (typeof candidate !== 'function') return null;
+    let bridgeTarget = candidate;
+    const seenBridgeTargets = new WeakSet();
+    while (typeof bridgeTarget === 'function') {
+      if (seenBridgeTargets.has(bridgeTarget)) {
+        __emit('warn', 'core_window:toString_native_candidate_cycle', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'preflight',
+          message: 'nativeToString candidate chain cycle detected; fallback to current realm toString',
+          type: 'contract violation',
+          data: { outcome: 'return', fallback: 'current_realm_toString' }
+        }, new Error('[CoreWindow] nativeToString candidate cycle'));
+        return null;
+      }
+      seenBridgeTargets.add(bridgeTarget);
+      const nextTarget = toStringProxyTargetMap.get(bridgeTarget);
+      if (typeof nextTarget !== 'function') break;
+      bridgeTarget = nextTarget;
+    }
+    return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
+  }
+
+  const nativeToStringCandidate = sharedCoreToStringStateOk
+    ? sharedCoreToStringState.nativeToString
+    : (currentRealmToString || iframeOracleToString || Function.prototype.toString);
+
+  const nativeToString = resolveToStringBridgeTarget(nativeToStringCandidate)
+    || resolveToStringBridgeTarget(currentRealmToString)
+    || resolveToStringBridgeTarget(iframeOracleToString)
+    || null;
+
+  if (typeof nativeToString !== 'function') {
+    throw new Error('[CoreWindow] Function.prototype.toString missing');
+  }
 
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
@@ -633,8 +669,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
           }, e);
           try {
             return Reflect.apply(target, thisArg, argList);
-          } catch (_) {
-            throw e;
+          } catch (nativeErr) {
+            throw nativeErr;
           }
         }
       }
