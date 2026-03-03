@@ -315,7 +315,7 @@ def init_driver(
     logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
 
-    # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
+    # Inject global seed into Dedicated/Shared workers via CDP as CDP_GLOBAL_SEED (pauses workers on start).
     # if the CDP websocket drops mid-session, paused workers may remain paused.
     if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
         cdp.enable_worker_seed_inject(global_seed)
