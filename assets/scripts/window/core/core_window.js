@@ -1157,8 +1157,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return wrapped;
         }
 
-        const strictReceiver = !!checkThis && invalidThis === 'throw';
-        const useCoreWrapper = wrapLayer === 'core_wrapper' || (wrapLayer === 'auto' && strictReceiver);
+        // [NORMATIVE] auto-mode getters must preserve cross-realm toString/shape checks.
+        const useCoreWrapper = wrapLayer === 'core_wrapper' || wrapLayer === 'auto';
         if (!useCoreWrapper) {
           const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
             if (checkThis && !checkThis(this)) {
@@ -1331,8 +1331,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] named_wrapper_strict forbids setImpl');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        const strictReceiver = !!validThis && invalidThis === 'throw';
-        const useCoreWrapper = wrapLayer === 'core_wrapper' || (wrapLayer === 'auto' && strictReceiver);
+        const useCoreWrapper = wrapLayer === 'core_wrapper' || wrapLayer === 'auto';
         if (strictAccessorContract && useCoreWrapper) {
           const e = new TypeError('[Core.applyTargets] named_wrapper_strict cannot use core_wrapper');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -1484,7 +1483,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] method cannot use descriptor_only wrapLayer');
           return fail(planItem.policy, planItem.tag, 'wrap_layer_kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        const useCoreWrapper = wrapLayer === 'core_wrapper' || (wrapLayer === 'auto' && requiresStrictThis);
+        const useCoreWrapper = wrapLayer === 'core_wrapper' || wrapLayer === 'auto';
         planItem.wrapperClass = useCoreWrapper ? 'core_proxy' : 'synthetic_named';
         if (requiresStrictThis && !validThis) {
           const e = new TypeError('[Core.applyTargets] invokeClass requires validThis');
@@ -1608,7 +1607,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] promise_method cannot use descriptor_only wrapLayer');
           return fail(planItem.policy, planItem.tag, 'wrap_layer_kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        const useCoreWrapper = wrapLayer === 'core_wrapper' || (wrapLayer === 'auto' && requiresStrictThis);
+        const useCoreWrapper = wrapLayer === 'core_wrapper' || wrapLayer === 'auto';
         planItem.wrapperClass = useCoreWrapper ? 'core_proxy' : 'synthetic_named';
         if (requiresStrictThis && !validThis) {
           const e = new TypeError('[Core.applyTargets] invokeClass requires validThis');

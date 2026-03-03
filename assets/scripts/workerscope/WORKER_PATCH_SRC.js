@@ -193,10 +193,9 @@
       }, e);
       throw e;
     }
-    const nativeToString = state.nativeToString;
     const overrideMap = state.overrideMap;
     const proxyTargetMap = state.proxyTargetMap;
-    if (typeof nativeToString !== 'function' || !(overrideMap instanceof WeakMap) || !(proxyTargetMap instanceof WeakMap)) {
+    if (!(overrideMap instanceof WeakMap) || !(proxyTargetMap instanceof WeakMap)) {
       const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ invalid');
       emitDegrade('error', 'worker_patch_src:state:contract:invalid', {
         type: 'pipeline missing data',
@@ -204,6 +203,45 @@
         module: 'WORKER_PATCH_SRC',
         surface: '__CORE_TOSTRING_STATE__',
         key: '__CORE_TOSTRING_STATE__',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
+    }
+    function resolveToStringBridgeTarget(candidate) {
+      if (typeof candidate !== 'function') return null;
+      let bridgeTarget = candidate;
+      const seenBridgeTargets = new WeakSet();
+      while (typeof bridgeTarget === 'function') {
+        if (seenBridgeTargets.has(bridgeTarget)) {
+          const e = new Error('UACHPatch: toString bridge cycle in state');
+          emitDegrade('error', 'worker_patch_src:tostring:contract:bridge_cycle', {
+            type: 'pipeline missing data',
+            stage: 'contract',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'Function.prototype.toString',
+            key: 'toString',
+            policy: 'throw',
+            action: 'throw'
+          }, e);
+          throw e;
+        }
+        seenBridgeTargets.add(bridgeTarget);
+        const nextTarget = proxyTargetMap.get(bridgeTarget);
+        if (typeof nextTarget !== 'function') break;
+        bridgeTarget = nextTarget;
+      }
+      return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
+    }
+    const nativeToString = resolveToStringBridgeTarget(state.nativeToString);
+    if (typeof nativeToString !== 'function') {
+      const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__.nativeToString invalid');
+      emitDegrade('error', 'worker_patch_src:state:contract:native_toString_invalid', {
+        type: 'pipeline missing data',
+        stage: 'contract',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'Function.prototype.toString',
+        key: 'toString',
         policy: 'throw',
         action: 'throw'
       }, e);
@@ -724,9 +762,18 @@
       let wrapped = impl;
       if (typeof k === 'string' && k) {
         try {
-          const acc = ({ get [k]() { return impl.call(this); } });
-          const d = Object.getOwnPropertyDescriptor(acc, k);
-          if (d && typeof d.get === 'function') wrapped = d.get;
+          const isIdent = /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(k);
+          if (isIdent) {
+            // Static accessor name keeps engine-facing source form stable (avoids computed "[k]" leakage).
+            const buildAccessor = new Function('impl', `return ({ get ${k}() { return impl.call(this); } });`);
+            const acc = buildAccessor(impl);
+            const d = Object.getOwnPropertyDescriptor(acc, k);
+            if (d && typeof d.get === 'function') wrapped = d.get;
+          } else {
+            const acc = ({ get [k]() { return impl.call(this); } });
+            const d = Object.getOwnPropertyDescriptor(acc, k);
+            if (d && typeof d.get === 'function') wrapped = d.get;
+          }
         } catch (e) {
           emitDegrade('warn', 'worker_patch_src:getter:apply:name_failed', {
             type: 'browser structure missing data',

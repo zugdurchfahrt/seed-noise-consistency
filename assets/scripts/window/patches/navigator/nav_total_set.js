@@ -910,14 +910,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           owner: navProto,
           key: key,
           kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
+          // Cross-realm Function#toString must not reveal synthetic wrapper source.
+          // Use core proxy-wrapper so other realms see native-looking "[native code]" too.
+          wrapLayer: 'core_wrapper',
           policy: 'strict',
           diagTag: 'nav_total_set:critical',
           allowCreate: false,
           configurable: !!d.configurable,
           enumerable: !!d.enumerable,
           validThis: __isNavigatorThis,
-          invalidThis: 'throw',
+          // [NORMATIVE] invalid receiver must be validated by the engine and rethrown unchanged.
+          invalidThis: 'native',
           getImpl: function navCriticalGetImpl() {
             __navLogAccess(key, null);
             return getter.call(this);
