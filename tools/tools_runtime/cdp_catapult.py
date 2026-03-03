@@ -1,5 +1,6 @@
 # cdp_catapult.py  (SW injector only)
 import json
+import hashlib
 import time
 import threading
 import subprocess
@@ -654,12 +655,26 @@ def run_worker_seed():
         logger.exception("Worker seed inject: get_ws_url failed (PATCH_SKIPPED)")
         raise ValueError("Worker seed inject: fail") from e
 
+    try:
+        seed_fp = hashlib.sha256(str(WORKER_GLOBAL_SEED).encode("utf-8")).hexdigest()[:12]
+    except Exception:
+        seed_fp = None
+    if seed_fp:
+        logger.info(
+            "Worker seed inject: seed prepared len=%s sha256_12=%s",
+            len(str(WORKER_GLOBAL_SEED)),
+            seed_fp,
+        )
+    else:
+        logger.info("Worker seed inject: seed prepared len=%s", len(str(WORKER_GLOBAL_SEED)))
+
     logger.warning("Worker seed inject: CDP websocket starting (waitForDebuggerOnStart=true): %s", ws_url)
     log_cdp_runtime_diag("worker_seed_before_ws")
 
     msg_id = {"v": 0}
     injected = set()   # targetId set
     manual_attach_sent = set()  # targetId set for fallback manual attach
+    sess_meta = {}  # sessionId -> {targetId,type,url}
     seed_prelude = _build_worker_seed_prelude(WORKER_GLOBAL_SEED)
     # sanity_expr = "(() => { try { return String(globalThis.CDP_GLOBAL_SEED); } catch (e) { return null; } })()"
 
@@ -780,10 +795,34 @@ def run_worker_seed():
                             _fatal(
                                 ws,
                                 "worker seed sanity: mismatch",
-                                {"expected_len": len(expected_seed), "got": out},
+                                {"expected_len": len(expected_seed), "got": out, "target": sess_meta.get(sid)},
                             )
                             return
-                        logger.info("Worker seed inject: sanity OK (CDP_GLOBAL_SEED set)")
+                        try:
+                            seed_fp = hashlib.sha256(str(expected_seed).encode("utf-8")).hexdigest()[:12]
+                        except Exception:
+                            seed_fp = None
+                        meta = sess_meta.get(sid) or {}
+                        ttype = meta.get("type")
+                        tid = meta.get("targetId")
+                        turl = meta.get("url")
+                        if seed_fp:
+                            logger.info(
+                                "Worker seed inject: sanity OK (CDP_GLOBAL_SEED set) type=%s targetId=%s url=%r seed_len=%s seed_sha256_12=%s",
+                                ttype,
+                                tid,
+                                turl,
+                                len(expected_seed),
+                                seed_fp,
+                            )
+                        else:
+                            logger.info(
+                                "Worker seed inject: sanity OK (CDP_GLOBAL_SEED set) type=%s targetId=%s url=%r seed_len=%s",
+                                ttype,
+                                tid,
+                                turl,
+                                len(expected_seed),
+                            )
                     except Exception as e:
                         _fatal(ws, "worker seed sanity: parse/compare failed", e)
             return
@@ -835,6 +874,11 @@ def run_worker_seed():
         if tid in injected:
             return
         injected.add(tid)
+
+        try:
+            sess_meta[sessionId] = {"targetId": tid, "type": ttype, "url": turl}
+        except Exception:
+            pass
 
         logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
         try:

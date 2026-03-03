@@ -450,14 +450,27 @@ const AudioContextModule = function AudioContextModule(window) {
         diagTag: `audio:${CTX_NAME}:sampleRate`,
         allowCreate: true,
         configurable: sampleRateDesc ? !!sampleRateDesc.configurable : true,
-        enumerable: sampleRateDesc ? !!sampleRateDesc.enumerable : false,
-        invalidThis: 'throw',
-        getImpl: function audioSampleRateGet(origGet) {
-          const v = Reflect.apply(origGet, this, []);
-          if (Number.isFinite(v) && priority >= sampleRateSource) { nativeSampleRate = v; sampleRateSource = priority; }
-          return v;
-        }
-      });
+          enumerable: sampleRateDesc ? !!sampleRateDesc.enumerable : false,
+          invalidThis: 'throw',
+          getImpl: function audioSampleRateGet(origGet) {
+            let v;
+            try {
+              v = Reflect.apply(origGet, this, []);
+            } catch (e) {
+              degrade('audiocontext:sampleRate:native_throw', e, {
+                stage: 'runtime',
+                level: 'warn',
+                type: __audioTypeBrowser,
+                diagTag: `audio:${CTX_NAME}:sampleRate`,
+                key: 'sampleRate',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              });
+              throw e;
+            }
+            if (Number.isFinite(v) && priority >= sampleRateSource) { nativeSampleRate = v; sampleRateSource = priority; }
+            return v;
+          }
+        });
     }
     if ('baseLatency' in proto) {
       const baseLatencyDesc = Object.getOwnPropertyDescriptor(proto, 'baseLatency') || getPropDescriptorDeep(proto, 'baseLatency');
@@ -475,7 +488,20 @@ const AudioContextModule = function AudioContextModule(window) {
           enumerable: baseLatencyDesc ? !!baseLatencyDesc.enumerable : false,
           invalidThis: 'throw',
           getImpl: function audioBaseLatencyGet(origGet) {
-            const v = Reflect.apply(origGet, this, []);
+            let v;
+            try {
+              v = Reflect.apply(origGet, this, []);
+            } catch (e) {
+              degrade('audiocontext:baseLatency:native_throw', e, {
+                stage: 'runtime',
+                level: 'warn',
+                type: __audioTypeBrowser,
+                diagTag: `audio:${CTX_NAME}:baseLatency`,
+                key: 'baseLatency',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              });
+              throw e;
+            }
             if (Number.isFinite(v) && priority >= baseLatencySource) { nativeBaseLatency = v; baseLatencySource = priority; }
             return v;
           }
@@ -498,7 +524,19 @@ const AudioContextModule = function AudioContextModule(window) {
         invalidThis: 'throw',
         invoke: function audioCreateBufferInvoke(orig, args) {
           const input = Array.isArray(args) ? args : [];
-          return Reflect.apply(orig, this, input);
+          try {
+            return Reflect.apply(orig, this, input);
+          } catch (e) {
+            degrade('audiocontext:createBuffer:native_throw', e, {
+              stage: 'runtime',
+              level: 'warn',
+              type: __audioTypeBrowser,
+              diagTag: `audio:${CTX_NAME}:createBuffer`,
+              key: 'createBuffer',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            });
+            throw e;
+          }
         }
       });
     }
@@ -518,7 +556,20 @@ const AudioContextModule = function AudioContextModule(window) {
       invalidThis: 'throw',
       invoke: function audioCreateAnalyserInvoke(orig, args) {
         const input = Array.isArray(args) ? args : [];
-        const analyser = Reflect.apply(orig, this, input);
+        let analyser;
+        try {
+          analyser = Reflect.apply(orig, this, input);
+        } catch (e) {
+          degrade('audiocontext:createAnalyser:native_throw', e, {
+            stage: 'runtime',
+            level: 'warn',
+            type: __audioTypeBrowser,
+            diagTag: `audio:${CTX_NAME}:createAnalyser`,
+            key: 'createAnalyser',
+            data: { outcome: 'throw', reason: 'native_throw' }
+          });
+          throw e;
+        }
         if (!analyser || (typeof analyser !== 'object' && typeof analyser !== 'function')) return analyser;
 
       // --- Byte Spectrum: discrete ±1/0 with compensation of the summ ---
@@ -527,7 +578,20 @@ const AudioContextModule = function AudioContextModule(window) {
         const wrappedByte = markAsNative(__wrapNativeApply(origByte, 'getByteFrequencyData', function(target, thisArg, argList) {
           const input = Array.isArray(argList) ? argList : [];
           const array = input[0];
-          const result = Reflect.apply(target, thisArg, input);
+          let result;
+          try {
+            result = Reflect.apply(target, thisArg, input);
+          } catch (e) {
+            degrade('audiocontext:analyser:byte_freq_native_throw', e, {
+              stage: 'runtime',
+              level: 'warn',
+              type: __audioTypeBrowser,
+              diagTag: `audio:${CTX_NAME}:analyser`,
+              key: 'AnalyserNode.getByteFrequencyData',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            });
+            throw e;
+          }
           if (!AUDIO_NOISE_ENABLED) return result;
           try {
             let delta = 0;
@@ -574,7 +638,20 @@ const AudioContextModule = function AudioContextModule(window) {
         const wrappedFloat = markAsNative(__wrapNativeApply(origFloat, 'getFloatFrequencyData', function(target, thisArg, argList) {
           const input = Array.isArray(argList) ? argList : [];
           const array = input[0];
-          const result = Reflect.apply(target, thisArg, input);
+          let result;
+          try {
+            result = Reflect.apply(target, thisArg, input);
+          } catch (e) {
+            degrade('audiocontext:analyser:float_freq_native_throw', e, {
+              stage: 'runtime',
+              level: 'warn',
+              type: __audioTypeBrowser,
+              diagTag: `audio:${CTX_NAME}:analyser`,
+              key: 'AnalyserNode.getFloatFrequencyData',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            });
+            throw e;
+          }
           if (!AUDIO_NOISE_ENABLED) return result;
           try {
             const lo = (typeof thisArg.minDecibels === 'number') ? thisArg.minDecibels : -100;
@@ -629,7 +706,20 @@ const AudioContextModule = function AudioContextModule(window) {
         const wrappedByteTD = markAsNative(__wrapNativeApply(origByteTD, 'getByteTimeDomainData', function(target, thisArg, argList) {
           const input = Array.isArray(argList) ? argList : [];
           const array = input[0];
-          const result = Reflect.apply(target, thisArg, input);
+          let result;
+          try {
+            result = Reflect.apply(target, thisArg, input);
+          } catch (e) {
+            degrade('audiocontext:analyser:byte_time_native_throw', e, {
+              stage: 'runtime',
+              level: 'warn',
+              type: __audioTypeBrowser,
+              diagTag: `audio:${CTX_NAME}:analyser`,
+              key: 'AnalyserNode.getByteTimeDomainData',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            });
+            throw e;
+          }
           if (!AUDIO_NOISE_ENABLED) return result;
           try {
             const n = array.length | 0;
@@ -677,7 +767,20 @@ const AudioContextModule = function AudioContextModule(window) {
         const wrappedFloatTD = markAsNative(__wrapNativeApply(origFloatTD, 'getFloatTimeDomainData', function(target, thisArg, argList) {
           const input = Array.isArray(argList) ? argList : [];
           const array = input[0];
-          const result = Reflect.apply(target, thisArg, input);
+          let result;
+          try {
+            result = Reflect.apply(target, thisArg, input);
+          } catch (e) {
+            degrade('audiocontext:analyser:float_time_native_throw', e, {
+              stage: 'runtime',
+              level: 'warn',
+              type: __audioTypeBrowser,
+              diagTag: `audio:${CTX_NAME}:analyser`,
+              key: 'AnalyserNode.getFloatTimeDomainData',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            });
+            throw e;
+          }
           if (!AUDIO_NOISE_ENABLED) return result;
           const n = array.length | 0;
           if (!n) return result;

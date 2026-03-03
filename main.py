@@ -670,6 +670,12 @@ def main():
     random.seed(seed_int)
     os.environ['__GLOBAL_SEED'] = global_seed
     logger.info(f"Seed for the current session has been generated: {global_seed}")
+    try:
+        seed_fp = hashlib.sha256(global_seed.encode("utf-8")).hexdigest()[:12]
+        logger.info("Seed fingerprint rule: sha256_12 = sha256(seed)[:12]")
+        logger.info("Seed fingerprint: len=%s sha256_12=%s", len(global_seed), seed_fp)
+    except Exception:
+        logger.info("Seed fingerprint: unavailable")
     client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
     try:
         json_path = str(PROFILE_DATA_SRC/ "profile.json")
@@ -1045,25 +1051,6 @@ def main():
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/")
-        # if os.getenv("WINDOW_DIAG_RELAY", "1") == "1":
-        #     window_diag_thread = threading.Thread(
-        #         target=cdp.run_window_diag_relay,
-        #         kwargs={
-        #             "driver": driver,
-        #             "poll_interval_sec": 0.75,
-        #             "critical_only": True,
-        #             "limit": 200,
-        #             "include_data": True,
-        #         },
-        #         daemon=True,
-        #         name="window_diag_relay",
-        #     )
-        #     window_diag_thread.start()
-        #     logger.info(
-        #         "Window diag relay thread started name=%s ident=%s",
-        #         window_diag_thread.name,
-        #         window_diag_thread.ident,
-        #     )
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.

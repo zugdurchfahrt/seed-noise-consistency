@@ -46,47 +46,38 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // === 0. Utilities ===
   const NOP = () => {};
   function emitContextDiag(level, code, err, extra) {
-    const d = global && global.__DEGRADE__;
-    const diag = (d && typeof d.diag === 'function') ? d.diag.bind(d) : null;
-    const eventCode = (typeof code === 'string' && code) ? code : 'context:diag';
-    const e = (typeof err === 'undefined') ? null : err;
-    const x = (extra && typeof extra === 'object') ? extra : null;
-    const stage = (x && typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime';
-    const errName = (e && typeof e === 'object' && typeof e.name === 'string') ? e.name : '';
-    const errMsg = (e && typeof e === 'object' && typeof e.message === 'string')
-      ? e.message
-      : (typeof e === 'string' ? e : '');
-    const isIllegal = !!(errName === 'TypeError' && /Illegal invocation/i.test(errMsg || ''));
-    const defaultType = (stage === 'runtime' || isIllegal) ? 'browser structure missing data' : 'pipeline missing data';
-    const ctx = Object.assign({
-      module: 'context',
-      diagTag: 'context',
-      surface: 'canvas',
-      key: null,
-      stage: 'runtime',
-      message: eventCode,
-      type: defaultType,
-      data: null
-    }, x);
-    if (!ctx.type) ctx.type = defaultType;
-    if (isIllegal) ctx.type = 'browser structure missing data';
-    if (!ctx.data || typeof ctx.data !== 'object') ctx.data = {};
-    if (ctx.data.outcome !== 'return' &&
-        ctx.data.outcome !== 'skip' &&
-        ctx.data.outcome !== 'rollback' &&
-        ctx.data.outcome !== 'throw') {
-      if (ctx.stage === 'rollback') ctx.data.outcome = 'rollback';
-      else if (isIllegal) ctx.data.outcome = 'throw';
-      else if (ctx.stage === 'hook') ctx.data.outcome = 'skip';
-      else if (ctx.stage === 'apply' && level === 'info') ctx.data.outcome = 'return';
-      else if (level === 'error') ctx.data.outcome = 'throw';
-      else ctx.data.outcome = 'skip';
+    try {
+      const __MODULE  = "context";
+      const __SURFACE = "canvas"; // дефолт для ctx2d веток; webgl приходит из extra.surface
+
+      const __D = global && global.__DEGRADE__;
+      const __diag = (__D && typeof __D.diag === "function") ? __D.diag.bind(__D) : null;
+
+      const x = (extra && typeof extra === "object") ? extra : {};
+
+      const ctx = {
+        module: __MODULE,
+        diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __MODULE,
+        surface: (typeof x.surface === "string" && x.surface) ? x.surface : __SURFACE,
+        key: (typeof x.key === "string" || x.key === null) ? x.key : null,
+        stage: x.stage,      // no local normalization
+        message: x.message,  // no local normalization
+        data: Object.prototype.hasOwnProperty.call(x, "data") ? x.data : null,
+        type: x.type         // no local normalization
+      };
+
+      if (__diag) return __diag(level, code, ctx, (err === undefined) ? null : err);
+
+      if (typeof __D === "function") {
+        const safeLevel = (level === undefined || level === null) ? "info" : level;
+        const safeErr = (err === undefined || err === null) ? null : err;
+        return __D(code, safeErr, Object.assign({}, ctx, { level: safeLevel }));
+      }
+
+      return undefined;
+    } catch (_emitErr) {
+      return undefined;
     }
-    if (diag) {
-      diag(level, eventCode, ctx, e);
-      return;
-    }
-    if (typeof d === 'function') d(eventCode, e, Object.assign({ level }, ctx));
   }
 
   const patchedMethods = new WeakSet();
@@ -151,18 +142,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
           type: 'browser structure missing data'
         });
         try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (eSet) {
-          if (global.__DEGRADE__ && typeof global.__DEGRADE__.diag === 'function') {
-            global.__DEGRADE__.diag('warn', 'context:ctx2d:guard:default_font_assign_failed', {
-              module: 'context',
-              diagTag: 'context',
-              surface: 'canvas',
-              stage: 'guard',
-              key: '__DEFAULT_CTX2D_FONT__',
-              type: 'browser structure missing data',
-              message: 'default font fallback assign failed',
-              data: null
-            }, eSet);
-          }
+          emitContextDiag('warn', 'context:ctx2d:guard:default_font_assign_failed', eSet, {
+            stage: 'guard',
+            key: '__DEFAULT_CTX2D_FONT__',
+            type: 'browser structure missing data',
+            message: 'default font fallback assign failed',
+            data: null
+          });
         }
       }
       return font;
@@ -1104,8 +1090,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
       if (total > 0 && (applied > 0 || already === total)) state.webgl = true;
       emitContextDiag('info', 'context:webgl:apply:patches_applied', null, {
         stage: 'apply',
+        surface: 'webgl',
         key: 'WebGLRenderingContext',
-        data: { applied: applied, total: total, already: already }
+        message: 'webgl patches applied',
+        type: 'pipeline missing data',
+        data: { applied, total, already }
       });
       return applied;
     };

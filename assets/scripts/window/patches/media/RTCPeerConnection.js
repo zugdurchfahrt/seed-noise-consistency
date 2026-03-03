@@ -290,7 +290,19 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   // --- patch prototype methods via Core wrapper (Proxy/apply)
   if (typeof origCreateOffer === 'function') {
     Orig.prototype.createOffer = wrapApply(origCreateOffer, 'createOffer', function(nativeFn, thisArg, args) {
-      const p = Reflect.apply(nativeFn, thisArg, args);
+      let p;
+      try {
+        p = Reflect.apply(nativeFn, thisArg, args);
+      } catch (e) {
+        __rtcDiag('warn', 'rtc:createOffer:native_throw', {
+          stage: 'runtime',
+          key: 'createOffer',
+          message: 'native createOffer threw',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'native_throw' }
+        }, e);
+        throw e;
+      }
       if (!p || typeof p.then !== 'function') return p;
       return p.then(function(desc) {
         if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
@@ -301,7 +313,19 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
 
   if (typeof origCreateAnswer === 'function') {
     Orig.prototype.createAnswer = wrapApply(origCreateAnswer, 'createAnswer', function(nativeFn, thisArg, args) {
-      const p = Reflect.apply(nativeFn, thisArg, args);
+      let p;
+      try {
+        p = Reflect.apply(nativeFn, thisArg, args);
+      } catch (e) {
+        __rtcDiag('warn', 'rtc:createAnswer:native_throw', {
+          stage: 'runtime',
+          key: 'createAnswer',
+          message: 'native createAnswer threw',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'native_throw' }
+        }, e);
+        throw e;
+      }
       if (!p || typeof p.then !== 'function') return p;
       return p.then(function(desc) {
         if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
@@ -314,7 +338,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     Orig.prototype.setLocalDescription = wrapApply(origSetLocalDescription, 'setLocalDescription', function(nativeFn, thisArg, args) {
       const desc = args && args.length ? args[0] : undefined;
       if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
-      return Reflect.apply(nativeFn, thisArg, args);
+      try {
+        return Reflect.apply(nativeFn, thisArg, args);
+      } catch (e) {
+        __rtcDiag('warn', 'rtc:setLocalDescription:native_throw', {
+          stage: 'runtime',
+          key: 'setLocalDescription',
+          message: 'native setLocalDescription threw',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'native_throw' }
+        }, e);
+        throw e;
+      }
     });
   }
 
@@ -324,7 +359,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       if (candidate && candidate.candidate && !candidate.candidate.includes('relay')) {
         return Promise.resolve();
       }
-      return Reflect.apply(nativeFn, thisArg, args);
+      try {
+        return Reflect.apply(nativeFn, thisArg, args);
+      } catch (e) {
+        __rtcDiag('warn', 'rtc:addIceCandidate:native_throw', {
+          stage: 'runtime',
+          key: 'addIceCandidate',
+          message: 'native addIceCandidate threw',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'native_throw' }
+        }, e);
+        throw e;
+      }
     });
   }
 
@@ -335,7 +381,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       if (cfg && typeof cfg === 'object' && cfg.iceServers) {
         cfg.iceServers = normalizeIceServers(cfg.iceServers);
       }
-      return Reflect.apply(nativeFn, thisArg, args);
+      try {
+        return Reflect.apply(nativeFn, thisArg, args);
+      } catch (e) {
+        __rtcDiag('warn', 'rtc:setConfiguration:native_throw', {
+          stage: 'runtime',
+          key: 'setConfiguration',
+          message: 'native setConfiguration threw',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'native_throw' }
+        }, e);
+        throw e;
+      }
     });
   }
 
@@ -355,7 +412,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
               const rec = handlerMap.get(thisArg);
               if (rec && Object.prototype.hasOwnProperty.call(rec, 'orig')) return rec.orig;
             }
-            return Reflect.apply(nativeGet, thisArg, args);
+            try {
+              return Reflect.apply(nativeGet, thisArg, args);
+            } catch (e) {
+              __rtcDiag('warn', 'rtc:onicecandidate_get:native_throw', {
+                stage: 'runtime',
+                key: 'onicecandidate',
+                message: 'native getter onicecandidate threw',
+                type: 'browser structure missing data',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              }, e);
+              throw e;
+            }
           })
         : undefined;
 
@@ -364,7 +432,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
             const handler = args && args.length ? args[0] : undefined;
             if (typeof handler !== 'function') {
               if (handlerMap) handlerMap.set(thisArg, { orig: handler, wrapped: handler });
-              return Reflect.apply(nativeSet, thisArg, args);
+              try {
+                return Reflect.apply(nativeSet, thisArg, args);
+              } catch (e) {
+                __rtcDiag('warn', 'rtc:onicecandidate_set:native_throw', {
+                  stage: 'runtime',
+                  key: 'onicecandidate',
+                  message: 'native setter onicecandidate threw',
+                  type: 'browser structure missing data',
+                  data: { outcome: 'throw', reason: 'native_throw' }
+                }, e);
+                throw e;
+              }
             }
             const wrapped = function(e) {
               if (!e || !e.candidate || (e.candidate && e.candidate.candidate && e.candidate.candidate.includes('relay'))) {
@@ -372,7 +451,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
               }
             };
             if (handlerMap) handlerMap.set(thisArg, { orig: handler, wrapped });
-            return Reflect.apply(nativeSet, thisArg, [wrapped]);
+            try {
+              return Reflect.apply(nativeSet, thisArg, [wrapped]);
+            } catch (e) {
+              __rtcDiag('warn', 'rtc:onicecandidate_set:native_throw', {
+                stage: 'runtime',
+                key: 'onicecandidate',
+                message: 'native setter onicecandidate threw',
+                type: 'browser structure missing data',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              }, e);
+              throw e;
+            }
           })
         : undefined;
 
@@ -435,9 +525,31 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
           if (e && typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
         };
         __iceRemember(thisArg, handler, capture, wrapped);
-        return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
+        try {
+          return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
+        } catch (e) {
+          __rtcDiag('warn', 'rtc:addEventListener:native_throw', {
+            stage: 'runtime',
+            key: 'addEventListener',
+            message: 'native addEventListener threw',
+            type: 'browser structure missing data',
+            data: { outcome: 'throw', reason: 'native_throw' }
+          }, e);
+          throw e;
+        }
       }
-      return Reflect.apply(nativeFn, thisArg, args);
+      try {
+        return Reflect.apply(nativeFn, thisArg, args);
+      } catch (e) {
+        __rtcDiag('warn', 'rtc:addEventListener:native_throw', {
+          stage: 'runtime',
+          key: 'addEventListener',
+          message: 'native addEventListener threw',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'native_throw' }
+        }, e);
+        throw e;
+      }
     });
   }
 
@@ -452,10 +564,32 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         const wrapped = __iceResolve(thisArg, handler, capture);
         if (wrapped) {
           __iceForget(thisArg, handler, capture);
-          return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
+          try {
+            return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
+          } catch (e) {
+            __rtcDiag('warn', 'rtc:removeEventListener:native_throw', {
+              stage: 'runtime',
+              key: 'removeEventListener',
+              message: 'native removeEventListener threw',
+              type: 'browser structure missing data',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            }, e);
+            throw e;
+          }
         }
       }
-      return Reflect.apply(nativeFn, thisArg, args);
+      try {
+        return Reflect.apply(nativeFn, thisArg, args);
+      } catch (e) {
+        __rtcDiag('warn', 'rtc:removeEventListener:native_throw', {
+          stage: 'runtime',
+          key: 'removeEventListener',
+          message: 'native removeEventListener threw',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'native_throw' }
+        }, e);
+        throw e;
+      }
     });
   }
   __rtcDiag('info', 'rtc:patched', {

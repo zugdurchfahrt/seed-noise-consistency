@@ -1952,6 +1952,41 @@ function printToStringCrossRealmChecks() {
     }
     const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
     const level = (extra && typeof extra.level === "string") ? extra.level : null;
+    const stage = (extra && typeof extra.stage === "string") ? extra.stage : null;
+    const code = (entry && typeof entry.code === "string") ? entry.code : "";
+    const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+    const reason = (data && typeof data.reason === "string") ? data.reason : null;
+    const outcome = (data && typeof data.outcome === "string") ? data.outcome : null;
+    const err = entry ? entry.error : null;
+    const errName = (err && typeof err === "object" && typeof err.name === "string")
+      ? err.name
+      : ((typeof err === "string" && err.indexOf("TypeError") >= 0) ? "TypeError" : null);
+    const errMessage = (err && typeof err === "object" && typeof err.message === "string")
+      ? err.message
+      : ((typeof err === "string") ? err : null);
+    const expectedReason = (
+      reason === "native_illegal_invocation"
+      || reason === "illegal_invocation"
+      || reason === "native_throw"
+    );
+    const expectedCode = (
+      code.endsWith("_illegal_invocation")
+      || code.endsWith(":native_throw")
+    );
+    const hasTypeErrorSignal = (
+      errName === "TypeError"
+      || (typeof errMessage === "string" && errMessage.indexOf("TypeError") >= 0)
+      || (typeof errMessage === "string" && errMessage.indexOf("Illegal invocation") >= 0)
+      || (typeof errMessage === "string" && errMessage.indexOf("incompatible receiver") >= 0)
+    );
+    if (
+      (stage === "runtime" || stage === "hook")
+      && hasTypeErrorSignal
+      && (expectedReason || expectedCode)
+      && (outcome === "throw" || outcome == null)
+    ) {
+      return "expected_throw";
+    }
     if (level === "fatal" || level === "error") return "error";
     if (level === "warn") return "warn";
     return __probeSummaryCode(entry.code) ? "ok" : "seen";
@@ -2292,6 +2327,4 @@ try {
 
 return result;
 }, configurable: true });
-
-
 

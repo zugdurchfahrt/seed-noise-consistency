@@ -482,7 +482,18 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     policy: 'skip',
     diagTag: 'fonts:accessor:ready',
     getImpl(origGet) {
-      return Reflect.apply(origGet, this, []);
+      try {
+        return Reflect.apply(origGet, this, []);
+      } catch (e) {
+        __fontDiagBrowser('warn', 'fonts:accessor:ready:native_throw', {
+          stage: 'runtime',
+          diagTag: 'fonts:accessor:ready',
+          key: 'ready',
+          message: 'FontFaceSet.ready getter threw',
+          data: { outcome: 'throw', reason: 'native_throw' }
+        }, e);
+        throw e;
+      }
     }
   }], 'skip');
 
@@ -558,8 +569,31 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       invoke(orig, args) {
         const query = args[0];
         if (throttled()) return false;
+        if (query != null && typeof query !== 'string') {
+          try {
+            return Reflect.apply(orig, this, args);
+          } catch (e) {
+            __fontDiagBrowser('warn', 'fonts:method:check:native_throw', {
+              stage: 'runtime',
+              key: 'FontFaceSet.check',
+              message: 'FontFaceSet.check threw',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            }, e);
+            throw e;
+          }
+        }
         if (!validFontQuery(query)) return false;
-        return Reflect.apply(orig, this, args);
+        try {
+          return Reflect.apply(orig, this, args);
+        } catch (e) {
+          __fontDiagBrowser('warn', 'fonts:method:check:native_throw', {
+            stage: 'runtime',
+            key: 'FontFaceSet.check',
+            message: 'FontFaceSet.check threw',
+            data: { outcome: 'throw', reason: 'native_throw' }
+          }, e);
+          throw e;
+        }
       }
     },
     {
@@ -581,15 +615,50 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     kind: 'promise_method',
     wrapLayer: 'named_wrapper',
     policy: 'skip',
-    diagTag: 'fonts:promise:load',
-    invoke(orig, args) {
-      const query = args[0];
-      const text = args[1];
-      if (throttled()) return Promise.resolve([]);
-      if (!validFontQuery(query)) return Promise.resolve([]);
-      if (text != null && typeof text !== 'string') return Promise.resolve([]);
-      return Reflect.apply(orig, this, args);
-    }
+      diagTag: 'fonts:promise:load',
+      invoke(orig, args) {
+        const query = args[0];
+        const text = args[1];
+        if (throttled()) return Promise.resolve([]);
+        if (query != null && typeof query !== 'string') {
+          try {
+            return Reflect.apply(orig, this, args);
+          } catch (e) {
+            __fontDiagBrowser('warn', 'fonts:promise:load:native_throw', {
+              stage: 'runtime',
+              key: 'FontFaceSet.load',
+              message: 'FontFaceSet.load threw',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            }, e);
+            throw e;
+          }
+        }
+        if (!validFontQuery(query)) return Promise.resolve([]);
+        if (text != null && typeof text !== 'string') {
+          try {
+            return Reflect.apply(orig, this, args);
+          } catch (e) {
+            __fontDiagBrowser('warn', 'fonts:promise:load:native_throw', {
+              stage: 'runtime',
+              key: 'FontFaceSet.load',
+              message: 'FontFaceSet.load threw',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            }, e);
+            throw e;
+          }
+        }
+        try {
+          return Reflect.apply(orig, this, args);
+        } catch (e) {
+          __fontDiagBrowser('warn', 'fonts:promise:load:native_throw', {
+            stage: 'runtime',
+            key: 'FontFaceSet.load',
+            message: 'FontFaceSet.load threw',
+            data: { outcome: 'throw', reason: 'native_throw' }
+          }, e);
+          throw e;
+        }
+      }
   }], 'skip');
 })();
 

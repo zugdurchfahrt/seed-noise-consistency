@@ -284,7 +284,13 @@
           },
           invalidThis: "throw",
           invoke(orig, args) {
-            const ro = Reflect.apply(orig, this, args || []);
+            let ro;
+            try {
+              ro = Reflect.apply(orig, this, args || []);
+            } catch (e) {
+              diagBrowser("warn", "tz:DateTimeFormat:resolvedOptions:native_throw", { stage: "runtime", timezone }, e);
+              throw e;
+            }
             try {
               if (ro && typeof ro === "object") ro.timeZone = timezone;
             } catch (e) {
@@ -343,7 +349,13 @@
           },
           invalidThis: "throw",
           invoke(orig, args) {
-            const options = Reflect.apply(orig, this, args || []);
+            let options;
+            try {
+              options = Reflect.apply(orig, this, args || []);
+            } catch (e) {
+              diagBrowser("warn", "tz:IntlResolvedOptions:native_throw", { stage: "runtime", timezone }, e);
+              throw e;
+            }
             try {
               fields.forEach(([field, value]) => {
                 try { options[field] = value; } catch (e) {
@@ -403,7 +415,12 @@
             let options = (args && args.length >= 2) ? args[1] : undefined;
             if (locales == null) locales = spoofedLocales;
             options = Object.assign({}, options, { timeZone: timezone });
-            return Reflect.apply(orig, this, [locales, options]);
+            try {
+              return Reflect.apply(orig, this, [locales, options]);
+            } catch (e) {
+              diagBrowser("warn", "tz:Date:toLocaleString:native_throw", { stage: "runtime", timezone }, e);
+              throw e;
+            }
           }
         },
         {
@@ -426,7 +443,12 @@
             let options = (args && args.length >= 2) ? args[1] : undefined;
             if (locales == null) locales = spoofedLocales;
             options = Object.assign({}, options, { timeZone: timezone });
-            return Reflect.apply(orig, this, [locales, options]);
+            try {
+              return Reflect.apply(orig, this, [locales, options]);
+            } catch (e) {
+              diagBrowser("warn", "tz:Date:toLocaleDateString:native_throw", { stage: "runtime", timezone }, e);
+              throw e;
+            }
           }
         },
         {
@@ -449,7 +471,12 @@
             let options = (args && args.length >= 2) ? args[1] : undefined;
             if (locales == null) locales = spoofedLocales;
             options = Object.assign({}, options, { timeZone: timezone });
-            return Reflect.apply(orig, this, [locales, options]);
+            try {
+              return Reflect.apply(orig, this, [locales, options]);
+            } catch (e) {
+              diagBrowser("warn", "tz:Date:toLocaleTimeString:native_throw", { stage: "runtime", timezone }, e);
+              throw e;
+            }
           }
         }
       ], "throw");

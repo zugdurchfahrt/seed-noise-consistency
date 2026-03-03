@@ -408,8 +408,20 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
                 return nativeHas;
               }
               methodCache.has = markNative(function has(feature) {
-                if (this !== proxy && this !== target) return Reflect.apply(nativeHas, this, [feature]);
-                return __WL_FEATURES__.has(feature) && Reflect.apply(nativeHas, target, [feature]);
+                try {
+                  if (this !== proxy && this !== target) return Reflect.apply(nativeHas, this, [feature]);
+                  return __WL_FEATURES__.has(feature) && Reflect.apply(nativeHas, target, [feature]);
+                } catch (e) {
+                  degrade('warn', 'webgpu:features:has_native_throw', e, {
+                    stage: 'runtime',
+                    type: __webgpuTypeBrowser,
+                    diagTag: 'webgpu',
+                    key: 'GPUSupportedFeatures.has',
+                    message: 'GPUSupportedFeatures.has threw',
+                    data: { outcome: 'throw', reason: 'native_throw' }
+                  });
+                  throw e;
+                }
               }, 'has');
             }
             return methodCache.has;
@@ -419,7 +431,21 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               const nativeForEach = Reflect.get(target, 'forEach', target);
               methodCache.forEach = markNative(function forEach(cb, thisArg) {
                 if (this !== proxy && this !== target) {
-                  if (typeof nativeForEach === 'function') return Reflect.apply(nativeForEach, this, [cb, thisArg]);
+                  if (typeof nativeForEach === 'function') {
+                    try {
+                      return Reflect.apply(nativeForEach, this, [cb, thisArg]);
+                    } catch (e) {
+                      degrade('warn', 'webgpu:features:forEach_native_throw', e, {
+                        stage: 'runtime',
+                        type: __webgpuTypeBrowser,
+                        diagTag: 'webgpu',
+                        key: 'GPUSupportedFeatures.forEach',
+                        message: 'GPUSupportedFeatures.forEach threw',
+                        data: { outcome: 'throw', reason: 'native_throw' }
+                      });
+                      throw e;
+                    }
+                  }
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) cb.call(thisArg, v, v, proxy);
@@ -434,7 +460,21 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               const nativeIter = Reflect.get(target, prop, target);
               methodCache[key] = markNative(function* iterator() {
                 if (this !== proxy && this !== target) {
-                  if (typeof nativeIter === 'function') return yield* Reflect.apply(nativeIter, this, []);
+                  if (typeof nativeIter === 'function') {
+                    try {
+                      return yield* Reflect.apply(nativeIter, this, []);
+                    } catch (e) {
+                      degrade('warn', 'webgpu:features:' + String(name) + '_native_throw', e, {
+                        stage: 'runtime',
+                        type: __webgpuTypeBrowser,
+                        diagTag: 'webgpu',
+                        key: 'GPUSupportedFeatures.' + String(name),
+                        message: 'GPUSupportedFeatures.' + String(name) + ' threw',
+                        data: { outcome: 'throw', reason: 'native_throw' }
+                      });
+                      throw e;
+                    }
+                  }
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) yield v;
@@ -447,7 +487,21 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               const nativeEntries = Reflect.get(target, 'entries', target);
               methodCache.entries = markNative(function* entries() {
                 if (this !== proxy && this !== target) {
-                  if (typeof nativeEntries === 'function') return yield* Reflect.apply(nativeEntries, this, []);
+                  if (typeof nativeEntries === 'function') {
+                    try {
+                      return yield* Reflect.apply(nativeEntries, this, []);
+                    } catch (e) {
+                      degrade('warn', 'webgpu:features:entries_native_throw', e, {
+                        stage: 'runtime',
+                        type: __webgpuTypeBrowser,
+                        diagTag: 'webgpu',
+                        key: 'GPUSupportedFeatures.entries',
+                        message: 'GPUSupportedFeatures.entries threw',
+                        data: { outcome: 'throw', reason: 'native_throw' }
+                      });
+                      throw e;
+                    }
+                  }
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) yield [v, v];
@@ -484,7 +538,19 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       const resolved = resolveDescriptorOnProtoChain(adapter, 'info');
       const nativeInfoGet = resolved && resolved.owner ? __adapterInfoGetterByOwner__.get(resolved.owner) : null;
       if (typeof nativeInfoGet === 'function') {
-        return Reflect.apply(nativeInfoGet, adapter, []);
+        try {
+          return Reflect.apply(nativeInfoGet, adapter, []);
+        } catch (e) {
+          degrade('warn', 'webgpu:adapter:info_native_throw', e, {
+            stage: 'runtime',
+            type: __webgpuTypeBrowser,
+            diagTag: 'webgpu',
+            key: 'GPUAdapter.info',
+            message: 'GPUAdapter.info getter threw',
+            data: { outcome: 'throw', reason: 'native_throw' }
+          });
+          throw e;
+        }
       }
       return {};
     }
@@ -535,7 +601,20 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           validThis: validDeviceThis,
           invalidThis: 'throw',
           getImpl: function webgpuDeviceFeaturesGet(origGet) {
-            const nativeFeatures = Reflect.apply(origGet, this, []);
+            let nativeFeatures;
+            try {
+              nativeFeatures = Reflect.apply(origGet, this, []);
+            } catch (e) {
+              degrade('warn', 'webgpu:device:features_native_throw', e, {
+                stage: 'runtime',
+                type: __webgpuTypeBrowser,
+                diagTag: 'webgpu',
+                key: 'GPUDevice.features',
+                message: 'GPUDevice.features getter threw',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              });
+              throw e;
+            }
             return __maskFeatures(nativeFeatures);
           }
         },
@@ -550,7 +629,20 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           validThis: validDeviceThis,
           invalidThis: 'throw',
           getImpl: function webgpuDeviceLimitsGet(origGet) {
-            const nativeLimits = Reflect.apply(origGet, this, []);
+            let nativeLimits;
+            try {
+              nativeLimits = Reflect.apply(origGet, this, []);
+            } catch (e) {
+              degrade('warn', 'webgpu:device:limits_native_throw', e, {
+                stage: 'runtime',
+                type: __webgpuTypeBrowser,
+                diagTag: 'webgpu',
+                key: 'GPUDevice.limits',
+                message: 'GPUDevice.limits getter threw',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              });
+              throw e;
+            }
             return __maskLimits(nativeLimits);
           }
         }
@@ -641,7 +733,20 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             const nextArgs = input.slice();
             nextArgs[0] = opts;
 
-            const out = Reflect.apply(orig, this, nextArgs);
+            let out;
+            try {
+              out = Reflect.apply(orig, this, nextArgs);
+            } catch (e) {
+              degrade('warn', 'webgpu:adapter:requestDevice:native_throw', e, {
+                stage: 'runtime',
+                type: __webgpuTypeBrowser,
+                diagTag: 'webgpu',
+                key: 'GPUAdapter.requestDevice',
+                message: 'GPUAdapter.requestDevice threw',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              });
+              throw e;
+            }
             return out.then(function onDevice(device) {
               if (!device) return null;
               patchDevicePrototype(device);
@@ -679,7 +784,21 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               return __adapterInfoPromiseCache__.get(this);
             }
             const input = Array.isArray(args) ? args : [];
-            const promise = Reflect.apply(orig, this, input).then((nativeInfo) => {
+            let pending;
+            try {
+              pending = Reflect.apply(orig, this, input);
+            } catch (e) {
+              degrade('warn', 'webgpu:adapter:requestAdapterInfo:native_throw', e, {
+                stage: 'runtime',
+                type: __webgpuTypeBrowser,
+                diagTag: 'webgpu',
+                key: 'GPUAdapter.requestAdapterInfo',
+                message: 'GPUAdapter.requestAdapterInfo threw',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              });
+              throw e;
+            }
+            const promise = pending.then((nativeInfo) => {
               const built = buildAdapterInfo(nativeInfo);
               __adapterInfoValueCache__.set(this, built);
               return built;
@@ -715,7 +834,22 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             if (__adapterInfoValueCache__.has(this)) {
               return __adapterInfoValueCache__.get(this);
             }
-            const nativeInfo = (typeof origGet === 'function') ? Reflect.apply(origGet, this, []) : {};
+            let nativeInfo = {};
+            if (typeof origGet === 'function') {
+              try {
+                nativeInfo = Reflect.apply(origGet, this, []);
+              } catch (e) {
+                degrade('warn', 'webgpu:adapter:info_native_throw', e, {
+                  stage: 'runtime',
+                  type: __webgpuTypeBrowser,
+                  diagTag: 'webgpu',
+                  key: 'GPUAdapter.info',
+                  message: 'GPUAdapter.info getter threw',
+                  data: { outcome: 'throw', reason: 'native_throw' }
+                });
+                throw e;
+              }
+            }
             const built = buildAdapterInfo(nativeInfo);
             __adapterInfoValueCache__.set(this, built);
             return built;
@@ -736,7 +870,20 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           validThis: validAdapterThis,
           invalidThis: 'throw',
           getImpl: function webgpuAdapterFeaturesGet(origGet) {
-            const nativeFeatures = Reflect.apply(origGet, this, []);
+            let nativeFeatures;
+            try {
+              nativeFeatures = Reflect.apply(origGet, this, []);
+            } catch (e) {
+              degrade('warn', 'webgpu:adapter:features_native_throw', e, {
+                stage: 'runtime',
+                type: __webgpuTypeBrowser,
+                diagTag: 'webgpu',
+                key: 'GPUAdapter.features',
+                message: 'GPUAdapter.features getter threw',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              });
+              throw e;
+            }
             return __maskFeatures(nativeFeatures);
           }
         });
@@ -755,7 +902,20 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           validThis: validAdapterThis,
           invalidThis: 'throw',
           getImpl: function webgpuAdapterLimitsGet(origGet) {
-            const nativeLimits = Reflect.apply(origGet, this, []);
+            let nativeLimits;
+            try {
+              nativeLimits = Reflect.apply(origGet, this, []);
+            } catch (e) {
+              degrade('warn', 'webgpu:adapter:limits_native_throw', e, {
+                stage: 'runtime',
+                type: __webgpuTypeBrowser,
+                diagTag: 'webgpu',
+                key: 'GPUAdapter.limits',
+                message: 'GPUAdapter.limits getter threw',
+                data: { outcome: 'throw', reason: 'native_throw' }
+              });
+              throw e;
+            }
             return __maskLimits(nativeLimits);
           }
         });
@@ -819,7 +979,20 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       invalidThis: 'throw',
       invoke: function webgpuRequestAdapterInvoke(orig, args) {
         const input = Array.isArray(args) ? args : [];
-        const out = Reflect.apply(orig, this, input);
+        let out;
+        try {
+          out = Reflect.apply(orig, this, input);
+        } catch (e) {
+          degrade('warn', 'webgpu:navigator:requestAdapter:native_throw', e, {
+            stage: 'runtime',
+            type: __webgpuTypeBrowser,
+            diagTag: 'webgpu',
+            key: 'navigator.gpu.requestAdapter',
+            message: 'navigator.gpu.requestAdapter threw',
+            data: { outcome: 'throw', reason: 'native_throw' }
+          });
+          throw e;
+        }
         return out.then(function onAdapter(adapter) {
           if (!adapter) return null;
           patchAdapterPrototype(adapter);
