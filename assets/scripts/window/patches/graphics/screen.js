@@ -4,96 +4,105 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenTypeContract = 'contract violation';
   const __screenModule = 'screen';
   const __screenSurface = 'screen';
+  const __core = window.Core;
+  const __flagKey = '__PATCH_SCREEN__';
   const __D = window.__DEGRADE__;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __emit = (level, code, ctx, err) => {
     try {
-      if (__diag) return __diag(level, code, ctx, err || null);
-      if (typeof __D === 'function') return __D(String(code), err || null, Object.assign({}, ctx, { level }));
-    } catch (_) {}
+      if (__diag) return __diag(level, code, ctx || null, err || null);
+      if (typeof __D === 'function') return __D(String(code), err || null, ctx || null);
+    } catch (emitErr) {
+      return undefined;
+    }
+    return undefined;
   };
   function __screenDiag(level, code, extra, err) {
-    const normalizedLevel = (level === 'warn' || level === 'error' || level === 'info' || level === 'fatal')
-      ? level
-      : 'info';
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const normalizedStage = (
-      x.stage === 'preflight' ||
-      x.stage === 'apply' ||
-      x.stage === 'rollback' ||
-      x.stage === 'contract' ||
-      x.stage === 'hook' ||
-      x.stage === 'runtime' ||
-      x.stage === 'guard'
-    ) ? x.stage : 'runtime';
-    const normalizedType = (
-      x.type === __screenTypePipeline ||
-      x.type === __screenTypeBrowser ||
-      x.type === __screenTypeContract
-    ) ? x.type : __screenTypePipeline;
-    const normalizedCode = code || 'screen';
-    const rawData = (x.data && typeof x.data === 'object') ? x.data : {};
-    const normalizedData = Object.assign({}, rawData);
-    if (typeof x.reason === 'string' && x.reason && !Object.prototype.hasOwnProperty.call(normalizedData, 'reason')) {
-      normalizedData.reason = x.reason;
-    }
-    if (typeof x.substage === 'string' && x.substage && !Object.prototype.hasOwnProperty.call(normalizedData, 'substage')) {
-      normalizedData.substage = x.substage;
-    }
-    if (normalizedData.outcome !== 'return' &&
-        normalizedData.outcome !== 'skip' &&
-        normalizedData.outcome !== 'rollback' &&
-        normalizedData.outcome !== 'throw') {
-      if (normalizedStage === 'rollback') normalizedData.outcome = 'rollback';
-      else if (normalizedLevel === 'error' || normalizedLevel === 'fatal') normalizedData.outcome = 'throw';
-      else if (normalizedLevel === 'info' && normalizedStage === 'apply') normalizedData.outcome = 'return';
-      else normalizedData.outcome = 'skip';
-    }
+    const x = (extra && typeof extra === 'object') ? extra : null;
     const ctx = {
       module: __screenModule,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __screenModule,
+      diagTag: x ? x.diagTag : undefined,
       surface: __screenSurface,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: normalizedStage,
-      message: (typeof x.message === 'string' && x.message) ? x.message : normalizedCode,
-      data: normalizedData,
-      type: normalizedType
+      key: (x && Object.prototype.hasOwnProperty.call(x, 'key')) ? x.key : null,
+      stage: x ? x.stage : undefined,
+      message: x ? x.message : undefined,
+      data: x ? x.data : undefined,
+      type: x ? x.type : undefined
     };
-    __emit(normalizedLevel, normalizedCode, ctx, err || null);
+    __emit(level, code, ctx, err || null);
   }
-
-  if (window.__PATCH_SCREEN__) {
-    __screenDiag('info', 'screen:already_patched', {
+  let __guardToken = null;
+  if (!__core || typeof __core.guardFlag !== 'function') {
+    const err = new Error('[ScreenPatch] Core.guardFlag missing');
+    __screenDiag('fatal', 'screen:guard_missing', {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: null,
-      message: 'screen already patched',
+      key: __flagKey,
+      message: 'Core.guardFlag missing',
       data: {
-        outcome: 'skip',
-        reason: 'already_patched',
-        substage: 'module_guard'
+        outcome: 'throw',
+        reason: 'missing_dep_core_guard',
+        substage: 'core.guardFlag'
       }
-    }, null);
-    return;
+    }, err);
+    throw err;
   }
+  try {
+    __guardToken = __core.guardFlag(__flagKey, __screenModule);
+  } catch (e) {
+    __screenDiag('fatal', 'screen:guard_failed', {
+      stage: 'guard',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: __flagKey,
+      message: 'guardFlag threw',
+      data: {
+        outcome: 'throw',
+        reason: 'guard_failed',
+        substage: 'core.guardFlag'
+      }
+    }, e);
+    throw e;
+  }
+  if (!__guardToken) return;
 
   const C = window.CanvasPatchContext;
   if (!C) {
-    __screenDiag('warn', 'screen:canvas_patch_context_missing', {
+    const canvasMissingErr = new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available');
+    __screenDiag('fatal', 'screen:canvas_patch_context_missing', {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: null,
-      message: 'CanvasPatchContext missing',
+      key: 'CanvasPatchContext',
+      message: 'CanvasPatchContext is undefined - module registration is not available',
       data: {
-        outcome: 'skip',
-        reason: 'missing_dep',
+        outcome: 'throw',
+        reason: 'canvas_patch_context_missing',
         substage: 'CanvasPatchContext'
       }
-    }, null);
-    return;
+    }, canvasMissingErr);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
+      }
+    } catch (releaseErr) {
+      __screenDiag('error', 'screen:guard_release_failed', {
+        stage: 'rollback',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: __flagKey,
+        message: 'guard release failed after preflight skip',
+        data: {
+          outcome: 'skip',
+          reason: 'guard_release_failed',
+          substage: 'preflight'
+        }
+      }, releaseErr);
+    }
+    throw canvasMissingErr;
   }
+  const __moduleRollbackStack = [];
 
   const SCREEN_WIDTH  = Number(window.__WIDTH);
   const SCREEN_HEIGHT = Number(window.__HEIGHT);
@@ -116,8 +125,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const ZERO = SCREEN_WIDTH - SCREEN_WIDTH;
   const ONE = DPR / DPR;
 
-  const __coreApplyTargets = (window.Core && typeof window.Core.applyTargets === 'function')
-    ? window.Core.applyTargets
+  const __coreApplyTargets = (__core && typeof __core.applyTargets === 'function')
+    ? __core.applyTargets
     : null;
   if (typeof __coreApplyTargets !== 'function') {
     throw new Error('Core.applyTargets missing');
@@ -126,11 +135,19 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   function safeDefine(obj, prop, descriptor) {
     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
     const d = Object.getOwnPropertyDescriptor(obj, prop);
+    const hadOwn = Object.prototype.hasOwnProperty.call(obj, prop);
     if (d && d.configurable === false) {
       throw new TypeError(`${prop} non-configurable`);
     }
-    if (Object.prototype.hasOwnProperty.call(obj, prop)) delete obj[prop];
+    if (hadOwn) delete obj[prop];
     Object.defineProperty(obj, prop, descriptor);
+    __moduleRollbackStack.push(function rollbackSafeDefine() {
+      if (d) {
+        Object.defineProperty(obj, prop, d);
+      } else {
+        delete obj[prop];
+      }
+    });
   }
   function makeNamedGetter(prop, getter) {
     if (typeof getter === 'function' && getter.name) return getter;
@@ -285,6 +302,16 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
+    }
+    if (applied.length) {
+      const appliedSnapshot = applied.slice();
+      __moduleRollbackStack.push(function rollbackCoreTargetsGroup() {
+        for (let i = appliedSnapshot.length - 1; i >= 0; i--) {
+          const p = appliedSnapshot[i];
+          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
+          else delete p.owner[p.key];
+        }
+      });
     }
     return applied.length;
   }
@@ -664,7 +691,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
 
 
 
-  document.addEventListener("DOMContentLoaded", () => {
+  const onPatchedViewport = () => {
     __screenDiag('info', 'screen:patched_viewport', {
       stage: 'runtime',
       type: __screenTypePipeline,
@@ -680,10 +707,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         screen: { width:  window.screen.width,  height: window.screen.height }
       }
     });
+  };
+  document.addEventListener("DOMContentLoaded", onPatchedViewport);
+  __moduleRollbackStack.push(function rollbackDomContentLoadedPatchedViewport() {
+    document.removeEventListener("DOMContentLoaded", onPatchedViewport);
   });
 
   // log after DOM ready for document & div
-  document.addEventListener("DOMContentLoaded", () => {
+  const onDocumentDivClientSizes = () => {
     __screenDiag('info', 'screen:document_div_client_sizes', {
       stage: 'runtime',
       type: __screenTypePipeline,
@@ -704,6 +735,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         }
       }
     });
+  };
+  document.addEventListener("DOMContentLoaded", onDocumentDivClientSizes);
+  __moduleRollbackStack.push(function rollbackDomContentLoadedDocumentDiv() {
+    document.removeEventListener("DOMContentLoaded", onDocumentDivClientSizes);
   });
   
   __screenDiag('info', 'screen:patches_applied', {
@@ -718,8 +753,28 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       substage: 'module_apply'
     }
   });
-  window.__PATCH_SCREEN__ = true;
   } catch (e) {
+    let rollbackErr = null;
+    for (let i = __moduleRollbackStack.length - 1; i >= 0; i--) {
+      try {
+        __moduleRollbackStack[i]();
+      } catch (re) {
+        if (!rollbackErr) rollbackErr = re;
+        __screenDiag('error', 'screen:rollback_failed', {
+          stage: 'rollback',
+          type: __screenTypeBrowser,
+          diagTag: 'screen',
+          key: null,
+          message: 'module rollback failed',
+          data: {
+            outcome: 'rollback',
+            reason: 'rollback_failed',
+            substage: 'module_catch'
+          }
+        }, re);
+      }
+    }
+    const rollbackOk = !rollbackErr;
     __screenDiag('fatal', 'screen:fatal', {
       stage: 'apply',
       type: __screenTypeBrowser,
@@ -729,10 +784,29 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       data: {
         outcome: 'throw',
         reason: 'fatal',
-        substage: 'module_try'
+        substage: 'module_try',
+        rollbackOk
       }
-    }, e);
-    return;
+    }, rollbackErr || e);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __screenModule);
+      }
+    } catch (releaseErr) {
+      __screenDiag('error', 'screen:guard_release_failed', {
+        stage: 'rollback',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: __flagKey,
+        message: 'guard release failed in fatal catch',
+        data: {
+          outcome: 'skip',
+          reason: 'guard_release_failed',
+          substage: 'module_catch'
+        }
+      }, releaseErr);
+    }
+    throw (rollbackErr || e);
   }
 }
   

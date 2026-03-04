@@ -185,6 +185,36 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return;
   }
 
+  const markAsNative = (function() {
+    const ensure = (window && typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
+    const m = ensure ? ensure() : null;
+    if (typeof m !== 'function') return null;
+    return m;
+  })();
+  if (typeof markAsNative !== 'function') {
+    __rtcDiag('fatal', 'rtc:mark_native_missing', {
+      stage: 'preflight',
+      key: '__ensureMarkAsNative',
+      message: '__ensureMarkAsNative/markAsNative missing',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'missing_dep_mark_native' }
+    }, new Error('[RTC] markAsNative missing'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on markAsNative preflight skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
+    return;
+  }
+
   const Orig = window.RTCPeerConnection;
   if (!Orig) {
     __rtcDiag('info', 'rtc:skip_no_api', {
@@ -279,6 +309,21 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const origRemoveEventListener = Orig.prototype.removeEventListener;
   const origSetConfiguration = Orig.prototype.setConfiguration;
   const origOnIceDesc = Object.getOwnPropertyDescriptor(Orig.prototype, 'onicecandidate') || null;
+  function __rtcMarkNative(fn, nativeName, key) {
+    if (typeof fn !== 'function') return fn;
+    try {
+      markAsNative(fn, nativeName || fn.name || '');
+    } catch (e) {
+      __rtcDiag('warn', 'rtc:mark_native_failed', {
+        stage: 'apply',
+        key: (typeof key === 'string' && key) ? key : null,
+        message: 'markAsNative failed for wrapper',
+        type: 'browser structure missing data',
+        data: { outcome: 'return', reason: 'mark_native_failed' }
+      }, e);
+    }
+    return fn;
+  }
 
   try {
   safeDefine(Orig, '__PATCH_RTCPEERCONNECTION__', {
@@ -289,7 +334,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   });
   // --- patch prototype methods via Core wrapper (Proxy/apply)
   if (typeof origCreateOffer === 'function') {
-    Orig.prototype.createOffer = wrapApply(origCreateOffer, 'createOffer', function(nativeFn, thisArg, args) {
+    const wrappedCreateOffer = wrapApply(origCreateOffer, 'createOffer', function(nativeFn, thisArg, args) {
       let p;
       try {
         p = Reflect.apply(nativeFn, thisArg, args);
@@ -309,10 +354,12 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         return desc;
       });
     });
+    __rtcMarkNative(wrappedCreateOffer, 'createOffer', 'createOffer');
+    Orig.prototype.createOffer = wrappedCreateOffer;
   }
 
   if (typeof origCreateAnswer === 'function') {
-    Orig.prototype.createAnswer = wrapApply(origCreateAnswer, 'createAnswer', function(nativeFn, thisArg, args) {
+    const wrappedCreateAnswer = wrapApply(origCreateAnswer, 'createAnswer', function(nativeFn, thisArg, args) {
       let p;
       try {
         p = Reflect.apply(nativeFn, thisArg, args);
@@ -332,10 +379,12 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         return desc;
       });
     });
+    __rtcMarkNative(wrappedCreateAnswer, 'createAnswer', 'createAnswer');
+    Orig.prototype.createAnswer = wrappedCreateAnswer;
   }
 
   if (typeof origSetLocalDescription === 'function') {
-    Orig.prototype.setLocalDescription = wrapApply(origSetLocalDescription, 'setLocalDescription', function(nativeFn, thisArg, args) {
+    const wrappedSetLocalDescription = wrapApply(origSetLocalDescription, 'setLocalDescription', function(nativeFn, thisArg, args) {
       const desc = args && args.length ? args[0] : undefined;
       if (desc && desc.sdp) desc.sdp = filterSDP(desc.sdp);
       try {
@@ -351,10 +400,12 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         throw e;
       }
     });
+    __rtcMarkNative(wrappedSetLocalDescription, 'setLocalDescription', 'setLocalDescription');
+    Orig.prototype.setLocalDescription = wrappedSetLocalDescription;
   }
 
   if (typeof origAddIceCandidate === 'function') {
-    Orig.prototype.addIceCandidate = wrapApply(origAddIceCandidate, 'addIceCandidate', function(nativeFn, thisArg, args) {
+    const wrappedAddIceCandidate = wrapApply(origAddIceCandidate, 'addIceCandidate', function(nativeFn, thisArg, args) {
       const candidate = args && args.length ? args[0] : undefined;
       if (candidate && candidate.candidate && !candidate.candidate.includes('relay')) {
         return Promise.resolve();
@@ -372,11 +423,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         throw e;
       }
     });
+    __rtcMarkNative(wrappedAddIceCandidate, 'addIceCandidate', 'addIceCandidate');
+    Orig.prototype.addIceCandidate = wrappedAddIceCandidate;
   }
 
   // Preserve iceServers normalization without wrapping constructor.
   if (typeof origSetConfiguration === 'function') {
-    Orig.prototype.setConfiguration = wrapApply(origSetConfiguration, 'setConfiguration', function(nativeFn, thisArg, args) {
+    const wrappedSetConfiguration = wrapApply(origSetConfiguration, 'setConfiguration', function(nativeFn, thisArg, args) {
       const cfg = args && args.length ? args[0] : undefined;
       if (cfg && typeof cfg === 'object' && cfg.iceServers) {
         cfg.iceServers = normalizeIceServers(cfg.iceServers);
@@ -394,6 +447,8 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         throw e;
       }
     });
+    __rtcMarkNative(wrappedSetConfiguration, 'setConfiguration', 'setConfiguration');
+    Orig.prototype.setConfiguration = wrappedSetConfiguration;
   }
 
   // --- onicecandidate accessor (prototype-level)
@@ -426,6 +481,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
             }
           })
         : undefined;
+      __rtcMarkNative(get, 'get onicecandidate', 'onicecandidate');
 
       const set = (typeof origSet === 'function')
         ? wrapAcc(origSet, 'set onicecandidate', function(nativeSet, thisArg, args) {
@@ -465,6 +521,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
             }
           })
         : undefined;
+      __rtcMarkNative(set, 'set onicecandidate', 'onicecandidate');
 
       Object.defineProperty(Orig.prototype, 'onicecandidate', {
         get,
@@ -510,7 +567,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     if (!m.size) __iceListenerMap.delete(thisArg);
   };
   if (typeof origAddEventListener === 'function') {
-    Orig.prototype.addEventListener = wrapApply(origAddEventListener, 'addEventListener', function(nativeFn, thisArg, args) {
+    const wrappedAddEventListener = wrapApply(origAddEventListener, 'addEventListener', function(nativeFn, thisArg, args) {
       const type = args && args.length ? args[0] : undefined;
       const handler = args && args.length > 1 ? args[1] : undefined;
       const options = args && args.length > 2 ? args[2] : undefined;
@@ -551,11 +608,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         throw e;
       }
     });
+    __rtcMarkNative(wrappedAddEventListener, 'addEventListener', 'addEventListener');
+    Orig.prototype.addEventListener = wrappedAddEventListener;
   }
 
 
   if (typeof origRemoveEventListener === 'function') {
-    Orig.prototype.removeEventListener = wrapApply(origRemoveEventListener, 'removeEventListener', function(nativeFn, thisArg, args) {
+    const wrappedRemoveEventListener = wrapApply(origRemoveEventListener, 'removeEventListener', function(nativeFn, thisArg, args) {
       const type = args && args.length ? args[0] : undefined;
       const handler = args && args.length > 1 ? args[1] : undefined;
       const options = args && args.length > 2 ? args[2] : undefined;
@@ -591,6 +650,8 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         throw e;
       }
     });
+    __rtcMarkNative(wrappedRemoveEventListener, 'removeEventListener', 'removeEventListener');
+    Orig.prototype.removeEventListener = wrappedRemoveEventListener;
   }
   __rtcDiag('info', 'rtc:patched', {
     stage: 'apply',

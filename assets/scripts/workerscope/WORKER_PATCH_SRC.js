@@ -112,62 +112,12 @@
     cache.snap = requireSnap(self.__lastSnap__, 'init');
 
     // Seed must be provided inside the worker realm (e.g. via CDP prelude).
-    const snapSeed = (cache.snap && typeof cache.snap.seed === 'string') ? cache.snap.seed : null;
-    const cdpSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
-    if (snapSeed && cdpSeed && String(snapSeed) !== String(cdpSeed)) {
-      const e = new Error('UACHPatch: seed mismatch (snapshot vs CDP_GLOBAL_SEED)');
-      emitDegrade('error', 'worker_patch_src:seed:contract:mismatch', {
-        type: 'pipeline missing data',
-        stage: 'contract',
-        module: 'WORKER_PATCH_SRC',
-        surface: 'CDP_GLOBAL_SEED',
-        key: 'CDP_GLOBAL_SEED',
-        policy: 'throw',
-        action: 'throw',
-        data: { snapshotSeed: String(snapSeed), hasCDPSeed: true }
-      }, e);
-      throw e;
-    }
-    const seedInit = (cdpSeed != null && cdpSeed !== '') ? String(cdpSeed) : (snapSeed != null ? String(snapSeed) : null);
+    const seedInit = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
     if (seedInit == null || seedInit === '') {
       const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
       emitDegrade('error', 'worker_patch_src:seed:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
-        module: 'WORKER_PATCH_SRC',
-        surface: 'CDP_GLOBAL_SEED',
-        key: 'CDP_GLOBAL_SEED',
-        policy: 'throw',
-        action: 'throw'
-      }, e);
-      throw e;
-    }
-    // Seed must be obtained once and then treated as immutable within session; hide it from enumeration.
-    try {
-      Object.defineProperty(self, 'CDP_GLOBAL_SEED', {
-        value: seedInit,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
-    } catch (e) {
-      emitDegrade('warn', 'worker_patch_src:seed:apply:seal_failed', {
-        type: 'browser structure missing data',
-        stage: 'apply',
-        module: 'WORKER_PATCH_SRC',
-        surface: 'CDP_GLOBAL_SEED',
-        key: 'CDP_GLOBAL_SEED',
-        policy: 'skip',
-        action: 'native'
-      }, e);
-      self.CDP_GLOBAL_SEED = seedInit;
-    }
-    // In sloppy mode, assignment to a non-writable property can fail silently; enforce invariants explicitly.
-    if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) !== String(seedInit)) {
-      const e = new Error('UACHPatch: CDP_GLOBAL_SEED set failed');
-      emitDegrade('error', 'worker_patch_src:seed:contract:set_failed', {
-        type: 'pipeline missing data',
-        stage: 'contract',
         module: 'WORKER_PATCH_SRC',
         surface: 'CDP_GLOBAL_SEED',
         key: 'CDP_GLOBAL_SEED',
@@ -860,7 +810,20 @@
         let owner = obj;
         let d = null;
         for (let o = obj; o; o = Object.getPrototypeOf(o)) {
-          try { d = Object.getOwnPropertyDescriptor(o, k) || null; } catch (_) { d = null; }
+          try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
+          catch (e) {
+            d = null;
+            emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
+              type: 'browser structure missing data',
+              stage: 'runtime',
+              module: 'WORKER_PATCH_SRC',
+              surface: 'descriptor',
+              key: String(k || ''),
+              policy: 'skip',
+              action: 'native',
+              data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
+            }, e);
+          }
           if (d) { owner = o; break; }
         }
         if (!d) {
@@ -909,7 +872,20 @@
       // CORE 4.1: descriptor-owner по proto-chain
       let d = null;
       for (let o = owner; o; o = Object.getPrototypeOf(o)) {
-        try { d = Object.getOwnPropertyDescriptor(o, k) || null; } catch (_) { d = null; }
+        try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
+        catch (e) {
+          d = null;
+          emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
+            type: 'browser structure missing data',
+            stage: 'runtime',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'descriptor',
+            key: String(k || ''),
+            policy: 'skip',
+            action: 'native',
+            data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
+          }, e);
+        }
         if (d) break;
       }
       if (!d) {
@@ -1018,29 +994,18 @@
       if (cache.snap === s) return;
       const prevSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
       cache.snap = requireSnap(s, 'apply');
-      try {
-        const curSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
-        const snapSeed2 = (cache.snap && typeof cache.snap.seed === 'string') ? String(cache.snap.seed) : null;
-        if (curSeed && snapSeed2 && curSeed !== snapSeed2) {
-          const e = new Error('UACHPatch: seed mismatch after snapshot apply');
-          emitDegrade('error', 'worker_patch_src:seed:contract:mismatch_apply', {
-            type: 'pipeline missing data',
-            stage: 'contract',
-            module: 'WORKER_PATCH_SRC',
-            surface: 'CDP_GLOBAL_SEED',
-            key: 'CDP_GLOBAL_SEED',
-            policy: 'throw',
-            action: 'throw',
-            data: { snapshotSeed: snapSeed2, cdpSeed: curSeed }
-          }, e);
-          throw e;
-        }
-      } catch (e) {
-        // preserve throw (fail-fast) while keeping diag path consistent
-        throw e;
-      }
       if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
-        throw new Error('UACHPatch: CDP_GLOBAL_SEED missing');
+        const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
+        emitDegrade('error', 'worker_patch_src:seed:runtime:missing', {
+          type: 'pipeline missing data',
+          stage: 'runtime',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'CDP_GLOBAL_SEED',
+          key: 'CDP_GLOBAL_SEED',
+          policy: 'throw',
+          action: 'throw'
+        }, e);
+        throw e;
       }
       if (typeof prev==='function') prev.call(self,s);
       // Paradigm: seed is immutable within session.
@@ -1051,7 +1016,17 @@
     };
     cache.snap = requireSnap(self.__lastSnap__, 'bootstrap');
     if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
-      throw new Error('UACHPatch: CDP_GLOBAL_SEED missing');
+      const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
+      emitDegrade('error', 'worker_patch_src:seed:contract:missing_bootstrap', {
+        type: 'pipeline missing data',
+        stage: 'contract',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'CDP_GLOBAL_SEED',
+        key: 'CDP_GLOBAL_SEED',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
     }
     if (!self.__ENV_SYNC_BC_INSTALLED__) {
       if (typeof BroadcastChannel !== 'function') {

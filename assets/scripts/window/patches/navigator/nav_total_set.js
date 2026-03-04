@@ -9,7 +9,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navTypeBrowser = 'browser structure missing data';
 
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
-    // [NORMATIVE] single channel: Window.__DEGRADE__ (no alternative sources)
     const __D = (window && window.__DEGRADE__) || null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
     const __emit = (level, code, ctx, err) => {
@@ -912,7 +911,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           kind: 'accessor',
           // Cross-realm Function#toString must not reveal synthetic wrapper source.
           // Use core proxy-wrapper so other realms see native-looking "[native code]" too.
-          wrapLayer: 'core_wrapper',
+          wrapLayer: 'named_wrapper_strict',
           policy: 'strict',
           diagTag: 'nav_total_set:critical',
           allowCreate: false,

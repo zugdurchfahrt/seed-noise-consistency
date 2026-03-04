@@ -960,7 +960,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (!key) return null;
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
-          if (Object.prototype.hasOwnProperty.call(window, key)) {
+          if (window[key]) {
             __emit('info', tag + ':already_patched', {
               module: 'core',
               diagTag: tag,
@@ -1008,29 +1008,40 @@ const CoreWindowModule = function CoreWindowModule(window) {
       function releaseGuardFlag(flagKey, token, rollbackOk, codePrefix) {
         const key = String(flagKey || '');
         if (!key) return false;
-        if (!rollbackOk) return false;
+        if (rollbackOk !== true) return false;
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
           if (window[key] !== token) return false;
-          let deleteErr = null;
-          let deleted = false;
           try {
-            deleted = delete window[key];
-          } catch (e) {
-            deleteErr = e;
-            deleted = false;
+            delete window[key];
+          } catch (deleteErr) {
+            try {
+              window[key] = false;
+            } catch (setErr) {
+              __emit('warn', tag + ':guard_release_failed', {
+                module: 'core',
+                diagTag: tag,
+                surface: 'core',
+                key,
+                stage: 'rollback',
+                message: 'guard release failed',
+                type: 'pipeline missing data',
+                data: { outcome: 'skip', reason: 'guard_release_failed' }
+              }, setErr || deleteErr);
+              return false;
+            }
           }
-          if (!deleted) {
+          if (window[key] === token) {
             __emit('warn', tag + ':guard_release_failed', {
               module: 'core',
               diagTag: tag,
               surface: 'core',
               key,
-              stage: 'guard',
-              message: 'guard delete failed',
+              stage: 'rollback',
+              message: 'guard release failed',
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'guard_release_failed' }
-            }, deleteErr);
+            }, null);
             return false;
           }
           __emit('info', tag + ':guard_released', {
@@ -1038,10 +1049,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
             diagTag: tag,
             surface: 'core',
             key,
-            stage: 'guard',
-            message: 'guard released',
+            stage: 'rollback',
+            message: 'guard released after rollback ok',
             type: 'pipeline missing data',
-            data: { outcome: 'return', reason: 'guard_released' }
+            data: { outcome: 'rollback', reason: 'rollback_ok' }
           }, null);
           return true;
         } catch (e) {
@@ -1050,8 +1061,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
             diagTag: tag,
             surface: 'core',
             key,
-            stage: 'guard',
-            message: 'guard release threw',
+            stage: 'rollback',
+            message: 'guard release failed',
             type: 'pipeline missing data',
             data: { outcome: 'skip', reason: 'guard_release_exception' }
           }, e);
