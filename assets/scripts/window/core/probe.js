@@ -44,6 +44,101 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     } catch (_) {}
   }
 
+  function __probeNum(v, fallback) {
+    const n = Number(v);
+    return (Number.isFinite(n) && n > 0) ? Math.floor(n) : fallback;
+  }
+
+  const __probeTimeoutCfg =
+    (globalThis.__PROBE_TIMEOUTS__ && typeof globalThis.__PROBE_TIMEOUTS__ === "object")
+      ? globalThis.__PROBE_TIMEOUTS__
+      : {};
+  const __PROBE_TIMEOUTS = {
+    callMs: __probeNum(__probeTimeoutCfg.callMs, 2500),
+    highEntropyMs: __probeNum(__probeTimeoutCfg.highEntropyMs, 3000),
+    stepMs: __probeNum(__probeTimeoutCfg.stepMs, 8000),
+    totalMs: __probeNum(__probeTimeoutCfg.totalMs, 30000)
+  };
+  const __probeRunStartedAt = Date.now();
+
+  function __probeBuildTimeoutError(meta, timeoutMs, elapsedMs) {
+    const check = (meta && typeof meta.check === "string" && meta.check) ? meta.check : "__PROBE__";
+    const phase = (meta && typeof meta.phase === "string" && meta.phase) ? meta.phase : "runtime";
+    const method = (meta && typeof meta.method === "string" && meta.method) ? meta.method : "unknown";
+    const ms = __probeNum(elapsedMs, 0);
+    const err = new Error(`[probe] async timeout (${check}/${phase}/${method}) after ${ms}ms`);
+    err.name = "TimeoutError";
+    err.code = "probe:async_timeout";
+    err.check = check;
+    err.phase = phase;
+    err.method = method;
+    err.elapsedMs = ms;
+    err.timeoutMs = __probeNum(timeoutMs, 0);
+    err.probeTimedOut = true;
+    return err;
+  }
+
+  async function __probeAwaitWithTimeout(promiseLike, timeoutMs, meta) {
+    const startedAt = Date.now();
+    const ms = __probeNum(timeoutMs, 1);
+    let timer = null;
+    try {
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(__probeBuildTimeoutError(meta, ms, Date.now() - startedAt));
+        }, ms);
+      });
+      const value = await Promise.race([Promise.resolve(promiseLike), timeoutPromise]);
+      return { ok: true, value, timedOut: false, elapsedMs: Date.now() - startedAt, timeoutMs: ms };
+    } catch (error) {
+      const timedOut = !!(error && (error.probeTimedOut === true || error.name === "TimeoutError"));
+      return { ok: false, error, timedOut, elapsedMs: Date.now() - startedAt, timeoutMs: ms };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  function __probeRemainingBudgetMs() {
+    const spent = Date.now() - __probeRunStartedAt;
+    return __PROBE_TIMEOUTS.totalMs - spent;
+  }
+
+  async function __probeAwaitWithinBudget(promiseLike, meta) {
+    const left = __probeRemainingBudgetMs();
+    if (!(left > 0)) {
+      return {
+        ok: false,
+        error: __probeBuildTimeoutError(meta, 0, Date.now() - __probeRunStartedAt),
+        timedOut: true,
+        elapsedMs: 0,
+        timeoutMs: 0
+      };
+    }
+    const budgetMs = Math.min(__PROBE_TIMEOUTS.stepMs, left);
+    return __probeAwaitWithTimeout(promiseLike, budgetMs, meta);
+  }
+
+  function __probeLogAsyncTimeout(meta, elapsedMs, timeoutMs, err) {
+    const check = (meta && typeof meta.check === "string" && meta.check) ? meta.check : "__PROBE__";
+    const phase = (meta && typeof meta.phase === "string" && meta.phase) ? meta.phase : "runtime";
+    const method = (meta && typeof meta.method === "string" && meta.method) ? meta.method : "unknown";
+    __probeDiag("error", "probe:async_timeout", {
+      stage: "runtime",
+      key: method,
+      message: "probe async operation timed out",
+      type: "pipeline missing data",
+      data: {
+        check,
+        phase,
+        method,
+        elapsedMs: __probeNum(elapsedMs, 0),
+        timeoutMs: __probeNum(timeoutMs, 0),
+        outcome: "throw",
+        reason: "timed_out"
+      }
+    }, err || null);
+  }
+
 
 
 
@@ -464,6 +559,8 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     const highEntropyValuesByPath = new Map();
     let highEntropyFetchError = null;
     let highEntropyFetchAttempted = false;
+    let highEntropyAsyncState = null;
+    let highEntropyElapsedMs = null;
 
     for (const path of NAV_VALUE_PATHS) {
       if (!String(path).startsWith(highEntropyBasePath)) continue;
@@ -478,12 +575,26 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     if (highEntropyKeys.length > 0) {
       if (!uaData || typeof uaData.getHighEntropyValues !== "function") {
         highEntropyFetchError = new TypeError("[probe] navigator.userAgentData.getHighEntropyValues is not available");
+        highEntropyAsyncState = "not_available";
       } else {
         highEntropyFetchAttempted = true;
-        try {
-          const highEntropyResult = await Reflect.apply(uaData.getHighEntropyValues, uaData, [highEntropyKeys]);
+        const meta = {
+          check: "fields",
+          phase: "high_entropy",
+          method: "NavigatorUAData.getHighEntropyValues"
+        };
+        const waited = await __probeAwaitWithTimeout(
+          (async () => Reflect.apply(uaData.getHighEntropyValues, uaData, [highEntropyKeys]))(),
+          __PROBE_TIMEOUTS.highEntropyMs,
+          meta
+        );
+        highEntropyElapsedMs = waited.elapsedMs;
+        if (waited.ok) {
+          const highEntropyResult = waited.value;
+          highEntropyAsyncState = "resolved";
           if (!highEntropyResult || typeof highEntropyResult !== "object") {
             highEntropyFetchError = new TypeError("[probe] getHighEntropyValues returned non-object result");
+            highEntropyAsyncState = "rejected";
           } else {
             for (const key of highEntropyKeys) {
               const path = `${highEntropyBasePath}${key}`;
@@ -493,8 +604,12 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
               });
             }
           }
-        } catch (e) {
-          highEntropyFetchError = e;
+        } else {
+          highEntropyFetchError = waited.error;
+          highEntropyAsyncState = waited.timedOut ? "timed_out" : "rejected";
+          if (waited.timedOut) {
+            __probeLogAsyncTimeout(meta, waited.elapsedMs, waited.timeoutMs, waited.error);
+          }
         }
       }
     }
@@ -509,7 +624,9 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
             ok: true,
             value: toPrintable(highEntropyEntry.value),
             error: null,
-            source: "userAgentData.getHighEntropyValues"
+            source: "userAgentData.getHighEntropyValues",
+            asyncState: highEntropyAsyncState,
+            elapsedMs: highEntropyElapsedMs
           };
         }
         if (highEntropyFetchError) {
@@ -518,7 +635,9 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
             ok: false,
             value: null,
             error: errorToString(highEntropyFetchError),
-            source: "userAgentData.getHighEntropyValues"
+            source: "userAgentData.getHighEntropyValues",
+            asyncState: highEntropyAsyncState,
+            elapsedMs: highEntropyElapsedMs
           };
         }
         if (highEntropyFetchAttempted) {
@@ -527,7 +646,9 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
             ok: false,
             value: null,
             error: `TypeError: Missing '${key}' in getHighEntropyValues result`,
-            source: "userAgentData.getHighEntropyValues"
+            source: "userAgentData.getHighEntropyValues",
+            asyncState: highEntropyAsyncState || "rejected",
+            elapsedMs: highEntropyElapsedMs
           };
         }
       }
@@ -843,19 +964,82 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
       return !!v && (typeof v === "object" || typeof v === "function") && typeof v.then === "function";
     }
 
-    async function safeApply(fn, thisArg, args) {
+    async function safeApply(fn, thisArg, args, meta) {
+      const startedAt = Date.now();
       try {
         const value = Reflect.apply(fn, thisArg, Array.isArray(args) ? args : []);
         if (isPromiseLike(value)) {
-          try {
-            return { ok: true, value: await value, promise: true };
-          } catch (e) {
-            return { ok: false, error: e, promise: true };
+          const waited = await __probeAwaitWithTimeout(
+            Promise.resolve(value),
+            __PROBE_TIMEOUTS.callMs,
+            meta || null
+          );
+          if (waited.ok) {
+            return {
+              ok: true,
+              value: waited.value,
+              promise: true,
+              asyncState: "resolved",
+              elapsedMs: waited.elapsedMs
+            };
           }
+          if (waited.timedOut) {
+            __probeLogAsyncTimeout(meta || null, waited.elapsedMs, waited.timeoutMs, waited.error);
+          }
+          return {
+            ok: false,
+            error: waited.error,
+            promise: true,
+            asyncState: waited.timedOut ? "timed_out" : "rejected",
+            elapsedMs: waited.elapsedMs
+          };
         }
-        return { ok: true, value, promise: false };
+        return {
+          ok: true,
+          value,
+          promise: false,
+          asyncState: "sync",
+          elapsedMs: Date.now() - startedAt
+        };
       } catch (e) {
-        return { ok: false, error: e, promise: false };
+        return {
+          ok: false,
+          error: e,
+          promise: false,
+          asyncState: "threw",
+          elapsedMs: Date.now() - startedAt
+        };
+      }
+    }
+
+    async function safeApplyWithMeta(fn, thisArg, args, meta) {
+      try {
+        return await safeApply(fn, thisArg, args, meta);
+      } catch (e) {
+        return {
+          ok: false,
+          error: e,
+          promise: false,
+          asyncState: "threw",
+          elapsedMs: 0
+        };
+      }
+    }
+
+    async function withProbeBadReceiverGuard(run) {
+      const root = (typeof globalThis !== "undefined" && globalThis) ? globalThis : {};
+      const mode = (root.__LOGGER_GUARD_MODE__ && typeof root.__LOGGER_GUARD_MODE__ === "object")
+        ? root.__LOGGER_GUARD_MODE__
+        : (root.__LOGGER_GUARD_MODE__ = {});
+      const prevDepth = Number(mode.probeExpectedThrowDepth) || 0;
+      mode.probeExpectedThrowDepth = prevDepth + 1;
+      mode.probeExpectedThrowAt = Date.now();
+      try {
+        return await run();
+      } finally {
+        const nextDepth = (Number(mode.probeExpectedThrowDepth) || 1) - 1;
+        mode.probeExpectedThrowDepth = nextDepth > 0 ? nextDepth : 0;
+        mode.probeExpectedThrowAt = Date.now();
       }
     }
 
@@ -863,24 +1047,37 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
       if (!e) return null;
       const name = e && e.name ? String(e.name) : "Error";
       const msg = e && e.message ? String(e.message) : String(e);
-      const illegal = msg.indexOf("Illegal invocation") !== -1;
-      const incompatibleProxy =
-        msg.indexOf("incompatible Proxy") !== -1 ||
-        msg.indexOf("incompatible proxy") !== -1 ||
-        msg.indexOf("Incompatible proxy") !== -1;
-      return { name, message: msg, illegalInvocation: illegal, incompatibleProxy: incompatibleProxy };
+      const lc = msg.toLowerCase();
+      const illegal = lc.indexOf("illegal invocation") !== -1;
+      const incompatibleReceiver = lc.indexOf("incompatible receiver") !== -1;
+      const incompatibleProxy = lc.indexOf("incompatible proxy") !== -1;
+      const timedOut = (name === "TimeoutError") || (lc.indexOf("timeout") !== -1);
+      return {
+        name,
+        message: msg,
+        illegalInvocation: illegal,
+        incompatibleReceiver: incompatibleReceiver,
+        incompatibleProxy: incompatibleProxy,
+        timedOut: timedOut
+      };
     }
 
     async function pushRow(label, fn, goodThis, goodArgs, badThis, badArgs) {
+      const methodId = (typeof label === "string" && label) ? label.replace(/^receiver:\s*/, "") : "unknown";
       const row = {
         check: label,
+        method: methodId,
         available: typeof fn === "function",
         goodThis: goodThis ? Object.prototype.toString.call(goodThis) : null,
         goodSyncOk: null,
         goodResult: null,
         goodError: null,
+        goodAsyncState: null,
+        goodElapsedMs: null,
         badThrew: null,
         badError: null,
+        badAsyncState: null,
+        badElapsedMs: null,
         match: null
       };
 
@@ -890,25 +1087,49 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
       }
 
       // Bad receiver: should throw TypeError / Illegal invocation in Chromium
-      const bad = await safeApply(fn, badThis, badArgs);
+      const bad = await withProbeBadReceiverGuard(() =>
+        safeApplyWithMeta(fn, badThis, badArgs, {
+          check: label,
+          phase: "bad",
+          method: methodId
+        })
+      );
       row.badThrew = !bad.ok;
       row.badError = bad.ok ? null : classifyError(bad.error);
+      row.badAsyncState = bad.asyncState || null;
+      row.badElapsedMs = typeof bad.elapsedMs === "number" ? bad.elapsedMs : null;
 
       const badMatch =
         row.badThrew === true &&
         row.badError &&
-        (row.badError.name === "TypeError" || row.badError.illegalInvocation === true);
+        row.badError.name === "TypeError" &&
+        (row.badError.illegalInvocation === true || row.badError.incompatibleReceiver === true) &&
+        row.badError.incompatibleProxy !== true;
 
       // Good receiver: should not throw TypeError synchronously (other errors may be env-specific)
       let goodMatch = null;
       if (goodThis) {
-        const good = await safeApply(fn, goodThis, goodArgs);
+        const good = await safeApplyWithMeta(fn, goodThis, goodArgs, {
+          check: label,
+          phase: "good",
+          method: methodId
+        });
         row.goodSyncOk = !!good.ok;
+        row.goodAsyncState = good.asyncState || null;
+        row.goodElapsedMs = typeof good.elapsedMs === "number" ? good.elapsedMs : null;
         if (good.ok) {
           row.goodResult = toPrintable(good.value);
         } else {
           row.goodError = classifyError(good.error);
-          if (row.goodError && (row.goodError.name === "TypeError" || row.goodError.illegalInvocation === true)) {
+          if (good.asyncState === "timed_out" || good.asyncState === "rejected") {
+            goodMatch = false;
+          }
+          if (row.goodError && (
+            row.goodError.name === "TypeError" ||
+            row.goodError.illegalInvocation === true ||
+            row.goodError.incompatibleReceiver === true ||
+            row.goodError.incompatibleProxy === true
+          )) {
             goodMatch = false;
           }
         }
@@ -1343,12 +1564,116 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     console.group("[probe] Receiver/Illegal invocation checks");
     console.table(rows.map((r) => ({
       check: r.check,
+      method: r.method,
       available: r.available,
       match: r.match,
       badThrew: r.badThrew,
       badError: r.badError ? r.badError.name : null,
+      badAsyncState: r.badAsyncState,
+      badElapsedMs: r.badElapsedMs,
       goodSyncOk: r.goodSyncOk,
-      goodError: r.goodError ? r.goodError.name : null
+      goodError: r.goodError ? r.goodError.name : null,
+      goodAsyncState: r.goodAsyncState,
+      goodElapsedMs: r.goodElapsedMs
+    })));
+    console.groupEnd();
+
+    return { ok, rows };
+  }
+
+  function printAudioOwnPropertyInvariantChecks() {
+    const rows = [];
+    const methods = [
+      "getByteFrequencyData",
+      "getFloatFrequencyData",
+      "getByteTimeDomainData",
+      "getFloatTimeDomainData"
+    ];
+    const hasOwn = Object.prototype.hasOwnProperty;
+
+    function pushRow(method, expectedAfterCreateOwn, actualAfterCreateOwn, match, extra, error) {
+      rows.push({
+        check: `audio-own: AnalyserNode.${method}`,
+        method,
+        expectedAfterCreateOwn,
+        actualAfterCreateOwn,
+        match: match === true ? true : match === false ? false : null,
+        extra: extra || null,
+        error: error ? errorShape(error) : null
+      });
+    }
+
+    let audioCtx = null;
+    let analyser = null;
+    try {
+      const AudioCtxCtor = (typeof AudioContext === "function")
+        ? AudioContext
+        : (typeof webkitAudioContext === "function" ? webkitAudioContext : null);
+      if (!AudioCtxCtor) {
+        for (const method of methods) {
+          pushRow(method, false, null, null, {
+            phase: "after_createAnalyser",
+            beforeCreateAnalyserOwn: false,
+            note: "AudioContext unavailable"
+          }, null);
+        }
+        return { ok: true, rows };
+      }
+      try {
+        audioCtx = new AudioCtxCtor();
+      } catch (_) {
+        audioCtx = null;
+      }
+      if (!audioCtx || typeof audioCtx.createAnalyser !== "function") {
+        for (const method of methods) {
+          pushRow(method, false, null, null, {
+            phase: "after_createAnalyser",
+            beforeCreateAnalyserOwn: false,
+            note: "createAnalyser unavailable"
+          }, null);
+        }
+        return { ok: true, rows };
+      }
+      analyser = Reflect.apply(audioCtx.createAnalyser, audioCtx, []);
+      for (const method of methods) {
+        const proto = (typeof AnalyserNode === "function" && AnalyserNode.prototype)
+          ? AnalyserNode.prototype
+          : null;
+        const protoOwn = !!(proto && hasOwn.call(proto, method));
+        const afterOwn = !!(analyser && (typeof analyser === "object" || typeof analyser === "function") && hasOwn.call(analyser, method));
+        pushRow(
+          method,
+          false,
+          afterOwn,
+          afterOwn === false,
+          {
+            phase: "after_createAnalyser",
+            beforeCreateAnalyserOwn: false,
+            protoHasOwn: protoOwn
+          },
+          null
+        );
+      }
+    } catch (e) {
+      for (const method of methods) {
+        pushRow(method, false, null, false, {
+          phase: "after_createAnalyser",
+          beforeCreateAnalyserOwn: false,
+          note: "probe internal error"
+        }, e);
+      }
+    }
+
+    const ok = rows.every((r) => r.match === true || r.match === null);
+    console.group("[probe] Audio own-property invariant checks");
+    console.table(rows.map((r) => ({
+      check: r.check,
+      method: r.method,
+      match: r.match,
+      expectedAfterCreateOwn: r.expectedAfterCreateOwn,
+      actualAfterCreateOwn: r.actualAfterCreateOwn,
+      protoHasOwn: r.extra && Object.prototype.hasOwnProperty.call(r.extra, "protoHasOwn") ? r.extra.protoHasOwn : null,
+      error: r.error ? r.error.name : null
     })));
     console.groupEnd();
 
@@ -1794,8 +2119,12 @@ function printToStringCrossRealmChecks() {
           const name = (typeof er.name === "string") ? er.name : "";
           const message = (typeof er.message === "string") ? er.message : "";
           const stack = (typeof er.stack === "string") ? er.stack : "";
+          const lcMessage = message.toLowerCase();
+          const expectedReceiverThrow =
+            lcMessage.indexOf("illegal invocation") !== -1 ||
+            lcMessage.indexOf("incompatible receiver") !== -1;
           if (name !== "TypeError") return false;
-          if (!/Illegal invocation/i.test(message)) return false;
+          if (!expectedReceiverThrow) return false;
           if (!stack) return false;
           // Probe intentionally runs bad-receiver tests in printReceiverChecks(); those should not populate "err".
           // Filter only by probe-owned markers to avoid accidental coupling to other helpers.
@@ -2110,26 +2439,118 @@ function printToStringCrossRealmChecks() {
     return rows;
   }
 
+  const fieldsMeta = { check: "__PROBE__", phase: "build", method: "printFieldValues" };
+  const fieldsWait = await __probeAwaitWithinBudget(printFieldValues(), fieldsMeta);
+  if (!fieldsWait.ok && fieldsWait.timedOut) {
+    __probeLogAsyncTimeout(fieldsMeta, fieldsWait.elapsedMs, fieldsWait.timeoutMs, fieldsWait.error);
+  }
+  const receiverMeta = { check: "__PROBE__", phase: "build", method: "printReceiverChecks" };
+  const receiverWait = await __probeAwaitWithinBudget(printReceiverChecks(), receiverMeta);
+  if (!receiverWait.ok && receiverWait.timedOut) {
+    __probeLogAsyncTimeout(receiverMeta, receiverWait.elapsedMs, receiverWait.timeoutMs, receiverWait.error);
+  }
+
   const result = {
     ok: true,
     timestamp: new Date().toISOString(),
-    fields: await printFieldValues(),
+    fields: fieldsWait.ok ? fieldsWait.value : [{
+      field: "__probe__.printFieldValues",
+      ok: false,
+      value: null,
+      error: errorToString(fieldsWait.error),
+      source: "watchdog",
+      asyncState: fieldsWait.timedOut ? "timed_out" : "rejected",
+      elapsedMs: fieldsWait.elapsedMs
+    }],
     descriptors: printPrototypeDescriptors(),
     methods: printTouchedMethods(),
-    receiverChecks: await printReceiverChecks(),
+    receiverChecks: receiverWait.ok ? receiverWait.value : {
+      ok: false,
+      rows: [{
+        check: "receiver: watchdog",
+        method: "printReceiverChecks",
+        available: false,
+        goodThis: null,
+        goodSyncOk: null,
+        goodResult: null,
+        goodError: errorShape(receiverWait.error),
+        goodAsyncState: receiverWait.timedOut ? "timed_out" : "rejected",
+        goodElapsedMs: receiverWait.elapsedMs,
+        badThrew: null,
+        badError: null,
+        badAsyncState: null,
+        badElapsedMs: null,
+        match: false
+      }]
+    },
+    audioOwnProperty: printAudioOwnPropertyInvariantChecks(),
     prototypeInvariants: printPrototypeInvariantChecks(),
     toStringCrossRealm: printToStringCrossRealmChecks(),
     degrade: printLastDegradeEvents(),
-    moduleCheck: printModuleCheck()
+    moduleCheck: printModuleCheck(),
+    watchdog: {
+      totalBudgetMs: __PROBE_TIMEOUTS.totalMs,
+      spentMs: Date.now() - __probeRunStartedAt,
+      remainingMs: __probeRemainingBudgetMs(),
+      fields: {
+        state: fieldsWait.ok ? "resolved" : (fieldsWait.timedOut ? "timed_out" : "rejected"),
+        elapsedMs: fieldsWait.elapsedMs,
+        timeoutMs: fieldsWait.timeoutMs
+      },
+      receiverChecks: {
+        state: receiverWait.ok ? "resolved" : (receiverWait.timedOut ? "timed_out" : "rejected"),
+        elapsedMs: receiverWait.elapsedMs,
+        timeoutMs: receiverWait.timeoutMs
+      }
+    }
   };
 
   result.descriptorExpectations = printDescriptorExpectations(result);
 
   try {
+    const criticalLevels = { warn: true, error: true, fatal: true };
+    const parseRowData = (row) => {
+      if (!row || typeof row !== "object") return null;
+      if (typeof row.data !== "string" || !row.data) return null;
+      try {
+        const parsed = JSON.parse(row.data);
+        return (parsed && typeof parsed === "object") ? parsed : null;
+      } catch (_) {
+        return null;
+      }
+    };
+    const isExpectedThrowRow = (row) => {
+      if (!row || typeof row !== "object") return false;
+      const code = (typeof row.code === "string") ? row.code : "";
+      const dataObj = parseRowData(row);
+      const reason = (dataObj && typeof dataObj.reason === "string") ? dataObj.reason : null;
+      const outcome = (dataObj && typeof dataObj.outcome === "string") ? dataObj.outcome : null;
+      if (outcome === "throw" && (reason === "native_throw" || reason === "native_illegal_invocation" || reason === "illegal_invocation")) return true;
+      if (code.endsWith(":native_throw")) return true;
+      if (code.indexOf("_illegal_invocation") !== -1) return true;
+      return false;
+    };
+    const degradeRows = (result.degrade && Array.isArray(result.degrade.rows)) ? result.degrade.rows : [];
+    const hasUnexpectedDegrade = degradeRows.some((row) => {
+      const level = (row && typeof row.level === "string") ? row.level : "";
+      if (!criticalLevels[level]) return false;
+      return !isExpectedThrowRow(row);
+    });
+    const moduleRows = Array.isArray(result.moduleCheck) ? result.moduleCheck : [];
+    const badModuleStatuses = { error: true, warn: true, missing_emitter: true, not_emitted: true };
+    const hasUnexpectedModule = moduleRows.some((row) => {
+      const status = (row && typeof row.status === "string") ? row.status : "";
+      return !!badModuleStatuses[status];
+    });
+    result.degradeOk = !hasUnexpectedDegrade;
+    result.moduleCheckOk = !hasUnexpectedModule;
     result.ok = !!(
       (result.receiverChecks ? result.receiverChecks.ok !== false : true) &&
+      (result.audioOwnProperty ? result.audioOwnProperty.ok !== false : true) &&
       (result.prototypeInvariants ? result.prototypeInvariants.ok !== false : true) &&
-      (result.toStringCrossRealm ? result.toStringCrossRealm.ok !== false : true)
+      (result.toStringCrossRealm ? result.toStringCrossRealm.ok !== false : true) &&
+      (result.degradeOk !== false) &&
+      (result.moduleCheckOk !== false)
     );
   } catch (_) {}
   globalThis.__PROBE_OUTPUT__ = result;
@@ -2200,6 +2621,7 @@ function __probeDownloadHtmlReport(result) {
   const degradeRows = result && result.degrade && result.degrade.rows;
   const toStringCrossRows = result && result.toStringCrossRealm && result.toStringCrossRealm.rows;
   const receiverRows = result && result.receiverChecks && result.receiverChecks.rows;
+  const audioOwnRows = result && result.audioOwnProperty && result.audioOwnProperty.rows;
   const protoInvRows = result && result.prototypeInvariants && result.prototypeInvariants.rows;
   const descriptorExpectRows = result && result.descriptorExpectations && Array.isArray(result.descriptorExpectations.rows)
     ? result.descriptorExpectations.rows.filter((r) => !r.allMatch)
@@ -2269,6 +2691,11 @@ function __probeDownloadHtmlReport(result) {
   </section>
 
   <section>
+    <h2>AnalyserNode own-property invariant checks</h2>
+    ${__probeTableHtml(audioOwnRows)}
+  </section>
+
+  <section>
     <h2>Prototype/instanceof checks</h2>
     ${__probeTableHtml(protoInvRows)}
   </section>
@@ -2327,4 +2754,3 @@ try {
 
 return result;
 }, configurable: true });
-
