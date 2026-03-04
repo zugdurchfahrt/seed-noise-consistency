@@ -121,6 +121,9 @@ const AudioContextModule = function AudioContextModule(window) {
   const __coreApplyTargets = (window.Core && typeof window.Core.applyTargets === 'function')
     ? window.Core.applyTargets
     : null;
+  const __coreRegisterPatchedTarget = (window.Core && typeof window.Core.registerPatchedTarget === 'function')
+    ? window.Core.registerPatchedTarget
+    : null;
   if (typeof safeDefine !== 'function') {
     degrade('audiocontext:safe_define_missing', new Error('[AudioContextPatch] __safeDefine missing'), {
       stage: 'preflight',
@@ -358,10 +361,12 @@ const AudioContextModule = function AudioContextModule(window) {
     }
 
     const applied = [];
+    let activeKey = null;
     try {
       for (let i = 0; i < plans.length; i++) {
         const p = plans[i];
         if (!p || p.skipApply) continue;
+        activeKey = p.key;
         if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
           throw new Error('[AudioContextPatch] invalid plan item');
         }
@@ -371,6 +376,19 @@ const AudioContextModule = function AudioContextModule(window) {
           throw new Error('[AudioContextPatch] descriptor post-check mismatch for ' + p.key);
         }
         applied.push(p);
+      }
+      for (let i = 0; i < applied.length; i++) {
+        const p = applied[i];
+        activeKey = p.key;
+        if (typeof __coreRegisterPatchedTarget !== 'function') continue;
+        try {
+          __coreRegisterPatchedTarget(p.owner, p.key);
+        } catch (registerErr) {
+          if (registerErr && typeof registerErr === 'object') {
+            registerErr.__audioRegisterTargetFailed = true;
+          }
+          throw registerErr;
+        }
       }
     } catch (e) {
       degrade(groupTag + ':rollback', null, {
@@ -404,8 +422,12 @@ const AudioContextModule = function AudioContextModule(window) {
         level: 'error',
         type: __audioTypeBrowser,
         diagTag: groupTag,
-        key: null,
-        data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
+        key: activeKey,
+        data: {
+          outcome: groupPolicy === 'throw' ? 'throw' : 'skip',
+          policy: groupPolicy,
+          reason: (e && e.__audioRegisterTargetFailed === true) ? 'register_target_failed' : 'apply_failed'
+        }
       });
       if (rollbackErr) throw rollbackErr;
       if (groupPolicy === 'throw') throw e;
@@ -444,11 +466,11 @@ const AudioContextModule = function AudioContextModule(window) {
         owner: proto,
         key: 'sampleRate',
         kind: 'accessor',
-        wrapLayer: 'core_wrapper',
+        wrapLayer: 'named_wrapper_strict',
         resolve: 'proto_chain',
-        policy: 'skip',
+        policy: 'strict',
         diagTag: `audio:${CTX_NAME}:sampleRate`,
-        allowCreate: true,
+        allowCreate: false,
         configurable: sampleRateDesc ? !!sampleRateDesc.configurable : true,
           enumerable: sampleRateDesc ? !!sampleRateDesc.enumerable : false,
           invalidThis: 'throw',
@@ -479,11 +501,11 @@ const AudioContextModule = function AudioContextModule(window) {
           owner: proto,
           key: 'baseLatency',
           kind: 'accessor',
-          wrapLayer: 'core_wrapper',
+          wrapLayer: 'named_wrapper_strict',
           resolve: 'proto_chain',
-          policy: 'skip',
+          policy: 'strict',
           diagTag: `audio:${CTX_NAME}:baseLatency`,
-          allowCreate: true,
+          allowCreate: false,
           configurable: baseLatencyDesc ? !!baseLatencyDesc.configurable : true,
           enumerable: baseLatencyDesc ? !!baseLatencyDesc.enumerable : false,
           invalidThis: 'throw',
@@ -516,12 +538,16 @@ const AudioContextModule = function AudioContextModule(window) {
         owner: proto,
         key: 'createBuffer',
         kind: 'method',
+        invokeClass: 'brand_strict',
         wrapLayer: 'core_wrapper',
         resolve: 'proto_chain',
         policy: 'skip',
         diagTag: `audio:${CTX_NAME}:createBuffer`,
         allowCreate: true,
         invalidThis: 'throw',
+        validThis: function audioCreateBufferValidThis(thisArg) {
+          try { return !!(thisArg instanceof CTX); } catch (_) { return false; }
+        },
         invoke: function audioCreateBufferInvoke(orig, args) {
           const input = Array.isArray(args) ? args : [];
           try {
@@ -548,12 +574,16 @@ const AudioContextModule = function AudioContextModule(window) {
       owner: proto,
       key: 'createAnalyser',
       kind: 'method',
+      invokeClass: 'brand_strict',
       wrapLayer: 'core_wrapper',
       resolve: 'proto_chain',
       policy: 'skip',
       diagTag: `audio:${CTX_NAME}:createAnalyser`,
       allowCreate: true,
       invalidThis: 'throw',
+      validThis: function audioCreateAnalyserValidThis(thisArg) {
+        try { return !!(thisArg instanceof CTX); } catch (_) { return false; }
+      },
       invoke: function audioCreateAnalyserInvoke(orig, args) {
         const input = Array.isArray(args) ? args : [];
         let analyser;
@@ -583,6 +613,9 @@ const AudioContextModule = function AudioContextModule(window) {
   if (AUDIO_NOISE_ENABLED && typeof window.AnalyserNode === 'function' && window.AnalyserNode.prototype) {
     const ANALYSER_NAME = 'AnalyserNode';
     const analyserProto = window.AnalyserNode.prototype;
+    function analyserValidThis(thisArg) {
+      try { return !!(thisArg instanceof window.AnalyserNode); } catch (_) { return false; }
+    }
     const analyserTargets = [];
 
     const dByteFreq = Object.getOwnPropertyDescriptor(analyserProto, 'getByteFrequencyData') || getPropDescriptorDeep(analyserProto, 'getByteFrequencyData');
@@ -591,12 +624,14 @@ const AudioContextModule = function AudioContextModule(window) {
         owner: analyserProto,
         key: 'getByteFrequencyData',
         kind: 'method',
+        invokeClass: 'brand_strict',
         wrapLayer: 'core_wrapper',
         resolve: 'proto_chain',
         policy: 'skip',
         diagTag: 'audio:AnalyserNode:getByteFrequencyData',
         allowCreate: false,
         invalidThis: 'throw',
+        validThis: analyserValidThis,
         invoke: function analyserGetByteFrequencyDataInvoke(orig, args) {
           const input = Array.isArray(args) ? args : [];
           const array = input[0];
@@ -656,12 +691,14 @@ const AudioContextModule = function AudioContextModule(window) {
         owner: analyserProto,
         key: 'getFloatFrequencyData',
         kind: 'method',
+        invokeClass: 'brand_strict',
         wrapLayer: 'core_wrapper',
         resolve: 'proto_chain',
         policy: 'skip',
         diagTag: 'audio:AnalyserNode:getFloatFrequencyData',
         allowCreate: false,
         invalidThis: 'throw',
+        validThis: analyserValidThis,
         invoke: function analyserGetFloatFrequencyDataInvoke(orig, args) {
           const input = Array.isArray(args) ? args : [];
           const array = input[0];
@@ -729,12 +766,14 @@ const AudioContextModule = function AudioContextModule(window) {
         owner: analyserProto,
         key: 'getByteTimeDomainData',
         kind: 'method',
+        invokeClass: 'brand_strict',
         wrapLayer: 'core_wrapper',
         resolve: 'proto_chain',
         policy: 'skip',
         diagTag: 'audio:AnalyserNode:getByteTimeDomainData',
         allowCreate: false,
         invalidThis: 'throw',
+        validThis: analyserValidThis,
         invoke: function analyserGetByteTimeDomainDataInvoke(orig, args) {
           const input = Array.isArray(args) ? args : [];
           const array = input[0];
@@ -797,12 +836,14 @@ const AudioContextModule = function AudioContextModule(window) {
         owner: analyserProto,
         key: 'getFloatTimeDomainData',
         kind: 'method',
+        invokeClass: 'brand_strict',
         wrapLayer: 'core_wrapper',
         resolve: 'proto_chain',
         policy: 'skip',
         diagTag: 'audio:AnalyserNode:getFloatTimeDomainData',
         allowCreate: false,
         invalidThis: 'throw',
+        validThis: analyserValidThis,
         invoke: function analyserGetFloatTimeDomainDataInvoke(orig, args) {
           const input = Array.isArray(args) ? args : [];
           const array = input[0];
