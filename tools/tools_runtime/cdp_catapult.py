@@ -27,7 +27,7 @@ SW_DM = None
 SW_META = None
 # --- Dedicated/Shared Worker CDP_GLOBAL_SEED injector (WorkerGlobalScope) ---
 WORKER_SEED_INJECT_ENABLED = False
-WORKER_GLOBAL_SEED = None
+CDP_GLOBAL_SEED = None
 _RUNNING_WORKER_SEED = False
 _RUNNING = False
 _SW_DIAG_BINDING = "__SW_REPORT_DIAG__"
@@ -166,10 +166,10 @@ def enable_worker_seed_inject(global_seed: str):
     Enable Dedicated/Shared worker injection for CDP_GLOBAL_SEED.
     Call this BEFORE starting run_worker_seed().
     """
-    global WORKER_SEED_INJECT_ENABLED, WORKER_GLOBAL_SEED
+    global WORKER_SEED_INJECT_ENABLED, CDP_GLOBAL_SEED
     if not isinstance(global_seed, str) or not global_seed.strip():
         raise ValueError("Worker seed inject: global_seed must be non-empty str")
-    WORKER_GLOBAL_SEED = global_seed
+    CDP_GLOBAL_SEED = global_seed
     WORKER_SEED_INJECT_ENABLED = True
 
 
@@ -643,9 +643,9 @@ def run_worker_seed():
         _RUNNING_WORKER_SEED = False
         logger.error("Worker seed inject: disabled flag encountered (PATCH_SKIPPED)")
         raise RuntimeError("Worker seed inject: disabled")
-    if not isinstance(WORKER_GLOBAL_SEED, str) or not WORKER_GLOBAL_SEED.strip():
+    if not isinstance(CDP_GLOBAL_SEED, str) or not CDP_GLOBAL_SEED.strip():
         _RUNNING_WORKER_SEED = False
-        logger.error("Worker seed inject: WORKER_GLOBAL_SEED missing (PATCH_SKIPPED)")
+        logger.error("Worker seed inject: CDP_GLOBAL_SEED missing (PATCH_SKIPPED)")
         raise RuntimeError("Worker seed inject: seed missing")
 
     try:
@@ -656,17 +656,17 @@ def run_worker_seed():
         raise ValueError("Worker seed inject: fail") from e
 
     try:
-        seed_fp = hashlib.sha256(str(WORKER_GLOBAL_SEED).encode("utf-8")).hexdigest()[:12]
+        seed_fp = hashlib.sha256(str(CDP_GLOBAL_SEED).encode("utf-8")).hexdigest()[:12]
     except Exception:
         seed_fp = None
     if seed_fp:
         logger.info(
             "Worker seed inject: seed prepared len=%s sha256_12=%s",
-            len(str(WORKER_GLOBAL_SEED)),
+            len(str(CDP_GLOBAL_SEED)),
             seed_fp,
         )
     else:
-        logger.info("Worker seed inject: seed prepared len=%s", len(str(WORKER_GLOBAL_SEED)))
+        logger.info("Worker seed inject: seed prepared len=%s", len(str(CDP_GLOBAL_SEED)))
 
     logger.warning("Worker seed inject: CDP websocket starting (waitForDebuggerOnStart=true): %s", ws_url)
     log_cdp_runtime_diag("worker_seed_before_ws")
@@ -675,7 +675,7 @@ def run_worker_seed():
     injected = set()   # targetId set
     manual_attach_sent = set()  # targetId set for fallback manual attach
     sess_meta = {}  # sessionId -> {targetId,type,url}
-    seed_prelude = _build_worker_seed_prelude(WORKER_GLOBAL_SEED)
+    seed_prelude = _build_worker_seed_prelude(CDP_GLOBAL_SEED)
     # sanity_expr = "(() => { try { return String(globalThis.CDP_GLOBAL_SEED); } catch (e) { return null; } })()"
 
 
@@ -789,7 +789,7 @@ def run_worker_seed():
                 if tag == "Runtime.evaluate:worker_seed_sanity":
                     try:
                         out = (res.get("result") or {}).get("value")
-                        expected_seed = str(WORKER_GLOBAL_SEED)
+                        expected_seed = str(CDP_GLOBAL_SEED)
                         got_seed = out.get("cdpGlobalSeed") if isinstance(out, dict) else None
                         if not isinstance(got_seed, str) or got_seed != expected_seed:
                             _fatal(

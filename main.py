@@ -461,9 +461,10 @@ def init_driver(
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
     inject_uach_strip_window(driver, user_agent)
 
-     # --- Workers Initial patch reading ---
+    # --- Workers Initial patch reading ---
     core = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
     logger.info("WORKER_PATCH_SRC.initated")
+    set_reflect = Path(SCRIPTS_WORKERSCOPE / "set_reflect.js").read_text("utf-8")
 
     # --- publish worker core into __ENV_BRIDGE__ (stable for external worker_bootstrap.js) ---
     worker_bootstrap_env_js = f"""
@@ -471,10 +472,16 @@ def init_driver(
         const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
         if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
         const core = {json.dumps(core)};
+        const set_reflect = {json.dumps(set_reflect)};
         if (!BR.inlinePatch) {{
             BR.inlinePatch = core;
         }} else if (BR.inlinePatch !== core) {{
             throw new Error('WorkerBootstrap: inlinePatch already set');
+        }}
+        if (!BR.inlineReflect) {{
+            BR.inlineReflect = set_reflect;
+        }} else if (BR.inlineReflect !== set_reflect) {{
+            throw new Error('WorkerBootstrap: inlineReflect already set');
         }}
     }})();
     //# sourceURL=worker_bootstrap_env.js
