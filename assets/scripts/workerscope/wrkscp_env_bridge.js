@@ -1,5 +1,13 @@
 // === env-worker-bridge (главный бандл) ===
-(() => {
+(function workerInit(self){
+// бАЗОВАЯ ПРОВЕРКА WorkerGlobalScope НЕ УБИРАТЬ
+const IS_WORKER =
+  typeof WorkerGlobalScope !== 'undefined' &&
+  self instanceof WorkerGlobalScope;
+
+if (!IS_WORKER) return;
+
+  const BR = (globalThis.__ENV_BRIDGE__ = globalThis.__ENV_BRIDGE__ || {});
   const G = (typeof globalThis !== 'undefined' && globalThis)
       || (typeof self       !== 'undefined' && self)
       || (typeof window     !== 'undefined' && window)
@@ -9,14 +17,49 @@
     throw new Error('UworkerInit: not in WorkerGlobalScope');
   }
 
+  const __MODULE = 'wrk_BRIDGE';
+  const __SURFACE = 'wrk_BRIDGE';
+  const __D = G && G.__DEGRADE__;
+  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+
+  function __wrkEmit(level, code, ctx, err) {
+    try {
+      if (__diag) return __diag(level, code, ctx, err);
+      if (typeof __D === 'function') {
+        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
+        const safeErr = (err === undefined || err === null) ? null : err;
+        return __D(code, safeErr, Object.assign({}, safeCtx, { level: level || 'info' }));
+      }
+    } catch (emitErr) {
+      return undefined;
+    }
+    return undefined;
+  }
+
+  function __wrkDiag(level, code, extra, err) {
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    return __wrkEmit(level, code, {
+      module: __MODULE,
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : __SURFACE,
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: x.stage,
+      message: x.message,
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: x.type
+    }, err || null);
+  }
 
 
 
 
 
-  const BR = (global.__ENV_BRIDGE__ = global.__ENV_BRIDGE__ || {});
 
-  const SEED_NATIVIZATION_SRC = 
+
+
+
+  
+    const SEED_NATIVIZATION_SR = (globalThis.__ENV_BRIDGE__ = globalThis.__ENV_BRIDGE__ || {});
         // --- Seed nativization (Window → Worker). No runtime coupling after start. ---
         try {
           const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
@@ -370,7 +413,62 @@
           self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);
           throw e;
         }
-  ;
+  
 
-})();
+
+  __wrkDiag('info', 'wrk:worker_function.prototype_bridge_ready', {
+    stage: 'apply',
+    key: 'function.prototype_bridge',
+    message: 'function.prototype_bridge ready',
+    type: 'pipeline missing data',
+    data: { outcome: 'return' }
+  }, null);
+
+  // reduce visibility of pipeline globals in Window realm (non-enumerable)
+  try {
+    const win = G;
+    if (win && (typeof win === 'object' || typeof win === 'function')) {
+      const keys = [
+        '__ENV_BRIDGE__',
+        'CanvasPatchContext',
+        '__CORE_TOSTRING_STATE__'
+      ];
+      for (const k of keys) {
+        if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
+        const d = Object.getOwnPropertyDescriptor(win, k);
+        if (!d || d.enumerable === false) continue;
+        if (d.configurable === false) {
+          const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
+          __wrkDiag('warn', 'wrk:hide_pipeline_surface_nonconfigurable', {
+            stage: 'apply',
+            key: k,
+            message: 'hide pipeline surface skipped: non-configurable',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'hide_pipeline_surface_nonconfigurable' }
+          }, e);
+          continue;
+        }
+        if ('value' in d) {
+          Object.defineProperty(win, k, { value: win[k], writable: !!d.writable, configurable: !!d.configurable, enumerable: false });
+        } else {
+          Object.defineProperty(win, k, { get: d.get, set: d.set, configurable: !!d.configurable, enumerable: false });
+        }
+      }
+    }
+  } catch (e) {
+    __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
+      stage: 'apply',
+      key: '__ENV_BRIDGE__',
+      message: 'hide pipeline surface failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }
+    }, e);
+  }
+  ;
+})(self); // <-- закрыли WrkModule
+
+
+
+
+
 
