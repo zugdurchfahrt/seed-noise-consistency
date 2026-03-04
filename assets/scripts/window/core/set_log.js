@@ -354,6 +354,53 @@ const LOGGingModule = function LOGGingModule() {
       });
     }
 
+    function isProbeReceiverGuardActive() {
+      try {
+        const mode = G.__LOGGER_GUARD_MODE__;
+        return !!(mode && typeof mode === "object" && Number(mode.probeExpectedThrowDepth) > 0);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function recordProbeGuardDegrade(code, err, extra) {
+      try {
+        const guard = getLoggerGuard();
+        const safeExtra = (extra && typeof extra === "object") ? extra : {};
+        const errMessage =
+          (err && typeof err === "object" && typeof err.message === "string") ? String(err.message) :
+          (typeof err === "string" ? String(err) : null);
+        const message = errMessage || ((typeof safeExtra.message === "string" && safeExtra.message) ? safeExtra.message : String(code || "probe.bad_receiver"));
+        const stack = (err && typeof err === "object" && typeof err.stack === "string") ? String(err.stack) : null;
+
+        guard.count++;
+        guard.lastAt = Date.now();
+        guard.last = {
+          where: "probe.bad_receiver",
+          message: message,
+          stack: stack
+        };
+
+        _guardPush({
+          type: "logger_guard",
+          logger_guard: true,
+          where: guard.last.where,
+          code: code ? String(code) : "probe.bad_receiver",
+          message: message,
+          stack: stack,
+          meta: {
+            source: "probe",
+            mode: "bad_receiver_checks",
+            module: (typeof safeExtra.module === "string") ? safeExtra.module : null,
+            stage: (typeof safeExtra.stage === "string") ? safeExtra.stage : null,
+            key: (typeof safeExtra.key === "string") ? safeExtra.key : null,
+            level: (typeof safeExtra.level === "string") ? safeExtra.level : null
+          },
+          timestamp: new Date().toISOString()
+        });
+      } catch (_) {}
+    }
+
     function guardedApply(fn, self, args, where) {
       try {
         return Reflect.apply(fn, self, args);
@@ -550,6 +597,13 @@ const LOGGingModule = function LOGGingModule() {
           }
           return;
         }
+        const normalizedExtra = extra ? normalizeForJSON(extra) : null;
+
+        if (isProbeReceiverGuardActive()) {
+          recordProbeGuardDegrade(code, err, normalizedExtra);
+          return;
+        }
+
         pushEntry({
           type: "degrade",
           code: code ? String(code) : "unknown",
@@ -558,7 +612,7 @@ const LOGGingModule = function LOGGingModule() {
             message: err.message,
             stack: err.stack || null,
           } : (err ? safeStringify(err) : null),
-          extra: extra ? normalizeForJSON(extra) : null,
+          extra: normalizedExtra,
           timestamp: new Date().toISOString(),
         });
         } catch (e) {
