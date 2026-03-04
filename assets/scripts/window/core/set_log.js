@@ -401,6 +401,65 @@ const LOGGingModule = function LOGGingModule() {
       } catch (_) {}
     }
 
+    function isExpectedReceiverThrow(code, extra, err) {
+      try {
+        const safeExtra = (extra && typeof extra === "object") ? extra : {};
+        const data = (safeExtra.data && typeof safeExtra.data === "object") ? safeExtra.data : {};
+        const reason = (typeof data.reason === "string") ? data.reason : "";
+        const outcome = (typeof data.outcome === "string") ? data.outcome : "";
+        const normalizedCode = (typeof code === "string") ? code : "";
+        if (outcome === "throw" && (reason === "native_throw" || reason === "native_illegal_invocation" || reason === "illegal_invocation")) return true;
+        if (normalizedCode.endsWith(":native_throw")) return true;
+        if (normalizedCode.indexOf("_illegal_invocation") !== -1) return true;
+        const er = (err && typeof err === "object") ? err : null;
+        const name = (er && typeof er.name === "string") ? er.name : "";
+        const message = (er && typeof er.message === "string") ? er.message.toLowerCase() : "";
+        if (name !== "TypeError") return false;
+        return message.indexOf("illegal invocation") !== -1 || message.indexOf("incompatible receiver") !== -1;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function recordExpectedReceiverThrow(code, err, extra) {
+      try {
+        const guard = getLoggerGuard();
+        const safeExtra = (extra && typeof extra === "object") ? extra : {};
+        const errMessage =
+          (err && typeof err === "object" && typeof err.message === "string") ? String(err.message) :
+          (typeof err === "string" ? String(err) : null);
+        const message = errMessage || ((typeof safeExtra.message === "string" && safeExtra.message) ? safeExtra.message : String(code || "expected_receiver_throw"));
+        const stack = (err && typeof err === "object" && typeof err.stack === "string") ? String(err.stack) : null;
+
+        guard.count++;
+        guard.lastAt = Date.now();
+        guard.last = {
+          where: "expected.receiver.throw",
+          message: message,
+          stack: stack
+        };
+
+        _guardPush({
+          type: "logger_guard",
+          logger_guard: true,
+          where: guard.last.where,
+          code: code ? String(code) : "expected_receiver_throw",
+          message: message,
+          stack: stack,
+          meta: {
+            source: "degrade",
+            mode: "expected_receiver_throw",
+            module: (typeof safeExtra.module === "string") ? safeExtra.module : null,
+            stage: (typeof safeExtra.stage === "string") ? safeExtra.stage : null,
+            key: (typeof safeExtra.key === "string") ? safeExtra.key : null,
+            level: (typeof safeExtra.level === "string") ? safeExtra.level : null,
+            data: (safeExtra.data && typeof safeExtra.data === "object") ? safeExtra.data : null
+          },
+          timestamp: new Date().toISOString()
+        });
+      } catch (_) {}
+    }
+
     function guardedApply(fn, self, args, where) {
       try {
         return Reflect.apply(fn, self, args);
@@ -687,6 +746,11 @@ const LOGGingModule = function LOGGingModule() {
 
       // Dedup gate: keeps early evidence, suppresses high-volume duplicate noise.
       if (!shouldEmitDiag(normalizedLevel, normalizedCode, extraObj, err || null)) {
+        return;
+      }
+
+      if (isExpectedReceiverThrow(normalizedCode, extraObj, err || null)) {
+        recordExpectedReceiverThrow(normalizedCode, err || null, extraObj);
         return;
       }
 
