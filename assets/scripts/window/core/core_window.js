@@ -470,29 +470,72 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }, e);
     }
   }
-  if (typeof window.__wrapNativeAccessor !== 'function') {
-    safeDefine(window, '__wrapNativeAccessor', {
-      value: __wrapNativeAccessor,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
-  if (typeof window.__wrapStrictAccessor !== 'function') {
-    safeDefine(window, '__wrapStrictAccessor', {
-      value: __wrapStrictAccessor,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
-  if (typeof window.__wrapNativeCtor !== 'function') {
-    safeDefine(window, '__wrapNativeCtor', {
-      value: __wrapNativeCtor,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
+  {
+    const hasOwnWrapNativeAccessor = Object.prototype.hasOwnProperty.call(window, '__wrapNativeAccessor');
+    if (!hasOwnWrapNativeAccessor || typeof window.__wrapNativeAccessor !== 'function') {
+      if (hasOwnWrapNativeAccessor && typeof window.__wrapNativeAccessor !== 'function') {
+        __emit('warn', 'core_window:export_conflict', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: '__wrapNativeAccessor',
+          stage: 'contract',
+          message: 'export conflict: existing own property is not a function; overwriting',
+          type: 'contract violation',
+          data: { outcome: 'return', typeof: typeof window.__wrapNativeAccessor }
+        }, null);
+      }
+      safeDefine(window, '__wrapNativeAccessor', {
+        value: __wrapNativeAccessor,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+
+    const hasOwnWrapStrictAccessor = Object.prototype.hasOwnProperty.call(window, '__wrapStrictAccessor');
+    if (!hasOwnWrapStrictAccessor || typeof window.__wrapStrictAccessor !== 'function') {
+      if (hasOwnWrapStrictAccessor && typeof window.__wrapStrictAccessor !== 'function') {
+        __emit('warn', 'core_window:export_conflict', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: '__wrapStrictAccessor',
+          stage: 'contract',
+          message: 'export conflict: existing own property is not a function; overwriting',
+          type: 'contract violation',
+          data: { outcome: 'return', typeof: typeof window.__wrapStrictAccessor }
+        }, null);
+      }
+      safeDefine(window, '__wrapStrictAccessor', {
+        value: __wrapStrictAccessor,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+
+    const hasOwnWrapNativeCtor = Object.prototype.hasOwnProperty.call(window, '__wrapNativeCtor');
+    if (!hasOwnWrapNativeCtor || typeof window.__wrapNativeCtor !== 'function') {
+      if (hasOwnWrapNativeCtor && typeof window.__wrapNativeCtor !== 'function') {
+        __emit('warn', 'core_window:export_conflict', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: '__wrapNativeCtor',
+          stage: 'contract',
+          message: 'export conflict: existing own property is not a function; overwriting',
+          type: 'contract violation',
+          data: { outcome: 'return', typeof: typeof window.__wrapNativeCtor }
+        }, null);
+      }
+      safeDefine(window, '__wrapNativeCtor', {
+        value: __wrapNativeCtor,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
   }
 
 
@@ -723,7 +766,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const p = Reflect.getPrototypeOf(toString);
         const ok = Reflect.setPrototypeOf(toString, p);
         if (ok !== true) {
-          __emit('warn', 'core_window:toString_setProto_failed', {
+          const invErr = new TypeError();
+          __emit('error', 'core_window:toString_setProto_failed', {
             module: 'core',
             diagTag: 'core_window',
             surface: 'core',
@@ -731,8 +775,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
             stage: 'contract',
             message: 'Reflect.setPrototypeOf(toString, currentProto) returned false',
             type: 'contract violation',
-            data: { outcome: 'return', ok: false }
-          }, null);
+            data: { outcome: 'throw', ok: false }
+          }, invErr);
+          throw invErr;
         }
       } catch (setProtoErr) {
         __emit('error', 'core_window:toString_setProto_threw', {
@@ -743,8 +788,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
           stage: 'contract',
           message: 'Reflect.setPrototypeOf(toString, currentProto) threw',
           type: 'contract violation',
-          data: { outcome: 'return', stx: (setProtoErr && setProtoErr.stack) ? String(setProtoErr.stack) : null }
+          data: { outcome: 'throw', stx: (setProtoErr && setProtoErr.stack) ? String(setProtoErr.stack) : null }
         }, setProtoErr);
+        throw setProtoErr;
       }
 
       safeDefine(window, '__CORE_TOSTRING_STATE__', {
@@ -948,7 +994,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
           n = __patchGuardSeq.get(window) || 0;
           n = (n + 1) | 0;
           __patchGuardSeq.set(window, n);
-        } catch (_) {
+        } catch (e) {
+          __emit('warn', 'core_window:nextGuardToken_seq_store_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: '__patchGuardSeq',
+            stage: 'guard',
+            message: 'guard token WeakMap store failed; using local counter fallback',
+            type: 'pipeline missing data',
+            data: { outcome: 'return', fallback: 'local_counter' }
+          }, e);
           n = ((nextGuardToken.__n || 0) + 1) | 0;
           nextGuardToken.__n = n;
         }
@@ -1730,7 +1786,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const targetId = item.targetId ? String(item.targetId) : ('pf:' + sameTargetKey(owner, key));
         const allowCreate = !!item.allowCreate;
         const allowShapeChange = !!item.allowShapeChange;
-        const resolveMode = normalizeResolveMode(item.resolve);
+        let resolveMode = normalizeResolveMode(item.resolve);
         if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
           return { ok: false, reason: 'owner_invalid', error: new TypeError('[Core.applyTargets] owner invalid'), tag, policy, targetId, key: key || null, kind: kind || null };
         }
@@ -1760,6 +1816,20 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         if ((kind === 'accessor' || kind === 'method' || kind === 'promise_method') && wrapLayer === 'descriptor_only') {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] descriptor_only unsupported for non-data kind'), tag, policy, targetId, key, kind };
+        }
+        if (wrapLayer === 'named_wrapper_strict' && resolveMode !== 'proto_chain') {
+          const fromMode = resolveMode;
+          resolveMode = 'proto_chain';
+          __emit('warn', 'core_window:strict_accessor_force_proto_chain', {
+            module: 'core',
+            diagTag: tag,
+            surface: 'core',
+            key,
+            stage: 'preflight',
+            message: 'strict accessor requires resolve=proto_chain; forced',
+            type: 'contract violation',
+            data: { outcome: 'return', from: fromMode, to: resolveMode, wrapLayer, policy, kind }
+          }, null);
         }
         // if ((kind === 'method' || kind === 'promise_method') && invokeClass !== 'normal' && wrapLayer === 'named_wrapper') {
         //   return { ok: false, reason: 'wrap_layer_unsupported', error: new TypeError('[Core.applyTargets] invokeClass requires core_wrapper wrapLayer'), tag, policy, targetId, key, kind };
