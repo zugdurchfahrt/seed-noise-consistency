@@ -270,13 +270,13 @@
         rememberProtoValue(proto, "resolvedOptions");
         applyCoreTargetsGroup("tz:DateTimeFormat:resolvedOptions", [{
           owner: proto,
-          key: "resolvedOptions",
-          kind: "method",
-          wrapLayer: "named_wrapper",
-          invokeClass: "brand_strict",
-          policy: "throw",
-          diagTag: "tz:DateTimeFormat:resolvedOptions",
-          validThis(self) {
+           key: "resolvedOptions",
+           kind: "method",
+           wrapLayer: "core_wrapper",
+           invokeClass: "brand_strict",
+           policy: "throw",
+           diagTag: "tz:DateTimeFormat:resolvedOptions",
+           validThis(self) {
             try { return !!(self && self instanceof OrigDTF); } catch (e) {
               diagBrowser("warn", "tz:DateTimeFormat:resolvedOptions:guard_failed", { stage: "guard", timezone }, e);
               return false;
@@ -334,14 +334,14 @@
         if (typeof origResolvedOptions !== "function") return;
         rememberProtoValue(proto, "resolvedOptions");
         applyCoreTargetsGroup("tz:IntlResolvedOptions", [{
-          owner: proto,
-          key: "resolvedOptions",
-          kind: "method",
-          wrapLayer: "named_wrapper",
-          invokeClass: "brand_strict",
-          policy: "throw",
-          diagTag: "tz:IntlResolvedOptions",
-          validThis(self) {
+           owner: proto,
+           key: "resolvedOptions",
+           kind: "method",
+           wrapLayer: "core_wrapper",
+           invokeClass: "brand_strict",
+           policy: "throw",
+           diagTag: "tz:IntlResolvedOptions",
+           validThis(self) {
             try { return !!(self && self.constructor && self.constructor.prototype && self.constructor.prototype.isPrototypeOf(self)); } catch (e) {
               diagBrowser("warn", "tz:IntlResolvedOptions:guard_failed", { stage: "guard", timezone }, e);
               return false;
