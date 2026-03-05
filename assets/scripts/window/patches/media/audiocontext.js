@@ -318,6 +318,38 @@ const AudioContextModule = function AudioContextModule(window) {
         }
         applied.push(p);
       }
+
+      // Registry/dedup invariant: only register after full group apply succeeded.
+      const coreRegisterPatchedTarget = (__core && typeof __core.registerPatchedTarget === 'function')
+        ? __core.registerPatchedTarget
+        : null;
+      if (typeof coreRegisterPatchedTarget === 'function') {
+        for (let i = 0; i < applied.length; i++) {
+          const p = applied[i];
+          try {
+            coreRegisterPatchedTarget(p.owner, p.key);
+          } catch (e) {
+            degrade(groupTag + ':register_failed', e, {
+              stage: 'apply',
+              level: 'error',
+              type: __audioTypePipeline,
+              diagTag: groupTag,
+              key: p.key,
+              data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'register_failed', policy: groupPolicy }
+            });
+            if (groupPolicy === 'throw') throw e;
+          }
+        }
+      } else {
+        degrade(groupTag + ':missing_core_registerPatchedTarget', null, {
+          stage: 'preflight',
+          level: 'warn',
+          type: __audioTypePipeline,
+          diagTag: groupTag,
+          key: null,
+          data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'missing_core_registerPatchedTarget', policy: groupPolicy }
+        });
+      }
     } catch (e) {
       degrade(groupTag + ':rollback', null, {
         stage: 'rollback',
@@ -518,7 +550,17 @@ const AudioContextModule = function AudioContextModule(window) {
         }
         if (!analyser || (typeof analyser !== 'object' && typeof analyser !== 'function')) return analyser;
 
+        const analyserProto = Object.getPrototypeOf(analyser);
+        if (!analyserProto || (typeof analyserProto !== 'object' && typeof analyserProto !== 'function')) return analyser;
+        const coreIsTargetRegistered = (__core && typeof __core.isTargetRegistered === 'function')
+          ? __core.isTargetRegistered
+          : null;
+        const analyserProtoTag = `audio:${CTX_NAME}:analyser_proto`;
+
       // --- Byte Spectrum: discrete ±1/0 with compensation of the summ ---
+      if (coreIsTargetRegistered && coreIsTargetRegistered(analyserProto, 'getByteFrequencyData')) {
+        // already patched on prototype
+      } else {
       const origByte = analyser.getByteFrequencyData;
       if (typeof origByte === 'function') {
         const wrappedByte = markAsNative(__wrapNativeApply(origByte, 'getByteFrequencyData', function(target, thisArg, argList) {
@@ -568,17 +610,24 @@ const AudioContextModule = function AudioContextModule(window) {
           }
           return result;
         }), 'getByteFrequencyData');
-        safeDefine(analyser, 'getByteFrequencyData', {
-          value: wrappedByte,
-          configurable: true,
-          enumerable: false,
-          writable: true
-        });
+        applyCoreTargetsGroup(analyserProtoTag + ':getByteFrequencyData', [{
+          owner: analyserProto,
+          key: 'getByteFrequencyData',
+          kind: 'data',
+          wrapperClass: 'core_proxy',
+          resolve: 'proto_chain',
+          policy: 'skip',
+          value: wrappedByte
+        }], 'skip');
       } else {
         noteIssue('missing_method:getByteFrequencyData', CTX_NAME);
       }
+      }
 
       // --- Float Spectrum: pair of zero summary noise, without going out for [min,max] ---
+      if (coreIsTargetRegistered && coreIsTargetRegistered(analyserProto, 'getFloatFrequencyData')) {
+        // already patched on prototype
+      } else {
       const origFloat = analyser.getFloatFrequencyData;
       if (typeof origFloat === 'function') {
         const wrappedFloat = markAsNative(__wrapNativeApply(origFloat, 'getFloatFrequencyData', function(target, thisArg, argList) {
@@ -636,17 +685,24 @@ const AudioContextModule = function AudioContextModule(window) {
           }
           return result;
         }), 'getFloatFrequencyData');
-        safeDefine(analyser, 'getFloatFrequencyData', {
-          value: wrappedFloat,
-          configurable: true,
-          enumerable: false,
-          writable: true
-        });
+        applyCoreTargetsGroup(analyserProtoTag + ':getFloatFrequencyData', [{
+          owner: analyserProto,
+          key: 'getFloatFrequencyData',
+          kind: 'data',
+          wrapperClass: 'core_proxy',
+          resolve: 'proto_chain',
+          policy: 'skip',
+          value: wrappedFloat
+        }], 'skip');
       } else {
         noteIssue('missing_method:getFloatFrequencyData', CTX_NAME);
       }
+      }
 
       // --- Byte time-domain: paired±1 (The sum preserved) carefully [0..255] ---
+      if (coreIsTargetRegistered && coreIsTargetRegistered(analyserProto, 'getByteTimeDomainData')) {
+        // already patched on prototype
+      } else {
       const origByteTD = analyser.getByteTimeDomainData;
       if (typeof origByteTD === 'function') {
         const wrappedByteTD = markAsNative(__wrapNativeApply(origByteTD, 'getByteTimeDomainData', function(target, thisArg, argList) {
@@ -699,15 +755,22 @@ const AudioContextModule = function AudioContextModule(window) {
           }
           return result;
         }), 'getByteTimeDomainData');
-        safeDefine(analyser, 'getByteTimeDomainData', {
-          value: wrappedByteTD,
-          configurable: true,
-          enumerable: false,
-          writable: true
-        });
+        applyCoreTargetsGroup(analyserProtoTag + ':getByteTimeDomainData', [{
+          owner: analyserProto,
+          key: 'getByteTimeDomainData',
+          kind: 'data',
+          wrapperClass: 'core_proxy',
+          resolve: 'proto_chain',
+          policy: 'skip',
+          value: wrappedByteTD
+        }], 'skip');
+      }
       }
 
       // --- Float time-domain: pair zero-summary noise within [-1..1] ---
+      if (coreIsTargetRegistered && coreIsTargetRegistered(analyserProto, 'getFloatTimeDomainData')) {
+        // already patched on prototype
+      } else {
       const origFloatTD = analyser.getFloatTimeDomainData;
       if (typeof origFloatTD === 'function') {
         const wrappedFloatTD = markAsNative(__wrapNativeApply(origFloatTD, 'getFloatTimeDomainData', function(target, thisArg, argList) {
@@ -766,12 +829,16 @@ const AudioContextModule = function AudioContextModule(window) {
           }
           return result;
         }), 'getFloatTimeDomainData');
-        safeDefine(analyser, 'getFloatTimeDomainData', {
-          value: wrappedFloatTD,
-          configurable: true,
-          enumerable: false,
-          writable: true
-        });
+        applyCoreTargetsGroup(analyserProtoTag + ':getFloatTimeDomainData', [{
+          owner: analyserProto,
+          key: 'getFloatTimeDomainData',
+          kind: 'data',
+          wrapperClass: 'core_proxy',
+          resolve: 'proto_chain',
+          policy: 'skip',
+          value: wrappedFloatTD
+        }], 'skip');
+      }
       }
 
       return analyser;

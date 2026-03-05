@@ -368,6 +368,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       key: prop,
       kind: 'accessor',
       wrapLayer: 'named_wrapper_strict',
+      resolve: 'proto_chain',
       policy: 'strict',
       diagTag: groupTag,
       validThis(self) {
@@ -408,6 +409,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         key: 'matches',
         kind: 'accessor',
         wrapLayer: 'named_wrapper_strict',
+        resolve: 'proto_chain',
         policy: 'strict',
         diagTag: 'screen:mql_matches',
         validThis(self) {
