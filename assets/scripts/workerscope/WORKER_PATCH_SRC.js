@@ -146,79 +146,15 @@
       throw e;
     }
 
-    const state = self.__CORE_TOSTRING_STATE__ || null;
-    if (!state) {
-      const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ missing');
-      emitDegrade('error', 'worker_patch_src:state:preflight:missing', {
+    const toStringDesc = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');
+    const nativeToString = (toStringDesc && typeof toStringDesc.value === 'function')
+      ? toStringDesc.value
+      : ((typeof Function.prototype.toString === 'function') ? Function.prototype.toString : null);
+    if (typeof nativeToString !== 'function') {
+      const e = new Error('UACHPatch: Function.prototype.toString missing');
+      emitDegrade('error', 'worker_patch_src:tostring:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
-        module: 'WORKER_PATCH_SRC',
-        surface: '__CORE_TOSTRING_STATE__',
-        key: '__CORE_TOSTRING_STATE__',
-        policy: 'throw',
-        action: 'throw'
-      }, e);
-      throw e;
-    }
-    if (state.__CORE_TOSTRING_STATE__ !== true) {
-      const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ marker invalid');
-      emitDegrade('error', 'worker_patch_src:state:contract:marker_invalid', {
-        type: 'pipeline missing data',
-        stage: 'contract',
-        module: 'WORKER_PATCH_SRC',
-        surface: '__CORE_TOSTRING_STATE__',
-        key: '__CORE_TOSTRING_STATE__',
-        policy: 'throw',
-        action: 'throw'
-      }, e);
-      throw e;
-    }
-    const overrideMap = state.overrideMap;
-    const proxyTargetMap = state.proxyTargetMap;
-    if (!(overrideMap instanceof WeakMap) || !(proxyTargetMap instanceof WeakMap)) {
-      const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ invalid');
-      emitDegrade('error', 'worker_patch_src:state:contract:invalid', {
-        type: 'pipeline missing data',
-        stage: 'contract',
-        module: 'WORKER_PATCH_SRC',
-        surface: '__CORE_TOSTRING_STATE__',
-        key: '__CORE_TOSTRING_STATE__',
-        policy: 'throw',
-        action: 'throw'
-      }, e);
-      throw e;
-    }
-    function resolveToStringBridgeTarget(candidate) {
-      if (typeof candidate !== 'function') return null;
-      let bridgeTarget = candidate;
-      const seenBridgeTargets = new WeakSet();
-      while (typeof bridgeTarget === 'function') {
-        if (seenBridgeTargets.has(bridgeTarget)) {
-          const e = new Error('UACHPatch: toString bridge cycle in state');
-          emitDegrade('error', 'worker_patch_src:tostring:contract:bridge_cycle', {
-            type: 'pipeline missing data',
-            stage: 'contract',
-            module: 'WORKER_PATCH_SRC',
-            surface: 'Function.prototype.toString',
-            key: 'toString',
-            policy: 'throw',
-            action: 'throw'
-          }, e);
-          throw e;
-        }
-        seenBridgeTargets.add(bridgeTarget);
-        const nextTarget = proxyTargetMap.get(bridgeTarget);
-        if (typeof nextTarget !== 'function') break;
-        bridgeTarget = nextTarget;
-      }
-      return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
-    }
-    const nativeToString = resolveToStringBridgeTarget(state.nativeToString);
-    if (typeof nativeToString !== 'function') {
-      const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__.nativeToString invalid');
-      emitDegrade('error', 'worker_patch_src:state:contract:native_toString_invalid', {
-        type: 'pipeline missing data',
-        stage: 'contract',
         module: 'WORKER_PATCH_SRC',
         surface: 'Function.prototype.toString',
         key: 'toString',
@@ -256,28 +192,15 @@
       throw e;
     }
 
-    // sanity: toString state must reflect labels written by seed markAsNative
+    // sanity: toString bridge must reflect labels written by seed markAsNative
     {
       const probe = function probe(){};
+      const nativeProbe = Reflect.apply(nativeToString, probe, []);
       markAsNative(probe);
-      const expected = overrideMap.get(probe);
-      if (expected === undefined) {
-        const e = new Error('UACHPatch: toString probe missing label');
-        emitDegrade('error', 'worker_patch_src:tostring:contract:probe_missing', {
-          type: 'pipeline missing data',
-          stage: 'contract',
-          module: 'WORKER_PATCH_SRC',
-          surface: 'Function.prototype.toString',
-          key: 'toString',
-          policy: 'throw',
-          action: 'throw'
-        }, e);
-        throw e;
-      }
       const actual = Function.prototype.toString.call(probe);
-      if (actual !== expected) {
-        const e = new Error('UACHPatch: toString state mismatch');
-        emitDegrade('error', 'worker_patch_src:tostring:contract:state_mismatch', {
+      if (actual === nativeProbe) {
+        const e = new Error('UACHPatch: toString bridge missing');
+        emitDegrade('error', 'worker_patch_src:tostring:contract:bridge_missing', {
           type: 'pipeline missing data',
           stage: 'contract',
           module: 'WORKER_PATCH_SRC',

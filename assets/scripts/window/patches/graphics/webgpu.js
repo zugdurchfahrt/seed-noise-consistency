@@ -968,7 +968,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       owner: gpu,
       key: 'requestAdapter',
       kind: 'promise_method',
-      wrapLayer: 'named_wrapper',
+      wrapLayer: 'core_wrapper',
       resolve: 'proto_chain',
       invokeClass: 'brand_strict',
       policy: 'throw',

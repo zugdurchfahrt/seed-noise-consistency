@@ -59,19 +59,8 @@
     const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = fpToStringDesc && fpToStringDesc.value;
 
-    const existingState = self.__CORE_TOSTRING_STATE__;
-    const existingStateOk = !!(existingState
-      && existingState.__CORE_TOSTRING_STATE__ === true
-      && typeof existingState.nativeToString === 'function'
-      && (existingState.overrideMap instanceof WeakMap)
-      && (existingState.proxyTargetMap instanceof WeakMap));
-
-    const toStringOverrideMap = existingStateOk
-      ? existingState.overrideMap
-      : new WeakMap();
-    const toStringProxyTargetMap = existingStateOk
-      ? existingState.proxyTargetMap
-      : new WeakMap();
+    const toStringOverrideMap = new WeakMap();
+    const toStringProxyTargetMap = new WeakMap();
 
     const currentRealmToString = (typeof currentToString === 'function')
       ? currentToString
@@ -110,12 +99,7 @@
         return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
       }
 
-      const nativeToStringCandidate = existingStateOk
-        ? existingState.nativeToString
-        : (currentRealmToString || Function.prototype.toString);
-      const nativeToString = resolveToStringBridgeTarget(nativeToStringCandidate)
-        || resolveToStringBridgeTarget(currentRealmToString)
-        || null;
+      const nativeToString = resolveToStringBridgeTarget(currentRealmToString) || null;
       if (typeof nativeToString !== 'function') {
         throw new Error('UACHPatch: Function.prototype.toString missing');
       }
@@ -162,16 +146,6 @@
       const seedExpected = toStringOverrideMap.get(seedProbe);
       if (seedExpected === undefined) {
         throw new Error('UACHPatch: toString probe missing label');
-      }
-
-      if (existingStateOk) {
-        if (typeof currentToString !== 'function') {
-          throw new Error('UACHPatch: Function.prototype.toString missing');
-        }
-        const actual = Reflect.apply(currentToString, seedProbe, []);
-        if (actual !== seedExpected) {
-          throw new Error('UACHPatch: toString bridge mismatch');
-        }
       }
 
       const toString = function toString(...argList) {
@@ -295,7 +269,6 @@
         configurable: fpToStringDesc ? !!fpToStringDesc.configurable : true,
         enumerable: fpToStringDesc ? !!fpToStringDesc.enumerable : false
       };
-      const prevCoreStateDesc = nativeGetOwnProp(self, '__CORE_TOSTRING_STATE__');
       try {
         toStringProxyTargetMap.set(toString, nativeToString);
         markAsNative(toString, 'toString');
@@ -371,17 +344,6 @@
           } catch (_e5) {}
         }
 
-        Object.defineProperty(self, '__CORE_TOSTRING_STATE__', {
-          value: {
-            __CORE_TOSTRING_STATE__: true,
-            nativeToString: nativeToString,
-            overrideMap: toStringOverrideMap,
-            proxyTargetMap: toStringProxyTargetMap
-          },
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
       } catch (e) {
         toStringProxyTargetMap.delete(toString);
         toStringOverrideMap.delete(toString);
@@ -395,11 +357,6 @@
           });
         }
 
-        if (prevCoreStateDesc) {
-          Object.defineProperty(self, '__CORE_TOSTRING_STATE__', prevCoreStateDesc);
-        } else {
-          delete self.__CORE_TOSTRING_STATE__;
-        }
         throw e;
       }
     } catch (e) {
@@ -420,8 +377,7 @@
       if (win && (typeof win === 'object' || typeof win === 'function')) {
         const keys = [
           '__ENV_BRIDGE__',
-          'CanvasPatchContext',
-          '__CORE_TOSTRING_STATE__'
+          'CanvasPatchContext'
         ];
         for (const k of keys) {
           if (!Object.prototype.hasOwnProperty.call(win, k)) continue;

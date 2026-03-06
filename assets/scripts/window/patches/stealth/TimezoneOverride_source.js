@@ -181,11 +181,11 @@
 
     function redefineValue(obj, prop, value, diagTag) {
       const d = Object.getOwnPropertyDescriptor(obj, prop);
-      const isFn = (typeof value === "function");
       const t = {
         owner: obj,
         key: prop,
         kind: "data",
+        wrapLayer: "descriptor_only",
         policy: "throw",
         diagTag: diagTag || ("tz:redefineValue:" + prop),
         value,
@@ -193,13 +193,6 @@
         configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : false
       };
-      if (isFn) {
-        // Wrapper-target (function value) must declare wrapperClass explicitly (CORE 4.0).
-        t.wrapperClass = "core_proxy";
-      } else {
-        // Data-only descriptor path (CORE 4.0).
-        t.wrapLayer = "descriptor_only";
-      }
       const applied = applyCoreTargetsGroup(diagTag || ("tz:redefineValue:" + prop), [t], "throw");
       if (applied !== 1) {
         const e = new Error("[patchTimeZone] redefineValue failed: " + String(prop));
@@ -272,7 +265,7 @@
            owner: proto,
             key: "resolvedOptions",
             kind: "method",
-            wrapLayer: "named_wrapper",
+            wrapLayer: "core_wrapper",
             invokeClass: "brand_strict",
             policy: "throw",
             diagTag: "tz:DateTimeFormat:resolvedOptions",
@@ -337,7 +330,7 @@
             owner: proto,
             key: "resolvedOptions",
             kind: "method",
-            wrapLayer: "named_wrapper",
+            wrapLayer: "core_wrapper",
             invokeClass: "brand_strict",
             policy: "throw",
             diagTag: "tz:IntlResolvedOptions",
@@ -399,7 +392,7 @@
           owner: Date.prototype,
           key: "toLocaleString",
           kind: "method",
-          wrapLayer: "named_wrapper",
+          wrapLayer: "core_wrapper",
           invokeClass: "brand_strict",
           policy: "throw",
           diagTag: "tz:Date:toLocaleString",
@@ -427,7 +420,7 @@
           owner: Date.prototype,
           key: "toLocaleDateString",
           kind: "method",
-          wrapLayer: "named_wrapper",
+          wrapLayer: "core_wrapper",
           invokeClass: "brand_strict",
           policy: "throw",
           diagTag: "tz:Date:toLocaleDateString",
@@ -455,7 +448,7 @@
           owner: Date.prototype,
           key: "toLocaleTimeString",
           kind: "method",
-          wrapLayer: "named_wrapper",
+          wrapLayer: "core_wrapper",
           invokeClass: "brand_strict",
           policy: "throw",
           diagTag: "tz:Date:toLocaleTimeString",
