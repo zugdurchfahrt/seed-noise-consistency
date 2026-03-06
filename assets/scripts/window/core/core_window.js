@@ -950,9 +950,23 @@ const CoreWindowModule = function CoreWindowModule(window) {
       if (v === 'normal' || v === 'brand_strict' || v === 'constructor' || v === 'meta_primitive') return v;
       return null;
     }
+    function isWrapLayerMissing(v) {
+      return v === undefined || v === null || v === '';
+    }
+    function classifyWrapLayer(v) {
+      if (isWrapLayerMissing(v)) return 'wrap_layer_missing';
+      if (v === 'auto') return 'wrap_layer_auto_forbidden';
+      return 'wrap_layer_unsupported';
+    }
+    function wrapLayerContractError(code, scope) {
+      const prefix = scope === 'wrapGetter' ? '[Core.wrapGetter]' : '[Core.applyTargets]';
+      if (code === 'wrap_layer_missing') return new TypeError(prefix + ' wrapLayer missing');
+      if (code === 'wrap_layer_auto_forbidden') return new TypeError(prefix + ' wrapLayer auto forbidden');
+      return new TypeError(prefix + ' unsupported wrapLayer');
+    }
     function normalizeWrapLayer(v) {
-      if (v === undefined || v === null || v === '') return 'auto';
-      if (v === 'auto' || v === 'descriptor_only' || v === 'named_wrapper' || v === 'named_wrapper_strict' || v === 'core_wrapper') return v;
+      if (isWrapLayerMissing(v)) return null;
+      if (v === 'descriptor_only' || v === 'named_wrapper' || v === 'named_wrapper_strict' || v === 'core_wrapper') return v;
       return null;
     }
     function resolveDescriptor(owner, key, options) {
@@ -1192,18 +1206,20 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const origGet = desc && desc.get;
         const invalidThis = options.invalidThis || 'native';
         const checkThis = (typeof validThis === 'function') ? validThis : null;
-        let wrapLayer = normalizeWrapLayer(options.wrapLayer);
+        const wrapLayerInput = options.wrapLayer;
+        let wrapLayer = normalizeWrapLayer(wrapLayerInput);
         if (wrapLayer === null) {
-          const e = new TypeError('[Core.wrapGetter] unsupported wrapLayer');
-          diagDegrade('core:wrapGetter:wrap_layer_unsupported', e, {
+          const code = classifyWrapLayer(wrapLayerInput);
+          const e = wrapLayerContractError(code, 'wrapGetter');
+          diagDegrade('core:wrapGetter:' + code, e, {
             module: 'core_window',
             diagTag: 'core:wrapGetter',
             surface: 'core',
             key: key || null,
             stage: 'guard',
             type: 'pipeline missing data',
-            message: 'unsupported wrapLayer',
-            data: { wrapLayer: options.wrapLayer }
+            message: e.message,
+            data: { wrapLayer: wrapLayerInput }
           });
           throw e;
         }
@@ -1224,8 +1240,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return wrapped;
         }
 
-        // [NORMATIVE] auto-mode getters must preserve cross-realm toString/shape checks.
-        const useCoreWrapper = wrapLayer === 'core_wrapper' || wrapLayer === 'auto';
+        // [NORMATIVE] getters may use proxy wrapping only on explicit core_wrapper.
+        const useCoreWrapper = wrapLayer === 'core_wrapper';
         if (!useCoreWrapper) {
           const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
             if (checkThis && !checkThis(this)) {
@@ -1372,10 +1388,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const setImpl = typeof t.setImpl === 'function' ? t.setImpl : null;
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
         const invalidThis = t.invalidThis || 'native';
-        const wrapLayer = normalizeWrapLayer(planItem.wrapLayer);
+        const wrapLayerInput = planItem.wrapLayer;
+        const wrapLayer = normalizeWrapLayer(wrapLayerInput);
         if (wrapLayer === null) {
-          const e = new TypeError('[Core.applyTargets] unsupported wrapLayer for accessor');
-          return fail(planItem.policy, planItem.tag, 'wrap_layer_unsupported', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+          const code = classifyWrapLayer(wrapLayerInput);
+          const e = wrapLayerContractError(code, 'applyTargets');
+          return fail(planItem.policy, planItem.tag, code, e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId, wrapLayer: wrapLayerInput });
         }
         const strictAccessorContract = planItem.policy === 'strict' && wrapLayer === 'named_wrapper_strict';
         const allowShapeChange = !!planItem.allowShapeChange;
@@ -1398,7 +1416,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] named_wrapper_strict forbids setImpl');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        const useCoreWrapper = wrapLayer === 'core_wrapper' || wrapLayer === 'auto';
+        const useCoreWrapper = wrapLayer === 'core_wrapper';
         if (strictAccessorContract && useCoreWrapper) {
           const e = new TypeError('[Core.applyTargets] named_wrapper_strict cannot use core_wrapper');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -1541,16 +1559,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const requiresStrictThis = invokeClass !== 'normal';
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
         const invalidThis = requiresStrictThis ? 'throw' : (t.invalidThis || 'native');
-        const wrapLayer = normalizeWrapLayer(planItem.wrapLayer);
+        const wrapLayerInput = planItem.wrapLayer;
+        const wrapLayer = normalizeWrapLayer(wrapLayerInput);
         if (wrapLayer === null) {
-          const e = new TypeError('[Core.applyTargets] unsupported wrapLayer for method');
-          return fail(planItem.policy, planItem.tag, 'wrap_layer_unsupported', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+          const code = classifyWrapLayer(wrapLayerInput);
+          const e = wrapLayerContractError(code, 'applyTargets');
+          return fail(planItem.policy, planItem.tag, code, e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId, wrapLayer: wrapLayerInput });
         }
         if (wrapLayer === 'descriptor_only') {
           const e = new TypeError('[Core.applyTargets] method cannot use descriptor_only wrapLayer');
           return fail(planItem.policy, planItem.tag, 'wrap_layer_kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        const useCoreWrapper = wrapLayer === 'core_wrapper' || wrapLayer === 'auto';
+        const useCoreWrapper = wrapLayer === 'core_wrapper';
         planItem.wrapperClass = useCoreWrapper ? 'core_proxy' : 'synthetic_named';
         if (requiresStrictThis && !validThis) {
           const e = new TypeError('[Core.applyTargets] invokeClass requires validThis');
@@ -1665,16 +1685,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const requiresStrictThis = invokeClass !== 'normal';
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
         const invalidThis = requiresStrictThis ? 'throw' : (t.invalidThis || 'native');
-        const wrapLayer = normalizeWrapLayer(planItem.wrapLayer);
+        const wrapLayerInput = planItem.wrapLayer;
+        const wrapLayer = normalizeWrapLayer(wrapLayerInput);
         if (wrapLayer === null) {
-          const e = new TypeError('[Core.applyTargets] unsupported wrapLayer for promise_method');
-          return fail(planItem.policy, planItem.tag, 'wrap_layer_unsupported', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
+          const code = classifyWrapLayer(wrapLayerInput);
+          const e = wrapLayerContractError(code, 'applyTargets');
+          return fail(planItem.policy, planItem.tag, code, e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId, wrapLayer: wrapLayerInput });
         }
         if (wrapLayer === 'descriptor_only') {
           const e = new TypeError('[Core.applyTargets] promise_method cannot use descriptor_only wrapLayer');
           return fail(planItem.policy, planItem.tag, 'wrap_layer_kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        const useCoreWrapper = wrapLayer === 'core_wrapper' || wrapLayer === 'auto';
+        const useCoreWrapper = wrapLayer === 'core_wrapper';
         planItem.wrapperClass = useCoreWrapper ? 'core_proxy' : 'synthetic_named';
         if (requiresStrictThis && !validThis) {
           const e = new TypeError('[Core.applyTargets] invokeClass requires validThis');
@@ -1780,7 +1802,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const key = item.key;
         const kind = item.kind;
         const invokeClass = normalizeInvokeClass(item.invokeClass);
-        const wrapLayer = normalizeWrapLayer(item.wrapLayer);
+        const wrapLayerInput = item.wrapLayer;
+        const wrapLayer = normalizeWrapLayer(wrapLayerInput);
         const policy = normalizePolicy(item.policy);
         const tag = item.diagTag ? String(item.diagTag) : 'core:applyTargets';
         const targetId = item.targetId ? String(item.targetId) : ('pf:' + sameTargetKey(owner, key));
@@ -1806,10 +1829,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return { ok: false, reason: 'invoke_class_kind_mismatch', error: new TypeError('[Core.applyTargets] invokeClass requires method kind'), tag, policy, targetId, key, kind };
         }
         if (wrapLayer === null) {
-          return { ok: false, reason: 'wrap_layer_unsupported', error: new TypeError('[Core.applyTargets] unsupported wrapLayer'), tag, policy, targetId, key, kind };
+          const code = classifyWrapLayer(wrapLayerInput);
+          return { ok: false, reason: code, error: wrapLayerContractError(code, 'applyTargets'), tag, policy, targetId, key, kind };
+        }
+        if (kind === 'data' && wrapLayer !== 'descriptor_only') {
+          return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] data requires descriptor_only wrapLayer'), tag, policy, targetId, key, kind };
         }
         if (wrapLayer === 'named_wrapper_strict' && kind !== 'accessor') {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] named_wrapper_strict requires accessor kind'), tag, policy, targetId, key, kind };
+        }
+        if (kind === 'accessor' && wrapLayer === 'named_wrapper_strict' && policy !== 'strict') {
+          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] named_wrapper_strict requires strict policy'), tag, policy, targetId, key, kind };
         }
         if (kind === 'accessor' && policy === 'strict' && wrapLayer !== 'named_wrapper_strict') {
           return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] strict policy for accessor requires named_wrapper_strict'), tag, policy, targetId, key, kind };
@@ -1831,14 +1861,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
             data: { outcome: 'return', from: fromMode, to: resolveMode, wrapLayer, policy, kind }
           }, null);
         }
-        // if ((kind === 'method' || kind === 'promise_method') && invokeClass !== 'normal' && wrapLayer === 'named_wrapper') {
-        //   return { ok: false, reason: 'wrap_layer_unsupported', error: new TypeError('[Core.applyTargets] invokeClass requires core_wrapper wrapLayer'), tag, policy, targetId, key, kind };
-        // }
-
+        if ((kind === 'method' || kind === 'promise_method')
+            && invokeClass === 'brand_strict'
+            && wrapLayer !== 'core_wrapper') {
+          return { ok: false, reason: 'wrap_layer_unsupported',
+            error: new TypeError('[Core.applyTargets] brand_strict requires core_wrapper wrapLayer'),
+            tag, policy, targetId, key, kind
+          };
+        }
 
         if ((kind === 'method' || kind === 'promise_method')
             && (invokeClass === 'constructor' || invokeClass === 'meta_primitive')
-            && wrapLayer === 'named_wrapper') {
+            && wrapLayer !== 'core_wrapper') {
           return { ok: false, reason: 'wrap_layer_unsupported',
             error: new TypeError('[Core.applyTargets] invokeClass requires core_wrapper wrapLayer'),
             tag, policy, targetId, key, kind

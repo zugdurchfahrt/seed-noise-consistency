@@ -413,6 +413,9 @@ const AudioContextModule = function AudioContextModule(window) {
     __seenProtos.add(proto);
     const CTX_NAME = CTX && CTX.name ? CTX.name : 'AudioContext';
     const priority = (CTX === window.AudioContext || CTX === window.webkitAudioContext) ? 2 : 1;
+    const validAudioContextThis = function validAudioContextThis(self) {
+      return !!self && proto.isPrototypeOf(self);
+    };
     const targets = [];
 
     // 3. patch sampleRate/baseLatency: accessor patch via CORE targets
@@ -496,9 +499,11 @@ const AudioContextModule = function AudioContextModule(window) {
         kind: 'method',
         wrapLayer: 'core_wrapper',
         resolve: 'proto_chain',
+        invokeClass: 'brand_strict',
         policy: 'skip',
         diagTag: `audio:${CTX_NAME}:createBuffer`,
         allowCreate: true,
+        validThis: validAudioContextThis,
         invalidThis: 'throw',
         invoke: function audioCreateBufferInvoke(orig, args) {
           const input = Array.isArray(args) ? args : [];
@@ -528,9 +533,11 @@ const AudioContextModule = function AudioContextModule(window) {
       kind: 'method',
       wrapLayer: 'core_wrapper',
       resolve: 'proto_chain',
+      invokeClass: 'brand_strict',
       policy: 'skip',
       diagTag: `audio:${CTX_NAME}:createAnalyser`,
       allowCreate: true,
+      validThis: validAudioContextThis,
       invalidThis: 'throw',
       invoke: function audioCreateAnalyserInvoke(orig, args) {
         const input = Array.isArray(args) ? args : [];
