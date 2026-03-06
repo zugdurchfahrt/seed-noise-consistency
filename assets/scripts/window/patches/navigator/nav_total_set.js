@@ -898,7 +898,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // Critical - only a prototype (without a fallback)
     // Important: like native - not enumerable
-    const critical = new Set(['userAgent','platform','vendor','appVersion']);
+    // [REGISTRY] userAgent is handled in `override_ua_data.js` (opt-in gate).
+    // Here we keep only the synthetic_named trio on Navigator.prototype.
+    const critical = new Set(['platform','vendor','appVersion']);
     (function patchCriticalOnProto(){
       const patch = (key, getter) => {
         const d = Object.getOwnPropertyDescriptor(navProto, key);
@@ -909,8 +911,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
            owner: navProto,
            key: key,
            kind: 'accessor',
-           // Cross-realm Function#toString must not reveal synthetic wrapper source.
-           // Use core proxy-wrapper so other realms see native-looking "[native code]" too.
+           // [REGISTRY] synthetic_named path (no Proxy) for Navigator.prototype.* trio.
+           // Cross-realm probes may still flag toString, but Proxy-wrapping these accessors is forbidden by registry.
            wrapLayer: 'named_wrapper_strict',
            resolve: 'proto_chain',
            policy: 'strict',
@@ -928,7 +930,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }], 'throw');
         if (applied !== 1) throw new TypeError(`failed to define ${key}`);
       };      
-      patch('userAgent',  () => userAgent);
       patch('platform',   () => navPlatformOut);
       patch('vendor',     () => vendor);
       patch('appVersion', () => {
@@ -1853,9 +1854,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         key: 'query',
         resolve: 'proto_chain',
         kind: 'promise_method',
-        wrapLayer: 'core_wrapper',
+        wrapLayer: 'named_wrapper',
         invokeClass: 'brand_strict',
-        wrapperClass: 'core_proxy',
+        allowNamedWrapperBrandStrict: true,
         policy: 'throw',
         diagTag: 'nav_total_set:permissions.query',
         validThis(self) {
@@ -1954,9 +1955,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         key: 'enumerateDevices',
         resolve: 'proto_chain',
         kind: 'promise_method',
-        wrapLayer: 'core_wrapper',
+        wrapLayer: 'named_wrapper',
         invokeClass: 'brand_strict',
-        wrapperClass: 'core_proxy',
+        allowNamedWrapperBrandStrict: true,
         policy: 'throw',
         diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
         validThis(self) {
@@ -2091,9 +2092,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         key: 'estimate',
         resolve: 'proto_chain',
         kind: 'promise_method',
-        wrapLayer: 'core_wrapper',
+        wrapLayer: 'named_wrapper',
         invokeClass: 'brand_strict',
-        wrapperClass: 'core_proxy',
+        allowNamedWrapperBrandStrict: true,
         policy: 'throw',
         diagTag: 'nav_total_set:storage.estimate',
         validThis(self) {

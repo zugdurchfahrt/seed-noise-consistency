@@ -1804,6 +1804,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const invokeClass = normalizeInvokeClass(item.invokeClass);
         const wrapLayerInput = item.wrapLayer;
         const wrapLayer = normalizeWrapLayer(wrapLayerInput);
+        const allowNamedWrapperBrandStrict = item.allowNamedWrapperBrandStrict === true;
         const policy = normalizePolicy(item.policy);
         const tag = item.diagTag ? String(item.diagTag) : 'core:applyTargets';
         const targetId = item.targetId ? String(item.targetId) : ('pf:' + sameTargetKey(owner, key));
@@ -1863,7 +1864,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         if ((kind === 'method' || kind === 'promise_method')
             && invokeClass === 'brand_strict'
-            && wrapLayer !== 'core_wrapper') {
+            && wrapLayer !== 'core_wrapper'
+            && !(allowNamedWrapperBrandStrict && wrapLayer === 'named_wrapper')) {
           return { ok: false, reason: 'wrap_layer_unsupported',
             error: new TypeError('[Core.applyTargets] brand_strict requires core_wrapper wrapLayer'),
             tag, policy, targetId, key, kind

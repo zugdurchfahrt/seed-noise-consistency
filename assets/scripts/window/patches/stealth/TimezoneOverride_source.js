@@ -261,12 +261,13 @@
       if (OrigDTF && OrigDTF.prototype && typeof OrigDTF.prototype.resolvedOptions === "function") {
         const proto = OrigDTF.prototype;
         rememberProtoValue(proto, "resolvedOptions");
-         applyCoreTargetsGroup("tz:DateTimeFormat:resolvedOptions", [{
-           owner: proto,
+          applyCoreTargetsGroup("tz:DateTimeFormat:resolvedOptions", [{
+            owner: proto,
             key: "resolvedOptions",
             kind: "method",
-            wrapLayer: "core_wrapper",
+            wrapLayer: "named_wrapper",
             invokeClass: "brand_strict",
+            allowNamedWrapperBrandStrict: true,
             policy: "throw",
             diagTag: "tz:DateTimeFormat:resolvedOptions",
             validThis(self) {
@@ -330,8 +331,9 @@
             owner: proto,
             key: "resolvedOptions",
             kind: "method",
-            wrapLayer: "core_wrapper",
+            wrapLayer: "named_wrapper",
             invokeClass: "brand_strict",
+            allowNamedWrapperBrandStrict: true,
             policy: "throw",
             diagTag: "tz:IntlResolvedOptions",
             validThis(self) {
@@ -392,8 +394,9 @@
           owner: Date.prototype,
           key: "toLocaleString",
           kind: "method",
-          wrapLayer: "core_wrapper",
+          wrapLayer: "named_wrapper",
           invokeClass: "brand_strict",
+          allowNamedWrapperBrandStrict: true,
           policy: "throw",
           diagTag: "tz:Date:toLocaleString",
           validThis(self) {
@@ -420,8 +423,9 @@
           owner: Date.prototype,
           key: "toLocaleDateString",
           kind: "method",
-          wrapLayer: "core_wrapper",
+          wrapLayer: "named_wrapper",
           invokeClass: "brand_strict",
+          allowNamedWrapperBrandStrict: true,
           policy: "throw",
           diagTag: "tz:Date:toLocaleDateString",
           validThis(self) {
@@ -448,8 +452,9 @@
           owner: Date.prototype,
           key: "toLocaleTimeString",
           kind: "method",
-          wrapLayer: "core_wrapper",
+          wrapLayer: "named_wrapper",
           invokeClass: "brand_strict",
+          allowNamedWrapperBrandStrict: true,
           policy: "throw",
           diagTag: "tz:Date:toLocaleTimeString",
           validThis(self) {

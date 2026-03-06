@@ -59,8 +59,20 @@
     const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = fpToStringDesc && fpToStringDesc.value;
 
-    const toStringOverrideMap = new WeakMap();
-    const toStringProxyTargetMap = new WeakMap();
+    // [NORMATIVE] single core bridge state (no module-local WeakMap holders)
+    const existingCoreToStringState = self && self.__CORE_TOSTRING_STATE__;
+    const existingCoreToStringStateOk = !!(existingCoreToStringState
+      && existingCoreToStringState.__CORE_TOSTRING_STATE__ === true
+      && typeof existingCoreToStringState.nativeToString === 'function'
+      && (existingCoreToStringState.overrideMap instanceof WeakMap)
+      && (existingCoreToStringState.proxyTargetMap instanceof WeakMap));
+
+    const toStringOverrideMap = existingCoreToStringStateOk
+      ? existingCoreToStringState.overrideMap
+      : new WeakMap();
+    const toStringProxyTargetMap = existingCoreToStringStateOk
+      ? existingCoreToStringState.proxyTargetMap
+      : new WeakMap();
 
     const currentRealmToString = (typeof currentToString === 'function')
       ? currentToString
@@ -99,9 +111,36 @@
         return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
       }
 
-      const nativeToString = resolveToStringBridgeTarget(currentRealmToString) || null;
+      const nativeToString = existingCoreToStringStateOk
+        ? existingCoreToStringState.nativeToString
+        : (resolveToStringBridgeTarget(currentRealmToString) || null);
       if (typeof nativeToString !== 'function') {
         throw new Error('UACHPatch: Function.prototype.toString missing');
+      }
+
+      if (!existingCoreToStringStateOk) {
+        try {
+          Object.defineProperty(self, '__CORE_TOSTRING_STATE__', {
+            value: {
+              __CORE_TOSTRING_STATE__: true,
+              nativeToString: nativeToString,
+              overrideMap: toStringOverrideMap,
+              proxyTargetMap: toStringProxyTargetMap
+            },
+            writable: false,
+            configurable: true,
+            enumerable: false
+          });
+        } catch (eState) {
+          __wrkDiag('error', 'wrk:core_tostring_state_define_failed', {
+            stage: 'apply',
+            key: '__CORE_TOSTRING_STATE__',
+            message: 'failed to define __CORE_TOSTRING_STATE__',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw' }
+          }, eState);
+          throw eState;
+        }
       }
 
       function baseMarkAsNative(func, name = "") {

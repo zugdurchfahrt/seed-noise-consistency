@@ -199,7 +199,32 @@ const ContextPatchModule = function ContextPatchModule(window) {
   }
 
   function definePatchedMethod(proto, method, value) {
-    const preflight = corePreflight(proto, method, 'method', 'context:definePatchedMethod');
+    // [NORMATIVE] Core no longer accepts missing/implicit wrapLayer; select explicit layer for preflight.
+    // This module installs both:
+    // - synthetic named wrappers (markAsNative)  -> wrapLayer='named_wrapper'
+    // - core provider wrappers (__wrapNativeApply Proxy) -> wrapLayer='core_wrapper'
+    let wrapLayer = 'named_wrapper';
+    try {
+      const st = global && global.__CORE_TOSTRING_STATE__;
+      const m = st && st.__CORE_TOSTRING_STATE__ === true ? st.proxyTargetMap : null;
+      if (m && (m instanceof WeakMap) && typeof value === 'function') {
+        const t = m.get(value);
+        if (typeof t === 'function') wrapLayer = 'core_wrapper';
+      }
+    } catch (e) {
+      emitContextDiag('warn', 'context:definePatchedMethod:wrapLayer_detect_failed', e, {
+        stage: 'guard',
+        key: method,
+        type: 'pipeline missing data',
+        data: { outcome: 'return', fallback: 'named_wrapper' }
+      });
+      wrapLayer = 'named_wrapper';
+    }
+
+    const preflight = corePreflight(proto, method, 'method', 'context:definePatchedMethod', {
+      wrapLayer,
+      policy: 'throw'
+    });
     const d = preflight.desc || Object.getOwnPropertyDescriptor(proto, method);
     if (!d) {
       throw new Error(`[ContextPatch] descriptor missing for ${method}`);

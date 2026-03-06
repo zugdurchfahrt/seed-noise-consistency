@@ -146,6 +146,29 @@
       throw e;
     }
 
+    // [NORMATIVE] use unified core toString bridge state (no module-local WeakMap holders).
+    {
+      const st = self.__CORE_TOSTRING_STATE__;
+      const ok = !!(st
+        && st.__CORE_TOSTRING_STATE__ === true
+        && typeof st.nativeToString === 'function'
+        && (st.overrideMap instanceof WeakMap)
+        && (st.proxyTargetMap instanceof WeakMap));
+      if (!ok) {
+        const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ missing/invalid');
+        emitDegrade('error', 'worker_patch_src:tostring_state:preflight:missing', {
+          type: 'pipeline missing data',
+          stage: 'preflight',
+          module: 'WORKER_PATCH_SRC',
+          surface: '__CORE_TOSTRING_STATE__',
+          key: '__CORE_TOSTRING_STATE__',
+          policy: 'throw',
+          action: 'throw'
+        }, e);
+        throw e;
+      }
+    }
+
     const toStringDesc = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');
     const nativeToString = (toStringDesc && typeof toStringDesc.value === 'function')
       ? toStringDesc.value
@@ -661,33 +684,24 @@
       };
 
       // IMPORTANT: native getters have stable `name` like "get hardwareConcurrency".
-      // `markAsNative()` only patches toString-labels, so we must produce a named getter function.
+      // Avoid `new Function`/eval in Worker scope: CSP can disable it and force a fallback to a normal function
+      // (constructable + has `.prototype`), which cascades into detector failures.
+      // Object-literal getter yields a non-constructable accessor and does not require eval.
       let wrapped = impl;
-      if (typeof k === 'string' && k) {
-        try {
-          const isIdent = /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(k);
-          if (isIdent) {
-            // Static accessor name keeps engine-facing source form stable (avoids computed "[k]" leakage).
-            const buildAccessor = new Function('impl', `return ({ get ${k}() { return impl.call(this); } });`);
-            const acc = buildAccessor(impl);
-            const d = Object.getOwnPropertyDescriptor(acc, k);
-            if (d && typeof d.get === 'function') wrapped = d.get;
-          } else {
-            const acc = ({ get [k]() { return impl.call(this); } });
-            const d = Object.getOwnPropertyDescriptor(acc, k);
-            if (d && typeof d.get === 'function') wrapped = d.get;
-          }
-        } catch (e) {
-          emitDegrade('warn', 'worker_patch_src:getter:apply:name_failed', {
-            type: 'browser structure missing data',
-            stage: 'apply',
-            module: 'WORKER_PATCH_SRC',
-            surface: 'makeGuardedGetter',
-            key: 'name',
-            policy: 'skip',
-            action: 'skip'
-          }, e);
-        }
+      try {
+        const acc = ({ get [k]() { return impl.call(this); } });
+        const d = Object.getOwnPropertyDescriptor(acc, k);
+        if (d && typeof d.get === 'function') wrapped = d.get;
+      } catch (e) {
+        emitDegrade('warn', 'worker_patch_src:getter:apply:name_failed', {
+          type: 'browser structure missing data',
+          stage: 'apply',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'makeGuardedGetter',
+          key: 'name',
+          policy: 'skip',
+          action: 'skip'
+        }, e);
       }
 
       return markAsNative(wrapped, `get ${k}`);
