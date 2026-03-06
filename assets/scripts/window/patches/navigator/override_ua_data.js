@@ -50,11 +50,29 @@
     return __moduleDiag(level, code, y, err);
   }
 
+  // ---- TEMPORARY: module is present but disabled by default (opt-in via profile) ----
+  // Purpose: keep legacy file available without accidental activation/conflicts in pipeline.
+  // Enable only by setting: window.__PROFILE__.override_ua_data_enabled === true
+  const __profile = g.__PROFILE__;
+  const __moduleEnabled = !!(__profile && __profile.override_ua_data_enabled === true);
+  if (!__moduleEnabled) {
+    __diagPipeline('info', __MODULE + ':disabled', {
+      diagTag: __MODULE,
+      surface: __SURFACE,
+      key: null,
+      stage: 'preflight',
+      message: 'module present but disabled (profile.override_ua_data_enabled !== true)',
+      data: { outcome: 'skip', reason: 'disabled' }
+    }, null);
+    return;
+  }
+
   // last group outcome (for guard release policy)
   let __groupStage = null;
   let __groupOutcome = null;
   let __groupReason = null;
   let __groupRollbackOk = true;
+  let __groupEmitted = false;
   let __fatalReported = false;
 
   function cloneDesc(d){
@@ -84,6 +102,7 @@
     __groupOutcome = 'return';
     __groupReason = 'ok';
     __groupRollbackOk = true;
+    __groupEmitted = false;
 
     const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
     let plans = [];
@@ -93,7 +112,8 @@
     } catch (e) {
       __groupOutcome = 'skip';
       __groupReason = 'preflight_failed';
-      __diagPipeline('error', groupTag + ':preflight_failed', {
+      __groupEmitted = true;
+      __diagPipeline((groupPolicy === 'throw') ? 'error' : 'warn', groupTag + ':preflight_failed', {
         stage: 'preflight',
         key: null,
         message: 'Core.applyTargets threw (preflight)',
@@ -104,15 +124,14 @@
     }
     if (!Array.isArray(plans) || !plans.length) {
       __groupOutcome = 'skip';
-      __groupReason = 'group_skipped';
-      if (plans && plans.ok === false) {
-        __diagPipeline('error', groupTag + ':group_skipped', {
-          stage: 'preflight',
-          key: null,
-          message: 'group skipped',
-          data: { outcome: 'skip', reason: plans.reason || 'group_skipped' }
-        }, new Error('[override_ua_data] group skipped'));
-      }
+      __groupReason = (plans && plans.reason) ? String(plans.reason) : 'group_skipped';
+      __groupEmitted = true;
+      __diagPipeline((groupPolicy === 'throw') ? 'error' : 'warn', groupTag + ':' + __groupReason, {
+        stage: 'preflight',
+        key: null,
+        message: 'group skipped',
+        data: { outcome: 'skip', reason: __groupReason }
+      }, null);
       return 0;
     }
 
@@ -152,6 +171,7 @@
       }
       __groupOutcome = 'rollback';
       __groupReason = 'apply_failed';
+      __groupEmitted = true;
       __diagBrowser('error', groupTag + ':apply_failed', {
         stage: 'apply',
         key: null,
@@ -174,15 +194,15 @@
 
     let __guardToken = null;
     try {
-      if (!__core || typeof __core.guardFlag !== 'function') {
+      if (!__core || typeof __core.guardFlag !== 'function' || typeof __core.releaseGuardFlag !== 'function') {
         __diagPipeline('warn', __tag + ':guard_missing', {
           module: __tag,
           diagTag: __tag,
           surface: __surface,
           key: __flagKey,
           stage: 'guard',
-          message: 'Core.guardFlag missing',
-          data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+          message: 'Core.guardFlag/releaseGuardFlag missing',
+          data: { outcome: 'skip', reason: 'missing_dep_core_guard_release' }
         }, null);
         return;
       }
@@ -350,14 +370,16 @@
       // If we reached here, group did not apply any target (skip or rollback).
       const outcome = (__groupOutcome === 'rollback') ? 'rollback' : 'skip';
       const rollbackOk = (__groupOutcome === 'rollback') ? !!__groupRollbackOk : true;
-      __moduleDiag((outcome === 'rollback') ? 'error' : 'warn', __tag + ':not_applied', {
-        diagTag: __tag,
-        surface: __surface,
-        key: 'navigator.userAgent',
-        stage: 'apply',
-        message: 'override not applied',
-        data: { outcome: outcome, reason: (__groupReason || 'not_applied'), rollbackOk: rollbackOk }
-      }, null);
+      if (!__groupEmitted) {
+        __moduleDiag((outcome === 'rollback') ? 'error' : 'warn', __tag + ':not_applied', {
+          diagTag: __tag,
+          surface: __surface,
+          key: 'navigator.userAgent',
+          stage: __groupStage || 'apply',
+          message: 'override not applied',
+          data: { outcome: outcome, reason: (__groupReason || 'not_applied'), rollbackOk: rollbackOk }
+        }, null);
+      }
       try {
         if (__core && typeof __core.releaseGuardFlag === 'function') {
           __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __tag);
