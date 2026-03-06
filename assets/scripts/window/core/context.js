@@ -163,19 +163,35 @@ const ContextPatchModule = function ContextPatchModule(window) {
     }
   })();
 
-  function corePreflight(owner, key, kind, diagTag) {
+  function corePreflight(owner, key, kind, diagTag, contract) {
+    const cfg = (contract && typeof contract === 'object') ? contract : {};
+    const resolve = (typeof cfg.resolve === 'string' && cfg.resolve) ? cfg.resolve : 'own';
+    let wrapLayer = (typeof cfg.wrapLayer === 'string' && cfg.wrapLayer) ? cfg.wrapLayer : null;
+    if (!wrapLayer) {
+      if (kind === 'data') wrapLayer = 'descriptor_only';
+      else if (kind === 'accessor') wrapLayer = 'named_wrapper_strict';
+      else wrapLayer = 'named_wrapper';
+    }
+    const policy = (typeof cfg.policy === 'string' && cfg.policy)
+      ? cfg.policy
+      : ((kind === 'accessor' && wrapLayer === 'named_wrapper_strict') ? 'strict' : 'throw');
     const core = global && global.Core;
     if (!core || typeof core.preflightTarget !== 'function') {
       throw new Error('[ContextPatch] Core.preflightTarget missing');
     }
-    const preflight = core.preflightTarget({
+    const target = {
       owner: owner,
       key: key,
       kind: kind,
-      resolve: 'own',
-      policy: 'throw',
+      wrapLayer: wrapLayer,
+      resolve: resolve,
+      policy: policy,
       diagTag: diagTag || 'context:preflight'
-    });
+    };
+    if (typeof cfg.invokeClass === 'string' && cfg.invokeClass) {
+      target.invokeClass = cfg.invokeClass;
+    }
+    const preflight = core.preflightTarget(target);
     if (!preflight || preflight.ok !== true) {
       throw (preflight && preflight.error) ? preflight.error : new Error('[ContextPatch] preflight failed');
     }
