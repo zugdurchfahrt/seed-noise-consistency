@@ -7,16 +7,17 @@
     || {};
   const __MODULE = 'worker_bootstrap';
   const __SURFACE = 'worker_bootstrap';
-  const __D = G && G.__DEGRADE__;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
 
   function __emit(level, code, ctx, err) {
     try {
-      if (__diag) return __diag(level, code, ctx, err);
-      if (typeof __D === 'function') {
+      // lazy lookup: __DEGRADE__ may be installed later in the pipeline than this script runs
+      const d = G && G.__DEGRADE__;
+      const diag = (d && typeof d.diag === 'function') ? d.diag.bind(d) : null;
+      if (diag) return diag(level, code, ctx, err);
+      if (typeof d === 'function') {
         const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
         const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, safeCtx, { level: level || 'info' }));
+        return d(code, safeErr, Object.assign({}, safeCtx, { level: level || 'info' }));
       }
     } catch (emitErr) {
       return undefined;
@@ -260,7 +261,40 @@
       Object.defineProperty(window, 'WorkerPatchHooks', {
         configurable: true,
         get() { return _h; },
-        set(v) { _h = v; boot(); }
+        set(v) {
+          _h = v;
+
+          // one-shot: accept the first valid hooks object, run boot(), then replace accessor
+          // with a plain value property to prevent re-entry in the same document.
+          if (v && typeof v === 'object' && typeof v.initAll === 'function') {
+            try {
+              Object.defineProperty(window, 'WorkerPatchHooks', {
+                value: v,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
+            } catch (e) {
+              __moduleDiag('warn', __MODULE + ':hooks_lock_failed', {
+                stage: 'guard',
+                key: 'WorkerPatchHooks',
+                message: 'failed to lock WorkerPatchHooks to plain property',
+                type: 'browser structure missing data',
+                data: { outcome: 'skip', reason: 'hooks_lock_failed' }
+              }, e);
+            }
+            boot();
+            return;
+          }
+
+          __moduleDiag('warn', __MODULE + ':hooks_invalid', {
+            stage: 'preflight',
+            key: 'WorkerPatchHooks',
+            message: 'WorkerPatchHooks set to invalid value; waiting for valid initAll',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'hooks_invalid' }
+          }, null);
+        }
       });
     }
   } catch (e) {

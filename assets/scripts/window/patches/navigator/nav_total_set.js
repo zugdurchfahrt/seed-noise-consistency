@@ -905,19 +905,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (!d) throw new TypeError(`${key}: descriptor missing`);
         if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
         __navRegisterKey(key);
-        const applied = applyCoreTargetsGroup('nav_total_set:critical', [{
-          owner: navProto,
-          key: key,
-          kind: 'accessor',
-          // Cross-realm Function#toString must not reveal synthetic wrapper source.
-          // Use core proxy-wrapper so other realms see native-looking "[native code]" too.
-          wrapLayer: 'named_wrapper_strict',
-          policy: 'strict',
-          diagTag: 'nav_total_set:critical',
-          allowCreate: false,
-          configurable: !!d.configurable,
-          enumerable: !!d.enumerable,
-          validThis: __isNavigatorThis,
+         const applied = applyCoreTargetsGroup('nav_total_set:critical', [{
+           owner: navProto,
+           key: key,
+           kind: 'accessor',
+           // Cross-realm Function#toString must not reveal synthetic wrapper source.
+           // Use core proxy-wrapper so other realms see native-looking "[native code]" too.
+           wrapLayer: 'named_wrapper_strict',
+           resolve: 'proto_chain',
+           policy: 'strict',
+           diagTag: 'nav_total_set:critical',
+           allowCreate: false,
+           configurable: !!d.configurable,
+           enumerable: !!d.enumerable,
+           validThis: __isNavigatorThis,
           // [NORMATIVE] invalid receiver must be validated by the engine and rethrown unchanged.
           invalidThis: 'native',
           getImpl: function navCriticalGetImpl() {
@@ -1171,6 +1172,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   key: spec.key,
                   kind: 'accessor',
                   wrapLayer: 'named_wrapper_strict',
+                  resolve: 'proto_chain',
                   policy: 'strict',
                   diagTag: 'nav_total_set:' + fullKey,
                   configurable: !!spec.desc.configurable,
@@ -1424,6 +1426,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         key: 'userAgentData',
         kind: 'accessor',
         wrapLayer: 'named_wrapper_strict',
+        resolve: 'proto_chain',
         policy: 'strict',
         diagTag: 'nav_total_set:userAgentData',
         configurable: !!dUaData.configurable,
@@ -1537,6 +1540,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'deviceMemory',
           kind: 'accessor',
           wrapLayer: 'named_wrapper_strict',
+          resolve: 'proto_chain',
           policy: 'strict',
           diagTag: 'nav_total_set:deviceMemory',
           configurable: !!dDeviceMemory.configurable,
@@ -1619,6 +1623,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'hardwareConcurrency',
           kind: 'accessor',
           wrapLayer: 'named_wrapper_strict',
+          resolve: 'proto_chain',
           policy: 'strict',
           diagTag: 'nav_total_set:hardwareConcurrency',
           configurable: !!dHardwareConcurrency.configurable,
@@ -1702,6 +1707,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'language',
           kind: 'accessor',
           wrapLayer: 'named_wrapper_strict',
+          resolve: 'proto_chain',
           policy: 'strict',
           diagTag: 'nav_total_set:language',
           configurable: !!dLanguage.configurable,
@@ -1784,6 +1790,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'languages',
           kind: 'accessor',
           wrapLayer: 'named_wrapper_strict',
+          resolve: 'proto_chain',
           policy: 'strict',
           diagTag: 'nav_total_set:languages',
           configurable: !!dLanguages.configurable,

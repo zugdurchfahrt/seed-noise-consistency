@@ -1861,7 +1861,6 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 })(G); // <-- закрыли и СРАЗУ вызвали WorkerPatchHooks(G)
 
 
-  window.WorkerPatchHooks = G.WorkerPatchHooks;
   __wrkDiag('info', 'wrk:worker_patch_hooks_ready', {
     stage: 'apply',
     key: 'WorkerPatchHooks',
