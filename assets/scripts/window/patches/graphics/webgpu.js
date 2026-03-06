@@ -884,7 +884,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               });
               throw e;
             }
-            return __maskFeatures(nativeFeatures);
+            return nativeFeatures;
           }
         });
       }
@@ -916,7 +916,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               });
               throw e;
             }
-            return __maskLimits(nativeLimits);
+            return nativeLimits;
           }
         });
       }
