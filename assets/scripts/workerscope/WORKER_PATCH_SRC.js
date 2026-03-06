@@ -8,12 +8,22 @@
   if (typeof self==='undefined' || typeof WorkerGlobalScope==='undefined' || !(self instanceof WorkerGlobalScope)) {
     throw new Error('UACHPatch: not in WorkerGlobalScope');
   }
-  if (self.installWorkerUACHMirror) {
+  const W = self;
+  if (Object.prototype.hasOwnProperty.call(W, '__WORKER_PATCH_LOADED__')) {
+    throw new Error('UACHPatch: WORKER_PATCH_SRC already loaded');
+  }
+  Object.defineProperty(W, '__WORKER_PATCH_LOADED__', {
+    value: true,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+  if (Object.prototype.hasOwnProperty.call(W, 'installWorkerUACHMirror')) {
     throw new Error('UACHPatch: installWorkerUACHMirror already defined');
   }
-  self.__WORKER_PATCH_LOADED__ = true;
 
-  self.installWorkerUACHMirror = function installWorkerUACHMirror(){
+  Object.defineProperty(W, 'installWorkerUACHMirror', {
+    value: function installWorkerUACHMirror(){
     if (self.__UACH_MIRROR_INSTALLED__) {
       throw new Error('UACHPatch: already installed');
     }
@@ -984,8 +994,8 @@
         const SNAP = JSON.stringify(snap);
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'
-          ? `(async function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=s=>{self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
-          : `(function(){'use strict';self.__GW_BOOTSTRAP__=true;self.__applyEnvSnapshot__=function(s){self.__lastSnap__=s;};self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
+          ? `(async function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
+          : `(function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
         // Do not revoke immediately: the worker may still be fetching the bootstrap script.
         // Early revoke can surface as `importScripts(blob:...) failed to load` in real sites.
@@ -1078,5 +1088,9 @@
       }, rollbackErr || e);
       throw (rollbackErr || e);
     }
-  };
+  },
+  writable: true,
+  configurable: true,
+  enumerable: false
+  });
 })();

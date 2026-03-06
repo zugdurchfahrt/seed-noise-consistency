@@ -1217,7 +1217,7 @@ const LOGGingModule = function LOGGingModule() {
     };
     // DIAG_SCREEN_ON({ includeData: true })
 
-
+    DIAG_SCREEN_ON({ criticalOnly:true, includeData:true, lastN:180 })
 
         // after all logger globals are assigned (Window realm only):
       if (W) {

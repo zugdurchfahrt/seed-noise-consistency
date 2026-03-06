@@ -751,11 +751,16 @@ function mkClassicWorkerSource(snapshot, absUrl){
         }
         return s;
       };
-      self.__applyEnvSnapshot__ = function(s){
-        if (self.__ENV_SNAP_APPLIED__ === s) return;
-        self.__lastSnap__ = __requireSnap(s);
-        self.__ENV_SNAP_APPLIED__ = s;
-      };
+      Object.defineProperty(self, '__applyEnvSnapshot__', {
+        value: function __applyEnvSnapshot__(s){
+          if (self.__ENV_SNAP_APPLIED__ === s) return;
+          self.__lastSnap__ = __requireSnap(s);
+          self.__ENV_SNAP_APPLIED__ = s;
+        },
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       try {
         self.__applyEnvSnapshot__(${SNAP});
       } catch (e) {
@@ -1119,6 +1124,8 @@ function SafeWorkerOverride(G){
         }, () => w.removeEventListener('error', onErr));
       };
 
+    let sawWorkerPatchDiag = false;
+
     const onErr = () => {
       cleanup();
     };
@@ -1127,6 +1134,17 @@ function SafeWorkerOverride(G){
       const data = ev && ev.data;
       const relayDiag = data && typeof data === 'object' ? data.__ENV_DIAG__ : null;
       if (relayDiag && typeof relayDiag === 'object') {
+        const relayCtx = (relayDiag.ctx && typeof relayDiag.ctx === 'object') ? relayDiag.ctx : null;
+        const relayModule = relayCtx && typeof relayCtx.module === 'string' ? relayCtx.module : null;
+        const relayTag = relayCtx && typeof relayCtx.diagTag === 'string' ? relayCtx.diagTag : null;
+        const relayCode = typeof relayDiag.code === 'string' ? relayDiag.code : null;
+        if (
+          relayModule === 'WORKER_PATCH_SRC'
+          || relayTag === 'worker_patch'
+          || (typeof relayCode === 'string' && relayCode.indexOf('worker_patch_src:') === 0)
+        ) {
+          sawWorkerPatchDiag = true;
+        }
         relayWorkerScopeDiag(G, 'Worker', relayDiag);
         __wrkBestEffort('wrk:worker_diag_stop_propagation_failed', {
           stage: 'runtime',
@@ -1136,6 +1154,21 @@ function SafeWorkerOverride(G){
           data: { outcome: 'skip', reason: 'worker_diag_stop_propagation_failed' }
         }, () => { ev.stopImmediatePropagation(); ev.stopPropagation(); });
         return;
+      }
+
+      const patchOk = data && typeof data === 'object' ? data.__ENV_PATCH_OK__ : null;
+      if (patchOk === true && !sawWorkerPatchDiag) {
+        sawWorkerPatchDiag = true;
+        __wrkDiag('info', 'worker_patch_src:apply:installed', {
+          stage: 'apply',
+          module: 'WORKER_PATCH_SRC',
+          diagTag: 'worker_patch',
+          surface: 'worker',
+          key: 'installWorkerUACHMirror',
+          message: 'worker patch installed',
+          type: 'pipeline missing data',
+          data: { outcome: 'return', reason: 'worker_patch_ok_confirmed', scope: 'Worker' }
+        }, null);
       }
 
       const bootErr = data && typeof data === 'object' && data.__ENV_BOOTSTRAP_ERROR__;
@@ -1297,6 +1330,7 @@ function SafeSharedWorkerOverride(G){
     try {
       const port = sw && sw.port;
       if (port && typeof port.addEventListener === 'function') {
+        let sawSharedWorkerPatchDiag = false;
         const onMsg = (ev) => {
           const data = ev && ev.data;
           if (!data || typeof data !== 'object') return;
@@ -1304,6 +1338,17 @@ function SafeSharedWorkerOverride(G){
           const relayDiag = data.__ENV_DIAG__;
           if (relayDiag && typeof relayDiag === 'object') {
             internal = true;
+            const relayCtx = (relayDiag.ctx && typeof relayDiag.ctx === 'object') ? relayDiag.ctx : null;
+            const relayModule = relayCtx && typeof relayCtx.module === 'string' ? relayCtx.module : null;
+            const relayTag = relayCtx && typeof relayCtx.diagTag === 'string' ? relayCtx.diagTag : null;
+            const relayCode = typeof relayDiag.code === 'string' ? relayDiag.code : null;
+            if (
+              relayModule === 'WORKER_PATCH_SRC'
+              || relayTag === 'worker_patch'
+              || (typeof relayCode === 'string' && relayCode.indexOf('worker_patch_src:') === 0)
+            ) {
+              sawSharedWorkerPatchDiag = true;
+            }
             relayWorkerScopeDiag(G, 'SharedWorker', relayDiag);
           }
           const bootErr = data.__ENV_BOOTSTRAP_ERROR__;
@@ -1332,6 +1377,19 @@ function SafeSharedWorkerOverride(G){
           const ok = data.__ENV_PATCH_OK__;
           if (ok === true) {
             internal = true;
+            if (!sawSharedWorkerPatchDiag) {
+              sawSharedWorkerPatchDiag = true;
+              __wrkDiag('info', 'worker_patch_src:apply:installed', {
+                stage: 'apply',
+                module: 'WORKER_PATCH_SRC',
+                diagTag: 'worker_patch',
+                surface: 'worker',
+                key: 'installWorkerUACHMirror',
+                message: 'worker patch installed',
+                type: 'pipeline missing data',
+                data: { outcome: 'return', reason: 'worker_patch_ok_confirmed', scope: 'SharedWorker' }
+              }, null);
+            }
             __wrkBestEffort('wrk:shared_worker_patch_ok_store_failed', {
               stage: 'runtime',
               key: '__LAST_SHARED_WORKER_PATCH_OK__',

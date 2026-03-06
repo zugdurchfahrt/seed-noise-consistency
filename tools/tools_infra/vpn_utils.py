@@ -72,21 +72,14 @@ class VPNClient:
         logger.info("Step 2: environment preparation(cleanup + DNS + auth)")
 
         self._terminate_vpn_processes()
-        logger.info("Step 2.1: finishing old VPN processes")
 
         self._clean_directories()
-        logger.info("Step 2.2: cleaning temporary directories")
 
         subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
-        logger.info("Step 2.3: reset DNS-cache")
 
         self._kill_old_processes()
-        logger.info("Step 2.4: kill old browser processes")
 
         self._create_auth_file()
-        logger.info("Step 2.5: generating temp auth-file")
-
-        logger.info("cleaning and preparation stage is completed")
 
         
     def connect(self) -> bool:
@@ -291,7 +284,7 @@ class VPNClient:
             'mitmproxy.exe',
             'mitmweb.exe',
         }
-
+        
         # Browser processes are only terminated if their cmdline points to our USER_DATA_DIR.
         browser_names = {
             'chrome.exe',
@@ -319,7 +312,7 @@ class VPNClient:
                 if not should_terminate:
                     continue
 
-                logger.warning(
+                logger.info(
                     "[cleanup] terminating PID=%d name=%s exe=%s cmd=%s",
                     proc.pid,
                     name,

@@ -424,8 +424,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // ===== WEBGL hook override logging: two toggles (ВКЛ/ВЫКЛ) =====
   // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override" (emitContextDiag + console.warn ниже),
   // НЕ отключают хук, НЕ отключают патчинг, НЕ трогают остальные warn/error.
-  const WEBGL_OVERRIDE_DIAG_LOG    = true;  // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
-  const WEBGL_OVERRIDE_CONSOLE_LOG = false;  // true=ВКЛ, false=ВЫКЛ (console.warn для override)
+  const WEBGL_OVERRIDE_DIAG_LOG    = false; // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
+  const WEBGL_OVERRIDE_CONSOLE_LOG = false; // true=ВКЛ, false=ВЫКЛ (console.warn для override)
 
   function patchMethod(proto, method, hooks) {
       if (!proto) {

@@ -197,28 +197,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
   // 2) Хук «whitelist-фильтра»
   function webglWhitelistParameterHook(orig, pname, ...args) {
-    const wl = window.__WEBGL_PARAM_WHITELIST__;
-    if (!Array.isArray(wl)) {
-      __webglDiagPipeline('warn', 'webgl:param_whitelist_missing', {
-        stage: 'guard',
-        key: 'getParameter',
-        message: '__WEBGL_PARAM_WHITELIST__ missing/invalid'
-      });
-      return;
-    }
-
-    //Allowed parameters - we let the original (patchMethodThen it will call orig)
-    if (wl.includes(pname)) {
+    const wl = Array.isArray(window.__WEBGL_PARAM_WHITELIST__)
+      ? window.__WEBGL_PARAM_WHITELIST__
+      : [];
+    if (wl.length === 0 || wl.includes(pname)) {
       return; // undefined → pass-through to orig.apply(this, args)
     }
-    // For non-whitelisted enums: keep native pass-through to avoid null overrides
-    // that can break third-party report renderers (Object.values(null) paths).
-    __webglDiagPipeline('warn', 'webgl:param_whitelist_miss', {
-      stage: 'guard',
-      key: 'getParameter',
-      message: 'parameter not in whitelist',
-      data: { pname: pname }
-    });
     return; // undefined -> pass-through to orig.apply(this, args)
   }
     // === 2. getSupportedExtensions ===
@@ -521,6 +505,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
 // **
 // Why so?
 
-// patchMethod in the context of WebGL when patching getParameter first takes result = orig(this, args) and passes it to the hook as the first argument.
-// If the hook returns undefined, patchMethod continues the cycle and ultimately returns result (the original response).
+// patchMethod in the context of WebGL passes the captured original as the first hook argument.
+// If the hook returns undefined, patchMethod continues the cycle and ultimately returns the native response.
 // If the hook returns null or any other value, that value will be substituted for the original.

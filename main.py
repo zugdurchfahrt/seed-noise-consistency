@@ -208,16 +208,13 @@ def init_driver(
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
     vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
-    if vscode_cdp_debug:
-        chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
-        if chrome_debug_port_raw.lower() in {"0", "auto"}:
-            raise ValueError("CHROME_DEBUG_PORT must be fixed when VSCODE_CDP_DEBUG=1")
-        try:
-            chrome_debug_port = int(chrome_debug_port_raw)
-        except ValueError as exc:
-            raise ValueError("CHROME_DEBUG_PORT must be an integer when VSCODE_CDP_DEBUG=1") from exc
-    else:
-        chrome_debug_port = 9222
+    chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
+    if chrome_debug_port_raw.lower() in {"0", "auto"}:
+        raise ValueError("CHROME_DEBUG_PORT must be a fixed integer port")
+    try:
+        chrome_debug_port = int(chrome_debug_port_raw)
+    except ValueError as exc:
+        raise ValueError("CHROME_DEBUG_PORT must be an integer") from exc
     chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
     chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
     chrome_options.add_argument("--remote-allow-origins=*")
@@ -228,10 +225,13 @@ def init_driver(
     if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
         chrome_options.add_argument("--auto-open-devtools-for-tabs")
     chrome_options.binary_location = CHROME_BINARY
+    driver_kwargs = {
+        "driver_executable_path": CHROMEDRIVER_PATH,
+        "options": chrome_options,
+    }
+    driver_kwargs["port"] = chrome_debug_port
     driver = uc.Chrome(
-        driver_executable_path=CHROMEDRIVER_PATH,
-        options=chrome_options,
-        port=chrome_debug_port,
+        **driver_kwargs,
     )
     logger.info("Initiating Webdriver...")
     driver._stealth_seed = global_seed
@@ -250,14 +250,13 @@ def init_driver(
                 return int(p.read_text(encoding="utf-8").splitlines()[0].strip())
             time.sleep(0.1)
 
-        # 3) fallback: твой желаемый порт
+        # 3) fallback: requested port
         return chrome_debug_port
     
     cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
     if vscode_cdp_debug and cdp.PORT != chrome_debug_port:
         raise RuntimeError(f"CDP port mismatch: requested {chrome_debug_port}, got {cdp.PORT}")
-    if vscode_cdp_debug:
-        logger.info("Chrome DevTools port: %s", cdp.PORT)
+    logger.info("Chrome DevTools port: %s", cdp.PORT)
           
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
@@ -620,6 +619,7 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         def _inject_time_machine(driver):
             tz_src = Path(SCRIPTS_PATCHES_STEALTH / "TimezoneOverride_source.js").read_text("utf-8")
             geo_src = Path(SCRIPTS_PATCHES_STEALTH / "GeoOverride_source.js").read_text("utf-8")
+            init_tz = "TimezonePatchModule(window);"
             call_tz = r'''
             
         Promise.resolve().then(() => {
@@ -628,6 +628,7 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         '''.strip()
             timegeo_js = "\n;\n".join([
                 tz_src,
+                init_tz,
                 call_tz,
                 geo_src,
             ]) + "\n//# sourceURL=timegeo_bundle.js"
@@ -694,7 +695,10 @@ def main():
         # client.prepare()
         # logger.info("preparation completed")
         # client.connect()
+        client._kill_old_processes()
         client._clean_directories()
+       
+       
         client.post()
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()

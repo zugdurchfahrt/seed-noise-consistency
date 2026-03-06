@@ -981,6 +981,70 @@ const WEBglDICKts = function WEBglDICKts(window) {
     "WEBGL_stencil_texturing"
     ];
     // Object.freeze(window.__EXTENSIONS_WHITELIST__);
+    function extendParamWhitelistFromExtensions() {
+        const wl = window.__WEBGL_PARAM_WHITELIST__;
+        const extList = window.__EXTENSIONS_WHITELIST__;
+        if (!Array.isArray(wl) || !Array.isArray(extList) || extList.length === 0) return;
+        const seen = (typeof Set === 'function') ? new Set() : null;
+        if (seen) {
+            for (let i = 0; i < wl.length; i++) {
+                const value = wl[i];
+                if (typeof value === 'number' && Number.isFinite(value)) seen.add(value);
+            }
+        }
+        let canvas = null;
+        try {
+            if (window.document && typeof window.document.createElement === 'function') {
+                canvas = window.document.createElement('canvas');
+                if (canvas) {
+                    canvas.width = 1;
+                    canvas.height = 1;
+                }
+            } else if (typeof window.OffscreenCanvas === 'function') {
+                canvas = new window.OffscreenCanvas(1, 1);
+            }
+        } catch (_) {
+            canvas = null;
+        }
+        if (!canvas || typeof canvas.getContext !== 'function') return;
+        const contexts = [];
+        ['webgl2', 'webgl', 'experimental-webgl'].forEach(function(contextId) {
+            try {
+                const ctx = canvas.getContext(contextId);
+                if (ctx && contexts.indexOf(ctx) === -1) contexts.push(ctx);
+            } catch (_) {}
+        });
+        if (contexts.length === 0) return;
+        contexts.forEach(function(ctx) {
+            extList.forEach(function(extName) {
+                if (typeof extName !== 'string' || !extName) return;
+                let ext = null;
+                try {
+                    ext = ctx.getExtension(extName);
+                } catch (_) {
+                    ext = null;
+                }
+                if (!ext || typeof ext !== 'object') return;
+                Object.getOwnPropertyNames(ext).forEach(function(key) {
+                    let value;
+                    try {
+                        value = ext[key];
+                    } catch (_) {
+                        return;
+                    }
+                    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+                    if (seen) {
+                        if (seen.has(value)) return;
+                        seen.add(value);
+                    } else if (wl.indexOf(value) !== -1) {
+                        return;
+                    }
+                    wl.push(value);
+                });
+            });
+        });
+    }
+    extendParamWhitelistFromExtensions();
     diag('info', 'webglstorage:whitelist_loaded', {
         stage: 'apply',
         key: null,
