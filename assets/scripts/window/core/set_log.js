@@ -738,7 +738,13 @@ const LOGGingModule = function LOGGingModule() {
         module: (typeof safeCtx.module === "string") ? safeCtx.module : undefined,
         diagTag: (typeof safeCtx.diagTag === "string") ? safeCtx.diagTag : undefined,
         surface: (typeof safeCtx.surface === "string") ? safeCtx.surface : undefined,
-        key: (typeof safeCtx.key === "string") ? safeCtx.key : undefined,
+        // Fill missing keys for log consumers: prefer explicit ctx.key, otherwise reuse diagTag/module.
+        // This keeps pipeline semantics intact while avoiding "null holes" in the log table.
+        key: (typeof safeCtx.key === "string" && safeCtx.key)
+          ? safeCtx.key
+          : ((typeof safeCtx.diagTag === "string" && safeCtx.diagTag)
+            ? safeCtx.diagTag
+            : ((typeof safeCtx.module === "string" && safeCtx.module) ? safeCtx.module : undefined)),
         stage: (typeof safeCtx.stage === "string") ? safeCtx.stage : undefined,
         message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
         data: safeData
