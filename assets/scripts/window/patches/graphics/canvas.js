@@ -308,18 +308,34 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     realInit();
   }
 
-    // ===== stable noise helper (module-scope) =====
-  function __stableNoise__(key, a, b){
-    //The ONLY source: __GLOBAL_SEED + key -> mulberry32(strToSeed(...))
-    if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED)
-      throw new Error('[PRNG] __GLOBAL_SEED is required');
-    if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function')
-      throw new Error('[PRNG] strToSeed/mulberry32 are required');
-    const base = 'seed:' + G.__GLOBAL_SEED + '|key:' + String(key);
-    const seed = G.strToSeed(base) >>> 0;
-    const u  = G.mulberry32(seed)();   // deterministical and order-independently
-    return a + (b - a) * u;
+
+  function stringHash(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
   }
+
+
+  function stableNoiseFromString(str, min, max) {
+  //The ONLY source: __GLOBAL_SEED + key -> mulberry32(strToSeed(...))
+  if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED)
+    throw new Error('[PRNG] __GLOBAL_SEED is required');
+  if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function')
+    throw new Error('[PRNG] strToSeed/mulberry32 are required')
+    const seedStr = str + ':' + (G.__GLOBAL_SEED);
+    let x = stringHash(seedStr);
+    x ^= x >>> 16;
+    x = Math.imul(x, 0x7feb352d);
+    x ^= x >>> 15;
+    x = Math.imul(x, 0x846ca68b);
+    x ^= x >>> 16;
+    const frac = (x >>> 0) / 4294967295;
+    return min + frac * (max - min);
+  }
+
 
   function q256(v){ return Math.round(v * 256) / 256; }
 
@@ -433,8 +449,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const jitterK = (cfg && cfg.epsJitterFactor != null) ? cfg.epsJitterFactor : 0.5;
     const base = 1 / (basePPX * dpr);
 
-    const mag = base * (1 + jitterK * __stableNoise__(`${key}|m`, 0, 1));
-    const ang = 2 * Math.PI * __stableNoise__(`${key}|a`, 0, 1);
+    const mag = base * (1 + jitterK * stableNoiseFromString(`${key}|m`, 0, 1));
+    const ang = 2 * Math.PI * stableNoiseFromString(`${key}|a`, 0, 1);
     const v = { epsX: Math.cos(ang) * mag, epsY: Math.sin(ang) * mag };
 
     JIT_CACHE.set(key, v);
@@ -461,148 +477,148 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   }
 
   // --- 2D ImageData noise hook ---
-  function patch2DNoise(img, type) {
-    if (type !== '2d' || !img || !img.data || !img.width || !img.height) return img;
-    const w = img.width | 0, h = img.height | 0; if (!w || !h) return img;
-    const cfg = (typeof globalThis !== 'undefined' && globalThis.CanvasPatchHooks && globalThis.CanvasPatchHooks.resampleCfg)
-            || (typeof __CNV_CFG__ !== 'undefined' ? __CNV_CFG__ : {})
-            || {};
-    const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
-      ? +devicePixelRatio
-      : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
-          ? +globalThis.__DPR
-          : undefined);
-    const { epsX, epsY } = __getJitter__('img:2d', w, h, dpr);
+  // function patch2DNoise(img, type) {
+  //   if (type !== '2d' || !img || !img.data || !img.width || !img.height) return img;
+  //   const w = img.width | 0, h = img.height | 0; if (!w || !h) return img;
+  //   const cfg = (typeof globalThis !== 'undefined' && globalThis.CanvasPatchHooks && globalThis.CanvasPatchHooks.resampleCfg)
+  //           || (typeof __CNV_CFG__ !== 'undefined' ? __CNV_CFG__ : {})
+  //           || {};
+  //   const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
+  //     ? +devicePixelRatio
+  //     : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
+  //         ? +globalThis.__DPR
+  //         : undefined);
+  //   const { epsX, epsY } = __getJitter__('img:2d', w, h, dpr);
 
-    const C1 = makeCanvas(w, h), C2 = makeCanvas(w, h);
-    if (!C1 || !C2) return img;
-    const ctx1 = C1.getContext('2d', { willReadFrequently: true });
-    const ctx2 = C2.getContext('2d', { willReadFrequently: true });
-    if (!ctx1 || !ctx2) return img;
-    const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
+  //   const C1 = makeCanvas(w, h), C2 = makeCanvas(w, h);
+  //   if (!C1 || !C2) return img;
+  //   const ctx1 = C1.getContext('2d', { willReadFrequently: true });
+  //   const ctx2 = C2.getContext('2d', { willReadFrequently: true });
+  //   if (!ctx1 || !ctx2) return img;
+  //   const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
 
-    try { ctx2.imageSmoothingEnabled = true; } catch (e) {
-      emitCanvasDiag('warn', 'canvas:patch2DNoise:apply:imageSmoothing_set_failed', e, {
-        stage: 'apply',
-        key: 'imageSmoothingEnabled',
-        type: 'browser structure missing data'
-      });
-    }
-    nativePutImageData(P1, ctx1, img, 0, 0);
-    nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
-    nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
-    nativeDrawImage(P2, ctx2, C1, 0, 0);
-    const res = nativeGetImageData(P2, ctx2, 0, 0, w, h);
+  //   try { ctx2.imageSmoothingEnabled = true; } catch (e) {
+  //     emitCanvasDiag('warn', 'canvas:patch2DNoise:apply:imageSmoothing_set_failed', e, {
+  //       stage: 'apply',
+  //       key: 'imageSmoothingEnabled',
+  //       type: 'browser structure missing data'
+  //     });
+  //   }
+  //   nativePutImageData(P1, ctx1, img, 0, 0);
+  //   nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
+  //   nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
+  //   nativeDrawImage(P2, ctx2, C1, 0, 0);
+  //   const res = nativeGetImageData(P2, ctx2, 0, 0, w, h);
 
-    const src = img.data, dst = res.data;
-    const mask = new Float32Array(w * h);
-    let sumMask = 0;
-    for (let y = 0; y < h; y++) {
-      const yOff = y * w;
-      for (let x = 0; x < w; x++) {
-        const i4 = (yOff + x) << 2;
-        const l  = 0.2126 * src[i4] + 0.7152 * src[i4 + 1] + 0.0722 * src[i4 + 2];
-        const xr = (x + 1 < w) ? ((yOff + x + 1) << 2) : i4;
-        const yd = (y + 1 < h) ? (((y + 1) * w + x) << 2) : i4;
-        const lr = 0.2126 * src[xr] + 0.7152 * src[xr + 1] + 0.0722 * src[xr + 2];
-        const ld = 0.2126 * src[yd] + 0.7152 * src[yd + 1] + 0.0722 * src[yd + 2];
-        const dx = Math.abs(l - lr) / 255; const dy = Math.abs(l - ld) / 255;
-        let m = (dx + dy) * (cfg.edgeGain ?? 4.0);
-        if (m > 1) m = 1; mask[yOff + x] = m; sumMask += m;
-      }
-    }
-    if (sumMask / (w * h) < (cfg.flatMeanThreshold ?? 0.02)) return img;
+  //   const src = img.data, dst = res.data;
+  //   const mask = new Float32Array(w * h);
+  //   let sumMask = 0;
+  //   for (let y = 0; y < h; y++) {
+  //     const yOff = y * w;
+  //     for (let x = 0; x < w; x++) {
+  //       const i4 = (yOff + x) << 2;
+  //       const l  = 0.2126 * src[i4] + 0.7152 * src[i4 + 1] + 0.0722 * src[i4 + 2];
+  //       const xr = (x + 1 < w) ? ((yOff + x + 1) << 2) : i4;
+  //       const yd = (y + 1 < h) ? (((y + 1) * w + x) << 2) : i4;
+  //       const lr = 0.2126 * src[xr] + 0.7152 * src[xr + 1] + 0.0722 * src[xr + 2];
+  //       const ld = 0.2126 * src[yd] + 0.7152 * src[yd + 1] + 0.0722 * src[yd + 2];
+  //       const dx = Math.abs(l - lr) / 255; const dy = Math.abs(l - ld) / 255;
+  //       let m = (dx + dy) * (cfg.edgeGain ?? 4.0);
+  //       if (m > 1) m = 1; mask[yOff + x] = m; sumMask += m;
+  //     }
+  //   }
+  //   if (sumMask / (w * h) < (cfg.flatMeanThreshold ?? 0.02)) return img;
 
-    const blurPasses = (cfg.maskBlurPasses ?? 1) | 0;
-    for (let p = 0; p < blurPasses; p++) boxBlurMask(mask, w, h);
+  //   const blurPasses = (cfg.maskBlurPasses ?? 1) | 0;
+  //   for (let p = 0; p < blurPasses; p++) boxBlurMask(mask, w, h);
 
-    const out = new Uint8ClampedArray(src.length);
-    for (let i = 0; i < out.length; i += 4) {
-      const m = mask[i >> 2];
-      if (m > 0) {
-        out[i]     = src[i]     + (dst[i]     - src[i])     * m;
-        out[i + 1] = src[i + 1] + (dst[i + 1] - src[i + 1]) * m;
-        out[i + 2] = src[i + 2] + (dst[i + 2] - src[i + 2]) * m;
-      } else {
-        out[i]     = src[i];
-        out[i + 1] = src[i + 1];
-        out[i + 2] = src[i + 2];
-      }
-      out[i + 3] = src[i + 3];
-    }
-    return new ImageData(out, w, h);
-  }
+  //   const out = new Uint8ClampedArray(src.length);
+  //   for (let i = 0; i < out.length; i += 4) {
+  //     const m = mask[i >> 2];
+  //     if (m > 0) {
+  //       out[i]     = src[i]     + (dst[i]     - src[i])     * m;
+  //       out[i + 1] = src[i + 1] + (dst[i + 1] - src[i + 1]) * m;
+  //       out[i + 2] = src[i + 2] + (dst[i + 2] - src[i + 2]) * m;
+  //     } else {
+  //       out[i]     = src[i];
+  //       out[i + 1] = src[i + 1];
+  //       out[i + 2] = src[i + 2];
+  //     }
+  //     out[i + 3] = src[i + 3];
+  //   }
+  //   return new ImageData(out, w, h);
+  // }
 
   //  addCanvasNoise()
-  function addCanvasNoise(imageData, dx = 0, dy = 0) {
-    const G = (typeof globalThis !== 'undefined' && globalThis)
-      || (typeof self !== 'undefined' && self)
-      || (typeof window !== 'undefined' && window)
-      || {};
-    try {
-      const cfg = (G.CanvasPatchHooks && G.CanvasPatchHooks.noiseCfg) || {};
-      const density  = Number.isFinite(cfg.density)  ? cfg.density  : 0.08;
-      const strength = Number.isFinite(cfg.strength) ? cfg.strength : 0.75;
-      const mono = !!cfg.mono;
+  // function addCanvasNoise(imageData, dx = 0, dy = 0) {
+  //   const G = (typeof globalThis !== 'undefined' && globalThis)
+  //     || (typeof self !== 'undefined' && self)
+  //     || (typeof window !== 'undefined' && window)
+  //     || {};
+  //   try {
+  //     const cfg = (G.CanvasPatchHooks && G.CanvasPatchHooks.noiseCfg) || {};
+  //     const density  = Number.isFinite(cfg.density)  ? cfg.density  : 0.08;
+  //     const strength = Number.isFinite(cfg.strength) ? cfg.strength : 0.75;
+  //     const mono = !!cfg.mono;
 
-      if (!imageData || !imageData.data || !imageData.width || !imageData.height) return;
-      const w = imageData.width | 0;
-      const h = imageData.height | 0;
-      if (!w || !h) return;
+  //     if (!imageData || !imageData.data || !imageData.width || !imageData.height) return;
+  //     const w = imageData.width | 0;
+  //     const h = imageData.height | 0;
+  //     if (!w || !h) return;
 
-      const data = imageData.data;
-      const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
-        ? +devicePixelRatio
-        : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
-            ? +globalThis.__DPR
-            : undefined);
+  //     const data = imageData.data;
+  //     const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
+  //       ? +devicePixelRatio
+  //       : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
+  //           ? +globalThis.__DPR
+  //           : undefined);
             
-      const cnv  = (this && this.canvas) ? this.canvas : null;
-      const cid  = (() => {
-        try { const cw = cnv && cnv.width, ch = cnv && cnv.height; return `cnv@${cw}x${ch}@${(Math.round(dpr * 1024))}`; }
-        catch (e) {
-          emitCanvasDiag('warn', 'canvas:addCanvasNoise:runtime:canvas_size_read_failed', e, {
-            stage: 'runtime',
-            key: 'canvas',
-            type: 'browser structure missing data'
-          });
-          return `cnv@${w}x${h}@${(Math.round(dpr * 1024))}`;
-        }
-      })();
-      const baseKey = `px|${w}x${h}|${cid}|dx:${dx|0},dy:${dy|0}`;
+  //     const cnv  = (this && this.canvas) ? this.canvas : null;
+  //     const cid  = (() => {
+  //       try { const cw = cnv && cnv.width, ch = cnv && cnv.height; return `cnv@${cw}x${ch}@${(Math.round(dpr * 1024))}`; }
+  //       catch (e) {
+  //         emitCanvasDiag('warn', 'canvas:addCanvasNoise:runtime:canvas_size_read_failed', e, {
+  //           stage: 'runtime',
+  //           key: 'canvas',
+  //           type: 'browser structure missing data'
+  //         });
+  //         return `cnv@${w}x${h}@${(Math.round(dpr * 1024))}`;
+  //       }
+  //     })();
+  //     const baseKey = `px|${w}x${h}|${cid}|dx:${dx|0},dy:${dy|0}`;
 
-      for (let y = 0, i = 0; y < h; y++) {
-        const ay = (dy|0) + y;
-        for (let x = 0; x < w; x++, i += 4) {
-          const ax = (dx|0) + x;
+  //     for (let y = 0, i = 0; y < h; y++) {
+  //       const ay = (dy|0) + y;
+  //       for (let x = 0; x < w; x++, i += 4) {
+  //         const ax = (dx|0) + x;
 
-          const gate = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|g`, 0, 1);
-          if (gate > density) continue;
+  //         const gate = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|g`, 0, 1);
+  //         if (gate > density) continue;
 
-          if (mono) {
-            const d  = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|mono`, -strength, +strength);
-            let r = data[i] + d, g = data[i+1] + d, b = data[i+2] + d;
-            data[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
-            data[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
-            data[i+2] = b < 0 ? 0 : b > 255 ? 255 : b;
-          } else {
-            const dr = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|r`, -strength, +strength);
-            const dg = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|g`, -strength, +strength);
-            const db = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|b`, -strength, +strength);
-            let r = data[i] + dr, g = data[i+1] + dg, b = data[i+2] + db;
-            data[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
-            data[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
-            data[i+2] = b < 0 ? 0 : b > 255 ? 255 : b;
-          }
-        }
-      }
-    } catch (e) {
-      emitCanvasDiag('warn', 'canvas:addCanvasNoise:hook:failed', e, {
-        stage: 'hook',
-        key: 'addCanvasNoise'
-      });
-    }
-  }
+  //         if (mono) {
+  //           const d  = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|mono`, -strength, +strength);
+  //           let r = data[i] + d, g = data[i+1] + d, b = data[i+2] + d;
+  //           data[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
+  //           data[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
+  //           data[i+2] = b < 0 ? 0 : b > 255 ? 255 : b;
+  //         } else {
+  //           const dr = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|r`, -strength, +strength);
+  //           const dg = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|g`, -strength, +strength);
+  //           const db = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|b`, -strength, +strength);
+  //           let r = data[i] + dr, g = data[i+1] + dg, b = data[i+2] + db;
+  //           data[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
+  //           data[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
+  //           data[i+2] = b < 0 ? 0 : b > 255 ? 255 : b;
+  //         }
+  //       }
+  //     }
+  //   } catch (e) {
+  //     emitCanvasDiag('warn', 'canvas:addCanvasNoise:hook:failed', e, {
+  //       stage: 'hook',
+  //       key: 'addCanvasNoise'
+  //     });
+  //   }
+  // }
 
   // =====================================================================
   // TEXT / FONTS (Layer 1: vector/layout stage, pre-raster)
@@ -759,8 +775,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const font = (this && this.font) || '';
     const keyx = `fx|${font}\u241F${text}`;
     const keyy = `fy|${font}\u241F${text}`;
-    const dx = __stableNoise__(keyx, -(__CNV_CFG__.dxPx), (__CNV_CFG__.dxPx));
-    const dy = __stableNoise__(keyy, -(__CNV_CFG__.dyPx), (__CNV_CFG__.dyPx));
+    const dx = stableNoiseFromString(keyx, -(__CNV_CFG__.dxPx), (__CNV_CFG__.dxPx));
+    const dy = stableNoiseFromString(keyy, -(__CNV_CFG__.dyPx), (__CNV_CFG__.dyPx));
     return [text, x + dx, y + dy, ...rest];
   }
 
@@ -769,8 +785,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const font = (this && this.font) || '';
     const keyx = `sx|${font}\u241F${text}`;
     const keyy = `sy|${font}\u241F${text}`;
-    const dx = __stableNoise__(keyx, -(__CNV_CFG__.dxPx), (__CNV_CFG__.dxPx));
-    const dy = __stableNoise__(keyy, -(__CNV_CFG__.dyPx), (__CNV_CFG__.dyPx));
+    const dx = stableNoiseFromString(keyx, -(__CNV_CFG__.dxPx), (__CNV_CFG__.dxPx));
+    const dy = stableNoiseFromString(keyy, -(__CNV_CFG__.dyPx), (__CNV_CFG__.dyPx));
     return [text, x + dx, y + dy, ...rest];
   }
 
@@ -1040,7 +1056,7 @@ try {
   });
 }
 
-__CanvasPatchHooks__.patch2DNoise = patch2DNoise;
+// __CanvasPatchHooks__.patch2DNoise = patch2DNoise;
 __CanvasPatchHooks__.patchToDataURLInjectNoise = patchToDataURLInjectNoise;
 // 2026-02-11: disabled export with runtime-disabled hook.
 // __CanvasPatchHooks__.patchCanvasIHDRHook = patchCanvasIHDRHook;
@@ -1052,7 +1068,7 @@ __CanvasPatchHooks__.applyMeasureTextHook = applyMeasureTextHook;
 __CanvasPatchHooks__.fillTextNoiseHook = fillTextNoiseHook;
 __CanvasPatchHooks__.strokeTextNoiseHook = strokeTextNoiseHook;
 __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
-__CanvasPatchHooks__.addCanvasNoise = addCanvasNoise;
+// __CanvasPatchHooks__.addCanvasNoise = addCanvasNoise;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
 
 if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
