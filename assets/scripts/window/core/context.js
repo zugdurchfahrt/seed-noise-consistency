@@ -115,52 +115,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
   // NOTE: this value is used as a stable fallback for hook keys (fontStr) when ctx.font is unreadable/empty.
   const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
-    try {
-      const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
-      if (cached && cached.trim()) return cached.trim();
-
-      const doc = global && global.document;
-      if (!doc || typeof doc.createElement !== 'function') {
-        throw new Error('[ContextPatch] document.createElement missing');
-      }
-      const canvas = doc.createElement('canvas');
-      const ctx = (canvas && typeof canvas.getContext === 'function') ? canvas.getContext('2d') : null;
-      const font = (ctx && typeof ctx.font === 'string' && ctx.font.trim()) ? ctx.font.trim() : '';
-      if (!font) throw new Error('[ContextPatch] default ctx2d.font missing/invalid');
-
-      try {
-        Object.defineProperty(C, '__DEFAULT_CTX2D_FONT__', {
-          value: font,
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
-      } catch (eDef) {
-        emitContextDiag('warn', 'context:ctx2d:guard:default_font_define_failed', eDef, {
-          stage: 'guard',
-          key: '__DEFAULT_CTX2D_FONT__',
-          type: 'browser structure missing data'
-        });
-        try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (eSet) {
-          emitContextDiag('warn', 'context:ctx2d:guard:default_font_assign_failed', eSet, {
-            stage: 'guard',
-            key: '__DEFAULT_CTX2D_FONT__',
-            type: 'browser structure missing data',
-            message: 'default font fallback assign failed',
-            data: null
-          });
-        }
-      }
-      return font;
-    } catch (e) {
-      emitContextDiag('warn', 'context:ctx2d:guard:default_font_compute_failed', e, {
-        stage: 'guard',
-        key: 'ctx.font',
-        type: 'browser structure missing data'
-      });
-      const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
-      return (cached && cached.trim()) ? cached.trim() : '16px sans-serif';
-    }
+    const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+    if (cached && cached.trim()) return cached.trim();
+    emitContextDiag('warn', 'context:ctx2d:guard:default_font_missing', null, {
+      stage: 'guard',
+      key: '__DEFAULT_CTX2D_FONT__',
+      type: 'pipeline missing data',
+      message: 'shared default ctx2d font missing'
+    });
+    return '';
   })();
 
   function corePreflight(owner, key, kind, diagTag, contract) {
@@ -251,7 +214,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.ctx2DStrokeTextHooks                = C.ctx2DStrokeTextHooks               || [];
   C.ctx2DFillRectHooks                  = C.ctx2DFillRectHooks                 || [];
   C.ctx2DDrawImageHooks                 = C.ctx2DDrawImageHooks                || [];
-  C.canvas2DNoiseHooks                  = C.canvas2DNoiseHooks                 || [];
+  // C.canvas2DNoiseHooks                  = C.canvas2DNoiseHooks                 || [];
 
   C.webglGetParameterHooks              = C.webglGetParameterHooks             || [];
   C.webglGetSupportedExtensionsHooks    = C.webglGetSupportedExtensionsHooks   || [];
@@ -283,7 +246,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.registerCtx2DStrokeTextHook               = fn => registerOnce(C.ctx2DStrokeTextHooks, fn);
   C.registerCtx2DFillRectHook                 = fn => registerOnce(C.ctx2DFillRectHooks, fn);
   C.registerCtx2DDrawImageHook                = fn => registerOnce(C.ctx2DDrawImageHooks, fn);
-  C.registerCtx2DAddNoiseHook                 = fn => registerOnce(C.canvas2DNoiseHooks, fn);
+  // C.registerCtx2DAddNoiseHook                 = fn => registerOnce(C.canvas2DNoiseHooks, fn);
   // 2026-02-11: TEMPORARILY DISABLED in one place (pipeline de-integration only).
   // Related implementations to revisit later:
   // assets/scripts/window/patches/graphics/canvas.js -> masterToDataURLHook, patchToBlobInjectNoise, patchConvertToBlobInjectNoise, addCanvasNoise
@@ -300,40 +263,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.registerWebGLGetUniformHook               = fn => registerOnce(C.webglGetUniformHooks, fn);
 
   // === 3. Patch utilities ===
-  const canvasReadbackGuard =
-    (typeof WeakMap === 'function') ? new WeakMap() : null;
-  const canvasReadbackMethods = {
-    toDataURL: true,
-    toBlob: true,
-    convertToBlob: true
-  };
-  // [ADD] guard: prevent nested readback while hooks are running (scratch canvas recursion)
-  let __canvasReadbackHookDepth = 0;
-  function enterCanvasReadback(self, method) {
-    if (!canvasReadbackGuard || !canvasReadbackMethods[method]) return null;
-
-    // [ADD] if we are inside a post-hook, skip hooking to avoid recursion
-    if (__canvasReadbackHookDepth > 0) return false;
-
-
-    const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
-    if (!isObj) return null;
-    let active = canvasReadbackGuard.get(self);
-    if (!active) {
-      active = new Set();
-      canvasReadbackGuard.set(self, active);
-    }
-    // 2026-02-11: cross-method stack guard for toDataURL/toBlob/convertToBlob.
-    if (active.size > 0) return false;
-    active.add(method);
-    return active;
-  }
-  function leaveCanvasReadback(self, active, method) {
-    if (!canvasReadbackGuard || !active || active === false) return;
-    active.delete(method);
-    if (active.size === 0) canvasReadbackGuard.delete(self);
-  }
-
   function chain(proto, method, hooks){
     if (!proto || typeof proto[method] !== 'function') return false;
     const orig = proto[method];
@@ -347,8 +276,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       ? ({ toDataURL(type, quality) {
            const self = this;
            const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
-           const readbackToken = enterCanvasReadback(self, method);
-           if (readbackToken === false) return Reflect.apply(orig, self, arguments);
             // 2026-02-11: disabled dead guard block (__isChain_toDataURL) as non-wired in runtime.
             // Internal encode paths guard left commented intentionally for later revisit.
             // const __CHAIN_GUARD__ = '__isChain_toDataURL';
@@ -372,11 +299,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
                    data: { hook: hook && (hook.name || null) }
                  });
                  throw e;
-               }
              }
-            return res;
+           }
+           return res;
           } finally {
-            leaveCanvasReadback(self, readbackToken, method);
             if (inProgress && isObj) {
               inProgress.delete(self);
             }
@@ -424,8 +350,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // ===== WEBGL hook override logging: two toggles (ВКЛ/ВЫКЛ) =====
   // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override" (emitContextDiag + console.warn ниже),
   // НЕ отключают хук, НЕ отключают патчинг, НЕ трогают остальные warn/error.
-  const WEBGL_OVERRIDE_DIAG_LOG    = false; // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
-  const WEBGL_OVERRIDE_CONSOLE_LOG = false; // true=ВКЛ, false=ВЫКЛ (console.warn для override)
+  const WEBGL_OVERRIDE_DIAG_LOG    = true; // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
+  const WEBGL_OVERRIDE_CONSOLE_LOG = true; // true=ВКЛ, false=ВЫКЛ (console.warn для override)
 
   function patchMethod(proto, method, hooks) {
       if (!proto) {
@@ -633,17 +559,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
        const wrapped = ({ toBlob(callback, type, quality) {
          const self = this;
          const args = arguments;
-         const readbackToken = enterCanvasReadback(self, method);
-         if (readbackToken === false) return Reflect.apply(orig, self, args);
          if (typeof callback === 'function') {
-          let released = false;
-          const release = () => {
-            if (!released) {
-              released = true;
-              leaveCanvasReadback(self, readbackToken, method);
-            }
-          };
-
           const done = (blob) => {
             let out;
             try {
@@ -653,40 +569,35 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 stage: 'hook',
                 key: method
               });
-              try { callback(blob); } finally { release(); }
+              callback(blob);
               return;
             }
 
             if (out && typeof out.then === 'function') {
               out.then(
-                (b2) => { try { callback(b2); } finally { release(); } },
+                (b2) => { callback(b2); },
                 (e)  => {
                   emitContextDiag('warn', 'context:chainAsync:hook_failed', e, {
                     stage: 'hook',
                     key: method
                   });
-                  try { callback(blob); } finally { release(); }
+                  callback(blob);
                 }
               );
               return;
             }
 
-            try { callback(out); } finally { release(); }
+            callback(out);
           };
 
           try {
             return Reflect.apply(orig, self, [done].concat(Array.prototype.slice.call(args, 1)));
           } catch (e) {
-            release();
             throw e;
           }
          }
          // 2026-02-11: keep native contract - toBlob without callback returns undefined.
-         try {
-           return Reflect.apply(orig, self, args);
-         } finally {
-           leaveCanvasReadback(self, readbackToken, method);
-         }
+         return Reflect.apply(orig, self, args);
        } }).toBlob;
        const patched = markAsNative(wrapped, method);
        definePatchedMethod(proto, method, patched);
@@ -698,32 +609,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
        const wrapped = ({ convertToBlob(options) {
          const self = this;
          const args = arguments;
-         const readbackToken = enterCanvasReadback(self, method);
-         if (readbackToken === false) return Reflect.apply(orig, self, args);
-        let released = false;
-        const release = () => {
-          if (!released) {
-            released = true;
-            leaveCanvasReadback(self, readbackToken, method);
-          }
-        };
-
         let p;
         try {
           p = Reflect.apply(orig, self, args);
         } catch (e) {
-          release();
           throw e;
         }
 
         if (!(p && typeof p.then === 'function')) {
-          release();
           return p;
         }
 
         const hooks = getHooksList();
         if (!(hooks && hooks.length)) {
-          release();
           return p;
         }
 
@@ -731,13 +629,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
           (blob) => {
             const out = applyHooksAsync(self, blob, args);
             return Promise.resolve(out).then(
-              (b2) => { release(); return b2; },
-              (e)  => { release(); throw e; }
+              (b2) => { return b2; },
+              (e)  => { throw e; }
             );
           },
-          (e) => { release(); throw e; }
+          (e) => { throw e; }
         );
-       } }).convertToBlob;
+      } }).convertToBlob;
        const patched = markAsNative(wrapped, method);
        definePatchedMethod(proto, method, patched);
        patchedMethods.add(patched);
@@ -752,7 +650,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const hooks = getHooksList();
       if (!(hooks && hooks.length)) return p;
       return p.then((blob) => {
-        __canvasReadbackHookDepth++;
         return Promise.resolve(applyHooksAsync(self, blob, args))
           .catch((e) => {
             try {
@@ -763,8 +660,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
               });
             } catch (_e) {}
             return blob; // fallback
-          })
-          .finally(() => { __canvasReadbackHookDepth--; });
+          });
       });
     } })[method];
     const patched = markAsNative(wrapped, method);
@@ -1158,10 +1054,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
     // 3) Validation of the availability of exports Canvas-hooks (from CanvasPatchModule)
     [
       // 2026-02-11: 'patchCanvasIHDRHook' disabled (non-wired runtime hook, kept out of required list).
-      'patch2DNoise','patchToDataURLInjectNoise','masterToDataURLHook',
-      'patchToBlobInjectNoise','patchConvertToBlobInjectNoise',
-      'measureTextNoiseHook','applyMeasureTextHook','fillTextNoiseHook','strokeTextNoiseHook','fillRectNoiseHook',
-      'applyDrawImageHook','addCanvasNoise'
+      // 2026-03-07: 'patch2DNoise','addCanvasNoise' disabled (non-wired runtime hook, kept out of required list).
+      'patchToDataURLInjectNoise','masterToDataURLHook', 'fillTextNoiseHook','strokeTextNoiseHook', 'patchToBlobInjectNoise', 'patchConvertToBlobInjectNoise',
+      'measureTextNoiseHook','applyMeasureTextHook', 'fillRectNoiseHook', 'applyDrawImageHook',
     ].forEach(name => {
       if (typeof H[name] !== 'function') {
         throw new Error(`[CanvasPatch] Hook ${name} not defined in CanvasPatchHooks`);

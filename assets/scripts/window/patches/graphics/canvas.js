@@ -43,10 +43,10 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
   window = G;
 }
 
-const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
+const C  = G.CanvasPatchContext || (G.CanvasPatchContext = {});
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
-    const d = window.__DEGRADE__;
+    const d = G.__DEGRADE__;
     if (typeof d !== 'function') return;
     const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
     const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
@@ -73,7 +73,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
       if (cached && cached.trim()) return cached.trim();
 
-      const doc = window && window.document;
+      const doc = G && G.document;
       if (!doc || typeof doc.createElement !== 'function') {
         throw new Error('[CanvasPatch] document.createElement missing');
       }
@@ -82,33 +82,20 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const font = (ctx && typeof ctx.font === 'string' && ctx.font.trim()) ? ctx.font.trim() : '';
       if (!font) throw new Error('[CanvasPatch] default ctx2d.font missing/invalid');
 
-      try {
-        Object.defineProperty(C, '__DEFAULT_CTX2D_FONT__', {
-          value: font,
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
-      } catch (eDef) {
-        emitCanvasDiag('warn', 'canvas:ctx2d:guard:default_font_define_failed', eDef, {
+      if (!__defineHidden__(
+        C,
+        '__DEFAULT_CTX2D_FONT__',
+        font,
+        'canvas:ctx2d:guard:default_font_define_failed',
+        '__DEFAULT_CTX2D_FONT__',
+        'default font defineProperty failed; fallback assign used'
+      )) {
+        emitCanvasDiag('warn', 'canvas:ctx2d:guard:default_font_assign_failed', null, {
           stage: 'guard',
           key: '__DEFAULT_CTX2D_FONT__',
-          type: 'browser structure missing data'
+          type: 'browser structure missing data',
+          message: 'default font fallback assign failed'
         });
-        try { C.__DEFAULT_CTX2D_FONT__ = font; } catch (eSet) {
-          if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
-            window.__DEGRADE__.diag('warn', 'canvas:ctx2d:guard:default_font_assign_failed', {
-              module: 'canvas',
-              diagTag: 'canvas',
-              surface: 'canvas',
-              stage: 'guard',
-              key: '__DEFAULT_CTX2D_FONT__',
-              type: 'browser structure missing data',
-              message: 'default font fallback assign failed',
-              data: null
-            }, eSet);
-          }
-        }
       }
       return font;
     } catch (e) {
@@ -118,7 +105,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         type: 'browser structure missing data'
       });
       const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
-      return (cached && cached.trim()) ? cached.trim() : '16px sans-serif';
+      return (cached && cached.trim()) ? cached.trim() : '';
     }
   })();
 
@@ -129,6 +116,9 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // keep internal handles inside CanvasPatchContext (non-enumerable),
   // do not publish generic aliases like window.canvas/window.div/window.offscreenCanvas.
   function __defineHidden__(obj, prop, value, diagCode, diagKey, message) {
+    const stage = (typeof diagCode === 'string' && diagCode.indexOf(':guard:') !== -1)
+      ? 'guard'
+      : ((typeof diagCode === 'string' && diagCode.indexOf(':preflight:') !== -1) ? 'preflight' : 'apply');
     try {
       Object.defineProperty(obj, prop, {
         value,
@@ -138,26 +128,21 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       });
       return true;
     } catch (eSet) {
-      if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
-        window.__DEGRADE__.diag('warn', diagCode, {
-          module: 'canvas',
-          diagTag: 'canvas',
-          surface: 'canvas',
-          stage: 'apply',
-          key: diagKey || prop,
-          type: 'browser structure missing data',
-          message: message || 'defineProperty failed; fallback assign used',
-          data: null
-        }, eSet);
-      }
+      emitCanvasDiag('warn', diagCode, eSet, {
+        stage,
+        key: diagKey || prop,
+        type: 'browser structure missing data',
+        message: message || 'defineProperty failed; fallback assign used'
+      });
       try {
         obj[prop] = value;
         return true;
       } catch (eAssign) {
         emitCanvasDiag('warn', diagCode, eAssign, {
-          stage: 'apply',
+          stage,
           key: diagKey || prop,
-          type: 'browser structure missing data'
+          type: 'browser structure missing data',
+          message: 'fallback assign failed'
         });
         return false;
       }
@@ -168,7 +153,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   function _ensureDomOnce() {
     if (C.state.domReady) return;
 
-    const doc = window && window.document;
+    const doc = G && G.document;
     if (!doc || !doc.body || typeof doc.createElement !== 'function') {
       C.state.domReady = false;
       return; // нет DOM — выходим
@@ -182,8 +167,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return;
     }
 
-    const screenWidth = window.__WIDTH;
-    const screenHeight = window.__HEIGHT;
+    const screenWidth = G.__WIDTH;
+    const screenHeight = G.__HEIGHT;
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
       emitCanvasDiag('warn', 'canvas:init:preflight:screen_dims_missing', null, {
         stage: 'preflight',
@@ -194,11 +179,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return;
     }
     const viewportWidth = (
-      Number.isFinite(window.innerWidth) && window.innerWidth > 0
-    ) ? Math.round(window.innerWidth) : Math.round(screenWidth);
+      Number.isFinite(G.innerWidth) && G.innerWidth > 0
+    ) ? Math.round(G.innerWidth) : Math.round(screenWidth);
     const viewportHeight = (
-      Number.isFinite(window.innerHeight) && window.innerHeight > 0
-    ) ? Math.round(window.innerHeight) : Math.round(screenHeight);
+      Number.isFinite(G.innerHeight) && G.innerHeight > 0
+    ) ? Math.round(G.innerHeight) : Math.round(screenHeight);
     const baseCanvasWidth = 300;
     const baseCanvasHeight = 150;
     const div = doc.createElement('div');
@@ -261,10 +246,10 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // создаём OffscreenCanvas (и в окне, и в воркере)
   function _ensureOffscreenOnce() {
     if (C.state.offscreenReady) return;
-    if (typeof window.OffscreenCanvas === 'undefined') return;
+    if (typeof G.OffscreenCanvas === 'undefined') return;
 
-    const screenWidth = window.__WIDTH;
-    const screenHeight = window.__HEIGHT;
+    const screenWidth = G.__WIDTH;
+    const screenHeight = G.__HEIGHT;
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
       emitCanvasDiag('warn', 'canvas:init:preflight:screen_dims_missing', null, {
         stage: 'preflight',
@@ -275,7 +260,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return;
     }
     if (!(C && C.__OFFSCREEN_CANVAS__)) {
-      const osc = new window.OffscreenCanvas(screenWidth, screenHeight);
+      const osc = new G.OffscreenCanvas(screenWidth, screenHeight);
       __defineHidden__(C, '__OFFSCREEN_CANVAS__', osc,
         'canvas:init:apply:offscreen_storage_define_failed',
         '__OFFSCREEN_CANVAS__',
@@ -302,9 +287,9 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     });
   }
 
-  if (typeof document !== 'undefined' && document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', realInit, { once: true });
-  } else if (typeof document !== 'undefined') {
+  if (typeof G.document !== 'undefined' && G.document.readyState === 'loading') {
+    G.document.addEventListener('DOMContentLoaded', realInit, { once: true });
+  } else if (typeof G.document !== 'undefined') {
     realInit();
   }
 
@@ -401,224 +386,63 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   }
 
   const __CNV_CFG__ = {
-    epsBasePPX: 512,
-    epsJitterFactor: 0.5,
-    edgeGain: 4.0,
-    maskBlurPasses: 1,
-    flatMeanThreshold: 0.02,
-    epsScale: 0,          // анизотр. масштаб (опц.)
-    linearBlend: false ,    // гамма-корректное смешивание (опц.)
+    // epsBasePPX: 512,
+    // epsJitterFactor: 0.5,
+    // edgeGain: 4.0,
+    // maskBlurPasses: 1,
+    // flatMeanThreshold: 0.02,
+    // epsScale: 0,          // анизотр. масштаб (опц.)
+    // linearBlend: false ,    // гамма-корректное смешивание (опц.)
     dxPx: 0.10,      // амплитуда X (px)
     dyPx: 0.10,      // амплитуда Y (px)
   };
 
   // --- Джиттер: порядок-независимый, кэш по (op,w,h,dpr) ---
-  const JIT_CACHE = (typeof globalThis !== 'undefined' && globalThis.__JIT_CACHE__ instanceof Map)
-    ? globalThis.__JIT_CACHE__
-    : (typeof globalThis !== 'undefined'
-        ? (globalThis.__JIT_CACHE__ = new Map())
-        : new Map());
+  // const JIT_CACHE = (typeof globalThis !== 'undefined' && globalThis.__JIT_CACHE__ instanceof Map)
+  //   ? globalThis.__JIT_CACHE__
+  //   : (typeof globalThis !== 'undefined'
+  //       ? (globalThis.__JIT_CACHE__ = new Map())
+  //       : new Map());
 
-  function __getJitter__(op, w, h, dpr, cfg = __CNV_CFG__) {
-    w |= 0;
-    h |= 0;
-    dpr = (typeof dpr === 'number' && dpr > 0) ? +dpr
-      : (typeof devicePixelRatio === 'number' && devicePixelRatio > 0) ? +devicePixelRatio
-      : (typeof window !== 'undefined' && typeof window.__DPR === 'number' && window.__DPR > 0) ? +window.__DPR
-      : (typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0) ? +globalThis.__DPR
-      : undefined;
-    if (!(typeof dpr === 'number' && dpr > 0)) {
-      if (typeof globalThis !== 'undefined') {
-        if (!globalThis.__JITTER_DPR_WARNED__) {
-          emitCanvasDiag('warn', 'canvas:jitter:preflight:dpr_missing', null, {
-            stage: 'preflight',
-            key: 'dpr',
-            message: 'jitter disabled: DPR missing/invalid',
-            type: 'pipeline missing data'
-          });
-          globalThis.__JITTER_DPR_WARNED__ = true;
-        }
-      }
-      return { epsX: 0, epsY: 0 };
-    }
-    const key = `${op}:${w}x${h}@${Math.round((dpr) * 1024)}`;
-
-    const cached = JIT_CACHE.get(key); if (cached) return cached;
-
-    const basePPX = (cfg && cfg.epsBasePPX);
-    const jitterK = (cfg && cfg.epsJitterFactor != null) ? cfg.epsJitterFactor : 0.5;
-    const base = 1 / (basePPX * dpr);
-
-    const mag = base * (1 + jitterK * stableNoiseFromString(`${key}|m`, 0, 1));
-    const ang = 2 * Math.PI * stableNoiseFromString(`${key}|a`, 0, 1);
-    const v = { epsX: Math.cos(ang) * mag, epsY: Math.sin(ang) * mag };
-
-    JIT_CACHE.set(key, v);
-    return v;
-  }
-
-  function boxBlurMask(m, w, h) {
-    const tmp = new Float32Array(m.length);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        let acc = 0, cnt = 0;
-        for (let yy = y - 1; yy <= y + 1; yy++) {
-          if (yy < 0 || yy >= h) continue;
-          const yOff = yy * w;
-          for (let xx = x - 1; xx <= x + 1; xx++) {
-            if (xx < 0 || xx >= w) continue;
-            acc += m[yOff + xx]; cnt++;
-          }
-        }
-        tmp[y * w + x] = acc / cnt;
-      }
-    }
-    m.set(tmp);
-  }
-
-  // --- 2D ImageData noise hook ---
-  // function patch2DNoise(img, type) {
-  //   if (type !== '2d' || !img || !img.data || !img.width || !img.height) return img;
-  //   const w = img.width | 0, h = img.height | 0; if (!w || !h) return img;
-  //   const cfg = (typeof globalThis !== 'undefined' && globalThis.CanvasPatchHooks && globalThis.CanvasPatchHooks.resampleCfg)
-  //           || (typeof __CNV_CFG__ !== 'undefined' ? __CNV_CFG__ : {})
-  //           || {};
-  //   const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
-  //     ? +devicePixelRatio
-  //     : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
-  //         ? +globalThis.__DPR
-  //         : undefined);
-  //   const { epsX, epsY } = __getJitter__('img:2d', w, h, dpr);
-
-  //   const C1 = makeCanvas(w, h), C2 = makeCanvas(w, h);
-  //   if (!C1 || !C2) return img;
-  //   const ctx1 = C1.getContext('2d', { willReadFrequently: true });
-  //   const ctx2 = C2.getContext('2d', { willReadFrequently: true });
-  //   if (!ctx1 || !ctx2) return img;
-  //   const P1 = get2DProto(ctx1), P2 = get2DProto(ctx2);
-
-  //   try { ctx2.imageSmoothingEnabled = true; } catch (e) {
-  //     emitCanvasDiag('warn', 'canvas:patch2DNoise:apply:imageSmoothing_set_failed', e, {
-  //       stage: 'apply',
-  //       key: 'imageSmoothingEnabled',
-  //       type: 'browser structure missing data'
-  //     });
-  //   }
-  //   nativePutImageData(P1, ctx1, img, 0, 0);
-  //   nativeSetTransform(P2, ctx2, 1, 0, 0, 1, 0, 0);
-  //   nativeTranslate(P2, ctx2, q256(epsX), q256(epsY));
-  //   nativeDrawImage(P2, ctx2, C1, 0, 0);
-  //   const res = nativeGetImageData(P2, ctx2, 0, 0, w, h);
-
-  //   const src = img.data, dst = res.data;
-  //   const mask = new Float32Array(w * h);
-  //   let sumMask = 0;
-  //   for (let y = 0; y < h; y++) {
-  //     const yOff = y * w;
-  //     for (let x = 0; x < w; x++) {
-  //       const i4 = (yOff + x) << 2;
-  //       const l  = 0.2126 * src[i4] + 0.7152 * src[i4 + 1] + 0.0722 * src[i4 + 2];
-  //       const xr = (x + 1 < w) ? ((yOff + x + 1) << 2) : i4;
-  //       const yd = (y + 1 < h) ? (((y + 1) * w + x) << 2) : i4;
-  //       const lr = 0.2126 * src[xr] + 0.7152 * src[xr + 1] + 0.0722 * src[xr + 2];
-  //       const ld = 0.2126 * src[yd] + 0.7152 * src[yd + 1] + 0.0722 * src[yd + 2];
-  //       const dx = Math.abs(l - lr) / 255; const dy = Math.abs(l - ld) / 255;
-  //       let m = (dx + dy) * (cfg.edgeGain ?? 4.0);
-  //       if (m > 1) m = 1; mask[yOff + x] = m; sumMask += m;
-  //     }
-  //   }
-  //   if (sumMask / (w * h) < (cfg.flatMeanThreshold ?? 0.02)) return img;
-
-  //   const blurPasses = (cfg.maskBlurPasses ?? 1) | 0;
-  //   for (let p = 0; p < blurPasses; p++) boxBlurMask(mask, w, h);
-
-  //   const out = new Uint8ClampedArray(src.length);
-  //   for (let i = 0; i < out.length; i += 4) {
-  //     const m = mask[i >> 2];
-  //     if (m > 0) {
-  //       out[i]     = src[i]     + (dst[i]     - src[i])     * m;
-  //       out[i + 1] = src[i + 1] + (dst[i + 1] - src[i + 1]) * m;
-  //       out[i + 2] = src[i + 2] + (dst[i + 2] - src[i + 2]) * m;
-  //     } else {
-  //       out[i]     = src[i];
-  //       out[i + 1] = src[i + 1];
-  //       out[i + 2] = src[i + 2];
-  //     }
-  //     out[i + 3] = src[i + 3];
-  //   }
-  //   return new ImageData(out, w, h);
-  // }
-
-  //  addCanvasNoise()
-  // function addCanvasNoise(imageData, dx = 0, dy = 0) {
-  //   const G = (typeof globalThis !== 'undefined' && globalThis)
-  //     || (typeof self !== 'undefined' && self)
-  //     || (typeof window !== 'undefined' && window)
-  //     || {};
-  //   try {
-  //     const cfg = (G.CanvasPatchHooks && G.CanvasPatchHooks.noiseCfg) || {};
-  //     const density  = Number.isFinite(cfg.density)  ? cfg.density  : 0.08;
-  //     const strength = Number.isFinite(cfg.strength) ? cfg.strength : 0.75;
-  //     const mono = !!cfg.mono;
-
-  //     if (!imageData || !imageData.data || !imageData.width || !imageData.height) return;
-  //     const w = imageData.width | 0;
-  //     const h = imageData.height | 0;
-  //     if (!w || !h) return;
-
-  //     const data = imageData.data;
-  //     const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
-  //       ? +devicePixelRatio
-  //       : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
-  //           ? +globalThis.__DPR
-  //           : undefined);
-            
-  //     const cnv  = (this && this.canvas) ? this.canvas : null;
-  //     const cid  = (() => {
-  //       try { const cw = cnv && cnv.width, ch = cnv && cnv.height; return `cnv@${cw}x${ch}@${(Math.round(dpr * 1024))}`; }
-  //       catch (e) {
-  //         emitCanvasDiag('warn', 'canvas:addCanvasNoise:runtime:canvas_size_read_failed', e, {
-  //           stage: 'runtime',
-  //           key: 'canvas',
-  //           type: 'browser structure missing data'
+  // function __getJitter__(op, w, h, dpr, cfg = __CNV_CFG__) {
+  //   w |= 0;
+  //   h |= 0;
+  //   dpr = (typeof dpr === 'number' && dpr > 0) ? +dpr
+  //     : (typeof devicePixelRatio === 'number' && devicePixelRatio > 0) ? +devicePixelRatio
+  //     : (typeof window !== 'undefined' && typeof window.__DPR === 'number' && window.__DPR > 0) ? +window.__DPR
+  //     : (typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0) ? +globalThis.__DPR
+  //     : undefined;
+  //   if (!(typeof dpr === 'number' && dpr > 0)) {
+  //     if (typeof globalThis !== 'undefined') {
+  //       if (!globalThis.__JITTER_DPR_WARNED__) {
+  //         emitCanvasDiag('warn', 'canvas:jitter:preflight:dpr_missing', null, {
+  //           stage: 'preflight',
+  //           key: 'dpr',
+  //           message: 'jitter disabled: DPR missing/invalid',
+  //           type: 'pipeline missing data'
   //         });
-  //         return `cnv@${w}x${h}@${(Math.round(dpr * 1024))}`;
-  //       }
-  //     })();
-  //     const baseKey = `px|${w}x${h}|${cid}|dx:${dx|0},dy:${dy|0}`;
-
-  //     for (let y = 0, i = 0; y < h; y++) {
-  //       const ay = (dy|0) + y;
-  //       for (let x = 0; x < w; x++, i += 4) {
-  //         const ax = (dx|0) + x;
-
-  //         const gate = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|g`, 0, 1);
-  //         if (gate > density) continue;
-
-  //         if (mono) {
-  //           const d  = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|mono`, -strength, +strength);
-  //           let r = data[i] + d, g = data[i+1] + d, b = data[i+2] + d;
-  //           data[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
-  //           data[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
-  //           data[i+2] = b < 0 ? 0 : b > 255 ? 255 : b;
-  //         } else {
-  //           const dr = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|r`, -strength, +strength);
-  //           const dg = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|g`, -strength, +strength);
-  //           const db = __stableNoise__(`${baseKey}|x:${ax},y:${ay}|b`, -strength, +strength);
-  //           let r = data[i] + dr, g = data[i+1] + dg, b = data[i+2] + db;
-  //           data[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
-  //           data[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
-  //           data[i+2] = b < 0 ? 0 : b > 255 ? 255 : b;
-  //         }
+  //         globalThis.__JITTER_DPR_WARNED__ = true;
   //       }
   //     }
-  //   } catch (e) {
-  //     emitCanvasDiag('warn', 'canvas:addCanvasNoise:hook:failed', e, {
-  //       stage: 'hook',
-  //       key: 'addCanvasNoise'
-  //     });
+  //     return { epsX: 0, epsY: 0 };
   //   }
+  //   const key = `${op}:${w}x${h}@${Math.round((dpr) * 1024)}`;
+
+  //   const cached = JIT_CACHE.get(key); if (cached) return cached;
+
+  // const basePPX = (cfg && cfg.epsBasePPX);
+  // const jitterK = (cfg && cfg.epsJitterFactor != null) ? cfg.epsJitterFactor : 0.5;
+  // const base = 1 / (basePPX * dpr);
+
+  //   const mag = base * (1 + jitterK * stableNoiseFromString(`${key}|m`, 0, 1));
+  //   const ang = 2 * Math.PI * stableNoiseFromString(`${key}|a`, 0, 1);
+  //   const v = { epsX: Math.cos(ang) * mag, epsY: Math.sin(ang) * mag };
+
+  //   JIT_CACHE.set(key, v);
+  //   return v;
   // }
+
+
 
   // =====================================================================
   // TEXT / FONTS (Layer 1: vector/layout stage, pre-raster)
@@ -798,135 +622,135 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // - Exports masters: `applyFillTextHook` / `applyStrokeTextHook` (via final export section)
   //
   // NOTE: This block must not replace `window.CanvasPatchHooks` identity.
-  let applyFillTextHook, applyStrokeTextHook;
+  // let applyFillTextHook, applyStrokeTextHook;
 
-  (function patchFontSizeScalingHooks(){
-    if (window.__PATCH_FONT_SCALE_HOOKS__) return;
-    window.__PATCH_FONT_SCALE_HOOKS__ = true;
+  // (function patchFontSizeScalingHooks(){
+  //   if (window.__PATCH_FONT_SCALE_HOOKS__) return;
+  //   window.__PATCH_FONT_SCALE_HOOKS__ = true;
 
-    const Hooks = (window.CanvasPatchHooks ||= {});
+  //   const Hooks = (window.CanvasPatchHooks ||= {});
 
-    // ——— helpers ———
-    // Разбор font-шортхенда: "... 16px/normal Arial"
-    function parseFontShorthand(font) {
-      const m = String(font || '').match(
-        /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
-      );
-      if (!m) {
-        return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
-      }
-      return {
-        style:   m[1] || 'normal',
-        variant: m[2] || 'normal',
-        weight:  m[3] || 'normal',
-        sizePx:  parseFloat(m[4]),
-        line:    m[5],
-        family:  m[6]
-      };
-    }
+  //   // ——— helpers ———
+  //   // Разбор font-шортхенда: "... 16px/normal Arial"
+  //   function parseFontShorthand(font) {
+  //     const m = String(font || '').match(
+  //       /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
+  //     );
+  //     if (!m) {
+  //       return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
+  //     }
+  //     return {
+  //       style:   m[1] || 'normal',
+  //       variant: m[2] || 'normal',
+  //       weight:  m[3] || 'normal',
+  //       sizePx:  parseFloat(m[4]),
+  //       line:    m[5],
+  //       family:  m[6]
+  //     };
+  //   }
 
-    function buildFont(f) {
-      if (!f || typeof f !== 'object') {
-        throw new Error('[CanvasPatch] buildFont: invalid font object');
-      }
-      const parts = [];
-      if (f.style && f.style !== 'normal') parts.push(String(f.style));
-      if (f.variant && f.variant !== 'normal') parts.push(String(f.variant));
-      if (f.weight && f.weight !== 'normal') parts.push(String(f.weight));
+    // function buildFont(f) {
+    //   if (!f || typeof f !== 'object') {
+    //     throw new Error('[CanvasPatch] buildFont: invalid font object');
+    //   }
+    //   const parts = [];
+    //   if (f.style && f.style !== 'normal') parts.push(String(f.style));
+    //   if (f.variant && f.variant !== 'normal') parts.push(String(f.variant));
+    //   if (f.weight && f.weight !== 'normal') parts.push(String(f.weight));
 
-      const sizePx = f.sizePx;
-      if (!(typeof sizePx === 'number' && isFinite(sizePx) && sizePx > 0)) {
-        throw new Error('[CanvasPatch] buildFont: invalid sizePx');
-      }
-      const sizePart = `${sizePx}px` + (f.line ? `/${String(f.line)}` : '');
-      parts.push(sizePart);
+    //   const sizePx = f.sizePx;
+    //   if (!(typeof sizePx === 'number' && isFinite(sizePx) && sizePx > 0)) {
+    //     throw new Error('[CanvasPatch] buildFont: invalid sizePx');
+    //   }
+    //   const sizePart = `${sizePx}px` + (f.line ? `/${String(f.line)}` : '');
+    //   parts.push(sizePart);
 
-      const family = (typeof f.family === 'string') ? f.family.trim() : '';
-      if (!family) {
-        throw new Error('[CanvasPatch] buildFont: missing family');
-      }
-      parts.push(family);
+    //   const family = (typeof f.family === 'string') ? f.family.trim() : '';
+    //   if (!family) {
+    //     throw new Error('[CanvasPatch] buildFont: missing family');
+    //   }
+    //   parts.push(family);
 
-      return parts.join(' ');
-    }
+    //   return parts.join(' ');
+    // }
 
     // Масштаб под текст: сперва fontPatchConfigs, фолбэк — __FONT_SCALE__
-    function getScaleForText(ctx, text) {
-      try {
-        const font = String(ctx && ctx.font || '');
-        const cfg = getManagedFontConfig(font);
-        if (cfg) {
-          const sx = Number.isFinite(cfg.scaleX) ? cfg.scaleX : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
-          const sy = Number.isFinite(cfg.scaleY) ? cfg.scaleY : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
-          return { sx, sy };
-        }
-      } catch (e) {
-        emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
-          stage: 'runtime',
-          key: 'fontPatchConfigs'
-        });
-      }
-      return { sx: 1, sy: 1 };
-    }
+    // function getScaleForText(ctx, text) {
+    //   try {
+    //     const font = String(ctx && ctx.font || '');
+    //     const cfg = getManagedFontConfig(font);
+    //     if (cfg) {
+    //       const sx = Number.isFinite(cfg.scaleX) ? cfg.scaleX : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
+    //       const sy = Number.isFinite(cfg.scaleY) ? cfg.scaleY : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
+    //       return { sx, sy };
+    //     }
+    //   } catch (e) {
+    //     emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
+    //       stage: 'runtime',
+    //       key: 'fontPatchConfigs'
+    //     });
+    //   }
+    //   return { sx: 1, sy: 1 };
+    // }
 
     // ——— master for fillText: consistent render ———
-    applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
-      const { sx, sy } = getScaleForText(this, text);
-      if (sx===1 && sy===1) {
-        return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
-      }
-      // Isotropic — temporarily scale font.sizePx (faster)
-      if (Math.abs(sx - sy) < 1e-6) {
-        const prev = this.font || '';
-        try {
-          const f = parseFontShorthand(prev);
-          f.sizePx *= sx;
-          this.font = buildFont(f);
-          return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
-        } finally {
-          this.font = prev;
-        }
-      }
-      // Anisotropic — matrix scale + coordinate/width compensation
-      this.save();
-      try {
-        this.scale(sx, sy);
-        return (maxWidth!=null)
-          ? origFillText(text, x/sx, y/sy, maxWidth/sx)
-          : origFillText(text, x/sx, y/sy);
-      } finally {
-        this.restore();
-      }
-    };
+    // applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
+    //   const { sx, sy } = getScaleForText(this, text);
+    //   if (sx===1 && sy===1) {
+    //     return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+    //   }
+    //   // Isotropic — temporarily scale font.sizePx (faster)
+    //   if (Math.abs(sx - sy) < 1e-6) {
+    //     const prev = this.font || '';
+    //     try {
+    //       const f = parseFontShorthand(prev);
+    //       f.sizePx *= sx;
+    //       this.font = buildFont(f);
+    //       return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+    //     } finally {
+    //       this.font = prev;
+    //     }
+    //   }
+    //   // Anisotropic — matrix scale + coordinate/width compensation
+    //   this.save();
+    //   try {
+    //     this.scale(sx, sy);
+    //     return (maxWidth!=null)
+    //       ? origFillText(text, x/sx, y/sy, maxWidth/sx)
+    //       : origFillText(text, x/sx, y/sy);
+    //   } finally {
+    //     this.restore();
+    //   }
+    // };
 
     // ——— master for strokeText: same as above ———
-    applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
-      const { sx, sy } = getScaleForText(this, text);
-      if (sx===1 && sy===1) {
-        return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
-      }
-      if (Math.abs(sx - sy) < 1e-6) {
-        const prev = this.font || '';
-        try {
-          const f = parseFontShorthand(prev);
-          f.sizePx *= sx;
-          this.font = buildFont(f);
-          return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
-        } finally {
-          this.font = prev;
-        }
-      }
-      this.save();
-      try {
-        this.scale(sx, sy);
-        return (maxWidth!=null)
-          ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
-          : origStrokeText(text, x/sx, y/sy);
-      } finally {
-        this.restore();
-      }
-    };
-  })();
+    // applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
+    //   const { sx, sy } = getScaleForText(this, text);
+    //   if (sx===1 && sy===1) {
+    //     return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+    //   }
+    //   if (Math.abs(sx - sy) < 1e-6) {
+    //     const prev = this.font || '';
+    //     try {
+    //       const f = parseFontShorthand(prev);
+    //       f.sizePx *= sx;
+    //       this.font = buildFont(f);
+    //       return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+    //     } finally {
+    //       this.font = prev;
+    //     }
+    //   }
+    //   this.save();
+    //   try {
+    //     this.scale(sx, sy);
+    //     return (maxWidth!=null)
+    //       ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
+    //       : origStrokeText(text, x/sx, y/sy);
+    //   } finally {
+    //     this.restore();
+    //   }
+    // };
+  // })();
 
   function fillRectNoiseHook(x, y, w, h){
     return [ q256(x), q256(y), q256(w), q256(h) ];
@@ -1036,18 +860,12 @@ try {
 } catch (e) {
   // Fallback: best-effort assignment. Do NOT allocate a new object here.
   try { if (window.CanvasPatchHooks == null) window.CanvasPatchHooks = __CanvasPatchHooks__; } catch (eSet) {
-    if (window.__DEGRADE__ && typeof window.__DEGRADE__.diag === 'function') {
-      window.__DEGRADE__.diag('warn', 'canvas:CanvasPatchHooks:fallback_assign_failed', {
-        module: 'canvas',
-        diagTag: 'canvas',
-        surface: 'canvas',
-        stage: 'apply',
-        key: 'CanvasPatchHooks',
-        type: 'browser structure missing data',
-        message: 'CanvasPatchHooks fallback assign failed',
-        data: null
-      }, eSet);
-    }
+    emitCanvasDiag('warn', 'canvas:CanvasPatchHooks:fallback_assign_failed', eSet, {
+      stage: 'apply',
+      key: 'CanvasPatchHooks',
+      type: 'browser structure missing data',
+      message: 'CanvasPatchHooks fallback assign failed'
+    });
   }
   emitCanvasDiag('warn', 'canvas:CanvasPatchHooks:define_failed', e, {
     stage: 'apply',
@@ -1071,6 +889,6 @@ __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
 // __CanvasPatchHooks__.addCanvasNoise = addCanvasNoise;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
 
-if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
-if (typeof applyStrokeTextHook === 'function') __CanvasPatchHooks__.applyStrokeTextHook = applyStrokeTextHook;
+// if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
+// if (typeof applyStrokeTextHook === 'function') __CanvasPatchHooks__.applyStrokeTextHook = applyStrokeTextHook;
 }
