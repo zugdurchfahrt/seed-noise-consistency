@@ -654,6 +654,28 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return { key, approx, widthNoise };
   }
 
+  function getManagedFontConfig(font) {
+    try {
+      const cfgs = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
+      const fontStr = String(font || '');
+      const fontLower = fontStr.toLowerCase();
+      for (const c of cfgs) {
+        if (!c || typeof c !== 'object') continue;
+        const fam = (c.family instanceof RegExp) ? c.family : new RegExp(c.family || '.*', 'i');
+        const wt  = (c.weight == null) ? null : String(c.weight).toLowerCase();
+        if (fam.test(fontStr) && (!wt || fontLower.includes(wt))) {
+          return c;
+        }
+      }
+    } catch (e) {
+      emitCanvasDiag('warn', 'canvas:fonts:managed_config_resolve_failed', e, {
+        stage: 'runtime',
+        key: 'fontPatchConfigs'
+      });
+    }
+    return null;
+  }
+
   //  Proxy TextMetrics
   function applyMeasureTextHook(nativeMetrics, text, font) {
     try {
@@ -667,24 +689,26 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
       const doc = (window && window.document);
       const ffs = doc && doc.fonts;
+      const fontStr = (typeof font === 'string' && font.trim())
+        ? font
+        : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : DEFAULT_CTX2D_FONT;
+      const managedFontCfg = getManagedFontConfig(fontStr);
+      const isManagedFont = !!managedFontCfg;
 
-       const fontsReadyFlag =
-         (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')
-           ? (window.__FONTS_READY__ === true)
-           : false);
+      const fontsReadyFlag =
+        (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')
+          ? (window.__FONTS_READY__ === true)
+          : false);
 
-       // If Fonts-patch is enabled (fontPatchConfigs present), avoid trusting FontFaceSet.status.
-       // `status === 'loaded'` can be true even before our injected fonts are actually ready,
-       // which would allow TextMetrics cache/Proxy to start too early and "freeze" fallback metrics.
-       const fontsPatchEnabled = Array.isArray(window.fontPatchConfigs);
-       const fontsReady = fontsPatchEnabled
-         ? fontsReadyFlag
-         : (fontsReadyFlag || (!!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded')));
- 
-       if (!fontsReady) return nativeMetrics;
+      const nativeFontsReady = !!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded');
+
+      // Managed fonts stay on the explicit __FONTS_READY__ gate.
+      // Unmanaged/custom CSS fonts must follow only native FontFaceSet readiness.
+      const fontsReady = isManagedFont ? fontsReadyFlag : nativeFontsReady;
+      if (!fontsReady) return nativeMetrics;
       // NOTE: widthNoise is intentionally applied ONLY here (post-read),
       // measureTextNoiseHook itself must not change returned metrics for consistency.
-      const info = measureTextNoiseHook.call(this, nativeMetrics, text, font);
+      const info = measureTextNoiseHook.call(this, nativeMetrics, text, fontStr);
       if (!info || typeof info !== 'object') return nativeMetrics;
       const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
       const TM = C.__TextMetrics__ || (C.__TextMetrics__ = { cache: new Map() });
@@ -813,16 +837,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     // Масштаб под текст: сперва fontPatchConfigs, фолбэк — __FONT_SCALE__
     function getScaleForText(ctx, text) {
       try {
-        const cfgs = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
         const font = String(ctx && ctx.font || '');
-        for (const c of cfgs) {
-          const fam = (c.family instanceof RegExp) ? c.family : new RegExp(c.family || '.*', 'i');
-          const wt  = (c.weight == null) ? null : String(c.weight).toLowerCase();
-          if (fam.test(font) && (!wt || font.toLowerCase().includes(wt))) {
-            const sx = Number.isFinite(c.scaleX) ? c.scaleX : (Number.isFinite(c.scale) ? c.scale : 1);
-            const sy = Number.isFinite(c.scaleY) ? c.scaleY : (Number.isFinite(c.scale) ? c.scale : 1);
-            return { sx, sy };
-          }
+        const cfg = getManagedFontConfig(font);
+        if (cfg) {
+          const sx = Number.isFinite(cfg.scaleX) ? cfg.scaleX : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
+          const sy = Number.isFinite(cfg.scaleY) ? cfg.scaleY : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
+          return { sx, sy };
         }
       } catch (e) {
         emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
@@ -830,8 +850,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
           key: 'fontPatchConfigs'
         });
       }
-      const s = (typeof window.__FONT_SCALE__ === 'number' && isFinite(window.__FONT_SCALE__)) ? window.__FONT_SCALE__ : 1;
-      return { sx: s, sy: s };
+      return { sx: 1, sy: 1 };
     }
 
     // ——— master for fillText: consistent render ———
