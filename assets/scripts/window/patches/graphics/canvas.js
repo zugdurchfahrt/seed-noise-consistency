@@ -294,30 +294,40 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     realInit();
   }
 
+
+
   function get2DProto(ctx) {
-    if (!ctx) return null;
-    if (typeof G.OffscreenCanvasRenderingContext2D !== 'undefined'
-        && ctx instanceof G.OffscreenCanvasRenderingContext2D) {
-      return G.OffscreenCanvasRenderingContext2D.prototype;
+    
+    if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && ctx instanceof OffscreenCanvasRenderingContext2D) {
+      return OffscreenCanvasRenderingContext2D.prototype;
     }
-    if (typeof G.CanvasRenderingContext2D !== 'undefined'
-        && ctx instanceof G.CanvasRenderingContext2D) {
-      return G.CanvasRenderingContext2D.prototype;
+    if (typeof CanvasRenderingContext2D !== 'undefined' && ctx instanceof CanvasRenderingContext2D) {
+      return CanvasRenderingContext2D.prototype;
     }
+    
     return Object.getPrototypeOf(ctx);
   }
 
-  // Reserved native-call sample; keep disabled until a concrete caller is restored.
-  // const P = get2DProto(ctx);
-  // const ORIG = {
-  //   getImageData: P && P.getImageData,
-  //   putImageData: P && P.putImageData,
-  //   drawImage: P && P.drawImage,
-  //   translate: P && P.translate,
-  //   setTransform: P && P.setTransform
-  // };
-  // ORIG.getImageData.call(ctx, x, y, w, h);
-
+  function nativeGetImageData(P, ctx, x, y, w, h) {
+    const fn = P && typeof P.getImageData === 'function' ? P.getImageData : ctx.getImageData;
+    return fn.call(ctx, x, y, w, h);
+  }
+  function nativePutImageData(P, ctx, img, x, y) {
+    const fn = P && typeof P.putImageData === 'function' ? P.putImageData : ctx.putImageData;
+    return fn.call(ctx, img, x, y);
+  }
+  function nativeDrawImage(P, ctx, src, dx, dy) {
+    const fn = P && typeof P.drawImage === 'function' ? P.drawImage : ctx.drawImage;
+    return fn.call(ctx, src, dx, dy);
+  }
+  function nativeTranslate(P, ctx, x, y) {
+    const fn = P && typeof P.translate === 'function' ? P.translate : ctx.translate;
+    return fn.call(ctx, x, y);
+  }
+  function nativeSetTransform(P, ctx, a, b, c, d, e, f) {
+    const fn = P && typeof P.setTransform === 'function' ? P.setTransform : ctx.setTransform;
+    return fn.call(ctx, a, b, c, d, e, f);
+  }
 
 
   function stringHash(str) {
@@ -384,8 +394,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     dxPx: 0.10,      // амплитуда X (px)
     dyPx: 0.10,      // амплитуда Y (px)
   };
-
-
 
   // =====================================================================
   // TEXT / FONTS (Layer 1: vector/layout stage, pre-raster)

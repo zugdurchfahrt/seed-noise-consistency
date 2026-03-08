@@ -207,6 +207,7 @@ def init_driver(
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-features=CanvasNoise")
     vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
     chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
     if chrome_debug_port_raw.lower() in {"0", "auto"}:
@@ -1061,30 +1062,11 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://browserleaks.com/fonts")
 
-        # Keep main thread alive; otherwise daemon CDP threads die on process exit.
-        # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.
-        def _hold_until_driver_end():
-            logger.warning("stdin is unavailable; keepalive mode is active (Ctrl+C to exit)")
-            while True:
-                try:
-                    driver.execute_script("return 1")
-                except Exception:
-                    logger.info("Driver session ended; keepalive loop finished")
-                    break
-                time.sleep(1.0)
-
+        # PLEASE, DO NO REMOVE THIS, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)
-        try:
-            if sys.stdin is not None and sys.stdin.isatty():
-                input("press Enter for exit...")
-            else:
-                _hold_until_driver_end()
-        except EOFError:
-            _hold_until_driver_end()
-        except KeyboardInterrupt:
-            logger.info("Interrupted by user (Ctrl+C)")
+        input("press Enter for exit...")
 
     except Exception as e:
         logger.error(f"Error in main block: {e}", exc_info=True)
