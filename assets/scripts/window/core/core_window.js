@@ -531,59 +531,61 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = toStringDesc && toStringDesc.value;
 
-    let skipToStringInstall = false;
-    if (sharedCoreToStringStateOk) {
+    // Disabled by policy: keep native `Function.prototype.toString` unchanged.
+    // markAsNative metadata may still be used by other Core bridges, but we do not install a toString Proxy.
+    let skipToStringInstall = true;
+    if (!skipToStringInstall && sharedCoreToStringStateOk) {
       const markAsNative = ensureMarkAsNative();
       const probe = function probe(){};
       markAsNative(probe);
-       const expected = toStringOverrideMap.get(probe);
-       if (expected === undefined) {
-         const e = new Error('[CoreWindow] toString probe missing label');
-         __emit('error', 'core_window:toString_probe_missing', {
-           module: 'core',
-           diagTag: 'core_window',
-           surface: 'core',
-           key: 'Function.prototype.toString',
-           stage: 'contract',
-           message: 'toString probe missing label in overrideMap',
-           type: 'contract_violation',
-           data: { outcome: 'throw' }
-         }, e);
-         throw e;
-       }
-       if (typeof currentToString !== 'function') {
-         const e = new Error('[CoreWindow] Function.prototype.toString missing');
-         __emit('error', 'core_window:toString_missing', {
-           module: 'core',
-           diagTag: 'core_window',
-           surface: 'core',
-           key: 'Function.prototype.toString',
-           stage: 'preflight',
-           message: 'Function.prototype.toString missing',
-           type: 'browser structure missing data',
-           data: { outcome: 'throw' }
-         }, e);
-         throw e;
-       }
-       const actual = currentToString.call(probe);
-       if (actual !== expected) {
-         const e = new Error('[CoreWindow] toString bridge mismatch');
-         __emit('error', 'core_window:toString_bridge_mismatch', {
-           module: 'core',
-           diagTag: 'core_window',
-           surface: 'core',
-           key: 'Function.prototype.toString',
-           stage: 'contract',
-           message: 'existing toString does not honor shared overrideMap labels',
-           type: 'contract_violation',
-           data: { outcome: 'throw' }
-         }, e);
-         throw e;
-       }
+      const expected = toStringOverrideMap.get(probe);
+      if (expected === undefined) {
+        const e = new Error('[CoreWindow] toString probe missing label');
+        __emit('error', 'core_window:toString_probe_missing', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'contract',
+          message: 'toString probe missing label in overrideMap',
+          type: 'contract_violation',
+          data: { outcome: 'throw' }
+        }, e);
+        throw e;
+      }
+      if (typeof currentToString !== 'function') {
+        const e = new Error('[CoreWindow] Function.prototype.toString missing');
+        __emit('error', 'core_window:toString_missing', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'preflight',
+          message: 'Function.prototype.toString missing',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw' }
+        }, e);
+        throw e;
+      }
+      const actual = currentToString.call(probe);
+      if (actual !== expected) {
+        const e = new Error('[CoreWindow] toString bridge mismatch');
+        __emit('error', 'core_window:toString_bridge_mismatch', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'contract',
+          message: 'existing toString does not honor shared overrideMap labels',
+          type: 'contract_violation',
+          data: { outcome: 'throw' }
+        }, e);
+        throw e;
+      }
 
       // Already installed and consistent: do not re-install another Proxy layer.
       skipToStringInstall = true;
-    } else if (typeof iframeOracleToString === 'function' && typeof currentToString === 'function') {
+    } else if (!skipToStringInstall && typeof iframeOracleToString === 'function' && typeof currentToString === 'function') {
       let oracleNativeSelf = null;
       let oracleCurrentSelf = null;
       try {

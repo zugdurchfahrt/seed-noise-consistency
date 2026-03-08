@@ -161,33 +161,26 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return preflight;
   }
 
-  function definePatchedMethod(proto, method, value) {
-    // [NORMATIVE] Core no longer accepts missing/implicit wrapLayer; select explicit layer for preflight.
-    // This module installs both:
-    // - synthetic named wrappers (markAsNative)  -> wrapLayer='named_wrapper'
-    // - core provider wrappers (__wrapNativeApply Proxy) -> wrapLayer='core_wrapper'
-    let wrapLayer = 'named_wrapper';
-    try {
-      const st = global && global.__CORE_TOSTRING_STATE__;
-      const m = st && st.__CORE_TOSTRING_STATE__ === true ? st.proxyTargetMap : null;
-      if (m && (m instanceof WeakMap) && typeof value === 'function') {
-        const t = m.get(value);
-        if (typeof t === 'function') wrapLayer = 'core_wrapper';
-      }
-    } catch (e) {
-      emitContextDiag('warn', 'context:definePatchedMethod:wrapLayer_detect_failed', e, {
+  function definePatchedMethod(proto, method, value, contract) {
+    const cfg = (contract && typeof contract === 'object') ? contract : {};
+    const wrapLayer = (typeof cfg.wrapLayer === 'string' && cfg.wrapLayer) ? cfg.wrapLayer : '';
+    if (!wrapLayer) {
+      emitContextDiag('error', 'context:definePatchedMethod:contract_missing_wrapLayer', null, {
         stage: 'guard',
         key: method,
         type: 'pipeline missing data',
-        data: { outcome: 'return', fallback: 'named_wrapper' }
+        data: { outcome: 'throw', reason: 'missing_wrapLayer' }
       });
-      wrapLayer = 'named_wrapper';
+      throw new Error(`[ContextPatch] definePatchedMethod missing wrapLayer for ${method}`);
     }
-
-    const preflight = corePreflight(proto, method, 'method', 'context:definePatchedMethod', {
+    const preflightContract = {
       wrapLayer,
-      policy: 'throw'
-    });
+      policy: (typeof cfg.policy === 'string' && cfg.policy) ? cfg.policy : 'throw'
+    };
+    if (typeof cfg.invokeClass === 'string' && cfg.invokeClass) {
+      preflightContract.invokeClass = cfg.invokeClass;
+    }
+    const preflight = corePreflight(proto, method, 'method', 'context:definePatchedMethod', preflightContract);
     const d = preflight.desc || Object.getOwnPropertyDescriptor(proto, method);
     if (!d) {
       throw new Error(`[ContextPatch] descriptor missing for ${method}`);
@@ -340,7 +333,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         } })[method];
 
     const patched = markAsNative(wrapped, method);
-    definePatchedMethod(proto, method, patched);
+    definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
     patchedMethods.add(patched);
     return true;
   }
@@ -515,7 +508,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         });
       }
 
-      definePatchedMethod(proto, method, wrapped);
+      definePatchedMethod(proto, method, wrapped, { wrapLayer: 'named_wrapper', policy: 'throw' });
       patchedMethods.add(wrapped);
 
       return true;
@@ -600,7 +593,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
          return Reflect.apply(orig, self, args);
        } }).toBlob;
        const patched = markAsNative(wrapped, method);
-       definePatchedMethod(proto, method, patched);
+       definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
        patchedMethods.add(patched);
        return true;
      }
@@ -637,7 +630,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         );
       } }).convertToBlob;
        const patched = markAsNative(wrapped, method);
-       definePatchedMethod(proto, method, patched);
+       definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
        patchedMethods.add(patched);
        return true;
      }
@@ -664,7 +657,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       });
     } })[method];
     const patched = markAsNative(wrapped, method);
-    definePatchedMethod(proto, method, patched);
+    definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
     patchedMethods.add(patched);
     return true;
   }
@@ -696,7 +689,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const applyImpl = makeApplyImpl(orig);
       const wrapped = wrapApply(orig, method, applyImpl);
 
-      definePatchedMethod(proto, method, wrapped);
+      definePatchedMethod(proto, method, wrapped, {
+        wrapLayer: 'core_wrapper',
+        policy: 'throw',
+        invokeClass: 'brand_strict'
+      });
       patchedMethods.add(wrapped);
       return true;
     }
@@ -940,7 +937,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     } }).getContext;
 
     const patched = markAsNative(wrapped, method);
-    definePatchedMethod(proto, method, patched);
+    definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
     patchedMethods.add(patched);
     return true;
   }

@@ -67,6 +67,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     d(eventCode, e, ctx);
   }
 
+
   // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
   const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
     try {
@@ -293,6 +294,31 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     realInit();
   }
 
+  function get2DProto(ctx) {
+    if (!ctx) return null;
+    if (typeof G.OffscreenCanvasRenderingContext2D !== 'undefined'
+        && ctx instanceof G.OffscreenCanvasRenderingContext2D) {
+      return G.OffscreenCanvasRenderingContext2D.prototype;
+    }
+    if (typeof G.CanvasRenderingContext2D !== 'undefined'
+        && ctx instanceof G.CanvasRenderingContext2D) {
+      return G.CanvasRenderingContext2D.prototype;
+    }
+    return Object.getPrototypeOf(ctx);
+  }
+
+  // Reserved native-call sample; keep disabled until a concrete caller is restored.
+  // const P = get2DProto(ctx);
+  // const ORIG = {
+  //   getImageData: P && P.getImageData,
+  //   putImageData: P && P.putImageData,
+  //   drawImage: P && P.drawImage,
+  //   translate: P && P.translate,
+  //   setTransform: P && P.setTransform
+  // };
+  // ORIG.getImageData.call(ctx, x, y, w, h);
+
+
 
   function stringHash(str) {
     let h = 2166136261;
@@ -350,97 +376,14 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     // 3) среда без обоих вариантов
     return null;
   }
-// pick exact proto for brand-safe native calls
-// fallback: whatever the engine reports
-  function get2DProto(ctx) {
-    
-    if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && ctx instanceof OffscreenCanvasRenderingContext2D) {
-      return OffscreenCanvasRenderingContext2D.prototype;
-    }
-    if (typeof CanvasRenderingContext2D !== 'undefined' && ctx instanceof CanvasRenderingContext2D) {
-      return CanvasRenderingContext2D.prototype;
-    }
-    
-    return Object.getPrototypeOf(ctx);
-  }
 
-  function nativeGetImageData(P, ctx, x, y, w, h) {
-    const fn = P && typeof P.getImageData === 'function' ? P.getImageData : ctx.getImageData;
-    return fn.call(ctx, x, y, w, h);
-  }
-  function nativePutImageData(P, ctx, img, x, y) {
-    const fn = P && typeof P.putImageData === 'function' ? P.putImageData : ctx.putImageData;
-    return fn.call(ctx, img, x, y);
-  }
-  function nativeDrawImage(P, ctx, src, dx, dy) {
-    const fn = P && typeof P.drawImage === 'function' ? P.drawImage : ctx.drawImage;
-    return fn.call(ctx, src, dx, dy);
-  }
-  function nativeTranslate(P, ctx, x, y) {
-    const fn = P && typeof P.translate === 'function' ? P.translate : ctx.translate;
-    return fn.call(ctx, x, y);
-  }
-  function nativeSetTransform(P, ctx, a, b, c, d, e, f) {
-    const fn = P && typeof P.setTransform === 'function' ? P.setTransform : ctx.setTransform;
-    return fn.call(ctx, a, b, c, d, e, f);
-  }
+
+
 
   const __CNV_CFG__ = {
-    // epsBasePPX: 512,
-    // epsJitterFactor: 0.5,
-    // edgeGain: 4.0,
-    // maskBlurPasses: 1,
-    // flatMeanThreshold: 0.02,
-    // epsScale: 0,          // анизотр. масштаб (опц.)
-    // linearBlend: false ,    // гамма-корректное смешивание (опц.)
     dxPx: 0.10,      // амплитуда X (px)
     dyPx: 0.10,      // амплитуда Y (px)
   };
-
-  // --- Джиттер: порядок-независимый, кэш по (op,w,h,dpr) ---
-  // const JIT_CACHE = (typeof globalThis !== 'undefined' && globalThis.__JIT_CACHE__ instanceof Map)
-  //   ? globalThis.__JIT_CACHE__
-  //   : (typeof globalThis !== 'undefined'
-  //       ? (globalThis.__JIT_CACHE__ = new Map())
-  //       : new Map());
-
-  // function __getJitter__(op, w, h, dpr, cfg = __CNV_CFG__) {
-  //   w |= 0;
-  //   h |= 0;
-  //   dpr = (typeof dpr === 'number' && dpr > 0) ? +dpr
-  //     : (typeof devicePixelRatio === 'number' && devicePixelRatio > 0) ? +devicePixelRatio
-  //     : (typeof window !== 'undefined' && typeof window.__DPR === 'number' && window.__DPR > 0) ? +window.__DPR
-  //     : (typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0) ? +globalThis.__DPR
-  //     : undefined;
-  //   if (!(typeof dpr === 'number' && dpr > 0)) {
-  //     if (typeof globalThis !== 'undefined') {
-  //       if (!globalThis.__JITTER_DPR_WARNED__) {
-  //         emitCanvasDiag('warn', 'canvas:jitter:preflight:dpr_missing', null, {
-  //           stage: 'preflight',
-  //           key: 'dpr',
-  //           message: 'jitter disabled: DPR missing/invalid',
-  //           type: 'pipeline missing data'
-  //         });
-  //         globalThis.__JITTER_DPR_WARNED__ = true;
-  //       }
-  //     }
-  //     return { epsX: 0, epsY: 0 };
-  //   }
-  //   const key = `${op}:${w}x${h}@${Math.round((dpr) * 1024)}`;
-
-  //   const cached = JIT_CACHE.get(key); if (cached) return cached;
-
-  // const basePPX = (cfg && cfg.epsBasePPX);
-  // const jitterK = (cfg && cfg.epsJitterFactor != null) ? cfg.epsJitterFactor : 0.5;
-  // const base = 1 / (basePPX * dpr);
-
-  //   const mag = base * (1 + jitterK * stableNoiseFromString(`${key}|m`, 0, 1));
-  //   const ang = 2 * Math.PI * stableNoiseFromString(`${key}|a`, 0, 1);
-  //   const v = { epsX: Math.cos(ang) * mag, epsY: Math.sin(ang) * mag };
-
-  //   JIT_CACHE.set(key, v);
-  //   return v;
-  // }
 
 
 
