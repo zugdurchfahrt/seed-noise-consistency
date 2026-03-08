@@ -345,6 +345,10 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           try {
             options = Reflect.apply(origResolvedOptions, this, []);
           } catch (e) {
+            const nativeThrowMsg = (e && e.message) ? String(e.message) : "";
+            if (e instanceof TypeError && /(?:illegal invocation|incompatible receiver|called on incompatible receiver)/i.test(nativeThrowMsg)) {
+              throw e;
+            }
             diagBrowser("warn", "tz:IntlResolvedOptions:native_throw", {
               stage: "runtime",
               message: "native resolvedOptions threw",

@@ -1,9 +1,5 @@
-
 Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
-
-
   "use strict";
-  // ...всё твоё текущее тело...
 
   if (typeof globalThis === "undefined") {
     throw new Error("[probe] globalThis is missing");
@@ -18,7 +14,6 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
 
   const W = (typeof window !== "undefined") ? window : null;
   const __probeDegrade = (W && typeof W.__DEGRADE__ === "function") ? W.__DEGRADE__ : null;
-
 
 
   function __probeDiag(level, code, extra, err) {

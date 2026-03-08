@@ -954,7 +954,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (!(prop in navProto)) return;
         const d = Object.getOwnPropertyDescriptor(navProto, prop);
         const isData = !!(d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set);
-        if (d && !isData) {
+        if (d && !isData && prop !== 'productSub' && prop !== 'vendorSub') {
           __navRegisterKey(prop);
           const origGet = (d && typeof d.get === 'function') ? d.get : null;
           const resolved = (!origGet && __navResolveDescriptor)

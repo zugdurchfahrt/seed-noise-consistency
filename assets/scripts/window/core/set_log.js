@@ -301,12 +301,12 @@ const LOGGingModule = function LOGGingModule() {
 
     // Debug flag
     G.__DEBUG__ =
-      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
-      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
+        // Toggle for *logger self-diagnostics visibility*.
+     // IMPORTANT: must not change runtime behavior by throwing from the logger.
+      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
+      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
     
     global.env = global.env || {};
-    // Toggle for *logger self-diagnostics visibility*.
-    // IMPORTANT: must not change runtime behavior by throwing from the logger.
     global.env.DEBUG_DEGRADES = true;   // включить
     // global.env.DEBUG_DEGRADES = false; // выключить
     const env = global.env;
@@ -706,7 +706,7 @@ const LOGGingModule = function LOGGingModule() {
      * Записывает в shape: { type:'degrade', code, error, extra:{ level, type, ... }, timestamp }.
      * Fail-safe: не бросает исключения и не пишет в console.
      */
-    Object.defineProperty(G.__DEGRADE__, "diag", {
+  Object.defineProperty(G.__DEGRADE__, "diag", {
       value(level, code, ctx, err) {
         try {
           const validLevels = ["info", "warn", "error", "fatal"];
@@ -770,6 +770,215 @@ const LOGGingModule = function LOGGingModule() {
     configurable: false
   });
   global.__DEGRADE__ = G.__DEGRADE__;
+
+  if (!Object.prototype.hasOwnProperty.call(global, "__PROBE_LIVE_READER__")) {
+    const __probeLiveCfg = (global.__PROBE_LIVE_READER_CONFIG__ && typeof global.__PROBE_LIVE_READER_CONFIG__ === "object")
+      ? global.__PROBE_LIVE_READER_CONFIG__
+      : {};
+    const __probeLiveState = {
+      intervalMs: toPosInt(__probeLiveCfg.intervalMs, 1000),
+      maxRows: toPosInt(__probeLiveCfg.maxRows, 80),
+      panelId: (typeof __probeLiveCfg.panelId === "string" && __probeLiveCfg.panelId) ? __probeLiveCfg.panelId : "__probe_live_reader__",
+      enabled: false,
+      timerId: null,
+      lastIndex: 0,
+      rows: [],
+      lastRenderSig: "",
+      startedAt: null
+    };
+
+    function __probeLiveDiag(level, code, message, data, err) {
+      try {
+        G.__DEGRADE__.diag(level, code, {
+          module: "set_log",
+          diagTag: "set_log:probe_live_reader",
+          surface: "logger",
+          key: "__PROBE_LIVE_READER__",
+          stage: "runtime",
+          message: message,
+          data: data == null ? null : data,
+          type: "pipeline telemetry"
+        }, err || null);
+      } catch (_) {}
+    }
+
+    function __probeLiveGetBuffer() {
+      try {
+        const buf = G.__DEGRADE__.getBuffer();
+        return Array.isArray(buf) ? buf : [];
+      } catch (e) {
+        __probeLiveDiag("warn", "set_log:probe_live_reader_buffer_failed", "__DEGRADE__.getBuffer failed", {
+          outcome: "skip",
+          reason: "buffer_failed"
+        }, e);
+        return [];
+      }
+    }
+
+    function __probeLiveEnsurePanel() {
+      if (!G || !G.documentElement || !G.body) return null;
+      let host = G.getElementById(__probeLiveState.panelId);
+      if (host) return host;
+      host = G.createElement("div");
+      host.id = __probeLiveState.panelId;
+      host.setAttribute("data-probe-live-reader", "1");
+      host.style.position = "fixed";
+      host.style.right = "12px";
+      host.style.bottom = "12px";
+      host.style.zIndex = "2147483647";
+      host.style.width = "420px";
+      host.style.maxHeight = "40vh";
+      host.style.overflow = "auto";
+      host.style.background = "rgba(12,12,14,0.95)";
+      host.style.color = "#e8e8e8";
+      host.style.border = "1px solid rgba(255,255,255,0.18)";
+      host.style.borderRadius = "8px";
+      host.style.boxShadow = "0 6px 18px rgba(0,0,0,0.35)";
+      host.style.padding = "8px 10px";
+      host.style.font = "12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      host.style.whiteSpace = "pre-wrap";
+      host.style.wordBreak = "break-word";
+      host.style.pointerEvents = "auto";
+      G.body.appendChild(host);
+      return host;
+    }
+
+    function __probeLiveEntryToRow(entry, index) {
+      const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+      const error = (entry && entry.error && typeof entry.error === "object") ? entry.error : null;
+      return {
+        idx: index,
+        timestamp: entry && entry.timestamp ? String(entry.timestamp) : "",
+        type: entry && entry.type ? String(entry.type) : "",
+        level: extra && typeof extra.level === "string" ? extra.level : "",
+        code: entry && entry.code ? String(entry.code) : "",
+        module: extra && typeof extra.module === "string" ? extra.module : "",
+        diagTag: extra && typeof extra.diagTag === "string" ? extra.diagTag : "",
+        key: extra && typeof extra.key === "string" ? extra.key : "",
+        message: extra && typeof extra.message === "string"
+          ? extra.message
+          : (error && typeof error.message === "string" ? error.message : ""),
+        error: error && typeof error.name === "string" ? error.name : ""
+      };
+    }
+
+    function __probeLiveFormatRows(rows) {
+      const arr = Array.isArray(rows) ? rows : [];
+      if (!arr.length) return "[probe-live] waiting for __DEGRADE__ events";
+      return arr.map((row) => {
+        return [
+          row.timestamp || "",
+          row.level || row.type || "",
+          row.code || "",
+          row.module || row.diagTag || "",
+          row.key || "",
+          row.message || row.error || ""
+        ].filter(Boolean).join(" | ");
+      }).join("\n");
+    }
+
+    function __probeLiveRender(force) {
+      const host = __probeLiveEnsurePanel();
+      if (!host) return false;
+      const text = __probeLiveFormatRows(__probeLiveState.rows);
+      if (!force && text === __probeLiveState.lastRenderSig) return false;
+      __probeLiveState.lastRenderSig = text;
+      const header = "[probe-live] __DEGRADE__ buffer";
+      const meta = "rows=" + __probeLiveState.rows.length + ", intervalMs=" + __probeLiveState.intervalMs;
+      host.textContent = header + "\n" + meta + "\n\n" + text;
+      return true;
+    }
+
+    function __probeLivePoll() {
+      const buf = __probeLiveGetBuffer();
+      if (!buf.length) {
+        __probeLiveRender(false);
+        return __probeLiveState.rows.slice();
+      }
+      if (buf.length < __probeLiveState.lastIndex) {
+        __probeLiveState.lastIndex = 0;
+        __probeLiveState.rows = [];
+      }
+      if (buf.length === __probeLiveState.lastIndex) {
+        __probeLiveRender(false);
+        return __probeLiveState.rows.slice();
+      }
+      for (let i = __probeLiveState.lastIndex; i < buf.length; i++) {
+        __probeLiveState.rows.push(__probeLiveEntryToRow(buf[i], i));
+      }
+      if (__probeLiveState.rows.length > __probeLiveState.maxRows) {
+        __probeLiveState.rows = __probeLiveState.rows.slice(-__probeLiveState.maxRows);
+      }
+      __probeLiveState.lastIndex = buf.length;
+      __probeLiveRender(false);
+      return __probeLiveState.rows.slice();
+    }
+
+    function __probeLiveStart() {
+      if (__probeLiveState.enabled) return true;
+      if (!G || G.documentElement) {
+        __probeLiveDiag("warn", "set_log:probe_live_reader_not_window_realm", "probe live reader requires document", {
+          outcome: "skip",
+          reason: "document_missing"
+        }, null);
+        return false;
+      }
+      __probeLiveState.enabled = true;
+      __probeLiveState.startedAt = Date.now();
+      try {
+        __probeLiveRender(true);
+        __probeLivePoll();
+        __probeLiveState.timerId = global.setInterval(__probeLivePoll, __probeLiveState.intervalMs);
+        __probeLiveDiag("info", "set_log:probe_live_reader_started", "probe live reader started", {
+          outcome: "return",
+          reason: "started",
+          intervalMs: __probeLiveState.intervalMs,
+          maxRows: __probeLiveState.maxRows
+        }, null);
+        return true;
+      } catch (e) {
+        __probeLiveState.enabled = false;
+        __probeLiveState.timerId = null;
+        __probeLiveDiag("error", "set_log:probe_live_reader_start_failed", "probe live reader start failed", {
+          outcome: "skip",
+          reason: "start_failed"
+        }, e);
+        return false;
+      }
+    }
+
+    function __probeLiveStop() {
+      if (__probeLiveState.timerId != null) {
+        try { global.clearInterval(__probeLiveState.timerId); } catch (_) {}
+      }
+      __probeLiveState.timerId = null;
+      __probeLiveState.enabled = false;
+      return true;
+    }
+
+    Object.defineProperty(global, "__PROBE_LIVE_READER__", {
+      value: {
+        start: __probeLiveStart,
+        stop: __probeLiveStop,
+        poll: __probeLivePoll,
+        snapshot() {
+          return {
+            enabled: __probeLiveState.enabled,
+            intervalMs: __probeLiveState.intervalMs,
+            maxRows: __probeLiveState.maxRows,
+            lastIndex: __probeLiveState.lastIndex,
+            rows: __probeLiveState.rows.slice(),
+            startedAt: __probeLiveState.startedAt
+          };
+        }
+      },
+      enumerable: false,
+      writable: false,
+      configurable: true
+    });
+
+    __probeLiveStart();
+  }
 
   // ===== Stage 0/1: runtime-evaluate alerts + optional live-summary state =====
   Object.defineProperty(global, "__DIAG_ALERTS__", {
@@ -1215,9 +1424,7 @@ const LOGGingModule = function LOGGingModule() {
         try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
       }
     };
-    // DIAG_SCREEN_ON({ includeData: true })
 
-    DIAG_SCREEN_ON({ criticalOnly:true, includeData:true, lastN:180 })
 
         // after all logger globals are assigned (Window realm only):
       if (W) {
@@ -1237,5 +1444,4 @@ const LOGGingModule = function LOGGingModule() {
         Object.defineProperty(W, "DIAG_SCREEN_SNAPSHOT", { value: W.DIAG_SCREEN_SNAPSHOT, writable:false, configurable:true, enumerable:false });
       }
     }
-    
 }

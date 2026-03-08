@@ -207,7 +207,7 @@ def init_driver(
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-features=CanvasNoise")
+    # chrome_options.add_argument("--disable-features=CanvasNoise")
     vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
     chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
     if chrome_debug_port_raw.lower() in {"0", "auto"}:
@@ -400,6 +400,7 @@ def init_driver(
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             // ——— Worker env diagnostics (pre-bootstrap) ———//
             // console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
+            __PROBE_LIVE_READER__.start();
             })(window);
             """
         ]
@@ -881,7 +882,7 @@ def main():
         dpr_map = {
             "1920x1080": 1.0,
             "2560x1440": 1.25,
-            "3840x2160": 2.0,
+            # "3840x2160": 2.0,
         }
         device_dpr_value = dpr_map.get(screen_res)
         if device_dpr_value is None:
@@ -1062,7 +1063,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/fonts")
+        driver.get("https://pixelscan.net/")
 
         # PLEASE, DO NO REMOVE THIS, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)

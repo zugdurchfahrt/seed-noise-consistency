@@ -42,6 +42,67 @@ const ContextPatchModule = function ContextPatchModule(window) {
     });
   }
   const HOOK_MODE_POST_ORIG_ONCE = hookModeStore.post_orig_once;
+  const KEEP_NATIVE_WL = (C && C.__KEEP_NATIVE_WL__ && typeof C.__KEEP_NATIVE_WL__ === 'object')
+    ? C.__KEEP_NATIVE_WL__
+    : Object.freeze({
+        htmlCanvas: Object.freeze(['getContext', 'toDataURL', 'toBlob']),
+        offscreenCanvas: Object.freeze(['getContext', 'convertToBlob']),
+        ctx2D: Object.freeze(['getImageData', 'putImageData', 'measureText', 'fillText', 'strokeText', 'fillRect', 'drawImage']),
+        webgl: Object.freeze(['getParameter', 'getSupportedExtensions', 'getExtension', 'readPixels', 'getShaderPrecisionFormat', 'shaderSource', 'getUniform'])
+      });
+  if (!Object.prototype.hasOwnProperty.call(C, '__KEEP_NATIVE_WL__')) {
+    Object.defineProperty(C, '__KEEP_NATIVE_WL__', {
+      value: KEEP_NATIVE_WL,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  const GATEWAY_METHODS = (C && C.__GATEWAY_METHODS__ && typeof C.__GATEWAY_METHODS__ === 'object')
+    ? C.__GATEWAY_METHODS__
+    : Object.freeze({
+        htmlCanvasSync: Object.freeze(['toDataURL']),
+        htmlCanvasAsync: Object.freeze(['toBlob']),
+        htmlCanvasFactory: Object.freeze(['getContext']),
+        offscreenAsync: Object.freeze(['convertToBlob']),
+        offscreenFactory: Object.freeze(['getContext']),
+        ctx2DRead: Object.freeze(['getImageData']),
+        ctx2DCore: Object.freeze(['measureText', 'fillText', 'strokeText', 'fillRect', 'drawImage']),
+        webgl: Object.freeze(['getParameter', 'getSupportedExtensions', 'getExtension', 'readPixels', 'getShaderPrecisionFormat', 'shaderSource', 'getUniform'])
+      });
+  if (!Object.prototype.hasOwnProperty.call(C, '__GATEWAY_METHODS__')) {
+    Object.defineProperty(C, '__GATEWAY_METHODS__', {
+      value: GATEWAY_METHODS,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  const keptNativeRefs = (C && C.__keptNativeRefs__ instanceof WeakMap)
+    ? C.__keptNativeRefs__
+    : new WeakMap();
+  if (!Object.prototype.hasOwnProperty.call(C, '__keptNativeRefs__')) {
+    Object.defineProperty(C, '__keptNativeRefs__', {
+      value: keptNativeRefs,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  const issuedContextRegistry = (C && C.__issuedContextRegistry__ instanceof WeakMap)
+    ? C.__issuedContextRegistry__
+    : new WeakMap();
+  if (!Object.prototype.hasOwnProperty.call(C, '__issuedContextRegistry__')) {
+    Object.defineProperty(C, '__issuedContextRegistry__', {
+      value: issuedContextRegistry,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  const ctx2DGatewayMethods = Object.freeze(
+    Array.prototype.concat.call([], GATEWAY_METHODS.ctx2DRead, GATEWAY_METHODS.ctx2DCore)
+  );
 
   // === 0. Utilities ===
   const NOP = () => {};
@@ -125,6 +186,78 @@ const ContextPatchModule = function ContextPatchModule(window) {
     });
     return '';
   })();
+
+  function keepNativeMethods(proto, methods) {
+    if (!proto || !Array.isArray(methods) || !methods.length) return false;
+    let bucket = keptNativeRefs.get(proto);
+    if (!bucket) {
+      bucket = Object.create(null);
+      keptNativeRefs.set(proto, bucket);
+    }
+    let captured = false;
+    for (const method of methods) {
+      if (typeof method !== 'string' || !method || Object.prototype.hasOwnProperty.call(bucket, method)) continue;
+      const desc = Object.getOwnPropertyDescriptor(proto, method);
+      if (desc && typeof desc.value === 'function') {
+        bucket[method] = desc.value;
+        captured = true;
+      }
+    }
+    return captured;
+  }
+
+  function resolveKeptNative(proto, method) {
+    const bucket = proto ? keptNativeRefs.get(proto) : null;
+    if (bucket && typeof bucket[method] === 'function') return bucket[method];
+    const desc = proto ? Object.getOwnPropertyDescriptor(proto, method) : null;
+    return (desc && typeof desc.value === 'function') ? desc.value : null;
+  }
+
+  function captureKeepNativeRefs() {
+    if (typeof HTMLCanvasElement !== 'undefined' && HTMLCanvasElement.prototype) {
+      keepNativeMethods(HTMLCanvasElement.prototype, KEEP_NATIVE_WL.htmlCanvas);
+    }
+    if (typeof OffscreenCanvas !== 'undefined' && OffscreenCanvas.prototype) {
+      keepNativeMethods(OffscreenCanvas.prototype, KEEP_NATIVE_WL.offscreenCanvas);
+    }
+    if (typeof CanvasRenderingContext2D !== 'undefined' && CanvasRenderingContext2D.prototype) {
+      keepNativeMethods(CanvasRenderingContext2D.prototype, KEEP_NATIVE_WL.ctx2D);
+    }
+    if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && OffscreenCanvasRenderingContext2D.prototype) {
+      keepNativeMethods(OffscreenCanvasRenderingContext2D.prototype, KEEP_NATIVE_WL.ctx2D);
+    }
+    if (typeof WebGLRenderingContext !== 'undefined' && WebGLRenderingContext.prototype) {
+      keepNativeMethods(WebGLRenderingContext.prototype, KEEP_NATIVE_WL.webgl);
+    }
+    if (typeof WebGL2RenderingContext !== 'undefined' && WebGL2RenderingContext.prototype) {
+      keepNativeMethods(WebGL2RenderingContext.prototype, KEEP_NATIVE_WL.webgl);
+    }
+  }
+
+  function getCtx2DProto(ctx) {
+    if (typeof CanvasRenderingContext2D !== 'undefined' && ctx instanceof CanvasRenderingContext2D) {
+      return CanvasRenderingContext2D.prototype;
+    }
+    if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && ctx instanceof OffscreenCanvasRenderingContext2D) {
+      return OffscreenCanvasRenderingContext2D.prototype;
+    }
+    return null;
+  }
+
+  function registerIssuedContext(ctx, contextId, owner) {
+    if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) return ctx;
+    const kind = (typeof contextId === 'string' && contextId) ? contextId : null;
+    let surface = 'canvas';
+    if (kind && /^webgl/.test(kind)) surface = 'webgl';
+    issuedContextRegistry.set(ctx, {
+      kind,
+      surface,
+      owner: (owner && owner.constructor && owner.constructor.name) ? String(owner.constructor.name) : null
+    });
+    return ctx;
+  }
+
+  captureKeepNativeRefs();
 
   function corePreflight(owner, key, kind, diagTag, contract) {
     const cfg = (contract && typeof contract === 'object') ? contract : {};
@@ -258,8 +391,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // === 3. Patch utilities ===
   function chain(proto, method, hooks){
     if (!proto || typeof proto[method] !== 'function') return false;
-    const orig = proto[method];
-    if (patchedMethods.has(orig)) return false;
+    const current = proto[method];
+    if (patchedMethods.has(current)) return false;
+    const orig = resolveKeptNative(proto, method) || current;
     const hookList = Array.isArray(hooks) ? hooks : [];
 
     // Avoid expando flags on "this" (detectable). Use WeakSet recursion guard.
@@ -343,7 +477,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // ===== WEBGL hook override logging: two toggles (ВКЛ/ВЫКЛ) =====
   // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override" (emitContextDiag + console.warn ниже),
   // НЕ отключают хук, НЕ отключают патчинг, НЕ трогают остальные warn/error.
-  const WEBGL_OVERRIDE_DIAG_LOG    = true; // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
+  const WEBGL_OVERRIDE_DIAG_LOG    = false; // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
   const WEBGL_OVERRIDE_CONSOLE_LOG = false; // true=ВКЛ, false=ВЫКЛ (console.warn для override)
 
   function patchMethod(proto, method, hooks) {
@@ -397,7 +531,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         return false;
       }
 
-      const orig = desc.value;
+      const orig = resolveKeptNative(proto, method) || desc.value;
       const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
       const hookMode = (hooks && (typeof hooks === 'object' || typeof hooks === 'function')) ? hooks.mode : undefined;
       const isPostOrigOnceMode = hookMode === HOOK_MODE_POST_ORIG_ONCE;
@@ -516,8 +650,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   function chainAsync(proto, method, hooksGetter){
     if (!proto || typeof proto[method] !== 'function') return false;
-    const orig = proto[method];
-    if (patchedMethods.has(orig)) return false;
+    const current = proto[method];
+    if (patchedMethods.has(current)) return false;
+    const orig = resolveKeptNative(proto, method) || current;
 
     const getHooksList = () => (typeof hooksGetter === 'function') ? hooksGetter() : [];
     const applyHooksAsync = async (self, blob, hookArgs) => {
@@ -664,16 +799,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   // === 4. Brand-safe patching for CanvasRenderingContext2D (no Proxy returned) ===
   function createSafeCtxProxy(ctx){
-    if (!ctx || typeof CanvasRenderingContext2D === 'undefined' || !(ctx instanceof CanvasRenderingContext2D)) return ctx;
-
-    const proto = CanvasRenderingContext2D.prototype;
+    const proto = getCtx2DProto(ctx);
+    if (!ctx || !proto) return ctx;
+    captureKeepNativeRefs();
 
     // Patch once-per-method: if already patched, do nothing
     function patchOnce(method, makeApplyImpl){
       if (!proto || typeof proto[method] !== 'function') return false;
+      if (ctx2DGatewayMethods.indexOf(method) === -1) return false;
       if (patchedMethods.has(proto[method])) return false;
 
-      const orig = proto[method];
+      const orig = resolveKeptNative(proto, method) || proto[method];
       const wrapApply = (global && typeof global.__wrapNativeApply === 'function')
         ? global.__wrapNativeApply
         : null;
@@ -711,6 +847,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
         return DEFAULT_CTX2D_FONT;
       }
     };
+
+    // --- getImageData: route read-path through gateway without changing native answer ---
+    patchOnce('getImageData', (orig) => (target, thisArg, argList) => {
+      return Reflect.apply(target, thisArg, argList || []);
+    });
 
     // --- measureText: post-process TextMetrics via CanvasPatchHooks.applyMeasureTextHook ---
     patchOnce('measureText', (orig) => (target, thisArg, argList) => {
@@ -881,8 +1022,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // === 5. getContext interception for HTMLCanvasElement/OffscreenCanvas ===
   function chainGetContext(proto, method, htmlHooks, ctx2dHooks, webglHooks){
     if (!proto || typeof proto[method] !== 'function') return false;
-    const orig = proto[method];
-    if (patchedMethods.has(orig)) return false;
+    captureKeepNativeRefs();
+    const current = proto[method];
+    if (patchedMethods.has(current)) return false;
+    const orig = resolveKeptNative(proto, method) || current;
 
     const wrapped = ({ getContext(contextId, contextAttributes) {
       const args = arguments;
@@ -925,12 +1068,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
             });
           }
         }
+        registerIssuedContext(ctx, type, this);
       } catch (e) {
         emitContextDiag('error', 'context:getContext:chain_failed', e, {
           stage: 'hook',
           key: 'getContext',
           data: { type: type || null }
         });
+        registerIssuedContext(ctx, type, this);
       }
 
       return ctx;
@@ -947,16 +1092,26 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const state = this.__patchState || (this.__patchState = patchState);
     if (state.canvas) return 0;
     if (typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype) return 0;
+    captureKeepNativeRefs();
     let applied = 0, total = 0;
-    total++; if (chain(HTMLCanvasElement.prototype, 'toDataURL', this.htmlCanvasToDataURLHooks)) applied++;
-    total++; if (chainAsync(HTMLCanvasElement.prototype, 'toBlob', () => this.htmlCanvasToBlobHooks)) applied++;
-    total++; if (chainGetContext(
-      HTMLCanvasElement.prototype,
-      'getContext',
-      this.htmlCanvasGetContextHooks,
-      this.ctx2DGetContextHooks,
-      this.webglGetContextHooks
-    )) applied++;
+    for (const method of GATEWAY_METHODS.htmlCanvasSync) {
+      total++;
+      if (chain(HTMLCanvasElement.prototype, method, this.htmlCanvasToDataURLHooks)) applied++;
+    }
+    for (const method of GATEWAY_METHODS.htmlCanvasAsync) {
+      total++;
+      if (chainAsync(HTMLCanvasElement.prototype, method, () => this.htmlCanvasToBlobHooks)) applied++;
+    }
+    for (const method of GATEWAY_METHODS.htmlCanvasFactory) {
+      total++;
+      if (chainGetContext(
+        HTMLCanvasElement.prototype,
+        method,
+        this.htmlCanvasGetContextHooks,
+        this.ctx2DGetContextHooks,
+        this.webglGetContextHooks
+      )) applied++;
+    }
     state.canvas = true;
     if (global.__DEBUG__) {
       emitContextDiag('info', 'context:canvas:apply:patches_applied', null, {
@@ -974,14 +1129,21 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const Ctx = this;
     let applied = 0, total = 0;
     if (typeof OffscreenCanvas !== 'undefined'){
-      total++; if (chainAsync(OffscreenCanvas.prototype, 'convertToBlob', () => Ctx.offscreenConvertToBlobHooks)) applied++;
-      total++; if (chainGetContext(
-        OffscreenCanvas.prototype,
-        'getContext',
-        Ctx.offscreenGetContextHooks,
-        Ctx.ctx2DGetContextHooks,
-        Ctx.webglGetContextHooks
-      )) applied++;
+      captureKeepNativeRefs();
+      for (const method of GATEWAY_METHODS.offscreenAsync) {
+        total++;
+        if (chainAsync(OffscreenCanvas.prototype, method, () => Ctx.offscreenConvertToBlobHooks)) applied++;
+      }
+      for (const method of GATEWAY_METHODS.offscreenFactory) {
+        total++;
+        if (chainGetContext(
+          OffscreenCanvas.prototype,
+          method,
+          Ctx.offscreenGetContextHooks,
+          Ctx.ctx2DGetContextHooks,
+          Ctx.webglGetContextHooks
+        )) applied++;
+      }
       state.offscreen = true;
     }
     if (global.__DEBUG__) {
@@ -997,24 +1159,29 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.applyWebGLContextPatches = function () {
       const state = this.__patchState || (this.__patchState = patchState);
       if (state.webgl) return 0;
+      captureKeepNativeRefs();
       let applied = 0, total = 0;
       let already = 0;
-      const list = [
-        [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "getParameter", this.webglGetParameterHooks],
-        [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "getSupportedExtensions", this.webglGetSupportedExtensionsHooks],
-        [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "getExtension", this.webglGetExtensionHooks],
-        [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "readPixels", this.webglReadPixelsHooks],
-        [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "getShaderPrecisionFormat", this.webglGetShaderPrecisionFormatHooks],
-        [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "shaderSource", this.webglShaderSourceHooks],
-        [typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null, "getUniform", this.webglGetUniformHooks],
-        [typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null, "getParameter", this.webglGetParameterHooks],
-        [typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null, "getSupportedExtensions", this.webglGetSupportedExtensionsHooks],
-        [typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null, "getExtension", this.webglGetExtensionHooks],
-        [typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null, "readPixels", this.webglReadPixelsHooks],
-        [typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null, "getShaderPrecisionFormat", this.webglGetShaderPrecisionFormatHooks],
-        [typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null,  "shaderSource", this.webglShaderSourceHooks],
-        [typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null, "getUniform", this.webglGetUniformHooks]
+      const hookByMethod = {
+        getParameter: this.webglGetParameterHooks,
+        getSupportedExtensions: this.webglGetSupportedExtensionsHooks,
+        getExtension: this.webglGetExtensionHooks,
+        readPixels: this.webglReadPixelsHooks,
+        getShaderPrecisionFormat: this.webglGetShaderPrecisionFormatHooks,
+        shaderSource: this.webglShaderSourceHooks,
+        getUniform: this.webglGetUniformHooks
+      };
+      const list = [];
+      const webglProtos = [
+        typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null,
+        typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null
       ];
+      for (const proto of webglProtos) {
+        if (!proto) continue;
+        for (const method of GATEWAY_METHODS.webgl) {
+          list.push([proto, method, hookByMethod[method]]);
+        }
+      }
       for (const [proto, m, hooks] of list) {
         if (!proto) continue;
         total++;
