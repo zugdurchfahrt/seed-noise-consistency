@@ -897,107 +897,133 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     // Critical - only a prototype (without a fallback)
+    function patchStrictScalarAccessor(key, getter, diagTag) {
+      if (!(key in navProto)) return false;
+      const d = Object.getOwnPropertyDescriptor(navProto, key);
+      if (!d) {
+        __navDiag('error', `${diagTag}_descriptor_missing`, {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `${key} descriptor missing`
+        });
+        return false;
+      }
+      if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
+      const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      __navRegisterKey(key);
+      const applied = applyCoreTargetsGroup(diagTag, [{
+        owner: navProto,
+        key: key,
+        kind: 'accessor',
+        wrapLayer: 'named_wrapper_strict',
+        resolve: 'proto_chain',
+        policy: 'strict',
+        diagTag: diagTag,
+        allowCreate: false,
+        configurable: !!d.configurable,
+        enumerable: !!d.enumerable,
+        allowShapeChange: !!isData,
+        validThis: __isNavigatorThis,
+        invalidThis: 'native',
+        getImpl: function navStrictScalarGetImpl() {
+          __navLogAccess(key, null);
+          return getter.call(this);
+        }
+      }], 'throw');
+      if (applied !== 1) {
+        __navDiag('error', `${diagTag}_define_failed`, {
+          stage: 'apply',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `failed to define ${key}`
+        });
+        return false;
+      }
+      return true;
+    }
+
+    function patchObjectReturnAccessor(key, getter, diagTag) {
+      if (!(key in navProto)) return false;
+      const d = Object.getOwnPropertyDescriptor(navProto, key);
+      if (!d) {
+        __navDiag('error', `${diagTag}_descriptor_missing`, {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `${key} descriptor missing`
+        });
+        return false;
+      }
+      if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
+      const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      __navRegisterKey(key);
+      const applied = applyCoreTargetsGroup(diagTag, [{
+        owner: navProto,
+        key: key,
+        kind: 'accessor',
+        wrapLayer: 'named_wrapper_strict',
+        resolve: 'proto_chain',
+        policy: 'strict',
+        diagTag: diagTag,
+        allowCreate: false,
+        configurable: !!d.configurable,
+        enumerable: !!d.enumerable,
+        allowShapeChange: !!isData,
+        validThis: __isNavigatorThis,
+        invalidThis: 'native',
+        getImpl: function navObjectReturnGetImpl() {
+          __navLogAccess(key, null);
+          return getter.call(this);
+        }
+      }], 'throw');
+      if (applied !== 1) {
+        __navDiag('error', `${diagTag}_define_failed`, {
+          stage: 'apply',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `failed to define ${key}`
+        });
+        return false;
+      }
+      return true;
+    }
+
     // Important: like native - not enumerable
     // [REGISTRY] userAgent is handled in `override_ua_data.js` (opt-in gate).
-    // Here we keep only the synthetic_named trio on Navigator.prototype.
+    // Here we keep only strict scalar accessor surfaces on Navigator.prototype.
     const critical = new Set(['platform','vendor','appVersion']);
-    (function patchCriticalOnProto(){
-      const patch = (key, getter) => {
-        const d = Object.getOwnPropertyDescriptor(navProto, key);
-        if (!d) throw new TypeError(`${key}: descriptor missing`);
-        if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
-        __navRegisterKey(key);
-         const applied = applyCoreTargetsGroup('nav_total_set:critical', [{
-           owner: navProto,
-           key: key,
-           kind: 'accessor',
-           // [REGISTRY] synthetic_named path (no Proxy) for Navigator.prototype.* trio.
-           // Cross-realm probes may still flag toString, but Proxy-wrapping these accessors is forbidden by registry.
-           wrapLayer: 'named_wrapper_strict',
-           resolve: 'proto_chain',
-           policy: 'strict',
-           diagTag: 'nav_total_set:critical',
-           allowCreate: false,
-           configurable: !!d.configurable,
-           enumerable: !!d.enumerable,
-           validThis: __isNavigatorThis,
-          // [NORMATIVE] invalid receiver must be validated by the engine and rethrown unchanged.
-          invalidThis: 'native',
-          getImpl: function navCriticalGetImpl() {
-            __navLogAccess(key, null);
-            return getter.call(this);
-          }
-        }], 'throw');
-        if (applied !== 1) throw new TypeError(`failed to define ${key}`);
-      };      
-      patch('platform',   () => navPlatformOut);
-      patch('vendor',     () => vendor);
-      patch('appVersion', () => {
+    const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages']);
+    const objectReturnKeys = new Set(['plugins','mimeTypes','userAgentData']);
+    (function patchStrictScalarAccessorsOnProto(){
+      patchStrictScalarAccessor('platform', 'platform' in navProto ? () => navPlatformOut : null, 'nav_total_set:platform');
+      patchStrictScalarAccessor('vendor', 'vendor' in navProto ? () => vendor : null, 'nav_total_set:vendor');
+      patchStrictScalarAccessor('appVersion', 'appVersion' in navProto ? () => {
         const pfx = "Mozilla/";
         return (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
           ? userAgent.slice(pfx.length)
           : userAgent;
-      });
+      } : null, 'nav_total_set:appVersion');
+      patchStrictScalarAccessor('productSub', 'productSub' in navProto ? () => "20030107" : null, 'nav_total_set:productSub');
+      patchStrictScalarAccessor('vendorSub', 'vendorSub' in navProto ? () => "" : null, 'nav_total_set:vendorSub');
+      patchStrictScalarAccessor('maxTouchPoints', 'maxTouchPoints' in navProto ? () => 0 : null, 'nav_total_set:maxTouchPoints');
     })();
-
 
     // rest
     const navigatorPatches = [
-      ['productSub',           () => "20030107"],
-      ['maxTouchPoints',       () => 0],
       ['buildID',              () => "20230501"],
-      ['globalPrivacyControl', () => false],
-      ['vendorSub',            () => ""]
+      ['globalPrivacyControl', () => false]
     ];
       navigatorPatches.forEach(([prop, getter]) => {
-        if (critical.has(prop)) return; 
+        if (critical.has(prop) || strictScalarKeys.has(prop) || objectReturnKeys.has(prop)) return; 
         if (!(prop in navProto)) return;
         const d = Object.getOwnPropertyDescriptor(navProto, prop);
-        const isData = !!(d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set);
-        if (d && !isData && prop !== 'productSub' && prop !== 'vendorSub') {
-          __navRegisterKey(prop);
-          const origGet = (d && typeof d.get === 'function') ? d.get : null;
-          const resolved = (!origGet && __navResolveDescriptor)
-            ? __navResolveDescriptor(navProto, prop, { mode: 'proto_chain' })
-            : null;
-          const nativeGet = origGet || ((resolved && resolved.desc && typeof resolved.desc.get === 'function') ? resolved.desc.get : null);
-          const namedGet = Object.getOwnPropertyDescriptor(({ get [prop]() {
-            __navLogAccess(prop, namedGet);
-            if (!__isNavigatorThis(this)) {
-              if (typeof nativeGet === 'function') {
-                try {
-                  return Reflect.apply(nativeGet, this, arguments);
-                } catch (e) {
-                  __navDiag('warn', 'nav_total_set:' + String(prop) + '_illegal_invocation', {
-                    stage: 'runtime',
-                    type: __navTypeBrowser,
-                    diagTag: 'nav_total_set:' + String(prop),
-                    key: String(prop),
-                    message: String(prop) + ' illegal invocation',
-                    data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-                  }, e);
-                  throw e;
-                }
-              }
-              const e = new TypeError();
-              __navDiag('error', 'nav_total_set:' + String(prop) + '_native_get_missing', {
-                stage: 'runtime',
-                type: __navTypePipeline,
-                diagTag: 'nav_total_set:' + String(prop),
-                key: String(prop),
-                message: String(prop) + ' native getter missing on invalid receiver',
-                data: { outcome: 'throw', reason: 'native_get_missing' }
-              }, e);
-              throw e;
-            }
-            return getter.call(this);
-          }}), prop).get;
-          __navRegisterFn(namedGet);
-          safeDefineAcc(navProto, prop, namedGet);
-        } else {
-          const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
-          safeDefineAcc(navProto, prop, wrapped);
-        }
+        const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
+        safeDefineAcc(navProto, prop, wrapped);
       });
 
     // ——— D. devicePixelRatio & screen.* ———
@@ -1384,69 +1410,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       });
     } else {
-      __navRegisterKey('userAgentData');
-      const getUserAgentData = Object.getOwnPropertyDescriptor(({ get userAgentData() {
-        __navLogAccess('userAgentData', getUserAgentData);
-        if (!__isNavigatorThis(this)) {
-          const origGet = (dUaData && typeof dUaData.get === 'function') ? dUaData.get : null;
-          const resolvedGet = (dUaDataResolved && dUaDataResolved.desc && typeof dUaDataResolved.desc.get === 'function')
-            ? dUaDataResolved.desc.get
-            : null;
-          const nativeGet = origGet || resolvedGet;
-          if (nativeGet) {
-            try {
-              return Reflect.apply(nativeGet, this, []);
-            } catch (e) {
-              __navDiag('warn', 'nav_total_set:userAgentData_illegal_invocation', {
-                stage: 'runtime',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:userAgentData',
-                key: 'userAgentData',
-                message: 'userAgentData illegal invocation',
-                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-              }, e);
-              throw e;
-            }
-          }
-          const e = new TypeError();
-          __navDiag('error', 'nav_total_set:userAgentData_native_get_missing', {
-            stage: 'runtime',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:userAgentData',
-            key: 'userAgentData',
-            message: 'userAgentData native getter missing on invalid receiver',
-            data: { outcome: 'throw', reason: 'native_get_missing' }
-          }, e);
-          throw e;
-        }
+      const appliedUaData = patchObjectReturnAccessor('userAgentData', function userAgentDataAccessorValue() {
         return nativeUAD;
-      }}), 'userAgentData').get;
-      __navRegisterFn(getUserAgentData);
-      const appliedUaData = applyCoreTargetsGroup('nav_total_set:userAgentData', [{
-        owner: navProto,
-        key: 'userAgentData',
-        kind: 'accessor',
-        wrapLayer: 'named_wrapper_strict',
-        resolve: 'proto_chain',
-        policy: 'strict',
-        diagTag: 'nav_total_set:userAgentData',
-        configurable: !!dUaData.configurable,
-        enumerable: !!dUaData.enumerable,
-        validThis: __isNavigatorThis,
-        invalidThis: 'throw',
-        getImpl: function getUserAgentDataImpl() {
-          return Reflect.apply(getUserAgentData, this, []);
-        }
-      }], 'throw');
-      if (appliedUaData !== 1) {
-        __navDiag('error', 'nav_total_set:userAgentData_define_failed', {
-          stage: 'apply',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set:userAgentData',
-          key: 'userAgentData',
-          message: 'failed to define userAgentData'
-        });
-      } else {
+      }, 'nav_total_set:userAgentData');
+      if (appliedUaData) {
         const uadTag = Object.prototype.toString.call(nativeUAD);
         if (uadTag === '[object Object]') {
           __navDiag('warn', 'nav_total_set:userAgentData_tag_suspicious', {
@@ -1481,339 +1448,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     }
 
-    // ——— F. deviceMemory/hardwareConcurrency ———
-    const hasDeviceMemory = ('deviceMemory' in navigator);
-    const dDeviceMemory = Object.getOwnPropertyDescriptor(navProto, 'deviceMemory');
-    const dDeviceMemoryResolved = __navResolveDescriptor
-      ? __navResolveDescriptor(navProto, 'deviceMemory', { mode: 'proto_chain' })
-      : null;
-    const nativeDeviceMemoryGet = (dDeviceMemory && typeof dDeviceMemory.get === 'function')
-      ? dDeviceMemory.get
-      : ((dDeviceMemoryResolved && dDeviceMemoryResolved.desc && typeof dDeviceMemoryResolved.desc.get === 'function')
-        ? dDeviceMemoryResolved.desc.get
-        : null);
-    const getDeviceMemory = Object.getOwnPropertyDescriptor(({ get deviceMemory() {
-      __navLogAccess('deviceMemory', getDeviceMemory);
-      if (!__isNavigatorThis(this)) {
-        if (typeof nativeDeviceMemoryGet === 'function') {
-          try {
-            return Reflect.apply(nativeDeviceMemoryGet, this, []);
-          } catch (e) {
-            __navDiag('warn', 'nav_total_set:deviceMemory_illegal_invocation', {
-              stage: 'runtime',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:deviceMemory',
-              key: 'deviceMemory',
-              message: 'deviceMemory illegal invocation',
-              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-            }, e);
-            throw e;
-          }
-        }
-        const e = new TypeError();
-        __navDiag('error', 'nav_total_set:deviceMemory_native_get_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:deviceMemory',
-          key: 'deviceMemory',
-          message: 'deviceMemory native getter missing on invalid receiver',
-          data: { outcome: 'throw', reason: 'native_get_missing' }
-        }, e);
-        throw e;
-      }
-      return mem;
-    }}), 'deviceMemory').get;
-    __navRegisterKey('deviceMemory');
-    __navRegisterFn(getDeviceMemory);
-    if (hasDeviceMemory) {
-      if (!dDeviceMemory) {
-        __navDiag('error', 'nav_total_set:deviceMemory_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set',
-          key: 'deviceMemory',
-          message: 'deviceMemory descriptor missing'
-        });
-      } else {
-        const dmIsData = Object.prototype.hasOwnProperty.call(dDeviceMemory, 'value') && !dDeviceMemory.get && !dDeviceMemory.set;
-        const appliedDeviceMemory = applyCoreTargetsGroup('nav_total_set:deviceMemory', [{
-          owner: navProto,
-          key: 'deviceMemory',
-          kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'nav_total_set:deviceMemory',
-          configurable: !!dDeviceMemory.configurable,
-          enumerable: !!dDeviceMemory.enumerable,
-          allowShapeChange: !!dmIsData,
-          validThis: __isNavigatorThis,
-          invalidThis: 'throw',
-          getImpl: function deviceMemoryGetImpl() {
-            return Reflect.apply(getDeviceMemory, this, []);
-          }
-        }], 'throw');
-        if (appliedDeviceMemory !== 1) {
-          __navDiag('error', 'nav_total_set:deviceMemory_define_failed', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set',
-            key: 'deviceMemory',
-            message: 'failed to define deviceMemory'
-          });
-        }
-      }
-    }
-
-    const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
-    const dHardwareConcurrency = Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency');
-    const dHardwareConcurrencyResolved = __navResolveDescriptor
-      ? __navResolveDescriptor(navProto, 'hardwareConcurrency', { mode: 'proto_chain' })
-      : null;
-    const nativeHardwareConcurrencyGet = (dHardwareConcurrency && typeof dHardwareConcurrency.get === 'function')
-      ? dHardwareConcurrency.get
-      : ((dHardwareConcurrencyResolved && dHardwareConcurrencyResolved.desc && typeof dHardwareConcurrencyResolved.desc.get === 'function')
-        ? dHardwareConcurrencyResolved.desc.get
-        : null);
-    const getHardwareConcurrency = Object.getOwnPropertyDescriptor(({ get hardwareConcurrency() {
-      __navLogAccess('hardwareConcurrency', getHardwareConcurrency);
-      if (!__isNavigatorThis(this)) {
-        if (typeof nativeHardwareConcurrencyGet === 'function') {
-          try {
-            return Reflect.apply(nativeHardwareConcurrencyGet, this, []);
-          } catch (e) {
-            __navDiag('warn', 'nav_total_set:hardwareConcurrency_illegal_invocation', {
-              stage: 'runtime',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:hardwareConcurrency',
-              key: 'hardwareConcurrency',
-              message: 'hardwareConcurrency illegal invocation',
-              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-            }, e);
-            throw e;
-          }
-        }
-        const e = new TypeError();
-        __navDiag('error', 'nav_total_set:hardwareConcurrency_native_get_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:hardwareConcurrency',
-          key: 'hardwareConcurrency',
-          message: 'hardwareConcurrency native getter missing on invalid receiver',
-          data: { outcome: 'throw', reason: 'native_get_missing' }
-        }, e);
-        throw e;
-      }
-      return cpu;
-    }}), 'hardwareConcurrency').get;
-    __navRegisterKey('hardwareConcurrency');
-    __navRegisterFn(getHardwareConcurrency);
-    if (hasHardwareConcurrency) {
-      if (!dHardwareConcurrency) {
-        __navDiag('error', 'nav_total_set:hardwareConcurrency_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set',
-          key: 'hardwareConcurrency',
-          message: 'hardwareConcurrency descriptor missing'
-        });
-      } else {
-        const hcIsData = Object.prototype.hasOwnProperty.call(dHardwareConcurrency, 'value') && !dHardwareConcurrency.get && !dHardwareConcurrency.set;
-        const appliedHardwareConcurrency = applyCoreTargetsGroup('nav_total_set:hardwareConcurrency', [{
-          owner: navProto,
-          key: 'hardwareConcurrency',
-          kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'nav_total_set:hardwareConcurrency',
-          configurable: !!dHardwareConcurrency.configurable,
-          enumerable: !!dHardwareConcurrency.enumerable,
-          allowShapeChange: !!hcIsData,
-          validThis: __isNavigatorThis,
-          invalidThis: 'throw',
-          getImpl: function hardwareConcurrencyGetImpl() {
-            return Reflect.apply(getHardwareConcurrency, this, []);
-          }
-        }], 'throw');
-        if (appliedHardwareConcurrency !== 1) {
-          __navDiag('error', 'nav_total_set:hardwareConcurrency_define_failed', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set',
-            key: 'hardwareConcurrency',
-            message: 'failed to define hardwareConcurrency'
-          });
-        }
-      }
-    }
-
-    // ——— G. language(s) ———
-    const hasLanguage = ('language' in navigator);
-    const dLanguage = Object.getOwnPropertyDescriptor(navProto, 'language');
-    const dLanguageResolved = __navResolveDescriptor
-      ? __navResolveDescriptor(navProto, 'language', { mode: 'proto_chain' })
-      : null;
-    const nativeLanguageGet = (dLanguage && typeof dLanguage.get === 'function')
-      ? dLanguage.get
-      : ((dLanguageResolved && dLanguageResolved.desc && typeof dLanguageResolved.desc.get === 'function')
-        ? dLanguageResolved.desc.get
-        : null);
-    const getLanguage = Object.getOwnPropertyDescriptor(({ get language() {
-      __navLogAccess('language', getLanguage);
-      if (!__isNavigatorThis(this)) {
-        if (typeof nativeLanguageGet === 'function') {
-          try {
-            return Reflect.apply(nativeLanguageGet, this, []);
-          } catch (e) {
-            __navDiag('warn', 'nav_total_set:language_illegal_invocation', {
-              stage: 'runtime',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:language',
-              key: 'language',
-              message: 'language illegal invocation',
-              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-            }, e);
-            throw e;
-          }
-        }
-        const e = new TypeError();
-        __navDiag('error', 'nav_total_set:language_native_get_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:language',
-          key: 'language',
-          message: 'language native getter missing on invalid receiver',
-          data: { outcome: 'throw', reason: 'native_get_missing' }
-        }, e);
-        throw e;
-      }
-      return window.__primaryLanguage;
-    }}), 'language').get;
-    __navRegisterKey('language');
-    __navRegisterFn(getLanguage);
-    if (hasLanguage) {
-      if (!dLanguage) {
-        __navDiag('error', 'nav_total_set:language_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set',
-          key: 'language',
-          message: 'language descriptor missing'
-        });
-      } else {
-        const langIsData = Object.prototype.hasOwnProperty.call(dLanguage, 'value') && !dLanguage.get && !dLanguage.set;
-        const appliedLanguage = applyCoreTargetsGroup('nav_total_set:language', [{
-          owner: navProto,
-          key: 'language',
-          kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'nav_total_set:language',
-          configurable: !!dLanguage.configurable,
-          enumerable: !!dLanguage.enumerable,
-          allowShapeChange: !!langIsData,
-          validThis: __isNavigatorThis,
-          invalidThis: 'throw',
-          getImpl: function languageGetImpl() {
-            return Reflect.apply(getLanguage, this, []);
-          }
-        }], 'throw');
-        if (appliedLanguage !== 1) {
-          __navDiag('error', 'nav_total_set:language_define_failed', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set',
-            key: 'language',
-            message: 'failed to define language'
-          });
-        }
-      }
-    }
-
-    const hasLanguages = ('languages' in navigator);
-    const dLanguages = Object.getOwnPropertyDescriptor(navProto, 'languages');
-    const dLanguagesResolved = __navResolveDescriptor
-      ? __navResolveDescriptor(navProto, 'languages', { mode: 'proto_chain' })
-      : null;
-    const nativeLanguagesGet = (dLanguages && typeof dLanguages.get === 'function')
-      ? dLanguages.get
-      : ((dLanguagesResolved && dLanguagesResolved.desc && typeof dLanguagesResolved.desc.get === 'function')
-        ? dLanguagesResolved.desc.get
-        : null);
-    const getLanguages = Object.getOwnPropertyDescriptor(({ get languages() {
-      __navLogAccess('languages', getLanguages);
-      if (!__isNavigatorThis(this)) {
-        if (typeof nativeLanguagesGet === 'function') {
-          try {
-            return Reflect.apply(nativeLanguagesGet, this, []);
-          } catch (e) {
-            __navDiag('warn', 'nav_total_set:languages_illegal_invocation', {
-              stage: 'runtime',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:languages',
-              key: 'languages',
-              message: 'languages illegal invocation',
-              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-            }, e);
-            throw e;
-          }
-        }
-        const e = new TypeError();
-        __navDiag('error', 'nav_total_set:languages_native_get_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:languages',
-          key: 'languages',
-          message: 'languages native getter missing on invalid receiver',
-          data: { outcome: 'throw', reason: 'native_get_missing' }
-        }, e);
-        throw e;
-      }
-      return window.__normalizedLanguages;
-    }}), 'languages').get;
-    __navRegisterKey('languages');
-    __navRegisterFn(getLanguages);
-    if (hasLanguages) {
-      if (!dLanguages) {
-        __navDiag('error', 'nav_total_set:languages_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set',
-          key: 'languages',
-          message: 'languages descriptor missing'
-        });
-      } else {
-        const langsIsData = Object.prototype.hasOwnProperty.call(dLanguages, 'value') && !dLanguages.get && !dLanguages.set;
-        const appliedLanguages = applyCoreTargetsGroup('nav_total_set:languages', [{
-          owner: navProto,
-          key: 'languages',
-          kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'nav_total_set:languages',
-          configurable: !!dLanguages.configurable,
-          enumerable: !!dLanguages.enumerable,
-          allowShapeChange: !!langsIsData,
-          validThis: __isNavigatorThis,
-          invalidThis: 'throw',
-          getImpl: function languagesGetImpl() {
-            return Reflect.apply(getLanguages, this, []);
-          }
-        }], 'throw');
-        if (appliedLanguages !== 1) {
-          __navDiag('error', 'nav_total_set:languages_define_failed', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set',
-            key: 'languages',
-            message: 'failed to define languages'
-          });
-        }
-      }
-    }
+    // ——— F/G. strict scalar runtime-backed accessors ———
+    patchStrictScalarAccessor('deviceMemory', 'deviceMemory' in navProto ? () => mem : null, 'nav_total_set:deviceMemory');
+    patchStrictScalarAccessor('hardwareConcurrency', 'hardwareConcurrency' in navProto ? () => cpu : null, 'nav_total_set:hardwareConcurrency');
+    patchStrictScalarAccessor('language', 'language' in navProto ? () => window.__primaryLanguage : null, 'nav_total_set:language');
+    patchStrictScalarAccessor('languages', 'languages' in navProto ? () => window.__normalizedLanguages : null, 'nav_total_set:languages');
 
   
    
@@ -2723,12 +2362,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
       // Getters - like in ORIG: enumerable: true
       if ('plugins' in navigator) {
-        const dPlugins = Object.getOwnPropertyDescriptor(navProto, 'plugins');
-        safeDefineAcc(navProto, 'plugins', __wrapGetter('plugins', () => createPluginArray(fakePlugins), dPlugins, __isNavigatorThis), { enumerable: true });
+        patchObjectReturnAccessor('plugins', function pluginsAccessorValue() {
+          return createPluginArray(fakePlugins);
+        }, 'nav_total_set:plugins');
       }
       if ('mimeTypes' in navigator) {
-        const dMimeTypes = Object.getOwnPropertyDescriptor(navProto, 'mimeTypes');
-        safeDefineAcc(navProto, 'mimeTypes', __wrapGetter('mimeTypes', () => createMimeTypeArray(fakePlugins), dMimeTypes, __isNavigatorThis), { enumerable: true });
+        patchObjectReturnAccessor('mimeTypes', function mimeTypesAccessorValue() {
+          return createMimeTypeArray(fakePlugins);
+        }, 'nav_total_set:mimeTypes');
       }
 
    

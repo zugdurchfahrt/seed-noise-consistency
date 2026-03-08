@@ -401,6 +401,8 @@ def init_driver(
             // ——— Worker env diagnostics (pre-bootstrap) ———//
             // console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             __PROBE_LIVE_READER__.start();
+            DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
+            __DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
             })(window);
             """
         ]
@@ -1063,7 +1065,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://pixelscan.net/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/prototype.html")
 
         # PLEASE, DO NO REMOVE THIS, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)

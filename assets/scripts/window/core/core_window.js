@@ -533,7 +533,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
     // Disabled by policy: keep native `Function.prototype.toString` unchanged.
     // markAsNative metadata may still be used by other Core bridges, but we do not install a toString Proxy.
-    let skipToStringInstall = true;
+    let skipToStringInstall = false;
     if (!skipToStringInstall && sharedCoreToStringStateOk) {
       const markAsNative = ensureMarkAsNative();
       const probe = function probe(){};
@@ -567,24 +567,73 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }, e);
         throw e;
       }
-      const actual = currentToString.call(probe);
-      if (actual !== expected) {
-        const e = new Error('[CoreWindow] toString bridge mismatch');
-        __emit('error', 'core_window:toString_bridge_mismatch', {
+      let actual = null;
+      let currentToStringProbeErr = null;
+      try {
+        actual = Reflect.apply(currentToString, probe, []);
+      } catch (e) {
+        currentToStringProbeErr = e;
+      }
+      if (currentToStringProbeErr) {
+        __emit('warn', 'core_window:toString_existing_probe_failed', {
           module: 'core',
           diagTag: 'core_window',
           surface: 'core',
           key: 'Function.prototype.toString',
           stage: 'contract',
-          message: 'existing toString does not honor shared overrideMap labels',
-          type: 'contract_violation',
-          data: { outcome: 'throw' }
-        }, e);
-        throw e;
+          message: 'existing toString probe threw; reinstalling bridge',
+          type: 'browser structure missing data',
+          data: { outcome: 'return', fallback: 'reinstall_bridge', stx: (currentToStringProbeErr && currentToStringProbeErr.stack) ? String(currentToStringProbeErr.stack) : null }
+        }, currentToStringProbeErr);
+      } else if (actual !== expected) {
+        __emit('warn', 'core_window:toString_bridge_mismatch', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'contract',
+          message: 'existing toString does not honor shared overrideMap labels; reinstalling bridge',
+          type: 'contract violation',
+          data: { outcome: 'return', fallback: 'reinstall_bridge' }
+        }, null);
+      } else {
+        let oracleBridgeMatch = true;
+        if (typeof iframeOracleToString === 'function') {
+          try {
+            const oracleNativeSelf = Reflect.apply(iframeOracleToString, nativeToString, []);
+            const oracleCurrentSelf = Reflect.apply(iframeOracleToString, currentToString, []);
+            oracleBridgeMatch = (oracleCurrentSelf === oracleNativeSelf);
+            if (!oracleBridgeMatch) {
+              __emit('warn', 'core_window:toString_existing_oracle_mismatch', {
+                module: 'core',
+                diagTag: 'core_window',
+                surface: 'core',
+                key: 'Function.prototype.toString',
+                stage: 'contract',
+                message: 'existing toString differs from oracle native self; reinstalling bridge',
+                type: 'contract violation',
+                data: { outcome: 'return', fallback: 'reinstall_bridge', oracleCurrentSelf: String(oracleCurrentSelf), oracleNativeSelf: String(oracleNativeSelf) }
+              }, null);
+            }
+          } catch (oracleProbeErr) {
+            oracleBridgeMatch = false;
+            __emit('warn', 'core_window:toString_existing_oracle_probe_failed', {
+              module: 'core',
+              diagTag: 'core_window',
+              surface: 'core',
+              key: 'Function.prototype.toString',
+              stage: 'contract',
+              message: 'existing toString oracle probe failed; reinstalling bridge',
+              type: 'browser structure missing data',
+              data: { outcome: 'return', fallback: 'reinstall_bridge', stx: (oracleProbeErr && oracleProbeErr.stack) ? String(oracleProbeErr.stack) : null }
+            }, oracleProbeErr);
+          }
+        }
+        if (oracleBridgeMatch) {
+          // Already installed and consistent: do not re-install another Proxy layer.
+          skipToStringInstall = true;
+        }
       }
-
-      // Already installed and consistent: do not re-install another Proxy layer.
-      skipToStringInstall = true;
     } else if (!skipToStringInstall && typeof iframeOracleToString === 'function' && typeof currentToString === 'function') {
       let oracleNativeSelf = null;
       let oracleCurrentSelf = null;

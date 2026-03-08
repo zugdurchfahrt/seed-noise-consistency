@@ -272,6 +272,10 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   try {
     const nav = navigator;
+    const navProto = Object.getPrototypeOf(nav);
+    const __isNavigatorThis = function __isNavigatorThis(self) {
+      return !!self && (self === nav || (navProto && typeof navProto.isPrototypeOf === 'function' && navProto.isPrototypeOf(self)));
+    };
     const wdResolved = resolveDescriptor(nav, 'webdriver', { mode: 'proto_chain' });
     if (!wdResolved || !wdResolved.desc) {
       degrade('hide_webdriver:webdriver_missing', null, {
@@ -301,6 +305,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       return;
     } else {
       const wdDesc = cloneDesc(wdResolved.desc);
+      const wdOwner = (wdResolved && wdResolved.owner) ? wdResolved.owner : navProto;
       if (wdDesc && wdDesc.configurable === false) {
         const e = new TypeError('[HideWebdriverPatchModule] webdriver non-configurable');
         degrade('hide_webdriver:webdriver_non_configurable', e, {
@@ -329,21 +334,49 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         }
         return;
       }
+      if (!wdOwner || wdOwner === nav) {
+        degrade('hide_webdriver:webdriver_owner_mismatch', null, {
+          level: 'error',
+          diagTag: 'hide_webdriver:webdriver',
+          key: 'webdriver',
+          stage: 'preflight',
+          message: 'webdriver resolved to instance owner',
+          type: __typeBrowser,
+          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+        });
+        try {
+          if (__core && typeof __core.releaseGuardFlag === 'function') {
+            __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
+          }
+        } catch (eRelease) {
+          degrade(__tag + ':guard_release_failed', eRelease, {
+            level: 'warn',
+            diagTag: __tag,
+            key: __flagKey,
+            stage: 'guard',
+            message: 'releaseGuardFlag threw on preflight skip',
+            type: __typePipeline,
+            data: { outcome: 'skip', reason: 'guard_release_failed' }
+          });
+        }
+        return;
+      }
+      const wdIsData = !!wdDesc && Object.prototype.hasOwnProperty.call(wdDesc, 'value') && !wdDesc.get && !wdDesc.set;
       const wdTarget = {
-        owner: nav,
+        owner: wdOwner,
         key: 'webdriver',
         resolve: 'proto_chain',
         policy: 'strict',
         wrapLayer: 'named_wrapper_strict',
         diagTag: 'hide_webdriver:webdriver',
         kind: 'accessor',
+        allowCreate: false,
+        configurable: !!wdDesc.configurable,
+        enumerable: !!wdDesc.enumerable,
         getImpl: function getWebdriverImpl() { return false; },
-        validThis: function validWebdriverThis(self) {
-          return self === nav;
-        },
+        validThis: __isNavigatorThis,
         invalidThis: 'native'
       };
-      const wdIsData = !!wdDesc && Object.prototype.hasOwnProperty.call(wdDesc, 'value') && !wdDesc.get && !wdDesc.set;
       if (wdIsData) {
         wdTarget.allowShapeChange = true;
       }
