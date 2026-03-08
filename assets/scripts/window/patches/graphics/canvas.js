@@ -360,32 +360,32 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   function q256(v){ return Math.round(v * 256) / 256; }
 
-  function makeCanvas(w, h) {
-    // быстрая нормализация размеров
-    w = w | 0; h = h | 0; if (w <= 0 || h <= 0) return null;
+  // function makeCanvas(w, h) {
+  //   // быстрая нормализация размеров
+  //   w = w | 0; h = h | 0; if (w <= 0 || h <= 0) return null;
 
-    // 1) предпочитаем OffscreenCanvas, если доступен
-    if (typeof OffscreenCanvas !== 'undefined') {
-      try { return new OffscreenCanvas(w, h); } catch (e) {
-        emitCanvasDiag('warn', 'canvas:makeCanvas:apply:offscreen_construct_failed', e, {
-          stage: 'apply',
-          key: 'OffscreenCanvas',
-          type: 'browser structure missing data'
-        });
-      }
-    if (typeof document !== 'undefined') { const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
-    }
+  //   // 1) предпочитаем OffscreenCanvas, если доступен
+  //   if (typeof OffscreenCanvas !== 'undefined') {
+  //     try { return new OffscreenCanvas(w, h); } catch (e) {
+  //       emitCanvasDiag('warn', 'canvas:makeCanvas:apply:offscreen_construct_failed', e, {
+  //         stage: 'apply',
+  //         key: 'OffscreenCanvas',
+  //         type: 'browser structure missing data'
+  //       });
+  //     }
+  //   if (typeof document !== 'undefined') { const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+  //   }
     
-    // 2) фолбэк: DOM <canvas>
-    if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
-      const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      return c;
-    }
+  //   // 2) фолбэк: DOM <canvas>
+  //   if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+  //     const c = document.createElement('canvas');
+  //     c.width = w; c.height = h;
+  //     return c;
+  //   }
 
-    // 3) среда без обоих вариантов
-    return null;
-  }
+  //   // 3) среда без обоих вариантов
+  //   return null;
+  // }
 
 
 

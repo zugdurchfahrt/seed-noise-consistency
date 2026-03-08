@@ -651,12 +651,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     return familyMatches[0];
   }
 
-  function buildManagedInvalidSource(cfg) {
-    const cfgUrl = cfg && typeof cfg.url === 'string' ? cfg.url : '';
-    const commaIndex = cfgUrl.indexOf(',');
-    if (!cfgUrl || !/^data:font\/woff2;base64,/i.test(cfgUrl) || commaIndex === -1) return null;
-    return `url(${JSON.stringify(cfgUrl.slice(0, commaIndex + 1))}) format("woff2")`;
-  }
 
   function sanitizeFontFaceSource(source, family, descriptors) {
     if (typeof source !== 'string') {
@@ -665,7 +659,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         hadLocal: false,
         hadOnlyLocal: false,
         localOnlyPassthrough: false,
-        localOnlyBlocked: false,
         unexpectedSourceType: false,
         runtimeConfigMatched: false
       };
@@ -698,14 +691,12 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         hadLocal: false,
         hadOnlyLocal: false,
         localOnlyPassthrough: false,
-        localOnlyBlocked: false,
         unexpectedSourceType: unexpectedSourceType,
         runtimeConfigMatched: false
       };
     }
 
     const matchedCfg = matchRuntimeFontConfig(family, descriptors);
-    const invalidManagedSource = buildManagedInvalidSource(matchedCfg) || buildManagedInvalidSource(getRuntimeFontConfigs()[0]);
 
     if (!filtered.length) {
       if (invalidManagedSource) {
@@ -714,7 +705,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           hadLocal: true,
           hadOnlyLocal: true,
           localOnlyPassthrough: false,
-          localOnlyBlocked: true,
           unexpectedSourceType: unexpectedSourceType,
           runtimeConfigMatched: !!matchedCfg
         };
@@ -724,7 +714,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         hadLocal: true,
         hadOnlyLocal: true,
         localOnlyPassthrough: true,
-        localOnlyBlocked: false,
         unexpectedSourceType: unexpectedSourceType,
         runtimeConfigMatched: !!matchedCfg
       };
@@ -735,7 +724,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       hadLocal: true,
       hadOnlyLocal: false,
       localOnlyPassthrough: false,
-      localOnlyBlocked: false,
       unexpectedSourceType: unexpectedSourceType,
       runtimeConfigMatched: !!matchedCfg
     };
@@ -797,20 +785,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
               data: {
                 outcome: 'return',
                 reason: 'unexpected_source_type',
-                family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
-                runtimeConfigMatched: !!sanitized.runtimeConfigMatched
-              }
-            }, null);
-          }
-          if (sanitized.localOnlyBlocked) {
-            __fontDiagPipeline('info', 'fonts:fontface:local_only_replaced_with_managed_invalid_src', {
-              stage: 'runtime',
-              diagTag: 'fonts:fontface',
-              key: 'FontFace',
-              message: 'FontFace local-only source replaced with managed invalid data src',
-              data: {
-                outcome: 'return',
-                reason: 'local_only_replaced_with_managed_invalid_src',
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
                 runtimeConfigMatched: !!sanitized.runtimeConfigMatched
               }
