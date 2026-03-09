@@ -473,6 +473,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
   }
 
   // === WEBGL PATCHING ===
+  // METHODOLOGY NOTE:
+  // WebGL patchMethod is a separate context-level gateway contract.
+  // Its current preflight sequence, diag/console logging, and override-log toggles
+  // are part of the patch semantics here, not incidental debug noise.
+  // Do not remove, reorder, or "normalize" these paths without explicit manual
+  // approval and runtime revalidation of this module.
 
   // ===== WEBGL hook override logging: two toggles (ВКЛ/ВЫКЛ) =====
   // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override" (emitContextDiag + console.warn ниже),
@@ -515,7 +521,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
         return false;
       }
 
-      const preflight = corePreflight(proto, method, 'method', 'context:webgl:patchMethod');
+      const preflight = corePreflight(proto, method, 'method', 'context:webgl:patchMethod', {
+        wrapLayer: 'named_wrapper',
+        policy: 'throw'
+      });
       const desc = preflight.desc || Object.getOwnPropertyDescriptor(proto, method);
       if (!desc || typeof desc.value !== 'function') {
         throw new TypeError(`[patchMethod] not a function: ${method}`);

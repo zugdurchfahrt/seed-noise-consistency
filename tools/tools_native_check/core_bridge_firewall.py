@@ -10,17 +10,6 @@ brandmauer_logger = logger.getChild("brandmauer")
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
-def _line_no(text: str, offset: int) -> int:
-    return text.count("\n", 0, offset) + 1
-
-
-def _line_text(lines: list[str], line_no: int) -> str:
-    idx = line_no - 1
-    if idx < 0 or idx >= len(lines):
-        return ""
-    return lines[idx].strip()
-
-
 def collect_core_bridge_violations(project_root: Path) -> dict:
     root = Path(project_root) / "assets" / "scripts"
     violations = []

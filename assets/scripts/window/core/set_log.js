@@ -867,6 +867,9 @@ const LOGGingModule = function LOGGingModule() {
       const runtimeTag = runtimeLevel ? "runtime" : "";
       const topMessage = (safeEntry && typeof safeEntry.message === "string") ? safeEntry.message : "";
       const topError = (safeEntry && typeof safeEntry.error === "string") ? safeEntry.error : "";
+      const resolvedMessage = extra && typeof extra.message === "string"
+        ? extra.message
+        : (topMessage || (error && typeof error.message === "string" ? error.message : ""));
       return {
         idx: index,
         timestamp: safeEntry && safeEntry.timestamp ? String(safeEntry.timestamp) : "",
@@ -884,10 +887,10 @@ const LOGGingModule = function LOGGingModule() {
         key: (extra && typeof extra.key === "string" && extra.key)
           ? extra.key
           : ((safeEntry && typeof safeEntry.key === "string" && safeEntry.key) ? safeEntry.key : ""),
-        message: extra && typeof extra.message === "string"
-          ? extra.message
-          : (topMessage || (error && typeof error.message === "string" ? error.message : "")),
-        error: error && typeof error.name === "string" ? error.name : topError
+        message: resolvedMessage,
+        error: (error && typeof error.name === "string" && error.name)
+          ? error.name
+          : (topError || resolvedMessage)
       };
     }
 
