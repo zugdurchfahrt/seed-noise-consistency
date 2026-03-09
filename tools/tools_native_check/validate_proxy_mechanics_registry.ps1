@@ -11,7 +11,7 @@ WHAT IT GUARANTEES (STATIC CHECKS)
   - Spot-checks a few modules for explicit/non-explicit wrapLayer usage expectations.
 
 NOT A RUNTIME TEST
-  - This script only regex-checks file contents (fail-fast via "ASSERT FAILED: ...").
+  - This script only regex-checks file contents (accumulate-mode; prints all "ASSERT FAILED: ..." findings before exit 1).
   - If it fails after legitimate refactors/renames in Core, update the patterns/messages here or in the registry/doc.
 
 EXPECTED OUTPUT
@@ -19,6 +19,15 @@ EXPECTED OUTPUT
 #>
 
 $ErrorActionPreference = "Stop"
+$script:Findings = New-Object System.Collections.Generic.List[string]
+
+function Add-Finding {
+  param(
+    [Parameter(Mandatory = $true)][string]$Message,
+    [Parameter(Mandatory = $true)][string]$Pattern
+  )
+  $script:Findings.Add("ASSERT FAILED: $Message (pattern: $Pattern)")
+}
 
 function Assert-Contains {
   param(
@@ -27,7 +36,7 @@ function Assert-Contains {
     [Parameter(Mandatory = $true)][string]$Message
   )
   if ($Text -notmatch $Pattern) {
-    throw "ASSERT FAILED: $Message (pattern: $Pattern)"
+    Add-Finding -Message $Message -Pattern $Pattern
   }
 }
 
@@ -38,13 +47,13 @@ function Assert-NotContains {
     [Parameter(Mandatory = $true)][string]$Message
   )
   if ($Text -match $Pattern) {
-    throw "ASSERT FAILED: $Message (pattern: $Pattern)"
+    Add-Finding -Message $Message -Pattern $Pattern
   }
 }
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-# This script lives in `Samples4Context/`; repo root is its parent folder.
-$repo = Resolve-Path (Join-Path $root "..") | Select-Object -ExpandProperty Path
+# This script lives in `sunami/tools/tools_native_check/`; repo root is three levels above.
+$repo = Resolve-Path (Join-Path $root "..\\..\\..") | Select-Object -ExpandProperty Path
 
 $coreWindowPath = Join-Path $repo "sunami\\assets\\scripts\\window\\core\\core_window.js"
 $coreText = Get-Content -Path $coreWindowPath -Raw
@@ -100,5 +109,10 @@ $navTotal = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'named_wrapper'" -Message "nav_total_set.js must include named_wrapper wrapLayer (documented as synthetic_named)"
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'descriptor_only'" -Message "nav_total_set.js must include descriptor_only wrapLayer (documented as native_descriptor data-path)"
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'core_wrapper'" -Message "nav_total_set.js must include core_wrapper wrapLayer (documented as core_proxy)"
+
+if ($script:Findings.Count -gt 0) {
+  $script:Findings | ForEach-Object { Write-Host $_ }
+  exit 1
+}
 
 Write-Host "OK: validate_proxy_mechanics_registry.ps1"

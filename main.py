@@ -63,6 +63,10 @@ from profile_data_source.datashell_win32 import data_4_win32
 from profile_data_source.macintel import macintel_data
 # ----------------------- MODULES-----------------------
 import tools.tools_runtime.cdp_catapult as cdp
+import tools.tools_runtime.helpers as helpers_module
+import tools.tools_runtime.headers_adapter as headers_adapter_module
+import tools.tools_infra.vpn_utils as vpn_utils_module
+import profile_data_source.plugins_dict as plugins_dict_module
 from profile_data_source.plugins_dict import build_plugins_profile
 from tools.tools_runtime.helpers import (
     build_device_metrics,
@@ -89,6 +93,28 @@ setup_logger(child_levels={
 
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
+
+
+def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
+    if not isinstance(global_seed, str) or not global_seed.strip():
+        raise ValueError("global_seed must be a non-empty string")
+
+    root = "__RAND_SEED_POOL__"
+
+    def _rng_for(label: str) -> random.Random:
+        if not isinstance(label, str) or not label.strip():
+            raise ValueError("rng pool label must be a non-empty string")
+        material = f"{root}|{label}|{global_seed}".encode("utf-8")
+        numeric_seed = int.from_bytes(hashlib.sha256(material).digest()[:8], "big")
+        return random.Random(numeric_seed)
+
+    return {
+        "profile": _rng_for("profile"),
+        "plugins": _rng_for("plugins"),
+        "headers": _rng_for("headers"),
+        "vpn": _rng_for("vpn"),
+    }
+
 # ----------------------- PROFILE FUNCTION -----------------------
 def get_random_profile(country_data, platform):
     return {}
@@ -237,7 +263,6 @@ def init_driver(
         **driver_kwargs,
     )
     logger.info("Initiating Webdriver...")
-    driver._stealth_seed = global_seed
 
     def _get_cdp_port(driver, user_data_dir):
         # 1) самый надёжный вариант: debuggerAddress от chromedriver
@@ -679,18 +704,14 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
 def main():
     global global_seed, profile
     global_seed = uuid.uuid4().hex
-    seed_int = int(hashlib.md5(global_seed.encode('utf-8')).hexdigest()[:8], 16)
-    random.seed(seed_int)
+    seed_int = _build_rng_pools(global_seed)
     os.environ['__GLOBAL_SEED'] = global_seed
     logger.info(f"Seed for the current session has been generated: {global_seed}")
-    try:
-        seed_fp = hashlib.sha256(global_seed.encode("utf-8")).hexdigest()[:12]
-        logger.info("Seed fingerprint rule: sha256_12 = sha256(seed)[:12]")
-        logger.info("Seed fingerprint: len=%s sha256_12=%s", len(global_seed), seed_fp)
-    except Exception:
-        logger.info("Seed fingerprint: unavailable")
-    enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer"))
+
+    vpn_rng = seed_int["vpn"]
+    vpn_utils_module.random = vpn_rng
     client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
+    enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer"))
     try:
         json_path = str(PROFILE_DATA_SRC/ "profile.json")
         if os.path.exists(json_path):
@@ -703,15 +724,25 @@ def main():
         # client.connect()
         client._kill_old_processes()
         client._clean_directories()
-       
-       
         client.post()
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()
         country_data = data["country_data"]
-        profile = get_random_profile(country_data, None)
-
+       
+        # -------- Getting PRNG random for each module -------------------
+        profile_rng = seed_int["profile"]
+        plugins_rng = seed_int["plugins"]
+        headers_rng = seed_int["headers"]
+        helpers_module.random = profile_rng
+        plugins_dict_module.random = plugins_rng
+        
+        if hasattr(headers_adapter_module, "_pick_nav_template"):
+            headers_adapter_module._pick_nav_template.cache_clear()
+        headers_adapter_module.random = headers_rng
+        
         # -------- Your PLATFORM and BROWSER preferences for random selection -------------------
+        profile = get_random_profile(country_data, None)
+        
         config = {
             # Supported platforms List
             "enabled_platforms": ["Win32", "MacIntel"],
@@ -724,11 +755,11 @@ def main():
             },
         }
         # --------PLATFORM selection -------------------
-        platform = random.choices(config["enabled_platforms"],
-                                weights=config["platform_weights"], k=1)[0]
+        platform = profile_rng.choices(config["enabled_platforms"],
+                                       weights=config["platform_weights"], k=1)[0]
         data = data_4_win32 if platform == "Win32" else macintel_data
         # -------- OS selection -------------------
-        os_opt = random.choice(data["os_options"]) # dict: {os_info, os_name, os_version}
+        os_opt = profile_rng.choice(data["os_options"]) # dict: {os_info, os_name, os_version}
         os_info = os_opt["os_info"]
         os_name = os_opt["os_name"].replace("(", "").replace(")", "").strip()
 
@@ -768,7 +799,7 @@ def main():
         )
 
         # --------BROWSER selection -------------------
-        browser_choice = random.choices(
+        browser_choice = profile_rng.choices(
             *config["browser_weights"][platform], k=1
         )[0]
         # as Windows version branches are hard-pinned to kernel browser versions
@@ -781,8 +812,8 @@ def main():
             prefixes = CHROMIUM_PREFIX_MAP.get(platform_version)
             if not prefixes:
                 # for macOS use whole pool, without being tied to browser kernel version
-                return random.choice([v.split(".")[0] for v in chrome_versions])
-            return random.choice(prefixes).rstrip(".")  # "134" / "135" / "137"
+                return profile_rng.choice([v.split(".")[0] for v in chrome_versions])
+            return profile_rng.choice(prefixes).rstrip(".")  # "134" / "135" / "137"
 
         def pick_product_version(src: list[str], major: str) -> str:
             """
@@ -794,7 +825,7 @@ def main():
             if not filt:
                 #  Avoiding incompatible version pairs
                 raise RuntimeError(f"No builds {major}.* in source")
-            return random.choice(filt)
+            return profile_rng.choice(filt)
 
         def split_version(version: str) -> tuple[str, str]:
             """
@@ -826,7 +857,7 @@ def main():
             else:  # MacIntel
                 if browser_choice == "chrome":
                     # macOS does not have binding to Windows CHROMIUM_PREFIX_MAP
-                    version = random.choice(chrome_versions)
+                    version = profile_rng.choice(chrome_versions)
                     version, version_ua = split_version(version)
                     os_info_chrome = os_info  # formatted for typing like "Macintosh; Intel Mac OS X 10_15_7"
                     user_agent = (
@@ -834,10 +865,10 @@ def main():
                         f"(KHTML, like Gecko) Chrome/{version_ua} Safari/537.36"
                     )
         elif browser_choice == "firefox":
-            version = random.choice(firefox_versions)
+            version = profile_rng.choice(firefox_versions)
             user_agent = f"Mozilla/5.0 ({os_info}; rv:{version}) Gecko/20100101 Firefox/{version}"
         elif browser_choice == "safari":
-            version = random.choice(safari_versions)
+            version = profile_rng.choice(safari_versions)
             os_info_safari = os_info.replace("_", ".")
             user_agent = f"Mozilla/5.0 ({os_info_safari}) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{version} Safari/605.1.15"
         else:
@@ -861,23 +892,23 @@ def main():
         device_memory_value, hardware_concurrency_value = choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac)
 
         # -----------------------  navigator.plugins и navigator.mimeTypes -----------------------
-        plugins_final, mime_types_final = build_plugins_profile(browser_choice, strict=False)
+        plugins_final, mime_types_final = build_plugins_profile(browser_choice, rng=plugins_rng, strict=False)
 
         # ----------------------- mediaDevices.enumerateDevices -----------------------
-        audioinput = random.choice(data["audioinput"])['name']
-        videoinput = random.choice(data["videoinput"])['name']
-        audiooutput = random.choice(data["headphone"])['name']
+        audioinput = profile_rng.choice(data["audioinput"])['name']
+        videoinput = profile_rng.choice(data["videoinput"])['name']
+        audiooutput = profile_rng.choice(data["headphone"])['name']
         devices_conf = {"audioinput": audioinput, "videoinput": videoinput, "audiooutput": audiooutput}
 
 
         # # ----------------------------Setting up GPU and Screen -----------------------
-        gpu = random.choice(data["GPU"])
+        gpu = profile_rng.choice(data["GPU"])
         gpu_architecture = str(gpu.get("architecture", "")).strip()
         gpu_type = str(gpu.get("type", ""))
         gpu_name = gpu["name"]
         gpu_code = gpu["prod_code"]
 
-        screen_res = random.choice(gpu["resolution"])
+        screen_res = profile_rng.choice(gpu["resolution"])
         if not isinstance(screen_res, str) or not re.fullmatch(r"[1-9]\d{2,4}x[1-9]\d{2,4}", screen_res):
             raise ValueError(f"invalid screen resolution from GPU dictionary: {screen_res!r}")
         screen_width, screen_height = map(int, screen_res.split("x", 1))

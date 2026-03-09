@@ -5,7 +5,7 @@ import pathlib
 from pathlib import Path
 from tools.tools_infra.overseer import logger
 
-bandmauer_logger = logger.getChild("bandmauer")
+brandmauer_logger = logger.getChild("brandmauer")
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -72,42 +72,47 @@ def collect_core_bridge_violations(project_root: Path) -> dict:
         for line in failure_text_clean.splitlines():
             if "ASSERT FAILED:" not in line:
                 continue
-            assert_lines.append(line.split("|", 1)[-1].strip())
+            cleaned_line = line.strip()
+            if "|" in cleaned_line and cleaned_line.lstrip().startswith("|"):
+                cleaned_line = cleaned_line.split("|", 1)[-1].strip()
+            assert_lines.append(cleaned_line)
 
-        failure_message = assert_lines[-1] if assert_lines else failure_text_clean.splitlines()[-1].strip()
-        if failure_message.startswith("ASSERT FAILED:"):
-            failure_message = failure_message[len("ASSERT FAILED:"):].strip()
-        if " (pattern:" in failure_message:
-            failure_message = failure_message.split(" (pattern:", 1)[0].strip()
+        failure_messages = assert_lines if assert_lines else [failure_text_clean.splitlines()[-1].strip()]
 
-        failure_file = str(validator_path)
-        js_match = re.search(r"([A-Za-z0-9_.-]+\.js)\b", failure_message)
-        if js_match and js_match.group(1) in basename_to_path:
-            failure_file = basename_to_path[js_match.group(1)]
-        elif (
-            "Core " in failure_message
-            or "normalizeWrapLayer" in failure_message
-            or "normalizePolicy" in failure_message
-            or "__wrapNativeApply" in failure_message
-            or "toString" in failure_message
-            or "applyTargets" in failure_message
-            or "patchMethod" in failure_message
-        ):
-            failure_file = core_window_path
+        for failure_message in failure_messages:
+            if failure_message.startswith("ASSERT FAILED:"):
+                failure_message = failure_message[len("ASSERT FAILED:"):].strip()
+            if " (pattern:" in failure_message:
+                failure_message = failure_message.split(" (pattern:", 1)[0].strip()
 
-        rule = "registry_validation_failed"
-        if failure_message:
-            rule = re.sub(r"[^a-z0-9]+", "_", failure_message.lower()).strip("_") or rule
+            failure_file = str(validator_path)
+            js_match = re.search(r"([A-Za-z0-9_.-]+\.js)\b", failure_message)
+            if js_match and js_match.group(1) in basename_to_path:
+                failure_file = basename_to_path[js_match.group(1)]
+            elif (
+                "Core " in failure_message
+                or "normalizeWrapLayer" in failure_message
+                or "normalizePolicy" in failure_message
+                or "__wrapNativeApply" in failure_message
+                or "toString" in failure_message
+                or "applyTargets" in failure_message
+                or "patchMethod" in failure_message
+            ):
+                failure_file = core_window_path
 
-        violation = {
-            "rule": rule,
-            "file": failure_file,
-            "line": 0,
-            "text": failure_message,
-        }
-        violations.append(violation)
-        violations_by_file.setdefault(failure_file, []).append(violation)
-        violation_counts_by_rule[rule] = violation_counts_by_rule.get(rule, 0) + 1
+            rule = "registry_validation_failed"
+            if failure_message:
+                rule = re.sub(r"[^a-z0-9]+", "_", failure_message.lower()).strip("_") or rule
+
+            violation = {
+                "rule": rule,
+                "file": failure_file,
+                "line": 0,
+                "text": failure_message,
+            }
+            violations.append(violation)
+            violations_by_file.setdefault(failure_file, []).append(violation)
+            violation_counts_by_rule[rule] = violation_counts_by_rule.get(rule, 0) + 1
 
     violated_files = sorted(violations_by_file)
     clean_files = [file_path for file_path in scanned_file_paths if file_path not in violations_by_file]
@@ -184,4 +189,3 @@ def enforce_core_bridge_firewall(project_root: Path, logger=None) -> dict:
         f"{len(violations)} (scanned_files={scanned_files})\n" + "\n".join(preview)
     )
     return result
-
