@@ -147,6 +147,19 @@ const LOGGingModule = function LOGGingModule() {
         if (!Object.prototype.hasOwnProperty.call(DIAG_RUNTIME_TYPES, entryType)) return null;
         const lvl = DIAG_RUNTIME_TYPES[entryType];
         const msg = (typeof entry.message === "string" && entry.message) ? entry.message : null;
+        const runtimeData = {};
+        if (Object.prototype.hasOwnProperty.call(entry, "data")) {
+          runtimeData.data = normalizeForJSON(entry.data);
+        }
+        if (typeof entry.stack === "string" && entry.stack) runtimeData.stack = entry.stack;
+        if (typeof entry.source === "string" && entry.source) runtimeData.source = entry.source;
+        if (typeof entry.filename === "string" && entry.filename) runtimeData.filename = entry.filename;
+        if (typeof entry.lineno === "number") runtimeData.lineno = entry.lineno;
+        if (typeof entry.colno === "number") runtimeData.colno = entry.colno;
+        if (Object.prototype.hasOwnProperty.call(entry, "error")) {
+          runtimeData.error = normalizeForJSON(entry.error);
+        }
+        const hasRuntimeData = Object.keys(runtimeData).length > 0;
         return {
           idx: (typeof idx === "number") ? idx : null,
           timestamp: safeEntryTimestamp(entry),
@@ -162,7 +175,7 @@ const LOGGingModule = function LOGGingModule() {
           errName: null,
           errMessage: msg,
           diagType: "browser structure missing data",
-          data: null
+          data: hasRuntimeData ? runtimeData : null
         };
       } catch (_) {
         return null;
@@ -844,21 +857,37 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     function __probeLiveEntryToRow(entry, index) {
-      const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
-      const error = (entry && entry.error && typeof entry.error === "object") ? entry.error : null;
+      const safeEntry = (entry && typeof entry === "object") ? entry : null;
+      const extra = (safeEntry && safeEntry.extra && typeof safeEntry.extra === "object") ? safeEntry.extra : null;
+      const error = (safeEntry && safeEntry.error && typeof safeEntry.error === "object") ? safeEntry.error : null;
+      const entryType = (safeEntry && safeEntry.type) ? String(safeEntry.type) : "";
+      const runtimeLevel = (entryType && Object.prototype.hasOwnProperty.call(DIAG_RUNTIME_TYPES, entryType))
+        ? DIAG_RUNTIME_TYPES[entryType]
+        : "";
+      const runtimeTag = runtimeLevel ? "runtime" : "";
+      const topMessage = (safeEntry && typeof safeEntry.message === "string") ? safeEntry.message : "";
+      const topError = (safeEntry && typeof safeEntry.error === "string") ? safeEntry.error : "";
       return {
         idx: index,
-        timestamp: entry && entry.timestamp ? String(entry.timestamp) : "",
-        type: entry && entry.type ? String(entry.type) : "",
-        level: extra && typeof extra.level === "string" ? extra.level : "",
-        code: entry && entry.code ? String(entry.code) : "",
-        module: extra && typeof extra.module === "string" ? extra.module : "",
-        diagTag: extra && typeof extra.diagTag === "string" ? extra.diagTag : "",
-        key: extra && typeof extra.key === "string" ? extra.key : "",
+        timestamp: safeEntry && safeEntry.timestamp ? String(safeEntry.timestamp) : "",
+        type: entryType,
+        level: (extra && typeof extra.level === "string" && extra.level)
+          ? extra.level
+          : ((safeEntry && typeof safeEntry.level === "string" && safeEntry.level) ? safeEntry.level : runtimeLevel),
+        code: (safeEntry && safeEntry.code) ? String(safeEntry.code) : entryType,
+        module: (extra && typeof extra.module === "string" && extra.module)
+          ? extra.module
+          : ((safeEntry && typeof safeEntry.module === "string" && safeEntry.module) ? safeEntry.module : runtimeTag),
+        diagTag: (extra && typeof extra.diagTag === "string" && extra.diagTag)
+          ? extra.diagTag
+          : ((safeEntry && typeof safeEntry.diagTag === "string" && safeEntry.diagTag) ? safeEntry.diagTag : runtimeTag),
+        key: (extra && typeof extra.key === "string" && extra.key)
+          ? extra.key
+          : ((safeEntry && typeof safeEntry.key === "string" && safeEntry.key) ? safeEntry.key : ""),
         message: extra && typeof extra.message === "string"
           ? extra.message
-          : (error && typeof error.message === "string" ? error.message : ""),
-        error: error && typeof error.name === "string" ? error.name : ""
+          : (topMessage || (error && typeof error.message === "string" ? error.message : "")),
+        error: error && typeof error.name === "string" ? error.name : topError
       };
     }
 

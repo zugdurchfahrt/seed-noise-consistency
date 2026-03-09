@@ -537,9 +537,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     function readNativeAdapterInfo(adapter) {
       const resolved = resolveDescriptorOnProtoChain(adapter, 'info');
       const nativeInfoGet = resolved && resolved.owner ? __adapterInfoGetterByOwner__.get(resolved.owner) : null;
-      if (typeof nativeInfoGet === 'function') {
+      const fallbackGet = resolved && resolved.desc && typeof resolved.desc.get === 'function' ? resolved.desc.get : null;
+      const getter = (typeof nativeInfoGet === 'function') ? nativeInfoGet : fallbackGet;
+      if (typeof getter === 'function') {
         try {
-          return Reflect.apply(nativeInfoGet, adapter, []);
+          return Reflect.apply(getter, adapter, []);
         } catch (e) {
           degrade('warn', 'webgpu:adapter:info_native_throw', e, {
             stage: 'runtime',
@@ -836,19 +838,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             }
             let nativeInfo = {};
             if (typeof origGet === 'function') {
-              try {
-                nativeInfo = Reflect.apply(origGet, this, []);
-              } catch (e) {
-                degrade('warn', 'webgpu:adapter:info_native_throw', e, {
-                  stage: 'runtime',
-                  type: __webgpuTypeBrowser,
-                  diagTag: 'webgpu',
-                  key: 'GPUAdapter.info',
-                  message: 'GPUAdapter.info getter threw',
-                  data: { outcome: 'throw', reason: 'native_throw' }
-                });
-                throw e;
-              }
+              nativeInfo = readNativeAdapterInfo(this);
             }
             const built = buildAdapterInfo(nativeInfo);
             __adapterInfoValueCache__.set(this, built);

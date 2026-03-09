@@ -274,6 +274,27 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
                 data: { outcome: 'return', reason: 'adapter_info_unavailable' }
               }, e);
             }
+          } else {
+            __moduleDiag('info', __module + ':requestAdapterInfo_missing', {
+              stage: 'runtime',
+              key: 'GPUAdapter.requestAdapterInfo',
+              message: 'requestAdapterInfo is not available',
+              type: 'browser structure missing data',
+              data: { outcome: 'return', reason: 'missing_requestAdapterInfo' }
+            }, null);
+          }
+          if (adapterInfo == null && ('info' in adapter)) {
+            try {
+              adapterInfo = adapter.info;
+            } catch (e) {
+              __moduleDiag('warn', __module + ':adapter_info_getter_failed', {
+                stage: 'runtime',
+                key: 'GPUAdapter.info',
+                message: 'adapter.info getter failed',
+                type: 'browser structure missing data',
+                data: { outcome: 'return', reason: 'adapter_info_getter_failed' }
+              }, e);
+            }
           }
 
           const device = await adapter.requestDevice();
