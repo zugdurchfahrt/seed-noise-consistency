@@ -303,8 +303,8 @@ const LOGGingModule = function LOGGingModule() {
     G.__DEBUG__ =
         // Toggle for *logger self-diagnostics visibility*.
      // IMPORTANT: must not change runtime behavior by throwing from the logger.
-      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
-      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
+      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
+      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
     
     global.env = global.env || {};
     global.env.DEBUG_DEGRADES = true;   // включить

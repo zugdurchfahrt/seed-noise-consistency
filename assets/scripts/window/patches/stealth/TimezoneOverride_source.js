@@ -142,6 +142,9 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       ? window.__ensureMarkAsNative
       : null;
     const markAsNative = __ensureMarkAsNative ? __ensureMarkAsNative() : null;
+    const __wrapNativeCtor = (window && typeof window.__wrapNativeCtor === "function")
+      ? window.__wrapNativeCtor
+      : null;
     if (typeof markAsNative !== "function") {
       diagPipeline("warn", "tz:missing_markAsNative", {
         key: __flagKey,
@@ -155,6 +158,13 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     const __registerPatchedTarget = (__core && typeof __core.registerPatchedTarget === "function")
       ? __core.registerPatchedTarget
       : null;
+
+    function createNativeShapedMethod(name, impl) {
+      const method = ({ [name](...args) {
+        return Reflect.apply(impl, this, args);
+      } })[name];
+      return markAsNative(method, name);
+    }
 
     function sameDesc(actual, expected) {
       if (!actual || !expected) return false;
@@ -278,20 +288,29 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     try {
       rememberValue(Intl, "DateTimeFormat");
       const OrigDTF = Intl.DateTimeFormat;
-      const PatchedDTF = markAsNative(function DateTimeFormat(locales, options) {
-        if (locales == null) locales = spoofedLocales;
-        if (options == null) options = { timeZone: timezone };
-        else options = Object.assign({}, options, { timeZone: timezone });
-        return new OrigDTF(locales, options);
-      }, "DateTimeFormat");
-      PatchedDTF.prototype = OrigDTF.prototype;
-      redefineValue(Intl, "DateTimeFormat", PatchedDTF, "tz:DateTimeFormat");
+      if (typeof __wrapNativeCtor === "function") {
+        const PatchedDTF = __wrapNativeCtor(OrigDTF, "DateTimeFormat", function patchDateTimeFormatArgs(argList) {
+          const nextArgs = Array.isArray(argList) ? argList.slice() : [];
+          if (nextArgs[0] == null) nextArgs[0] = spoofedLocales;
+          if (nextArgs[1] == null) nextArgs[1] = { timeZone: timezone };
+          else nextArgs[1] = Object.assign({}, nextArgs[1], { timeZone: timezone });
+          return nextArgs;
+        });
+        redefineValue(Intl, "DateTimeFormat", PatchedDTF, "tz:DateTimeFormat");
+      } else {
+        diagPipeline("warn", "tz:wrapNativeCtor_missing", {
+          key: "DateTimeFormat",
+          stage: "preflight",
+          message: "__wrapNativeCtor missing (skip constructor patch)",
+          data: { outcome: "skip", reason: "missing_wrap_native_ctor", timezone: timezone }
+        }, null);
+      }
 
       if (OrigDTF && OrigDTF.prototype && typeof OrigDTF.prototype.resolvedOptions === "function") {
         const proto = OrigDTF.prototype;
         rememberProtoValue(proto, "resolvedOptions");
         const origResolvedOptions = proto.resolvedOptions;
-        const patchedResolvedOptions = markAsNative(function resolvedOptions() {
+        const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", function resolvedOptionsImpl() {
           let ro;
           try {
             ro = Reflect.apply(origResolvedOptions, this, []);
@@ -313,7 +332,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
             }, e);
           }
           return ro;
-        }, "resolvedOptions");
+        });
         redefineMethod(proto, "resolvedOptions", patchedResolvedOptions, "tz:DateTimeFormat:resolvedOptions");
       }
 
@@ -321,11 +340,20 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         if (!Intl || typeof Intl[ctorName] !== "function") return;
         rememberValue(Intl, ctorName);
         const OrigCtor = Intl[ctorName];
-        const PatchedCtor = markAsNative(({ [ctorName]: function(locales, options) {
-          if (locales == null) locales = spoofedLocales;
-          return new OrigCtor(locales, options);
-        } })[ctorName], ctorName);
-        PatchedCtor.prototype = OrigCtor.prototype;
+        if (typeof __wrapNativeCtor !== "function") {
+          diagPipeline("warn", "tz:wrapNativeCtor_missing", {
+            key: ctorName,
+            stage: "preflight",
+            message: "__wrapNativeCtor missing (skip constructor patch)",
+            data: { outcome: "skip", reason: "missing_wrap_native_ctor", timezone: timezone }
+          }, null);
+          return;
+        }
+        const PatchedCtor = __wrapNativeCtor(OrigCtor, ctorName, function patchIntlCtorArgs(argList) {
+          const nextArgs = Array.isArray(argList) ? argList.slice() : [];
+          if (nextArgs[0] == null) nextArgs[0] = spoofedLocales;
+          return nextArgs;
+        });
         redefineValue(Intl, ctorName, PatchedCtor, "tz:" + ctorName);
       }
 
@@ -340,7 +368,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         const origResolvedOptions = proto.resolvedOptions;
         if (typeof origResolvedOptions !== "function") return;
         rememberProtoValue(proto, "resolvedOptions");
-        const patchedResolvedOptions = markAsNative(function resolvedOptions() {
+        const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", function resolvedOptionsImpl() {
           let options;
           try {
             options = Reflect.apply(origResolvedOptions, this, []);
@@ -376,7 +404,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
             }, e);
           }
           return options;
-        }, "resolvedOptions");
+        });
         redefineMethod(proto, "resolvedOptions", patchedResolvedOptions, "tz:IntlResolvedOptions");
       }
 
@@ -407,7 +435,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         }, e);
         throw e;
       }
-      const patchedToLocaleString = markAsNative(function toLocaleString(locales, options) {
+      const patchedToLocaleString = createNativeShapedMethod("toLocaleString", function toLocaleStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
         options = Object.assign({}, options, { timeZone: timezone });
         try {
@@ -420,8 +448,8 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           }, e);
           throw e;
         }
-      }, "toLocaleString");
-      const patchedToLocaleDateString = markAsNative(function toLocaleDateString(locales, options) {
+      });
+      const patchedToLocaleDateString = createNativeShapedMethod("toLocaleDateString", function toLocaleDateStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
         options = Object.assign({}, options, { timeZone: timezone });
         try {
@@ -434,8 +462,8 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           }, e);
           throw e;
         }
-      }, "toLocaleDateString");
-      const patchedToLocaleTimeString = markAsNative(function toLocaleTimeString(locales, options) {
+      });
+      const patchedToLocaleTimeString = createNativeShapedMethod("toLocaleTimeString", function toLocaleTimeStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
         options = Object.assign({}, options, { timeZone: timezone });
         try {
@@ -448,7 +476,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           }, e);
           throw e;
         }
-      }, "toLocaleTimeString");
+      });
       redefineMethod(Date.prototype, "toLocaleString", patchedToLocaleString, "tz:Date:toLocaleString");
       redefineMethod(Date.prototype, "toLocaleDateString", patchedToLocaleDateString, "tz:Date:toLocaleDateString");
       redefineMethod(Date.prototype, "toLocaleTimeString", patchedToLocaleTimeString, "tz:Date:toLocaleTimeString");
