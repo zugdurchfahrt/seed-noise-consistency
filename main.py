@@ -77,7 +77,7 @@ from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
 from tools.generators.rand_met import generate_font_manifest
-from tools.tools_infra.core_bridge_firewall import enforce_core_bridge_firewall
+from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
