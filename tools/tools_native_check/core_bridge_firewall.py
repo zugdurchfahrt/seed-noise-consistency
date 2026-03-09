@@ -1,5 +1,6 @@
 import re
 import sys
+import subprocess
 import pathlib
 from pathlib import Path
 from tools.tools_infra.overseer import logger
@@ -7,17 +8,6 @@ from tools.tools_infra.overseer import logger
 bandmauer_logger = logger.getChild("bandmauer")
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
-
-_FORBIDDEN_PATTERNS = (
-    ("local_base_mark_native", re.compile(r"\bfunction\s+baseMarkAsNative\b")),
-    ("local_ensure_mark_native", re.compile(r"\bfunction\s+ensureMarkAsNative\b")),
-    ("redefine_ensure_assign", re.compile(r"(?<![\w.])__ensureMarkAsNative\s*=\s*function\b")),
-    ("redefine_ensure_define_property", re.compile(r"Object\.defineProperty\(\s*(?:window|globalThis|self)\s*,\s*['\"]__ensureMarkAsNative['\"]")),
-    ("patch_function_toString_assign", re.compile(r"Function\.prototype\.toString\s*=")),
-    ("patch_function_toString_define_property", re.compile(r"Object\.defineProperty\(\s*Function\.prototype\s*,\s*['\"]toString['\"]")),
-)
-
-_MARK_NATIVE_CALL = re.compile(r"\bmarkAsNative\s*\(")
 
 
 def _line_no(text: str, offset: int) -> int:
@@ -34,7 +24,6 @@ def _line_text(lines: list[str], line_no: int) -> str:
 def collect_core_bridge_violations(project_root: Path) -> dict:
     root = Path(project_root) / "assets" / "scripts"
     violations = []
-    scanned_files = 0
     scanned_file_paths = []
     violations_by_file = {}
     violation_counts_by_rule = {}
@@ -42,7 +31,7 @@ def collect_core_bridge_violations(project_root: Path) -> dict:
     if not root.exists():
         return {
             "scanned_root": str(root),
-            "scanned_files": scanned_files,
+            "scanned_files": 0,
             "scanned_file_paths": scanned_file_paths,
             "clean_files": [],
             "violated_files": [],
@@ -56,53 +45,69 @@ def collect_core_bridge_violations(project_root: Path) -> dict:
             }]
         }
 
-    for js_file in sorted(root.rglob("*.js")):
-        scanned_files += 1
-        file_key = str(js_file)
-        scanned_file_paths.append(file_key)
-        try:
-            text = js_file.read_text(encoding="utf-8", errors="replace")
-        except Exception as e:
-            violation = {
-                "rule": "file_read_failed",
-                "file": file_key,
-                "line": 0,
-                "text": str(e)
-            }
-            violations.append(violation)
-            violations_by_file.setdefault(file_key, []).append(violation)
-            violation_counts_by_rule["file_read_failed"] = violation_counts_by_rule.get("file_read_failed", 0) + 1
-            continue
+    repo_root = Path(project_root).parent
+    scanned_file_paths = [str(js_file) for js_file in sorted(root.rglob("*.js"))]
+    scanned_files = len(scanned_file_paths)
+    basename_to_path = {Path(file_path).name: file_path for file_path in scanned_file_paths}
+    core_window_path = str(Path(project_root) / "assets" / "scripts" / "window" / "core" / "core_window.js")
 
-        lines = text.splitlines()
+    validator_path = Path(__file__).with_name("validate_proxy_mechanics_registry.ps1")
+    completed = subprocess.run(
+        ["pwsh", "-NoProfile", "-File", str(validator_path)],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
 
-        for rule, pattern in _FORBIDDEN_PATTERNS:
-            for match in pattern.finditer(text):
-                ln = _line_no(text, match.start())
-                violation = {
-                    "rule": rule,
-                    "file": file_key,
-                    "line": ln,
-                    "text": _line_text(lines, ln)
-                }
-                violations.append(violation)
-                violations_by_file.setdefault(file_key, []).append(violation)
-                violation_counts_by_rule[rule] = violation_counts_by_rule.get(rule, 0) + 1
+    if completed.returncode != 0:
+        failure_text = "\n".join(part for part in (
+            (completed.stdout or "").strip(),
+            (completed.stderr or "").strip(),
+        ) if part).strip() or "validate_proxy_mechanics_registry.ps1 failed without output"
+        failure_text_clean = re.sub(r"\x1b\[[0-9;]*m", "", failure_text)
+        assert_lines = []
+        for line in failure_text_clean.splitlines():
+            if "ASSERT FAILED:" not in line:
+                continue
+            assert_lines.append(line.split("|", 1)[-1].strip())
 
-        if _MARK_NATIVE_CALL.search(text) and "__ensureMarkAsNative" not in text:
-            match = _MARK_NATIVE_CALL.search(text)
-            ln = _line_no(text, match.start())
-            violation = {
-                "rule": "mark_native_without_core_bridge",
-                "file": file_key,
-                "line": ln,
-                "text": _line_text(lines, ln)
-            }
-            violations.append(violation)
-            violations_by_file.setdefault(file_key, []).append(violation)
-            violation_counts_by_rule["mark_native_without_core_bridge"] = (
-                violation_counts_by_rule.get("mark_native_without_core_bridge", 0) + 1
-            )
+        failure_message = assert_lines[-1] if assert_lines else failure_text_clean.splitlines()[-1].strip()
+        if failure_message.startswith("ASSERT FAILED:"):
+            failure_message = failure_message[len("ASSERT FAILED:"):].strip()
+        if " (pattern:" in failure_message:
+            failure_message = failure_message.split(" (pattern:", 1)[0].strip()
+
+        failure_file = str(validator_path)
+        js_match = re.search(r"([A-Za-z0-9_.-]+\.js)\b", failure_message)
+        if js_match and js_match.group(1) in basename_to_path:
+            failure_file = basename_to_path[js_match.group(1)]
+        elif (
+            "Core " in failure_message
+            or "normalizeWrapLayer" in failure_message
+            or "normalizePolicy" in failure_message
+            or "__wrapNativeApply" in failure_message
+            or "toString" in failure_message
+            or "applyTargets" in failure_message
+            or "patchMethod" in failure_message
+        ):
+            failure_file = core_window_path
+
+        rule = "registry_validation_failed"
+        if failure_message:
+            rule = re.sub(r"[^a-z0-9]+", "_", failure_message.lower()).strip("_") or rule
+
+        violation = {
+            "rule": rule,
+            "file": failure_file,
+            "line": 0,
+            "text": failure_message,
+        }
+        violations.append(violation)
+        violations_by_file.setdefault(failure_file, []).append(violation)
+        violation_counts_by_rule[rule] = violation_counts_by_rule.get(rule, 0) + 1
 
     violated_files = sorted(violations_by_file)
     clean_files = [file_path for file_path in scanned_file_paths if file_path not in violations_by_file]
@@ -180,17 +185,3 @@ def enforce_core_bridge_firewall(project_root: Path, logger=None) -> dict:
     )
     return result
 
-
-# def _main() -> int:
-#     root = Path(__file__).resolve().parents[2]
-#     try:
-#         result = enforce_core_bridge_firewall(root, logger=None)
-#     except RuntimeError as e:
-#         print(str(e))
-#         return 2
-#     print(f"[brandmauer] passed (scanned_files={result['scanned_files']})")
-#     return 0
-
-
-# if __name__ == "__main__":
-#     raise SystemExit(_main())
