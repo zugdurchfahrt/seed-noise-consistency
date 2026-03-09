@@ -64,6 +64,19 @@ def setup_logger(child_levels=None):
         sw_relay_logger.propagate = False
         sw_relay_logger.addHandler(sw_relay_fh)
         
+        
+        bandmauer_log_file = PROJECT_ROOT / 'logs' / 'bandmauer.log'
+        bandmauer_fh = logging.FileHandler(bandmauer_log_file, encoding="utf-8")
+        bandmauer_fh.setLevel(logging.INFO)
+        bandmauer_fh.setFormatter(formatter)
+
+        bandmauer_logger = logger.getChild("brandmauer")
+        bandmauer_logger.setLevel(logging.INFO)
+        bandmauer_logger.propagate = False
+        bandmauer_logger.addHandler(bandmauer_fh)
+        
+        
+        
         # StreamHandler To log in the console
         ch = logging.StreamHandler(sys.stdout)
         ch.setLevel(logging.INFO)

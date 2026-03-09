@@ -77,12 +77,14 @@ from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
 from tools.generators.rand_met import generate_font_manifest
+from tools.tools_infra.core_bridge_firewall import enforce_core_bridge_firewall
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
     "vpn_utils": logging.DEBUG,
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
+    "brandmauer": logging.INFO,
 })
 
 # ----------------------- GLOBAL VARIABLES -----------------------
@@ -687,6 +689,7 @@ def main():
         logger.info("Seed fingerprint: len=%s sha256_12=%s", len(global_seed), seed_fp)
     except Exception:
         logger.info("Seed fingerprint: unavailable")
+    enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer"))
     client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
     try:
         json_path = str(PROFILE_DATA_SRC/ "profile.json")
