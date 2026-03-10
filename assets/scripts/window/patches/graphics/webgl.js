@@ -76,6 +76,23 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
     if (!__guardToken) return; // already_patched: Core emits webgl:already_patched
 
+    function releaseEntryGuard(rollbackOk) {
+      try {
+        if (__core && typeof __core.releaseGuardFlag === 'function') {
+          __core.releaseGuardFlag(__flagKey, __guardToken, !!rollbackOk, 'webgl');
+        }
+      } catch (e) {
+        __webglDiagPipeline('warn', 'webgl:guard_release_failed', {
+          stage: 'rollback',
+          key: __flagKey,
+          message: 'releaseGuardFlag failed',
+          data: { outcome: 'skip', reason: 'guard_release_failed' }
+        }, e);
+      }
+    }
+
+    try {
+
     if (!C) {
       __webglDiagPipeline('fatal', 'webgl:canvas_patch_context_missing', {
         stage: 'preflight',
@@ -442,40 +459,52 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
 
   // === 6.export hooks to context.js ===
+  const __webglHooksEntry = {
+    webglGetParameterMask,
+    webglWhitelistParameterHook,
+    webglGetSupportedExtensionsPatch,
+    webglGetExtensionPatch,
+    webglGetContextPatch,
+    webglReadPixelsHook,
+    webglGetShaderPrecisionFormatHook,
+    webglShaderSourceHook,
+    webglGetUniformHook
+  };
   try {
-    Object.defineProperty(window, 'webglHooks', {
-      value: {
-        webglGetParameterMask,
-        webglWhitelistParameterHook,
-        webglGetSupportedExtensionsPatch,
-        webglGetExtensionPatch,
-        webglGetContextPatch,
-        webglReadPixelsHook,
-        webglGetShaderPrecisionFormatHook,
-        webglShaderSourceHook,
-        webglGetUniformHook
-      },
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
+    const __hasOwnWebglHooks = Object.prototype.hasOwnProperty.call(window, 'webglHooks');
+    const __currentWebglHooks = __hasOwnWebglHooks ? window.webglHooks : null;
+    if (__hasOwnWebglHooks && __currentWebglHooks && typeof __currentWebglHooks === 'object' &&
+        typeof __currentWebglHooks.webglGetParameterMask === 'function') {
+      const __currentDesc = Object.getOwnPropertyDescriptor(window, 'webglHooks');
+      if (__currentDesc && __currentDesc.configurable && __currentDesc.enumerable) {
+        Object.defineProperty(window, 'webglHooks', {
+          value: __currentWebglHooks,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      } else if (__currentDesc && !__currentDesc.configurable && __currentDesc.enumerable) {
+        __webglDiagBrowser('warn', 'webgl:webglHooks:hide_skip_non_configurable', {
+          stage: 'apply',
+          key: 'webglHooks',
+          message: 'webglHooks hide-after-apply skipped for non-configurable descriptor'
+        }, null);
+      }
+    } else {
+      Object.defineProperty(window, 'webglHooks', {
+        value: __webglHooksEntry,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
   } catch (e) {
     __webglDiagBrowser('error', 'webgl:webglHooks:define_failed', {
       stage: 'apply',
       key: 'webglHooks',
       message: 'webglHooks define failed'
     }, e);
-    window.webglHooks = {
-      webglGetParameterMask,
-      webglWhitelistParameterHook,
-      webglGetSupportedExtensionsPatch,
-      webglGetExtensionPatch,
-      webglGetContextPatch,
-      webglReadPixelsHook,
-      webglGetShaderPrecisionFormatHook,
-      webglShaderSourceHook,
-      webglGetUniformHook
-    };
+    window.webglHooks = __webglHooksEntry;
     const h = window.webglHooks;
     if (!h || typeof h !== 'object' || typeof h.webglGetParameterMask !== 'function') {
       __webglDiagBrowser('fatal', 'webgl:webglHooks:fallback_invalid', {
@@ -486,6 +515,29 @@ const WebglPatchModule = function WebglPatchModule(window) {
       }, e);
       throw e;
     }
+    try {
+      const __fallbackDesc = Object.getOwnPropertyDescriptor(window, 'webglHooks');
+      if (__fallbackDesc && __fallbackDesc.configurable && __fallbackDesc.enumerable) {
+        Object.defineProperty(window, 'webglHooks', {
+          value: h,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      } else if (__fallbackDesc && !__fallbackDesc.configurable && __fallbackDesc.enumerable) {
+        __webglDiagBrowser('warn', 'webgl:webglHooks:hide_skip_non_configurable', {
+          stage: 'apply',
+          key: 'webglHooks',
+          message: 'webglHooks hide-after-apply skipped for non-configurable descriptor'
+        }, null);
+      }
+    } catch (hideErr) {
+      __webglDiagBrowser('warn', 'webgl:webglHooks:hide_failed', {
+        stage: 'apply',
+        key: 'webglHooks',
+        message: 'webglHooks hide-after-apply failed'
+      }, hideErr);
+    }
   }
     __webglDiag('info', 'webgl:patches_applied', {
       stage: 'apply',
@@ -494,6 +546,10 @@ const WebglPatchModule = function WebglPatchModule(window) {
       message: 'webgl patches applied',
       data: { outcome: 'return' }
     });
+  } catch (e) {
+    releaseEntryGuard(false);
+    throw e;
+  }
 }
 
 

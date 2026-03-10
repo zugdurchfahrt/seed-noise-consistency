@@ -678,7 +678,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         const token = nextGuardToken(key);
         try {
-          window[key] = token;
+          Object.defineProperty(window, key, {
+            value: token,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
         } catch (e) {
           __emit('warn', tag + ':guard_write_failed', {
             module: 'core',
@@ -706,7 +711,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
             delete window[key];
           } catch (deleteErr) {
             try {
-              window[key] = false;
+              Object.defineProperty(window, key, {
+                value: false,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
             } catch (setErr) {
               __emit('warn', tag + ':guard_release_failed', {
                 module: 'core',

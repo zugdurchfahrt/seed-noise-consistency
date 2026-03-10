@@ -364,6 +364,8 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
+            Path(SCRIPTS_CORE / "bootstrap_hide.js").read_text("utf-8"),
+            "BootstrapHideModule(window);",
             # --- set_log ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
@@ -1098,7 +1100,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers")
 
         # PLEASE, DO NO REMOVE THIS, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)

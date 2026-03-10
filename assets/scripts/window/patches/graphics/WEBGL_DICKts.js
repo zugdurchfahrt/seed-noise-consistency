@@ -1145,11 +1145,6 @@ const WEBglDICKts = function WEBglDICKts(window) {
     }, null);
     __hideOwnSurface('__WEBGL_PARAM_WHITELIST__');
     __hideOwnSurface('__EXTENSIONS_WHITELIST__');
-    try {
-        if (__core && typeof __core.releaseGuardFlag === 'function') {
-            __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
-        }
-    } catch (_) {}
     } catch (e) {
         let rollbackOk = true;
         rollbackOk = __restoreDescriptorState(__state.paramWhitelist) && rollbackOk;

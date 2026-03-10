@@ -393,8 +393,6 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     }
     __hideOwnSurface('__collectWebGPUSnapshot__');
 
-    __releaseGuard(true);
-
     __moduleDiag('info', __module + ':ready', {
       stage: 'apply',
       key: null,
