@@ -216,7 +216,7 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
 def init_driver(
     profile, country_data, platform, user_agent, screen_width, screen_height,
     webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer, devices_conf, generated_version, generated_platform, generated_platform_version,
-    generated_oscpu, expected_client_hints, vendor_value, language, normalized_languages, device_memory_value, hardware_concurrency_value, device_dpr_value,
+    expected_client_hints, vendor_value, language, normalized_languages, device_memory_value, hardware_concurrency_value, device_dpr_value,
     plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type, global_seed,
 ):
     timezone = country_data["timezone"]
@@ -983,7 +983,7 @@ def main():
         elif profile["platform"]  == "MacIntel":
             generated_platform = "macOS"
 
-        generated_oscpu = profile["os_info"] if profile["platform"] == "Win32" and "firefox" in user_agent.lower() else f"Intel Mac OS X {profile['platform_version']}" if "firefox" in user_agent.lower() else None
+        # generated_oscpu = profile["os_info"] if profile["platform"] == "Win32" and "firefox" in user_agent.lower() else f"Intel Mac OS X {profile['platform_version']}" if "firefox" in user_agent.lower() else None
         generated_platform_version = profile["platform_version"]
         generated_version = profile["browser_version"]
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
@@ -1043,7 +1043,7 @@ def main():
             profile["screen_width"], profile["screen_height"], profile["webgl_vendor"], profile["webgl_renderer"],
             profile["webgl_unmasked_vendor"], profile["webgl_unmasked_renderer"],
             profile["devices_conf"], generated_version, generated_platform, generated_platform_version,
-            generated_oscpu, expected_client_hints, profile["vendor_value"], profile["language"], profile["languages"],
+            expected_client_hints, profile["vendor_value"], profile["language"], profile["languages"],
             profile["deviceMemory"], profile["hardwareConcurrency"], profile["device_dpr_value"],
             profile["plugins"], profile["mimeTypes"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"],
             global_seed,
