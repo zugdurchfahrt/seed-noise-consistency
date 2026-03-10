@@ -739,6 +739,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       source: source,
       hadLocal: false,
       hadOnlyLocal: false,
+      localOnlyBlocked: false,
       localOnlyPassthrough: false,
       unexpectedSourceType: false,
       runtimeConfigMatched: false,
@@ -789,12 +790,18 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
 
     let matchedCfg = null;
+    let invalidManagedSource = null;
     try {
       const familyDictionary = getSharedFamilyDictionary();
       const normalizedFamily = normalizeFamilyName(family);
       matchedCfg = (normalizedFamily && familyDictionary.has(normalizedFamily))
         ? matchRuntimeFontConfig(family, descriptors)
         : null;
+      const matchedUrl = matchedCfg && typeof matchedCfg.url === 'string' ? matchedCfg.url : '';
+      const commaIndex = matchedUrl.indexOf(',');
+      if (/^data:font\/woff2;base64,/i.test(matchedUrl) && commaIndex !== -1) {
+        invalidManagedSource = `url(${JSON.stringify(matchedUrl.slice(0, commaIndex + 1))}) format("woff2")`;
+      }
     } catch (e) {
       return Object.assign({}, resultBase, {
         hadLocal: true,
@@ -807,9 +814,11 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
     if (!filtered.length) {
       return Object.assign({}, resultBase, {
+        source: invalidManagedSource || source,
         hadLocal: true,
         hadOnlyLocal: true,
-        localOnlyPassthrough: true,
+        localOnlyBlocked: !!invalidManagedSource,
+        localOnlyPassthrough: !invalidManagedSource,
         unexpectedSourceType: unexpectedSourceType,
         runtimeConfigMatched: !!matchedCfg
       });
@@ -900,13 +909,32 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
               }
             }, null);
           }
+          if (sanitized.localOnlyBlocked) {
+            __fontDiagPipeline('info', 'fonts:fontface:local_only_replaced_with_managed_invalid_src', {
+              stage: 'runtime',
+              diagTag: 'fonts:fontface',
+              key: 'FontFace',
+              message: 'FontFace local-only source replaced with managed invalid data src',
+              data: {
+                outcome: 'return',
+                reason: 'local_only_replaced_with_managed_invalid_src',
+                family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
+                runtimeConfigMatched: !!sanitized.runtimeConfigMatched
+              }
+            }, null);
+          }
           if (sanitized.localOnlyPassthrough) {
             __fontDiagPipeline('warn', 'fonts:fontface:local_only_passthrough_not_proven', {
               stage: 'runtime',
               diagTag: 'fonts:fontface',
               key: 'FontFace',
               message: 'FontFace local-only source kept as native (not proven)',
-              data: { outcome: 'return', reason: 'local_only_passthrough_not_proven' }
+              data: {
+                outcome: 'return',
+                reason: 'local_only_passthrough_not_proven',
+                family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
+                runtimeConfigMatched: !!sanitized.runtimeConfigMatched
+              }
             }, null);
           }
           return nextArgs;
