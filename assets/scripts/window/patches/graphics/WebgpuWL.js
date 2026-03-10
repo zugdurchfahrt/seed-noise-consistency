@@ -75,29 +75,12 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     }
   }
 
-  function __captureValueState(key) {
+  function __captureDescriptorState(key) {
     return {
       key: key,
       exists: Object.prototype.hasOwnProperty.call(window, key),
-      value: window[key]
+      desc: Object.getOwnPropertyDescriptor(window, key) || null
     };
-  }
-
-  function __restoreValueState(state) {
-    try {
-      if (state.exists) window[state.key] = state.value;
-      else delete window[state.key];
-      return true;
-    } catch (e) {
-      __moduleDiag('error', __module + ':rollback_failed', {
-        stage: 'rollback',
-        key: state.key,
-        message: 'rollback failed',
-        type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'rollback_failed' }
-      }, e);
-      return false;
-    }
   }
 
   function __restoreDescriptorState(state) {
@@ -120,6 +103,76 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     }
   }
 
+  function __hideOwnSurface(key) {
+    try {
+      if (!Object.prototype.hasOwnProperty.call(window, key)) return true;
+      const d = Object.getOwnPropertyDescriptor(window, key);
+      if (!d || d.enumerable === false) return true;
+      if (d.configurable === false) {
+        __moduleDiag('warn', __module + ':hide_surface_nonconfigurable', {
+          stage: 'apply',
+          key: key,
+          message: 'hide surface skipped: non-configurable',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'hide_surface_nonconfigurable' }
+        }, null);
+        return false;
+      }
+      if ('value' in d) {
+        Object.defineProperty(window, key, {
+          value: d.value,
+          writable: !!d.writable,
+          configurable: !!d.configurable,
+          enumerable: false
+        });
+      } else {
+        Object.defineProperty(window, key, {
+          get: d.get,
+          set: d.set,
+          configurable: !!d.configurable,
+          enumerable: false
+        });
+      }
+      return true;
+    } catch (e) {
+      __moduleDiag('warn', __module + ':hide_surface_failed', {
+        stage: 'apply',
+        key: key,
+        message: 'hide surface failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'hide_surface_failed' }
+      }, e);
+      return false;
+    }
+  }
+
+  function __setHiddenValue(key, value) {
+    try {
+      const own = Object.prototype.hasOwnProperty.call(window, key);
+      const d = own ? (Object.getOwnPropertyDescriptor(window, key) || null) : null;
+      if (d && d.configurable === false) {
+        window[key] = value;
+        return __hideOwnSurface(key);
+      }
+      Object.defineProperty(window, key, {
+        value: value,
+        writable: d ? !!d.writable : true,
+        configurable: d ? !!d.configurable : true,
+        enumerable: false
+      });
+      return true;
+    } catch (e) {
+      __moduleDiag('error', __module + ':define_hidden_failed', {
+        stage: 'apply',
+        key: key,
+        message: 'define hidden value failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'define_hidden_failed' }
+      }, e);
+      throw e;
+    }
+  }
+
   let __state = null;
   try {
     const C = window.CanvasPatchContext;
@@ -137,9 +190,9 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     }
 
     __state = {
-      features: __captureValueState('__WEBGPU_FEATURES_WHITELIST__'),
-      limits: __captureValueState('__WEBGPU_LIMITS_WHITELIST__'),
-      formats: __captureValueState('__WEBGPU_FORMATS_WHITELIST__'),
+      features: __captureDescriptorState('__WEBGPU_FEATURES_WHITELIST__'),
+      limits: __captureDescriptorState('__WEBGPU_LIMITS_WHITELIST__'),
+      formats: __captureDescriptorState('__WEBGPU_FORMATS_WHITELIST__'),
       collect: {
         key: '__collectWebGPUSnapshot__',
         exists: Object.prototype.hasOwnProperty.call(window, '__collectWebGPUSnapshot__'),
@@ -176,10 +229,10 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     const __hasFeaturesWL = Object.prototype.hasOwnProperty.call(window, '__WEBGPU_FEATURES_WHITELIST__')
       && window.__WEBGPU_FEATURES_WHITELIST__ !== undefined;
     if (!__hasFeaturesWL) {
-      window.__WEBGPU_FEATURES_WHITELIST__ = [
+      __setHiddenValue('__WEBGPU_FEATURES_WHITELIST__', [
         ...STABLE_FEATURES,
         ...(window.__ALLOW_CHROMIUM_EXPERIMENTAL__ ? EXPERIMENTAL_FEATURES : [])
-      ];
+      ]);
     } else {
       __moduleDiag('info', __module + ':features_whitelist_already_set', {
         stage: 'apply',
@@ -189,12 +242,13 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         data: { outcome: 'skip', reason: 'already_set' }
       }, null);
     }
+    __hideOwnSurface('__WEBGPU_FEATURES_WHITELIST__');
 
     // === LIMITS WHITELIST (use only YOR device specification) ===
     const __hasLimitsWL = Object.prototype.hasOwnProperty.call(window, '__WEBGPU_LIMITS_WHITELIST__')
       && window.__WEBGPU_LIMITS_WHITELIST__ !== undefined;
     if (!__hasLimitsWL) {
-      window.__WEBGPU_LIMITS_WHITELIST__ = [
+      __setHiddenValue('__WEBGPU_LIMITS_WHITELIST__', [
         'maxTextureDimension1D', 'maxTextureDimension2D', 'maxTextureDimension3D',
         'maxTextureArrayLayers', 'maxBindGroups', 'maxBindingsPerBindGroup',
         'maxDynamicUniformBuffersPerPipelineLayout', 'maxDynamicStorageBuffersPerPipelineLayout',
@@ -209,7 +263,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         'maxComputeInvocationsPerWorkgroup', 'maxComputeWorkgroupSizeX',
         'maxComputeWorkgroupSizeY', 'maxComputeWorkgroupSizeZ',
         'maxComputeWorkgroupsPerDimension'
-      ];
+      ]);
     } else {
       __moduleDiag('info', __module + ':limits_whitelist_already_set', {
         stage: 'apply',
@@ -219,10 +273,11 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         data: { outcome: 'skip', reason: 'already_set' }
       }, null);
     }
+    __hideOwnSurface('__WEBGPU_LIMITS_WHITELIST__');
 
     // === TEXTURE FORMATS WHITELIST (as is, without guessing) ===
     if (!window.__WEBGPU_FORMATS_WHITELIST__) {
-      window.__WEBGPU_FORMATS_WHITELIST__ = [
+      __setHiddenValue('__WEBGPU_FORMATS_WHITELIST__', [
         'r8unorm', 'r8snorm', 'r8uint', 'r8sint',
         'rg8unorm', 'rg8snorm', 'rg8uint', 'rg8sint',
         'rgba8unorm', 'rgba8unorm-srgb', 'rgba8snorm', 'rgba8uint', 'rgba8sint',
@@ -249,8 +304,9 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         'astc-10x5-unorm', 'astc-10x5-unorm-srgb', 'astc-10x6-unorm', 'astc-10x6-unorm-srgb',
         'astc-10x8-unorm', 'astc-10x8-unorm-srgb', 'astc-10x10-unorm', 'astc-10x10-unorm-srgb',
         'astc-12x10-unorm', 'astc-12x10-unorm-srgb', 'astc-12x12-unorm', 'astc-12x12-unorm-srgb'
-      ];
+      ]);
     }
+    __hideOwnSurface('__WEBGPU_FORMATS_WHITELIST__');
 
     // === Snapshot helper ===
     if (!Object.prototype.hasOwnProperty.call(window, '__collectWebGPUSnapshot__')) {
@@ -335,6 +391,9 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         enumerable: false
       });
     }
+    __hideOwnSurface('__collectWebGPUSnapshot__');
+
+    __releaseGuard(true);
 
     __moduleDiag('info', __module + ':ready', {
       stage: 'apply',
@@ -346,9 +405,9 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   } catch (e) {
     let rollbackOk = true;
     if (__state) {
-      rollbackOk = __restoreValueState(__state.features) && rollbackOk;
-      rollbackOk = __restoreValueState(__state.limits) && rollbackOk;
-      rollbackOk = __restoreValueState(__state.formats) && rollbackOk;
+      rollbackOk = __restoreDescriptorState(__state.features) && rollbackOk;
+      rollbackOk = __restoreDescriptorState(__state.limits) && rollbackOk;
+      rollbackOk = __restoreDescriptorState(__state.formats) && rollbackOk;
       rollbackOk = __restoreDescriptorState(__state.collect) && rollbackOk;
     }
 
