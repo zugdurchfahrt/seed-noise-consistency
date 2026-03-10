@@ -217,9 +217,8 @@ def init_driver(
     profile, country_data, platform, user_agent, screen_width, screen_height,
     webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer, devices_conf, generated_version, generated_platform, generated_platform_version,
     generated_oscpu, expected_client_hints, vendor_value, language, normalized_languages, device_memory_value, hardware_concurrency_value, device_dpr_value,
-    plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type,
+    plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type, global_seed,
 ):
-    global global_seed
     timezone = country_data["timezone"]
     offset_minutes = country_data["offset_minutes"]
     latitude = country_data["latitude"]
@@ -1046,7 +1045,8 @@ def main():
             profile["devices_conf"], generated_version, generated_platform, generated_platform_version,
             generated_oscpu, expected_client_hints, profile["vendor_value"], profile["language"], profile["languages"],
             profile["deviceMemory"], profile["hardwareConcurrency"], profile["device_dpr_value"],
-            profile["plugins"], profile["mimeTypes"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"]
+            profile["plugins"], profile["mimeTypes"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"],
+            global_seed,
         )
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
