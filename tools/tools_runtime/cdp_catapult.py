@@ -1,6 +1,5 @@
 # cdp_catapult.py  (SW injector only)
 import json
-import hashlib
 import time
 import threading
 import subprocess
@@ -30,6 +29,10 @@ WORKER_SEED_INJECT_ENABLED = True
 CDP_GLOBAL_SEED = None
 _RUNNING_WORKER_SEED = False
 _RUNNING = False
+_SW_WS = None
+_WORKER_SEED_WS = None
+_SW_STOPPING = False
+_WORKER_SEED_STOPPING = False
 _SW_DIAG_BINDING = "__SW_REPORT_DIAG__"
 
 
@@ -173,6 +176,40 @@ def enable_worker_seed_inject(global_seed: str):
     WORKER_SEED_INJECT_ENABLED = True
 
 
+def stop():
+    global _SW_STOPPING
+    ws = _SW_WS
+    if ws is None:
+        return False
+    _SW_STOPPING = True
+    try:
+        ws.keep_running = False
+    except Exception:
+        pass
+    try:
+        ws.close()
+    except Exception:
+        return False
+    return True
+
+
+def stop_worker_seed():
+    global _WORKER_SEED_STOPPING
+    ws = _WORKER_SEED_WS
+    if ws is None:
+        return False
+    _WORKER_SEED_STOPPING = True
+    try:
+        ws.keep_running = False
+    except Exception:
+        pass
+    try:
+        ws.close()
+    except Exception:
+        return False
+    return True
+
+
 def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
     if not isinstance(SW_META, dict) or not SW_META:
         raise ValueError("SW inject: expected_client_hints missing")
@@ -235,7 +272,7 @@ def _build_worker_seed_prelude(global_seed: str) -> str:
     Object.defineProperty(G, 'CDP_GLOBAL_SEED', {{
       value: String(seed),
       writable: false,
-      configurable: true,
+      configurable: false,
       enumerable: false
     }});
   }} catch (e) {{
@@ -320,10 +357,11 @@ def run():
     - resumes non-service_worker targets immediately
     - for service_worker targets: Runtime.enable + Runtime.evaluate(prelude) + sanity + (optional) resume
     """
-    global _RUNNING
+    global _RUNNING, _SW_WS, _SW_STOPPING
     if _RUNNING:
         return
     _RUNNING = True
+    _SW_STOPPING = False
 
     if not SW_INJECT_ENABLED:
         _RUNNING = False
@@ -344,7 +382,6 @@ def run():
     log_cdp_runtime_diag("sw_run_before_ws")
 
     msg_id = {"v": 0}
-    sess_id = {}       # per-session counters
     injected = set()   # targetId set
     sw_prelude = None
     if do_prelude:
@@ -611,16 +648,26 @@ def run():
             return
         _fatal(ws, "cdp websocket error", err)
 
-    def on_close(ws, code, msg):
-        global _RUNNING
+    def on_close(_ws, code, msg):
+        global _RUNNING, _SW_WS, _SW_STOPPING
         _RUNNING = False
-        if fatal["disconnect"]:
+        _SW_WS = None
+        if _SW_STOPPING:
+            logger.info("SW inject: websocket closed by stop request code=%r msg=%r", code, msg)
+        elif fatal["disconnect"]:
             logger.info("SW inject: websocket closed after disconnect code=%r msg=%r", code, msg)
         elif code is not None or msg:
             logger.error("SW inject: websocket closed code=%r msg=%r", code, msg)
+        _SW_STOPPING = False
 
     ws = WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close)
-    ws.run_forever()
+    _SW_WS = ws
+    try:
+        ws.run_forever()
+    finally:
+        _SW_WS = None
+        _RUNNING = False
+        _SW_STOPPING = False
     if fatal["err"]:
         raise fatal["err"]
 
@@ -634,10 +681,11 @@ def run_worker_seed():
 
     IMPORTANT: if the CDP websocket drops mid-session, paused workers may remain paused.
     """
-    global _RUNNING_WORKER_SEED
+    global _RUNNING_WORKER_SEED, _WORKER_SEED_WS, _WORKER_SEED_STOPPING
     if _RUNNING_WORKER_SEED:
         return
     _RUNNING_WORKER_SEED = True
+    _WORKER_SEED_STOPPING = False
 
     if not WORKER_SEED_INJECT_ENABLED:
         _RUNNING_WORKER_SEED = False
@@ -655,18 +703,7 @@ def run_worker_seed():
         logger.exception("Worker seed inject: get_ws_url failed (PATCH_SKIPPED)")
         raise ValueError("Worker seed inject: fail") from e
 
-    try:
-        seed_fp = hashlib.sha256(str(CDP_GLOBAL_SEED).encode("utf-8")).hexdigest()[:12]
-    except Exception:
-        seed_fp = None
-    if seed_fp:
-        logger.info(
-            "Worker seed inject: seed prepared len=%s sha256_12=%s",
-            len(str(CDP_GLOBAL_SEED)),
-            seed_fp,
-        )
-    else:
-        logger.info("Worker seed inject: seed prepared len=%s", len(str(CDP_GLOBAL_SEED)))
+    logger.info("Worker seed inject: seed prepared len=%s", len(str(CDP_GLOBAL_SEED)))
 
     logger.warning("Worker seed inject: CDP websocket starting (waitForDebuggerOnStart=true): %s", ws_url)
     log_cdp_runtime_diag("worker_seed_before_ws")
@@ -676,9 +713,6 @@ def run_worker_seed():
     manual_attach_sent = set()  # targetId set for fallback manual attach
     sess_meta = {}  # sessionId -> {targetId,type,url}
     seed_prelude = _build_worker_seed_prelude(CDP_GLOBAL_SEED)
-    sanity_expr = "(() => { try { return String(globalThis.CDP_GLOBAL_SEED); } catch (e) { return null; } })()"
-
-
     sanity_expr = (
         "(() => {"
         " const G = globalThis;"
@@ -798,31 +832,17 @@ def run_worker_seed():
                                 {"expected_len": len(expected_seed), "got": out, "target": sess_meta.get(sid)},
                             )
                             return
-                        try:
-                            seed_fp = hashlib.sha256(str(expected_seed).encode("utf-8")).hexdigest()[:12]
-                        except Exception:
-                            seed_fp = None
                         meta = sess_meta.get(sid) or {}
                         ttype = meta.get("type")
                         tid = meta.get("targetId")
                         turl = meta.get("url")
-                        if seed_fp:
-                            logger.info(
-                                "Worker seed inject: sanity OK (CDP_GLOBAL_SEED set) type=%s targetId=%s url=%r seed_len=%s seed_sha256_12=%s",
-                                ttype,
-                                tid,
-                                turl,
-                                len(expected_seed),
-                                seed_fp,
-                            )
-                        else:
-                            logger.info(
-                                "Worker seed inject: sanity OK (CDP_GLOBAL_SEED set) type=%s targetId=%s url=%r seed_len=%s",
-                                ttype,
-                                tid,
-                                turl,
-                                len(expected_seed),
-                            )
+                        logger.info(
+                            "Worker seed inject: sanity logging successful; CDP_GLOBAL_SEED verified type=%s targetId=%s url=%r seed_len=%s",
+                            ttype,
+                            tid,
+                            turl,
+                            len(expected_seed),
+                        )
                     except Exception as e:
                         _fatal(ws, "worker seed sanity: parse/compare failed", e)
             return
@@ -904,15 +924,25 @@ def run_worker_seed():
             return
         _fatal(ws, "cdp websocket error", err)
 
-    def on_close(ws, code, msg):
-        global _RUNNING_WORKER_SEED
+    def on_close(_ws, code, msg):
+        global _RUNNING_WORKER_SEED, _WORKER_SEED_WS, _WORKER_SEED_STOPPING
         _RUNNING_WORKER_SEED = False
-        if fatal["disconnect"]:
+        _WORKER_SEED_WS = None
+        if _WORKER_SEED_STOPPING:
+            logger.info("Worker seed inject: websocket closed by stop request code=%r msg=%r", code, msg)
+        elif fatal["disconnect"]:
             logger.info("Worker seed inject: websocket closed after disconnect code=%r msg=%r", code, msg)
         elif code is not None or msg:
             logger.error("Worker seed inject: websocket closed code=%r msg=%r", code, msg)
+        _WORKER_SEED_STOPPING = False
 
     ws = WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close)
-    ws.run_forever()
+    _WORKER_SEED_WS = ws
+    try:
+        ws.run_forever()
+    finally:
+        _WORKER_SEED_WS = None
+        _RUNNING_WORKER_SEED = False
+        _WORKER_SEED_STOPPING = False
     if fatal["err"]:
         raise fatal["err"]

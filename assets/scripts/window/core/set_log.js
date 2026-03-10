@@ -322,6 +322,8 @@ const LOGGingModule = function LOGGingModule() {
     global.env = global.env || {};
     global.env.DEBUG_DEGRADES = true;   // включить
     // global.env.DEBUG_DEGRADES = false; // выключить
+    // global.env.EXPECTED_RECEIVER_THROW_GUARD = true;   // включить special logger_guard for expected Illegal invocation / incompatible receiver
+    global.env.EXPECTED_RECEIVER_THROW_GUARD = false; // выключить: такие случаи пойдут в обычный __DEGRADE__ поток
     const env = global.env;
 
 
@@ -347,6 +349,20 @@ const LOGGingModule = function LOGGingModule() {
       return G.__LOGGER_GUARD__;
     }
 
+    function getLoggerGuardMode() {
+      try {
+        const mode = (G.__LOGGER_GUARD_MODE__ && typeof G.__LOGGER_GUARD_MODE__ === "object")
+          ? G.__LOGGER_GUARD_MODE__
+          : (G.__LOGGER_GUARD_MODE__ = {});
+        if (!Object.prototype.hasOwnProperty.call(mode, "expectedReceiverThrow")) {
+          mode.expectedReceiverThrow = !(global.env && global.env.EXPECTED_RECEIVER_THROW_GUARD === false);
+        }
+        return mode;
+      } catch (_) {
+        return null;
+      }
+    }
+
     function recordLoggerError(err, where) {
       const guard = getLoggerGuard();
       guard.count++;
@@ -369,10 +385,19 @@ const LOGGingModule = function LOGGingModule() {
 
     function isProbeReceiverGuardActive() {
       try {
-        const mode = G.__LOGGER_GUARD_MODE__;
+        const mode = getLoggerGuardMode();
         return !!(mode && typeof mode === "object" && Number(mode.probeExpectedThrowDepth) > 0);
       } catch (_) {
         return false;
+      }
+    }
+
+    function isExpectedReceiverThrowGuardActive() {
+      try {
+        const mode = getLoggerGuardMode();
+        return !(mode && mode.expectedReceiverThrow === false);
+      } catch (_) {
+        return true;
       }
     }
 
@@ -769,7 +794,9 @@ const LOGGingModule = function LOGGingModule() {
       }
 
       if (isExpectedReceiverThrow(normalizedCode, extraObj, err || null)) {
-        recordExpectedReceiverThrow(normalizedCode, err || null, extraObj);
+        if (isExpectedReceiverThrowGuardActive()) {
+          recordExpectedReceiverThrow(normalizedCode, err || null, extraObj);
+        }
         return;
       }
 
@@ -1457,6 +1484,43 @@ const LOGGingModule = function LOGGingModule() {
       }
     };
 
+    global.EXPECTED_RECEIVER_THROW_GUARD_ON = function () {
+      try {
+        global.env = global.env || {};
+        global.env.EXPECTED_RECEIVER_THROW_GUARD = true;
+        const mode = getLoggerGuardMode();
+        if (mode) mode.expectedReceiverThrow = true;
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_ON"); } catch (_) {}
+      }
+    };
+
+    global.EXPECTED_RECEIVER_THROW_GUARD_OFF = function () {
+      try {
+        global.env = global.env || {};
+        global.env.EXPECTED_RECEIVER_THROW_GUARD = false;
+        const mode = getLoggerGuardMode();
+        if (mode) mode.expectedReceiverThrow = false;
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_OFF"); } catch (_) {}
+      }
+    };
+
+    global.EXPECTED_RECEIVER_THROW_GUARD_TOGGLE = function () {
+      try {
+        global.env = global.env || {};
+        const mode = getLoggerGuardMode();
+        const next = !(mode && mode.expectedReceiverThrow === false);
+        if (mode) mode.expectedReceiverThrow = !next;
+        global.env.EXPECTED_RECEIVER_THROW_GUARD = !!(mode && mode.expectedReceiverThrow !== false);
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_TOGGLE"); } catch (_) {}
+      }
+    };
+
 
         // after all logger globals are assigned (Window realm only):
       if (W) {
@@ -1469,6 +1533,9 @@ const LOGGingModule = function LOGGingModule() {
         Object.defineProperty(W, "DEBUG_ALL_ON",     { value: W.DEBUG_ALL_ON,     writable:false, configurable:true, enumerable:false });
         Object.defineProperty(W, "DEBUG_ALL_OFF",    { value: W.DEBUG_ALL_OFF,    writable:false, configurable:true, enumerable:false });
         Object.defineProperty(W, "DEBUG_ALL_TOGGLE", { value: W.DEBUG_ALL_TOGGLE, writable:false, configurable:true, enumerable:false });
+        Object.defineProperty(W, "EXPECTED_RECEIVER_THROW_GUARD_ON", { value: W.EXPECTED_RECEIVER_THROW_GUARD_ON, writable:false, configurable:true, enumerable:false });
+        Object.defineProperty(W, "EXPECTED_RECEIVER_THROW_GUARD_OFF", { value: W.EXPECTED_RECEIVER_THROW_GUARD_OFF, writable:false, configurable:true, enumerable:false });
+        Object.defineProperty(W, "EXPECTED_RECEIVER_THROW_GUARD_TOGGLE", { value: W.EXPECTED_RECEIVER_THROW_GUARD_TOGGLE, writable:false, configurable:true, enumerable:false });
         Object.defineProperty(W, "__DIAG_ALERTS__", { value: W.__DIAG_ALERTS__, writable:false, configurable:true, enumerable:false });
         Object.defineProperty(W, "DIAG_SCREEN_ON", { value: W.DIAG_SCREEN_ON, writable:false, configurable:true, enumerable:false });
         Object.defineProperty(W, "DIAG_SCREEN_OFF", { value: W.DIAG_SCREEN_OFF, writable:false, configurable:true, enumerable:false });
