@@ -209,6 +209,9 @@ const WebglPatchModule = function WebglPatchModule(window) {
   function webglGetSupportedExtensionsPatch(orig, ...args) {
     const whitelist = Array.isArray(window.__EXTENSIONS_WHITELIST__)
       ? window.__EXTENSIONS_WHITELIST__ : [];
+    if (whitelist.length === 0) {
+      return; // undefined -> native pass-through in patchMethod
+    }
 
     const res = Reflect.apply(orig, this, args);
     if (!Array.isArray(res)) return res;
@@ -219,6 +222,9 @@ const WebglPatchModule = function WebglPatchModule(window) {
   function webglGetExtensionPatch(orig, name, ...rest) {
     const whitelist = Array.isArray(window.__EXTENSIONS_WHITELIST__)
       ? window.__EXTENSIONS_WHITELIST__ : [];
+    if (whitelist.length === 0) {
+      return; // undefined -> native pass-through in patchMethod
+    }
     if (!whitelist.includes(name)) return null;
     const res = Reflect.apply(orig, this, [name].concat(rest));
     //  WEBGL_debug_renderer_info

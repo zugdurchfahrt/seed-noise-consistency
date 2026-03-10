@@ -78,12 +78,103 @@ const WEBglDICKts = function WEBglDICKts(window) {
     }
     if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
 
+    function __captureDescriptorState(key) {
+        return {
+            key: key,
+            exists: Object.prototype.hasOwnProperty.call(window, key),
+            desc: Object.getOwnPropertyDescriptor(window, key) || null
+        };
+    }
+
+    function __restoreDescriptorState(state) {
+        try {
+            if (state.exists && state.desc) {
+                Object.defineProperty(window, state.key, state.desc);
+            } else {
+                delete window[state.key];
+            }
+            return true;
+        } catch (e) {
+            diag('error', 'webglstorage:rollback_failed', {
+                stage: 'rollback',
+                key: state && state.key ? state.key : null,
+                message: 'Rollback failed',
+                type: __typeBrowser,
+                data: { outcome: 'skip', reason: 'rollback_failed' }
+            }, e);
+            return false;
+        }
+    }
+
+    function __hideOwnSurface(key) {
+        try {
+            if (!Object.prototype.hasOwnProperty.call(window, key)) return true;
+            const d = Object.getOwnPropertyDescriptor(window, key);
+            if (!d || d.enumerable === false) return true;
+            if (d.configurable === false) {
+                diag('warn', 'webglstorage:hide_surface_nonconfigurable', {
+                    stage: 'apply',
+                    key: key,
+                    message: 'Hide surface skipped: non-configurable',
+                    type: __typeBrowser,
+                    data: { outcome: 'skip', reason: 'hide_surface_nonconfigurable' }
+                }, null);
+                return false;
+            }
+            if ('value' in d) {
+                Object.defineProperty(window, key, {
+                    value: d.value,
+                    writable: !!d.writable,
+                    configurable: !!d.configurable,
+                    enumerable: false
+                });
+            } else {
+                Object.defineProperty(window, key, {
+                    get: d.get,
+                    set: d.set,
+                    configurable: !!d.configurable,
+                    enumerable: false
+                });
+            }
+            return true;
+        } catch (e) {
+            diag('warn', 'webglstorage:hide_surface_failed', {
+                stage: 'apply',
+                key: key,
+                message: 'Hide surface failed',
+                type: __typeBrowser,
+                data: { outcome: 'skip', reason: 'hide_surface_failed' }
+            }, e);
+            return false;
+        }
+    }
+
+    function __setHiddenValue(key, value) {
+        const own = Object.prototype.hasOwnProperty.call(window, key);
+        const d = own ? (Object.getOwnPropertyDescriptor(window, key) || null) : null;
+        if (d && d.configurable === false) {
+            window[key] = value;
+            __hideOwnSurface(key);
+            return;
+        }
+        Object.defineProperty(window, key, {
+            value: value,
+            writable: d ? !!d.writable : true,
+            configurable: d ? !!d.configurable : true,
+            enumerable: false
+        });
+    }
+
+    const __state = {
+    paramWhitelist: __captureDescriptorState('__WEBGL_PARAM_WHITELIST__'),
+    extensionsWhitelist: __captureDescriptorState('__EXTENSIONS_WHITELIST__')
+    };
     try {
     const WebGLRenderingContext = window.WebGLRenderingContext || {};
     const WebGL2RenderingContext = window.WebGL2RenderingContext || {};
     
     // === WHITELIST (use YOR device specification list)===
-    window.__WEBGL_PARAM_WHITELIST__ = [
+    __setHiddenValue('__WEBGL_PARAM_WHITELIST__', [
     0x1F00,
     0x1F01,
     WebGLRenderingContext.DEPTH_BUFFER_BIT,
@@ -943,10 +1034,10 @@ const WEBglDICKts = function WEBglDICKts(window) {
     WebGL2RenderingContext.TEXTURE_IMMUTABLE_LEVELS,
     WebGL2RenderingContext.TIMEOUT_IGNORED,
     WebGL2RenderingContext.MAX_CLIENT_WAIT_TIMEOUT_WEBGL
-    ];
+    ]);
     // Object.freeze(window.__WEBGL_PARAM_WHITELIST__);
         
-    window.__EXTENSIONS_WHITELIST__ = [
+    __setHiddenValue('__EXTENSIONS_WHITELIST__', [
     "EXT_clip_control",
     "EXT_color_buffer_float",
     "EXT_color_buffer_half_float",
@@ -979,7 +1070,7 @@ const WEBglDICKts = function WEBglDICKts(window) {
     "WEBGL_polygon_mode",
     "WEBGL_provoking_vertex",
     "WEBGL_stencil_texturing"
-    ];
+    ]);
     // Object.freeze(window.__EXTENSIONS_WHITELIST__);
     function extendParamWhitelistFromExtensions() {
         const wl = window.__WEBGL_PARAM_WHITELIST__;
@@ -1052,10 +1143,17 @@ const WEBglDICKts = function WEBglDICKts(window) {
         type: __typePipeline,
         data: { outcome: 'return' }
     }, null);
+    __hideOwnSurface('__WEBGL_PARAM_WHITELIST__');
+    __hideOwnSurface('__EXTENSIONS_WHITELIST__');
+    try {
+        if (__core && typeof __core.releaseGuardFlag === 'function') {
+            __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
+        }
+    } catch (_) {}
     } catch (e) {
         let rollbackOk = true;
-        try { delete window.__WEBGL_PARAM_WHITELIST__; } catch (_) { rollbackOk = false; }
-        try { delete window.__EXTENSIONS_WHITELIST__; } catch (_) { rollbackOk = false; }
+        rollbackOk = __restoreDescriptorState(__state.paramWhitelist) && rollbackOk;
+        rollbackOk = __restoreDescriptorState(__state.extensionsWhitelist) && rollbackOk;
 
         diag('error', 'webglstorage:apply_failed', {
             stage: 'apply',
