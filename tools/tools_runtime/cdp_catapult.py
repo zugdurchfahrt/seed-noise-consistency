@@ -19,14 +19,14 @@ PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPTS_WORKERSCOPE = PROJECT_ROOT / "assets" / "scripts" / "workerscope"
 PORT = None
 # --- SW prelude injector (ServiceWorkerGlobalScope) ---
-SW_INJECT_ENABLED = False
+SW_INJECT_ENABLED = True
 SW_PRIMARY = None
 SW_LANGS = None
 SW_HC = None
 SW_DM = None
 SW_META = None
 # --- Dedicated/Shared Worker CDP_GLOBAL_SEED injector (WorkerGlobalScope) ---
-WORKER_SEED_INJECT_ENABLED = False
+WORKER_SEED_INJECT_ENABLED = True
 CDP_GLOBAL_SEED = None
 _RUNNING_WORKER_SEED = False
 _RUNNING = False
@@ -173,46 +173,46 @@ def enable_worker_seed_inject(global_seed: str):
     WORKER_SEED_INJECT_ENABLED = True
 
 
-# def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
-#     if not isinstance(SW_META, dict) or not SW_META:
-#         raise ValueError("SW inject: expected_client_hints missing")
+def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
+    if not isinstance(SW_META, dict) or not SW_META:
+        raise ValueError("SW inject: expected_client_hints missing")
 
-#     prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
-#     if not prelude_path.exists():
-#         raise FileNotFoundError(prelude_path)
+    prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
+    if not prelude_path.exists():
+        raise FileNotFoundError(prelude_path)
 
-#     sw_prelude_js = prelude_path.read_text("utf-8")
-#     sw_env_js = f"""
-# (() => {{
-#   'use strict';
-#   const G = globalThis;
-#   const nextEnv = {{
-#     primary: {json.dumps(language, ensure_ascii=False)},
-#     langs: {json.dumps(normalized_languages, ensure_ascii=False)},
-#     hc: {json.dumps(hardware_concurrency)},
-#     dm: {json.dumps(device_memory)},
-#     meta: {json.dumps(SW_META, ensure_ascii=False)}
-#   }};
-#   const prev = Object.getOwnPropertyDescriptor(G, '__SW_ENV__');
-#   if (prev && prev.configurable === false) {{
-#     const cur = ('value' in prev) ? prev.value : G.__SW_ENV__;
-#     const curJson = JSON.stringify(cur);
-#     const nextJson = JSON.stringify(nextEnv);
-#     if (curJson !== nextJson) {{
-#       throw new Error('SW inject: __SW_ENV__ non-configurable mismatch');
-#     }}
-#     return;
-#   }}
-#   Object.defineProperty(G, '__SW_ENV__', {{
-#     value: nextEnv,
-#     writable: true,
-#     configurable: true,
-#     enumerable: false
-#   }});
-# }})();
-# //# sourceURL=sw_prelude_env.js
-# """
-#     return (sw_env_js + "\n" + sw_prelude_js).strip()
+    sw_prelude_js = prelude_path.read_text("utf-8")
+    sw_env_js = f"""
+(() => {{
+  'use strict';
+  const G = globalThis;
+  const nextEnv = {{
+    primary: {json.dumps(language, ensure_ascii=False)},
+    langs: {json.dumps(normalized_languages, ensure_ascii=False)},
+    hc: {json.dumps(hardware_concurrency)},
+    dm: {json.dumps(device_memory)},
+    meta: {json.dumps(SW_META, ensure_ascii=False)}
+  }};
+  const prev = Object.getOwnPropertyDescriptor(G, '__SW_ENV__');
+  if (prev && prev.configurable === false) {{
+    const cur = ('value' in prev) ? prev.value : G.__SW_ENV__;
+    const curJson = JSON.stringify(cur);
+    const nextJson = JSON.stringify(nextEnv);
+    if (curJson !== nextJson) {{
+      throw new Error('SW inject: __SW_ENV__ non-configurable mismatch');
+    }}
+    return;
+  }}
+  Object.defineProperty(G, '__SW_ENV__', {{
+    value: nextEnv,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  }});
+}})();
+//# sourceURL=sw_prelude_env.js
+"""
+    return (sw_env_js + "\n" + sw_prelude_js).strip()
 
 
 def _build_worker_seed_prelude(global_seed: str) -> str:
@@ -347,8 +347,8 @@ def run():
     sess_id = {}       # per-session counters
     injected = set()   # targetId set
     sw_prelude = None
-    # if do_prelude:
-    #     sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS, SW_HC, SW_DM)
+    if do_prelude:
+        sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS, SW_HC, SW_DM)
 
     # Post-inject sanity probe (read back values in the SW context).
     sanity_expr = None
@@ -676,7 +676,7 @@ def run_worker_seed():
     manual_attach_sent = set()  # targetId set for fallback manual attach
     sess_meta = {}  # sessionId -> {targetId,type,url}
     seed_prelude = _build_worker_seed_prelude(CDP_GLOBAL_SEED)
-    # sanity_expr = "(() => { try { return String(globalThis.CDP_GLOBAL_SEED); } catch (e) { return null; } })()"
+    sanity_expr = "(() => { try { return String(globalThis.CDP_GLOBAL_SEED); } catch (e) { return null; } })()"
 
 
     sanity_expr = (
