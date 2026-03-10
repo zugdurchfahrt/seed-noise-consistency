@@ -62,7 +62,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   function __releaseGuard(rollbackOk) {
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__flagKey, __guardToken, !!rollbackOk, __module);
+        __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __module);
       }
     } catch (e) {
       __moduleDiag('warn', __module + ':guard_release_exception', {
@@ -83,6 +83,15 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     };
   }
 
+  function __captureContextState(owner, key) {
+    return {
+      owner: owner,
+      key: key,
+      exists: !!owner && Object.prototype.hasOwnProperty.call(owner, key),
+      desc: owner ? (Object.getOwnPropertyDescriptor(owner, key) || null) : null
+    };
+  }
+
   function __restoreDescriptorState(state) {
     try {
       if (state.exists && state.desc) {
@@ -95,6 +104,27 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       __moduleDiag('error', __module + ':rollback_failed', {
         stage: 'rollback',
         key: state.key,
+        message: 'rollback failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'rollback_failed' }
+      }, e);
+      return false;
+    }
+  }
+
+  function __restoreContextState(state) {
+    try {
+      if (!state || !state.owner) return true;
+      if (state.exists && state.desc) {
+        Object.defineProperty(state.owner, state.key, state.desc);
+      } else {
+        delete state.owner[state.key];
+      }
+      return true;
+    } catch (e) {
+      __moduleDiag('error', __module + ':rollback_failed', {
+        stage: 'rollback',
+        key: state && state.key ? state.key : null,
         message: 'rollback failed',
         type: 'browser structure missing data',
         data: { outcome: 'skip', reason: 'rollback_failed' }
@@ -190,6 +220,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     }
 
     __state = {
+      store: __captureContextState(C, '__WEBGPU_WL_STORE__'),
       features: __captureDescriptorState('__WEBGPU_FEATURES_WHITELIST__'),
       limits: __captureDescriptorState('__WEBGPU_LIMITS_WHITELIST__'),
       formats: __captureDescriptorState('__WEBGPU_FORMATS_WHITELIST__'),
@@ -199,6 +230,19 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         desc: Object.getOwnPropertyDescriptor(window, '__collectWebGPUSnapshot__') || null
       }
     };
+
+    const __existingStore = Object.prototype.hasOwnProperty.call(C, '__WEBGPU_WL_STORE__')
+      ? C.__WEBGPU_WL_STORE__
+      : null;
+    const __store = (__existingStore && typeof __existingStore === 'object')
+      ? __existingStore
+      : {};
+    Object.defineProperty(C, '__WEBGPU_WL_STORE__', {
+      value: __store,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
 
     // === FEATURES WHITELIST (use YOR device specification list) ===
     const STABLE_FEATURES = [
@@ -229,11 +273,22 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     const __hasFeaturesWL = Object.prototype.hasOwnProperty.call(window, '__WEBGPU_FEATURES_WHITELIST__')
       && window.__WEBGPU_FEATURES_WHITELIST__ !== undefined;
     if (!__hasFeaturesWL) {
-      __setHiddenValue('__WEBGPU_FEATURES_WHITELIST__', [
+      Object.defineProperty(__store, 'featuresWhitelist', {
+        value: [
         ...STABLE_FEATURES,
         ...(window.__ALLOW_CHROMIUM_EXPERIMENTAL__ ? EXPERIMENTAL_FEATURES : [])
-      ]);
+        ],
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
     } else {
+      Object.defineProperty(__store, 'featuresWhitelist', {
+        value: window.__WEBGPU_FEATURES_WHITELIST__,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       __moduleDiag('info', __module + ':features_whitelist_already_set', {
         stage: 'apply',
         key: '__WEBGPU_FEATURES_WHITELIST__',
@@ -242,13 +297,14 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         data: { outcome: 'skip', reason: 'already_set' }
       }, null);
     }
-    __hideOwnSurface('__WEBGPU_FEATURES_WHITELIST__');
+    try { delete window.__WEBGPU_FEATURES_WHITELIST__; } catch (e) {}
 
     // === LIMITS WHITELIST (use only YOR device specification) ===
     const __hasLimitsWL = Object.prototype.hasOwnProperty.call(window, '__WEBGPU_LIMITS_WHITELIST__')
       && window.__WEBGPU_LIMITS_WHITELIST__ !== undefined;
     if (!__hasLimitsWL) {
-      __setHiddenValue('__WEBGPU_LIMITS_WHITELIST__', [
+      Object.defineProperty(__store, 'limitsWhitelist', {
+        value: [
         'maxTextureDimension1D', 'maxTextureDimension2D', 'maxTextureDimension3D',
         'maxTextureArrayLayers', 'maxBindGroups', 'maxBindingsPerBindGroup',
         'maxDynamicUniformBuffersPerPipelineLayout', 'maxDynamicStorageBuffersPerPipelineLayout',
@@ -263,8 +319,18 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         'maxComputeInvocationsPerWorkgroup', 'maxComputeWorkgroupSizeX',
         'maxComputeWorkgroupSizeY', 'maxComputeWorkgroupSizeZ',
         'maxComputeWorkgroupsPerDimension'
-      ]);
+        ],
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
     } else {
+      Object.defineProperty(__store, 'limitsWhitelist', {
+        value: window.__WEBGPU_LIMITS_WHITELIST__,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       __moduleDiag('info', __module + ':limits_whitelist_already_set', {
         stage: 'apply',
         key: '__WEBGPU_LIMITS_WHITELIST__',
@@ -273,11 +339,12 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         data: { outcome: 'skip', reason: 'already_set' }
       }, null);
     }
-    __hideOwnSurface('__WEBGPU_LIMITS_WHITELIST__');
+    try { delete window.__WEBGPU_LIMITS_WHITELIST__; } catch (e) {}
 
     // === TEXTURE FORMATS WHITELIST (as is, without guessing) ===
     if (!window.__WEBGPU_FORMATS_WHITELIST__) {
-      __setHiddenValue('__WEBGPU_FORMATS_WHITELIST__', [
+      Object.defineProperty(__store, 'formatsWhitelist', {
+        value: [
         'r8unorm', 'r8snorm', 'r8uint', 'r8sint',
         'rg8unorm', 'rg8snorm', 'rg8uint', 'rg8sint',
         'rgba8unorm', 'rgba8unorm-srgb', 'rgba8snorm', 'rgba8uint', 'rgba8sint',
@@ -304,13 +371,24 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         'astc-10x5-unorm', 'astc-10x5-unorm-srgb', 'astc-10x6-unorm', 'astc-10x6-unorm-srgb',
         'astc-10x8-unorm', 'astc-10x8-unorm-srgb', 'astc-10x10-unorm', 'astc-10x10-unorm-srgb',
         'astc-12x10-unorm', 'astc-12x10-unorm-srgb', 'astc-12x12-unorm', 'astc-12x12-unorm-srgb'
-      ]);
+        ],
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    } else {
+      Object.defineProperty(__store, 'formatsWhitelist', {
+        value: window.__WEBGPU_FORMATS_WHITELIST__,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
     }
-    __hideOwnSurface('__WEBGPU_FORMATS_WHITELIST__');
+    try { delete window.__WEBGPU_FORMATS_WHITELIST__; } catch (e) {}
 
     // === Snapshot helper ===
-    if (!Object.prototype.hasOwnProperty.call(window, '__collectWebGPUSnapshot__')) {
-      Object.defineProperty(window, '__collectWebGPUSnapshot__', {
+    if (!Object.prototype.hasOwnProperty.call(__store, 'collectSnapshot')) {
+      Object.defineProperty(__store, 'collectSnapshot', {
         value: async function collectWebGPUSnapshot() {
           if (!('gpu' in navigator)) return { error: 'WebGPU not available' };
           const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
@@ -356,12 +434,12 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
           const device = await adapter.requestDevice();
 
           const nativeFeatures = new Set([...adapter.features, ...device.features]);
-          const features = (window.__WEBGPU_FEATURES_WHITELIST__ || [])
+          const features = ((__store.featuresWhitelist || []))
             .filter(function hasFeature(featureName) { return nativeFeatures.has(featureName); });
 
           const pickLimits = function pickLimits(limits) {
             const out = {};
-            for (const key of (window.__WEBGPU_LIMITS_WHITELIST__ || [])) {
+            for (const key of (__store.limitsWhitelist || [])) {
               if (key in limits) out[key] = limits[key];
             }
             return out;
@@ -369,7 +447,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
           const adapterLimits = pickLimits(adapter.limits || {});
           const deviceLimits = pickLimits(device.limits || {});
 
-          const formats = (window.__WEBGPU_FORMATS_WHITELIST__ || []).slice();
+          const formats = (__store.formatsWhitelist || []).slice();
           const preferredCanvasFormat = navigator.gpu.getPreferredCanvasFormat();
 
           const summary = {
@@ -391,7 +469,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         enumerable: false
       });
     }
-    __hideOwnSurface('__collectWebGPUSnapshot__');
+    try { delete window.__collectWebGPUSnapshot__; } catch (e) {}
 
     __moduleDiag('info', __module + ':ready', {
       stage: 'apply',
@@ -403,6 +481,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   } catch (e) {
     let rollbackOk = true;
     if (__state) {
+      rollbackOk = __restoreContextState(__state.store) && rollbackOk;
       rollbackOk = __restoreDescriptorState(__state.features) && rollbackOk;
       rollbackOk = __restoreDescriptorState(__state.limits) && rollbackOk;
       rollbackOk = __restoreDescriptorState(__state.formats) && rollbackOk;

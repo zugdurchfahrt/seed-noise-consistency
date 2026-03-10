@@ -137,6 +137,16 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     return;
   }
 
+    const __webgpuWLStore = (C && C.__WEBGPU_WL_STORE__ && typeof C.__WEBGPU_WL_STORE__ === 'object')
+      ? C.__WEBGPU_WL_STORE__
+      : null;
+    const __webgpuFeaturesWhitelist = (__webgpuWLStore && Array.isArray(__webgpuWLStore.featuresWhitelist))
+      ? __webgpuWLStore.featuresWhitelist
+      : (Array.isArray(window.__WEBGPU_FEATURES_WHITELIST__) ? window.__WEBGPU_FEATURES_WHITELIST__ : []);
+    const __webgpuLimitsWhitelist = (__webgpuWLStore && Array.isArray(__webgpuWLStore.limitsWhitelist))
+      ? __webgpuWLStore.limitsWhitelist
+      : (Array.isArray(window.__WEBGPU_LIMITS_WHITELIST__) ? window.__WEBGPU_LIMITS_WHITELIST__ : []);
+
     function isSameDescriptor(actual, expected) {
       if (!actual || !expected) return false;
       const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
@@ -295,13 +305,9 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       };
     }
 
-    const __WL_FEATURES__ = new Set(Array.isArray(window.__WEBGPU_FEATURES_WHITELIST__)
-      ? window.__WEBGPU_FEATURES_WHITELIST__
-      : []);
+    const __WL_FEATURES__ = new Set(__webgpuFeaturesWhitelist);
 
-    const __WL_LIMITS__ = new Set(Array.isArray(window.__WEBGPU_LIMITS_WHITELIST__)
-      ? window.__WEBGPU_LIMITS_WHITELIST__
-      : []);
+    const __WL_LIMITS__ = new Set(__webgpuLimitsWhitelist);
 
     const __MaskedLimitsCache__ = new WeakMap();
     function __maskLimits(nativeLimits) {
@@ -721,7 +727,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             const first = input.length ? input[0] : undefined;
             const opts = (first && typeof first === 'object') ? Object.assign({}, first) : {};
             const req = new Set(Array.isArray(opts.requiredFeatures) ? opts.requiredFeatures : []);
-            const autoEnable = Array.isArray(window.__WEBGPU_FEATURES_WHITELIST__) ? window.__WEBGPU_FEATURES_WHITELIST__ : [];
+            const autoEnable = __webgpuFeaturesWhitelist;
 
             const thisFeatures = this.features;
             const thisHas = thisFeatures && Reflect.get(thisFeatures, 'has', thisFeatures);

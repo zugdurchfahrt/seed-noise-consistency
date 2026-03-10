@@ -622,12 +622,45 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const globalTargetRegistry = (Core.__targetRegistry instanceof WeakMap) ? Core.__targetRegistry : new WeakMap();
       const __patchGuardSeq = (Core.__patchGuardSeq instanceof WeakMap) ? Core.__patchGuardSeq : new WeakMap();
 
-      function nextGuardToken(flagKey) {
+      function normStr(s) {
+        return (s == null ? '' : String(s)).normalize('NFKC');
+      }
+
+      function guardSeedTag() {
+        const raw = normStr((G && G.__GLOBAL_SEED) || '');
+        const mixed = 'ok|' + raw;
+
+        try {
+          if (G && typeof G.strToSeed === 'function') {
+            return String(G.strToSeed(mixed) >>> 0).toString(36).slice(0, 8);
+          }
+        } catch (e) {
+          __emit('warn', 'core_window:guard_seed_hash_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: '__GLOBAL_SEED',
+            stage: 'guard',
+            message: 'guard seed hash provider failed; using local hash fallback',
+            type: 'pipeline missing data',
+            data: { outcome: 'return', fallback: 'local_hash' }
+          }, e);
+        }
+
+        let h = 2166136261 >>> 0;
+        for (let i = 0; i < mixed.length; i++) {
+          h ^= mixed.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return String(h >>> 0).toString(36).slice(0, 8);
+      }
+
+      function nextGuardToken() {
         let n = 0;
         try {
-          n = __patchGuardSeq.get(window) || 0;
+          n = __patchGuardSeq.get(G) || 0;
           n = (n + 1) | 0;
-          __patchGuardSeq.set(window, n);
+          __patchGuardSeq.set(G, n);
         } catch (e) {
           __emit('warn', 'core_window:nextGuardToken_seq_store_failed', {
             module: 'core',
@@ -642,7 +675,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           n = ((nextGuardToken.__n || 0) + 1) | 0;
           nextGuardToken.__n = n;
         }
-        return `g:${String(flagKey || 'flag')}:${String(n)}`;
+        return 'ok:' + guardSeedTag() + ':' + String(n);
       }
 
       function guardFlag(flagKey, codePrefix) {
@@ -676,7 +709,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           }, e);
           return null;
         }
-        const token = nextGuardToken(key);
+        const token = nextGuardToken();
         try {
           Object.defineProperty(window, key, {
             value: token,

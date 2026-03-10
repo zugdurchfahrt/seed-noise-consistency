@@ -1276,20 +1276,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (C.registerWebGLGetUniformHook)               C.registerWebGLGetUniformHook(webglHooks.webglGetUniformHook);
     state.hooksRegistered = true;
   }
-    // export registerAllHooks for applying in main.py
-    const W = (typeof window !== 'undefined') ? window : null;
-    if (W && !Object.prototype.hasOwnProperty.call(W, 'registerAllHooks')) {
-      Object.defineProperty(W, 'registerAllHooks', {
+    // keep registerAllHooks inside CanvasPatchContext to avoid a standalone window export
+    if (!Object.prototype.hasOwnProperty.call(C, 'registerAllHooks')) {
+      Object.defineProperty(C, 'registerAllHooks', {
         value: registerAllHooks,
         writable: true,
         configurable: true,
         enumerable: false
       });
-    } else if (W) {
-      const d = Object.getOwnPropertyDescriptor(W, 'registerAllHooks');
-      if (d && d.enumerable !== false && d.configurable !== false && typeof W.registerAllHooks === 'function') {
-        Object.defineProperty(W, 'registerAllHooks', {
-          value: W.registerAllHooks,
+    } else {
+      const d = Object.getOwnPropertyDescriptor(C, 'registerAllHooks');
+      if (d && d.enumerable !== false && d.configurable !== false && typeof C.registerAllHooks === 'function') {
+        Object.defineProperty(C, 'registerAllHooks', {
+          value: C.registerAllHooks,
           writable: !!d.writable,
           configurable: true,
           enumerable: false
