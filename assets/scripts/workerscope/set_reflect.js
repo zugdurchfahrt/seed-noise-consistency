@@ -118,7 +118,7 @@
         throw new Error('UACHPatch: Function.prototype.toString missing');
       }
 
-      if (!existingCoreToStringStateOk) {
+      function publishCoreToStringState() {
         try {
           Object.defineProperty(self, '__CORE_TOSTRING_STATE__', {
             value: {
@@ -141,6 +141,10 @@
           }, eState);
           throw eState;
         }
+      }
+
+      if (!existingCoreToStringStateOk) {
+        publishCoreToStringState();
       }
 
       function baseMarkAsNative(func, name = "") {
@@ -186,226 +190,14 @@
       if (seedExpected === undefined) {
         throw new Error('UACHPatch: toString probe missing label');
       }
-
-      const toString = function toString(...argList) {
-        const target = nativeToString;
-        const thisArg = this;
-        if (typeof thisArg !== 'function') {
-          try {
-            return Reflect.apply(target, thisArg, argList);
-          } catch (e) {
-            try {
-              var d = self && self.__DEGRADE__;
-              if (typeof d === 'function') {
-                var ctx = {
-                  type: 'browser structure missing data',
-                  stage: 'runtime',
-                  module: 'wrk',
-                  diagTag: 'wrk',
-                  surface: 'worker_bootstrap',
-                  key: 'Function.prototype.toString',
-                  message: 'Function.prototype.toString illegal invocation',
-                  data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-                };
-                if (typeof d.diag === 'function') d.diag('warn', 'wrk:toString_illegal_invocation', ctx, e);
-                else d('wrk:toString_illegal_invocation', e, Object.assign({}, ctx, { level: 'warn' }));
-              }
-            } catch (_e) {}
-            throw e;
-          }
-        }
-        try {
-          var direct = toStringOverrideMap.get(thisArg);
-          if (direct !== undefined) return direct;
-
-          var bridgeTarget = toStringProxyTargetMap.get(thisArg);
-          if (typeof bridgeTarget === 'function') {
-            var seenBridgeTargets = new WeakSet();
-            while (typeof bridgeTarget === 'function') {
-              if (seenBridgeTargets.has(bridgeTarget)) {
-                try {
-                  var d1 = self && self.__DEGRADE__;
-                  if (typeof d1 === 'function') {
-                    var ctx1 = {
-                      type: 'contract violation',
-                      stage: 'runtime',
-                      module: 'wrk',
-                      diagTag: 'wrk',
-                      surface: 'worker_bootstrap',
-                      key: 'Function.prototype.toString',
-                      message: 'Function.prototype.toString bridge cycle',
-                      data: { outcome: 'return', reason: 'bridge_cycle', fallback: 'native' }
-                    };
-                    if (typeof d1.diag === 'function') d1.diag('error', 'wrk:toString_bridge_cycle', ctx1, null);
-                    else d1('wrk:toString_bridge_cycle', null, Object.assign({}, ctx1, { level: 'error' }));
-                  }
-                } catch (_e1) {}
-                return Reflect.apply(target, thisArg, argList);
-              }
-              seenBridgeTargets.add(bridgeTarget);
-
-              var bridgeLabel = toStringOverrideMap.get(bridgeTarget);
-              if (bridgeLabel !== undefined) return bridgeLabel;
-
-              var nextBridgeTarget = toStringProxyTargetMap.get(bridgeTarget);
-              if (typeof nextBridgeTarget !== 'function') break;
-              bridgeTarget = nextBridgeTarget;
-            }
-            if (bridgeTarget !== thisArg && typeof bridgeTarget === 'function') {
-              try {
-                return Reflect.apply(target, bridgeTarget, argList);
-              } catch (mappedErr) {
-                try {
-                  var d2 = self && self.__DEGRADE__;
-                  if (typeof d2 === 'function') {
-                    var ctx2 = {
-                      type: 'browser structure missing data',
-                      stage: 'hook',
-                      module: 'wrk',
-                      diagTag: 'wrk',
-                      surface: 'worker_bootstrap',
-                      key: 'Function.prototype.toString',
-                      message: 'Function.prototype.toString mapped forward failed',
-                      data: { outcome: 'return', reason: 'mapped_forward_failed', fallback: 'native' }
-                    };
-                    if (typeof d2.diag === 'function') d2.diag('warn', 'wrk:toString_mapped_forward_failed', ctx2, mappedErr);
-                    else d2('wrk:toString_mapped_forward_failed', mappedErr, Object.assign({}, ctx2, { level: 'warn' }));
-                  }
-                } catch (_e2) {}
-              }
-            }
-          }
-          return Reflect.apply(target, thisArg, argList);
-        } catch (e) {
-          try {
-            var d3 = self && self.__DEGRADE__;
-            if (typeof d3 === 'function') {
-              var ctx3 = {
-                type: 'browser structure missing data',
-                stage: 'runtime',
-                module: 'wrk',
-                diagTag: 'wrk',
-                surface: 'worker_bootstrap',
-                key: 'Function.prototype.toString',
-                message: 'Function.prototype.toString apply failed',
-                data: { outcome: 'return', reason: 'apply_failed', fallback: 'native' }
-              };
-              if (typeof d3.diag === 'function') d3.diag('error', 'wrk:toString_apply_failed', ctx3, e);
-              else d3('wrk:toString_apply_failed', e, Object.assign({}, ctx3, { level: 'error' }));
-            }
-          } catch (_e3) {}
-          try {
-            return Reflect.apply(target, thisArg, argList);
-          } catch (nativeErr) {
-            throw nativeErr;
-          }
-        }
-      };
-
-      const installDesc = {
-        value: toString,
-        writable: fpToStringDesc ? !!fpToStringDesc.writable : true,
-        configurable: fpToStringDesc ? !!fpToStringDesc.configurable : true,
-        enumerable: fpToStringDesc ? !!fpToStringDesc.enumerable : false
-      };
-      try {
-        toStringProxyTargetMap.set(toString, nativeToString);
-        markAsNative(toString, 'toString');
-
-        Object.defineProperty(Function.prototype, 'toString', installDesc);
-
-        const installedDesc = nativeGetOwnProp(Function.prototype, 'toString');
-        if (!installedDesc || installedDesc.value !== toString) {
-          throw new Error('UACHPatch: toString install descriptor mismatch');
-        }
-        if (!!installedDesc.writable !== !!installDesc.writable
-          || !!installedDesc.configurable !== !!installDesc.configurable
-          || !!installedDesc.enumerable !== !!installDesc.enumerable) {
-          throw new Error('UACHPatch: toString install flags mismatch');
-        }
-
-        let nonFnErr = null;
-        try {
-          Reflect.apply(toString, {}, []);
-        } catch (e) {
-          nonFnErr = e;
-        }
-        if (!nonFnErr) {
-          throw new Error('UACHPatch: toString brand-check lost');
-        }
-
-        const directProbe = function directProbe(){};
-        const expectedNative = Reflect.apply(nativeToString, directProbe, []);
-        const actualNative = Reflect.apply(toString, directProbe, []);
-        if (actualNative !== expectedNative) {
-          throw new Error('UACHPatch: toString native forwarding mismatch');
-        }
-
-        try {
-          var p = Reflect.getPrototypeOf(toString);
-          var ok = Reflect.setPrototypeOf(toString, p);
-          if (ok !== true) {
-            try {
-              var d4 = self && self.__DEGRADE__;
-              if (typeof d4 === 'function') {
-                var ctx4 = {
-                  type: 'contract violation',
-                  stage: 'contract',
-                  module: 'wrk',
-                  diagTag: 'wrk',
-                  surface: 'worker_bootstrap',
-                  key: 'Function.prototype.toString',
-                  message: 'Reflect.setPrototypeOf(toString, currentProto) returned false',
-                  data: { outcome: 'return', ok: false }
-                };
-                if (typeof d4.diag === 'function') d4.diag('warn', 'wrk:toString_setProto_failed', ctx4, null);
-                else d4('wrk:toString_setProto_failed', null, Object.assign({}, ctx4, { level: 'warn' }));
-              }
-            } catch (_e4) {}
-          }
-        } catch (setProtoErr) {
-          try {
-            var d5 = self && self.__DEGRADE__;
-            if (typeof d5 === 'function') {
-              var ctx5 = {
-                type: 'contract violation',
-                stage: 'contract',
-                module: 'wrk',
-                diagTag: 'wrk',
-                surface: 'worker_bootstrap',
-                key: 'Function.prototype.toString',
-                message: 'Reflect.setPrototypeOf(toString, currentProto) threw',
-                data: { outcome: 'return' }
-              };
-              if (typeof d5.diag === 'function') d5.diag('error', 'wrk:toString_setProto_threw', ctx5, setProtoErr);
-              else d5('wrk:toString_setProto_threw', setProtoErr, Object.assign({}, ctx5, { level: 'error' }));
-            }
-          } catch (_e5) {}
-        }
-
-      } catch (e) {
-        toStringProxyTargetMap.delete(toString);
-        toStringOverrideMap.delete(toString);
-
-        if (typeof currentToString === 'function') {
-          Object.defineProperty(Function.prototype, 'toString', {
-            value: currentToString,
-            writable: fpToStringDesc ? !!fpToStringDesc.writable : true,
-            configurable: fpToStringDesc ? !!fpToStringDesc.configurable : true,
-            enumerable: fpToStringDesc ? !!fpToStringDesc.enumerable : false
-          });
-        }
-
-        throw e;
-      }
     } catch (e) {
       self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);
       throw e;
     }
-    __wrkDiag('info', 'wrk:worker_function.prototype_bridge_ready', {
+    __wrkDiag('info', 'wrk:worker_function.prototype_state_ready', {
       stage: 'apply',
-      key: 'function.prototype_bridge',
-      message: 'function.prototype_bridge ready',
+      key: 'function.prototype_state',
+      message: 'function.prototype_state ready',
       type: 'pipeline missing data',
       data: { outcome: 'return' }
     }, null);

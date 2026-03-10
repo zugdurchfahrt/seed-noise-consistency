@@ -225,20 +225,24 @@
       throw e;
     }
 
-    // sanity: toString bridge must reflect labels written by seed markAsNative
+    // sanity: worker follows window-style nativeization.
+    // markAsNative must write labels into shared CORE state; public Function.prototype.toString stays native.
     {
+      const st = self.__CORE_TOSTRING_STATE__;
       const probe = function probe(){};
       const nativeProbe = Reflect.apply(nativeToString, probe, []);
       markAsNative(probe);
-      const actual = Function.prototype.toString.call(probe);
-      if (actual === nativeProbe) {
-        const e = new Error('UACHPatch: toString bridge missing');
-        emitDegrade('error', 'worker_patch_src:tostring:contract:bridge_missing', {
+      const actual = st && st.overrideMap && typeof st.overrideMap.get === 'function'
+        ? st.overrideMap.get(probe)
+        : undefined;
+      if (typeof actual !== 'string' || actual === nativeProbe) {
+        const e = new Error('UACHPatch: toString override map missing label');
+        emitDegrade('error', 'worker_patch_src:tostring_state:contract:label_missing', {
           type: 'pipeline missing data',
           stage: 'contract',
           module: 'WORKER_PATCH_SRC',
-          surface: 'Function.prototype.toString',
-          key: 'toString',
+          surface: '__CORE_TOSTRING_STATE__',
+          key: '__CORE_TOSTRING_STATE__',
           policy: 'throw',
           action: 'throw'
         }, e);
@@ -246,7 +250,7 @@
       }
       const directProbe = function workerPatchDirectProbe(){};
       const expectedNative = Reflect.apply(nativeToString, directProbe, []);
-      const actualNative = Function.prototype.toString.call(directProbe);
+      const actualNative = Reflect.apply(Function.prototype.toString, directProbe, []);
       if (actualNative !== expectedNative) {
         const e = new Error('UACHPatch: toString native forwarding mismatch');
         emitDegrade('error', 'worker_patch_src:tostring:contract:forwarding_mismatch', {
