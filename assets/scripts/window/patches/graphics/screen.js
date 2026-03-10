@@ -149,11 +149,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     });
   }
-  function makeNamedGetter(prop, getter) {
-    if (typeof getter === 'function' && getter.name) return getter;
-    const acc = ({ get [prop]() { return getter.call(this); } });
-    return Object.getOwnPropertyDescriptor(acc, prop).get;
-  }
   let __screenReceiverCheckDiagSent = false;
   function receiverMatchesTarget(target, thisArg) {
     try {
@@ -362,7 +357,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       return;
     }
     if (typeof d.get !== 'function') throw new Error(`${prop} getter missing`);
-    const namedGet = (typeof getterOrValue === 'function') ? makeNamedGetter(prop, getterOrValue) : null;
     applyCoreTargetsGroup(groupTag, [{
       owner: target,
       key: prop,
@@ -376,7 +370,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       },
       invalidThis: 'throw',
       getImpl: function screenAccessorGetImpl() {
-        if (namedGet) return Reflect.apply(namedGet, this, []);
+        if (typeof getterOrValue === 'function') return getterOrValue.call(this);
         return getterOrValue;
       }
     }], 'skip');

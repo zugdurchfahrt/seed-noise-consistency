@@ -375,7 +375,7 @@ def init_driver(
             # --- RTC ---
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
-            # --- hide_webdriver (markAsNative provider) ---
+            # --- hide_webdriver  ---
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
             # --- rng params ---
@@ -917,7 +917,7 @@ def main():
         dpr_map = {
             "1920x1080": 1.0,
             "2560x1440": 1.25,
-            # "3840x2160": 2.0,
+            "3840x2160": 2.0,
         }
         device_dpr_value = dpr_map.get(screen_res)
         if device_dpr_value is None:
@@ -1098,7 +1098,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/fonts.html")
 
         # PLEASE, DO NO REMOVE THIS, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
         time.sleep(0.5)
