@@ -993,6 +993,38 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return true;
     }
 
+    function __navReadNativeScalarFallback(desc, receiver, key, diagTag) {
+      try {
+        if (desc && typeof desc.get === 'function') return Reflect.apply(desc.get, receiver, []);
+        if (desc && Object.prototype.hasOwnProperty.call(desc, 'value')) return desc.value;
+      } catch (e) {
+        __navDiagBrowser('warn', (diagTag || 'nav_total_set') + '_native_fallback_failed', {
+          stage: 'runtime',
+          diagTag: diagTag || 'nav_total_set',
+          key: key || null,
+          message: 'native scalar fallback failed',
+          data: { outcome: 'return', reason: 'native_fallback_failed' }
+        }, e);
+      }
+      return undefined;
+    }
+
+    function __navIsValidLanguageList(value) {
+      if (!Array.isArray(value) || !value.length) return false;
+      for (let i = 0; i < value.length; i++) {
+        if (typeof value[i] !== 'string' || !value[i]) return false;
+      }
+      return true;
+    }
+
+    function __navIsValidDeviceMemoryValue(value) {
+      return Number.isFinite(value) && value > 0;
+    }
+
+    function __navIsValidHardwareConcurrencyValue(value) {
+      return Number.isInteger(value) && value > 0;
+    }
+
     // Important: like native - not enumerable
     // [REGISTRY] userAgent is handled in `override_ua_data.js` (opt-in gate).
     // Here we keep only strict scalar accessor surfaces on Navigator.prototype.
@@ -1293,23 +1325,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                // Public API path must not leak service errors; pass-through native behavior.
                return Reflect.apply(orig, this, args || []);
              }
-             const fullVersionList = (meta && meta.fullVersionList != null)
-               ? meta.fullVersionList
-               : window.__FULL_VERSION_LIST;
-              const map = {
-                architecture: meta.architecture,
-                bitness: meta.bitness,
+              const safeDeviceMemory = __navIsValidDeviceMemoryValue(mem) ? mem : undefined;
+              const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(cpu) ? cpu : undefined;
+              const fullVersionList = (meta && meta.fullVersionList != null)
+                ? meta.fullVersionList
+                : window.__FULL_VERSION_LIST;
+               const map = {
+                 architecture: meta.architecture,
+                 bitness: meta.bitness,
                 model: meta.model,
                 brands: meta.brands,
-                mobile: meta.mobile,
-                platform: chPlatform,
-                platformVersion: meta.platformVersion,
-                fullVersionList: fullVersionList,
-                deviceMemory: mem,
-                hardwareConcurrency: cpu,
-                wow64: meta.wow64,
-                formFactors: meta.formFactors
-              };
+                 mobile: meta.mobile,
+                 platform: chPlatform,
+                 platformVersion: meta.platformVersion,
+                 fullVersionList: fullVersionList,
+                 deviceMemory: safeDeviceMemory,
+                 hardwareConcurrency: safeHardwareConcurrency,
+                 wow64: meta.wow64,
+                 formFactors: meta.formFactors
+               };
              const result = {};
              for (const hint of keys) {
                if (typeof hint !== 'string' || !hint) {
@@ -1329,13 +1363,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                }
                result[hint] = val;
              }
-             return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
-               try {
-                 const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : {};
-                 const out = Object.assign({}, base, result);
-                 return out;
-               } catch (e) {
-                 __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
+              return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
+                try {
+                  const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : null;
+                  if (!base) {
+                    return Object.keys(result).length ? Object.assign({}, result) : nativeResolved;
+                  }
+                  const out = Object.assign({}, base);
+                  for (const hint of Object.keys(result)) {
+                    const current = out[hint];
+                    if (current === undefined || current === null || (typeof current === 'string' && !current && hint !== 'model') || (Array.isArray(current) && !current.length)) {
+                      out[hint] = result[hint];
+                    }
+                  }
+                  return out;
+                } catch (e) {
+                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
                    stage: 'runtime',
                    type: __navTypePipeline,
                    diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
@@ -1376,8 +1419,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           invalidThis: 'throw',
           invoke(orig, args) {
             __navLogAccess('userAgentData.toJSON', null);
+            let nativeOut;
             try {
-              return { platform: this.platform, brands: this.brands, mobile: this.mobile };
+              nativeOut = Reflect.apply(orig, this, args || []);
             } catch (e) {
               __navDiag('error', 'nav_total_set:userAgentData_toJSON_runtime_failed', {
                 stage: 'runtime',
@@ -1386,7 +1430,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 key: 'userAgentData.toJSON',
                 message: 'uaData.toJSON runtime failed'
               }, e);
-              return Reflect.apply(orig, this, args || []);
+              throw e;
+            }
+            try {
+              const out = (nativeOut && typeof nativeOut === 'object') ? Object.assign({}, nativeOut) : {};
+              if (out.platform == null) out.platform = this.platform;
+              if (out.brands == null) out.brands = this.brands;
+              if (out.mobile == null) out.mobile = this.mobile;
+              return out;
+            } catch (e) {
+              __navDiag('error', 'nav_total_set:userAgentData_toJSON_post_failed', {
+                stage: 'runtime',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:userAgentData.toJSON',
+                key: 'userAgentData.toJSON',
+                message: 'uaData.toJSON post failed'
+              }, e);
+              return nativeOut;
             }
           }
         }], 'throw');
@@ -1449,10 +1509,69 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     // ——— F/G. strict scalar runtime-backed accessors ———
-    patchStrictScalarAccessor('deviceMemory', 'deviceMemory' in navProto ? () => mem : null, 'nav_total_set:deviceMemory');
-    patchStrictScalarAccessor('hardwareConcurrency', 'hardwareConcurrency' in navProto ? () => cpu : null, 'nav_total_set:hardwareConcurrency');
-    patchStrictScalarAccessor('language', 'language' in navProto ? () => window.__primaryLanguage : null, 'nav_total_set:language');
-    patchStrictScalarAccessor('languages', 'languages' in navProto ? () => window.__normalizedLanguages : null, 'nav_total_set:languages');
+    const nativeDeviceMemoryDesc = ('deviceMemory' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'deviceMemory') : null;
+    const nativeHardwareConcurrencyDesc = ('hardwareConcurrency' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency') : null;
+    const nativeLanguageDesc = ('language' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'language') : null;
+    const nativeLanguagesDesc = ('languages' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'languages') : null;
+
+    patchStrictScalarAccessor('deviceMemory', 'deviceMemory' in navProto ? function navDeviceMemoryValue() {
+      if (__navIsValidDeviceMemoryValue(mem)) return mem;
+      __navDiagPipeline('warn', 'nav_total_set:deviceMemory_invalid_profile', {
+        stage: 'runtime',
+        key: 'deviceMemory',
+        message: 'invalid deviceMemory profile value',
+        data: { outcome: 'return', reason: 'invalid_profile_value', value: mem }
+      });
+      return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
+    } : null, 'nav_total_set:deviceMemory');
+    patchStrictScalarAccessor('hardwareConcurrency', 'hardwareConcurrency' in navProto ? function navHardwareConcurrencyValue() {
+      if (__navIsValidHardwareConcurrencyValue(cpu)) return cpu;
+      __navDiagPipeline('warn', 'nav_total_set:hardwareConcurrency_invalid_profile', {
+        stage: 'runtime',
+        key: 'hardwareConcurrency',
+        message: 'invalid hardwareConcurrency profile value',
+        data: { outcome: 'return', reason: 'invalid_profile_value', value: cpu }
+      });
+      return __navReadNativeScalarFallback(nativeHardwareConcurrencyDesc, this, 'hardwareConcurrency', 'nav_total_set:hardwareConcurrency');
+    } : null, 'nav_total_set:hardwareConcurrency');
+    patchStrictScalarAccessor('language', 'language' in navProto ? function navLanguageValue() {
+      const primaryLanguage = window.__primaryLanguage;
+      const normalizedLanguages = window.__normalizedLanguages;
+      if (__navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0]) {
+        return primaryLanguage;
+      }
+      __navDiagPipeline('warn', 'nav_total_set:language_invalid_profile', {
+        stage: 'runtime',
+        key: 'language',
+        message: 'invalid language profile value',
+        data: {
+          outcome: 'return',
+          reason: 'invalid_profile_value',
+          primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
+          normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
+        }
+      });
+      return __navReadNativeScalarFallback(nativeLanguageDesc, this, 'language', 'nav_total_set:language');
+    } : null, 'nav_total_set:language');
+    patchStrictScalarAccessor('languages', 'languages' in navProto ? function navLanguagesValue() {
+      const primaryLanguage = window.__primaryLanguage;
+      const normalizedLanguages = window.__normalizedLanguages;
+      if (__navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0]) {
+        return normalizedLanguages;
+      }
+      __navDiagPipeline('warn', 'nav_total_set:languages_invalid_profile', {
+        stage: 'runtime',
+        key: 'languages',
+        message: 'invalid languages profile value',
+        data: {
+          outcome: 'return',
+          reason: 'invalid_profile_value',
+          primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
+          normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
+        }
+      });
+      return __navReadNativeScalarFallback(nativeLanguagesDesc, this, 'languages', 'nav_total_set:languages');
+    } : null, 'nav_total_set:languages');
 
   
    

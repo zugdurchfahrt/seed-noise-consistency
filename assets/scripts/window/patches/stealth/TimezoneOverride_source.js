@@ -107,6 +107,13 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         ? window.__safeDefine
         : function(obj, prop, desc) { Object.defineProperty(obj, prop, desc); };
 
+    function applyDefaultTimeZoneOption(options) {
+      if (options == null) return { timeZone: timezone };
+      const nextOptions = Object.assign({}, options);
+      if (nextOptions.timeZone == null) nextOptions.timeZone = timezone;
+      return nextOptions;
+    }
+
     if (!timezone || typeof timezone !== "string") {
       diagPipeline("error", "tz:missing_timezone", {
         key: __flagKey,
@@ -292,8 +299,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         const PatchedDTF = __wrapNativeCtor(OrigDTF, "DateTimeFormat", function patchDateTimeFormatArgs(argList) {
           const nextArgs = Array.isArray(argList) ? argList.slice() : [];
           if (nextArgs[0] == null) nextArgs[0] = spoofedLocales;
-          if (nextArgs[1] == null) nextArgs[1] = { timeZone: timezone };
-          else nextArgs[1] = Object.assign({}, nextArgs[1], { timeZone: timezone });
+          nextArgs[1] = applyDefaultTimeZoneOption(nextArgs[1]);
           return nextArgs;
         });
         redefineValue(Intl, "DateTimeFormat", PatchedDTF, "tz:DateTimeFormat");
@@ -310,6 +316,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         const proto = OrigDTF.prototype;
         rememberProtoValue(proto, "resolvedOptions");
         const origResolvedOptions = proto.resolvedOptions;
+        // Keep this path unchanged until constructor-time caller intent can be tracked per instance.
         const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", function resolvedOptionsImpl() {
           let ro;
           try {
@@ -368,6 +375,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         const origResolvedOptions = proto.resolvedOptions;
         if (typeof origResolvedOptions !== "function") return;
         rememberProtoValue(proto, "resolvedOptions");
+        // Keep this path unchanged until constructor-time caller intent can be tracked per instance.
         const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", function resolvedOptionsImpl() {
           let options;
           try {
@@ -437,7 +445,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       }
       const patchedToLocaleString = createNativeShapedMethod("toLocaleString", function toLocaleStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
-        options = Object.assign({}, options, { timeZone: timezone });
+        options = applyDefaultTimeZoneOption(options);
         try {
           return Reflect.apply(origToLocaleString, this, [locales, options]);
         } catch (e) {
@@ -451,7 +459,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       });
       const patchedToLocaleDateString = createNativeShapedMethod("toLocaleDateString", function toLocaleDateStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
-        options = Object.assign({}, options, { timeZone: timezone });
+        options = applyDefaultTimeZoneOption(options);
         try {
           return Reflect.apply(origToLocaleDateString, this, [locales, options]);
         } catch (e) {
@@ -465,7 +473,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       });
       const patchedToLocaleTimeString = createNativeShapedMethod("toLocaleTimeString", function toLocaleTimeStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
-        options = Object.assign({}, options, { timeZone: timezone });
+        options = applyDefaultTimeZoneOption(options);
         try {
           return Reflect.apply(origToLocaleTimeString, this, [locales, options]);
         } catch (e) {
