@@ -122,6 +122,45 @@ const WrkModule = function WrkModule(window) {
       return m;
     })();
 
+    const __hiddenStateKeys = [
+      '__ENV_HUB__',
+      '__lastSnap__',
+      '__LAST_UACH_HE__',
+      '__UACH_HE_READY__',
+      '__UACH_HE_PROMISE__',
+      '__PATCHED_SAFE_WORKER__',
+      '__PATCHED_SHARED_WORKER__',
+      '__PATCHED_SERVICE_WORKER__'
+    ];
+    for (const k of __hiddenStateKeys) {
+      const d = Object.getOwnPropertyDescriptor(G, k);
+      if (!d) {
+        Object.defineProperty(G, k, {
+          value: undefined,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        continue;
+      }
+      if (d.enumerable === false || d.configurable === false) continue;
+      if ('value' in d) {
+        Object.defineProperty(G, k, {
+          value: G[k],
+          writable: !!d.writable,
+          configurable: true,
+          enumerable: false
+        });
+      } else {
+        Object.defineProperty(G, k, {
+          get: d.get,
+          set: d.set,
+          configurable: true,
+          enumerable: false
+        });
+      }
+    }
+
 // 1) Источник снапшотов
 function EnvBus(G){
   function envSnapshot(){
@@ -1263,7 +1302,24 @@ function SafeWorkerOverride(G){
     }, null);
   }
 }
-window.SafeWorkerOverride = SafeWorkerOverride;
+if (!Object.prototype.hasOwnProperty.call(window, 'SafeWorkerOverride')) {
+  Object.defineProperty(window, 'SafeWorkerOverride', {
+    value: SafeWorkerOverride,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} else {
+  const d = Object.getOwnPropertyDescriptor(window, 'SafeWorkerOverride');
+  if (d && d.enumerable !== false && d.configurable !== false && typeof window.SafeWorkerOverride === 'function') {
+    Object.defineProperty(window, 'SafeWorkerOverride', {
+      value: window.SafeWorkerOverride,
+      writable: !!d.writable,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}
 
 
 // === SafeSharedWorkerOverride (Shared) ===
@@ -1458,7 +1514,24 @@ function SafeSharedWorkerOverride(G){
     }, null);
   }
 }
-window.SafeSharedWorkerOverride = SafeSharedWorkerOverride;
+if (!Object.prototype.hasOwnProperty.call(window, 'SafeSharedWorkerOverride')) {
+  Object.defineProperty(window, 'SafeSharedWorkerOverride', {
+    value: SafeSharedWorkerOverride,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} else {
+  const d = Object.getOwnPropertyDescriptor(window, 'SafeSharedWorkerOverride');
+  if (d && d.enumerable !== false && d.configurable !== false && typeof window.SafeSharedWorkerOverride === 'function') {
+    Object.defineProperty(window, 'SafeSharedWorkerOverride', {
+      value: window.SafeSharedWorkerOverride,
+      writable: !!d.writable,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}
 
 
 
@@ -1788,7 +1861,24 @@ function ServiceWorkerOverride(G){
     data: { outcome: 'return' }
   }, null);
 }
-window.ServiceWorkerOverride = ServiceWorkerOverride;
+if (!Object.prototype.hasOwnProperty.call(window, 'ServiceWorkerOverride')) {
+  Object.defineProperty(window, 'ServiceWorkerOverride', {
+    value: ServiceWorkerOverride,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} else {
+  const d = Object.getOwnPropertyDescriptor(window, 'ServiceWorkerOverride');
+  if (d && d.enumerable !== false && d.configurable !== false && typeof window.ServiceWorkerOverride === 'function') {
+    Object.defineProperty(window, 'ServiceWorkerOverride', {
+      value: window.ServiceWorkerOverride,
+      writable: !!d.writable,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}
 
 // === WorkerPatchHooks: оркестратор ===
 (function WorkerPatchHooks(G){
@@ -1997,9 +2087,21 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 }; // <-- закрыли WrkModule
 
 // --- export WrkModule globally (stable regardless of load order) ---
-Object.defineProperty(globalThis, 'WrkModule', {
-  value: WrkModule,
-  writable: true,
-  configurable: false,
-  enumerable: false,
-});
+if (!Object.prototype.hasOwnProperty.call(globalThis, 'WrkModule')) {
+  Object.defineProperty(globalThis, 'WrkModule', {
+    value: WrkModule,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} else {
+  const d = Object.getOwnPropertyDescriptor(globalThis, 'WrkModule');
+  if (d && d.enumerable !== false && d.configurable !== false && typeof globalThis.WrkModule === 'function') {
+    Object.defineProperty(globalThis, 'WrkModule', {
+      value: globalThis.WrkModule,
+      writable: !!d.writable,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}

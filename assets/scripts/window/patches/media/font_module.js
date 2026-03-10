@@ -444,7 +444,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     allowCreate: true,
     writable: true,
     configurable: true,
-    enumerable: true,
+    enumerable: false,
     policy: 'skip',
     diagTag: 'fonts:data:ready'
   };
@@ -459,7 +459,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     allowCreate: true,
     writable: true,
     configurable: true,
-    enumerable: true,
+    enumerable: false,
     policy: 'skip',
     diagTag: 'fonts:data:error'
   };

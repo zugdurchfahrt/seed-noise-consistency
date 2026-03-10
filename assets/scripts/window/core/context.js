@@ -1277,6 +1277,24 @@ const ContextPatchModule = function ContextPatchModule(window) {
     state.hooksRegistered = true;
   }
     // export registerAllHooks for applying in main.py
-window.registerAllHooks = registerAllHooks;
+    const W = (typeof window !== 'undefined') ? window : null;
+    if (W && !Object.prototype.hasOwnProperty.call(W, 'registerAllHooks')) {
+      Object.defineProperty(W, 'registerAllHooks', {
+        value: registerAllHooks,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    } else if (W) {
+      const d = Object.getOwnPropertyDescriptor(W, 'registerAllHooks');
+      if (d && d.enumerable !== false && d.configurable !== false && typeof W.registerAllHooks === 'function') {
+        Object.defineProperty(W, 'registerAllHooks', {
+          value: W.registerAllHooks,
+          writable: !!d.writable,
+          configurable: true,
+          enumerable: false
+        });
+      }
+    }
 
 }

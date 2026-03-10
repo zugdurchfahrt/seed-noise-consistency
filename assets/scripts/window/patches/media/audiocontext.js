@@ -200,10 +200,32 @@ const AudioContextModule = function AudioContextModule(window) {
 
   try {
 
-  const GUARD = globalThis.__AUDIO_CTX_GUARD__ || (globalThis.__AUDIO_CTX_GUARD__ = {
-    counts: {},
-    last: null
-  });
+  let GUARD = globalThis.__AUDIO_CTX_GUARD__;
+  if (!GUARD) {
+    GUARD = {
+      counts: {},
+      last: null
+    };
+    try {
+      Object.defineProperty(globalThis, '__AUDIO_CTX_GUARD__', {
+        value: GUARD,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    } catch (e) {
+      emitDegrade('warn', 'audiocontext:guard_define_failed', e, {
+        diagTag: 'audiocontext:guard',
+        surface: 'audio',
+        key: '__AUDIO_CTX_GUARD__',
+        stage: 'apply',
+        message: 'Object.defineProperty(globalThis,"__AUDIO_CTX_GUARD__") failed; fallback to assignment',
+        data: { outcome: 'skip', reason: 'guard_define_failed' },
+        type: __audioTypeBrowser
+      });
+      globalThis.__AUDIO_CTX_GUARD__ = GUARD;
+    }
+  }
 
   function noteIssue(code, detail) {
     const key = String(code);

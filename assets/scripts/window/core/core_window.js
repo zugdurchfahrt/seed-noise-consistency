@@ -1842,7 +1842,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   })();
 
-  window.__CORE_WINDOW_LOADED__ = true;
+  Object.defineProperty(window, '__CORE_WINDOW_LOADED__', {
+    value: true,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
   __emit('info', 'core_window:ready', {
     module: 'core_window',
     diagTag: 'core_window',

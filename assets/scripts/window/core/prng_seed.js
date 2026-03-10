@@ -76,7 +76,7 @@
 
       // Fallbacks (do not interfere, if already defined)
       if (typeof G.mulberry32 !== 'function') {
-        G.mulberry32 = function (seed) {
+        const __mulberry32 = function (seed) {
           return function () {
             let t = (seed += 0x6d2b79f5);
             t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -84,13 +84,53 @@
             return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
           };
         };
+        try {
+          Object.defineProperty(G, 'mulberry32', {
+            value: __mulberry32,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        } catch (e) {
+          __emit('warn', 'rng_set:define_mulberry32_failed', {
+            module: 'rng_set',
+            diagTag: 'rng_set',
+            surface: 'rng_set',
+            key: 'mulberry32',
+            stage: 'apply',
+            message: 'Object.defineProperty(G,"mulberry32") failed; fallback to assignment',
+            type: 'browser structure missing data',
+            data: { outcome: 'rollback', action: 'fallback_assign' }
+          }, e);
+          G.mulberry32 = __mulberry32;
+        }
       }
       if (typeof G.strToSeed !== 'function') {
-        G.strToSeed = function (str) {
+        const __strToSeed = function (str) {
           let h = 5381; str = String(str);
           for (let i = 0; i < str.length; i++) h = ((h << 5) + h) + str.charCodeAt(i);
           return h >>> 0;
         };
+        try {
+          Object.defineProperty(G, 'strToSeed', {
+            value: __strToSeed,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        } catch (e) {
+          __emit('warn', 'rng_set:define_strToSeed_failed', {
+            module: 'rng_set',
+            diagTag: 'rng_set',
+            surface: 'rng_set',
+            key: 'strToSeed',
+            stage: 'apply',
+            message: 'Object.defineProperty(G,"strToSeed") failed; fallback to assignment',
+            type: 'browser structure missing data',
+            data: { outcome: 'rollback', action: 'fallback_assign' }
+          }, e);
+          G.strToSeed = __strToSeed;
+        }
       }
 
       const LOG_SEED = toBool(G.__LOG_SEED);
@@ -237,13 +277,13 @@
         || (typeof global     !== 'undefined' && global)
         || {};
 
-  if (typeof G.RNGsetModule !== 'function') {
+  if (!Object.prototype.hasOwnProperty.call(G, 'RNGsetModule')) {
     try {
       Object.defineProperty(G, 'RNGsetModule', {
         value: RNGsetModule,
-        writable: false,
-        configurable: false,
-        enumerable: true
+        writable: true,
+        configurable: true,
+        enumerable: false
       });
     } catch (e) {
       // [NORMATIVE] no console.*, report through __DEGRADE__.diag with fallback
@@ -265,6 +305,18 @@
       } catch (_) {}
       G.RNGsetModule = RNGsetModule;
     }
+  } else {
+    try {
+      const d = Object.getOwnPropertyDescriptor(G, 'RNGsetModule');
+      if (d && d.enumerable !== false && d.configurable !== false && typeof G.RNGsetModule === 'function') {
+        Object.defineProperty(G, 'RNGsetModule', {
+          value: G.RNGsetModule,
+          writable: !!d.writable,
+          configurable: true,
+          enumerable: false
+        });
+      }
+    } catch (_) {}
   }
 })();
 
