@@ -60,8 +60,11 @@ const AudioContextModule = function AudioContextModule(window) {
     return;
   }
 
-  const rand = window.rand;
-  if (!rand || typeof rand.use !== 'function') {
+  const __prngState = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+  const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
+    ? __prngState.rand
+    : window.rand;
+  if (!__randSource || typeof __randSource.use !== 'function') {
     degrade('audiocontext:rand_missing', new Error('[AudioContextPatch] rand.use missing'), {
       stage: 'preflight',
       level: 'fatal',
@@ -73,7 +76,7 @@ const AudioContextModule = function AudioContextModule(window) {
   }
   let R = null;
   try {
-    R = rand.use('audio');
+    R = __randSource.use('audio');
   } catch (e) {
     degrade('audiocontext:rand_use_failed', e, {
       stage: 'preflight',

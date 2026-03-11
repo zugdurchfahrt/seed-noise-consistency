@@ -1275,14 +1275,36 @@ def main():
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers")
 
-        # PLEASE, DO NO REMOVE THIS, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
+
+        # Keep main thread alive; otherwise daemon CDP threads die on process exit.
+        # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.
+        def _hold_until_driver_end():
+            logger.warning("stdin is unavailable; keepalive mode is active (Ctrl+C to exit)")
+            while True:
+                try:
+                    driver.execute_script("return 1")
+                except Exception:
+                    logger.info("Driver session ended; keepalive loop finished")
+                    break
+                time.sleep(1.0)
+
         time.sleep(0.5)
-        input("press Enter for exit...")
+        try:
+            if sys.stdin is not None and sys.stdin.isatty():
+                input("press Enter for exit...")
+            else:
+                _hold_until_driver_end()
+        except EOFError:
+            _hold_until_driver_end()
+        except KeyboardInterrupt:
+            logger.info("Interrupted by user (Ctrl+C)")
 
     except Exception as e:
         logger.error(f"Error in main block: {e}", exc_info=True)
         logger.info(f"Error: {e}")
-        # ----------------------- THAT'S ALL, FOLKS!  -----------------------
+
+
+    # ----------------------- THAT'S ALL, FOLKS!  -----------------------
     # finally:
     #     # Wait for mitmproxy to complete, then close the file
     #     mitmproxy_proc.terminate()

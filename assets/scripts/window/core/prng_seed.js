@@ -69,13 +69,79 @@
       s = String(s); const n = s.length; const k = Math.max(2, Math.min(keep || 4, Math.floor(n / 4)));
       return (n <= 2 * k) ? '"' + s + '" (len ' + n + ')' : '"' + s.slice(0, k) + '…' + s.slice(-k) + '" (len ' + n + ')';
     }
+    const C = (G && G.CanvasPatchContext) || (window && window.CanvasPatchContext) || null;
+    function ensurePrngState() {
+      if (!C || (typeof C !== 'object' && typeof C !== 'function')) return null;
+      let state = (C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+      if (!state) {
+        state = {
+          seed: '',
+          strToSeed: null,
+          mulberry32: null,
+          rand: null,
+          pools: Object.create(null),
+          marker: 'envrand',
+          version: '1.1.1'
+        };
+        try {
+          Object.defineProperty(C, '__PRNG_STATE__', {
+            value: state,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        } catch (e) {
+          __emit('warn', 'rng_set:define_prng_state_failed', {
+            module: 'rng_set',
+            diagTag: 'rng_set',
+            surface: 'CanvasPatchContext',
+            key: '__PRNG_STATE__',
+            stage: 'apply',
+            message: 'Object.defineProperty(CanvasPatchContext,"__PRNG_STATE__") failed; fallback to assignment',
+            type: 'browser structure missing data',
+            data: { outcome: 'rollback', action: 'fallback_assign' }
+          }, e);
+          C.__PRNG_STATE__ = state;
+        }
+      }
+      if (!state.pools || typeof state.pools !== 'object') state.pools = Object.create(null);
+      return state;
+    }
+    const __prngState = ensurePrngState();
 
     function installRand() {
-      if (G.rand && G.rand.__marker === 'envrand' && typeof G.rand.use === 'function') return true;
-      if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED) return false; // why: waiting for the seed
+      if (__prngState && __prngState.rand && __prngState.rand.__marker === 'envrand' && typeof __prngState.rand.use === 'function') {
+        if (!__prngState.seed && typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) __prngState.seed = String(G.__GLOBAL_SEED);
+        if (!__prngState.strToSeed && typeof G.strToSeed === 'function') __prngState.strToSeed = G.strToSeed;
+        if (!__prngState.mulberry32 && typeof G.mulberry32 === 'function') __prngState.mulberry32 = G.mulberry32;
+        if (G.rand !== __prngState.rand) {
+          try {
+            Object.defineProperty(G, 'rand', { value: __prngState.rand, writable: false, configurable: false, enumerable: true });
+          } catch (e) {
+            try { G.rand = __prngState.rand; } catch (_) {}
+          }
+        }
+        return true;
+      }
+      if (G.rand && G.rand.__marker === 'envrand' && typeof G.rand.use === 'function') {
+        if (__prngState) {
+          __prngState.seed = (typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) ? String(G.__GLOBAL_SEED) : (__prngState.seed || '');
+          __prngState.strToSeed = (typeof G.strToSeed === 'function') ? G.strToSeed : __prngState.strToSeed;
+          __prngState.mulberry32 = (typeof G.mulberry32 === 'function') ? G.mulberry32 : __prngState.mulberry32;
+          __prngState.rand = G.rand;
+        }
+        return true;
+      }
+      const seed = (typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED)
+        ? String(G.__GLOBAL_SEED)
+        : ((__prngState && typeof __prngState.seed === 'string' && __prngState.seed) ? __prngState.seed : '');
+      if (!seed) return false; // why: waiting for the seed
+      if (__prngState) __prngState.seed = seed;
 
-      // Fallbacks (do not interfere, if already defined)
-      if (typeof G.mulberry32 !== 'function') {
+      let mulberry32Fn = (__prngState && typeof __prngState.mulberry32 === 'function')
+        ? __prngState.mulberry32
+        : ((typeof G.mulberry32 === 'function') ? G.mulberry32 : null);
+      if (typeof mulberry32Fn !== 'function') {
         const __mulberry32 = function (seed) {
           return function () {
             let t = (seed += 0x6d2b79f5);
@@ -84,9 +150,10 @@
             return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
           };
         };
+        mulberry32Fn = __mulberry32;
         try {
           Object.defineProperty(G, 'mulberry32', {
-            value: __mulberry32,
+            value: mulberry32Fn,
             writable: true,
             configurable: true,
             enumerable: false
@@ -102,18 +169,24 @@
             type: 'browser structure missing data',
             data: { outcome: 'rollback', action: 'fallback_assign' }
           }, e);
-          G.mulberry32 = __mulberry32;
+          G.mulberry32 = mulberry32Fn;
         }
       }
-      if (typeof G.strToSeed !== 'function') {
+      if (__prngState) __prngState.mulberry32 = mulberry32Fn;
+
+      let strToSeedFn = (__prngState && typeof __prngState.strToSeed === 'function')
+        ? __prngState.strToSeed
+        : ((typeof G.strToSeed === 'function') ? G.strToSeed : null);
+      if (typeof strToSeedFn !== 'function') {
         const __strToSeed = function (str) {
           let h = 5381; str = String(str);
           for (let i = 0; i < str.length; i++) h = ((h << 5) + h) + str.charCodeAt(i);
           return h >>> 0;
         };
+        strToSeedFn = __strToSeed;
         try {
           Object.defineProperty(G, 'strToSeed', {
-            value: __strToSeed,
+            value: strToSeedFn,
             writable: true,
             configurable: true,
             enumerable: false
@@ -129,13 +202,13 @@
             type: 'browser structure missing data',
             data: { outcome: 'rollback', action: 'fallback_assign' }
           }, e);
-          G.strToSeed = __strToSeed;
+          G.strToSeed = strToSeedFn;
         }
       }
+      if (__prngState) __prngState.strToSeed = strToSeedFn;
 
       const LOG_SEED = toBool(G.__LOG_SEED);
       const LOG_POOLS = toBool(G.__LOG_POOLS);
-      // console.* is forbidden here; diagnostics must go through __DEGRADE__.diag
       if (LOG_SEED) {
         __emit('info', 'rng_set:seed_detected', {
           module: 'rng_set',
@@ -145,12 +218,15 @@
           stage: 'preflight',
           message: '__GLOBAL_SEED detected',
           type: 'ok',
-          data: { outcome: 'return', seed: maskSeed(G.__GLOBAL_SEED) }
+          data: { outcome: 'return', seed: maskSeed(seed) }
         }, null);
       }
 
       const ROOT = '__RAND_SEED_POOL__';
-      const pools = Object.create(null);
+      const pools = (__prngState && __prngState.pools && typeof __prngState.pools === 'object')
+        ? __prngState.pools
+        : Object.create(null);
+      if (__prngState) __prngState.pools = pools;
       let __labelCoerceWarned = false;
 
       function getRng(label) {
@@ -170,8 +246,8 @@
         const key = String(label == null ? 'default' : label);
         let rng = pools[key];
         if (!rng) {
-          const material = ROOT + '|' + key + '|' + String(G.__GLOBAL_SEED);
-          const numericSeed = G.strToSeed(material);
+          const material = ROOT + '|' + key + '|' + String(seed);
+          const numericSeed = strToSeedFn(material);
           if (LOG_POOLS) {
             __emit('info', 'rng_set:pool_created', {
               module: 'rng_set',
@@ -184,7 +260,7 @@
               data: { outcome: 'return' }
             }, null);
           }
-          rng = pools[key] = G.mulberry32(numericSeed);
+          rng = pools[key] = mulberry32Fn(numericSeed);
         }
         return rng;
       }
@@ -196,6 +272,12 @@
       };
 
       Object.freeze(rand);
+      if (__prngState) {
+        __prngState.seed = seed;
+        __prngState.rand = rand;
+        __prngState.marker = 'envrand';
+        __prngState.version = '1.1.1';
+      }
 
       try {
         Object.defineProperty(G, 'rand', { value: rand, writable: false, configurable: false, enumerable: true });

@@ -66,6 +66,16 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     }
     d(eventCode, e, ctx);
   }
+  function __resolvePrngState() {
+    const state = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+    return {
+      seed: (state && typeof state.seed === 'string' && state.seed)
+        ? state.seed
+        : ((typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) ? G.__GLOBAL_SEED : ''),
+      strToSeed: (state && typeof state.strToSeed === 'function') ? state.strToSeed : G.strToSeed,
+      mulberry32: (state && typeof state.mulberry32 === 'function') ? state.mulberry32 : G.mulberry32
+    };
+  }
 
 
   // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
@@ -188,7 +198,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const baseCanvasWidth = 300;
     const baseCanvasHeight = 150;
     const div = doc.createElement('div');
-    if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED) {
+    const __prng = __resolvePrngState();
+    if (typeof __prng.seed !== 'string' || !__prng.seed) {
       emitCanvasDiag('warn', 'canvas:init:preflight:global_seed_missing', null, {
         stage: 'preflight',
         key: '__GLOBAL_SEED',
@@ -196,7 +207,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       });
       return;
     }
-    if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function') {
+    if (typeof __prng.strToSeed !== 'function' || typeof __prng.mulberry32 !== 'function') {
       emitCanvasDiag('warn', 'canvas:init:preflight:prng_helpers_missing', null, {
         stage: 'preflight',
         key: 'strToSeed/mulberry32',
@@ -204,7 +215,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       });
       return;
     }
-    const rng = G.mulberry32(G.strToSeed(G.__GLOBAL_SEED + '|canvasId'));
+    const rng = __prng.mulberry32(__prng.strToSeed(__prng.seed + '|canvasId'));
     const u1 = rng();
     const u2 = rng();
 
@@ -307,11 +318,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   function stableNoiseFromString(str, min, max) {
   //The ONLY source: __GLOBAL_SEED + key -> mulberry32(strToSeed(...))
-  if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED)
+  const __prng = __resolvePrngState();
+  if (typeof __prng.seed !== 'string' || !__prng.seed)
     throw new Error('[PRNG] __GLOBAL_SEED is required');
-  if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function')
+  if (typeof __prng.strToSeed !== 'function' || typeof __prng.mulberry32 !== 'function')
     throw new Error('[PRNG] strToSeed/mulberry32 are required')
-    const seedStr = str + ':' + (G.__GLOBAL_SEED);
+    const seedStr = str + ':' + (__prng.seed);
     let x = stringHash(seedStr);
     x ^= x >>> 16;
     x = Math.imul(x, 0x7feb352d);

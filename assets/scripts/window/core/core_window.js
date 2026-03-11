@@ -720,12 +720,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }
 
       function guardSeedTag() {
-        const raw = normStr((G && G.__GLOBAL_SEED) || '');
+        const prngState = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+        const raw = normStr((prngState && typeof prngState.seed === 'string' && prngState.seed) ? prngState.seed : ((G && G.__GLOBAL_SEED) || ''));
         const mixed = 'ok|' + raw;
 
         try {
-          if (G && typeof G.strToSeed === 'function') {
-            return String(G.strToSeed(mixed) >>> 0).toString(36).slice(0, 8);
+          const seedHasher = (prngState && typeof prngState.strToSeed === 'function')
+            ? prngState.strToSeed
+            : ((G && typeof G.strToSeed === 'function') ? G.strToSeed : null);
+          if (typeof seedHasher === 'function') {
+            return String(seedHasher(mixed) >>> 0).toString(36).slice(0, 8);
           }
         } catch (e) {
           __emit('warn', 'core_window:guard_seed_hash_failed', {
