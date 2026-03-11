@@ -554,10 +554,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     diagTag: 'screen:matchMedia',
     validThis: isMatchMediaThis,
     invalidThis: 'throw',
-    // validThis() {
-    //   return true;
-    // },
-    // invalidThis: 'throw',
     invoke: matchMediaInvokeCore
   }], 'throw');
 

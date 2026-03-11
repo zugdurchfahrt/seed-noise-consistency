@@ -661,64 +661,48 @@
       value: getHighEntropyValues
     });
 
-    const makeGuardedGetter = (k, owner, patchedGet, origGet) => {
+    const wrapStrictAccessor = (typeof self.__wrapStrictAccessor === 'function') ? self.__wrapStrictAccessor : null;
+    if (typeof wrapStrictAccessor !== 'function') {
+      throw new Error('UACHPatch: worker native accessor bridge missing');
+    }
+
+    const makeGuardedGetter = (k, owner, patchedGet, origGet, desc) => {
       if (typeof origGet !== 'function') {
         throw new Error(`UACHPatch: ${k} native getter missing`);
       }
-      const impl = function(){
-        const recv = this;
-        if (recv === nav) {
-          try {
-            return Reflect.apply(patchedGet, recv, []);
-          } catch (e) {
-            emitDegrade('warn', 'worker_patch_src:getter_native_fallback', {
-              stage: 'runtime',
-              surface: 'WorkerNavigator',
-              key: k,
-              message: 'worker navigator getter fallback to native',
-              type: 'pipeline missing data',
-              data: { outcome: 'skip', reason: 'getter_native_fallback' }
-            }, e);
-            return Reflect.apply(origGet, recv, []);
-          }
-        }
+      const guardedPatchedGet = function() {
         try {
-          return Reflect.apply(origGet, recv, []);
+          return Reflect.apply(patchedGet, this, []);
         } catch (e) {
-          emitDegrade('warn', 'worker_patch_src:workernavigator_illegal_invocation', {
+          emitDegrade('warn', 'worker_patch_src:getter_native_fallback', {
             stage: 'runtime',
             surface: 'WorkerNavigator',
             key: k,
-            message: 'worker navigator getter illegal invocation',
-            type: 'browser structure missing data',
-            data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+            message: 'worker navigator getter fallback to native',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'getter_native_fallback' }
           }, e);
-          throw e;
+          return Reflect.apply(origGet, this, []);
         }
       };
-
-      // IMPORTANT: native getters have stable `name` like "get hardwareConcurrency".
-      // Avoid `new Function`/eval in Worker scope: CSP can disable it and force a fallback to a normal function
-      // (constructable + has `.prototype`), which cascades into detector failures.
-      // Object-literal getter yields a non-constructable accessor and does not require eval.
-      let wrapped = impl;
-      try {
-        const acc = ({ get [k]() { return impl.call(this); } });
-        const d = Object.getOwnPropertyDescriptor(acc, k);
-        if (d && typeof d.get === 'function') wrapped = d.get;
-      } catch (e) {
-        emitDegrade('warn', 'worker_patch_src:getter:apply:name_failed', {
-          type: 'browser structure missing data',
-          stage: 'apply',
-          module: 'WORKER_PATCH_SRC',
-          surface: 'makeGuardedGetter',
-          key: 'name',
-          policy: 'skip',
-          action: 'skip'
-        }, e);
-      }
-
-      return markAsNative(wrapped, `get ${k}`);
+      const sourceDesc = desc && typeof desc === 'object'
+        ? {
+            configurable: !!desc.configurable,
+            enumerable: !!desc.enumerable,
+            get: origGet,
+            set: (Object.prototype.hasOwnProperty.call(desc, 'set') ? desc.set : undefined)
+          }
+        : {
+            configurable: true,
+            enumerable: true,
+            get: origGet,
+            set: undefined
+          };
+      return wrapStrictAccessor(k, guardedPatchedGet, sourceDesc, function(recv) {
+        return recv === nav;
+      }, {
+        name: `get ${k}`
+      });
     };
 
     const def = (obj, k, getter, enumerable = true) => {
@@ -745,7 +729,7 @@
           throw new Error(`UACHPatch: ${k} not configurable on navigator`);
         }
         const ownOrigGet = resolveNativeGetter(own, 'navigator');
-        const ownGuardedGet = makeGuardedGetter(k, nav, getter, ownOrigGet);
+        const ownGuardedGet = makeGuardedGetter(k, nav, getter, ownOrigGet, own);
         trackedDefineProperty(nav, k, {
           configurable: !!own.configurable,
           enumerable: !!own.enumerable,
@@ -784,7 +768,7 @@
           throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
         }
         const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
-        const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet);
+        const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet, d);
         trackedDefineProperty(owner, k, {
           configurable: d ? !!d.configurable : true,
           enumerable: d ? !!d.enumerable : !!enumerable,
