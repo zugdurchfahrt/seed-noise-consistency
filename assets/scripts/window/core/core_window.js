@@ -2028,6 +2028,33 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }, e);
     }
   }
+  for (const key of [
+    '__safeDefine',
+    '__ensureMarkAsNative',
+    'Core',
+    '__wrapNativeApply',
+    '__wrapNativeAccessor',
+    '__wrapStrictAccessor',
+    '__wrapNativeCtor',
+    '__CORE_WINDOW_LOADED__'
+  ]) {
+    const d = Object.getOwnPropertyDescriptor(window, key);
+    if (!d || d.enumerable !== false) {
+      __throw('core_window:core_export_contract_failed', {
+        module: 'core_window',
+        diagTag: 'core_window',
+        surface: 'core',
+        key,
+        stage: 'post-check',
+        message: 'core export layer requires own hidden surface',
+        type: 'contract violation',
+        data: {
+          outcome: 'throw',
+          reason: !d ? 'missing_own_descriptor' : 'enumerable_surface'
+        }
+      }, new Error('[CoreWindow] core export contract failed: ' + key));
+    }
+  }
   __emit('info', 'core_window:ready', {
     module: 'core_window',
     diagTag: 'core_window',
