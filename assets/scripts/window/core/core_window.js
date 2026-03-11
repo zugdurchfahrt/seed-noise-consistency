@@ -354,8 +354,21 @@ const CoreWindowModule = function CoreWindowModule(window) {
   function __exportWrapFactory(exportName, exportValue) {
     const hasOwnExport = Object.prototype.hasOwnProperty.call(window, exportName);
     const priorStatus = __hiddenSurfaceState.applied[exportName] || null;
+    const ownExportDesc = hasOwnExport ? Object.getOwnPropertyDescriptor(window, exportName) : null;
+    const isHiddenProducerSlot = !!(
+      ownExportDesc
+      && ownExportDesc.enumerable === false
+      && ownExportDesc.configurable === true
+      && Object.prototype.hasOwnProperty.call(ownExportDesc, 'value')
+      && ownExportDesc.value === undefined
+    );
     if (!hasOwnExport || typeof window[exportName] !== 'function') {
-      if (hasOwnExport && typeof window[exportName] !== 'function' && !(priorStatus === 'predefined' && window[exportName] === undefined)) {
+      if (
+        hasOwnExport
+        && typeof window[exportName] !== 'function'
+        && !(priorStatus === 'predefined' && window[exportName] === undefined)
+        && !isHiddenProducerSlot
+      ) {
         __emit('warn', 'core_window:export_conflict', {
           module: 'core',
           diagTag: 'core_window',

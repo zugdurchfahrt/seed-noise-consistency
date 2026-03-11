@@ -253,13 +253,9 @@ def init_driver(
     if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
         chrome_options.add_argument("--auto-open-devtools-for-tabs")
     chrome_options.binary_location = CHROME_BINARY
-    driver_kwargs = {
-        "driver_executable_path": CHROMEDRIVER_PATH,
-        "options": chrome_options,
-    }
-    driver_kwargs["port"] = chrome_debug_port
     driver = uc.Chrome(
-        **driver_kwargs,
+        driver_executable_path=CHROMEDRIVER_PATH,
+        options=chrome_options,
     )
     logger.info("Initiating Webdriver...")
 
@@ -277,8 +273,6 @@ def init_driver(
                 return int(p.read_text(encoding="utf-8").splitlines()[0].strip())
             time.sleep(0.1)
 
-        # 3) fallback: requested port
-        return chrome_debug_port
     
     cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
     if vscode_cdp_debug and cdp.PORT != chrome_debug_port:
@@ -430,7 +424,7 @@ def init_driver(
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             // ——— Worker env diagnostics (pre-bootstrap) ———//
-            // console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
+            console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             __PROBE_LIVE_READER__.start();
             DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
             __DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
@@ -1273,7 +1267,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.

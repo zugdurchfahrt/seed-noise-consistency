@@ -367,7 +367,7 @@ const LOGGingModule = function LOGGingModule() {
     global.env = global.env || {};
     global.env.DEBUG_DEGRADES = true;   // включить
     // global.env.DEBUG_DEGRADES = false; // выключить
-    // global.env.EXPECTED_RECEIVER_THROW_GUARD = true;   // включить special logger_guard for expected Illegal invocation / incompatible receiver
+    // global.env.EXPECTED_RECEIVER_THROW_GUARD = true;   // включить logger_guard for expected Illegal invocation / incompatible receiver
     global.env.EXPECTED_RECEIVER_THROW_GUARD = false; // выключить: такие случаи пойдут в обычный __DEGRADE__ поток
     const env = global.env;
 
