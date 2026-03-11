@@ -690,7 +690,7 @@
             configurable: !!desc.configurable,
             enumerable: !!desc.enumerable,
             get: origGet,
-            set: (Object.prototype.hasOwnProperty.call(desc, 'set') ? desc.set : undefined)
+            set: undefined
           }
         : {
             configurable: true,
@@ -708,6 +708,10 @@
     const def = (obj, k, getter, enumerable = true) => {
       // По методологии: не молчим, если некуда ставить
       if (!nav) throw new Error(`UACHPatch: cannot define ${k} (no navigator)`);
+      const targetOwner = (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype) || obj || null;
+      if (!targetOwner) {
+        throw new Error(`UACHPatch: cannot define ${k} (no WorkerNavigator.prototype)`);
+      }
       const resolveNativeGetter = (desc, where) => {
         if (desc && typeof desc.get === 'function') return desc.get;
         const isData = !!desc
@@ -721,64 +725,41 @@
         throw new Error(`UACHPatch: ${k} missing native getter on ${where}`);
       };
 
-      // 1) Если свойство уже есть как OWN на navigator — патчим ТУДА.
-      // Иначе прототипный getter никогда не сработает.
-      const own = Object.getOwnPropertyDescriptor(nav, k);
-      if (own) {
-        if (own.configurable === false) {
-          throw new Error(`UACHPatch: ${k} not configurable on navigator`);
+      // WorkerNavigator.* must land on WorkerNavigator.prototype as own accessor.
+      let d = null;
+      for (let o = targetOwner; o; o = Object.getPrototypeOf(o)) {
+        try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
+        catch (e) {
+          d = null;
+          emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
+            type: 'browser structure missing data',
+            stage: 'runtime',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'descriptor',
+            key: String(k || ''),
+            policy: 'skip',
+            action: 'native',
+            data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
+          }, e);
         }
-        const ownOrigGet = resolveNativeGetter(own, 'navigator');
-        const ownGuardedGet = makeGuardedGetter(k, nav, getter, ownOrigGet, own);
-        trackedDefineProperty(nav, k, {
-          configurable: !!own.configurable,
-          enumerable: !!own.enumerable,
-          get: ownGuardedGet,
-          set: own && Object.prototype.hasOwnProperty.call(own, 'set') ? own.set : undefined
-        });
-        return;
+        if (d) break;
       }
-
-      // 2) Иначе — патчим на proto (как раньше)
-      if (obj) {
-        // CORE 4.1: descriptor-owner по proto-chain (не всегда OWN на ближайшем proto)
-        let owner = obj;
-        let d = null;
-        for (let o = obj; o; o = Object.getPrototypeOf(o)) {
-          try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
-          catch (e) {
-            d = null;
-            emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
-              type: 'browser structure missing data',
-              stage: 'runtime',
-              module: 'WORKER_PATCH_SRC',
-              surface: 'descriptor',
-              key: String(k || ''),
-              policy: 'skip',
-              action: 'native',
-              data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
-            }, e);
-          }
-          if (d) { owner = o; break; }
-        }
-        if (!d) {
-          throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
-        }
-        if (d.configurable === false) {
-          throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
-        }
-        const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
-        const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet, d);
-        trackedDefineProperty(owner, k, {
-          configurable: d ? !!d.configurable : true,
-          enumerable: d ? !!d.enumerable : !!enumerable,
-          get: protoGuardedGet,
-          set: d && Object.prototype.hasOwnProperty.call(d, 'set') ? d.set : undefined
-        });
-        return;
+      if (!d) {
+        throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
       }
+      if (d.configurable === false) {
+        throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
+      }
+      const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
+      const protoGuardedGet = makeGuardedGetter(k, targetOwner, getter, protoOrigGet, d);
+      trackedDefineProperty(targetOwner, k, {
+        configurable: d ? !!d.configurable : true,
+        enumerable: d ? !!d.enumerable : !!enumerable,
+        get: protoGuardedGet,
+        set: undefined
+      });
+      return;
 
-      throw new Error(`UACHPatch: cannot define ${k} (no proto)`);
     };
 
     const failWorkerNavigatorSanity = (code, key, message, data) => {
@@ -804,24 +785,20 @@
           `UACHPatch: ${k} descriptor owner missing`
         );
       }
-      // CORE 4.1: descriptor-owner по proto-chain
       let d = null;
-      for (let o = owner; o; o = Object.getPrototypeOf(o)) {
-        try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
-        catch (e) {
-          d = null;
-          emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
-            type: 'browser structure missing data',
-            stage: 'runtime',
-            module: 'WORKER_PATCH_SRC',
-            surface: 'descriptor',
-            key: String(k || ''),
-            policy: 'skip',
-            action: 'native',
-            data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
-          }, e);
-        }
-        if (d) break;
+      try { d = Object.getOwnPropertyDescriptor(owner, k) || null; }
+      catch (e) {
+        d = null;
+        emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
+          type: 'browser structure missing data',
+          stage: 'runtime',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'descriptor',
+          key: String(k || ''),
+          policy: 'skip',
+          action: 'native',
+          data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
+        }, e);
       }
       if (!d) {
         failWorkerNavigatorSanity(
@@ -832,7 +809,8 @@
       }
       const hasGetter = typeof d.get === 'function';
       const hasValue = Object.prototype.hasOwnProperty.call(d, 'value');
-      if (!hasGetter || hasValue) {
+      const hasOwnOnNavigator = !!Object.getOwnPropertyDescriptor(nav, k);
+      if (!hasGetter || hasValue || hasOwnOnNavigator) {
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator_descriptor:sanity:mismatch',
           k,
@@ -841,6 +819,7 @@
             hasGetter,
             hasSetter: typeof d.set === 'function',
             hasValue,
+            hasOwnOnNavigator,
             configurable: !!d.configurable,
             enumerable: !!d.enumerable
           }
