@@ -420,7 +420,9 @@ def init_driver(
             "ContextPatchModule(window);",
             """
             // —————— Register all hooks here ——————//
-            if (typeof window.registerAllHooks === 'function') window.registerAllHooks();
+            if (window.CanvasPatchContext && typeof window.CanvasPatchContext.registerAllHooks === 'function') {
+                window.CanvasPatchContext.registerAllHooks();
+            }
             (function applyAllPatchesCustomOrder(win) {
                 const C = window.CanvasPatchContext; if (!C) return;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
@@ -440,23 +442,176 @@ def init_driver(
     # --- creation of window.__ objects ---
     init_params = f"""
     // ——— Globals Bootstrap ———
-    window.__GLOBAL_SEED                = {json.dumps(global_seed)};
-    window.__EXPECTED_CLIENT_HINTS      = {json.dumps(expected_client_hints, ensure_ascii=False)};
-    window.__NAV_PLATFORM__             = {json.dumps(profile['platform'], ensure_ascii=False)};
-    window.__GENERATED_PLATFORM         = {json.dumps(generated_platform, ensure_ascii=False)};
-    window.__GENERATED_PLATFORM_VERSION = {json.dumps(generated_platform_version, ensure_ascii=False)};
-    window.__USER_AGENT                 = {json.dumps(user_agent, ensure_ascii=False)};
-    window.__VENDOR                     = {json.dumps(vendor_value, ensure_ascii=False)};
-    window.__LATITUDE__                 = {json.dumps(latitude)};
-    window.__LONGITUDE__                = {json.dumps(longitude)};
-    window.__TIMEZONE__                 = {json.dumps(timezone)};
-    window.__OFFSET_MINUTES__           = {json.dumps(offset_minutes)};
-    window.__WIDTH                      = {json.dumps(screen_width)};
-    window.__HEIGHT                     = {json.dumps(screen_height)};
-    window.__COLOR_DEPTH                = 24;
-    window.__DPR                        = {json.dumps(device_dpr_value)};
-    window.__primaryLanguage            = {json.dumps(profile['language'], ensure_ascii=False)};
-    window.__normalizedLanguages        = {json.dumps(profile['languages'], ensure_ascii=False)};
+    Object.defineProperties(window, {{
+        __GLOBAL_SEED: {{
+            value: {json.dumps(global_seed)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __EXPECTED_CLIENT_HINTS: {{
+            value: {json.dumps(expected_client_hints, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __NAV_PLATFORM__: {{
+            value: {json.dumps(profile['platform'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GENERATED_PLATFORM: {{
+            value: {json.dumps(generated_platform, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GENERATED_PLATFORM_VERSION: {{
+            value: {json.dumps(generated_platform_version, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __USER_AGENT: {{
+            value: {json.dumps(user_agent, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __VENDOR: {{
+            value: {json.dumps(vendor_value, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __LATITUDE__: {{
+            value: {json.dumps(latitude)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __LONGITUDE__: {{
+            value: {json.dumps(longitude)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __TIMEZONE__: {{
+            value: {json.dumps(timezone)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __OFFSET_MINUTES__: {{
+            value: {json.dumps(offset_minutes)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WIDTH: {{
+            value: {json.dumps(screen_width)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __HEIGHT: {{
+            value: {json.dumps(screen_height)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __COLOR_DEPTH: {{
+            value: 24,
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __DPR: {{
+            value: {json.dumps(device_dpr_value)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __primaryLanguage: {{
+            value: {json.dumps(profile['language'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __normalizedLanguages: {{
+            value: {json.dumps(profile['languages'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __cpu: {{
+            value: {json.dumps(hardware_concurrency_value)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __memory: {{
+            value: {json.dumps(device_memory_value)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WEBGL_RENDERER__: {{
+            value: {json.dumps(webgl_renderer, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WEBGL_VENDOR__: {{
+            value: {json.dumps(webgl_vendor, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WEBGL_UNMASKED_VENDOR__: {{
+            value: {json.dumps(webgl_unmasked_vendor, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WEBGL_UNMASKED_RENDERER__: {{
+            value: {json.dumps(webgl_unmasked_renderer, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GPU_TYPE__: {{
+            value: {json.dumps(gpu_type, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GPU_ARCHITECTURE__: {{
+            value: {json.dumps(gpu_architecture, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GPU_VENDOR__: {{
+            value: {json.dumps(gpu_vendor, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __DEVICES_LABELS: {{
+            value: {json.dumps(devices_conf, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __PLUGIN_PROFILES__: {{
+            value: {json.dumps(profile.get("plugins", []), ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }}
+    }});
 
     // Languages stable final setting (moved here to guarantee availability before nav_total_set.js)
     // FrozenArray semantics (минимально приближенно): массив заморожен
@@ -473,17 +628,6 @@ def init_driver(
     if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
         throw new Error('THW: language != languages[0]');
     }}
-    window.__cpu                        = {json.dumps(hardware_concurrency_value)};
-    window.__memory                     = {json.dumps(device_memory_value)};
-    window.__WEBGL_RENDERER__           = {json.dumps(webgl_renderer, ensure_ascii=False)};
-    window.__WEBGL_VENDOR__             = {json.dumps(webgl_vendor, ensure_ascii=False)};
-    window.__WEBGL_UNMASKED_VENDOR__    = {json.dumps(webgl_unmasked_vendor, ensure_ascii=False)};
-    window.__WEBGL_UNMASKED_RENDERER__  = {json.dumps(webgl_unmasked_renderer, ensure_ascii=False)};
-    window.__GPU_TYPE__                 = {json.dumps(gpu_type, ensure_ascii=False)};
-    window.__GPU_ARCHITECTURE__         = {json.dumps(gpu_architecture, ensure_ascii=False)};
-    window.__GPU_VENDOR__               = {json.dumps(gpu_vendor, ensure_ascii=False)};
-    window.__DEVICES_LABELS             = {json.dumps(devices_conf, ensure_ascii=False)};
-    window.__PLUGIN_PROFILES__          = {json.dumps(profile.get("plugins", []), ensure_ascii=False)};
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
@@ -501,7 +645,36 @@ def init_driver(
     # --- publish worker core into __ENV_BRIDGE__ (stable for external worker_bootstrap.js) ---
     worker_bootstrap_env_js = f"""
     (() => {{
-        const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
+        const bridgeDesc = Object.getOwnPropertyDescriptor(window, '__ENV_BRIDGE__');
+        let BR = bridgeDesc ? (('value' in bridgeDesc) ? bridgeDesc.value : window.__ENV_BRIDGE__) : window.__ENV_BRIDGE__;
+        if (BR == null) {{
+            BR = {{}};
+            Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                value: BR,
+                writable: true,
+                configurable: true,
+                enumerable: false
+            }});
+        }} else if (typeof BR !== 'object') {{
+            throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+        }} else if (bridgeDesc && bridgeDesc.enumerable !== false) {{
+            if (bridgeDesc.configurable === false) throw new Error('WorkerBootstrap: __ENV_BRIDGE__ non-configurable enumerable');
+            if ('value' in bridgeDesc) {{
+                Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                    value: BR,
+                    writable: !!bridgeDesc.writable,
+                    configurable: true,
+                    enumerable: false
+                }});
+            }} else {{
+                Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                    get: bridgeDesc.get,
+                    set: bridgeDesc.set,
+                    configurable: true,
+                    enumerable: false
+                }});
+            }}
+        }}
         if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
         const core = {json.dumps(core)};
         const set_reflect = {json.dumps(set_reflect)};

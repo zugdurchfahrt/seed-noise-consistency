@@ -78,20 +78,25 @@ const WEBglDICKts = function WEBglDICKts(window) {
     }
     if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
 
-    function __captureDescriptorState(key) {
+    function __captureDescriptorState(target, key) {
         return {
+            target: target,
             key: key,
-            exists: Object.prototype.hasOwnProperty.call(window, key),
-            desc: Object.getOwnPropertyDescriptor(window, key) || null
+            exists: !!(target && Object.prototype.hasOwnProperty.call(target, key)),
+            desc: (target && Object.getOwnPropertyDescriptor(target, key)) || null
         };
     }
 
     function __restoreDescriptorState(state) {
         try {
+            const target = state && state.target;
+            if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+                throw new Error('restore target missing');
+            }
             if (state.exists && state.desc) {
-                Object.defineProperty(window, state.key, state.desc);
+                Object.defineProperty(target, state.key, state.desc);
             } else {
-                delete window[state.key];
+                delete target[state.key];
             }
             return true;
         } catch (e) {
@@ -106,10 +111,11 @@ const WEBglDICKts = function WEBglDICKts(window) {
         }
     }
 
-    function __hideOwnSurface(key) {
+    function __hideOwnSurface(target, key) {
         try {
-            if (!Object.prototype.hasOwnProperty.call(window, key)) return true;
-            const d = Object.getOwnPropertyDescriptor(window, key);
+            if (!target || (typeof target !== 'object' && typeof target !== 'function')) return true;
+            if (!Object.prototype.hasOwnProperty.call(target, key)) return true;
+            const d = Object.getOwnPropertyDescriptor(target, key);
             if (!d || d.enumerable === false) return true;
             if (d.configurable === false) {
                 diag('warn', 'webglstorage:hide_surface_nonconfigurable', {
@@ -122,14 +128,14 @@ const WEBglDICKts = function WEBglDICKts(window) {
                 return false;
             }
             if ('value' in d) {
-                Object.defineProperty(window, key, {
+                Object.defineProperty(target, key, {
                     value: d.value,
                     writable: !!d.writable,
                     configurable: !!d.configurable,
                     enumerable: false
                 });
             } else {
-                Object.defineProperty(window, key, {
+                Object.defineProperty(target, key, {
                     get: d.get,
                     set: d.set,
                     configurable: !!d.configurable,
@@ -149,15 +155,15 @@ const WEBglDICKts = function WEBglDICKts(window) {
         }
     }
 
-    function __setHiddenValue(key, value) {
-        const own = Object.prototype.hasOwnProperty.call(window, key);
-        const d = own ? (Object.getOwnPropertyDescriptor(window, key) || null) : null;
+    function __setHiddenValue(target, key, value) {
+        const own = !!(target && Object.prototype.hasOwnProperty.call(target, key));
+        const d = own ? (Object.getOwnPropertyDescriptor(target, key) || null) : null;
         if (d && d.configurable === false) {
-            window[key] = value;
-            __hideOwnSurface(key);
+            target[key] = value;
+            __hideOwnSurface(target, key);
             return;
         }
-        Object.defineProperty(window, key, {
+        Object.defineProperty(target, key, {
             value: value,
             writable: d ? !!d.writable : true,
             configurable: d ? !!d.configurable : true,
@@ -166,15 +172,15 @@ const WEBglDICKts = function WEBglDICKts(window) {
     }
 
     const __state = {
-    paramWhitelist: __captureDescriptorState('__WEBGL_PARAM_WHITELIST__'),
-    extensionsWhitelist: __captureDescriptorState('__EXTENSIONS_WHITELIST__')
+    paramWhitelist: __captureDescriptorState(C, '__WEBGL_PARAM_WHITELIST__'),
+    extensionsWhitelist: __captureDescriptorState(C, '__EXTENSIONS_WHITELIST__')
     };
     try {
     const WebGLRenderingContext = window.WebGLRenderingContext || {};
     const WebGL2RenderingContext = window.WebGL2RenderingContext || {};
     
     // === WHITELIST (use YOR device specification list)===
-    __setHiddenValue('__WEBGL_PARAM_WHITELIST__', [
+    __setHiddenValue(C, '__WEBGL_PARAM_WHITELIST__', [
     0x1F00,
     0x1F01,
     WebGLRenderingContext.DEPTH_BUFFER_BIT,
@@ -1037,7 +1043,7 @@ const WEBglDICKts = function WEBglDICKts(window) {
     ]);
     // Object.freeze(window.__WEBGL_PARAM_WHITELIST__);
         
-    __setHiddenValue('__EXTENSIONS_WHITELIST__', [
+    __setHiddenValue(C, '__EXTENSIONS_WHITELIST__', [
     "EXT_clip_control",
     "EXT_color_buffer_float",
     "EXT_color_buffer_half_float",
@@ -1073,8 +1079,8 @@ const WEBglDICKts = function WEBglDICKts(window) {
     ]);
     // Object.freeze(window.__EXTENSIONS_WHITELIST__);
     function extendParamWhitelistFromExtensions() {
-        const wl = window.__WEBGL_PARAM_WHITELIST__;
-        const extList = window.__EXTENSIONS_WHITELIST__;
+        const wl = C.__WEBGL_PARAM_WHITELIST__;
+        const extList = C.__EXTENSIONS_WHITELIST__;
         if (!Array.isArray(wl) || !Array.isArray(extList) || extList.length === 0) return;
         const seen = (typeof Set === 'function') ? new Set() : null;
         if (seen) {
@@ -1143,8 +1149,8 @@ const WEBglDICKts = function WEBglDICKts(window) {
         type: __typePipeline,
         data: { outcome: 'return' }
     }, null);
-    __hideOwnSurface('__WEBGL_PARAM_WHITELIST__');
-    __hideOwnSurface('__EXTENSIONS_WHITELIST__');
+    __hideOwnSurface(C, '__WEBGL_PARAM_WHITELIST__');
+    __hideOwnSurface(C, '__EXTENSIONS_WHITELIST__');
     } catch (e) {
         let rollbackOk = true;
         rollbackOk = __restoreDescriptorState(__state.paramWhitelist) && rollbackOk;

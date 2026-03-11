@@ -277,7 +277,10 @@
         || (typeof global     !== 'undefined' && global)
         || {};
 
-  if (!Object.prototype.hasOwnProperty.call(G, 'RNGsetModule')) {
+  const __rngHasOwnExport = Object.prototype.hasOwnProperty.call(G, 'RNGsetModule');
+  const __rngExportDesc = __rngHasOwnExport ? Object.getOwnPropertyDescriptor(G, 'RNGsetModule') : null;
+  const __rngCanFillPlaceholder = !!(__rngExportDesc && __rngExportDesc.configurable !== false && G.RNGsetModule === undefined);
+  if (!__rngHasOwnExport || __rngCanFillPlaceholder) {
     try {
       Object.defineProperty(G, 'RNGsetModule', {
         value: RNGsetModule,

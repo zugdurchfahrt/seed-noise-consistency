@@ -1,14 +1,17 @@
 const TimezonePatchModule = function TimezonePatchModule(window) {
   function patchTimeZone() {
-    const __MODULE = "tz";
-    const __SURFACE = "timezone";
+    const __module = "Timezone";
+    const __tag = __module;
+    const __surface = "timezone";
     const __tzTypePipeline = "pipeline missing data";
     const __tzTypeBrowser = "browser structure missing data";
-    const __flagKey = "__TZ_PATCHED__";
-    const __core = window.Core;
-    const __D = window.__DEGRADE__;
-    const __diag = (__D && typeof __D.diag === "function") ? __D.diag.bind(__D) : null;
+    const __flagKey = '__PATCH_TIMEZONE__';
+    const __core = window && window.Core;
+    const __D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+    const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
 
+   
+   
     function __emit(level, code, ctx, err) {
       try {
         if (__diag) return __diag(level, code, ctx, err);
@@ -26,9 +29,9 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     function diag(level, code, extra, err) {
       const x = (extra && typeof extra === "object") ? extra : {};
       const ctx = {
-        module: __MODULE,
-        diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __MODULE,
-        surface: __SURFACE,
+        module: __module,
+        diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __module,
+        surface: __surface,
         key: (typeof x.key === "string" || x.key === null) ? x.key : null,
         stage: x.stage,
         message: x.message,
@@ -42,7 +45,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       const x = (extra && typeof extra === "object") ? extra : {};
       return diag(level, code, Object.assign({}, x, {
         type: (typeof x.type === "string" && x.type) ? x.type : __tzTypePipeline,
-        diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __MODULE
+        diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __module
       }), err);
     }
 
@@ -50,48 +53,47 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       const x = (extra && typeof extra === "object") ? extra : {};
       return diag(level, code, Object.assign({}, x, {
         type: (typeof x.type === "string" && x.type) ? x.type : __tzTypeBrowser,
-        diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __MODULE
+        diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __module
       }), err);
     }
 
     let __guardToken = null;
-    function releaseGuard(rollbackOk) {
-      try {
-        if (__core && typeof __core.releaseGuardFlag === "function") {
-          return __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __MODULE);
-        }
-      } catch (e) {
-        diagPipeline("warn", "tz:guard_release_failed", {
-          key: __flagKey,
-          stage: "rollback",
-          message: "releaseGuardFlag threw",
-          data: { outcome: "rollback", reason: "guard_release_failed", rollbackOk: rollbackOk === true }
-        }, e);
-      }
-      return false;
-    }
-
     try {
-      if (!__core || typeof __core.guardFlag !== "function") {
-        diagPipeline("warn", "tz:guard_missing", {
+      if (!__core || typeof __core.guardFlag !== 'function') {
+        diagPipeline('warn', __tag + ':guard_missing', {
           key: __flagKey,
-          stage: "guard",
-          message: "Core.guardFlag missing",
-          data: { outcome: "skip", reason: "missing_dep_core_guard" }
+          stage: 'guard',
+          message: 'Core.guardFlag missing',
+          data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
         }, null);
         return;
       }
-      __guardToken = __core.guardFlag(__flagKey, __MODULE);
+      __guardToken = __core.guardFlag(__flagKey, __tag);
     } catch (e) {
-      diagPipeline("warn", "tz:guard_failed", {
+      diagPipeline('warn', __tag + ':guard_failed', {
         key: __flagKey,
-        stage: "guard",
-        message: "guardFlag threw",
-        data: { outcome: "skip", reason: "guard_failed" }
+        stage: 'guard',
+        message: 'guardFlag threw',
+        data: { outcome: 'skip', reason: 'guard_failed' }
       }, e);
       return;
     }
     if (!__guardToken) return;
+
+    function releaseGuard(rollbackOk) {
+      try {
+        if (__core && typeof __core.releaseGuardFlag === "function") {
+          __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __tag);
+        }
+      } catch (e) {
+        diagPipeline("warn", __tag + ":guard_release_exception", {
+          key: __flagKey,
+          stage: "rollback",
+          message: "releaseGuardFlag failed",
+          data: { outcome: "skip", reason: "guard_release_exception" }
+        }, e);
+      }
+    }
 
     const timezone = window.__TIMEZONE__;
     const offsetMinutes = window.__OFFSET_MINUTES__;

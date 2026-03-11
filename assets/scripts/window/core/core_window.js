@@ -32,6 +32,31 @@ const CoreWindowModule = function CoreWindowModule(window) {
   };
   const __exit = (level, code, ctx, ret) => (__emit(level, code, ctx, null), ret);
   const __throw = (code, ctx, err) => (__emit('error', code, ctx, err), (() => { throw err; })());
+  const __hiddenSurfaceState = {
+    preapply: [
+      '__safeDefine',
+      '__CORE_TOSTRING_STATE__',
+      '__ensureMarkAsNative',
+      '__wrapNativeApply',
+      '__wrapNativeAccessor',
+      '__wrapStrictAccessor',
+      '__wrapNativeCtor',
+      'Core',
+      '__CORE_WINDOW_LOADED__'
+    ],
+    final: [
+      '__safeDefine',
+      '__CORE_TOSTRING_STATE__',
+      '__ensureMarkAsNative',
+      '__wrapNativeApply',
+      '__wrapNativeAccessor',
+      '__wrapStrictAccessor',
+      '__wrapNativeCtor',
+      'Core',
+      '__CORE_WINDOW_LOADED__'
+    ],
+    applied: Object.create(null)
+  };
 
   // --- nativization provider  ---
   function safeDefine(obj, prop, descriptor) {
@@ -55,6 +80,68 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
+  for (const key of __hiddenSurfaceState.preapply) {
+    try {
+      const d = Object.getOwnPropertyDescriptor(window, key);
+      if (!d) {
+        Object.defineProperty(window, key, {
+          value: undefined,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        __hiddenSurfaceState.applied[key] = 'predefined';
+        continue;
+      }
+      if (d.enumerable === false) {
+        if (!__hiddenSurfaceState.applied[key]) __hiddenSurfaceState.applied[key] = 'already_hidden';
+        continue;
+      }
+      if (d.configurable === false) {
+        __hiddenSurfaceState.applied[key] = 'skip_nonconfigurable';
+        __emit('warn', 'core_window:hide_surface_nonconfigurable', {
+          module: 'core_window',
+          diagTag: 'core_window',
+          surface: 'core',
+          key,
+          stage: 'apply',
+          message: 'hide core surface skipped: non-configurable',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'hide_surface_nonconfigurable' }
+        }, new Error('[CoreWindow] hide surface non-configurable: ' + key));
+        continue;
+      }
+      if ('value' in d) {
+        Object.defineProperty(window, key, {
+          value: window[key],
+          writable: !!d.writable,
+          configurable: true,
+          enumerable: false
+        });
+      } else {
+        Object.defineProperty(window, key, {
+          get: d.get,
+          set: d.set,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      __hiddenSurfaceState.applied[key] = 'hidden';
+    } catch (e) {
+      __hiddenSurfaceState.applied[key] = 'hide_failed';
+      __emit('warn', 'core_window:hide_surface_failed', {
+        module: 'core_window',
+        diagTag: 'core_window',
+        surface: 'core',
+        key,
+        stage: 'apply',
+        message: 'hide core surface failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'hide_surface_failed' }
+      }, e);
+    }
+  }
+
   if (typeof window.__safeDefine !== 'function') {
     safeDefine(window, '__safeDefine', {
       value: safeDefine,
@@ -62,6 +149,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       configurable: true,
       enumerable: false
     });
+    __hiddenSurfaceState.applied.__safeDefine = (__hiddenSurfaceState.applied.__safeDefine === 'predefined') ? 'defined' : 'redefined';
   }
 
   // ——— Global mask "native" + general WeakMap ———
@@ -200,6 +288,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       configurable: true,
       enumerable: false
     });
+    __hiddenSurfaceState.applied.__CORE_TOSTRING_STATE__ = (__hiddenSurfaceState.applied.__CORE_TOSTRING_STATE__ === 'predefined') ? 'defined' : 'redefined';
   }
 
 
@@ -210,6 +299,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       configurable: true,
       enumerable: false
     });
+    __hiddenSurfaceState.applied.__ensureMarkAsNative = (__hiddenSurfaceState.applied.__ensureMarkAsNative === 'predefined') ? 'defined' : 'redefined';
   }
 
   // --- centralized native-shaped wrappers (Proxy/apply) ---
@@ -263,8 +353,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
   function __exportWrapFactory(exportName, exportValue) {
     const hasOwnExport = Object.prototype.hasOwnProperty.call(window, exportName);
+    const priorStatus = __hiddenSurfaceState.applied[exportName] || null;
     if (!hasOwnExport || typeof window[exportName] !== 'function') {
-      if (hasOwnExport && typeof window[exportName] !== 'function') {
+      if (hasOwnExport && typeof window[exportName] !== 'function' && !(priorStatus === 'predefined' && window[exportName] === undefined)) {
         __emit('warn', 'core_window:export_conflict', {
           module: 'core',
           diagTag: 'core_window',
@@ -282,6 +373,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
+      __hiddenSurfaceState.applied[exportName] = (priorStatus === 'predefined') ? 'defined' : (hasOwnExport ? 'redefined' : 'defined');
     }
   }
 
@@ -1744,6 +1836,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
+      __hiddenSurfaceState.applied.Core = (__hiddenSurfaceState.applied.Core === 'predefined') ? 'defined' : 'redefined';
       safeDefine(Core, 'applyTargets', {
         value: applyTargets,
         writable: true,
@@ -1881,6 +1974,60 @@ const CoreWindowModule = function CoreWindowModule(window) {
     configurable: true,
     enumerable: false
   });
+  __hiddenSurfaceState.applied.__CORE_WINDOW_LOADED__ = (__hiddenSurfaceState.applied.__CORE_WINDOW_LOADED__ === 'predefined') ? 'defined' : 'redefined';
+  for (const key of __hiddenSurfaceState.final) {
+    try {
+      if (!Object.prototype.hasOwnProperty.call(window, key)) continue;
+      const d = Object.getOwnPropertyDescriptor(window, key);
+      if (!d) continue;
+      if (d.enumerable === false) {
+        if (!__hiddenSurfaceState.applied[key]) __hiddenSurfaceState.applied[key] = 'already_hidden';
+        continue;
+      }
+      if (d.configurable === false) {
+        __hiddenSurfaceState.applied[key] = 'skip_nonconfigurable';
+        __emit('warn', 'core_window:hide_surface_nonconfigurable', {
+          module: 'core_window',
+          diagTag: 'core_window',
+          surface: 'core',
+          key,
+          stage: 'apply',
+          message: 'hide core surface skipped: non-configurable',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'hide_surface_nonconfigurable' }
+        }, new Error('[CoreWindow] hide surface non-configurable: ' + key));
+        continue;
+      }
+      if ('value' in d) {
+        Object.defineProperty(window, key, {
+          value: window[key],
+          writable: !!d.writable,
+          configurable: !!d.configurable,
+          enumerable: false
+        });
+      } else {
+        Object.defineProperty(window, key, {
+          get: d.get,
+          set: d.set,
+          configurable: !!d.configurable,
+          enumerable: false
+        });
+      }
+      __hiddenSurfaceState.applied[key] = 'hidden';
+    } catch (e) {
+      __hiddenSurfaceState.applied[key] = 'hide_failed';
+      __emit('warn', 'core_window:hide_surface_failed', {
+        module: 'core_window',
+        diagTag: 'core_window',
+        surface: 'core',
+        key,
+        stage: 'apply',
+        message: 'hide core surface failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'hide_surface_failed' }
+      }, e);
+    }
+  }
   __emit('info', 'core_window:ready', {
     module: 'core_window',
     diagTag: 'core_window',

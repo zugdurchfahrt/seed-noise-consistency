@@ -1,5 +1,6 @@
 const BootstrapHideModule = function BootstrapHideModule(window) {
-  const keys = [
+  const hiddenSurfaceState = {
+    keys: [
     "__GLOBAL_SEED",
     "__EXPECTED_CLIENT_HINTS",
     "__NAV_PLATFORM__",
@@ -27,13 +28,67 @@ const BootstrapHideModule = function BootstrapHideModule(window) {
     "__GPU_ARCHITECTURE__",
     "__GPU_VENDOR__",
     "__DEVICES_LABELS",
-    "__PLUGIN_PROFILES__"
-  ];
+    "__PLUGIN_PROFILES__",
+    "__safeDefine",
+    "__CORE_TOSTRING_STATE__",
+    "__ensureMarkAsNative",
+    "__wrapNativeApply",
+    "__wrapNativeAccessor",
+    "__wrapStrictAccessor",
+    "__wrapNativeCtor",
+    "__CORE_WINDOW_LOADED__",
+    "Core",
+    "__ENV_BRIDGE__",
+    "__ENV_HUB__",
+    "__lastSnap__",
+    "__LAST_UACH_HE__",
+    "__UACH_HE_READY__",
+    "__UACH_HE_PROMISE__",
+    "__PATCHED_SAFE_WORKER__",
+    "__PATCHED_SHARED_WORKER__",
+    "__PATCHED_SERVICE_WORKER__",
+    "__BLOB_URL_STORE__",
+    "__LAST_WORKER_BOOTSTRAP_ERROR__",
+    "__LAST_WORKER_USER_URL_LOADED__",
+    "__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__",
+    "__LAST_SHARED_WORKER_USER_URL_LOADED__",
+    "__LAST_SHARED_WORKER_PATCH_OK__",
+    "WorkerPatchHooks",
+    "WrkModule",
+    "SafeWorkerOverride",
+    "SafeSharedWorkerOverride",
+    "ServiceWorkerOverride",
+    "CanvasPatchContext",
+    "CanvasPatchHooks",
+    "webglHooks",
+    "RNGsetModule",
+    "rand",
+    "mulberry32",
+    "strToSeed"
+    ],
+    applied: Object.create(null)
+  };
 
-  for (const key of keys) {
-    if (!Object.prototype.hasOwnProperty.call(window, key)) continue;
+  for (const key of hiddenSurfaceState.keys) {
     const d = Object.getOwnPropertyDescriptor(window, key);
-    if (!d || d.enumerable === false || d.configurable === false) continue;
+    if (!d) {
+      Object.defineProperty(window, key, {
+        value: undefined,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      hiddenSurfaceState.applied[key] = "predefined";
+      continue;
+    }
+    if (d.enumerable === false) {
+      hiddenSurfaceState.applied[key] = "already_hidden";
+      continue;
+    }
+    if (d.configurable === false) {
+      hiddenSurfaceState.applied[key] = "skip_nonconfigurable";
+      continue;
+    }
     if ("value" in d) {
       Object.defineProperty(window, key, {
         value: d.value,
@@ -49,5 +104,6 @@ const BootstrapHideModule = function BootstrapHideModule(window) {
         enumerable: false
       });
     }
+    hiddenSurfaceState.applied[key] = "hidden";
   }
 };

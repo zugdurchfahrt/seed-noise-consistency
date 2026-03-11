@@ -214,8 +214,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
   // 2) Хук «whitelist-фильтра»
   function webglWhitelistParameterHook(orig, pname, ...args) {
-    const wl = Array.isArray(window.__WEBGL_PARAM_WHITELIST__)
-      ? window.__WEBGL_PARAM_WHITELIST__
+    const wl = Array.isArray(C && C.__WEBGL_PARAM_WHITELIST__)
+      ? C.__WEBGL_PARAM_WHITELIST__
       : [];
     if (wl.length === 0 || wl.includes(pname)) {
       return; // undefined → pass-through to orig.apply(this, args)
@@ -224,8 +224,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
     // === 2. getSupportedExtensions ===
   function webglGetSupportedExtensionsPatch(orig, ...args) {
-    const whitelist = Array.isArray(window.__EXTENSIONS_WHITELIST__)
-      ? window.__EXTENSIONS_WHITELIST__ : [];
+    const whitelist = Array.isArray(C && C.__EXTENSIONS_WHITELIST__)
+      ? C.__EXTENSIONS_WHITELIST__ : [];
     if (whitelist.length === 0) {
       return; // undefined -> native pass-through in patchMethod
     }
@@ -237,8 +237,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
 
   function webglGetExtensionPatch(orig, name, ...rest) {
-    const whitelist = Array.isArray(window.__EXTENSIONS_WHITELIST__)
-      ? window.__EXTENSIONS_WHITELIST__ : [];
+    const whitelist = Array.isArray(C && C.__EXTENSIONS_WHITELIST__)
+      ? C.__EXTENSIONS_WHITELIST__ : [];
     if (whitelist.length === 0) {
       return; // undefined -> native pass-through in patchMethod
     }

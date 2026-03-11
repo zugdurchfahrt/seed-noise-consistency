@@ -122,17 +122,52 @@ const WrkModule = function WrkModule(window) {
       return m;
     })();
 
-    const __hiddenStateKeys = [
-      '__ENV_HUB__',
-      '__lastSnap__',
-      '__LAST_UACH_HE__',
-      '__UACH_HE_READY__',
-      '__UACH_HE_PROMISE__',
-      '__PATCHED_SAFE_WORKER__',
-      '__PATCHED_SHARED_WORKER__',
-      '__PATCHED_SERVICE_WORKER__'
-    ];
-    for (const k of __hiddenStateKeys) {
+    const __hiddenSurfaceState = {
+      preapply: [
+        '__ENV_BRIDGE__',
+        '__ENV_HUB__',
+        '__lastSnap__',
+        '__LAST_UACH_HE__',
+        '__UACH_HE_READY__',
+        '__UACH_HE_PROMISE__',
+        '__PATCHED_SAFE_WORKER__',
+        '__PATCHED_SHARED_WORKER__',
+        '__PATCHED_SERVICE_WORKER__',
+        '__BLOB_URL_STORE__',
+        '__LAST_WORKER_BOOTSTRAP_ERROR__',
+        '__LAST_WORKER_USER_URL_LOADED__',
+        '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
+        '__LAST_SHARED_WORKER_USER_URL_LOADED__',
+        '__LAST_SHARED_WORKER_PATCH_OK__',
+        'WorkerPatchHooks'
+      ],
+      final: [
+        '__ENV_BRIDGE__',
+        '__ENV_HUB__',
+        '__lastSnap__',
+        '__LAST_UACH_HE__',
+        '__UACH_HE_READY__',
+        '__UACH_HE_PROMISE__',
+        '__PATCHED_SAFE_WORKER__',
+        '__PATCHED_SHARED_WORKER__',
+        '__PATCHED_SERVICE_WORKER__',
+        '__BLOB_URL_STORE__',
+        '__LAST_WORKER_BOOTSTRAP_ERROR__',
+        '__LAST_WORKER_USER_URL_LOADED__',
+        '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
+        '__LAST_SHARED_WORKER_USER_URL_LOADED__',
+        '__LAST_SHARED_WORKER_PATCH_OK__',
+        'WrkModule',
+        'SafeWorkerOverride',
+        'SafeSharedWorkerOverride',
+        'ServiceWorkerOverride',
+        'WorkerPatchHooks',
+        'CanvasPatchContext',
+        '__CORE_TOSTRING_STATE__'
+      ],
+      applied: Object.create(null)
+    };
+    for (const k of __hiddenSurfaceState.preapply) {
       const d = Object.getOwnPropertyDescriptor(G, k);
       if (!d) {
         Object.defineProperty(G, k, {
@@ -141,9 +176,17 @@ const WrkModule = function WrkModule(window) {
           configurable: true,
           enumerable: false
         });
+        __hiddenSurfaceState.applied[k] = 'predefined';
         continue;
       }
-      if (d.enumerable === false || d.configurable === false) continue;
+      if (d.enumerable === false) {
+        __hiddenSurfaceState.applied[k] = 'already_hidden';
+        continue;
+      }
+      if (d.configurable === false) {
+        __hiddenSurfaceState.applied[k] = 'skip_nonconfigurable';
+        continue;
+      }
       if ('value' in d) {
         Object.defineProperty(G, k, {
           value: G[k],
@@ -159,6 +202,7 @@ const WrkModule = function WrkModule(window) {
           enumerable: false
         });
       }
+      __hiddenSurfaceState.applied[k] = 'hidden';
     }
 
 // 1) Источник снапшотов
@@ -1302,7 +1346,10 @@ function SafeWorkerOverride(G){
     }, null);
   }
 }
-if (!Object.prototype.hasOwnProperty.call(window, 'SafeWorkerOverride')) {
+const __safeWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'SafeWorkerOverride');
+const __safeWorkerExportDesc = __safeWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'SafeWorkerOverride') : null;
+const __safeWorkerCanFillPlaceholder = !!(__safeWorkerExportDesc && __safeWorkerExportDesc.configurable !== false && window.SafeWorkerOverride === undefined);
+if (!__safeWorkerExportOwn || __safeWorkerCanFillPlaceholder) {
   Object.defineProperty(window, 'SafeWorkerOverride', {
     value: SafeWorkerOverride,
     writable: true,
@@ -1514,7 +1561,10 @@ function SafeSharedWorkerOverride(G){
     }, null);
   }
 }
-if (!Object.prototype.hasOwnProperty.call(window, 'SafeSharedWorkerOverride')) {
+const __safeSharedWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'SafeSharedWorkerOverride');
+const __safeSharedWorkerExportDesc = __safeSharedWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'SafeSharedWorkerOverride') : null;
+const __safeSharedWorkerCanFillPlaceholder = !!(__safeSharedWorkerExportDesc && __safeSharedWorkerExportDesc.configurable !== false && window.SafeSharedWorkerOverride === undefined);
+if (!__safeSharedWorkerExportOwn || __safeSharedWorkerCanFillPlaceholder) {
   Object.defineProperty(window, 'SafeSharedWorkerOverride', {
     value: SafeSharedWorkerOverride,
     writable: true,
@@ -1861,7 +1911,10 @@ function ServiceWorkerOverride(G){
     data: { outcome: 'return' }
   }, null);
 }
-if (!Object.prototype.hasOwnProperty.call(window, 'ServiceWorkerOverride')) {
+const __serviceWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'ServiceWorkerOverride');
+const __serviceWorkerExportDesc = __serviceWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'ServiceWorkerOverride') : null;
+const __serviceWorkerCanFillPlaceholder = !!(__serviceWorkerExportDesc && __serviceWorkerExportDesc.configurable !== false && window.ServiceWorkerOverride === undefined);
+if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
   Object.defineProperty(window, 'ServiceWorkerOverride', {
     value: ServiceWorkerOverride,
     writable: true,
@@ -2021,17 +2074,16 @@ if (!Object.prototype.hasOwnProperty.call(window, 'ServiceWorkerOverride')) {
   try {
     const win = G;
     if (win && (typeof win === 'object' || typeof win === 'function')) {
-      const keys = [
-        '__ENV_BRIDGE__',
-        '__ENV_HUB__',
-        'CanvasPatchContext',
-        '__CORE_TOSTRING_STATE__'
-      ];
-      for (const k of keys) {
+      for (const k of __hiddenSurfaceState.final) {
         if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
         const d = Object.getOwnPropertyDescriptor(win, k);
-        if (!d || d.enumerable === false) continue;
+        if (!d) continue;
+        if (d.enumerable === false) {
+          __hiddenSurfaceState.applied[k] = 'already_hidden';
+          continue;
+        }
         if (d.configurable === false) {
+          __hiddenSurfaceState.applied[k] = 'skip_nonconfigurable';
           const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
           __wrkDiag('warn', 'wrk:hide_pipeline_surface_nonconfigurable', {
             stage: 'apply',
@@ -2047,6 +2099,7 @@ if (!Object.prototype.hasOwnProperty.call(window, 'ServiceWorkerOverride')) {
         } else {
           Object.defineProperty(win, k, { get: d.get, set: d.set, configurable: !!d.configurable, enumerable: false });
         }
+        __hiddenSurfaceState.applied[k] = 'hidden';
       }
     }
   } catch (e) {
@@ -2087,7 +2140,10 @@ if (!Object.prototype.hasOwnProperty.call(window, 'ServiceWorkerOverride')) {
 }; // <-- закрыли WrkModule
 
 // --- export WrkModule globally (stable regardless of load order) ---
-if (!Object.prototype.hasOwnProperty.call(globalThis, 'WrkModule')) {
+const __wrkModuleExportOwn = Object.prototype.hasOwnProperty.call(globalThis, 'WrkModule');
+const __wrkModuleExportDesc = __wrkModuleExportOwn ? Object.getOwnPropertyDescriptor(globalThis, 'WrkModule') : null;
+const __wrkModuleCanFillPlaceholder = !!(__wrkModuleExportDesc && __wrkModuleExportDesc.configurable !== false && globalThis.WrkModule === undefined);
+if (!__wrkModuleExportOwn || __wrkModuleCanFillPlaceholder) {
   Object.defineProperty(globalThis, 'WrkModule', {
     value: WrkModule,
     writable: true,
