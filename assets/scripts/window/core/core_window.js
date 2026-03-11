@@ -592,6 +592,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
   }
 
   // === Core2.0 targets dispatcher (Window scope) ===
+   // !!!! core_window.js сначала считает tag локальным fallback-хэшем, а позже, когда появляется G.strToSeed, начинает считать через него. То есть guard policy уже подхватилась, но не даёт одного стабильного seed-tag на весь document.
   // Methodology: Core controls preflight/dispatch/nativization/diag. Module applies descriptors.
   (function installCoreApplyTargets(){
     function diagDegrade(code, err, extra) {
