@@ -48,6 +48,43 @@ const AudioContextModule = function AudioContextModule(window) {
     emitDegrade(lvl, code, err, x);
   }
 
+  function __normalizeAudioGuardSurface() {
+    try {
+      const d = Object.getOwnPropertyDescriptor(globalThis, '__AUDIO_CTX_GUARD__');
+      if (!d || d.enumerable === false) return true;
+      if (d.configurable === false) {
+        emitDegrade('warn', 'audiocontext:guard_hide_skipped_nonconfigurable', null, {
+          diagTag: 'audiocontext:guard',
+          surface: 'audio',
+          key: '__AUDIO_CTX_GUARD__',
+          stage: 'apply',
+          message: '__AUDIO_CTX_GUARD__ hide skipped: non-configurable',
+          data: { outcome: 'skip', reason: 'guard_hide_nonconfigurable' },
+          type: __audioTypeBrowser
+        });
+        return false;
+      }
+      Object.defineProperty(globalThis, '__AUDIO_CTX_GUARD__', {
+        value: globalThis.__AUDIO_CTX_GUARD__,
+        writable: !!d.writable,
+        configurable: true,
+        enumerable: false
+      });
+      return true;
+    } catch (e) {
+      emitDegrade('warn', 'audiocontext:guard_hide_failed', e, {
+        diagTag: 'audiocontext:guard',
+        surface: 'audio',
+        key: '__AUDIO_CTX_GUARD__',
+        stage: 'apply',
+        message: 'failed to normalize __AUDIO_CTX_GUARD__ hidden surface',
+        data: { outcome: 'skip', reason: 'guard_hide_failed' },
+        type: __audioTypeBrowser
+      });
+      return false;
+    }
+  }
+
   const C = window.CanvasPatchContext;
   if (!C) {
     degrade('audiocontext:canvas_patch_context_missing', new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available'), {
@@ -227,8 +264,10 @@ const AudioContextModule = function AudioContextModule(window) {
         type: __audioTypeBrowser
       });
       globalThis.__AUDIO_CTX_GUARD__ = GUARD;
+      __normalizeAudioGuardSurface();
     }
   }
+  __normalizeAudioGuardSurface();
 
   function noteIssue(code, detail) {
     const key = String(code);

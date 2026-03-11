@@ -100,6 +100,48 @@
     __emit(level, code, ctx, err || null);
   }
 
+  function __setGeoPatchedHidden(value) {
+    try {
+      Object.defineProperty(window, '__GEO_PATCHED__', {
+        value: !!value,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      return true;
+    } catch (e) {
+      degrade('geo:hidden_status_define_failed', e, {
+        key: '__GEO_PATCHED__',
+        stage: 'apply',
+        message: '[GeoOverride] failed to define hidden __GEO_PATCHED__ status',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'hidden_status_define_failed' }
+      });
+    }
+    try {
+      window.__GEO_PATCHED__ = !!value;
+      const d = Object.getOwnPropertyDescriptor(window, '__GEO_PATCHED__');
+      if (d && d.enumerable === true && d.configurable !== false) {
+        Object.defineProperty(window, '__GEO_PATCHED__', {
+          value: window.__GEO_PATCHED__,
+          writable: !!d.writable,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      return true;
+    } catch (e) {
+      degrade('geo:hidden_status_fallback_failed', e, {
+        key: '__GEO_PATCHED__',
+        stage: 'apply',
+        message: '[GeoOverride] failed to store __GEO_PATCHED__ status',
+        type: 'contract violation',
+        data: { outcome: 'skip', reason: 'hidden_status_fallback_failed' }
+      });
+      return false;
+    }
+  }
+
   if (window.__GEO_PATCHED__) {
     degrade('geo:already_patched', null, {
       stage: 'guard',
@@ -502,13 +544,5 @@
     return true;
   }
 
-  if (!Object.prototype.hasOwnProperty.call(window, 'patchGeolocation')) {
-    Object.defineProperty(window, 'patchGeolocation', {
-      value: patchGeolocation,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
-  if (patchGeolocation(latitude, longitude)) window.__GEO_PATCHED__ = true;
+  if (patchGeolocation(latitude, longitude)) __setGeoPatchedHidden(true);
 })();
