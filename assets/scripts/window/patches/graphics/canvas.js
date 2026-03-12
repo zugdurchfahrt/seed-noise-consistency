@@ -463,14 +463,14 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const managedFontCfg = getManagedFontConfig(fontStr);
       const isManagedFont = !!managedFontCfg;
 
-      const fontsReadyFlag =
-        (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')
-          ? (window.__FONTS_READY__ === true)
-          : false);
+      const fontsState = (C && C.__FONTS_STATE__ && typeof C.__FONTS_STATE__ === 'object')
+        ? C.__FONTS_STATE__
+        : null;
+      const fontsReadyFlag = !!(fontsState && fontsState.ready === true);
 
       const nativeFontsReady = !!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded');
 
-      // Managed fonts stay on the explicit __FONTS_READY__ gate.
+      // Managed fonts stay on the explicit CanvasPatchContext.__FONTS_STATE__.ready gate.
       // Unmanaged/custom CSS fonts must follow only native FontFaceSet readiness.
       const fontsReady = isManagedFont ? fontsReadyFlag : nativeFontsReady;
       if (!fontsReady) return nativeMetrics;

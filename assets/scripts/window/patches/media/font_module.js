@@ -10,66 +10,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     window = G;
   }
 
-  const C = window.CanvasPatchContext;
-  if (!C) {
-    const D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
-    if (D && typeof D.diag === 'function') {
-      D.diag('warn', 'fonts:canvas_patch_context_missing', {
-        module: 'fonts',
-        diagTag: 'fonts',
-        surface: 'fonts',
-        key: null,
-        stage: 'preflight',
-        message: 'CanvasPatchContext missing',
-        data: { outcome: 'skip', reason: 'missing_canvas_patch_context' },
-        type: 'pipeline missing data'
-      }, null);
-    } else if (typeof D === 'function') {
-      D('fonts:canvas_patch_context_missing', null, {
-        level: 'warn',
-        module: 'fonts',
-        diagTag: 'fonts',
-        surface: 'fonts',
-        key: null,
-        stage: 'preflight',
-        message: 'CanvasPatchContext missing',
-        data: { outcome: 'skip', reason: 'missing_canvas_patch_context' },
-        type: 'pipeline missing data'
-      });
-    }
-    return;
-  }
-
-  const Core = window && window.Core;
-  if (!Core || typeof Core.applyTargets !== 'function') {
-    const D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
-    if (D && typeof D.diag === 'function') {
-      D.diag('warn', 'fonts:core_apply_targets_missing', {
-        module: 'fonts',
-        diagTag: 'fonts',
-        surface: 'fonts',
-        key: null,
-        stage: 'preflight',
-        message: 'Core.applyTargets missing',
-        data: { outcome: 'skip', reason: 'missing_core_apply_targets' },
-        type: 'pipeline missing data'
-      }, null);
-    } else if (typeof D === 'function') {
-      D('fonts:core_apply_targets_missing', null, {
-        level: 'warn',
-        module: 'fonts',
-        diagTag: 'fonts',
-        surface: 'fonts',
-        key: null,
-        stage: 'preflight',
-        message: 'Core.applyTargets missing',
-        data: { outcome: 'skip', reason: 'missing_core_apply_targets' },
-        type: 'pipeline missing data'
-      });
-    }
-    return;
-  }
-
   const __fontTypePipeline = 'pipeline missing data';
   const __fontTypeBrowser = 'browser structure missing data';
   function __fontDiag(level, code, extra, err) {
@@ -127,6 +67,191 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'fonts'),
       data: x
     }, err || null);
+  }
+
+  function __makeFontFamilySnapshot() {
+    return {
+      allowedFamilies: null,
+      runtimeFamilies: new Set(),
+      platformDom: null,
+      versionToken: null
+    };
+  }
+
+  function __cloneFontsStateValue(state) {
+    if (!state || typeof state !== 'object') return null;
+    const familySnapshot = (state.familySnapshot && typeof state.familySnapshot === 'object')
+      ? state.familySnapshot
+      : null;
+    return {
+      ready: state.ready === true,
+      error: Object.prototype.hasOwnProperty.call(state, 'error') ? state.error : null,
+      awaitReady: state.awaitReady || null,
+      awaitReadyStatus: state.awaitReadyStatus || null,
+      awaitReadyResolve: (typeof state.awaitReadyResolve === 'function') ? state.awaitReadyResolve : null,
+      awaitReadyReject: (typeof state.awaitReadyReject === 'function') ? state.awaitReadyReject : null,
+      familySnapshot: familySnapshot ? {
+        allowedFamilies: (familySnapshot.allowedFamilies instanceof Set)
+          ? new Set(familySnapshot.allowedFamilies)
+          : null,
+        runtimeFamilies: (familySnapshot.runtimeFamilies instanceof Set)
+          ? new Set(familySnapshot.runtimeFamilies)
+          : new Set(),
+        platformDom: Object.prototype.hasOwnProperty.call(familySnapshot, 'platformDom')
+          ? familySnapshot.platformDom
+          : null,
+        versionToken: Object.prototype.hasOwnProperty.call(familySnapshot, 'versionToken')
+          ? familySnapshot.versionToken
+          : null
+      } : __makeFontFamilySnapshot()
+    };
+  }
+
+  const C = window.CanvasPatchContext;
+  if (!C) {
+    __fontDiagPipeline('warn', 'fonts:canvas_patch_context_missing', {
+      stage: 'preflight',
+      message: 'CanvasPatchContext missing',
+      data: { outcome: 'skip', reason: 'missing_canvas_patch_context' }
+    }, null);
+    return;
+  }
+
+  function __ensureFontsStateSlot() {
+    if (Object.prototype.hasOwnProperty.call(C, '__FONTS_STATE__')) {
+      const existing = C.__FONTS_STATE__;
+      if (existing && typeof existing === 'object') return existing;
+      __fontDiagPipeline('warn', 'fonts:fonts_state_invalid', {
+        stage: 'preflight',
+        surface: 'CanvasPatchContext',
+        key: '__FONTS_STATE__',
+        message: 'CanvasPatchContext.__FONTS_STATE__ invalid',
+        data: { outcome: 'skip', reason: 'invalid_fonts_state_slot' }
+      }, null);
+      return null;
+    }
+    const state = {
+      ready: false,
+      error: null,
+      awaitReady: null,
+      awaitReadyStatus: null,
+      awaitReadyResolve: null,
+      awaitReadyReject: null,
+      familySnapshot: __makeFontFamilySnapshot()
+    };
+    try {
+      Object.defineProperty(C, '__FONTS_STATE__', {
+        value: state,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      return state;
+    } catch (e) {
+      __fontDiagBrowser('warn', 'fonts:fonts_state_define_failed', {
+        stage: 'apply',
+        surface: 'CanvasPatchContext',
+        key: '__FONTS_STATE__',
+        message: 'Object.defineProperty(CanvasPatchContext,"__FONTS_STATE__") failed',
+        data: { outcome: 'skip', reason: 'fonts_state_define_failed' }
+      }, e);
+      return null;
+    }
+  }
+
+  const __fontsState = __ensureFontsStateSlot();
+  if (!__fontsState) return;
+
+  if (__fontsState.ready !== true) __fontsState.ready = false;
+  if (!Object.prototype.hasOwnProperty.call(__fontsState, 'error')) __fontsState.error = null;
+  if (!Object.prototype.hasOwnProperty.call(__fontsState, 'awaitReady')) __fontsState.awaitReady = null;
+  if (!Object.prototype.hasOwnProperty.call(__fontsState, 'awaitReadyStatus')) __fontsState.awaitReadyStatus = null;
+  if (!Object.prototype.hasOwnProperty.call(__fontsState, 'awaitReadyResolve')) __fontsState.awaitReadyResolve = null;
+  if (!Object.prototype.hasOwnProperty.call(__fontsState, 'awaitReadyReject')) __fontsState.awaitReadyReject = null;
+
+  const __legacyFontFamilySnapshot = (C.__fontFamilySnapshot && typeof C.__fontFamilySnapshot === 'object')
+    ? C.__fontFamilySnapshot
+    : null;
+  const __fontFamilySnapshot = (__fontsState.familySnapshot && typeof __fontsState.familySnapshot === 'object')
+    ? __fontsState.familySnapshot
+    : __makeFontFamilySnapshot();
+  if (__legacyFontFamilySnapshot && __fontFamilySnapshot !== __legacyFontFamilySnapshot) {
+    if (
+      (
+        !(__fontFamilySnapshot.allowedFamilies instanceof Set) ||
+        __fontFamilySnapshot.allowedFamilies.size === 0
+      ) &&
+      (__legacyFontFamilySnapshot.allowedFamilies instanceof Set)
+    ) {
+      __fontFamilySnapshot.allowedFamilies = new Set(__legacyFontFamilySnapshot.allowedFamilies);
+    }
+    if (__legacyFontFamilySnapshot.runtimeFamilies instanceof Set) {
+      if (!(__fontFamilySnapshot.runtimeFamilies instanceof Set)) {
+        __fontFamilySnapshot.runtimeFamilies = new Set();
+      }
+      if (__fontFamilySnapshot.runtimeFamilies.size === 0) {
+        __legacyFontFamilySnapshot.runtimeFamilies.forEach(function migrateRuntimeFamily(fam) {
+          __fontFamilySnapshot.runtimeFamilies.add(fam);
+        });
+      }
+    }
+    if (__fontFamilySnapshot.platformDom == null && Object.prototype.hasOwnProperty.call(__legacyFontFamilySnapshot, 'platformDom')) {
+      __fontFamilySnapshot.platformDom = __legacyFontFamilySnapshot.platformDom;
+    }
+    if (__fontFamilySnapshot.versionToken == null && Object.prototype.hasOwnProperty.call(__legacyFontFamilySnapshot, 'versionToken')) {
+      __fontFamilySnapshot.versionToken = __legacyFontFamilySnapshot.versionToken;
+    }
+  }
+  if (!(__fontFamilySnapshot.runtimeFamilies instanceof Set)) {
+    __fontFamilySnapshot.runtimeFamilies = new Set();
+  }
+  __fontsState.familySnapshot = __fontFamilySnapshot;
+
+  const Core = window && window.Core;
+  if (!Core) {
+    __fontDiagPipeline('warn', 'fonts:core_missing', {
+      stage: 'preflight',
+      key: 'Core',
+      message: 'Core missing',
+      data: { outcome: 'skip', reason: 'missing_core' }
+    }, null);
+    return;
+  }
+  if (typeof Core.applyTargets !== 'function') {
+    __fontDiagPipeline('warn', 'fonts:core_apply_targets_missing', {
+      stage: 'preflight',
+      key: 'Core.applyTargets',
+      message: 'Core.applyTargets missing',
+      data: { outcome: 'skip', reason: 'missing_core_apply_targets' }
+    }, null);
+    return;
+  }
+  if (typeof Core.registerPatchedTarget !== 'function') {
+    __fontDiagPipeline('warn', 'fonts:core_register_patched_target_missing', {
+      stage: 'preflight',
+      key: 'Core.registerPatchedTarget',
+      message: 'Core.registerPatchedTarget missing',
+      data: { outcome: 'skip', reason: 'missing_core_register_patched_target' }
+    }, null);
+    return;
+  }
+  if (typeof Core.guardFlag !== 'function') {
+    __fontDiagPipeline('warn', 'fonts:core_guard_flag_missing', {
+      stage: 'preflight',
+      key: 'Core.guardFlag',
+      message: 'Core.guardFlag missing',
+      data: { outcome: 'skip', reason: 'missing_core_guard_flag' }
+    }, null);
+    return;
+  }
+  if (typeof Core.resolveDescriptor !== 'function') {
+    __fontDiagPipeline('warn', 'fonts:core_resolve_descriptor_missing', {
+      stage: 'preflight',
+      key: 'Core.resolveDescriptor',
+      message: 'Core.resolveDescriptor missing',
+      data: { outcome: 'skip', reason: 'missing_core_resolve_descriptor' }
+    }, null);
+    return;
   }
 
   function isSameDescriptor(actual, expected) {
@@ -289,6 +414,139 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
   }
 
+  function __restoreFontsStateValue(snapshot) {
+    if (!snapshot || !__fontsState || typeof __fontsState !== 'object') return;
+    __fontsState.ready = snapshot.ready === true;
+    __fontsState.error = Object.prototype.hasOwnProperty.call(snapshot, 'error') ? snapshot.error : null;
+    __fontsState.awaitReady = snapshot.awaitReady || null;
+    __fontsState.awaitReadyStatus = snapshot.awaitReadyStatus || null;
+    __fontsState.awaitReadyResolve = (typeof snapshot.awaitReadyResolve === 'function') ? snapshot.awaitReadyResolve : null;
+    __fontsState.awaitReadyReject = (typeof snapshot.awaitReadyReject === 'function') ? snapshot.awaitReadyReject : null;
+    const familySnapshot = (snapshot.familySnapshot && typeof snapshot.familySnapshot === 'object')
+      ? snapshot.familySnapshot
+      : __makeFontFamilySnapshot();
+    __fontFamilySnapshot.allowedFamilies = (familySnapshot.allowedFamilies instanceof Set)
+      ? new Set(familySnapshot.allowedFamilies)
+      : null;
+    FONTFACE_RUNTIME_FAMILIES.clear();
+    if (familySnapshot.runtimeFamilies instanceof Set) {
+      familySnapshot.runtimeFamilies.forEach(function restoreRuntimeFamily(fam) {
+        FONTFACE_RUNTIME_FAMILIES.add(fam);
+      });
+    }
+    __fontFamilySnapshot.runtimeFamilies = FONTFACE_RUNTIME_FAMILIES;
+    __fontFamilySnapshot.platformDom = Object.prototype.hasOwnProperty.call(familySnapshot, 'platformDom')
+      ? familySnapshot.platformDom
+      : null;
+    __fontFamilySnapshot.versionToken = Object.prototype.hasOwnProperty.call(familySnapshot, 'versionToken')
+      ? familySnapshot.versionToken
+      : null;
+    __fontsState.familySnapshot = __fontFamilySnapshot;
+  }
+
+  function __hideLegacyFontSurface(key) {
+    const d = Object.getOwnPropertyDescriptor(window, key);
+    if (!d) return true;
+    if (d.enumerable === false) return true;
+    if (d.configurable === false) {
+      __fontDiagBrowser('warn', 'fonts:hide_pass_nonconfigurable', {
+        stage: 'apply',
+        diagTag: 'fonts:hide-pass',
+        key: key,
+        message: 'hide-pass skipped: non-configurable legacy surface',
+        data: { outcome: 'skip', reason: 'hide_pass_nonconfigurable' }
+      }, null);
+      return false;
+    }
+    try {
+      if ('value' in d) {
+        Object.defineProperty(window, key, {
+          value: d.value,
+          writable: !!d.writable,
+          configurable: true,
+          enumerable: false
+        });
+      } else {
+        Object.defineProperty(window, key, {
+          get: d.get,
+          set: d.set,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      return true;
+    } catch (e) {
+      __fontDiagBrowser('warn', 'fonts:hide_pass_failed', {
+        stage: 'apply',
+        diagTag: 'fonts:hide-pass',
+        key: key,
+        message: 'hide-pass failed for legacy font surface',
+        data: { outcome: 'skip', reason: 'hide_pass_failed' }
+      }, e);
+      return false;
+    }
+  }
+
+  function __runFontsHidePass() {
+    __hideLegacyFontSurface('awaitFontsReady');
+    __hideLegacyFontSurface('__FONTS_READY__');
+    __hideLegacyFontSurface('__FONTS_ERROR__');
+  }
+
+  function __syncAwaitFontsMirror() {
+    try {
+      Object.defineProperty(window, 'awaitFontsReady', {
+        value: __fontsState.awaitReady,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      return true;
+    } catch (e) {
+      __fontDiagBrowser('warn', 'fonts:await_ready_mirror_define_failed', {
+        stage: 'apply',
+        diagTag: 'fonts:data:awaitFontsReady',
+        key: 'awaitFontsReady',
+        message: 'awaitFontsReady mirror define failed',
+        data: { outcome: 'throw', reason: 'await_ready_mirror_define_failed' }
+      }, e);
+      return false;
+    }
+  }
+
+  function __setFontsAwaitState(promiseValue, status, resolveFn, rejectFn) {
+    __fontsState.awaitReady = promiseValue || null;
+    __fontsState.awaitReadyStatus = status || null;
+    __fontsState.awaitReadyResolve = (typeof resolveFn === 'function') ? resolveFn : null;
+    __fontsState.awaitReadyReject = (typeof rejectFn === 'function') ? rejectFn : null;
+    return __syncAwaitFontsMirror();
+  }
+
+  function __setFontsRuntimeState(readyValue, errorValue) {
+    __fontsState.ready = readyValue === true;
+    __fontsState.error = (errorValue == null) ? null : errorValue;
+  }
+
+  function __releaseGuardOnSkip(message, key, reason) {
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
+      }
+    } catch (eRelease) {
+      __fontDiagPipeline('warn', 'fonts:guard_release_failed', {
+        stage: 'rollback',
+        diagTag: __tag,
+        surface: __surface,
+        key: key || __flagKey,
+        message: message,
+        data: { outcome: 'skip', reason: reason || 'guard_release_failed' }
+      }, eRelease);
+    }
+  }
+
+  const FONTFACE_RUNTIME_FAMILIES = __fontFamilySnapshot.runtimeFamilies;
+  let FONTFACE_RUNTIME_SYNC_FAILED = false;
+
   // === Fonts module local guard (window & worker) ===
   const __core = Core;
   const __flagKey = '__PATCH_FONTS__';
@@ -322,6 +580,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   if (!__guardToken) return; // already_patched: Core emits fonts:already_patched
 
   const __rollbackSnapshot = {
+    fontsStateValue: __cloneFontsStateValue(__fontsState),
     awaitFontsReadyOwn: Object.prototype.hasOwnProperty.call(window, 'awaitFontsReady'),
     awaitFontsReadyDesc: Object.getOwnPropertyDescriptor(window, 'awaitFontsReady') || null,
     fontsReadyOwn: Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__'),
@@ -339,20 +598,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         message: 'fontPatchConfigs missing/invalid (skip font patch)',
         data: { outcome: 'skip', reason: 'configs_missing_or_invalid', typeof: typeof window.fontPatchConfigs }
       }, null);
-      try {
-        if (__core && typeof __core.releaseGuardFlag === 'function') {
-          __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
-        }
-      } catch (eRelease) {
-        __fontDiagPipeline('warn', 'fonts:guard_release_failed', {
-          stage: 'rollback',
-          diagTag: __tag,
-          surface: __surface,
-          key: __flagKey,
-          message: 'releaseGuardFlag threw on preflight skip',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, eRelease);
-      }
+      __releaseGuardOnSkip('releaseGuardFlag threw on preflight skip', __flagKey, 'guard_release_failed');
       return;
     }
     __applyStarted = true;
@@ -364,38 +610,42 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
     // В window-ветке нам нужна "внешне резолвимая" точка
     if (hasDocFonts) {
-      if (!window.awaitFontsReady || typeof window.awaitFontsReady.then !== 'function' || !window.awaitFontsReady.__owned_by_fontpatch) {
+      if (!__fontsState.awaitReady || typeof __fontsState.awaitReady.then !== 'function' || __fontsState.awaitReadyStatus !== 'pending') {
         let resolveFn, rejectFn;
         const p = new Promise((res, rej) => { resolveFn = res; rejectFn = rej; });
-        p.resolve = resolveFn;
-        p.reject  = rejectFn;
-        Object.defineProperty(p, '__owned_by_fontpatch', { value: true });
-        Object.defineProperty(p, '__fontpatch_state', { value: 'pending', writable: true, configurable: true });
-        window.awaitFontsReady = p;
+        if (!__setFontsAwaitState(p, 'pending', resolveFn, rejectFn)) {
+          throw new Error('awaitFontsReady mirror define failed');
+        }
+      } else if (!__syncAwaitFontsMirror()) {
+        throw new Error('awaitFontsReady mirror define failed');
       }
       return;
     }
     // В non-window (worker) НЕ подменяем нативный ready на pending-промис, который никто не резолвит
     if (window.fonts && window.fonts.ready && typeof window.fonts.ready.then === 'function') {
-      window.awaitFontsReady = window.fonts.ready;
+      if (!__setFontsAwaitState(window.fonts.ready, 'native', null, null)) {
+        throw new Error('awaitFontsReady mirror define failed');
+      }
     } else {
-      window.awaitFontsReady = Promise.resolve();
+      if (!__setFontsAwaitState(Promise.resolve(), 'native', null, null)) {
+        throw new Error('awaitFontsReady mirror define failed');
+      }
     }
   })();
 
+  __runFontsHidePass();
+
   function __settleAwaitFontsReady(state, payload) {
-    const p = window.awaitFontsReady;
-    if (!p || typeof p.then !== 'function' || !p.__owned_by_fontpatch) return false;
-    if (p.__fontpatch_state && p.__fontpatch_state !== 'pending') return false;
-    try {
-      p.__fontpatch_state = state;
-    } catch (_) {}
+    const p = __fontsState.awaitReady;
+    if (!p || typeof p.then !== 'function') return false;
+    if (__fontsState.awaitReadyStatus && __fontsState.awaitReadyStatus !== 'pending') return false;
+    __fontsState.awaitReadyStatus = state;
     if (state === 'resolved') {
-      if (typeof p.resolve === 'function') p.resolve(payload);
+      if (typeof __fontsState.awaitReadyResolve === 'function') __fontsState.awaitReadyResolve(payload);
       return true;
     }
     if (state === 'rejected') {
-      if (typeof p.reject === 'function') p.reject(payload);
+      if (typeof __fontsState.awaitReadyReject === 'function') __fontsState.awaitReadyReject(payload);
       return true;
     }
     return false;
@@ -408,65 +658,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 // font -guard (must run after minimal env validation and after exposeFontsReady)
 (() => {
   'use strict';
-
-  // data group: critical runtime promise handle
-  try {
-    applyTargetGroup('fonts:data:critical', [{
-      owner: window,
-      key: 'awaitFontsReady',
-      kind: 'data',
-      wrapLayer: 'descriptor_only',
-      value: window.awaitFontsReady,
-      allowCreate: true,
-      writable: true,
-      configurable: true,
-      enumerable: true,
-      policy: 'throw',
-      diagTag: 'fonts:data:awaitFontsReady'
-    }], 'throw');
-  } catch (e) {
-    __fontDiagBrowser('fatal', 'fonts:data:critical_failed', {
-      stage: 'apply',
-      diagTag: 'fonts:data:awaitFontsReady',
-      key: 'awaitFontsReady',
-      message: 'critical data patch failed',
-      data: { outcome: 'throw', reason: 'critical_data_patch_failed' }
-    }, e);
-    throw e;
-  }
-
-  // data group: optional runtime flags
-  const fontsReadyTarget = {
-    owner: window,
-    key: '__FONTS_READY__',
-    kind: 'data',
-    wrapLayer: 'descriptor_only',
-    allowCreate: true,
-    writable: true,
-    configurable: true,
-    enumerable: false,
-    policy: 'skip',
-    diagTag: 'fonts:data:ready'
-  };
-  if (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')) {
-    fontsReadyTarget.value = window.__FONTS_READY__;
-  }
-  const fontsErrorTarget = {
-    owner: window,
-    key: '__FONTS_ERROR__',
-    kind: 'data',
-    wrapLayer: 'descriptor_only',
-    allowCreate: true,
-    writable: true,
-    configurable: true,
-    enumerable: false,
-    policy: 'skip',
-    diagTag: 'fonts:data:error'
-  };
-  if (Object.prototype.hasOwnProperty.call(window, '__FONTS_ERROR__')) {
-    fontsErrorTarget.value = window.__FONTS_ERROR__;
-  }
-  applyTargetGroup('fonts:data:flags', [fontsReadyTarget, fontsErrorTarget], 'skip');
 
   // Глобал рантайма
   const G = (typeof globalThis !== "undefined" ? globalThis : self);
@@ -499,27 +690,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   const __wrapNativeCtor = (typeof window.__wrapNativeCtor === 'function')
     ? window.__wrapNativeCtor
     : ((G && typeof G.__wrapNativeCtor === 'function') ? G.__wrapNativeCtor : null);
-  const __fontFamilySnapshot = (C && C.__fontFamilySnapshot && typeof C.__fontFamilySnapshot === 'object')
-    ? C.__fontFamilySnapshot
-    : {
-        allowedFamilies: null,
-        runtimeFamilies: new Set(),
-        platformDom: null,
-        versionToken: null
-      };
-  if (!Object.prototype.hasOwnProperty.call(C, '__fontFamilySnapshot')) {
-    Object.defineProperty(C, '__fontFamilySnapshot', {
-      value: __fontFamilySnapshot,
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
-  }
-  if (!(__fontFamilySnapshot.runtimeFamilies instanceof Set)) {
-    __fontFamilySnapshot.runtimeFamilies = new Set();
-  }
-  const FONTFACE_RUNTIME_FAMILIES = __fontFamilySnapshot.runtimeFamilies;
-  let FONTFACE_RUNTIME_SYNC_FAILED = false;
 
   function normalizeFamilyName(family) {
     return String(family == null ? '' : family)
@@ -1196,11 +1366,12 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }, null);
     try {
       if (typeof document === 'object' && document && document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
-        window.awaitFontsReady = document.fonts.ready;
+        __setFontsAwaitState(document.fonts.ready, 'native', null, null);
       }
     } catch (eRestore) {
       degrade('fonts:await_ready_restore_failed', eRestore);
     }
+    __releaseGuardOnSkip('releaseGuardFlag threw on nav_platform skip', __flagKey, 'guard_release_failed');
     return;
   }
 
@@ -1383,8 +1554,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           if (readyInfo && readyInfo.kind === 'fallback_raf') {
             return __doubleRafBarrier().then(() => {
               const nativeStatus = (document.fonts && typeof document.fonts.status === 'string') ? document.fonts.status : null;
-              const ownAwaitState = (window.awaitFontsReady && window.awaitFontsReady.__owned_by_fontpatch)
-                ? window.awaitFontsReady.__fontpatch_state
+              const ownAwaitState = (__fontsState.awaitReadyStatus === 'pending')
+                ? __fontsState.awaitReadyStatus
                 : null;
               if (!nativeReadySettled && ownAwaitState === 'pending' && nativeStatus === 'loading') {
                 __fontDiagPipeline('warn', 'fonts:await_ready_native_pending_fallback', {
@@ -1411,9 +1582,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             const first = results.find((r) => r.status === 'rejected');
             const err = first && ('reason' in first) ? first.reason : new Error('font load failed');
 
-            window.__FONTS_READY__ = false;
+            __setFontsRuntimeState(false, null);
             try {
-              window.__FONTS_ERROR__ = String((err && (err.stack || err.message)) || err);
+              __fontsState.error = String((err && (err.stack || err.message)) || err);
             } catch (eSet) {
               degrade('fonts:data:set_error_failed', eSet);
             }
@@ -1429,7 +1600,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             return;
           }
 
-          window.__FONTS_READY__ = true;
+          __setFontsRuntimeState(true, null);
           __settleAwaitFontsReady('resolved');
           try {
             if (window.dispatchEvent) window.dispatchEvent(new Event('fontsready'));
@@ -1446,9 +1617,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           });
     }).catch((e) => {
       // no "наружу": перехватываем неожиданные промис-ошибки и оставляем нативное состояние
-      window.__FONTS_READY__ = false;
+      __setFontsRuntimeState(false, null);
       try {
-        window.__FONTS_ERROR__ = String((e && (e.stack || e.message)) || e);
+        __fontsState.error = String((e && (e.stack || e.message)) || e);
       } catch (eSet) {
         degrade('fonts:data:set_error_failed', eSet);
       }
@@ -1504,6 +1675,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     let rollbackErr = null;
     if (__applyStarted) {
       try {
+        __restoreFontsStateValue(__rollbackSnapshot.fontsStateValue);
         if (__rollbackSnapshot.awaitFontsReadyOwn) {
           if (__rollbackSnapshot.awaitFontsReadyDesc) {
             Object.defineProperty(window, 'awaitFontsReady', __rollbackSnapshot.awaitFontsReadyDesc);

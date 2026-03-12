@@ -20,9 +20,18 @@
     return out;
   }
 
+  const __swDiagBindingName = '__SW_REPORT_DIAG__';
+  const __swDiagReporter =
+    (G && typeof G[__swDiagBindingName] === 'function') ? G[__swDiagBindingName] : null;
+
+  const __swDiagBindingDesc = G ? Object.getOwnPropertyDescriptor(G, __swDiagBindingName) : null;
+  if (__swDiagBindingDesc && __swDiagBindingDesc.configurable === true) {
+    delete G[__swDiagBindingName];
+  }
+
   function __relaySWDiag(level, code, ctx, err) {
     try {
-      const reporter = G && G.__SW_REPORT_DIAG__;
+      const reporter = __swDiagReporter;
       if (typeof reporter !== 'function') return;
       const x = (ctx && typeof ctx === 'object') ? ctx : {};
       reporter(JSON.stringify({
