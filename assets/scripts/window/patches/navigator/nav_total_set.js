@@ -833,7 +833,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: navProto,
         key: key,
         kind: 'accessor',
-        wrapLayer: 'named_wrapper_strict',
+        wrapLayer: 'strict_accessor_gateway',
         resolve: 'proto_chain',
         policy: 'strict',
         diagTag: diagTag,
@@ -861,9 +861,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return true;
     }
 
-    // Bucket: object-return identity surfaces. The getter gateway is separate
-    // from scalar accessors even though current Core accessor contract still
-    // requires named_wrapper_strict for strict accessor policy.
+    // Bucket: object-return identity surfaces.
     function patchObjectReturnAccessor(key, getter, diagTag) {
       if (!(key in navProto)) return false;
       const d = Object.getOwnPropertyDescriptor(navProto, key);
@@ -884,7 +882,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         owner: navProto,
         key: key,
         kind: 'accessor',
-        wrapLayer: 'named_wrapper_strict',
+        wrapLayer: 'object_return_gateway',
         resolve: 'proto_chain',
         policy: 'strict',
         diagTag: diagTag,
@@ -1149,7 +1147,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   owner: uadOwner,
                   key: spec.key,
                   kind: 'accessor',
-                  wrapLayer: 'named_wrapper_strict',
+                  wrapLayer: 'strict_accessor_gateway',
                   resolve: 'proto_chain',
                   policy: 'strict',
                   diagTag: 'nav_total_set:' + fullKey,

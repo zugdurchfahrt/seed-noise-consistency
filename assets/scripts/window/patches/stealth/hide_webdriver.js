@@ -367,7 +367,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         key: 'webdriver',
         resolve: 'proto_chain',
         policy: 'strict',
-        wrapLayer: 'named_wrapper_strict',
+        wrapLayer: 'strict_accessor_gateway',
         diagTag: 'hide_webdriver:webdriver',
         kind: 'accessor',
         allowCreate: false,
