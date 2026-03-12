@@ -1,4 +1,23 @@
 const BootstrapHideModule = function BootstrapHideModule(window) {
+const G = (typeof globalThis !== 'undefined' && globalThis)
+    || (typeof self !== 'undefined' && self)
+    || (typeof window !== 'undefined' && window)
+    || (typeof global !== 'undefined' && global)
+    || null;
+
+if (!G || (typeof G !== 'object' && typeof G !== 'function')) {
+  throw new Error('[module] global object missing');
+}
+  
+ const W = (typeof window !== 'undefined') ? window : null;
+
+if (!W || (typeof W !== 'object' && typeof W !== 'function')) {
+  throw new Error('[module] window missing');
+}
+
+const C = W.CanvasPatchContext || (W.CanvasPatchContext = {});
+  
+  
   const hiddenSurfaceState = {
     keys: [
     "__GLOBAL_SEED",
