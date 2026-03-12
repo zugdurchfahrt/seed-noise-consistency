@@ -33,53 +33,51 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   let __guardToken = null;
   if (!__core || typeof __core.guardFlag !== 'function') {
-    const err = new Error('[ScreenPatch] Core.guardFlag missing');
-    __screenDiag('fatal', 'screen:guard_missing', {
+    __screenDiag('warn', 'screen:guard_missing', {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: __flagKey,
       message: 'Core.guardFlag missing',
       data: {
-        outcome: 'throw',
-        reason: 'missing_dep_core_guard',
-        substage: 'core.guardFlag'
+        outcome: 'skip',
+        reason: 'missing_dep_core_guard'
       }
-    }, err);
-    throw err;
+    }, null);
+    return;
   }
   try {
     __guardToken = __core.guardFlag(__flagKey, __screenModule);
   } catch (e) {
-    __screenDiag('fatal', 'screen:guard_failed', {
+    __screenDiag('warn', 'screen:guard_failed', {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: __flagKey,
       message: 'guardFlag threw',
       data: {
-        outcome: 'throw',
-        reason: 'guard_failed',
-        substage: 'core.guardFlag'
+        outcome: 'skip',
+        reason: 'guard_failed'
       }
     }, e);
-    throw e;
+    return;
   }
-  if (!__guardToken) return;
+  if (!__guardToken) return; // already_patched: Core emits screen:already_patched
 
+  // Read-only preflight: required dependency check, separate from guard semantics.
   const C = window.CanvasPatchContext;
   if (!C) {
     const canvasMissingErr = new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available');
-    __screenDiag('fatal', 'screen:canvas_patch_context_missing', {
+    __screenDiag('warn', 'screen:canvas_patch_context_missing', {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: 'CanvasPatchContext',
       message: 'CanvasPatchContext is undefined - module registration is not available',
       data: {
-        outcome: 'throw',
+        outcome: 'skip',
         reason: 'canvas_patch_context_missing',
-        substage: 'CanvasPatchContext'
+        missing: 'CanvasPatchContext'
       }
     }, canvasMissingErr);
     try {
@@ -87,8 +85,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
       }
     } catch (releaseErr) {
-      __screenDiag('error', 'screen:guard_release_failed', {
-        stage: 'rollback',
+      __screenDiag('warn', 'screen:guard_release_failed', {
+        stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
         key: __flagKey,
@@ -96,11 +94,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         data: {
           outcome: 'skip',
           reason: 'guard_release_failed',
-          substage: 'preflight'
+          substage: 'CanvasPatchContext'
         }
       }, releaseErr);
     }
-    throw canvasMissingErr;
+    return;
   }
   const __moduleRollbackStack = [];
 
@@ -181,7 +179,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       if (!__screenReceiverCheckDiagSent) {
         __screenReceiverCheckDiagSent = true;
         __screenDiag('warn', 'screen:receiver_matches_target_failed', {
-          stage: 'guard',
+          stage: 'apply',
           type: __screenTypeBrowser,
           diagTag: 'screen',
           key: null,
@@ -428,7 +426,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       if (!__screenMatchMediaThisCheckDiagSent) {
         __screenMatchMediaThisCheckDiagSent = true;
         __screenDiag('warn', 'screen:matchMedia_window_this_check_failed', {
-          stage: 'guard',
+          stage: 'apply',
           type: __screenTypeBrowser,
           diagTag: 'screen:matchMedia',
           key: 'matchMedia',

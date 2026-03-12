@@ -45,13 +45,68 @@ const LOGGingModule = function LOGGingModule() {
       }
     }
 
+    function __ensureBootstrapHiddenObject(target, key) {
+      let value = null;
+      try {
+        value = target ? target[key] : null;
+      } catch (_) {
+        value = null;
+      }
+      if (!value || typeof value !== "object") value = {};
+      try {
+        const d = target ? Object.getOwnPropertyDescriptor(target, key) : null;
+        if (!d || d.enumerable !== false) {
+          __defineBootstrapHiddenValue(target, key, value, true);
+        } else {
+          __hideBootstrapSurface(target, key);
+        }
+      } catch (_) {
+        __defineBootstrapHiddenValue(target, key, value, true);
+      }
+      return value;
+    }
+
     __hideBootstrapSurface(G, "__PATCH_MYTYPER__");
 
     if (!G.__PATCH_MYTYPER__) {
     __defineBootstrapHiddenValue(G, "__PATCH_MYTYPER__", true, true);
 
     const global = G;
-    const C = ((W || G).CanvasPatchContext = (W || G).CanvasPatchContext || {});
+    const C = __ensureBootstrapHiddenObject(W || G, "CanvasPatchContext");
+    const __setLogState = __ensureBootstrapHiddenObject(C, "__SET_LOG_STATE__");
+
+    function __bindHiddenStateSlot(target, key, slotKey, fallbackValue, writable) {
+      try {
+        if (!Object.prototype.hasOwnProperty.call(__setLogState, slotKey)) {
+          let initialValue = fallbackValue;
+          try {
+            if (target && Object.prototype.hasOwnProperty.call(target, key)) {
+              initialValue = target[key];
+            }
+          } catch (_) {}
+          __defineBootstrapHiddenValue(__setLogState, slotKey, initialValue, writable);
+        } else {
+          __hideBootstrapSurface(__setLogState, slotKey);
+        }
+
+        Object.defineProperty(target, key, {
+          get() {
+            return __setLogState[slotKey];
+          },
+          set: writable === false ? undefined : function (value) {
+            __setLogState[slotKey] = value;
+          },
+          configurable: true,
+          enumerable: false
+        });
+      } catch (_) {
+        try {
+          if (writable !== false) target[key] = __setLogState[slotKey];
+          __hideBootstrapSurface(target, key);
+        } catch (__e) {}
+      }
+      return __setLogState[slotKey];
+    }
 
     // ===== 0) Central store: private buffer only =====
     const STORE = new WeakMap();
@@ -225,9 +280,7 @@ const LOGGingModule = function LOGGingModule() {
 
     function diagScreenGetConfig() {
       if (!(global.__DIAG_SCREEN__ && typeof global.__DIAG_SCREEN__ === "object")) {
-        __defineBootstrapHiddenValue(global, "__DIAG_SCREEN__", {}, true);
-      } else {
-        __hideBootstrapSurface(global, "__DIAG_SCREEN__");
+        global.__DIAG_SCREEN__ = {};
       }
       const cfg = global.__DIAG_SCREEN__;
       if (!Object.prototype.hasOwnProperty.call(cfg, "enabled")) cfg.enabled = false;
@@ -358,18 +411,21 @@ const LOGGingModule = function LOGGingModule() {
 
 
     // Debug flag
-    G.__DEBUG__ =
+    __bindHiddenStateSlot(global, "__DEBUG__", "debug", typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true, true);
         // Toggle for *logger self-diagnostics visibility*.
      // IMPORTANT: must not change runtime behavior by throwing from the logger.
-      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
       // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
-    
-    global.env = global.env || {};
-    global.env.DEBUG_DEGRADES = true;   // включить
+
+    const env = __bindHiddenStateSlot(global, "env", "env", (global.env && typeof global.env === "object") ? global.env : {}, true);
+    __bindHiddenStateSlot(global, "__LOGGER_GUARD__", "loggerGuard", { count: 0, last: null, lastAt: null }, true);
+    __bindHiddenStateSlot(global, "__LOGGER_GUARD_MODE__", "loggerGuardMode", {}, true);
+    __bindHiddenStateSlot(global, "__DIAG_SCREEN__", "diagScreen", {}, true);
+    __bindHiddenStateSlot(global, "_logLevel", "logLevel", typeof global._logLevel === "string" && global._logLevel ? global._logLevel : "log", true);
+
+    env.DEBUG_DEGRADES = true;   // включить
     // global.env.DEBUG_DEGRADES = false; // выключить
     // global.env.EXPECTED_RECEIVER_THROW_GUARD = true;   // включить logger_guard for expected Illegal invocation / incompatible receiver
-    global.env.EXPECTED_RECEIVER_THROW_GUARD = false; // выключить: такие случаи пойдут в обычный __DEGRADE__ поток
-    const env = global.env;
+    env.EXPECTED_RECEIVER_THROW_GUARD = false; // выключить: такие случаи пойдут в обычный __DEGRADE__ поток
 
 
     // Save original console methods
@@ -383,13 +439,8 @@ const LOGGingModule = function LOGGingModule() {
     };
 
     function getLoggerGuard() {
-      if (!G.__LOGGER_GUARD__) {
-        Object.defineProperty(G, "__LOGGER_GUARD__", {
-          value: { count: 0, last: null, lastAt: null },
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
+      if (!(G.__LOGGER_GUARD__ && typeof G.__LOGGER_GUARD__ === "object")) {
+        G.__LOGGER_GUARD__ = { count: 0, last: null, lastAt: null };
       }
       return G.__LOGGER_GUARD__;
     }
@@ -397,9 +448,7 @@ const LOGGingModule = function LOGGingModule() {
     function getLoggerGuardMode() {
       try {
         if (!(G.__LOGGER_GUARD_MODE__ && typeof G.__LOGGER_GUARD_MODE__ === "object")) {
-          __defineBootstrapHiddenValue(G, "__LOGGER_GUARD_MODE__", {}, true);
-        } else {
-          __hideBootstrapSurface(G, "__LOGGER_GUARD_MODE__");
+          G.__LOGGER_GUARD_MODE__ = {};
         }
         const mode = G.__LOGGER_GUARD_MODE__;
         if (!Object.prototype.hasOwnProperty.call(mode, "expectedReceiverThrow")) {
@@ -558,7 +607,7 @@ const LOGGingModule = function LOGGingModule() {
 
     // Supported logging levels
     const LOG_LEVELS = ["error", "warn", "log", "info", "debug", "trace"];
-    G._logLevel = global._logLevel || "log";
+    G._logLevel = (typeof global._logLevel === "string" && global._logLevel) ? global._logLevel : "log";
 
     function levelAllows(currentLevel, eventLevel) {
       const idx = LOG_LEVELS.indexOf(currentLevel);
@@ -1226,14 +1275,14 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     // ===== 4) Module logger window.log (no double logging) =====
-    global._logConfig = global._logConfig || {
+    __bindHiddenStateSlot(global, "_logConfig", "logConfig", (global._logConfig && typeof global._logConfig === "object") ? global._logConfig : {
       global: { enabled: true, level: "log" },
       WEBGLlogger: { enabled: true, level: "log" },
       CanvasLogger: { enabled: true, level: "debug" },
       Contextlogger: { enabled: true, level: "debug" },
       Navigatorlogger: { enabled: true, level: "debug" },
       WRKlogger: { enabled: true, level: "debug" },
-    };
+    }, true);
 
     global.log = function (module, level) {
       const args = Array.prototype.slice.call(arguments, 2);
@@ -1570,28 +1619,35 @@ const LOGGingModule = function LOGGingModule() {
     };
 
 
-        // after all logger globals are assigned (Window realm only):
+        // hide-pass for logger globals after all exports are assigned (Window realm only):
       if (W) {
-        if (Object.prototype.hasOwnProperty.call(W, "__PATCH_MYTYPER__")) Object.defineProperty(W, "__PATCH_MYTYPER__", { value: W.__PATCH_MYTYPER__, writable:true, configurable:true, enumerable:false });
-        if (Object.prototype.hasOwnProperty.call(W, "__LOGGER_GUARD_MODE__")) Object.defineProperty(W, "__LOGGER_GUARD_MODE__", { value: W.__LOGGER_GUARD_MODE__, writable:true, configurable:true, enumerable:false });
-        if (Object.prototype.hasOwnProperty.call(W, "__DIAG_SCREEN__")) Object.defineProperty(W, "__DIAG_SCREEN__", { value: W.__DIAG_SCREEN__, writable:true, configurable:true, enumerable:false });
-        Object.defineProperty(W, "_logLevel",   { value: W._logLevel,   writable:true, configurable:true, enumerable:false });
-        Object.defineProperty(W, "_logConfig",  { value: W._logConfig,  writable:true, configurable:true, enumerable:false });
-        Object.defineProperty(W, "__DEBUG__",   { value: W.__DEBUG__,   writable:true, configurable:true, enumerable:false });
-        Object.defineProperty(W, "__DEGRADE__", { value: W.__DEGRADE__, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "log",         { value: W.log,         writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "exportMyDebugLog", { value: W.exportMyDebugLog, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DEBUG_ALL_ON",     { value: W.DEBUG_ALL_ON,     writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DEBUG_ALL_OFF",    { value: W.DEBUG_ALL_OFF,    writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DEBUG_ALL_TOGGLE", { value: W.DEBUG_ALL_TOGGLE, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "EXPECTED_RECEIVER_THROW_GUARD_ON", { value: W.EXPECTED_RECEIVER_THROW_GUARD_ON, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "EXPECTED_RECEIVER_THROW_GUARD_OFF", { value: W.EXPECTED_RECEIVER_THROW_GUARD_OFF, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "EXPECTED_RECEIVER_THROW_GUARD_TOGGLE", { value: W.EXPECTED_RECEIVER_THROW_GUARD_TOGGLE, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "__DIAG_ALERTS__", { value: W.__DIAG_ALERTS__, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DIAG_SCREEN_ON", { value: W.DIAG_SCREEN_ON, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DIAG_SCREEN_OFF", { value: W.DIAG_SCREEN_OFF, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DIAG_SCREEN_RESET", { value: W.DIAG_SCREEN_RESET, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DIAG_SCREEN_SNAPSHOT", { value: W.DIAG_SCREEN_SNAPSHOT, writable:false, configurable:true, enumerable:false });
+        const __loggerHideKeys = [
+          "__PATCH_MYTYPER__",
+          "CanvasPatchContext",
+          "__LOGGER_GUARD__",
+          "__LOGGER_GUARD_MODE__",
+          "__DIAG_SCREEN__",
+          "_logLevel",
+          "_logConfig",
+          "__DEBUG__",
+          "__DEGRADE__",
+          "log",
+          "exportMyDebugLog",
+          "DEBUG_ALL_ON",
+          "DEBUG_ALL_OFF",
+          "DEBUG_ALL_TOGGLE",
+          "EXPECTED_RECEIVER_THROW_GUARD_ON",
+          "EXPECTED_RECEIVER_THROW_GUARD_OFF",
+          "EXPECTED_RECEIVER_THROW_GUARD_TOGGLE",
+          "__DIAG_ALERTS__",
+          "DIAG_SCREEN_ON",
+          "DIAG_SCREEN_OFF",
+          "DIAG_SCREEN_RESET",
+          "DIAG_SCREEN_SNAPSHOT"
+        ];
+        for (let i = 0; i < __loggerHideKeys.length; i++) {
+          __hideBootstrapSurface(W, __loggerHideKeys[i]);
+        }
       }
     }
 }

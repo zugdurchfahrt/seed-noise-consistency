@@ -234,7 +234,7 @@ def init_driver(
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
-    # chrome_options.add_argument("--disable-features=CanvasNoise")
+    chrome_options.add_argument("--disable-features=CanvasNoise")
     vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
     chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
     if chrome_debug_port_raw.lower() in {"0", "auto"}:
@@ -387,7 +387,6 @@ def init_driver(
             # --- fonts ---
             Path(SCRIPTS_PATCHES_MEDIA / "font_module.js").read_text("utf-8"),
             "FontPatchModule(window);",
-
             # --- canvas ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "canvas.js").read_text("utf-8"),
             "CanvasPatchModule(window);",
@@ -424,7 +423,7 @@ def init_driver(
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             // ——— Worker env diagnostics (pre-bootstrap) ———//
-            console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
+            //  console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
             __PROBE_LIVE_READER__.start();
             DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
             __DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });

@@ -2548,7 +2548,8 @@ function printToStringCrossRealmChecks() {
       (result.moduleCheckOk !== false)
     );
   } catch (_) {}
-  globalThis.__PROBE_OUTPUT__ = result;
+  
+  return result;
 
 function __probeEscapeHtml(s) {
   return String(s)
