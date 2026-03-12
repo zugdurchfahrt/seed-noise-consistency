@@ -63,6 +63,8 @@ Assert-Contains -Text $coreText -Pattern "function\s+normalizeWrapLayer\b" -Mess
 Assert-Contains -Text $coreText -Pattern "'descriptor_only'" -Message "normalizeWrapLayer must accept descriptor_only"
 Assert-Contains -Text $coreText -Pattern "'named_wrapper'" -Message "normalizeWrapLayer must accept named_wrapper"
 Assert-Contains -Text $coreText -Pattern "'named_wrapper_strict'" -Message "normalizeWrapLayer must accept named_wrapper_strict"
+Assert-Contains -Text $coreText -Pattern "'strict_accessor_gateway'" -Message "normalizeWrapLayer must accept strict_accessor_gateway"
+Assert-Contains -Text $coreText -Pattern "'object_return_gateway'" -Message "normalizeWrapLayer must accept object_return_gateway"
 Assert-Contains -Text $coreText -Pattern "'core_wrapper'" -Message "normalizeWrapLayer must accept core_wrapper"
 Assert-NotContains -Text $coreText -Pattern "v\s*===\s*undefined\s*\|\|\s*v\s*===\s*null\s*\|\|\s*v\s*===\s*''\)\s*return\s*'auto'" -Message "normalizeWrapLayer must not default to auto"
 Assert-Contains -Text $coreText -Pattern "if\s*\(v\s*===\s*'auto'\)\s*return\s*'wrap_layer_auto_forbidden'" -Message "wrapLayer=auto must be forbidden in registry-contracts"
@@ -86,8 +88,9 @@ Assert-Contains -Text $coreText -Pattern "const\s+requiresStrictThis\s*=\s*invok
 Assert-Contains -Text $coreText -Pattern "function\s+__wrapNativeApply\b" -Message "__wrapNativeApply must exist"
 Assert-Contains -Text $coreText -Pattern "return\s+applyImpl\(target,\s*thisArg,\s*argList\);" -Message "__wrapNativeApply apply-trap must call applyImpl(target,thisArg,argList)"
 
-# strict accessor synthetic invalid-this path must delegate to native bridge target
-Assert-Contains -Text $coreText -Pattern "return\s+Reflect\.apply\(syntheticBridgeTarget,\s*thisArg,\s*argList\s*\|\|\s*\[\]\);" -Message "__wrapStrictAccessor synthetic invalid-this path must rethrow through native bridge target"
+# accessor gateway synthetic invalid-this path must delegate to native bridge target
+Assert-Contains -Text $coreText -Pattern "return\s+Reflect\.apply\(nativeBridgeTarget,\s*this,\s*\[\]\);" -Message "__wrapStrictAccessor synthetic invalid-this path must rethrow through native bridge target"
+Assert-Contains -Text $coreText -Pattern "safeDefine\(synthetic,\s*'__coreBridgeTarget__'" -Message "__wrapStrictAccessor must expose __coreBridgeTarget__ for bridge-aware toString/nativeization"
 
 # applyTargets preflight must reject descriptor_only for method/promise_method
 Assert-Contains -Text $coreText -Pattern "descriptor_only unsupported for method kind|descriptor_only unsupported for non-data kind" -Message "applyTargets must reject wrapLayer=descriptor_only for method/promise_method"
@@ -106,7 +109,7 @@ Assert-Contains -Text $context -Pattern "(?s)function\s+chainGetContext\b.*?mark
 
 # --- Module spot-checks for doc/registry method-gateway markers ---
 $hideWd = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\\patches\\stealth\\hide_webdriver.js") -Raw
-Assert-Contains -Text $hideWd -Pattern "wrapLayer\s*:\s*'named_wrapper_strict'" -Message "hide_webdriver.js must set wrapLayer=named_wrapper_strict (CORE2.0 strict accessor contract)"
+Assert-Contains -Text $hideWd -Pattern "wrapLayer\s*:\s*'strict_accessor_gateway'" -Message "hide_webdriver.js must set wrapLayer=strict_accessor_gateway for strict scalar accessor contract"
 Assert-Contains -Text $hideWd -Pattern "policy\s*:\s*'strict'" -Message "hide_webdriver.js must set policy=strict for strict accessor contract"
 Assert-NotContains -Text $hideWd -Pattern "wrapLayer\s*:\s*'auto'" -Message "hide_webdriver.js must not use wrapLayer=auto"
 
@@ -126,6 +129,8 @@ $navTotal = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'named_wrapper'" -Message "nav_total_set.js must include named_wrapper wrapLayer (documented as synthetic_named)"
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'descriptor_only'" -Message "nav_total_set.js must include descriptor_only wrapLayer (documented as native_descriptor data-path)"
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'core_wrapper'" -Message "nav_total_set.js must include core_wrapper wrapLayer (documented as core_proxy)"
+Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'strict_accessor_gateway'" -Message "nav_total_set.js must include strict_accessor_gateway for strict scalar accessors"
+Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'object_return_gateway'" -Message "nav_total_set.js must include object_return_gateway for object-return accessor surfaces"
 Assert-Contains -Text $navTotal -Pattern "__wrapStrictAccessor|__wrapGetter" -Message "nav_total_set.js must keep current strict accessor helper path after core invalid-this update"
 Assert-Contains -Text $navTotal -Pattern "const\s+patchedQuery\s*=\s*__navMark\(\(\{\s*query\(parameters\)" -Message "nav_total_set.js permissions.query must stay on local marked named-wrapper path"
 Assert-Contains -Text $navTotal -Pattern "Object\.defineProperty\(permOwner,\s*'query',\s*permNextDesc\)" -Message "nav_total_set.js permissions.query must keep direct descriptor install path"

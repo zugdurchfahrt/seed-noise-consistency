@@ -243,8 +243,7 @@ def init_driver(
         chrome_debug_port = int(chrome_debug_port_raw)
     except ValueError as exc:
         raise ValueError("CHROME_DEBUG_PORT must be an integer") from exc
-    chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
-    chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
+    chrome_options.debugger_address = f"127.0.0.1:{chrome_debug_port}"
     chrome_options.add_argument("--remote-allow-origins=*")
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -1266,7 +1265,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://www.browserscan.net/bot-detection")
 
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.

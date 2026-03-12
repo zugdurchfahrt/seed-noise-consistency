@@ -505,57 +505,39 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const opts = options || {};
     const onAccess = (typeof opts.onAccess === 'function') ? opts.onAccess : null;
     const name = (typeof opts.name === 'string' && opts.name) ? opts.name : `get ${key}`;
-    const isData = !!desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
-    if (isData) return getter;
-
     const valueFromGetter = function (thisArg) {
       return (typeof getter === 'function') ? getter.call(thisArg) : getter;
     };
     const checkThis = (typeof validThis === 'function') ? validThis : null;
     const origGet = desc && desc.get;
-
-    if (typeof origGet === 'function') {
-      let wrapped;
-      wrapped = __wrapNativeAccessor(origGet, name, function (target, thisArg, argList) {
-        if (onAccess) onAccess(key, wrapped, thisArg);
-        if (checkThis && !checkThis(thisArg)) {
-          return Reflect.apply(target, thisArg, argList || []);
-        }
-        return valueFromGetter(thisArg);
-      });
-      return wrapped;
-    }
+    const markAsNative = __requireMarkAsNative(name, 'wrapStrictAccessor');
 
     const syntheticBridgeTarget = (typeof getter === 'function' && typeof getter.__coreBridgeTarget__ === 'function')
       ? getter.__coreBridgeTarget__
       : ((typeof getter === 'function') ? toStringProxyTargetMap.get(getter) : null);
-    if (typeof syntheticBridgeTarget !== 'function') {
-      const e = new Error('[CoreWindow] __wrapStrictAccessor: synthetic path requires native bridge target');
-      __throwWrapFactoryPreflight(
-        'core_window:wrapStrictAccessor:synthetic_bridge_missing',
-        key,
-        '__wrapStrictAccessor: synthetic path requires native bridge target',
-        e
-      );
-    }
-
+    const nativeBridgeTarget = (typeof origGet === 'function')
+      ? origGet
+      : ((typeof syntheticBridgeTarget === 'function') ? syntheticBridgeTarget : null);
+    let wrapped;
     const synthetic = Object.getOwnPropertyDescriptor(({ get [key]() {
+      if (onAccess) onAccess(key, wrapped, this);
+      if (checkThis && !checkThis(this)) {
+        if (typeof nativeBridgeTarget === 'function') {
+          return Reflect.apply(nativeBridgeTarget, this, []);
+        }
+        throw new TypeError();
+      }
       return valueFromGetter(this);
     }}), key).get;
-    safeDefine(synthetic, '__coreBridgeTarget__', {
-      value: syntheticBridgeTarget,
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
-    let wrapped;
-    wrapped = __wrapNativeAccessor(synthetic, name, function (target, thisArg, argList) {
-      if (onAccess) onAccess(key, wrapped, thisArg);
-      if (checkThis && !checkThis(thisArg)) {
-        return Reflect.apply(syntheticBridgeTarget, thisArg, argList || []);
-      }
-      return Reflect.apply(target, thisArg, argList || []);
-    });
+    if (typeof nativeBridgeTarget === 'function') {
+      safeDefine(synthetic, '__coreBridgeTarget__', {
+        value: nativeBridgeTarget,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    wrapped = markAsNative(synthetic, name);
     return wrapped;
   }
 
@@ -690,10 +672,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
       if (code === 'wrap_layer_auto_forbidden') return new TypeError(prefix + ' wrapLayer auto forbidden');
       return new TypeError(prefix + ' unsupported wrapLayer');
     }
-    function isStrictAccessorGatewayWrapLayer(v) {
-      return v === 'named_wrapper_strict' || v === 'strict_accessor_gateway' || v === 'object_return_gateway';
+    function isStrictScalarAccessorGatewayWrapLayer(v) {
+      return v === 'named_wrapper_strict' || v === 'strict_accessor_gateway';
     }
-    function isUnifiedStrictAccessorGatewayWrapLayer(v) {
+    function isObjectReturnGatewayWrapLayer(v) {
+      return v === 'object_return_gateway';
+    }
+    function isAccessorGatewayWrapLayer(v) {
+      return isStrictScalarAccessorGatewayWrapLayer(v) || isObjectReturnGatewayWrapLayer(v);
+    }
+    function isUnifiedAccessorGatewayWrapLayer(v) {
       return v === 'strict_accessor_gateway' || v === 'object_return_gateway';
     }
     function normalizeWrapLayer(v) {
@@ -1011,21 +999,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const valueFromGetter = function (thisArg) {
           return (typeof getter === 'function') ? getter.call(thisArg) : getter;
         };
-        const useUnifiedStrictGateway = isUnifiedStrictAccessorGatewayWrapLayer(wrapLayer);
+        const useUnifiedAccessorGateway = isUnifiedAccessorGatewayWrapLayer(wrapLayer);
 
-        if (useUnifiedStrictGateway) {
-          if (isData) {
-            const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
-              if (checkThis && !checkThis(this)) {
-                return onInvalidThis('native', origGet, this, arguments);
-              }
-              return valueFromGetter(this);
-            }}), key).get;
-            const markAsNative = ensureMarkAsNative();
-            const wrappedDataGet = markAsNative(namedGet, 'get ' + key);
-            knownWrapped.add(wrappedDataGet);
-            return wrappedDataGet;
-          }
+        if (useUnifiedAccessorGateway) {
           const wrappedStrictGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
             name: 'get ' + key
           });
@@ -1203,15 +1179,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = wrapLayerContractError(code, 'applyTargets');
           return fail(planItem.policy, planItem.tag, code, e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId, wrapLayer: wrapLayerInput });
         }
-        const strictAccessorContract = planItem.policy === 'strict' && isStrictAccessorGatewayWrapLayer(wrapLayer);
+        const strictScalarContract = planItem.policy === 'strict' && isStrictScalarAccessorGatewayWrapLayer(wrapLayer);
+        const objectReturnContract = planItem.policy === 'strict' && isObjectReturnGatewayWrapLayer(wrapLayer);
+        const accessorGatewayContract = strictScalarContract || objectReturnContract;
         const allowShapeChange = !!planItem.allowShapeChange;
-        if (strictAccessorContract && !desc) {
+        if (accessorGatewayContract && !desc) {
           const e = new Error('[Core.applyTargets] accessor strict requires descriptor');
           return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
         const descIsAccessor = !!desc && hasAccessorShape(desc);
         const descIsData = !!desc && hasDataShape(desc);
-        const canShapeChange = strictAccessorContract && allowShapeChange && descIsData;
+        const canShapeChange = strictScalarContract && allowShapeChange && descIsData;
         if (desc && !descIsAccessor && !canShapeChange) {
           const e = new TypeError('[Core.applyTargets] kind mismatch for accessor');
           return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -1220,16 +1198,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] non-configurable accessor');
           return fail(planItem.policy, planItem.tag, 'non_configurable', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        if (strictAccessorContract && setImpl) {
-          const e = new TypeError('[Core.applyTargets] strict accessor gateway forbids setImpl');
+        if (accessorGatewayContract && setImpl) {
+          const e = new TypeError('[Core.applyTargets] accessor gateway forbids setImpl');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
         const useCoreWrapper = wrapLayer === 'core_wrapper';
-        if (strictAccessorContract && useCoreWrapper) {
-          const e = new TypeError('[Core.applyTargets] strict accessor gateway cannot use core_wrapper');
+        if (accessorGatewayContract && useCoreWrapper) {
+          const e = new TypeError('[Core.applyTargets] accessor gateway cannot use core_wrapper');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        planItem.wrapperClass = (strictAccessorContract || !useCoreWrapper) ? 'synthetic_named' : 'core_proxy';
+        planItem.wrapperClass = (accessorGatewayContract || !useCoreWrapper) ? 'synthetic_named' : 'core_proxy';
         let getWrapped = origGet;
         let setWrapped = origSet;
 
@@ -1248,7 +1226,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             const computedGetter = function coreAccessorGetCreate() {
               return getImpl.call(this, undefined);
             };
-            const createDesc = strictAccessorContract && desc
+            const createDesc = accessorGatewayContract && desc
               ? {
                   configurable: !!desc.configurable,
                   enumerable: !!desc.enumerable,
@@ -1265,7 +1243,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               wrapLayer: wrapLayer
             });
           }
-          if (strictAccessorContract) {
+          if (accessorGatewayContract) {
             if (desc && Object.prototype.hasOwnProperty.call(desc, 'set')) {
               setWrapped = desc.set;
             } else {
@@ -1313,9 +1291,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return fail(planItem.policy, planItem.tag, 'mark_failed', e, { key, kind: planItem.kind, targetId: planItem.targetId });
         }
 
-        if (strictAccessorContract) {
+        if (accessorGatewayContract) {
           if (typeof getWrapped !== 'function') {
-            const e = new TypeError('[Core.applyTargets] strict accessor gateway requires getter');
+            const e = new TypeError('[Core.applyTargets] accessor gateway requires getter');
             return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key, kind: planItem.kind, targetId: planItem.targetId });
           }
           const nextDesc = {
@@ -1644,28 +1622,28 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (kind === 'data' && wrapLayer !== 'descriptor_only') {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] data requires descriptor_only wrapLayer'), tag, policy, targetId, key, kind };
         }
-        if (isStrictAccessorGatewayWrapLayer(wrapLayer) && kind !== 'accessor') {
-          return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] strict accessor gateway requires accessor kind'), tag, policy, targetId, key, kind };
+        if (isAccessorGatewayWrapLayer(wrapLayer) && kind !== 'accessor') {
+          return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] accessor gateway requires accessor kind'), tag, policy, targetId, key, kind };
         }
-        if (kind === 'accessor' && isStrictAccessorGatewayWrapLayer(wrapLayer) && policy !== 'strict') {
-          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] strict accessor gateway requires strict policy'), tag, policy, targetId, key, kind };
+        if (kind === 'accessor' && isAccessorGatewayWrapLayer(wrapLayer) && policy !== 'strict') {
+          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] accessor gateway requires strict policy'), tag, policy, targetId, key, kind };
         }
-        if (kind === 'accessor' && policy === 'strict' && !isStrictAccessorGatewayWrapLayer(wrapLayer)) {
-          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] strict policy for accessor requires strict accessor gateway'), tag, policy, targetId, key, kind };
+        if (kind === 'accessor' && policy === 'strict' && !isAccessorGatewayWrapLayer(wrapLayer)) {
+          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] strict policy for accessor requires accessor gateway'), tag, policy, targetId, key, kind };
         }
         if ((kind === 'accessor' || kind === 'method' || kind === 'promise_method') && wrapLayer === 'descriptor_only') {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] descriptor_only unsupported for non-data kind'), tag, policy, targetId, key, kind };
         }
-        if (isStrictAccessorGatewayWrapLayer(wrapLayer) && resolveMode !== 'proto_chain') {
+        if (isAccessorGatewayWrapLayer(wrapLayer) && resolveMode !== 'proto_chain') {
           const fromMode = resolveMode;
           resolveMode = 'proto_chain';
-          __emit('warn', 'core_window:strict_accessor_force_proto_chain', {
+          __emit('warn', 'core_window:accessor_gateway_force_proto_chain', {
             module: 'core',
             diagTag: tag,
             surface: 'core',
             key,
             stage: 'preflight',
-            message: 'strict accessor requires resolve=proto_chain; forced',
+            message: 'accessor gateway requires resolve=proto_chain; forced',
             type: 'contract violation',
             data: { outcome: 'return', from: fromMode, to: resolveMode, wrapLayer, policy, kind }
           }, null);
@@ -1715,8 +1693,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (!desc && !allowCreate) {
           return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] descriptor missing'), tag, policy, targetId, key, kind };
         }
-        if (!desc && kind === 'accessor' && isStrictAccessorGatewayWrapLayer(wrapLayer)) {
-          return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] accessor strict requires descriptor'), tag, policy, targetId, key, kind };
+        if (!desc && kind === 'accessor' && isAccessorGatewayWrapLayer(wrapLayer)) {
+          return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] accessor gateway requires descriptor'), tag, policy, targetId, key, kind };
         }
         if (desc && kind === 'data') {
           if (!hasDataShape(desc)) {
@@ -1729,7 +1707,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (desc && kind === 'accessor') {
           const accessorShape = hasAccessorShape(desc);
           const dataShape = hasDataShape(desc);
-          const canShapeChange = isStrictAccessorGatewayWrapLayer(wrapLayer) && allowShapeChange && dataShape;
+          const canShapeChange = isStrictScalarAccessorGatewayWrapLayer(wrapLayer) && allowShapeChange && dataShape;
           if (!accessorShape && !canShapeChange) {
             return { ok: false, reason: 'kind_mismatch', error: new TypeError('[Core.applyTargets] kind mismatch for accessor'), tag, policy, targetId, key, kind };
           }
