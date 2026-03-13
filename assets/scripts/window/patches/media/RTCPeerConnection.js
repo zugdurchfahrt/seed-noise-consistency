@@ -296,30 +296,6 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return;
   }
 
-  if (Orig.__PATCH_RTCPEERCONNECTION__) {
-    __rtcDiag('info', 'rtc:already_patched_marker', {
-      stage: 'guard',
-      key: 'RTCPeerConnection',
-      message: 'RTCPeerConnection already patched by marker',
-      type: 'pipeline missing data',
-      data: { outcome: 'skip', reason: 'already_patched_marker' }
-    }, null);
-    try {
-      if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
-      }
-    } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
-        stage: 'guard',
-        key: __FLAG_KEY,
-        message: 'releaseGuardFlag threw on already patched marker skip',
-        type: 'pipeline missing data',
-        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
-    }
-    return;
-  }
-
   function filterSDP(sdp) {
     return sdp
       .split('\n')
