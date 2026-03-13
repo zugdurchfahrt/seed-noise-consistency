@@ -32,31 +32,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
   };
   const __exit = (level, code, ctx, ret) => (__emit(level, code, ctx, null), ret);
   const __throw = (code, ctx, err) => (__emit('error', code, ctx, err), (() => { throw err; })());
-  const __hiddenSurfaceState = {
-    preapply: [
-      '__safeDefine',
-      '__CORE_TOSTRING_STATE__',
-      '__ensureMarkAsNative',
-      '__wrapNativeApply',
-      '__wrapNativeAccessor',
-      '__wrapStrictAccessor',
-      '__wrapNativeCtor',
-      'Core',
-      '__CORE_WINDOW_LOADED__'
-    ],
-    final: [
-      '__safeDefine',
-      '__CORE_TOSTRING_STATE__',
-      '__ensureMarkAsNative',
-      '__wrapNativeApply',
-      '__wrapNativeAccessor',
-      '__wrapStrictAccessor',
-      '__wrapNativeCtor',
-      'Core',
-      '__CORE_WINDOW_LOADED__'
-    ],
-    applied: Object.create(null)
-  };
 
   // --- nativization provider  ---
   function safeDefine(obj, prop, descriptor) {
@@ -80,68 +55,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
-  for (const key of __hiddenSurfaceState.preapply) {
-    try {
-      const d = Object.getOwnPropertyDescriptor(window, key);
-      if (!d) {
-        Object.defineProperty(window, key, {
-          value: undefined,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        __hiddenSurfaceState.applied[key] = 'predefined';
-        continue;
-      }
-      if (d.enumerable === false) {
-        if (!__hiddenSurfaceState.applied[key]) __hiddenSurfaceState.applied[key] = 'already_hidden';
-        continue;
-      }
-      if (d.configurable === false) {
-        __hiddenSurfaceState.applied[key] = 'skip_nonconfigurable';
-        __emit('warn', 'core_window:hide_surface_nonconfigurable', {
-          module: 'core_window',
-          diagTag: 'core_window',
-          surface: 'core',
-          key,
-          stage: 'apply',
-          message: 'hide core surface skipped: non-configurable',
-          type: 'browser structure missing data',
-          data: { outcome: 'skip', reason: 'hide_surface_nonconfigurable' }
-        }, new Error('[CoreWindow] hide surface non-configurable: ' + key));
-        continue;
-      }
-      if ('value' in d) {
-        Object.defineProperty(window, key, {
-          value: window[key],
-          writable: !!d.writable,
-          configurable: true,
-          enumerable: false
-        });
-      } else {
-        Object.defineProperty(window, key, {
-          get: d.get,
-          set: d.set,
-          configurable: true,
-          enumerable: false
-        });
-      }
-      __hiddenSurfaceState.applied[key] = 'hidden';
-    } catch (e) {
-      __hiddenSurfaceState.applied[key] = 'hide_failed';
-      __emit('warn', 'core_window:hide_surface_failed', {
-        module: 'core_window',
-        diagTag: 'core_window',
-        surface: 'core',
-        key,
-        stage: 'apply',
-        message: 'hide core surface failed',
-        type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'hide_surface_failed' }
-      }, e);
-    }
-  }
-
   if (typeof window.__safeDefine !== 'function') {
     safeDefine(window, '__safeDefine', {
       value: safeDefine,
@@ -149,7 +62,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
       configurable: true,
       enumerable: false
     });
-    __hiddenSurfaceState.applied.__safeDefine = (__hiddenSurfaceState.applied.__safeDefine === 'predefined') ? 'defined' : 'redefined';
   }
 
   // ——— Global mask "native" + general WeakMap ———
@@ -195,6 +107,56 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
+  let iframeOracleToString = null;
+  if (!sharedCoreToStringStateOk) {
+    let oracleFrame = null;
+    try {
+      const doc = window && window.document;
+      const root = doc && (doc.documentElement || doc.head || doc.body);
+      if (doc && root && typeof doc.createElement === 'function' && typeof root.appendChild === 'function') {
+        oracleFrame = doc.createElement('iframe');
+        oracleFrame.setAttribute('aria-hidden', 'true');
+        oracleFrame.style.display = 'none';
+        root.appendChild(oracleFrame);
+        const oracleWin = oracleFrame.contentWindow;
+        const candidate = oracleWin && oracleWin.Function
+          && oracleWin.Function.prototype
+          && oracleWin.Function.prototype.toString;
+        if (typeof candidate === 'function') {
+          iframeOracleToString = candidate;
+        }
+      }
+    } catch (e) {
+      __emit('warn', 'core_window:toString_oracle_acquire_failed', {
+        module: 'core',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: 'Function.prototype.toString',
+        stage: 'preflight',
+        message: 'iframe oracle acquisition failed; nativeToString stays local',
+        type: 'browser structure missing data',
+        data: { outcome: 'return', fallback: 'local', stx: (e && e.stack) ? String(e.stack) : null }
+      }, e);
+    } finally {
+      if (oracleFrame) {
+        try {
+          oracleFrame.remove();
+        } catch (removeErr) {
+          __emit('warn', 'core_window:toString_oracle_cleanup_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: 'Function.prototype.toString',
+            stage: 'rollback',
+            message: 'iframe oracle cleanup failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'return', stx: (removeErr && removeErr.stack) ? String(removeErr.stack) : null }
+          }, removeErr);
+        }
+      }
+    }
+  }
+
   const toStringOverrideMap = sharedCoreToStringStateOk
     ? sharedCoreToStringState.overrideMap
     : new WeakMap();
@@ -234,10 +196,11 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
   const nativeToStringCandidate = sharedCoreToStringStateOk
     ? sharedCoreToStringState.nativeToString
-    : (currentRealmToString || Function.prototype.toString);
+    : (currentRealmToString || iframeOracleToString || Function.prototype.toString);
 
   const nativeToString = resolveToStringBridgeTarget(nativeToStringCandidate)
     || resolveToStringBridgeTarget(currentRealmToString)
+    || resolveToStringBridgeTarget(iframeOracleToString)
     || null;
 
   if (typeof nativeToString !== 'function') {
@@ -288,7 +251,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
       configurable: true,
       enumerable: false
     });
-    __hiddenSurfaceState.applied.__CORE_TOSTRING_STATE__ = (__hiddenSurfaceState.applied.__CORE_TOSTRING_STATE__ === 'predefined') ? 'defined' : 'redefined';
   }
 
 
@@ -299,7 +261,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
       configurable: true,
       enumerable: false
     });
-    __hiddenSurfaceState.applied.__ensureMarkAsNative = (__hiddenSurfaceState.applied.__ensureMarkAsNative === 'predefined') ? 'defined' : 'redefined';
   }
 
   // --- centralized native-shaped wrappers (Proxy/apply) ---
@@ -353,22 +314,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
   function __exportWrapFactory(exportName, exportValue) {
     const hasOwnExport = Object.prototype.hasOwnProperty.call(window, exportName);
-    const priorStatus = __hiddenSurfaceState.applied[exportName] || null;
-    const ownExportDesc = hasOwnExport ? Object.getOwnPropertyDescriptor(window, exportName) : null;
-    const isHiddenProducerSlot = !!(
-      ownExportDesc
-      && ownExportDesc.enumerable === false
-      && ownExportDesc.configurable === true
-      && Object.prototype.hasOwnProperty.call(ownExportDesc, 'value')
-      && ownExportDesc.value === undefined
-    );
     if (!hasOwnExport || typeof window[exportName] !== 'function') {
-      if (
-        hasOwnExport
-        && typeof window[exportName] !== 'function'
-        && !(priorStatus === 'predefined' && window[exportName] === undefined)
-        && !isHiddenProducerSlot
-      ) {
+      if (hasOwnExport && typeof window[exportName] !== 'function') {
         __emit('warn', 'core_window:export_conflict', {
           module: 'core',
           diagTag: 'core_window',
@@ -386,7 +333,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      __hiddenSurfaceState.applied[exportName] = (priorStatus === 'predefined') ? 'defined' : (hasOwnExport ? 'redefined' : 'defined');
     }
   }
 
@@ -505,39 +451,57 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const opts = options || {};
     const onAccess = (typeof opts.onAccess === 'function') ? opts.onAccess : null;
     const name = (typeof opts.name === 'string' && opts.name) ? opts.name : `get ${key}`;
+    const isData = !!desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
+    if (isData) return getter;
+
     const valueFromGetter = function (thisArg) {
       return (typeof getter === 'function') ? getter.call(thisArg) : getter;
     };
     const checkThis = (typeof validThis === 'function') ? validThis : null;
     const origGet = desc && desc.get;
-    const markAsNative = __requireMarkAsNative(name, 'wrapStrictAccessor');
+
+    if (typeof origGet === 'function') {
+      let wrapped;
+      wrapped = __wrapNativeAccessor(origGet, name, function (target, thisArg, argList) {
+        if (onAccess) onAccess(key, wrapped, thisArg);
+        if (checkThis && !checkThis(thisArg)) {
+          return Reflect.apply(target, thisArg, argList || []);
+        }
+        return valueFromGetter(thisArg);
+      });
+      return wrapped;
+    }
 
     const syntheticBridgeTarget = (typeof getter === 'function' && typeof getter.__coreBridgeTarget__ === 'function')
       ? getter.__coreBridgeTarget__
       : ((typeof getter === 'function') ? toStringProxyTargetMap.get(getter) : null);
-    const nativeBridgeTarget = (typeof origGet === 'function')
-      ? origGet
-      : ((typeof syntheticBridgeTarget === 'function') ? syntheticBridgeTarget : null);
-    let wrapped;
+    if (typeof syntheticBridgeTarget !== 'function') {
+      const e = new Error('[CoreWindow] __wrapStrictAccessor: synthetic path requires native bridge target');
+      __throwWrapFactoryPreflight(
+        'core_window:wrapStrictAccessor:synthetic_bridge_missing',
+        key,
+        '__wrapStrictAccessor: synthetic path requires native bridge target',
+        e
+      );
+    }
+
     const synthetic = Object.getOwnPropertyDescriptor(({ get [key]() {
-      if (onAccess) onAccess(key, wrapped, this);
-      if (checkThis && !checkThis(this)) {
-        if (typeof nativeBridgeTarget === 'function') {
-          return Reflect.apply(nativeBridgeTarget, this, []);
-        }
-        throw new TypeError();
-      }
       return valueFromGetter(this);
     }}), key).get;
-    if (typeof nativeBridgeTarget === 'function') {
-      safeDefine(synthetic, '__coreBridgeTarget__', {
-        value: nativeBridgeTarget,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
-    }
-    wrapped = markAsNative(synthetic, name);
+    safeDefine(synthetic, '__coreBridgeTarget__', {
+      value: syntheticBridgeTarget,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+    let wrapped;
+    wrapped = __wrapNativeAccessor(synthetic, name, function (target, thisArg, argList) {
+      if (onAccess) onAccess(key, wrapped, thisArg);
+      if (checkThis && !checkThis(thisArg)) {
+        throw new TypeError();
+      }
+      return Reflect.apply(target, thisArg, argList || []);
+    });
     return wrapped;
   }
 
@@ -566,28 +530,337 @@ const CoreWindowModule = function CoreWindowModule(window) {
   {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = toStringDesc && toStringDesc.value;
-    if (typeof currentToString !== 'function') {
-      const e = new Error('[CoreWindow] Function.prototype.toString missing');
-      __emit('error', 'core_window:toString_missing', {
+
+    let skipToStringInstall = false;
+    if (sharedCoreToStringStateOk) {
+      const markAsNative = ensureMarkAsNative();
+      const probe = function probe(){};
+      markAsNative(probe);
+       const expected = toStringOverrideMap.get(probe);
+       if (expected === undefined) {
+         const e = new Error('[CoreWindow] toString probe missing label');
+         __emit('error', 'core_window:toString_probe_missing', {
+           module: 'core',
+           diagTag: 'core_window',
+           surface: 'core',
+           key: 'Function.prototype.toString',
+           stage: 'contract',
+           message: 'toString probe missing label in overrideMap',
+           type: 'contract_violation',
+           data: { outcome: 'throw' }
+         }, e);
+         throw e;
+       }
+       if (typeof currentToString !== 'function') {
+         const e = new Error('[CoreWindow] Function.prototype.toString missing');
+         __emit('error', 'core_window:toString_missing', {
+           module: 'core',
+           diagTag: 'core_window',
+           surface: 'core',
+           key: 'Function.prototype.toString',
+           stage: 'preflight',
+           message: 'Function.prototype.toString missing',
+           type: 'browser structure missing data',
+           data: { outcome: 'throw' }
+         }, e);
+         throw e;
+       }
+       const actual = currentToString.call(probe);
+       if (actual !== expected) {
+         const e = new Error('[CoreWindow] toString bridge mismatch');
+         __emit('error', 'core_window:toString_bridge_mismatch', {
+           module: 'core',
+           diagTag: 'core_window',
+           surface: 'core',
+           key: 'Function.prototype.toString',
+           stage: 'contract',
+           message: 'existing toString does not honor shared overrideMap labels',
+           type: 'contract_violation',
+           data: { outcome: 'throw' }
+         }, e);
+         throw e;
+       }
+
+      // Already installed and consistent: do not re-install another Proxy layer.
+      skipToStringInstall = true;
+    } else if (typeof iframeOracleToString === 'function' && typeof currentToString === 'function') {
+      let oracleNativeSelf = null;
+      let oracleCurrentSelf = null;
+      try {
+        oracleNativeSelf = Reflect.apply(iframeOracleToString, nativeToString, []);
+        oracleCurrentSelf = Reflect.apply(iframeOracleToString, currentToString, []);
+      } catch (e) {
+        __emit('error', 'core_window:toString_oracle_probe_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'preflight',
+          message: 'iframe oracle probe failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', stx: (e && e.stack) ? String(e.stack) : null }
+        }, e);
+        throw e;
+      }
+      if (oracleCurrentSelf !== oracleNativeSelf) {
+        const e = new Error('[CoreWindow] Function.prototype.toString already wrapped without CORE state');
+        __emit('error', 'core_window:toString_rewrap_blocked', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'preflight',
+          message: 'repeat toString install blocked: current Function.prototype.toString differs from oracle',
+          type: 'contract violation',
+          data: {
+            outcome: 'throw',
+            oracleCurrentSelf: String(oracleCurrentSelf),
+            oracleNativeSelf: String(oracleNativeSelf)
+          }
+        }, e);
+        throw e;
+      }
+    }
+
+    if (skipToStringInstall) {
+      // Keep existing Function.prototype.toString; shared maps still used for markAsNative.
+      if (!existingCoreToStringStateOk) {
+        publishCoreToStringState();
+      }
+    } else {
+    const toString = new Proxy(nativeToString, {
+      apply(target, thisArg, argList) {
+        // Keep native brand-check behavior (no CORE noise) for non-function receivers.
+        if (typeof thisArg !== 'function') {
+          return Reflect.apply(target, thisArg, argList);
+        }
+        try {
+          const direct = toStringOverrideMap.get(thisArg);
+          if (direct !== undefined) return direct;
+
+          let bridgeTarget = toStringProxyTargetMap.get(thisArg);
+          if (typeof bridgeTarget === 'function') {
+            const seenBridgeTargets = new WeakSet();
+            while (typeof bridgeTarget === 'function') {
+              if (seenBridgeTargets.has(bridgeTarget)) {
+                const e = new Error('[CoreWindow] toString bridge cycle');
+                __emit('error', 'core_window:toString_bridge_cycle', {
+                  module: 'core',
+                  diagTag: 'core_window',
+                  surface: 'core',
+                  key: 'Function.prototype.toString',
+                  stage: 'runtime',
+                  message: 'toString bridge cycle; falling back to native',
+                  type: 'contract violation',
+                  data: { outcome: 'return', fallback: 'native', stx: (e && e.stack) ? String(e.stack) : null }
+                }, e);
+                return Reflect.apply(target, thisArg, argList);
+              }
+              seenBridgeTargets.add(bridgeTarget);
+
+              const bridgeLabel = toStringOverrideMap.get(bridgeTarget);
+              if (bridgeLabel !== undefined) return bridgeLabel;
+
+              const nextTarget = toStringProxyTargetMap.get(bridgeTarget);
+              if (typeof nextTarget !== 'function') break;
+              bridgeTarget = nextTarget;
+            }
+            if (bridgeTarget !== thisArg && typeof bridgeTarget === 'function') {
+              try {
+                return Reflect.apply(target, bridgeTarget, argList);
+              } catch (mappedErr) {
+                __emit('warn', 'core_window:toString_mapped_forward_failed', {
+                  module: 'core',
+                  diagTag: 'core_window',
+                  surface: 'core',
+                  key: 'Function.prototype.toString',
+                  stage: 'hook',
+                  message: 'toString mapped forward failed; falling back to native',
+                  type: 'browser structure missing data',
+                  data: { outcome: 'return', fallback: 'native', stx: (mappedErr && mappedErr.stack) ? String(mappedErr.stack) : null }
+                }, mappedErr);
+              }
+            }
+          }
+          return Reflect.apply(target, thisArg, argList);
+        } catch (e) {
+          // Public API surface: do not leak internal failures; record and fall back to native.
+          __emit('error', 'core_window:toString_apply_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: 'Function.prototype.toString',
+            stage: 'runtime',
+            message: 'toString apply threw; falling back to native',
+            type: 'browser structure missing data',
+            data: {
+              outcome: 'return',
+              fallback: 'native',
+              stx: (e && e.stack) ? String(e.stack) : null,
+              thisArgType: typeof thisArg,
+              thisArgName: (thisArg && typeof thisArg === 'function' && thisArg.name) ? String(thisArg.name) : null
+            }
+          }, e);
+          try {
+            return Reflect.apply(target, thisArg, argList);
+          } catch (nativeErr) {
+            throw nativeErr;
+          }
+        }
+      }
+    });
+
+    const installDesc = {
+      value: toString,
+      writable: toStringDesc ? !!toStringDesc.writable : true,
+      configurable: toStringDesc ? !!toStringDesc.configurable : true,
+      enumerable: toStringDesc ? !!toStringDesc.enumerable : false
+    };
+    const prevCoreStateDesc = nativeGetOwnProp(window, '__CORE_TOSTRING_STATE__');
+
+    try {
+      toStringProxyTargetMap.set(toString, nativeToString);
+      const markAsNative = ensureMarkAsNative();
+      markAsNative(toString, 'toString');
+
+      Object.defineProperty(Function.prototype, 'toString', installDesc);
+
+      const installedDesc = nativeGetOwnProp(Function.prototype, 'toString');
+      if (!installedDesc || installedDesc.value !== toString) {
+        throw new Error('[CoreWindow] toString install descriptor mismatch');
+      }
+      if (!!installedDesc.writable !== !!installDesc.writable
+        || !!installedDesc.configurable !== !!installDesc.configurable
+        || !!installedDesc.enumerable !== !!installDesc.enumerable) {
+        throw new Error('[CoreWindow] toString install flags mismatch');
+      }
+
+      let nonFnErr = null;
+      try {
+        Reflect.apply(toString, {}, []);
+      } catch (e) {
+        nonFnErr = e;
+      }
+      if (!nonFnErr) {
+        throw new Error('[CoreWindow] toString brand-check lost');
+      }
+
+      const directProbe = function coreToStringProbe(){};
+      const expectedNative = Reflect.apply(nativeToString, directProbe, []);
+      const actualNative = Reflect.apply(toString, directProbe, []);
+      if (actualNative !== expectedNative) {
+        throw new Error('[CoreWindow] toString native forwarding mismatch');
+      }
+
+      // If this invariant fails, external "Reflect.setPrototypeOf" probes will light up immediately.
+      try {
+        const p = Reflect.getPrototypeOf(toString);
+        const ok = Reflect.setPrototypeOf(toString, p);
+        if (ok !== true) {
+          const invErr = new TypeError();
+          __emit('error', 'core_window:toString_setProto_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: 'Function.prototype.toString',
+            stage: 'contract',
+            message: 'Reflect.setPrototypeOf(toString, currentProto) returned false',
+            type: 'contract violation',
+            data: { outcome: 'throw', ok: false }
+          }, invErr);
+          throw invErr;
+        }
+      } catch (setProtoErr) {
+        __emit('error', 'core_window:toString_setProto_threw', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'contract',
+          message: 'Reflect.setPrototypeOf(toString, currentProto) threw',
+          type: 'contract violation',
+          data: { outcome: 'throw', stx: (setProtoErr && setProtoErr.stack) ? String(setProtoErr.stack) : null }
+        }, setProtoErr);
+        throw setProtoErr;
+      }
+
+      publishCoreToStringState();
+    } catch (e) {
+      try {
+        toStringProxyTargetMap.delete(toString);
+        toStringOverrideMap.delete(toString);
+      } catch (mapErr) {
+        __emit('error', 'core_window:toString_maps_restore_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'rollback',
+          message: 'toString rollback: WeakMap restore failed',
+          type: 'rollback_failed',
+          data: { outcome: 'return' }
+        }, mapErr);
+      }
+
+      try {
+        if (typeof currentToString === 'function') {
+          Object.defineProperty(Function.prototype, 'toString', {
+            value: currentToString,
+            writable: toStringDesc ? !!toStringDesc.writable : true,
+            configurable: toStringDesc ? !!toStringDesc.configurable : true,
+            enumerable: toStringDesc ? !!toStringDesc.enumerable : false
+          });
+        }
+      } catch (restoreErr) {
+        __emit('error', 'core_window:toString_restore_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'rollback',
+          message: 'toString rollback: restoring Function.prototype.toString failed',
+          type: 'rollback_failed',
+          data: { outcome: 'throw' }
+        }, restoreErr);
+        throw restoreErr;
+      }
+
+      try {
+        if (prevCoreStateDesc) {
+          Object.defineProperty(window, '__CORE_TOSTRING_STATE__', prevCoreStateDesc);
+        } else {
+          delete window.__CORE_TOSTRING_STATE__;
+        }
+      } catch (stateErr) {
+        __emit('error', 'core_window:toString_state_restore_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: '__CORE_TOSTRING_STATE__',
+          stage: 'rollback',
+          message: 'toString rollback: restoring __CORE_TOSTRING_STATE__ failed',
+          type: 'rollback_failed',
+          data: { outcome: 'throw' }
+        }, stateErr);
+        throw stateErr;
+      }
+
+      __emit('error', 'core_window:toString_install_failed', {
         module: 'core',
         diagTag: 'core_window',
         surface: 'core',
         key: 'Function.prototype.toString',
-        stage: 'preflight',
-        message: 'Function.prototype.toString missing',
-        type: 'browser structure missing data',
+        stage: 'apply',
+        message: 'toString install failed',
+        type: 'apply_failed',
         data: { outcome: 'throw' }
       }, e);
       throw e;
     }
-
-    if (!existingCoreToStringStateOk) {
-      publishCoreToStringState();
     }
   }
 
   // === Core2.0 targets dispatcher (Window scope) ===
-   // !!!! core_window.js сначала считает tag локальным fallback-хэшем, а позже, когда появляется G.strToSeed, начинает считать через него. То есть guard policy уже подхватилась, но не даёт одного стабильного seed-tag на весь document.
   // Methodology: Core controls preflight/dispatch/nativization/diag. Module applies descriptors.
   (function installCoreApplyTargets(){
     function diagDegrade(code, err, extra) {
@@ -672,28 +945,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
       if (code === 'wrap_layer_auto_forbidden') return new TypeError(prefix + ' wrapLayer auto forbidden');
       return new TypeError(prefix + ' unsupported wrapLayer');
     }
-    function isStrictScalarAccessorGatewayWrapLayer(v) {
-      return v === 'named_wrapper_strict' || v === 'strict_accessor_gateway';
-    }
-    function isObjectReturnGatewayWrapLayer(v) {
-      return v === 'object_return_gateway';
-    }
-    function isAccessorGatewayWrapLayer(v) {
-      return isStrictScalarAccessorGatewayWrapLayer(v) || isObjectReturnGatewayWrapLayer(v);
-    }
-    function isUnifiedAccessorGatewayWrapLayer(v) {
-      return v === 'strict_accessor_gateway' || v === 'object_return_gateway';
-    }
     function normalizeWrapLayer(v) {
       if (isWrapLayerMissing(v)) return null;
-      if (
-        v === 'descriptor_only'
-        || v === 'named_wrapper'
-        || v === 'named_wrapper_strict'
-        || v === 'strict_accessor_gateway'
-        || v === 'object_return_gateway'
-        || v === 'core_wrapper'
-      ) return v;
+      if (v === 'descriptor_only' || v === 'named_wrapper' || v === 'named_wrapper_strict' || v === 'core_wrapper') return v;
       return null;
     }
     function resolveDescriptor(owner, key, options) {
@@ -729,49 +983,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const globalTargetRegistry = (Core.__targetRegistry instanceof WeakMap) ? Core.__targetRegistry : new WeakMap();
       const __patchGuardSeq = (Core.__patchGuardSeq instanceof WeakMap) ? Core.__patchGuardSeq : new WeakMap();
 
-      function normStr(s) {
-        return (s == null ? '' : String(s)).normalize('NFKC');
-      }
-
-      function guardSeedTag() {
-        const prngState = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
-        const raw = normStr((prngState && typeof prngState.seed === 'string' && prngState.seed) ? prngState.seed : ((G && G.__GLOBAL_SEED) || ''));
-        const mixed = 'ok|' + raw;
-
-        try {
-          const seedHasher = (prngState && typeof prngState.strToSeed === 'function')
-            ? prngState.strToSeed
-            : ((G && typeof G.strToSeed === 'function') ? G.strToSeed : null);
-          if (typeof seedHasher === 'function') {
-            return String(seedHasher(mixed) >>> 0).toString(36).slice(0, 8);
-          }
-        } catch (e) {
-          __emit('warn', 'core_window:guard_seed_hash_failed', {
-            module: 'core',
-            diagTag: 'core_window',
-            surface: 'core',
-            key: '__GLOBAL_SEED',
-            stage: 'guard',
-            message: 'guard seed hash provider failed; using local hash fallback',
-            type: 'pipeline missing data',
-            data: { outcome: 'return', fallback: 'local_hash' }
-          }, e);
-        }
-
-        let h = 2166136261 >>> 0;
-        for (let i = 0; i < mixed.length; i++) {
-          h ^= mixed.charCodeAt(i);
-          h = Math.imul(h, 16777619);
-        }
-        return String(h >>> 0).toString(36).slice(0, 8);
-      }
-
-      function nextGuardToken() {
+      function nextGuardToken(flagKey) {
         let n = 0;
         try {
-          n = __patchGuardSeq.get(G) || 0;
+          n = __patchGuardSeq.get(window) || 0;
           n = (n + 1) | 0;
-          __patchGuardSeq.set(G, n);
+          __patchGuardSeq.set(window, n);
         } catch (e) {
           __emit('warn', 'core_window:nextGuardToken_seq_store_failed', {
             module: 'core',
@@ -786,7 +1003,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           n = ((nextGuardToken.__n || 0) + 1) | 0;
           nextGuardToken.__n = n;
         }
-        return 'ok:' + guardSeedTag() + ':' + String(n);
+        return `g:${String(flagKey || 'flag')}:${String(n)}`;
       }
 
       function guardFlag(flagKey, codePrefix) {
@@ -820,14 +1037,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
           }, e);
           return null;
         }
-        const token = nextGuardToken();
+        const token = nextGuardToken(key);
         try {
-          Object.defineProperty(window, key, {
-            value: token,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
+          window[key] = token;
         } catch (e) {
           __emit('warn', tag + ':guard_write_failed', {
             module: 'core',
@@ -855,12 +1067,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             delete window[key];
           } catch (deleteErr) {
             try {
-              Object.defineProperty(window, key, {
-                value: false,
-                writable: true,
-                configurable: true,
-                enumerable: false
-              });
+              window[key] = false;
             } catch (setErr) {
               __emit('warn', tag + ':guard_release_failed', {
                 module: 'core',
@@ -976,6 +1183,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       function wrapGetter(key, getter, desc, validThis, opts) {
         const options = opts || {};
         const isData = desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
+        if (isData) return getter;
         const origGet = desc && desc.get;
         const invalidThis = options.invalidThis || 'native';
         const checkThis = (typeof validThis === 'function') ? validThis : null;
@@ -999,17 +1207,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const valueFromGetter = function (thisArg) {
           return (typeof getter === 'function') ? getter.call(thisArg) : getter;
         };
-        const useUnifiedAccessorGateway = isUnifiedAccessorGatewayWrapLayer(wrapLayer);
-
-        if (useUnifiedAccessorGateway) {
-          const wrappedStrictGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
-            name: 'get ' + key
-          });
-          knownWrapped.add(wrappedStrictGet);
-          return wrappedStrictGet;
-        }
-
-        if (isData) return getter;
 
         if (options.mark === false) {
           const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
@@ -1179,17 +1376,15 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = wrapLayerContractError(code, 'applyTargets');
           return fail(planItem.policy, planItem.tag, code, e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId, wrapLayer: wrapLayerInput });
         }
-        const strictScalarContract = planItem.policy === 'strict' && isStrictScalarAccessorGatewayWrapLayer(wrapLayer);
-        const objectReturnContract = planItem.policy === 'strict' && isObjectReturnGatewayWrapLayer(wrapLayer);
-        const accessorGatewayContract = strictScalarContract || objectReturnContract;
+        const strictAccessorContract = planItem.policy === 'strict' && wrapLayer === 'named_wrapper_strict';
         const allowShapeChange = !!planItem.allowShapeChange;
-        if (accessorGatewayContract && !desc) {
+        if (strictAccessorContract && !desc) {
           const e = new Error('[Core.applyTargets] accessor strict requires descriptor');
           return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
         const descIsAccessor = !!desc && hasAccessorShape(desc);
         const descIsData = !!desc && hasDataShape(desc);
-        const canShapeChange = strictScalarContract && allowShapeChange && descIsData;
+        const canShapeChange = strictAccessorContract && allowShapeChange && descIsData;
         if (desc && !descIsAccessor && !canShapeChange) {
           const e = new TypeError('[Core.applyTargets] kind mismatch for accessor');
           return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -1198,16 +1393,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] non-configurable accessor');
           return fail(planItem.policy, planItem.tag, 'non_configurable', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        if (accessorGatewayContract && setImpl) {
-          const e = new TypeError('[Core.applyTargets] accessor gateway forbids setImpl');
+        if (strictAccessorContract && setImpl) {
+          const e = new TypeError('[Core.applyTargets] named_wrapper_strict forbids setImpl');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
         const useCoreWrapper = wrapLayer === 'core_wrapper';
-        if (accessorGatewayContract && useCoreWrapper) {
-          const e = new TypeError('[Core.applyTargets] accessor gateway cannot use core_wrapper');
+        if (strictAccessorContract && useCoreWrapper) {
+          const e = new TypeError('[Core.applyTargets] named_wrapper_strict cannot use core_wrapper');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        planItem.wrapperClass = (accessorGatewayContract || !useCoreWrapper) ? 'synthetic_named' : 'core_proxy';
+        planItem.wrapperClass = (strictAccessorContract || !useCoreWrapper) ? 'synthetic_named' : 'core_proxy';
         let getWrapped = origGet;
         let setWrapped = origSet;
 
@@ -1226,7 +1421,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             const computedGetter = function coreAccessorGetCreate() {
               return getImpl.call(this, undefined);
             };
-            const createDesc = accessorGatewayContract && desc
+            const createDesc = strictAccessorContract && desc
               ? {
                   configurable: !!desc.configurable,
                   enumerable: !!desc.enumerable,
@@ -1243,7 +1438,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               wrapLayer: wrapLayer
             });
           }
-          if (accessorGatewayContract) {
+          if (strictAccessorContract) {
             if (desc && Object.prototype.hasOwnProperty.call(desc, 'set')) {
               setWrapped = desc.set;
             } else {
@@ -1291,9 +1486,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return fail(planItem.policy, planItem.tag, 'mark_failed', e, { key, kind: planItem.kind, targetId: planItem.targetId });
         }
 
-        if (accessorGatewayContract) {
+        if (strictAccessorContract) {
           if (typeof getWrapped !== 'function') {
-            const e = new TypeError('[Core.applyTargets] accessor gateway requires getter');
+            const e = new TypeError('[Core.applyTargets] named_wrapper_strict requires getter');
             return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key, kind: planItem.kind, targetId: planItem.targetId });
           }
           const nextDesc = {
@@ -1622,28 +1817,28 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (kind === 'data' && wrapLayer !== 'descriptor_only') {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] data requires descriptor_only wrapLayer'), tag, policy, targetId, key, kind };
         }
-        if (isAccessorGatewayWrapLayer(wrapLayer) && kind !== 'accessor') {
-          return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] accessor gateway requires accessor kind'), tag, policy, targetId, key, kind };
+        if (wrapLayer === 'named_wrapper_strict' && kind !== 'accessor') {
+          return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] named_wrapper_strict requires accessor kind'), tag, policy, targetId, key, kind };
         }
-        if (kind === 'accessor' && isAccessorGatewayWrapLayer(wrapLayer) && policy !== 'strict') {
-          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] accessor gateway requires strict policy'), tag, policy, targetId, key, kind };
+        if (kind === 'accessor' && wrapLayer === 'named_wrapper_strict' && policy !== 'strict') {
+          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] named_wrapper_strict requires strict policy'), tag, policy, targetId, key, kind };
         }
-        if (kind === 'accessor' && policy === 'strict' && !isAccessorGatewayWrapLayer(wrapLayer)) {
-          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] strict policy for accessor requires accessor gateway'), tag, policy, targetId, key, kind };
+        if (kind === 'accessor' && policy === 'strict' && wrapLayer !== 'named_wrapper_strict') {
+          return { ok: false, reason: 'wrap_layer_policy_mismatch', error: new TypeError('[Core.applyTargets] strict policy for accessor requires named_wrapper_strict'), tag, policy, targetId, key, kind };
         }
         if ((kind === 'accessor' || kind === 'method' || kind === 'promise_method') && wrapLayer === 'descriptor_only') {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] descriptor_only unsupported for non-data kind'), tag, policy, targetId, key, kind };
         }
-        if (isAccessorGatewayWrapLayer(wrapLayer) && resolveMode !== 'proto_chain') {
+        if (wrapLayer === 'named_wrapper_strict' && resolveMode !== 'proto_chain') {
           const fromMode = resolveMode;
           resolveMode = 'proto_chain';
-          __emit('warn', 'core_window:accessor_gateway_force_proto_chain', {
+          __emit('warn', 'core_window:strict_accessor_force_proto_chain', {
             module: 'core',
             diagTag: tag,
             surface: 'core',
             key,
             stage: 'preflight',
-            message: 'accessor gateway requires resolve=proto_chain; forced',
+            message: 'strict accessor requires resolve=proto_chain; forced',
             type: 'contract violation',
             data: { outcome: 'return', from: fromMode, to: resolveMode, wrapLayer, policy, kind }
           }, null);
@@ -1693,8 +1888,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (!desc && !allowCreate) {
           return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] descriptor missing'), tag, policy, targetId, key, kind };
         }
-        if (!desc && kind === 'accessor' && isAccessorGatewayWrapLayer(wrapLayer)) {
-          return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] accessor gateway requires descriptor'), tag, policy, targetId, key, kind };
+        if (!desc && kind === 'accessor' && wrapLayer === 'named_wrapper_strict') {
+          return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] accessor strict requires descriptor'), tag, policy, targetId, key, kind };
         }
         if (desc && kind === 'data') {
           if (!hasDataShape(desc)) {
@@ -1707,7 +1902,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (desc && kind === 'accessor') {
           const accessorShape = hasAccessorShape(desc);
           const dataShape = hasDataShape(desc);
-          const canShapeChange = isStrictScalarAccessorGatewayWrapLayer(wrapLayer) && allowShapeChange && dataShape;
+          const canShapeChange = wrapLayer === 'named_wrapper_strict' && allowShapeChange && dataShape;
           if (!accessorShape && !canShapeChange) {
             return { ok: false, reason: 'kind_mismatch', error: new TypeError('[Core.applyTargets] kind mismatch for accessor'), tag, policy, targetId, key, kind };
           }
@@ -1867,7 +2062,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      __hiddenSurfaceState.applied.Core = (__hiddenSurfaceState.applied.Core === 'predefined') ? 'defined' : 'redefined';
       safeDefine(Core, 'applyTargets', {
         value: applyTargets,
         writable: true,
@@ -1999,93 +2193,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   })();
 
-  Object.defineProperty(window, '__CORE_WINDOW_LOADED__', {
-    value: true,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
-  __hiddenSurfaceState.applied.__CORE_WINDOW_LOADED__ = (__hiddenSurfaceState.applied.__CORE_WINDOW_LOADED__ === 'predefined') ? 'defined' : 'redefined';
-  for (const key of __hiddenSurfaceState.final) {
-    try {
-      if (!Object.prototype.hasOwnProperty.call(window, key)) continue;
-      const d = Object.getOwnPropertyDescriptor(window, key);
-      if (!d) continue;
-      if (d.enumerable === false) {
-        if (!__hiddenSurfaceState.applied[key]) __hiddenSurfaceState.applied[key] = 'already_hidden';
-        continue;
-      }
-      if (d.configurable === false) {
-        __hiddenSurfaceState.applied[key] = 'skip_nonconfigurable';
-        __emit('warn', 'core_window:hide_surface_nonconfigurable', {
-          module: 'core_window',
-          diagTag: 'core_window',
-          surface: 'core',
-          key,
-          stage: 'apply',
-          message: 'hide core surface skipped: non-configurable',
-          type: 'browser structure missing data',
-          data: { outcome: 'skip', reason: 'hide_surface_nonconfigurable' }
-        }, new Error('[CoreWindow] hide surface non-configurable: ' + key));
-        continue;
-      }
-      if ('value' in d) {
-        Object.defineProperty(window, key, {
-          value: window[key],
-          writable: !!d.writable,
-          configurable: !!d.configurable,
-          enumerable: false
-        });
-      } else {
-        Object.defineProperty(window, key, {
-          get: d.get,
-          set: d.set,
-          configurable: !!d.configurable,
-          enumerable: false
-        });
-      }
-      __hiddenSurfaceState.applied[key] = 'hidden';
-    } catch (e) {
-      __hiddenSurfaceState.applied[key] = 'hide_failed';
-      __emit('warn', 'core_window:hide_surface_failed', {
-        module: 'core_window',
-        diagTag: 'core_window',
-        surface: 'core',
-        key,
-        stage: 'apply',
-        message: 'hide core surface failed',
-        type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'hide_surface_failed' }
-      }, e);
-    }
-  }
-  for (const key of [
-    '__safeDefine',
-    '__ensureMarkAsNative',
-    'Core',
-    '__wrapNativeApply',
-    '__wrapNativeAccessor',
-    '__wrapStrictAccessor',
-    '__wrapNativeCtor',
-    '__CORE_WINDOW_LOADED__'
-  ]) {
-    const d = Object.getOwnPropertyDescriptor(window, key);
-    if (!d || d.enumerable !== false) {
-      __throw('core_window:core_export_contract_failed', {
-        module: 'core_window',
-        diagTag: 'core_window',
-        surface: 'core',
-        key,
-        stage: 'post-check',
-        message: 'core export layer requires own hidden surface',
-        type: 'contract violation',
-        data: {
-          outcome: 'throw',
-          reason: !d ? 'missing_own_descriptor' : 'enumerable_surface'
-        }
-      }, new Error('[CoreWindow] core export contract failed: ' + key));
-    }
-  }
+  window.__CORE_WINDOW_LOADED__ = true;
   __emit('info', 'core_window:ready', {
     module: 'core_window',
     diagTag: 'core_window',
