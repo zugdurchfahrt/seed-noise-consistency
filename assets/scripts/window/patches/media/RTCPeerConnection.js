@@ -98,6 +98,62 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return;
   }
 
+  if (!C) {
+    __rtcDiag('fatal', 'rtc:canvas_patch_context_missing', {
+      stage: 'preflight',
+      key: 'CanvasPatchContext',
+      message: 'CanvasPatchContext missing',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
+    }, new Error('[RTC] CanvasPatchContext missing'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on CanvasPatchContext preflight skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
+    return;
+  }
+  const __rtcStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__rtcStateRoot) {
+    __rtcDiag('fatal', 'rtc:canvas_patch_state_missing', {
+      stage: 'preflight',
+      key: 'CanvasPatchContext.state',
+      message: 'CanvasPatchContext.state missing',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
+    }, new Error('[RTC] CanvasPatchContext.state missing'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on CanvasPatchContext.state preflight skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
+    return;
+  }
+  if (!(__rtcStateRoot.__RTCPeerConnection__ && typeof __rtcStateRoot.__RTCPeerConnection__ === 'object')) {
+    Object.defineProperty(__rtcStateRoot, '__RTCPeerConnection__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+
   const safeDefine = (function() {
     const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
     if (typeof sd !== 'function') return null;

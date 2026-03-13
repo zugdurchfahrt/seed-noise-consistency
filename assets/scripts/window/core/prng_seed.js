@@ -72,7 +72,13 @@
     const C = (G && G.CanvasPatchContext) || (window && window.CanvasPatchContext) || null;
     function ensurePrngState() {
       if (!C || (typeof C !== 'object' && typeof C !== 'function')) return null;
-      let state = (C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+      let state = (stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
+        ? stateRoot.__PRNG_STATE__
+        : null;
+      if (!state) {
+        state = (C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+      }
       if (!state) {
         state = {
           seed: '',
@@ -83,28 +89,7 @@
           marker: 'envrand',
           version: '1.1.1'
         };
-        try {
-          Object.defineProperty(C, '__PRNG_STATE__', {
-            value: state,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-        } catch (e) {
-          __emit('warn', 'rng_set:define_prng_state_failed', {
-            module: 'rng_set',
-            diagTag: 'rng_set',
-            surface: 'CanvasPatchContext',
-            key: '__PRNG_STATE__',
-            stage: 'apply',
-            message: 'Object.defineProperty(CanvasPatchContext,"__PRNG_STATE__") failed; fallback to assignment',
-            type: 'browser structure missing data',
-            data: { outcome: 'rollback', action: 'fallback_assign' }
-          }, e);
-          C.__PRNG_STATE__ = state;
-        }
       }
-      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
       if (stateRoot) {
         try {
           const shared = stateRoot.__PRNG_STATE__;
@@ -128,6 +113,28 @@
             data: { outcome: 'continue', action: 'keep_root_slot' }
           }, e);
         }
+      }
+      try {
+        if (C.__PRNG_STATE__ !== state) {
+          Object.defineProperty(C, '__PRNG_STATE__', {
+            value: state,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        }
+      } catch (e) {
+        __emit('warn', 'rng_set:define_prng_state_failed', {
+          module: 'rng_set',
+          diagTag: 'rng_set',
+          surface: 'CanvasPatchContext',
+          key: '__PRNG_STATE__',
+          stage: 'apply',
+          message: 'Object.defineProperty(CanvasPatchContext,"__PRNG_STATE__") failed; fallback to assignment',
+          type: 'browser structure missing data',
+          data: { outcome: 'rollback', action: 'fallback_assign' }
+        }, e);
+        C.__PRNG_STATE__ = state;
       }
       if (!state.pools || typeof state.pools !== 'object') state.pools = Object.create(null);
       return state;

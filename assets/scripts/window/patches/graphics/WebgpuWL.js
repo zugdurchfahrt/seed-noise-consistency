@@ -203,6 +203,36 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     }
   }
 
+  function __setHiddenOwnerValue(owner, key, value) {
+    try {
+      if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
+        throw new Error('hidden owner missing');
+      }
+      const own = Object.prototype.hasOwnProperty.call(owner, key);
+      const d = own ? (Object.getOwnPropertyDescriptor(owner, key) || null) : null;
+      if (d && d.configurable === false) {
+        owner[key] = value;
+        return true;
+      }
+      Object.defineProperty(owner, key, {
+        value: value,
+        writable: d ? !!d.writable : true,
+        configurable: d ? !!d.configurable : true,
+        enumerable: false
+      });
+      return true;
+    } catch (e) {
+      __moduleDiag('error', __module + ':define_hidden_failed', {
+        stage: 'apply',
+        key: key,
+        message: 'define hidden owner value failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'define_hidden_failed' }
+      }, e);
+      throw e;
+    }
+  }
+
   let __state = null;
   try {
     const C = window.CanvasPatchContext;
@@ -218,9 +248,22 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       __releaseGuard(true);
       return;
     }
+    const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+    if (!__stateRoot) {
+      const preflightErr = new Error('[WebGPUPatch] CanvasPatchContext.state is undefined - no further execution');
+      __moduleDiag('error', __module + ':preflight_failed', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state',
+        message: 'CanvasPatchContext.state is undefined',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
+      }, preflightErr);
+      __releaseGuard(true);
+      return;
+    }
 
     __state = {
-      store: __captureContextState(C, '__WEBGPU_WL_STORE__'),
+      store: __captureContextState(__stateRoot, '__WEBGPU_WL_STATE__'),
       features: __captureDescriptorState('__WEBGPU_FEATURES_WHITELIST__'),
       limits: __captureDescriptorState('__WEBGPU_LIMITS_WHITELIST__'),
       formats: __captureDescriptorState('__WEBGPU_FORMATS_WHITELIST__'),
@@ -231,18 +274,24 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       }
     };
 
-    const __existingStore = Object.prototype.hasOwnProperty.call(C, '__WEBGPU_WL_STORE__')
-      ? C.__WEBGPU_WL_STORE__
+    const __existingStore = Object.prototype.hasOwnProperty.call(__stateRoot, '__WEBGPU_WL_STATE__')
+      ? __stateRoot.__WEBGPU_WL_STATE__
       : null;
-    const __store = (__existingStore && typeof __existingStore === 'object')
-      ? __existingStore
+    const __wlState = (__existingStore && typeof __existingStore === 'object')
+      ? {
+          store: (__existingStore.store && typeof __existingStore.store === 'object')
+            ? Object.assign({}, __existingStore.store)
+            : null,
+          featuresWhitelist: Array.isArray(__existingStore.featuresWhitelist) ? __existingStore.featuresWhitelist.slice() : null,
+          limitsWhitelist: Array.isArray(__existingStore.limitsWhitelist) ? __existingStore.limitsWhitelist.slice() : null,
+          formatsWhitelist: Array.isArray(__existingStore.formatsWhitelist) ? __existingStore.formatsWhitelist.slice() : null
+        }
       : {};
-    Object.defineProperty(C, '__WEBGPU_WL_STORE__', {
-      value: __store,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
+    const __store = (__wlState.store && typeof __wlState.store === 'object')
+      ? __wlState.store
+      : {};
+    __wlState.store = __store;
+    __setHiddenOwnerValue(__stateRoot, '__WEBGPU_WL_STATE__', __wlState);
 
     // === FEATURES WHITELIST (use YOR device specification list) ===
     const STABLE_FEATURES = [
@@ -297,6 +346,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         data: { outcome: 'skip', reason: 'already_set' }
       }, null);
     }
+    __wlState.featuresWhitelist = __store.featuresWhitelist;
     try { delete window.__WEBGPU_FEATURES_WHITELIST__; } catch (e) {}
 
     // === LIMITS WHITELIST (use only YOR device specification) ===
@@ -339,6 +389,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         data: { outcome: 'skip', reason: 'already_set' }
       }, null);
     }
+    __wlState.limitsWhitelist = __store.limitsWhitelist;
     try { delete window.__WEBGPU_LIMITS_WHITELIST__; } catch (e) {}
 
     // === TEXTURE FORMATS WHITELIST (as is, without guessing) ===
@@ -384,6 +435,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         enumerable: false
       });
     }
+    __wlState.formatsWhitelist = __store.formatsWhitelist;
     try { delete window.__WEBGPU_FORMATS_WHITELIST__; } catch (e) {}
 
     // === Snapshot helper ===

@@ -39,18 +39,6 @@ const WEBglDICKts = function WEBglDICKts(window) {
         }
     }
 
-    const C = window.CanvasPatchContext;
-    if (!C) {
-        diag('fatal', 'webglstorage:canvas_patch_context_missing', {
-            stage: 'preflight',
-            key: null,
-            message: 'CanvasPatchContext is undefined — no further execution',
-            type: __typePipeline,
-            data: { outcome: 'throw' }
-        }, null);
-        throw new Error('[CanvasPatch] CanvasPatchContext is undefined — no futher execution');
-    }
-
     const __core = window.Core;
     const __flagKey = '__PATCH_WEBGLSTORAGE__';
     let __guardToken = null;
@@ -77,6 +65,39 @@ const WEBglDICKts = function WEBglDICKts(window) {
         throw e;
     }
     if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
+
+    function __releaseGuard(rollbackOk) {
+        try {
+            if (__core && typeof __core.releaseGuardFlag === 'function') {
+                __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __tag);
+            }
+        } catch (_) {}
+    }
+
+    const C = window.CanvasPatchContext;
+    if (!C) {
+        diag('fatal', 'webglstorage:canvas_patch_context_missing', {
+            stage: 'preflight',
+            key: 'CanvasPatchContext',
+            message: 'CanvasPatchContext is undefined — module registration is not available',
+            type: __typePipeline,
+            data: { outcome: 'skip', reason: 'missing_canvas_patch_context' }
+        }, null);
+        __releaseGuard(true);
+        return;
+    }
+    const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+    if (!__stateRoot) {
+        diag('fatal', 'webglstorage:canvas_patch_state_missing', {
+            stage: 'preflight',
+            key: 'CanvasPatchContext.state',
+            message: 'CanvasPatchContext.state is undefined — module registration is not available',
+            type: __typePipeline,
+            data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
+        }, null);
+        __releaseGuard(true);
+        return;
+    }
 
     function __captureDescriptorState(target, key) {
         return {
@@ -172,15 +193,27 @@ const WEBglDICKts = function WEBglDICKts(window) {
     }
 
     const __state = {
-    paramWhitelist: __captureDescriptorState(C, '__WEBGL_PARAM_WHITELIST__'),
-    extensionsWhitelist: __captureDescriptorState(C, '__EXTENSIONS_WHITELIST__')
+    webglState: __captureDescriptorState(__stateRoot, '__WEBGL_STATE__')
     };
     try {
+    const __existingWebGLState = (__stateRoot.__WEBGL_STATE__ && typeof __stateRoot.__WEBGL_STATE__ === 'object')
+        ? __stateRoot.__WEBGL_STATE__
+        : null;
+    const __webglState = __existingWebGLState
+        ? {
+            paramWhitelist: Array.isArray(__existingWebGLState.paramWhitelist) ? __existingWebGLState.paramWhitelist.slice() : [],
+            extensionsWhitelist: Array.isArray(__existingWebGLState.extensionsWhitelist) ? __existingWebGLState.extensionsWhitelist.slice() : []
+          }
+        : {
+            paramWhitelist: [],
+            extensionsWhitelist: []
+          };
+    __setHiddenValue(__stateRoot, '__WEBGL_STATE__', __webglState);
     const WebGLRenderingContext = window.WebGLRenderingContext || {};
     const WebGL2RenderingContext = window.WebGL2RenderingContext || {};
     
     // === WHITELIST (use YOR device specification list)===
-    __setHiddenValue(C, '__WEBGL_PARAM_WHITELIST__', [
+    __webglState.paramWhitelist = [
     0x1F00,
     0x1F01,
     WebGLRenderingContext.DEPTH_BUFFER_BIT,
@@ -1040,10 +1073,10 @@ const WEBglDICKts = function WEBglDICKts(window) {
     WebGL2RenderingContext.TEXTURE_IMMUTABLE_LEVELS,
     WebGL2RenderingContext.TIMEOUT_IGNORED,
     WebGL2RenderingContext.MAX_CLIENT_WAIT_TIMEOUT_WEBGL
-    ]);
+    ];
     // Object.freeze(window.__WEBGL_PARAM_WHITELIST__);
         
-    __setHiddenValue(C, '__EXTENSIONS_WHITELIST__', [
+    __webglState.extensionsWhitelist = [
     "EXT_clip_control",
     "EXT_color_buffer_float",
     "EXT_color_buffer_half_float",
@@ -1076,11 +1109,11 @@ const WEBglDICKts = function WEBglDICKts(window) {
     "WEBGL_polygon_mode",
     "WEBGL_provoking_vertex",
     "WEBGL_stencil_texturing"
-    ]);
+    ];
     // Object.freeze(window.__EXTENSIONS_WHITELIST__);
     function extendParamWhitelistFromExtensions() {
-        const wl = C.__WEBGL_PARAM_WHITELIST__;
-        const extList = C.__EXTENSIONS_WHITELIST__;
+        const wl = __webglState.paramWhitelist;
+        const extList = __webglState.extensionsWhitelist;
         if (!Array.isArray(wl) || !Array.isArray(extList) || extList.length === 0) return;
         const seen = (typeof Set === 'function') ? new Set() : null;
         if (seen) {
@@ -1149,12 +1182,9 @@ const WEBglDICKts = function WEBglDICKts(window) {
         type: __typePipeline,
         data: { outcome: 'return' }
     }, null);
-    __hideOwnSurface(C, '__WEBGL_PARAM_WHITELIST__');
-    __hideOwnSurface(C, '__EXTENSIONS_WHITELIST__');
     } catch (e) {
         let rollbackOk = true;
-        rollbackOk = __restoreDescriptorState(__state.paramWhitelist) && rollbackOk;
-        rollbackOk = __restoreDescriptorState(__state.extensionsWhitelist) && rollbackOk;
+        rollbackOk = __restoreDescriptorState(__state.webglState) && rollbackOk;
 
         diag('error', 'webglstorage:apply_failed', {
             stage: 'apply',
@@ -1164,11 +1194,7 @@ const WEBglDICKts = function WEBglDICKts(window) {
             data: { outcome: 'throw', rollbackOk: rollbackOk }
         }, e);
 
-        try {
-            if (__core && typeof __core.releaseGuardFlag === 'function') {
-                __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __tag);
-            }
-        } catch (_) {}
+        __releaseGuard(rollbackOk);
         throw e;
     }
 }  

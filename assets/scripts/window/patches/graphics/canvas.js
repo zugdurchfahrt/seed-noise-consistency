@@ -503,8 +503,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       // measureTextNoiseHook itself must not change returned metrics for consistency.
       const info = measureTextNoiseHook.call(this, nativeMetrics, text, fontStr);
       if (!info || typeof info !== 'object') return nativeMetrics;
-      const C  = window.CanvasPatchContext;
-      if (!C) return nativeMetrics;
       const TM = C.__TextMetrics__ || (C.__TextMetrics__ = { cache: new Map() });
       const key = (typeof info.key === 'string' && info.key.length) ? info.key : null;
       return new Proxy(nativeMetrics, {

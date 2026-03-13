@@ -510,13 +510,5 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     }
   }
 
-  const W = (typeof window !== "undefined") ? window : null;
-  if (W && !Object.prototype.hasOwnProperty.call(W, "patchTimeZone")) {
-    Object.defineProperty(W, "patchTimeZone", {
-      value: patchTimeZone,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
+  return patchTimeZone;
 };

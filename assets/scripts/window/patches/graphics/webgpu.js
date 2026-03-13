@@ -104,6 +104,26 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     releaseEntryGuard(true);
     return;
   }
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    degrade('fatal', 'webgpu:canvas_patch_state_missing', new Error('[CanvasPatch] CanvasPatchContext.state is undefined - module registration is not available'), {
+      stage: 'preflight',
+      type: __webgpuTypePipeline,
+      key: 'CanvasPatchContext.state',
+      message: 'CanvasPatchContext.state is undefined',
+      data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
+    });
+    releaseEntryGuard(true);
+    return;
+  }
+  if (!(__stateRoot.__WEBGPU__ && typeof __stateRoot.__WEBGPU__ === 'object')) {
+    Object.defineProperty(__stateRoot, '__WEBGPU__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
 
   const Core = __core;
   if (!Core || typeof Core.applyTargets !== 'function') {
@@ -137,8 +157,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     return;
   }
 
-    const __webgpuWLStore = (C && C.__WEBGPU_WL_STORE__ && typeof C.__WEBGPU_WL_STORE__ === 'object')
-      ? C.__WEBGPU_WL_STORE__
+    const __webgpuWLState = (__stateRoot.__WEBGPU_WL_STATE__ && typeof __stateRoot.__WEBGPU_WL_STATE__ === 'object')
+      ? __stateRoot.__WEBGPU_WL_STATE__
+      : null;
+    const __webgpuWLStore = (__webgpuWLState && __webgpuWLState.store && typeof __webgpuWLState.store === 'object')
+      ? __webgpuWLState.store
       : null;
     const __webgpuFeaturesWhitelist = (__webgpuWLStore && Array.isArray(__webgpuWLStore.featuresWhitelist))
       ? __webgpuWLStore.featuresWhitelist

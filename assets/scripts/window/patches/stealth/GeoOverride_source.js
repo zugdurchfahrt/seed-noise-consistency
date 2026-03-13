@@ -298,9 +298,21 @@
   }
 
   function __ensureGeoState() {
+    const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+    if (stateRoot && Object.prototype.hasOwnProperty.call(stateRoot, '__GEO_STATE__')) {
+      const shared = (stateRoot.__GEO_STATE__ && typeof stateRoot.__GEO_STATE__ === 'object') ? stateRoot.__GEO_STATE__ : null;
+      if (shared && C.__GEO_STATE__ !== shared) {
+        Object.defineProperty(C, '__GEO_STATE__', {
+          value: shared,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      return shared;
+    }
     if (Object.prototype.hasOwnProperty.call(C, '__GEO_STATE__')) {
       const existing = (C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') ? C.__GEO_STATE__ : null;
-      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
       if (existing && stateRoot && stateRoot.__GEO_STATE__ !== existing) {
         Object.defineProperty(stateRoot, '__GEO_STATE__', {
           value: existing,
@@ -315,13 +327,6 @@
       latitude: null,
       longitude: null
     };
-    Object.defineProperty(C, '__GEO_STATE__', {
-      value: state,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-    const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
     if (stateRoot) {
       Object.defineProperty(stateRoot, '__GEO_STATE__', {
         value: state,
@@ -330,6 +335,12 @@
         enumerable: false
       });
     }
+    Object.defineProperty(C, '__GEO_STATE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
     return state;
   }
 
@@ -338,7 +349,7 @@
   }
 
   function patchGeolocation() {
-    const geoState = (C && C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') ? C.__GEO_STATE__ : null;
+    const geoState = __ensureGeoState();
     const lat = geoState ? geoState.latitude : null;
     const lon = geoState ? geoState.longitude : null;
     if (typeof lat !== 'number' || typeof lon !== 'number') {
@@ -637,10 +648,10 @@
   try {
     __geoState = __ensureGeoState();
     if (!__geoState) {
-      degrade('geo:geo_state_missing', new Error('[GeoOverride] CanvasPatchContext.__GEO_STATE__ is required'), {
+      degrade('geo:geo_state_missing', new Error('[GeoOverride] CanvasPatchContext.state.__GEO_STATE__ is required'), {
         stage: 'preflight',
-        key: '__GEO_STATE__',
-        message: '[GeoOverride] CanvasPatchContext.__GEO_STATE__ is required',
+        key: 'state.__GEO_STATE__',
+        message: '[GeoOverride] CanvasPatchContext.state.__GEO_STATE__ is required',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'geo_state_missing' }
       });

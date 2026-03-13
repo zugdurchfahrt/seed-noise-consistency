@@ -105,6 +105,23 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
     // basic random from the existing seed initialization
     const __stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+    if (!__stateRoot) {
+      __webglDiagPipeline('fatal', 'webgl:canvas_patch_state_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state',
+        message: 'CanvasPatchContext.state missing',
+        data: { outcome: 'throw' }
+      });
+      throw new Error('CanvasPatchContext.state missing');
+    }
+    if (!(__stateRoot.__WEBGL__ && typeof __stateRoot.__WEBGL__ === 'object')) {
+      Object.defineProperty(__stateRoot, '__WEBGL__', {
+        value: Object.create(null),
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
     const __prngState = (__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
       ? __stateRoot.__PRNG_STATE__
       : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
@@ -221,8 +238,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
   // 2) Хук «whitelist-фильтра»
   function webglWhitelistParameterHook(orig, pname, ...args) {
-    const wl = Array.isArray(C && C.__WEBGL_PARAM_WHITELIST__)
-      ? C.__WEBGL_PARAM_WHITELIST__
+    const __webglState = (__stateRoot.__WEBGL_STATE__ && typeof __stateRoot.__WEBGL_STATE__ === 'object')
+      ? __stateRoot.__WEBGL_STATE__
+      : null;
+    const wl = Array.isArray(__webglState && __webglState.paramWhitelist)
+      ? __webglState.paramWhitelist
       : [];
     if (wl.length === 0 || wl.includes(pname)) {
       return; // undefined → pass-through to orig.apply(this, args)
@@ -231,8 +251,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
     // === 2. getSupportedExtensions ===
   function webglGetSupportedExtensionsPatch(orig, ...args) {
-    const whitelist = Array.isArray(C && C.__EXTENSIONS_WHITELIST__)
-      ? C.__EXTENSIONS_WHITELIST__ : [];
+    const __webglState = (__stateRoot.__WEBGL_STATE__ && typeof __stateRoot.__WEBGL_STATE__ === 'object')
+      ? __stateRoot.__WEBGL_STATE__
+      : null;
+    const whitelist = Array.isArray(__webglState && __webglState.extensionsWhitelist)
+      ? __webglState.extensionsWhitelist : [];
     if (whitelist.length === 0) {
       return; // undefined -> native pass-through in patchMethod
     }
@@ -244,8 +267,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
   }
 
   function webglGetExtensionPatch(orig, name, ...rest) {
-    const whitelist = Array.isArray(C && C.__EXTENSIONS_WHITELIST__)
-      ? C.__EXTENSIONS_WHITELIST__ : [];
+    const __webglState = (__stateRoot.__WEBGL_STATE__ && typeof __stateRoot.__WEBGL_STATE__ === 'object')
+      ? __stateRoot.__WEBGL_STATE__
+      : null;
+    const whitelist = Array.isArray(__webglState && __webglState.extensionsWhitelist)
+      ? __webglState.extensionsWhitelist : [];
     if (whitelist.length === 0) {
       return; // undefined -> native pass-through in patchMethod
     }

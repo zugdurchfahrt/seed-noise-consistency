@@ -93,17 +93,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return;
     }
     if (!__navGuardToken) return; // already_patched: Core emits nav_total_set:already_patched
-    // Must run in Window realm (not Worker)
-    if (typeof document === 'undefined' || !window || window.document !== document) {
-      __navDiagBrowser('fatal', 'nav_total_set:not_window_realm', {
-        stage: 'preflight',
-        message: 'not in Window realm',
-        data: { outcome: 'skip', reason: 'not_window_realm' }
-      });
+    function __navReleaseGuard(rollbackOk) {
       try {
         const __navCore = window.Core;
         if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
+          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, rollbackOk === true, 'nav_total_set');
         }
       } catch (e) {
         __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
@@ -113,6 +107,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           data: { outcome: 'skip', reason: 'guard_release_failed' }
         }, e);
       }
+    }
+    // Must run in Window realm (not Worker)
+    if (typeof document === 'undefined' || !window || window.document !== document) {
+      __navDiagBrowser('fatal', 'nav_total_set:not_window_realm', {
+        stage: 'preflight',
+        message: 'not in Window realm',
+        data: { outcome: 'skip', reason: 'not_window_realm' }
+      });
+      __navReleaseGuard(true);
       return;
     }
 
@@ -120,12 +123,32 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!C) {
       __navDiagPipeline('warn', 'nav_total_set:canvas_patch_context_missing', {
         stage: 'preflight',
-        message: 'CanvasPatchContext missing'
+        message: 'CanvasPatchContext missing',
+        data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
+      });
+      __navReleaseGuard(true);
+      return;
+    }
+    const __stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+    if (!__stateRoot) {
+      __navDiagPipeline('warn', 'nav_total_set:canvas_patch_state_missing', {
+        stage: 'preflight',
+        message: 'CanvasPatchContext.state missing',
+        data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
+      });
+      __navReleaseGuard(true);
+      return;
+    }
+    if (!(__stateRoot.__NAV_TOTAL_SET__ && typeof __stateRoot.__NAV_TOTAL_SET__ === 'object')) {
+      Object.defineProperty(__stateRoot, '__NAV_TOTAL_SET__', {
+        value: Object.create(null),
+        writable: true,
+        configurable: true,
+        enumerable: false
       });
     }
 
     // basic random from the existing seed initialization
-    const __stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
     const __prngState = (__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
       ? __stateRoot.__PRNG_STATE__
       : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
@@ -148,19 +171,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: '__ensureMarkAsNative failed',
         data: { outcome: 'skip', reason: 'ensure_mark_as_native_failed', policy: 'skip', action: 'native' }
       }, e);
-      try {
-        const __navCore = window.Core;
-        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
-        }
-      } catch (e2) {
-        __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-          stage: 'guard',
-          key: '__PATCH_NAVTOTALSET__',
-          message: 'releaseGuardFlag threw',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, e2);
-      }
+      __navReleaseGuard(true);
       return;
     }
     if (typeof mark !== 'function') {
@@ -169,19 +180,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'markAsNative missing',
         data: { outcome: 'skip', reason: 'missing_dep_mark_as_native', policy: 'skip', action: 'native' }
       });
-      try {
-        const __navCore = window.Core;
-        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
-        }
-      } catch (e) {
-        __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-          stage: 'guard',
-          key: '__PATCH_NAVTOTALSET__',
-          message: 'releaseGuardFlag threw',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, e);
-      }
+      __navReleaseGuard(true);
       return;
     }
     const __navMark = mark;
@@ -192,19 +191,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'wrapStrictAccessor missing',
         data: { outcome: 'skip', reason: 'missing_dep_wrap_strict_accessor', policy: 'skip', action: 'native' }
       });
-      try {
-        const __navCore = window.Core;
-        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
-        }
-      } catch (e) {
-        __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-          stage: 'guard',
-          key: '__PATCH_NAVTOTALSET__',
-          message: 'releaseGuardFlag threw',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, e);
-      }
+      __navReleaseGuard(true);
       return;
     }
     function registerPatchedTarget(owner, key, tag) {
@@ -260,19 +247,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'bad __DPR',
         data: { outcome: 'skip', reason: 'bad_dpr', dpr: dpr }
       });
-      try {
-        const __navCore = window.Core;
-        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
-        }
-      } catch (e) {
-        __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-          stage: 'guard',
-          key: '__PATCH_NAVTOTALSET__',
-          message: 'releaseGuardFlag threw',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, e);
-      }
+      __navReleaseGuard(true);
       return;
     }
 
@@ -341,19 +316,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'GENERATED_PLATFORM missing',
         data: { outcome: 'skip', reason: 'missing_generated_platform' }
       });
-      try {
-        const __navCore = window.Core;
-        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
-        }
-      } catch (e) {
-        __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-          stage: 'guard',
-          key: '__PATCH_NAVTOTALSET__',
-          message: 'releaseGuardFlag threw',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, e);
-      }
+      __navReleaseGuard(true);
       return;
     }
     if (!navPlat) {
@@ -365,19 +328,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'NAV_PLATFORM__ missing',
         data: { outcome: 'skip', reason: 'missing_nav_platform' }
       });
-      try {
-        const __navCore = window.Core;
-        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
-        }
-      } catch (e) {
-        __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-          stage: 'guard',
-          key: '__PATCH_NAVTOTALSET__',
-          message: 'releaseGuardFlag threw',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, e);
-      }
+      __navReleaseGuard(true);
       return;
     }
 
@@ -394,19 +345,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: `CH.platform '${chPlatform}' is DOM-like; expected OS-string (e.g. 'Windows'/'macOS')`,
           data: { outcome: 'skip', reason: 'ch_platform_dom_like', from: chPlatform, to: normalized }
         });
-        try {
-          const __navCore = window.Core;
-          if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-            __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
-          }
-        } catch (e) {
-          __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-            stage: 'guard',
-            key: '__PATCH_NAVTOTALSET__',
-            message: 'releaseGuardFlag threw',
-            data: { outcome: 'skip', reason: 'guard_release_failed' }
-          }, e);
-        }
+        __navReleaseGuard(true);
         return;
       } else {
         __navDiag('warn', 'nav_total_set:ch_platform_normalized', {
@@ -432,19 +371,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: msg,
           data: { outcome: 'skip', reason: 'nav_platform_inconsistent', navPlat, generatedPlatform: gen, expectedNavPlat }
         });
-        try {
-          const __navCore = window.Core;
-          if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-            __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, true, 'nav_total_set');
-          }
-        } catch (e) {
-          __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-            stage: 'guard',
-            key: '__PATCH_NAVTOTALSET__',
-            message: 'releaseGuardFlag threw',
-            data: { outcome: 'skip', reason: 'guard_release_failed' }
-          }, e);
-        }
+        __navReleaseGuard(true);
         return;
       } else {
         __navDiag('warn', 'nav_total_set:nav_platform_inconsistent', {
@@ -2663,19 +2590,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'fatal module error',
         data: { outcome: rollbackErr ? 'skip' : 'rollback', reason: 'fatal', rollbackOk: !rollbackErr, action: 'native' }
       }, rollbackErr || e);
-      try {
-        const __navCore = window.Core;
-        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, !rollbackErr, 'nav_total_set');
-        }
-      } catch (e2) {
-        __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-          stage: 'guard',
-          key: '__PATCH_NAVTOTALSET__',
-          message: 'releaseGuardFlag threw',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, e2);
-      }
+      __navReleaseGuard(!rollbackErr);
       return;
     }
   }

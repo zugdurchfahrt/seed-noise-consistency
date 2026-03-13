@@ -81,7 +81,7 @@ from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
 from tools.generators.rand_met import generate_font_manifest
-from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
+# from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
@@ -362,7 +362,7 @@ def init_driver(
             # --- set_log ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
-            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
             # --- core window ---
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
@@ -817,11 +817,11 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         def _inject_time_machine(driver):
             tz_src = Path(SCRIPTS_PATCHES_STEALTH / "TimezoneOverride_source.js").read_text("utf-8")
             geo_src = Path(SCRIPTS_PATCHES_STEALTH / "GeoOverride_source.js").read_text("utf-8")
-            init_tz = "TimezonePatchModule(window);"
+            init_tz = "const __patchTimeZone = TimezonePatchModule(window);"
             call_tz = r'''
             
         Promise.resolve().then(() => {
-        if (typeof patchTimeZone === "function") patchTimeZone();
+        if (typeof __patchTimeZone === "function") __patchTimeZone();
         });
         '''.strip()
             timegeo_js = "\n;\n".join([
@@ -879,7 +879,7 @@ def main():
     vpn_rng = seed_int["vpn"]
     vpn_utils_module.random = vpn_rng
     client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
-    enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer"))
+    # enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer"))
     try:
         json_path = str(PROFILE_DATA_SRC/ "profile.json")
         if os.path.exists(json_path):
@@ -1265,7 +1265,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://www.browserscan.net/bot-detection")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
