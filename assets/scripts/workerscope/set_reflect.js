@@ -343,54 +343,41 @@
         const isData = !!desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
         if (isData) return getter;
 
+        const markAsNative = __requireMarkAsNative(name || key, 'wrapStrictAccessor');
         const valueFromGetter = function(thisArg) {
           return (typeof getter === 'function') ? getter.call(thisArg) : getter;
         };
         const checkThis = (typeof validThis === 'function') ? validThis : null;
         const origGet = desc && desc.get;
+        const syntheticBridgeTarget = (typeof origGet === 'function')
+          ? origGet
+          : ((typeof getter === 'function' && typeof getter.__coreBridgeTarget__ === 'function')
+              ? getter.__coreBridgeTarget__
+              : ((typeof getter === 'function') ? toStringProxyTargetMap.get(getter) : null));
+        const nativeBridgeTarget = (typeof syntheticBridgeTarget === 'function')
+          ? __resolveWrappedBridgeTarget(syntheticBridgeTarget, '__wrapStrictAccessor')
+          : null;
 
-        if (typeof origGet === 'function') {
-          let wrapped;
-          wrapped = __wrapNativeAccessor(origGet, name, function(target, thisArg, argList) {
-            if (onAccess) onAccess(key, wrapped, thisArg);
-            if (checkThis && !checkThis(thisArg)) {
-              return Reflect.apply(target, thisArg, argList || []);
-            }
-            return valueFromGetter(thisArg);
-          });
-          return wrapped;
-        }
-
-        const syntheticBridgeTarget = (typeof getter === 'function' && typeof getter.__coreBridgeTarget__ === 'function')
-          ? getter.__coreBridgeTarget__
-          : ((typeof getter === 'function') ? toStringProxyTargetMap.get(getter) : null);
-        if (typeof syntheticBridgeTarget !== 'function') {
-          const e = new Error('[WrkBridge] __wrapStrictAccessor: synthetic path requires native bridge target');
-          __throwWrapFactoryPreflight(
-            'wrk:wrapStrictAccessor:synthetic_bridge_missing',
-            key,
-            '__wrapStrictAccessor: synthetic path requires native bridge target',
-            e
-          );
-        }
-
+        let wrapped;
         const synthetic = Object.getOwnPropertyDescriptor(({ get [key]() {
+          if (onAccess) onAccess(key, wrapped, this);
+          if (checkThis && !checkThis(this)) {
+            if (typeof nativeBridgeTarget === 'function') {
+              return Reflect.apply(nativeBridgeTarget, this, []);
+            }
+            throw new TypeError();
+          }
           return valueFromGetter(this);
         }}), key).get;
-        Object.defineProperty(synthetic, '__coreBridgeTarget__', {
-          value: syntheticBridgeTarget,
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
-        let wrapped;
-        wrapped = __wrapNativeAccessor(synthetic, name, function(target, thisArg, argList) {
-          if (onAccess) onAccess(key, wrapped, thisArg);
-          if (checkThis && !checkThis(thisArg)) {
-            return Reflect.apply(syntheticBridgeTarget, thisArg, argList || []);
-          }
-          return Reflect.apply(target, thisArg, argList || []);
-        });
+        if (typeof nativeBridgeTarget === 'function') {
+          Object.defineProperty(synthetic, '__coreBridgeTarget__', {
+            value: nativeBridgeTarget,
+            writable: false,
+            configurable: true,
+            enumerable: false
+          });
+        }
+        wrapped = markAsNative(synthetic, name);
         return wrapped;
       }
 
