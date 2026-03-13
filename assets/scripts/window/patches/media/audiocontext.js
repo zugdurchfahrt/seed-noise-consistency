@@ -59,8 +59,29 @@ const AudioContextModule = function AudioContextModule(window) {
     });
     return;
   }
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    degrade('audiocontext:canvas_patch_state_missing', new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available'), {
+      stage: 'preflight',
+      level: 'fatal',
+      type: __audioTypePipeline,
+      key: 'CanvasPatchContext.state',
+      data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
+    });
+    return;
+  }
+  if (!(__stateRoot.__AUDIOCONTEXT__ && typeof __stateRoot.__AUDIOCONTEXT__ === 'object')) {
+    Object.defineProperty(__stateRoot, '__AUDIOCONTEXT__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
 
-  const __prngState = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+  const __prngState = (__stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
+    ? __stateRoot.__PRNG_STATE__
+    : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
   const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
     ? __prngState.rand
     : window.rand;

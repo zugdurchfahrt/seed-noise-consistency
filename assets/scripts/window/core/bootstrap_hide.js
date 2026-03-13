@@ -15,7 +15,36 @@ if (!W || (typeof W !== 'object' && typeof W !== 'function')) {
   throw new Error('[module] window missing');
 }
 
-const C = W.CanvasPatchContext || (W.CanvasPatchContext = {});
+function __defineHiddenValue__(obj, key, value) {
+  const d = Object.getOwnPropertyDescriptor(obj, key);
+  if (d && d.configurable === false) return null;
+  Object.defineProperty(obj, key, {
+    value,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+  return value;
+}
+
+let C = (W.CanvasPatchContext && (typeof W.CanvasPatchContext === 'object' || typeof W.CanvasPatchContext === 'function'))
+  ? W.CanvasPatchContext
+  : null;
+
+if (!C) {
+  C = __defineHiddenValue__(W, 'CanvasPatchContext', {});
+  if (!C) throw new Error('[module] CanvasPatchContext bootstrap failed');
+} else {
+  __defineHiddenValue__(W, 'CanvasPatchContext', C);
+}
+
+let stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+if (!stateRoot) {
+  stateRoot = __defineHiddenValue__(C, 'state', Object.create(null));
+  if (!stateRoot) throw new Error('[module] CanvasPatchContext.state bootstrap failed');
+} else {
+  __defineHiddenValue__(C, 'state', stateRoot);
+}
   
   
   const hiddenSurfaceState = {

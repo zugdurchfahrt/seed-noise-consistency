@@ -43,7 +43,7 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
   window = G;
 }
 
-const C  = G.CanvasPatchContext || (G.CanvasPatchContext = {});
+const C  = G.CanvasPatchContext;
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
     const d = G.__DEGRADE__;
@@ -67,7 +67,10 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     d(eventCode, e, ctx);
   }
   function __resolvePrngState() {
-    const state = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+    const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+    const state = (stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
+      ? stateRoot.__PRNG_STATE__
+      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
     return {
       seed: (state && typeof state.seed === 'string' && state.seed)
         ? state.seed
@@ -122,7 +125,28 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   // === MODULE INITIALIZATION ===
   // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
-  C.state = C.state || { domReady: false, offscreenReady: false };
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    throw new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available');
+  }
+  const __canvasState = (function ensureCanvasStateSlot() {
+    const existing = __stateRoot.__CANVAS_STATE__;
+    if (existing && typeof existing === 'object') return existing;
+    const slot = { domReady: false, offscreenReady: false };
+    if (!__defineHidden__(
+      __stateRoot,
+      '__CANVAS_STATE__',
+      slot,
+      'canvas:init:apply:canvas_state_slot_define_failed',
+      '__CANVAS_STATE__',
+      'canvas state slot defineProperty failed; fallback assign used'
+    )) {
+      throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS_STATE__ unavailable');
+    }
+    return (__stateRoot.__CANVAS_STATE__ && typeof __stateRoot.__CANVAS_STATE__ === 'object')
+      ? __stateRoot.__CANVAS_STATE__
+      : slot;
+  })();
 
   // keep internal handles inside CanvasPatchContext (non-enumerable),
   // do not publish generic aliases like window.canvas/window.div/window.offscreenCanvas.
@@ -162,11 +186,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   // создаём скрытый HTML-canvas в окне
   function _ensureDomOnce() {
-    if (C.state.domReady) return;
+    if (__canvasState.domReady) return;
 
     const doc = G && G.document;
     if (!doc || !doc.body || typeof doc.createElement !== 'function') {
-      C.state.domReady = false;
+      __canvasState.domReady = false;
       return; // нет DOM — выходим
     }
 
@@ -174,7 +198,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const existingCanvas = (C && C.__DOM_CANVAS__);
     const existingHost = (C && C.__DOM_CANVAS_HOST__);
     if (existingCanvas && existingHost && existingHost.contains(existingCanvas) && existingHost.parentNode) {
-      C.state.domReady = true;
+      __canvasState.domReady = true;
       return;
     }
 
@@ -252,12 +276,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       '__DOM_CANVAS_HOST__',
       'DOM host defineProperty failed; fallback assign used'
     );
-    C.state.domReady = true;
+    __canvasState.domReady = true;
   }
 
   // создаём OffscreenCanvas (и в окне, и в воркере)
   function _ensureOffscreenOnce() {
-    if (C.state.offscreenReady) return;
+    if (__canvasState.offscreenReady) return;
     if (typeof G.OffscreenCanvas === 'undefined') return;
 
     const screenWidth = G.__WIDTH;
@@ -279,7 +303,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         'offscreen defineProperty failed; fallback assign used'
       );
     }
-    C.state.offscreenReady = true;
+    __canvasState.offscreenReady = true;
   }
 
   // Воркеру нужен Offscreen без ожидания DOM; в окне — это тоже безопасно
@@ -463,9 +487,10 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const managedFontCfg = getManagedFontConfig(fontStr);
       const isManagedFont = !!managedFontCfg;
 
-      const fontsState = (C && C.__FONTS_STATE__ && typeof C.__FONTS_STATE__ === 'object')
-        ? C.__FONTS_STATE__
-        : null;
+      const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+      const fontsState = (stateRoot && stateRoot.__FONTS_STATE__ && typeof stateRoot.__FONTS_STATE__ === 'object')
+        ? stateRoot.__FONTS_STATE__
+        : ((C && C.__FONTS_STATE__ && typeof C.__FONTS_STATE__ === 'object') ? C.__FONTS_STATE__ : null);
       const fontsReadyFlag = !!(fontsState && fontsState.ready === true);
 
       const nativeFontsReady = !!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded');
@@ -478,7 +503,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       // measureTextNoiseHook itself must not change returned metrics for consistency.
       const info = measureTextNoiseHook.call(this, nativeMetrics, text, fontStr);
       if (!info || typeof info !== 'object') return nativeMetrics;
-      const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
+      const C  = window.CanvasPatchContext;
+      if (!C) return nativeMetrics;
       const TM = C.__TextMetrics__ || (C.__TextMetrics__ = { cache: new Map() });
       const key = (typeof info.key === 'string' && info.key.length) ? info.key : null;
       return new Proxy(nativeMetrics, {

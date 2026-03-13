@@ -299,7 +299,17 @@
 
   function __ensureGeoState() {
     if (Object.prototype.hasOwnProperty.call(C, '__GEO_STATE__')) {
-      return (C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') ? C.__GEO_STATE__ : null;
+      const existing = (C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') ? C.__GEO_STATE__ : null;
+      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+      if (existing && stateRoot && stateRoot.__GEO_STATE__ !== existing) {
+        Object.defineProperty(stateRoot, '__GEO_STATE__', {
+          value: existing,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      return existing;
     }
     const state = {
       latitude: null,
@@ -311,6 +321,15 @@
       configurable: true,
       enumerable: false
     });
+    const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+    if (stateRoot) {
+      Object.defineProperty(stateRoot, '__GEO_STATE__', {
+        value: state,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
     return state;
   }
 

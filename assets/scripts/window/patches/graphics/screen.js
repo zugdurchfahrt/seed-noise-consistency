@@ -100,6 +100,49 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
+  const __screenStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__screenStateRoot) {
+    const stateMissingErr = new Error('[CanvasPatch] CanvasPatchContext.state is undefined - module registration is not available');
+    __screenDiag('warn', 'screen:canvas_patch_state_missing', {
+      stage: 'preflight',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: 'CanvasPatchContext.state',
+      message: 'CanvasPatchContext.state is undefined - module registration is not available',
+      data: {
+        outcome: 'skip',
+        reason: 'canvas_patch_state_missing',
+        missing: 'CanvasPatchContext.state'
+      }
+    }, stateMissingErr);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
+      }
+    } catch (releaseErr) {
+      __screenDiag('warn', 'screen:guard_release_failed', {
+        stage: 'preflight',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: __flagKey,
+        message: 'guard release failed after state registration skip',
+        data: {
+          outcome: 'skip',
+          reason: 'guard_release_failed',
+          substage: 'CanvasPatchContext.state'
+        }
+      }, releaseErr);
+    }
+    return;
+  }
+  if (!(__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')) {
+    Object.defineProperty(__screenStateRoot, '__SCREEN__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
   const __moduleRollbackStack = [];
 
   const SCREEN_WIDTH  = Number(window.__WIDTH);

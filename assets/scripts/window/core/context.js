@@ -2,7 +2,7 @@
 // === CONTEXT PATCH MODULE ===
 const ContextPatchModule = function ContextPatchModule(window) {
   'use strict';  
-  const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
+  const C  = window.CanvasPatchContext;
     if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   const G = (typeof globalThis !== 'undefined' && globalThis)
     || (typeof self       !== 'undefined' && self)

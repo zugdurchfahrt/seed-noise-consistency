@@ -51,6 +51,25 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     });
     return;
   }
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    degrade('hide_webdriver:canvas_patch_state_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext.state missing'), {
+      level: 'warn',
+      stage: 'preflight',
+      message: 'CanvasPatchContext.state missing',
+      type: __typePipeline,
+      data: { outcome: 'skip', reason: 'canvas_patch_state_missing', missing: 'CanvasPatchContext.state' }
+    });
+    return;
+  }
+  if (!(__stateRoot.__HIDE_WEBDRIVER__ && typeof __stateRoot.__HIDE_WEBDRIVER__ === 'object')) {
+    Object.defineProperty(__stateRoot, '__HIDE_WEBDRIVER__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
 
   const Core = window && window.Core;
   if (!Core || typeof Core.applyTargets !== 'function' || typeof Core.registerPatchedTarget !== 'function') {

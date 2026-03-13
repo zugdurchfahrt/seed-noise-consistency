@@ -104,7 +104,10 @@ const WebglPatchModule = function WebglPatchModule(window) {
     }
 
     // basic random from the existing seed initialization
-    const __prngState = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+    const __stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+    const __prngState = (__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
+      ? __stateRoot.__PRNG_STATE__
+      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
     const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
       ? __prngState.rand
       : window.rand;

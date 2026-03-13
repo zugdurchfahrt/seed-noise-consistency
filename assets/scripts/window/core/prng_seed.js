@@ -104,6 +104,31 @@
           C.__PRNG_STATE__ = state;
         }
       }
+      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+      if (stateRoot) {
+        try {
+          const shared = stateRoot.__PRNG_STATE__;
+          if (shared !== state) {
+            Object.defineProperty(stateRoot, '__PRNG_STATE__', {
+              value: state,
+              writable: true,
+              configurable: true,
+              enumerable: false
+            });
+          }
+        } catch (e) {
+          __emit('warn', 'rng_set:define_state_root_prng_failed', {
+            module: 'rng_set',
+            diagTag: 'rng_set',
+            surface: 'CanvasPatchContext.state',
+            key: '__PRNG_STATE__',
+            stage: 'apply',
+            message: 'Object.defineProperty(CanvasPatchContext.state,"__PRNG_STATE__") failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'continue', action: 'keep_root_slot' }
+          }, e);
+        }
+      }
       if (!state.pools || typeof state.pools !== 'object') state.pools = Object.create(null);
       return state;
     }
