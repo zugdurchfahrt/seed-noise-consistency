@@ -5,7 +5,10 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
   const __flagKey = '__PATCH_WEBGPU__';
   const __webgpuTypePipeline = 'pipeline missing data';
   const __webgpuTypeBrowser = 'browser structure missing data';
-  const __webgpuDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __webgpuDegrade = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __webgpuDegradeDiag = (__webgpuDegrade && typeof __webgpuDegrade.diag === 'function')
     ? __webgpuDegrade.diag.bind(__webgpuDegrade)
     : null;

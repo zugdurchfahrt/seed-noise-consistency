@@ -44,9 +44,10 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 }
 
 const C  = G.CanvasPatchContext;
+const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
-    const d = G.__DEGRADE__;
+    const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     if (typeof d !== 'function') return;
     const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
     const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));

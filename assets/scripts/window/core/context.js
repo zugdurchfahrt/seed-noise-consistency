@@ -3,6 +3,7 @@
 const ContextPatchModule = function ContextPatchModule(window) {
   'use strict';  
   const C  = window.CanvasPatchContext;
+  const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
     if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   const G = (typeof globalThis !== 'undefined' && globalThis)
     || (typeof self       !== 'undefined' && self)
@@ -111,7 +112,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const __MODULE  = "context";
       const __SURFACE = "canvas"; // дефолт для ctx2d веток; webgl приходит из extra.surface
 
-      const __D = global && global.__DEGRADE__;
+      const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
       const __diag = (__D && typeof __D.diag === "function") ? __D.diag.bind(__D) : null;
 
       const x = (extra && typeof extra === "object") ? extra : {};
@@ -588,9 +589,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
                       // override logging (TOGGLED)
                       if (res !== undefined && !Array.isArray(res)) {
                           const webglLoggerGate =
-                            !(global._logConfig && global._logConfig.WEBGLlogger === false);
+                            !(__loggerRoot && __loggerRoot._logConfig && __loggerRoot._logConfig.WEBGLlogger === false);
 
-                          if (global.__DEBUG__ && webglLoggerGate) {
+                          if ((__loggerRoot && __loggerRoot.__DEBUG__) && webglLoggerGate) {
                               if (WEBGL_OVERRIDE_DIAG_LOG) {
                                 emitContextDiag('debug', 'context:webgl:hook:override', null, {
                                   stage: 'hook',
@@ -642,7 +643,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       })();
 
       const wrapped = markAsNative(wrappedRaw, method);
-      if (global.__DEBUG__ && (method === 'getParameter' || method === 'readPixels')) {
+      if ((__loggerRoot && __loggerRoot.__DEBUG__) && (method === 'getParameter' || method === 'readPixels')) {
         emitContextDiag('info', 'context:webgl:wrapLayer:selected', null, {
           stage: 'apply',
           surface: 'webgl',
@@ -684,7 +685,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
               data: { hook: hook && (hook.name || null) }
             });
           } catch (_e) {
-            if (global.__DEBUG__) console.error('[chainAsync][hook_failed]', method, hook && hook.name, e);
+            if (__loggerRoot && __loggerRoot.__DEBUG__) console.error('[chainAsync][hook_failed]', method, hook && hook.name, e);
           }
           // keep b unchanged
         }
@@ -1122,7 +1123,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       )) applied++;
     }
     state.canvas = true;
-    if (global.__DEBUG__) {
+    if (__loggerRoot && __loggerRoot.__DEBUG__) {
       emitContextDiag('info', 'context:canvas:apply:patches_applied', null, {
         stage: 'apply',
         key: 'HTMLCanvasElement.getContext',
@@ -1155,7 +1156,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       }
       state.offscreen = true;
     }
-    if (global.__DEBUG__) {
+    if (__loggerRoot && __loggerRoot.__DEBUG__) {
       emitContextDiag('info', 'context:offscreen:apply:patches_applied', null, {
         stage: 'apply',
         key: 'OffscreenCanvas.getContext',

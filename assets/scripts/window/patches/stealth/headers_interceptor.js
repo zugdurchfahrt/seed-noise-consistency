@@ -21,7 +21,10 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
   }
 
   function emitDegrade(level, code, err, extra) {
-    const d = window.__DEGRADE__;
+    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+      ? window.CanvasPatchContext.__logger
+      : null;
+    const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     if (typeof d !== 'function') return;
     const e = err instanceof Error
       ? err

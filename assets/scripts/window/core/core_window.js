@@ -2,6 +2,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
   'use strict';
 
   const C = window.CanvasPatchContext;
+  const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
   const G = (typeof globalThis !== 'undefined' && globalThis)
         || (typeof self       !== 'undefined' && self)
         || (typeof window     !== 'undefined' && window)
@@ -14,8 +15,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
   }
   if (window.__CORE_WINDOW_LOADED__) return;
 
-  // [MANDATORY MODULE PRELUDE] [NORMATIVE] unified adapter to window.__DEGRADE__ (module_NORMATIVE_align.md)
-  const __D = (window && window.__DEGRADE__) || null;
+  // [MANDATORY MODULE PRELUDE] [NORMATIVE] unified adapter to C.__logger.__DEGRADE__ (module_NORMATIVE_align.md)
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __emit = (level, code, ctx, err) => {
     try {
