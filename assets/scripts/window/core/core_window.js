@@ -980,8 +980,60 @@ const CoreWindowModule = function CoreWindowModule(window) {
         : {};
 
       const knownWrapped = new WeakSet();
-      const globalTargetRegistry = (Core.__targetRegistry instanceof WeakMap) ? Core.__targetRegistry : new WeakMap();
-      const __patchGuardSeq = (Core.__patchGuardSeq instanceof WeakMap) ? Core.__patchGuardSeq : new WeakMap();
+      const __internal = (Core.__internal && typeof Core.__internal === 'object')
+        ? Core.__internal
+        : Object.create(null);
+      const globalTargetRegistry = (__internal.targets instanceof WeakMap)
+        ? __internal.targets
+        : ((Core.__targetRegistry instanceof WeakMap) ? Core.__targetRegistry : new WeakMap());
+      const __patchGuardSeq = (__internal.__patchGuardSeq instanceof WeakMap)
+        ? __internal.__patchGuardSeq
+        : ((Core.__patchGuardSeq instanceof WeakMap) ? Core.__patchGuardSeq : new WeakMap());
+      const __guardRegistry = (__internal.guards instanceof Map) ? __internal.guards : new Map();
+      const __prngRoot = (__internal.prng && typeof __internal.prng === 'object') ? __internal.prng : Object.create(null);
+      __internal.targets = globalTargetRegistry;
+      __internal.__patchGuardSeq = __patchGuardSeq;
+      __internal.guards = __guardRegistry;
+      __internal.prng = __prngRoot;
+
+      function normStr(s) {
+        return (s == null ? '' : String(s)).normalize('NFKC');
+      }
+
+      function guardSeedTag() {
+        const prngState = (__prngRoot && typeof __prngRoot === 'object')
+          ? __prngRoot
+          : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
+        const raw = normStr((prngState && typeof prngState.seed === 'string' && prngState.seed) ? prngState.seed : ((G && G.__GLOBAL_SEED) || ''));
+        const mixed = 'ok|' + raw;
+
+        try {
+          const seedHasher = (prngState && typeof prngState.strToSeed === 'function')
+            ? prngState.strToSeed
+            : ((G && typeof G.strToSeed === 'function') ? G.strToSeed : null);
+          if (typeof seedHasher === 'function') {
+            return String(seedHasher(mixed) >>> 0).toString(36).slice(0, 8);
+          }
+        } catch (e) {
+          __emit('warn', 'core_window:guard_seed_hash_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: '__GLOBAL_SEED',
+            stage: 'guard',
+            message: 'guard seed hash provider failed; using local hash fallback',
+            type: 'pipeline missing data',
+            data: { outcome: 'return', fallback: 'local_hash' }
+          }, e);
+        }
+
+        let h = 2166136261 >>> 0;
+        for (let i = 0; i < mixed.length; i++) {
+          h ^= mixed.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return String(h >>> 0).toString(36).slice(0, 8);
+      }
 
       function nextGuardToken(flagKey) {
         let n = 0;
@@ -1003,7 +1055,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           n = ((nextGuardToken.__n || 0) + 1) | 0;
           nextGuardToken.__n = n;
         }
-        return `g:${String(flagKey || 'flag')}:${String(n)}`;
+        return 'ok:' + guardSeedTag() + ':' + String(n);
       }
 
       function guardFlag(flagKey, codePrefix) {
@@ -1011,7 +1063,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (!key) return null;
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
-          if (window[key]) {
+          if (__guardRegistry.has(key)) {
             __emit('info', tag + ':already_patched', {
               module: 'core',
               diagTag: tag,
@@ -1039,7 +1091,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         const token = nextGuardToken(key);
         try {
-          window[key] = token;
+          __guardRegistry.set(key, token);
         } catch (e) {
           __emit('warn', tag + ':guard_write_failed', {
             module: 'core',
@@ -1062,27 +1114,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (rollbackOk !== true) return false;
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
-          if (window[key] !== token) return false;
-          try {
-            delete window[key];
-          } catch (deleteErr) {
-            try {
-              window[key] = false;
-            } catch (setErr) {
-              __emit('warn', tag + ':guard_release_failed', {
-                module: 'core',
-                diagTag: tag,
-                surface: 'core',
-                key,
-                stage: 'rollback',
-                message: 'guard release failed',
-                type: 'pipeline missing data',
-                data: { outcome: 'skip', reason: 'guard_release_failed' }
-              }, setErr || deleteErr);
-              return false;
-            }
-          }
-          if (window[key] === token) {
+          if (__guardRegistry.get(key) !== token) return false;
+          __guardRegistry.delete(key);
+          if (__guardRegistry.get(key) === token) {
             __emit('warn', tag + ':guard_release_failed', {
               module: 'core',
               diagTag: tag,
@@ -2140,6 +2174,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
       safeDefine(Core, '__patchGuardSeq', {
         value: __patchGuardSeq,
         writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__internal', {
+        value: __internal,
+        writable: true,
         configurable: true,
         enumerable: false
       });

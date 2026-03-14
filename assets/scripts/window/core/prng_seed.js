@@ -70,14 +70,22 @@
       return (n <= 2 * k) ? '"' + s + '" (len ' + n + ')' : '"' + s.slice(0, k) + '…' + s.slice(-k) + '" (len ' + n + ')';
     }
     const C = (G && G.CanvasPatchContext) || (window && window.CanvasPatchContext) || null;
+    const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
+      ? __core.__internal
+      : null;
     function ensurePrngState() {
-      if (!C || (typeof C !== 'object' && typeof C !== 'function')) return null;
-      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-      let state = (stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
-        ? stateRoot.__PRNG_STATE__
+      let state = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+        ? __coreInternal.prng
         : null;
+      if (!state && (!C || (typeof C !== 'object' && typeof C !== 'function'))) return null;
+      const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
       if (!state) {
-        state = (C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
+        state = (stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
+          ? stateRoot.__PRNG_STATE__
+          : null;
+      }
+      if (!state) {
+        state = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
       }
       if (!state) {
         state = {
@@ -115,7 +123,7 @@
         }
       }
       try {
-        if (C.__PRNG_STATE__ !== state) {
+        if (C && C.__PRNG_STATE__ !== state) {
           Object.defineProperty(C, '__PRNG_STATE__', {
             value: state,
             writable: true,
@@ -134,7 +142,10 @@
           type: 'browser structure missing data',
           data: { outcome: 'rollback', action: 'fallback_assign' }
         }, e);
-        C.__PRNG_STATE__ = state;
+        if (C) C.__PRNG_STATE__ = state;
+      }
+      if (__coreInternal && __coreInternal.prng !== state) {
+        __coreInternal.prng = state;
       }
       if (!state.pools || typeof state.pools !== 'object') state.pools = Object.create(null);
       return state;

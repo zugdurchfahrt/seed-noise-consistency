@@ -45,6 +45,14 @@ if (!stateRoot) {
 } else {
   __defineHiddenValue__(C, 'state', stateRoot);
 }
+
+let loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+if (!loggerRoot) {
+  loggerRoot = __defineHiddenValue__(C, '__logger', Object.create(null));
+  if (!loggerRoot) throw new Error('[module] CanvasPatchContext.__logger bootstrap failed');
+} else {
+  __defineHiddenValue__(C, '__logger', loggerRoot);
+}
   
   
   const hiddenSurfaceState = {
