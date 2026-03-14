@@ -7,7 +7,10 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     const __tzTypeBrowser = "browser structure missing data";
     const __flagKey = '__PATCH_TIMEZONE__';
     const __core = window && window.Core;
-    const __D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+      ? window.CanvasPatchContext.__logger
+      : null;
+    const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
 
    

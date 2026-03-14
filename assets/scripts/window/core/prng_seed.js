@@ -9,7 +9,10 @@
           || {};
 
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
-    const __D = (G && G.__DEGRADE__) || (window && window.__DEGRADE__) || null;
+    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+      ? window.CanvasPatchContext.__logger
+      : ((G && G.CanvasPatchContext && G.CanvasPatchContext.__logger && typeof G.CanvasPatchContext.__logger === 'object') ? G.CanvasPatchContext.__logger : null);
+    const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
     const __emit = (level, code, ctx, err) => {
       try {
@@ -339,7 +342,7 @@
     } catch (e) {
       // [NORMATIVE] no console.*, report through __DEGRADE__.diag with fallback
       try {
-        const __D = (G && G.__DEGRADE__) || null;
+        const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
         const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
         const ctx = {
           module: 'rng_set',

@@ -5,7 +5,10 @@ const AudioContextModule = function AudioContextModule(window) {
   const __MODULE = 'audiocontext';
   const __SURFACE = 'audio';
 
-  const __D = window.__DEGRADE__;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   function __emit(level, code, ctx, err) {
     try {
@@ -199,7 +202,7 @@ const AudioContextModule = function AudioContextModule(window) {
   let __guardToken = null;
   try {
     if (!__core || typeof __core.guardFlag !== 'function') {
-      window.__DEGRADE__?.diag?.('warn', __tag + ':guard_missing', {
+      __D?.diag?.('warn', __tag + ':guard_missing', {
         module: __tag,
         diagTag: __tag,
         surface: __surface,
@@ -213,7 +216,7 @@ const AudioContextModule = function AudioContextModule(window) {
     }
     __guardToken = __core.guardFlag(__flagKey, __tag);
   } catch (e) {
-    window.__DEGRADE__?.diag?.('warn', __tag + ':guard_failed', {
+    __D?.diag?.('warn', __tag + ':guard_failed', {
       module: __tag,
       diagTag: __tag,
       surface: __surface,
@@ -911,7 +914,7 @@ const AudioContextModule = function AudioContextModule(window) {
     });
   } catch (e) {
     const rollbackErr = e;
-    window.__DEGRADE__?.diag?.('error', __tag + ':fatal', {
+    __D?.diag?.('error', __tag + ':fatal', {
       module: __tag,
       diagTag: __tag,
       surface: __surface,
@@ -926,7 +929,7 @@ const AudioContextModule = function AudioContextModule(window) {
         __core.releaseGuardFlag(__flagKey, __guardToken, false, __tag);
       }
     } catch (eRelease) {
-      window.__DEGRADE__?.diag?.('warn', __tag + ':guard_release_failed', {
+      __D?.diag?.('warn', __tag + ':guard_release_failed', {
         module: __tag,
         diagTag: __tag,
         surface: __surface,

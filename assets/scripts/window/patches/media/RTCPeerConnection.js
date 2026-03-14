@@ -9,7 +9,10 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const __MODULE = 'rtc';
   const __SURFACE = 'rtcp';
   const __FLAG_KEY = '__PATCH_RTCPEERCONNECTION__';
-  const __rtcDegrade = (window && typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __rtcLoggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __rtcDegrade = (__rtcLoggerRoot && typeof __rtcLoggerRoot.__DEGRADE__ === 'function') ? __rtcLoggerRoot.__DEGRADE__ : null;
   function __rtcDiag(level, code, extra, err) {
     try {
       const x = (extra && typeof extra === 'object') ? extra : {};

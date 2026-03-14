@@ -4,7 +4,10 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   const __surface = 'webgpu';
   const __flagKey = '__WEBGPU_WHITELIST__';
   const __core = window && window.Core;
-  const __degrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __degrade = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__degrade && typeof __degrade.diag === 'function') ? __degrade.diag.bind(__degrade) : null;
 
   function __emit(level, code, ctx, err) {

@@ -1,7 +1,10 @@
 (() => {
   const __MODULE = 'GeoOverride';
   const __SURFACE = 'geolocation';
-  const __D = window.__DEGRADE__;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __ALLOWED_STAGES = {
     preflight: true,

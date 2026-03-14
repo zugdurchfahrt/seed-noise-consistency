@@ -362,7 +362,7 @@ def init_driver(
             # --- set_log ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
-            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
             # --- core window ---
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
@@ -417,15 +417,22 @@ def init_driver(
             }
             (function applyAllPatchesCustomOrder(win) {
                 const C = window.CanvasPatchContext; if (!C) return;
+                const L = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             // ——— Worker env diagnostics (pre-bootstrap) ———//
             //  console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
-            __PROBE_LIVE_READER__.start();
-            DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
-            __DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
+            if (L && L.__PROBE_LIVE_READER__ && typeof L.__PROBE_LIVE_READER__.start === 'function') {
+                L.__PROBE_LIVE_READER__.start();
+            }
+            if (L && typeof L.DIAG_SCREEN_ON === 'function') {
+                L.DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
+            }
+            if (L && typeof L.__DIAG_ALERTS__ === 'function') {
+                L.__DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
+            }
             })(window);
             """
         ]

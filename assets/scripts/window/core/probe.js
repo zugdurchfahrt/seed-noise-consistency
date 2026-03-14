@@ -13,7 +13,10 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
 
 
   const W = (typeof window !== "undefined") ? window : null;
-  const __probeDegrade = (W && typeof W.__DEGRADE__ === "function") ? W.__DEGRADE__ : null;
+  const __probeLoggerRoot = (W && W.CanvasPatchContext && W.CanvasPatchContext.__logger && typeof W.CanvasPatchContext.__logger === "object")
+    ? W.CanvasPatchContext.__logger
+    : null;
+  const __probeDegrade = (__probeLoggerRoot && typeof __probeLoggerRoot.__DEGRADE__ === "function") ? __probeLoggerRoot.__DEGRADE__ : null;
 
 
   function __probeDiag(level, code, extra, err) {
@@ -2077,7 +2080,7 @@ function printToStringCrossRealmChecks() {
 
   function getDegradeEvents() {
     // External probe: no project-specific fallbacks, only explicit __DEGRADE__ buffer if present.
-    const degrade = globalThis.__DEGRADE__;
+    const degrade = (__probeLoggerRoot && typeof __probeLoggerRoot.__DEGRADE__ === "function") ? __probeLoggerRoot.__DEGRADE__ : null;
     if (typeof degrade !== "function" || typeof degrade.getBuffer !== "function") return [];
     try {
       const buf = degrade.getBuffer();
@@ -2393,7 +2396,7 @@ function printToStringCrossRealmChecks() {
   function printModuleCheck() {
     const rows = [];
     try {
-      const degrade = globalThis.__DEGRADE__;
+      const degrade = (__probeLoggerRoot && typeof __probeLoggerRoot.__DEGRADE__ === "function") ? __probeLoggerRoot.__DEGRADE__ : null;
       const buf = (typeof degrade === "function" && typeof degrade.getBuffer === "function") ? degrade.getBuffer() : [];
       const arr = Array.isArray(buf) ? buf : [];
       let rowIndex = 0;
