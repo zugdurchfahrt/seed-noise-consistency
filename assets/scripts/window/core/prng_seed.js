@@ -157,13 +157,6 @@
         if (!__prngState.seed && typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) __prngState.seed = String(G.__GLOBAL_SEED);
         if (!__prngState.strToSeed && typeof G.strToSeed === 'function') __prngState.strToSeed = G.strToSeed;
         if (!__prngState.mulberry32 && typeof G.mulberry32 === 'function') __prngState.mulberry32 = G.mulberry32;
-        if (G.rand !== __prngState.rand) {
-          try {
-            Object.defineProperty(G, 'rand', { value: __prngState.rand, writable: false, configurable: false, enumerable: true });
-          } catch (e) {
-            try { G.rand = __prngState.rand; } catch (_) {}
-          }
-        }
         return true;
       }
       if (G.rand && G.rand.__marker === 'envrand' && typeof G.rand.use === 'function') {
@@ -194,26 +187,6 @@
           };
         };
         mulberry32Fn = __mulberry32;
-        try {
-          Object.defineProperty(G, 'mulberry32', {
-            value: mulberry32Fn,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-        } catch (e) {
-          __emit('warn', 'rng_set:define_mulberry32_failed', {
-            module: 'rng_set',
-            diagTag: 'rng_set',
-            surface: 'rng_set',
-            key: 'mulberry32',
-            stage: 'apply',
-            message: 'Object.defineProperty(G,"mulberry32") failed; fallback to assignment',
-            type: 'browser structure missing data',
-            data: { outcome: 'rollback', action: 'fallback_assign' }
-          }, e);
-          G.mulberry32 = mulberry32Fn;
-        }
       }
       if (__prngState) __prngState.mulberry32 = mulberry32Fn;
 
@@ -227,26 +200,6 @@
           return h >>> 0;
         };
         strToSeedFn = __strToSeed;
-        try {
-          Object.defineProperty(G, 'strToSeed', {
-            value: strToSeedFn,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-        } catch (e) {
-          __emit('warn', 'rng_set:define_strToSeed_failed', {
-            module: 'rng_set',
-            diagTag: 'rng_set',
-            surface: 'rng_set',
-            key: 'strToSeed',
-            stage: 'apply',
-            message: 'Object.defineProperty(G,"strToSeed") failed; fallback to assignment',
-            type: 'browser structure missing data',
-            data: { outcome: 'rollback', action: 'fallback_assign' }
-          }, e);
-          G.strToSeed = strToSeedFn;
-        }
       }
       if (__prngState) __prngState.strToSeed = strToSeedFn;
 
@@ -320,36 +273,6 @@
         __prngState.rand = rand;
         __prngState.marker = 'envrand';
         __prngState.version = '1.1.1';
-      }
-
-      try {
-        Object.defineProperty(G, 'rand', { value: rand, writable: false, configurable: false, enumerable: true });
-      } catch (e) {
-        __emit('warn', 'rng_set:define_rand_failed', {
-          module: 'rng_set',
-          diagTag: 'rng_set',
-          surface: 'rng_set',
-          key: 'rand',
-          stage: 'apply',
-          message: 'Object.defineProperty(G,"rand") failed; fallback to assignment',
-          type: 'browser structure missing data',
-          data: { outcome: 'rollback', action: 'fallback_assign' }
-        }, e);
-        try {
-          G.rand = rand;
-        } catch (e2) {
-          __emit('fatal', 'rng_set:assign_rand_failed', {
-            module: 'rng_set',
-            diagTag: 'rng_set',
-            surface: 'rng_set',
-            key: 'rand',
-            stage: 'apply',
-            message: 'G.rand assignment failed; leaving native',
-            type: 'browser structure missing data',
-            data: { outcome: 'rollback', action: 'native' }
-          }, e2);
-          return false;
-        }
       }
       return true;
     }

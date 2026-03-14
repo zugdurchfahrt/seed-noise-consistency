@@ -67,16 +67,23 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     d(eventCode, e, ctx);
   }
   function __resolvePrngState() {
+    const __core = G && G.Core;
+    const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
+      ? __core.__internal
+      : null;
+    const corePrng = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+      ? __coreInternal.prng
+      : null;
     const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-    const state = (stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
+    const state = corePrng || ((stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
       ? stateRoot.__PRNG_STATE__
-      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
+      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
     return {
       seed: (state && typeof state.seed === 'string' && state.seed)
         ? state.seed
         : ((typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) ? G.__GLOBAL_SEED : ''),
-      strToSeed: (state && typeof state.strToSeed === 'function') ? state.strToSeed : G.strToSeed,
-      mulberry32: (state && typeof state.mulberry32 === 'function') ? state.mulberry32 : G.mulberry32
+      strToSeed: (state && typeof state.strToSeed === 'function') ? state.strToSeed : null,
+      mulberry32: (state && typeof state.mulberry32 === 'function') ? state.mulberry32 : null
     };
   }
 

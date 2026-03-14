@@ -117,10 +117,7 @@ if (!loggerRoot) {
     "CanvasPatchContext",
     "CanvasPatchHooks",
     "webglHooks",
-    "RNGsetModule",
-    "rand",
-    "mulberry32",
-    "strToSeed"
+    "RNGsetModule"
     ],
     applied: Object.create(null)
   };

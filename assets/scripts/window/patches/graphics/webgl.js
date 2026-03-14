@@ -122,12 +122,17 @@ const WebglPatchModule = function WebglPatchModule(window) {
         enumerable: false
       });
     }
-    const __prngState = (__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
+    const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
+      ? __core.__internal
+      : null;
+    const __prngState = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+      ? __coreInternal.prng
+      : ((__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
       ? __stateRoot.__PRNG_STATE__
-      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
+      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
     const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
       ? __prngState.rand
-      : window.rand;
+      : null;
     const R = (__randSource && typeof __randSource.use === 'function') ? __randSource.use('webgl') : null;
     if (typeof R !== 'function') {
       __webglDiagPipeline('fatal', 'webgl:rand_missing', {

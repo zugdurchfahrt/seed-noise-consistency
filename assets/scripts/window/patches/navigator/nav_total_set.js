@@ -149,12 +149,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     // basic random from the existing seed initialization
-    const __prngState = (__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
+    const __navCoreInternal = (window.Core && window.Core.__internal && typeof window.Core.__internal === 'object')
+      ? window.Core.__internal
+      : null;
+    const __prngState = (__navCoreInternal && __navCoreInternal.prng && typeof __navCoreInternal.prng === 'object')
+      ? __navCoreInternal.prng
+      : ((__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
       ? __stateRoot.__PRNG_STATE__
-      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
+      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
     const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
       ? __prngState.rand
-      : ((window.rand && typeof window.rand.use === 'function') ? window.rand : null);
+      : null;
     const R = (__randSource && typeof __randSource.use === 'function') ? __randSource.use('nav') : null;
     if (typeof R !== 'function') {
       __navDiagPipeline('warn', 'nav_total_set:rand_missing', {

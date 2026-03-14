@@ -1001,6 +1001,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }
 
       function guardSeedTag() {
+        if (__prngRoot && typeof __prngRoot.__guardSeedTag === 'string' && __prngRoot.__guardSeedTag) {
+          return __prngRoot.__guardSeedTag;
+        }
         const prngState = (__prngRoot && typeof __prngRoot === 'object')
           ? __prngRoot
           : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
@@ -1012,7 +1015,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
             ? prngState.strToSeed
             : ((G && typeof G.strToSeed === 'function') ? G.strToSeed : null);
           if (typeof seedHasher === 'function') {
-            return String(seedHasher(mixed) >>> 0).toString(36).slice(0, 8);
+            const tag = String(seedHasher(mixed) >>> 0).toString(36).slice(0, 8);
+            if (__prngRoot && typeof __prngRoot === 'object') __prngRoot.__guardSeedTag = tag;
+            return tag;
           }
         } catch (e) {
           __emit('warn', 'core_window:guard_seed_hash_failed', {
@@ -1032,7 +1037,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
           h ^= mixed.charCodeAt(i);
           h = Math.imul(h, 16777619);
         }
-        return String(h >>> 0).toString(36).slice(0, 8);
+        const tag = String(h >>> 0).toString(36).slice(0, 8);
+        if (__prngRoot && typeof __prngRoot === 'object') __prngRoot.__guardSeedTag = tag;
+        return tag;
       }
 
       function nextGuardToken(flagKey) {

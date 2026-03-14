@@ -79,12 +79,18 @@ const AudioContextModule = function AudioContextModule(window) {
     });
   }
 
-  const __prngState = (__stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
+  const __core = window.Core;
+  const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
+    ? __core.__internal
+    : null;
+  const __prngState = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+    ? __coreInternal.prng
+    : ((__stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
     ? __stateRoot.__PRNG_STATE__
-    : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
+    : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
   const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
     ? __prngState.rand
-    : window.rand;
+    : null;
   if (!__randSource || typeof __randSource.use !== 'function') {
     degrade('audiocontext:rand_missing', new Error('[AudioContextPatch] rand.use missing'), {
       stage: 'preflight',
@@ -138,7 +144,6 @@ const AudioContextModule = function AudioContextModule(window) {
   const safeDefine = (typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
   const __wrapNativeApply = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
   const __wrapNativeAccessor = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
-  const __core = window.Core;
   const __corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
     ? window.Core.preflightTarget
     : null;
