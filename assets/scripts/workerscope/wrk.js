@@ -139,7 +139,11 @@ const WrkModule = function WrkModule(window) {
         '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
         '__LAST_SHARED_WORKER_USER_URL_LOADED__',
         '__LAST_SHARED_WORKER_PATCH_OK__',
-        'WorkerPatchHooks'
+        'WorkerPatchHooks',
+        'WrkModule',
+        'SafeWorkerOverride',
+        'SafeSharedWorkerOverride',
+        'ServiceWorkerOverride'
       ],
       final: [
         '__ENV_BRIDGE__',
@@ -170,39 +174,12 @@ const WrkModule = function WrkModule(window) {
     for (const k of __hiddenSurfaceState.preapply) {
       const d = Object.getOwnPropertyDescriptor(G, k);
       if (!d) {
-        Object.defineProperty(G, k, {
-          value: undefined,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        __hiddenSurfaceState.applied[k] = 'predefined';
-        continue;
+        throw new Error('[WrkModule] bootstrap owner slot missing: ' + k);
       }
-      if (d.enumerable === false) {
-        __hiddenSurfaceState.applied[k] = 'already_hidden';
-        continue;
+      if (d.enumerable !== false) {
+        throw new Error('[WrkModule] bootstrap owner slot visible: ' + k);
       }
-      if (d.configurable === false) {
-        __hiddenSurfaceState.applied[k] = 'skip_nonconfigurable';
-        continue;
-      }
-      if ('value' in d) {
-        Object.defineProperty(G, k, {
-          value: G[k],
-          writable: !!d.writable,
-          configurable: true,
-          enumerable: false
-        });
-      } else {
-        Object.defineProperty(G, k, {
-          get: d.get,
-          set: d.set,
-          configurable: true,
-          enumerable: false
-        });
-      }
-      __hiddenSurfaceState.applied[k] = 'hidden';
+      __hiddenSurfaceState.applied[k] = 'already_hidden';
     }
 
 // 1) Источник снапшотов
@@ -1017,8 +994,17 @@ function requireWorkerSnapshot(snap, label) {
 function installBlobURLStore(G) {
   if (!G || !G.URL || typeof G.URL.createObjectURL !== 'function') return;
   if (G.__BLOB_URL_STORE__) return;
+  const storeDesc = Object.getOwnPropertyDescriptor(G, '__BLOB_URL_STORE__');
+  if (!storeDesc) {
+    throw new Error('[WorkerOverride] __BLOB_URL_STORE__ slot missing');
+  }
   const store = new Map();
-  Object.defineProperty(G, '__BLOB_URL_STORE__', { value: store, configurable: false, writable: false });
+  Object.defineProperty(G, '__BLOB_URL_STORE__', {
+    value: store,
+    configurable: false,
+    writable: false,
+    enumerable: false
+  });
   if (typeof mark !== 'function') {
     throw new Error('[WorkerOverride] markAsNative missing');
   }
@@ -1350,6 +1336,9 @@ const __safeWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'Safe
 const __safeWorkerExportDesc = __safeWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'SafeWorkerOverride') : null;
 const __safeWorkerCanFillPlaceholder = !!(__safeWorkerExportDesc && __safeWorkerExportDesc.configurable !== false && window.SafeWorkerOverride === undefined);
 if (!__safeWorkerExportOwn || __safeWorkerCanFillPlaceholder) {
+  if (!__safeWorkerExportOwn) {
+    throw new Error('[WrkModule] bootstrap owner slot missing: SafeWorkerOverride');
+  }
   Object.defineProperty(window, 'SafeWorkerOverride', {
     value: SafeWorkerOverride,
     writable: true,
@@ -1565,6 +1554,9 @@ const __safeSharedWorkerExportOwn = Object.prototype.hasOwnProperty.call(window,
 const __safeSharedWorkerExportDesc = __safeSharedWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'SafeSharedWorkerOverride') : null;
 const __safeSharedWorkerCanFillPlaceholder = !!(__safeSharedWorkerExportDesc && __safeSharedWorkerExportDesc.configurable !== false && window.SafeSharedWorkerOverride === undefined);
 if (!__safeSharedWorkerExportOwn || __safeSharedWorkerCanFillPlaceholder) {
+  if (!__safeSharedWorkerExportOwn) {
+    throw new Error('[WrkModule] bootstrap owner slot missing: SafeSharedWorkerOverride');
+  }
   Object.defineProperty(window, 'SafeSharedWorkerOverride', {
     value: SafeSharedWorkerOverride,
     writable: true,
@@ -1915,6 +1907,9 @@ const __serviceWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'S
 const __serviceWorkerExportDesc = __serviceWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'ServiceWorkerOverride') : null;
 const __serviceWorkerCanFillPlaceholder = !!(__serviceWorkerExportDesc && __serviceWorkerExportDesc.configurable !== false && window.ServiceWorkerOverride === undefined);
 if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
+  if (!__serviceWorkerExportOwn) {
+    throw new Error('[WrkModule] bootstrap owner slot missing: ServiceWorkerOverride');
+  }
   Object.defineProperty(window, 'ServiceWorkerOverride', {
     value: ServiceWorkerOverride,
     writable: true,
@@ -2070,47 +2065,6 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
     data: { outcome: 'return' }
   }, null);
 
-  // reduce visibility of pipeline globals in Window realm (non-enumerable)
-  try {
-    const win = G;
-    if (win && (typeof win === 'object' || typeof win === 'function')) {
-      for (const k of __hiddenSurfaceState.final) {
-        if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
-        const d = Object.getOwnPropertyDescriptor(win, k);
-        if (!d) continue;
-        if (d.enumerable === false) {
-          __hiddenSurfaceState.applied[k] = 'already_hidden';
-          continue;
-        }
-        if (d.configurable === false) {
-          __hiddenSurfaceState.applied[k] = 'skip_nonconfigurable';
-          const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
-          __wrkDiag('warn', 'wrk:hide_pipeline_surface_nonconfigurable', {
-            stage: 'apply',
-            key: k,
-            message: 'hide pipeline surface skipped: non-configurable',
-            type: 'browser structure missing data',
-            data: { outcome: 'skip', reason: 'hide_pipeline_surface_nonconfigurable' }
-          }, e);
-          continue;
-        }
-        if ('value' in d) {
-          Object.defineProperty(win, k, { value: win[k], writable: !!d.writable, configurable: !!d.configurable, enumerable: false });
-        } else {
-          Object.defineProperty(win, k, { get: d.get, set: d.set, configurable: !!d.configurable, enumerable: false });
-        }
-        __hiddenSurfaceState.applied[k] = 'hidden';
-      }
-    }
-  } catch (e) {
-    __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
-      stage: 'apply',
-      key: '__ENV_BRIDGE__',
-      message: 'hide pipeline surface failed',
-      type: 'browser structure missing data',
-      data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }
-    }, e);
-  }
     __wrkDiag('info', 'wrk:init:return', {
       stage: 'apply',
       key: '__PATCH_WRK__',
@@ -2144,6 +2098,9 @@ const __wrkModuleExportOwn = Object.prototype.hasOwnProperty.call(globalThis, 'W
 const __wrkModuleExportDesc = __wrkModuleExportOwn ? Object.getOwnPropertyDescriptor(globalThis, 'WrkModule') : null;
 const __wrkModuleCanFillPlaceholder = !!(__wrkModuleExportDesc && __wrkModuleExportDesc.configurable !== false && globalThis.WrkModule === undefined);
 if (!__wrkModuleExportOwn || __wrkModuleCanFillPlaceholder) {
+  if (!__wrkModuleExportOwn) {
+    throw new Error('[WrkModule] bootstrap owner slot missing: WrkModule');
+  }
   Object.defineProperty(globalThis, 'WrkModule', {
     value: WrkModule,
     writable: true,

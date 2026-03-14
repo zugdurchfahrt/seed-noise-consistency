@@ -421,44 +421,4 @@
       data: { outcome: 'return' }
     }, null);
 
-    // reduce visibility of pipeline globals in Window realm (non-enumerable)
-    try {
-      const win = G;
-      if (win && (typeof win === 'object' || typeof win === 'function')) {
-        const keys = [
-          '__ENV_BRIDGE__',
-          'CanvasPatchContext'
-        ];
-        for (const k of keys) {
-          if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
-          const d = Object.getOwnPropertyDescriptor(win, k);
-          if (!d || d.enumerable === false) continue;
-          if (d.configurable === false) {
-            const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
-            __wrkDiag('warn', 'wrk:hide_pipeline_surface_nonconfigurable', {
-              stage: 'apply',
-              key: k,
-              message: 'hide pipeline surface skipped: non-configurable',
-              type: 'browser structure missing data',
-              data: { outcome: 'skip', reason: 'hide_pipeline_surface_nonconfigurable' }
-            }, e);
-            continue;
-          }
-          if ('value' in d) {
-            Object.defineProperty(win, k, { value: win[k], writable: !!d.writable, configurable: !!d.configurable, enumerable: false });
-          } else {
-            Object.defineProperty(win, k, { get: d.get, set: d.set, configurable: !!d.configurable, enumerable: false });
-          }
-        }
-      }
-    } catch (e) {
-    __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
-      stage: 'apply',
-      key: '__ENV_BRIDGE__',
-      message: 'hide pipeline surface failed',
-      type: 'browser structure missing data',
-      data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }
-    }, e);
-  }
-  ;
 })(self); // <-- закрыли WrkModule
