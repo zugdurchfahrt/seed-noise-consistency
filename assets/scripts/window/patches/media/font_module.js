@@ -14,10 +14,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   const __fontTypeBrowser = 'browser structure missing data';
   function __fontDiag(level, code, extra, err) {
     try {
-      const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-        ? window.CanvasPatchContext.__logger
-        : null;
-      const D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
+      const D = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
       const emitCode = String(code || 'fonts');
       const ctx = (extra && typeof extra === 'object') ? extra : null;
       if (D && typeof D.diag === 'function') {

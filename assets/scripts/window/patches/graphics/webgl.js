@@ -7,10 +7,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
           || {};
     const __webglTypePipeline = 'pipeline missing data';
     const __webglTypeBrowser = 'browser structure missing data';
-    const __webglLoggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-      ? window.CanvasPatchContext.__logger
-      : null;
-    const __webglDegrade = (__webglLoggerRoot && typeof __webglLoggerRoot.__DEGRADE__ === 'function') ? __webglLoggerRoot.__DEGRADE__ : null;
+    const __webglDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
     const __webglDegradeDiag = (__webglDegrade && typeof __webglDegrade.diag === 'function')
       ? __webglDegrade.diag.bind(__webglDegrade)
       : null;
