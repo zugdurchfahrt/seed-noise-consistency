@@ -187,18 +187,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   const wrapApply = (function() {
-    const wrap = (window && typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
+    const wrap = (__core && typeof __core.__wrapNativeApply === 'function') ? __core.__wrapNativeApply : null;
     if (typeof wrap !== 'function') return null;
     return wrap;
   })();
   if (typeof wrapApply !== 'function') {
     __rtcDiag('fatal', 'rtc:wrap_native_apply_missing', {
       stage: 'preflight',
-      key: '__wrapNativeApply',
-      message: '__wrapNativeApply missing',
+      key: 'Core.__wrapNativeApply',
+      message: 'Core.__wrapNativeApply missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_wrap_native_apply' }
-    }, new Error('[RTC] __wrapNativeApply missing'));
+    }, new Error('[RTC] Core.__wrapNativeApply missing'));
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
@@ -216,18 +216,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   const wrapAcc = (function() {
-    const wrap = (window && typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
+    const wrap = (__core && typeof __core.__wrapNativeAccessor === 'function') ? __core.__wrapNativeAccessor : null;
     if (typeof wrap !== 'function') return null;
     return wrap;
   })();
   if (typeof wrapAcc !== 'function') {
     __rtcDiag('fatal', 'rtc:wrap_native_accessor_missing', {
       stage: 'preflight',
-      key: '__wrapNativeAccessor',
-      message: '__wrapNativeAccessor missing',
+      key: 'Core.__wrapNativeAccessor',
+      message: 'Core.__wrapNativeAccessor missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_wrap_native_accessor' }
-    }, new Error('[RTC] __wrapNativeAccessor missing'));
+    }, new Error('[RTC] Core.__wrapNativeAccessor missing'));
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);

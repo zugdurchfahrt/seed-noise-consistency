@@ -11,10 +11,10 @@ const LOGGingModule = function LOGGingModule() {
     if (!C || (typeof C !== "object" && typeof C !== "function")) {
       throw new Error("[LOGGingModule] CanvasPatchContext missing");
     }
-    const __loggerRoot = (C.__logger && typeof C.__logger === "object") ? C.__logger : null;
-    if (!__loggerRoot) {
-      throw new Error("[LOGGingModule] CanvasPatchContext.__logger missing");
-    }
+      const __loggerRoot = (C.__logger && typeof C.__logger === "object") ? C.__logger : null;
+      if (!__loggerRoot) {
+        throw new Error("[LOGGingModule] CanvasPatchContext.__logger missing");
+      }
 
     function __defineWindowLoggerAccessor(name, getter, setter) {
       if (!W) return;

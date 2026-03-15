@@ -154,8 +154,8 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       ? window.__ensureMarkAsNative
       : null;
     const markAsNative = __ensureMarkAsNative ? __ensureMarkAsNative() : null;
-    const __wrapNativeCtor = (window && typeof window.__wrapNativeCtor === "function")
-      ? window.__wrapNativeCtor
+    const __wrapNativeCtor = (__core && typeof __core.__wrapNativeCtor === "function")
+      ? __core.__wrapNativeCtor
       : null;
     if (typeof markAsNative !== "function") {
       diagPipeline("warn", "tz:missing_markAsNative", {
@@ -312,7 +312,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         diagPipeline("warn", "tz:wrapNativeCtor_missing", {
           key: "DateTimeFormat",
           stage: "preflight",
-          message: "__wrapNativeCtor missing (skip constructor patch)",
+          message: "Core.__wrapNativeCtor missing (skip constructor patch)",
           data: { outcome: "skip", reason: "missing_wrap_native_ctor", timezone: timezone }
         }, null);
       }
@@ -356,7 +356,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           diagPipeline("warn", "tz:wrapNativeCtor_missing", {
             key: ctorName,
             stage: "preflight",
-            message: "__wrapNativeCtor missing (skip constructor patch)",
+            message: "Core.__wrapNativeCtor missing (skip constructor patch)",
             data: { outcome: "skip", reason: "missing_wrap_native_ctor", timezone: timezone }
           }, null);
           return;

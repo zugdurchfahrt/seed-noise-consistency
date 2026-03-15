@@ -690,9 +690,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     return;
   }
 
-  const __wrapNativeCtor = (typeof window.__wrapNativeCtor === 'function')
-    ? window.__wrapNativeCtor
-    : ((G && typeof G.__wrapNativeCtor === 'function') ? G.__wrapNativeCtor : null);
+  const __wrapNativeCtor = (Core && typeof Core.__wrapNativeCtor === 'function')
+    ? Core.__wrapNativeCtor
+    : null;
 
   function normalizeFamilyName(family) {
     return String(family == null ? '' : family)
@@ -1041,8 +1041,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __fontDiagPipeline('warn', 'fonts:wrap_native_ctor_missing', {
       stage: 'preflight',
       diagTag: 'fonts:fontface',
-      key: '__wrapNativeCtor',
-      message: '__wrapNativeCtor missing (skip constructor patch)',
+      key: 'Core.__wrapNativeCtor',
+      message: 'Core.__wrapNativeCtor missing (skip constructor patch)',
       data: { outcome: 'skip', reason: 'missing_wrap_native_ctor' }
     }, null);
   } else {

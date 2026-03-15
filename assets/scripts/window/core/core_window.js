@@ -427,28 +427,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     return wrapped;
   }
 
-  // [Observed Exit Contract] idempotent export
-  try {
-    __exportWrapFactory('__wrapNativeApply', __wrapNativeApply);
-  } catch (e) {
-    __emit('error', 'core_window:export_failed', {
-      module: 'core',
-      diagTag: 'core_window',
-      surface: 'core',
-      key: '__wrapNativeApply',
-      stage: 'contract',
-      message: 'export failed',
-      type: 'browser structure missing data',
-      data: { outcome: 'return', stx: (e && e.stack) ? String(e.stack) : null }
-    }, e);
-  }
-  {
-    __exportWrapFactory('__wrapNativeAccessor', __wrapNativeAccessor);
-    __exportWrapFactory('__wrapStrictAccessor', __wrapStrictAccessor);
-    __exportWrapFactory('__wrapNativeCtor', __wrapNativeCtor);
-  }
-
-
   {
     const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = toStringDesc && toStringDesc.value;
@@ -2114,6 +2092,30 @@ const CoreWindowModule = function CoreWindowModule(window) {
       });
       safeDefine(Core, 'releaseGuardFlag', {
         value: releaseGuardFlag,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__wrapNativeApply', {
+        value: __wrapNativeApply,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__wrapNativeAccessor', {
+        value: __wrapNativeAccessor,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__wrapStrictAccessor', {
+        value: __wrapStrictAccessor,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__wrapNativeCtor', {
+        value: __wrapNativeCtor,
         writable: true,
         configurable: true,
         enumerable: false

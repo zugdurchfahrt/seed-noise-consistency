@@ -192,11 +192,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return;
     }
     const __navMark = mark;
-    const wrapStrictAccessor = (typeof window.__wrapStrictAccessor === 'function') ? window.__wrapStrictAccessor : null;
+    const wrapStrictAccessor = (window.Core && typeof window.Core.__wrapStrictAccessor === 'function') ? window.Core.__wrapStrictAccessor : null;
     if (typeof wrapStrictAccessor !== 'function') {
       __navDiagPipeline('warn', 'nav_total_set:wrap_strict_accessor_missing', {
         stage: 'preflight',
-        message: 'wrapStrictAccessor missing',
+        message: 'Core.__wrapStrictAccessor missing',
         data: { outcome: 'skip', reason: 'missing_dep_wrap_strict_accessor', policy: 'skip', action: 'native' }
       });
       __navReleaseGuard(true);

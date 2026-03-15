@@ -145,13 +145,13 @@ const AudioContextModule = function AudioContextModule(window) {
   })();
   if (!markAsNative) return;
   const safeDefine = (typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
-  const __wrapNativeApply = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
-  const __wrapNativeAccessor = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
-  const __corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
-    ? window.Core.preflightTarget
+  const __wrapNativeApply = (__core && typeof __core.__wrapNativeApply === 'function') ? __core.__wrapNativeApply : null;
+  const __wrapNativeAccessor = (__core && typeof __core.__wrapNativeAccessor === 'function') ? __core.__wrapNativeAccessor : null;
+  const __corePreflightTarget = (__core && typeof __core.preflightTarget === 'function')
+    ? __core.preflightTarget
     : null;
-  const __coreApplyTargets = (window.Core && typeof window.Core.applyTargets === 'function')
-    ? window.Core.applyTargets
+  const __coreApplyTargets = (__core && typeof __core.applyTargets === 'function')
+    ? __core.applyTargets
     : null;
   if (typeof safeDefine !== 'function') {
     degrade('audiocontext:safe_define_missing', new Error('[AudioContextPatch] __safeDefine missing'), {
@@ -164,21 +164,21 @@ const AudioContextModule = function AudioContextModule(window) {
     return;
   }
   if (typeof __wrapNativeApply !== 'function') {
-    degrade('audiocontext:wrap_native_apply_missing', new Error('[AudioContextPatch] __wrapNativeApply missing'), {
+    degrade('audiocontext:wrap_native_apply_missing', new Error('[AudioContextPatch] Core.__wrapNativeApply missing'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: '__wrapNativeApply',
+      key: 'Core.__wrapNativeApply',
       data: { outcome: 'skip', reason: 'wrap_native_apply_missing' }
     });
     return;
   }
   if (typeof __wrapNativeAccessor !== 'function') {
-    degrade('audiocontext:wrap_native_accessor_missing', new Error('[AudioContextPatch] __wrapNativeAccessor missing'), {
+    degrade('audiocontext:wrap_native_accessor_missing', new Error('[AudioContextPatch] Core.__wrapNativeAccessor missing'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: '__wrapNativeAccessor',
+      key: 'Core.__wrapNativeAccessor',
       data: { outcome: 'skip', reason: 'wrap_native_accessor_missing' }
     });
     return;
