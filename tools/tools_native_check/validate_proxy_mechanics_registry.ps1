@@ -7,7 +7,7 @@ USAGE
 
 WHAT IT GUARANTEES (STATIC CHECKS)
   - Ensures Core still contains expected Proxy mechanics invariants used by the docs/registry:
-      sunami\assets\scripts\window\core\core_window.js
+      logreverse\assets\scripts\window\core\core_window.js
   - Spot-checks current method-gateway modules for explicit/non-explicit wrapLayer usage expectations.
 
 NOT A RUNTIME TEST
@@ -52,10 +52,10 @@ function Assert-NotContains {
 }
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-# This script lives in `sunami/tools/tools_native_check/`; repo root is three levels above.
+# This script lives in `logreverse/tools/tools_native_check/`; repo root is three levels above.
 $repo = Resolve-Path (Join-Path $root "..\\..\\..") | Select-Object -ExpandProperty Path
 
-$coreWindowPath = Join-Path $repo "sunami\\assets\\scripts\\window\\core\\core_window.js"
+$coreWindowPath = Join-Path $repo "logreverse\\assets\\scripts\\window\\core\\core_window.js"
 $coreText = Get-Content -Path $coreWindowPath -Raw
 
 # --- Core invariants this document relies on ---
@@ -96,7 +96,7 @@ Assert-Contains -Text $coreText -Pattern "safeDefine\(synthetic,\s*'__coreBridge
 Assert-Contains -Text $coreText -Pattern "descriptor_only unsupported for method kind|descriptor_only unsupported for non-data kind" -Message "applyTargets must reject wrapLayer=descriptor_only for method/promise_method"
 
 # --- context.js: current bucket split must stay explicit ---
-$context = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\\core\\context.js") -Raw
+$context = Get-Content -Path (Join-Path $repo "logreverse\\assets\\scripts\\window\\core\\context.js") -Raw
 Assert-Contains -Text $context -Pattern "definePatchedMethod missing wrapLayer" -Message "context.js must keep explicit wrapLayer guard in definePatchedMethod"
 Assert-Contains -Text $context -Pattern "(?s)function\s+patchMethod\b.*?corePreflight\(proto,\s*method,\s*'method',\s*'context:webgl:patchMethod',\s*\{\s*wrapLayer:\s*'named_wrapper',\s*policy:\s*'throw'\s*\}\)" -Message "context.js webgl patchMethod must pass explicit named_wrapper contract into corePreflight"
 Assert-NotContains -Text $context -Pattern "corePreflight\(proto,\s*method,\s*'method',\s*'context:webgl:patchMethod'\s*\)" -Message "context.js webgl patchMethod must not rely on implicit corePreflight wrapLayer selection"
@@ -108,24 +108,24 @@ Assert-Contains -Text $context -Pattern "return real ctx \(brand-safe\)\. No Pro
 Assert-Contains -Text $context -Pattern "(?s)function\s+chainGetContext\b.*?markAsNative\(wrapped,\s*method\).*?definePatchedMethod\(proto,\s*method,\s*patched,\s*\{\s*wrapLayer:\s*'named_wrapper',\s*policy:\s*'throw'\s*\}\)" -Message "context.js getContext public wrapper must stay on explicit named_wrapper path"
 
 # --- Module spot-checks for doc/registry method-gateway markers ---
-$hideWd = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\\patches\\stealth\\hide_webdriver.js") -Raw
+$hideWd = Get-Content -Path (Join-Path $repo "logreverse\\assets\\scripts\\window\\patches\\stealth\\hide_webdriver.js") -Raw
 Assert-Contains -Text $hideWd -Pattern "wrapLayer\s*:\s*'strict_accessor_gateway'" -Message "hide_webdriver.js must set wrapLayer=strict_accessor_gateway for strict scalar accessor contract"
 Assert-Contains -Text $hideWd -Pattern "policy\s*:\s*'strict'" -Message "hide_webdriver.js must set policy=strict for strict accessor contract"
 Assert-NotContains -Text $hideWd -Pattern "wrapLayer\s*:\s*'auto'" -Message "hide_webdriver.js must not use wrapLayer=auto"
 
-$uad = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\\patches\\navigator\\override_ua_data.js") -Raw
+$uad = Get-Content -Path (Join-Path $repo "logreverse\\assets\\scripts\\window\\patches\\navigator\\override_ua_data.js") -Raw
 Assert-Contains -Text $uad -Pattern "wrapLayer\s*:\s*'core_wrapper'" -Message "override_ua_data.js must set wrapLayer=core_wrapper for strict receiver/accessor targets"
 Assert-NotContains -Text $uad -Pattern "wrapLayer\s*:\s*'auto'" -Message "override_ua_data.js must not use wrapLayer=auto"
 
-$geo = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\\patches\\stealth\\GeoOverride_source.js") -Raw
+$geo = Get-Content -Path (Join-Path $repo "logreverse\\assets\\scripts\\window\\patches\\stealth\\GeoOverride_source.js") -Raw
 Assert-Contains -Text $geo -Pattern "wrapLayer\s*:\s*'core_wrapper'" -Message "GeoOverride_source.js must set wrapLayer=core_wrapper for brand_strict Geolocation methods (no implicit auto)"
 Assert-NotContains -Text $geo -Pattern "wrapLayer\s*:\s*'auto'" -Message "GeoOverride_source.js must not use wrapLayer=auto"
 
-$webgpu = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\\patches\\graphics\\webgpu.js") -Raw
+$webgpu = Get-Content -Path (Join-Path $repo "logreverse\\assets\\scripts\\window\\patches\\graphics\\webgpu.js") -Raw
 Assert-Contains -Text $webgpu -Pattern "wrapLayer\s*:\s*'core_wrapper'" -Message "webgpu.js must set wrapLayer=core_wrapper for brand_strict and strict-receiver targets (no implicit auto)"
 Assert-NotContains -Text $webgpu -Pattern "wrapLayer\s*:\s*'auto'" -Message "webgpu.js must not use wrapLayer=auto"
 
-$navTotal = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\\patches\\navigator\\nav_total_set.js") -Raw
+$navTotal = Get-Content -Path (Join-Path $repo "logreverse\\assets\\scripts\\window\\patches\\navigator\\nav_total_set.js") -Raw
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'named_wrapper'" -Message "nav_total_set.js must include named_wrapper wrapLayer (documented as synthetic_named)"
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'descriptor_only'" -Message "nav_total_set.js must include descriptor_only wrapLayer (documented as native_descriptor data-path)"
 Assert-Contains -Text $navTotal -Pattern "wrapLayer\s*:\s*'core_wrapper'" -Message "nav_total_set.js must include core_wrapper wrapLayer (documented as core_proxy)"
@@ -141,7 +141,7 @@ Assert-Contains -Text $navTotal -Pattern "Object\.defineProperty\(storageOwner,\
 Assert-Contains -Text $navTotal -Pattern "(?s)nav_total_set:userAgentData\.getHighEntropyValues.*?wrapLayer\s*:\s*'core_wrapper'" -Message "nav_total_set.js userAgentData.getHighEntropyValues must stay on explicit core_wrapper path"
 Assert-Contains -Text $navTotal -Pattern "(?s)nav_total_set:userAgentData\.toJSON.*?wrapLayer\s*:\s*'core_wrapper'" -Message "nav_total_set.js userAgentData.toJSON must stay on explicit core_wrapper path"
 
-$tz = Get-Content -Path (Join-Path $repo "sunami\\assets\\scripts\\window\\patches\\stealth\\TimezoneOverride_source.js") -Raw
+$tz = Get-Content -Path (Join-Path $repo "logreverse\\assets\\scripts\\window\\patches\\stealth\\TimezoneOverride_source.js") -Raw
 Assert-Contains -Text $tz -Pattern "__wrapNativeCtor" -Message "TimezoneOverride_source.js must use __wrapNativeCtor for Intl ctor surfaces"
 Assert-Contains -Text $tz -Pattern "createNativeShapedMethod" -Message "TimezoneOverride_source.js must use createNativeShapedMethod for method surfaces"
 Assert-Contains -Text $tz -Pattern '(?s)createNativeShapedMethod\("resolvedOptions".*?Reflect\.apply\(origResolvedOptions,\s*this,\s*\[\]\)' -Message "TimezoneOverride_source.js resolvedOptions patches must stay on native-shaped local method path"

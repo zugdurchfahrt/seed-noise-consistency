@@ -1,7 +1,7 @@
 # Proxy Mechanics Registry
 
 Format: `object/provider [wrapperClass=...] --- mechanic`
-Scope: modules injected by `sunami/main.py` (`build_page_bundle`) and related new-document patches.
+Scope: modules injected by `logreverse/main.py` (`build_page_bundle`) and related new-document patches.
 
 ## wrapperClass (CORE2.0 vCurrent)
 

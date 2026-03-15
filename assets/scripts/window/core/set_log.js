@@ -35,6 +35,30 @@ const LOGGingModule = function LOGGingModule() {
         enumerable: false
       });
     }
+    function __defineLoggerHiddenValue(name, value, writable) {
+      Object.defineProperty(__loggerRoot, name, {
+        value: value,
+        writable: writable !== false,
+        configurable: true,
+        enumerable: false
+      });
+      return value;
+    }
+    function __ensureLoggerHiddenValue(name, fallbackFactory, validator, writable) {
+      const current = __loggerRoot[name];
+      const isValid = (typeof validator === "function") ? validator(current) : !!current;
+      const nextValue = isValid ? current : fallbackFactory();
+      return __defineLoggerHiddenValue(name, nextValue, writable);
+    }
+    function __defineGlobalCompatValue(name, value, writable) {
+      Object.defineProperty(global, name, {
+        value: value,
+        writable: writable !== false,
+        configurable: true,
+        enumerable: false
+      });
+      return value;
+    }
 
     function rebindWindowLoggerShell() {
       if (!W) return;
@@ -68,13 +92,13 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     if (!__loggerRoot.__PATCH_MYTYPER__) {
-    __loggerRoot.__PATCH_MYTYPER__ = true;
+    __defineLoggerHiddenValue("__PATCH_MYTYPER__", true, true);
 
     // ===== 0) Central store: private buffer only =====
     const STORE = (__loggerRoot.STORE instanceof WeakMap) ? __loggerRoot.STORE : new WeakMap();
     const FALLBACK_BUF = Array.isArray(__loggerRoot.FALLBACK_BUF) ? __loggerRoot.FALLBACK_BUF : [];
-    __loggerRoot.STORE = STORE;
-    __loggerRoot.FALLBACK_BUF = FALLBACK_BUF;
+    __defineLoggerHiddenValue("STORE", STORE, true);
+    __defineLoggerHiddenValue("FALLBACK_BUF", FALLBACK_BUF, true);
     let degradeFn = null;
 
     function _buf() {
@@ -243,9 +267,9 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     function diagScreenGetConfig() {
-      if (!(__loggerRoot.__DIAG_SCREEN__ && typeof __loggerRoot.__DIAG_SCREEN__ === "object")) {
-        __loggerRoot.__DIAG_SCREEN__ = {};
-      }
+      __ensureLoggerHiddenValue("__DIAG_SCREEN__", function () { return {}; }, function (v) {
+        return !!(v && typeof v === "object");
+      }, true);
       const cfg = __loggerRoot.__DIAG_SCREEN__;
       if (!Object.prototype.hasOwnProperty.call(cfg, "enabled")) cfg.enabled = false;
       if (!Object.prototype.hasOwnProperty.call(cfg, "criticalOnly")) cfg.criticalOnly = true;
@@ -375,20 +399,26 @@ const LOGGingModule = function LOGGingModule() {
 
 
     // Debug flag
-    if (!Object.prototype.hasOwnProperty.call(__loggerRoot, "__DEBUG__")) {
-      __loggerRoot.__DEBUG__ =
-          // Toggle for *logger self-diagnostics visibility*.
-       // IMPORTANT: must not change runtime behavior by throwing from the logger.
-        typeof global.__DEBUG__ !== "undefined" ? !!global.__DEBUG__ : true;
-        // typeof global.__DEBUG__ !== "undefined" ? !!global.__DEBUG__ : false;
-    }
-    
-    global.env = global.env || {};
-    global.env.DEBUG_DEGRADES = true;   // включить
-    // global.env.DEBUG_DEGRADES = false; // выключить
-    // global.env.EXPECTED_RECEIVER_THROW_GUARD = true;   // включить special logger_guard for expected Illegal invocation / incompatible receiver
-    global.env.EXPECTED_RECEIVER_THROW_GUARD = false; // выключить: такие случаи пойдут в обычный __DEGRADE__ поток
-    const env = global.env;
+    __ensureLoggerHiddenValue("__DEBUG__", function () {
+      return (
+        // Toggle for *logger self-diagnostics visibility*.
+        // IMPORTANT: must not change runtime behavior by throwing from the logger.
+        typeof global.__DEBUG__ !== "undefined" ? !!global.__DEBUG__ : true
+      );
+      // typeof global.__DEBUG__ !== "undefined" ? !!global.__DEBUG__ : false;
+    }, function (v) {
+      return typeof v === "boolean";
+    }, true);
+
+    const env = (function () {
+      const existingEnv = (global.env && typeof global.env === "object") ? global.env : Object.create(null);
+      __defineGlobalCompatValue("env", existingEnv, true);
+      if (!Object.prototype.hasOwnProperty.call(existingEnv, "DEBUG_DEGRADES")) existingEnv.DEBUG_DEGRADES = true;
+      // existingEnv.DEBUG_DEGRADES = false; // выключить
+      // existingEnv.EXPECTED_RECEIVER_THROW_GUARD = true;   // включить special logger_guard for expected Illegal invocation / incompatible receiver
+      if (!Object.prototype.hasOwnProperty.call(existingEnv, "EXPECTED_RECEIVER_THROW_GUARD")) existingEnv.EXPECTED_RECEIVER_THROW_GUARD = false;
+      return existingEnv;
+    })();
 
 
     // Save original console methods
@@ -402,20 +432,22 @@ const LOGGingModule = function LOGGingModule() {
     };
 
     function getLoggerGuard() {
-      if (!(__loggerRoot.__LOGGER_GUARD__ && typeof __loggerRoot.__LOGGER_GUARD__ === "object")) {
-        __loggerRoot.__LOGGER_GUARD__ = { count: 0, last: null, lastAt: null };
-      }
+      __ensureLoggerHiddenValue("__LOGGER_GUARD__", function () {
+        return { count: 0, last: null, lastAt: null };
+      }, function (v) {
+        return !!(v && typeof v === "object");
+      }, true);
       return __loggerRoot.__LOGGER_GUARD__;
     }
 
     function getLoggerGuardMode() {
       try {
-        if (!(__loggerRoot.__LOGGER_GUARD_MODE__ && typeof __loggerRoot.__LOGGER_GUARD_MODE__ === "object")) {
-          __loggerRoot.__LOGGER_GUARD_MODE__ = {};
-        }
+        __ensureLoggerHiddenValue("__LOGGER_GUARD_MODE__", function () { return {}; }, function (v) {
+          return !!(v && typeof v === "object");
+        }, true);
         const mode = __loggerRoot.__LOGGER_GUARD_MODE__;
         if (!Object.prototype.hasOwnProperty.call(mode, "expectedReceiverThrow")) {
-          mode.expectedReceiverThrow = !(global.env && global.env.EXPECTED_RECEIVER_THROW_GUARD === false);
+          mode.expectedReceiverThrow = !(env && env.EXPECTED_RECEIVER_THROW_GUARD === false);
         }
         return mode;
       } catch (_) {
@@ -570,9 +602,11 @@ const LOGGingModule = function LOGGingModule() {
 
     // Supported logging levels
     const LOG_LEVELS = ["error", "warn", "log", "info", "debug", "trace"];
-    __loggerRoot._logLevel = (typeof __loggerRoot._logLevel === "string" && __loggerRoot._logLevel)
-      ? __loggerRoot._logLevel
-      : (global._logLevel || "log");
+    __ensureLoggerHiddenValue("_logLevel", function () {
+      return (typeof global._logLevel === "string" && global._logLevel) ? global._logLevel : "log";
+    }, function (v) {
+      return typeof v === "string" && !!v;
+    }, true);
 
     function levelAllows(currentLevel, eventLevel) {
       const idx = LOG_LEVELS.indexOf(currentLevel);
@@ -784,7 +818,7 @@ const LOGGingModule = function LOGGingModule() {
         }
     };
     degradeFn = __degradeApi;
-    __loggerRoot.__DEGRADE__ = __degradeApi;
+    __defineLoggerHiddenValue("__DEGRADE__", __degradeApi, true);
 
     Object.defineProperty(__degradeApi, "getBuffer", {
       value() {
@@ -1077,7 +1111,7 @@ const LOGGingModule = function LOGGingModule() {
       return true;
     }
 
-    __loggerRoot.__PROBE_LIVE_READER__ = {
+    __defineLoggerHiddenValue("__PROBE_LIVE_READER__", {
       start: __probeLiveStart,
       stop: __probeLiveStop,
       poll: __probeLivePoll,
@@ -1091,15 +1125,15 @@ const LOGGingModule = function LOGGingModule() {
           startedAt: __probeLiveState.startedAt
         };
       }
-    };
+    }, false);
 
     __probeLiveStart();
   }
 
   // ===== Stage 0/1: runtime-evaluate alerts + optional live-summary state =====
-  __loggerRoot.__DIAG_ALERTS__ = function (opts) { return pullDiagAlerts(opts); };
+  __defineLoggerHiddenValue("__DIAG_ALERTS__", function (opts) { return pullDiagAlerts(opts); }, false);
 
-  __loggerRoot.DIAG_SCREEN_ON = function (opts) {
+  __defineLoggerHiddenValue("DIAG_SCREEN_ON", function (opts) {
     try {
       const cfg = diagScreenGetConfig();
       if (isPlainObject(opts)) {
@@ -1110,24 +1144,24 @@ const LOGGingModule = function LOGGingModule() {
       cfg.enabled = true;
     } catch (_) {}
     return diagScreenSnapshot();
-  };
+  }, false);
 
-  __loggerRoot.DIAG_SCREEN_OFF = function () {
+  __defineLoggerHiddenValue("DIAG_SCREEN_OFF", function () {
     try {
       const cfg = diagScreenGetConfig();
       cfg.enabled = false;
     } catch (_) {}
     return diagScreenSnapshot();
-  };
+  }, false);
 
-  __loggerRoot.DIAG_SCREEN_RESET = function () {
+  __defineLoggerHiddenValue("DIAG_SCREEN_RESET", function () {
     resetDiagScreenState();
     return diagScreenSnapshot();
-  };
+  }, false);
 
-  __loggerRoot.DIAG_SCREEN_SNAPSHOT = function () {
+  __defineLoggerHiddenValue("DIAG_SCREEN_SNAPSHOT", function () {
     return diagScreenSnapshot();
-  };
+  }, false);
 
 
     // ===== 2) Core logger: pushLog (console + errors) =====
@@ -1210,16 +1244,18 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     // ===== 4) Module logger window.log (no double logging) =====
-    __loggerRoot._logConfig = (__loggerRoot._logConfig && typeof __loggerRoot._logConfig === "object") ? __loggerRoot._logConfig : {
+    __ensureLoggerHiddenValue("_logConfig", function () { return {
       global: { enabled: true, level: "log" },
       WEBGLlogger: { enabled: true, level: "log" },
       CanvasLogger: { enabled: true, level: "debug" },
       Contextlogger: { enabled: true, level: "debug" },
       Navigatorlogger: { enabled: true, level: "debug" },
       WRKlogger: { enabled: true, level: "debug" },
-    };
+    }; }, function (v) {
+      return !!(v && typeof v === "object");
+    }, true);
 
-    __loggerRoot.log = function (module, level) {
+    __defineLoggerHiddenValue("log", function (module, level) {
       const args = Array.prototype.slice.call(arguments, 2);
       const config = __loggerRoot._logConfig[module] || __loggerRoot._logConfig.global;
       if (!config || !config.enabled) return;
@@ -1237,7 +1273,7 @@ const LOGGingModule = function LOGGingModule() {
 
       // Store entry
       pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
-    };
+    }, false);
 
     // ===== 5) Uncaught errors + unhandled rejections (consistent, no logError) =====
 
@@ -1388,7 +1424,7 @@ const LOGGingModule = function LOGGingModule() {
      }
 
     // ===== 6) Export helper (in-session) =====
-    __loggerRoot.exportMyDebugLog = function () {
+    __defineLoggerHiddenValue("exportMyDebugLog", function () {
       try {
         if (typeof document === "undefined" || !document) return;
         const list = (typeof __loggerRoot.__DEGRADE__ === "function" && typeof __loggerRoot.__DEGRADE__.getBuffer === "function")
@@ -1426,10 +1462,10 @@ const LOGGingModule = function LOGGingModule() {
           try { recordLoggerError(e, "exportMyDebugLog"); } catch (_) {}
         }
       }
-    };
+    }, false);
 
     // ===== 7) One-click toggles (no markers) =====
-    __loggerRoot.DEBUG_ALL_ON = function () {
+    __defineLoggerHiddenValue("DEBUG_ALL_ON", function () {
       try {
         __loggerRoot.__DEBUG__ = true;
         __loggerRoot._logLevel = "trace";
@@ -1448,9 +1484,9 @@ const LOGGingModule = function LOGGingModule() {
           try { recordLoggerError(e, "DEBUG_ALL_ON"); } catch (_) {}
         }
       }
-    };
+    }, false);
 
-    __loggerRoot.DEBUG_ALL_OFF = function () {
+    __defineLoggerHiddenValue("DEBUG_ALL_OFF", function () {
       try {
         __loggerRoot.__DEBUG__ = false;
         __loggerRoot._logLevel = "error";
@@ -1468,9 +1504,9 @@ const LOGGingModule = function LOGGingModule() {
           try { recordLoggerError(e, "DEBUG_ALL_OFF"); } catch (_) {}
         }
       }
-    };
+    }, false);
 
-    __loggerRoot.DEBUG_ALL_TOGGLE = function () {
+    __defineLoggerHiddenValue("DEBUG_ALL_TOGGLE", function () {
       try {
         if (__loggerRoot.__DEBUG__) __loggerRoot.DEBUG_ALL_OFF();
         else __loggerRoot.DEBUG_ALL_ON();
@@ -1480,78 +1516,72 @@ const LOGGingModule = function LOGGingModule() {
           try { recordLoggerError(e, "DEBUG_ALL_TOGGLE"); } catch (_) {}
         }
       }
-    };
+    }, false);
 
     // Logger self-diagnostics mode toggles (controls verbosity, not runtime throws)
-    __loggerRoot.DEBUG_DEGRADES_ON = function () {
+    __defineLoggerHiddenValue("DEBUG_DEGRADES_ON", function () {
       try {
-        global.env = global.env || {};
-        global.env.DEBUG_DEGRADES = true;
+        env.DEBUG_DEGRADES = true;
         if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_ON", null);
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "DEBUG_DEGRADES_ON"); } catch (_) {}
       }
-    };
+    }, false);
 
-    __loggerRoot.DEBUG_DEGRADES_OFF = function () {
+    __defineLoggerHiddenValue("DEBUG_DEGRADES_OFF", function () {
       try {
-        global.env = global.env || {};
-        global.env.DEBUG_DEGRADES = false;
+        env.DEBUG_DEGRADES = false;
         if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_OFF", null);
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "DEBUG_DEGRADES_OFF"); } catch (_) {}
       }
-    };
+    }, false);
 
-    __loggerRoot.DEBUG_DEGRADES_TOGGLE = function () {
+    __defineLoggerHiddenValue("DEBUG_DEGRADES_TOGGLE", function () {
       try {
-        global.env = global.env || {};
-        global.env.DEBUG_DEGRADES = !global.env.DEBUG_DEGRADES;
-        if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_TOGGLE", null, { enabled: !!global.env.DEBUG_DEGRADES });
+        env.DEBUG_DEGRADES = !env.DEBUG_DEGRADES;
+        if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_TOGGLE", null, { enabled: !!env.DEBUG_DEGRADES });
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
       }
-    };
+    }, false);
 
-    __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_ON = function () {
+    __defineLoggerHiddenValue("EXPECTED_RECEIVER_THROW_GUARD_ON", function () {
       try {
-        global.env = global.env || {};
-        global.env.EXPECTED_RECEIVER_THROW_GUARD = true;
+        env.EXPECTED_RECEIVER_THROW_GUARD = true;
         const mode = getLoggerGuardMode();
         if (mode) mode.expectedReceiverThrow = true;
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_ON"); } catch (_) {}
       }
-    };
+    }, false);
 
-    __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_OFF = function () {
+    __defineLoggerHiddenValue("EXPECTED_RECEIVER_THROW_GUARD_OFF", function () {
       try {
-        global.env = global.env || {};
-        global.env.EXPECTED_RECEIVER_THROW_GUARD = false;
+        env.EXPECTED_RECEIVER_THROW_GUARD = false;
         const mode = getLoggerGuardMode();
         if (mode) mode.expectedReceiverThrow = false;
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_OFF"); } catch (_) {}
       }
-    };
+    }, false);
 
-    __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_TOGGLE = function () {
+    __defineLoggerHiddenValue("EXPECTED_RECEIVER_THROW_GUARD_TOGGLE", function () {
       try {
-        global.env = global.env || {};
         const mode = getLoggerGuardMode();
         const next = !(mode && mode.expectedReceiverThrow === false);
         if (mode) mode.expectedReceiverThrow = !next;
-        global.env.EXPECTED_RECEIVER_THROW_GUARD = !!(mode && mode.expectedReceiverThrow !== false);
+        env.EXPECTED_RECEIVER_THROW_GUARD = !!(mode && mode.expectedReceiverThrow !== false);
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_TOGGLE"); } catch (_) {}
       }
-    };
+    }, false);
       Object.defineProperty(__loggerRoot, "rebindWindowLoggerShell", {
         value: rebindWindowLoggerShell,
         writable: false,
