@@ -130,7 +130,7 @@
   function applyTargetGroup(groupTag, targets, policy) {
     let plans = [];
     try {
-      plans = Core.applyTargets(targets, window.__PROFILE__, []);
+      plans = Core.applyTargets(targets, []);
     } catch (e) {
       degrade(groupTag + ':preflight_failed', e, {
         stage: 'preflight',
@@ -665,8 +665,8 @@
     }
     __geoStateSnapshot = __cloneGeoStateValue(__geoState);
 
-    const latitude = (typeof __geoState.latitude === 'number') ? __geoState.latitude : window.__LATITUDE__;
-    const longitude = (typeof __geoState.longitude === 'number') ? __geoState.longitude : window.__LONGITUDE__;
+    const latitude = __geoState.latitude;
+    const longitude = __geoState.longitude;
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
       degrade('geo:coords_missing', new Error('[GeoOverride] geolocation missing latitude/longitude'), {
         stage: 'preflight',

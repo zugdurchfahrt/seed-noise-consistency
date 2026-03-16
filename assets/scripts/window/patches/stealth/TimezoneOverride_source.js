@@ -128,16 +128,14 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     const langTransitState = __resolveLangTransitState();
     const timezone = (geoTransitState && typeof geoTransitState.timezone === "string" && geoTransitState.timezone)
       ? geoTransitState.timezone
-      : window.__TIMEZONE__;
+      : null;
     const offsetMinutes = (geoTransitState && typeof geoTransitState.offsetMinutes === "number")
       ? geoTransitState.offsetMinutes
-      : window.__OFFSET_MINUTES__;
+      : null;
 
     const spoofedLocales = (langTransitState && Array.isArray(langTransitState.normalizedLanguages))
       ? langTransitState.normalizedLanguages
-      : (Array.isArray(window.__normalizedLanguages)
-        ? window.__normalizedLanguages
-        : (typeof window.__normalizedLanguages === "string" ? [window.__normalizedLanguages] : null));
+      : null;
 
     const spoofedLocale = spoofedLocales ? spoofedLocales[0] : null;
 
@@ -420,10 +418,6 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           try {
             options = Reflect.apply(origResolvedOptions, this, []);
           } catch (e) {
-            const nativeThrowMsg = (e && e.message) ? String(e.message) : "";
-            if (e instanceof TypeError && /(?:illegal invocation|incompatible receiver|called on incompatible receiver)/i.test(nativeThrowMsg)) {
-              throw e;
-            }
             diagBrowser("warn", "tz:IntlResolvedOptions:native_throw", {
               stage: "runtime",
               message: "native resolvedOptions threw",
