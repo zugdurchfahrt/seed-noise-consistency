@@ -210,16 +210,16 @@ const LOGGingModule = function LOGGingModule() {
             ? errObj.message
             : (typeof entry.error === "string" ? entry.error : null);
           return {
+            diagTag: (typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null,
+            module: (typeof extra.module === "string" && extra.module) ? extra.module : null,
+            key: (typeof extra.key === "string") ? extra.key : null,
             idx: (typeof idx === "number") ? idx : null,
             timestamp: safeEntryTimestamp(entry),
             entryType: "degrade",
             level: String(level),
             critical: !!DIAG_CRITICAL_LEVELS[String(level)],
             code: (typeof entry.code === "string" && entry.code) ? entry.code : null,
-            module: (typeof extra.module === "string" && extra.module) ? extra.module : null,
-            diagTag: (typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null,
             stage: (typeof extra.stage === "string" && extra.stage) ? extra.stage : null,
-            key: (typeof extra.key === "string") ? extra.key : null,
             message: (typeof extra.message === "string" && extra.message) ? extra.message : errMessage,
             errName: errName,
             errMessage: errMessage,
@@ -245,16 +245,16 @@ const LOGGingModule = function LOGGingModule() {
         }
         const hasRuntimeData = Object.keys(runtimeData).length > 0;
         return {
+          diagTag: "runtime",
+          module: "runtime",
+          key: null,
           idx: (typeof idx === "number") ? idx : null,
           timestamp: safeEntryTimestamp(entry),
           entryType: entryType,
           level: lvl,
           critical: true,
           code: entryType,
-          module: "runtime",
-          diagTag: "runtime",
           stage: "runtime",
-          key: null,
           message: msg,
           errName: null,
           errMessage: msg,

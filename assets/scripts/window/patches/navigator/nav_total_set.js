@@ -153,6 +153,32 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         enumerable: false
       });
     }
+    const __navModuleState = __stateRoot.__NAV_TOTAL_SET__;
+    function __navCloneStateValue(value) {
+      if (Array.isArray(value)) return value.map(__navCloneStateValue);
+      if (value && typeof value === 'object') {
+        const out = Object.create(null);
+        const keys = Object.keys(value);
+        for (let i = 0; i < keys.length; i++) {
+          const key = keys[i];
+          out[key] = __navCloneStateValue(value[key]);
+        }
+        return out;
+      }
+      return value;
+    }
+    let __navProfileState = (__navModuleState.__PROFILE_STATE__ && typeof __navModuleState.__PROFILE_STATE__ === 'object')
+      ? __navModuleState.__PROFILE_STATE__
+      : null;
+    if (!__navProfileState) {
+      __navProfileState = Object.create(null);
+      Object.defineProperty(__navModuleState, '__PROFILE_STATE__', {
+        value: __navProfileState,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
 
     // basic random from the existing seed initialization
     const __navCoreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
@@ -210,10 +236,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       : ((C && C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') ? C.__LANG_STATE__ : null);
     const __navPrimaryLanguage = (__navLangState && typeof __navLangState.primaryLanguage === 'string' && __navLangState.primaryLanguage)
       ? __navLangState.primaryLanguage
-      : ((typeof window.__primaryLanguage === 'string' && window.__primaryLanguage) ? window.__primaryLanguage : null);
+      : null;
     const __navNormalizedLanguages = (__navLangState && Array.isArray(__navLangState.normalizedLanguages))
       ? __navLangState.normalizedLanguages.slice()
-      : (Array.isArray(window.__normalizedLanguages) ? window.__normalizedLanguages.slice() : null);
+      : null;
     if (Array.isArray(__navNormalizedLanguages)) {
       try {
         Object.freeze(__navNormalizedLanguages);
@@ -246,25 +272,45 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     try {
+    __navProfileState.meta = __navCloneStateValue(window.__EXPECTED_CLIENT_HINTS || {});
+    __navProfileState.navPlat = window.__NAV_PLATFORM__;
+    __navProfileState.generatedPlatform = window.__GENERATED_PLATFORM;
+    __navProfileState.generatedPlatformVersion = window.__GENERATED_PLATFORM_VERSION;
+    __navProfileState.userAgent = window.__USER_AGENT;
+    __navProfileState.vendor = window.__VENDOR;
+    __navProfileState.mem = Number(window.__memory);
+    __navProfileState.cpu = Number(window.__cpu);
+    __navProfileState.dpr = Number(window.__DPR);
+    __navProfileState.width = Number(window.__WIDTH ?? (window.screen && window.screen.width));
+    __navProfileState.height = Number(window.__HEIGHT ?? (window.screen && window.screen.height));
+    __navProfileState.devicesLabels = __navCloneStateValue(window.__DEVICES_LABELS);
+    __navProfileState.colorDepth = Number(window.__COLOR_DEPTH);
+    __navProfileState.orientationDom = window.__ORIENTATION ?? (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary');
+    __navProfileState.strict = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
+    __navProfileState.debug = !!window.__NAV_PATCH_DEBUG__;
+    __navProfileState.fullVersionList = __navCloneStateValue(window.__FULL_VERSION_LIST);
+    __navProfileState.storageQuotaMb = window.__STORAGE_QUOTA_MB;
+    __navProfileState.storageUsedPct = window.__STORAGE_USED_PCT;
+    __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(window.__PLUGIN_PROFILES__) ? window.__PLUGIN_PROFILES__ : []);
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
-    const meta          = window.__EXPECTED_CLIENT_HINTS || {};
-    const navPlat       = window.__NAV_PLATFORM__;     // 'Win32' | 'MacIntel'
-    const gen           = window.__GENERATED_PLATFORM; // "Windows" | "macOS"
-    const userAgent     = window.__USER_AGENT;
-    const vendor        = window.__VENDOR;
-    const mem           = Number(window.__memory);
-    const cpu           = Number(window.__cpu);
-    const dpr           = Number(window.__DPR);
-    const width         = Number(window.__WIDTH  ?? (window.screen && window.screen.width));
-    const height        = Number(window.__HEIGHT ?? (window.screen && window.screen.height));
-    const devicesLabels = window.__DEVICES_LABELS;
-    const colorDepth    = Number(window.__COLOR_DEPTH);
-    const orientationDom = window.__ORIENTATION ?? ((height >= width) ? 'portrait-primary' : 'landscape-primary')
+    const meta          = __navProfileState.meta || {};
+    const navPlat       = __navProfileState.navPlat;     // 'Win32' | 'MacIntel'
+    const gen           = __navProfileState.generatedPlatform; // "Windows" | "macOS"
+    const userAgent     = __navProfileState.userAgent;
+    const vendor        = __navProfileState.vendor;
+    const mem           = __navProfileState.mem;
+    const cpu           = __navProfileState.cpu;
+    const dpr           = __navProfileState.dpr;
+    const width         = __navProfileState.width;
+    const height        = __navProfileState.height;
+    const devicesLabels = __navProfileState.devicesLabels;
+    const colorDepth    = __navProfileState.colorDepth;
+    const orientationDom = __navProfileState.orientationDom;
 
     // strictness & diagnostics
-    const STRICT        = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
-    const DEBUG         = !!window.__NAV_PATCH_DEBUG__;
+    const STRICT        = __navProfileState.strict;
+    const DEBUG         = __navProfileState.debug;
     let mediaDevicesLabelsUnlocked = false;
     let mediaMicGranted = false;
     let mediaCameraGranted = false;
@@ -417,7 +463,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
     }
     const navPlatformOut = STRICT ? navPlat : expectedNavPlat;
-    if (!window.__COLOR_DEPTH) {
+    if (!Number.isFinite(colorDepth) || colorDepth <= 0) {
       __navDiag('warn', 'nav_total_set:color_depth_missing', {
         stage: 'preflight',
         type: __navTypePipeline,
@@ -776,7 +822,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       let plans = [];
       try {
-        plans = Core.applyTargets(targets, window.__PROFILE__, []);
+        plans = Core.applyTargets(targets, null, []);
       } catch (e) {
         __navDiag('error', groupTag + ':preflight_failed', {
           stage: 'preflight',
@@ -1298,7 +1344,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(cpu) ? cpu : undefined;
               const fullVersionList = (meta && meta.fullVersionList != null)
                 ? meta.fullVersionList
-                : window.__FULL_VERSION_LIST;
+                : __navProfileState.fullVersionList;
                const map = {
                  architecture: meta.architecture,
                  bitness: meta.bitness,
@@ -1872,8 +1918,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
         });
       } else {
-      const QUOTA_MB   = Number(window.__STORAGE_QUOTA_MB   ?? 120);
-      const USED_PCT   = Math.max(0, Math.min(100, Number(window.__STORAGE_USED_PCT ?? 3))); // ~3% занято
+      const QUOTA_MB   = Number(__navProfileState.storageQuotaMb ?? 120);
+      const USED_PCT   = Math.max(0, Math.min(100, Number(__navProfileState.storageUsedPct ?? 3))); // ~3% занято
       const quotaBytes = Math.floor(QUOTA_MB * 1024 * 1024);
       let usageBytes   = Math.max(0, Math.floor(quotaBytes * USED_PCT / 100));
 
@@ -2322,7 +2368,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     });
 
     // ——— L. Plugins & MimeTypes ———
-    const profiles = Array.isArray(window.__PLUGIN_PROFILES__) ? window.__PLUGIN_PROFILES__ : [];
+    const profiles = Array.isArray(__navProfileState.pluginProfiles) ? __navProfileState.pluginProfiles : [];
       function safeString(val) { return (typeof val === 'symbol' || typeof val === 'undefined') ? '' : String(val); }
 
       const fakeMimeTypes = [];

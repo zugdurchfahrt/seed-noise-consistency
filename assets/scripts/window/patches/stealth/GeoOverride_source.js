@@ -130,7 +130,7 @@
   function applyTargetGroup(groupTag, targets, policy) {
     let plans = [];
     try {
-      plans = Core.applyTargets(targets, []);
+      plans = Core.applyTargets(targets, null, []);
     } catch (e) {
       degrade(groupTag + ':preflight_failed', e, {
         stage: 'preflight',
