@@ -184,26 +184,55 @@ const WrkModule = function WrkModule(window) {
 
 // 1) Источник снапшотов
 function EnvBus(G){
+  function __cloneEnvValue(v) {
+    if (Array.isArray(v)) return v.map(__cloneEnvValue);
+    if (v && typeof v === 'object') {
+      const out = {};
+      const keys = Object.keys(v);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        out[key] = __cloneEnvValue(v[key]);
+      }
+      return out;
+    }
+    return v;
+  }
+  const __envLangs = (() => {
+    const src = G.__normalizedLanguages;
+    if (Array.isArray(src)) return src.slice();
+    if (typeof src === 'string' && src) return [src];
+    return null;
+  })();
+  const __envLang = (typeof G.__primaryLanguage === 'string' && G.__primaryLanguage) ? G.__primaryLanguage : null;
+  const __envUa = (typeof G.__USER_AGENT === 'string' && G.__USER_AGENT) ? G.__USER_AGENT : null;
+  const __envVendor = (typeof G.__VENDOR === 'string') ? G.__VENDOR : null;
+  const __envDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null;
+  const __envCpu = (G.__cpu != null) ? G.__cpu : null;
+  const __envMem = (G.__memory != null) ? G.__memory : null;
+  const __envTimeZone = (typeof G.__TIMEZONE__ === 'string' && G.__TIMEZONE__) ? G.__TIMEZONE__ : null;
+  const __envContract = (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object')
+    ? __cloneEnvValue(G.__EXPECTED_CLIENT_HINTS)
+    : null;
   function envSnapshot(){
     const nav = G.navigator;
-    let langs = G.__normalizedLanguages;
+    let langs = __envLangs;
     if (!Array.isArray(langs)) {
-      if (typeof langs === 'string') langs = [langs];
-      else throw new Error('EnvBus: __normalizedLanguages missing');
+      throw new Error('EnvBus: __normalizedLanguages missing');
     }
-    const lang     = (typeof G.__primaryLanguage === 'string') ? G.__primaryLanguage : null;
+    langs = langs.slice();
+    const lang     = __envLang;
     if (!lang) throw new Error('EnvBus: __primaryLanguage missing');
-    const ua       = G.__USER_AGENT;
-    const vendor   = G.__VENDOR;
+    const ua       = __envUa;
+    const vendor   = __envVendor;
     if (typeof ua !== 'string' || !ua) throw new Error('EnvBus: __USER_AGENT missing');
     if (typeof vendor !== 'string') throw new Error('EnvBus: __VENDOR missing');
-    const dpr      = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null;
+    const dpr      = __envDpr;
     if (!dpr) throw new Error('EnvBus: __DPR missing');
-    const cpu      = (G.__cpu != null) ? G.__cpu : null;
-    const mem      = (G.__memory != null) ? G.__memory : null;
+    const cpu      = __envCpu;
+    const mem      = __envMem;
     if (cpu == null) throw new Error('EnvBus: __cpu missing');
     if (mem == null) throw new Error('EnvBus: __memory missing');
-    const timeZone = G.__TIMEZONE__;
+    const timeZone = __envTimeZone;
     if (!timeZone) throw new Error('EnvBus: __TIMEZONE__ missing');
 
     // UAData (Window runtime) is the primary source for Worker snapshots.
@@ -211,7 +240,7 @@ function EnvBus(G){
     if (!UAD) throw new Error('EnvBus: navigator.userAgentData missing');
 
     // Contract snapshot is used only for validation (not as a data source).
-    const contract = G.__EXPECTED_CLIENT_HINTS;
+    const contract = __envContract;
     if (!contract || typeof contract !== 'object') {
       throw new Error('EnvBus: __EXPECTED_CLIENT_HINTS missing');
     }
@@ -946,6 +975,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
     const bc = new BroadcastChannel('__ENV_SYNC__');
     bc.postMessage({ __ENV_SYNC__: { envSnapshot: snap } });
   }
+  const __bridgeEnvBus = EnvBus(global);
   if (BR.mkModuleWorkerSource && BR.mkModuleWorkerSource !== mkModuleWorkerSource) {
     throw new Error('EnvBridge: mkModuleWorkerSource already set');
   }
@@ -955,13 +985,13 @@ function mkClassicWorkerSource(snapshot, absUrl){
   if (BR.publishSnapshot && BR.publishSnapshot !== publishSnapshot) {
     throw new Error('EnvBridge: publishSnapshot already set');
   }
-  if (BR.envSnapshot && BR.envSnapshot !== EnvBus(global).envSnapshot) {
+  if (BR.envSnapshot && BR.envSnapshot !== __bridgeEnvBus.envSnapshot) {
     throw new Error('EnvBridge: envSnapshot already set');
   }
   BR.mkModuleWorkerSource  = mkModuleWorkerSource;
   BR.mkClassicWorkerSource = mkClassicWorkerSource;
   BR.publishSnapshot       = publishSnapshot;
-  BR.envSnapshot           = EnvBus(global).envSnapshot;
+  BR.envSnapshot           = __bridgeEnvBus.envSnapshot;
 })(window);
 
 
@@ -1948,7 +1978,10 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
   // 3) Первый снапшот (LE) из текущего состояния
   function snapshotOnce(){
-    const snap = EnvBus(G).envSnapshot();
+    const envSnapshot = (G.__ENV_BRIDGE__ && typeof G.__ENV_BRIDGE__.envSnapshot === 'function')
+      ? G.__ENV_BRIDGE__.envSnapshot
+      : EnvBus(G).envSnapshot;
+    const snap = envSnapshot();
     if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
       throw new Error('[WorkerInit] hub missing');
     }
