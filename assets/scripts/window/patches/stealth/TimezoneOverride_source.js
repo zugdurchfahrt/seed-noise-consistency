@@ -111,7 +111,21 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       return null;
     }
 
+    function __resolveLangTransitState() {
+      const C = window && window.CanvasPatchContext;
+      if (!C || typeof C !== 'object') return null;
+      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+      if (stateRoot && stateRoot.__LANG_STATE__ && typeof stateRoot.__LANG_STATE__ === 'object') {
+        return stateRoot.__LANG_STATE__;
+      }
+      if (C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') {
+        return C.__LANG_STATE__;
+      }
+      return null;
+    }
+
     const geoTransitState = __resolveGeoTransitState();
+    const langTransitState = __resolveLangTransitState();
     const timezone = (geoTransitState && typeof geoTransitState.timezone === "string" && geoTransitState.timezone)
       ? geoTransitState.timezone
       : window.__TIMEZONE__;
@@ -119,9 +133,11 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       ? geoTransitState.offsetMinutes
       : window.__OFFSET_MINUTES__;
 
-    const spoofedLocales = Array.isArray(window.__normalizedLanguages)
-      ? window.__normalizedLanguages
-      : (typeof window.__normalizedLanguages === "string" ? [window.__normalizedLanguages] : null);
+    const spoofedLocales = (langTransitState && Array.isArray(langTransitState.normalizedLanguages))
+      ? langTransitState.normalizedLanguages
+      : (Array.isArray(window.__normalizedLanguages)
+        ? window.__normalizedLanguages
+        : (typeof window.__normalizedLanguages === "string" ? [window.__normalizedLanguages] : null));
 
     const spoofedLocale = spoofedLocales ? spoofedLocales[0] : null;
 
@@ -159,7 +175,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     }
     if (!spoofedLocales || !spoofedLocales.length || typeof spoofedLocale !== "string" || !spoofedLocale) {
       diagPipeline("error", "tz:missing_normalizedLanguages", {
-        key: __flagKey,
+        key: 'state.__LANG_STATE__.normalizedLanguages',
         stage: "preflight",
         message: "normalized languages missing",
         data: { outcome: "skip", reason: "missing_normalizedLanguages", timezone: timezone }

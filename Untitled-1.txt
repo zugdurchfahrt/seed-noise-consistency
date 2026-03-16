@@ -1,0 +1,31 @@
+
+
+Имплементировать  правки в соответстии с Планом
+## Object/function/proxy/property kinds / descriptor/receiver/apply path fulfulling alighnment plan
+bunch\insearthof2string\bunch_constrains\change.md
+
+Обеспечить в
+bunch\assets\scripts\window\core\core_window.js,
+bunch\assets\scripts\window\patches\stealth\hide_webdriver.js
+bunch\assets\scripts\window\patches\graphics\webgpu.js 
+
+модулях piplelne Контролль  соблюдения нормативно установленнных сущеностей:
+
+- `Proxy`/descriptor/toString-инварианты берутся из ECMAScript, а не из `Core`: [ECMAScript spec](https://tc39.es/ecma262/), [Function.prototype.toString](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/toString), [Object.defineProperty](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty).
+- `Illegal invocation`/brand/“объект действительно реализует интерфейс” берутся из Web IDL, а не из `Core`: [Web IDL Standard](https://webidl.spec.whatwg.org/). Там источник для `platform object`, `implements interface`, implementation-check, getter/method invocation.
+- return-contract конкретного API берётся уже из API-спеки: HTML/Permissions/MediaDevices/Storage/WebGPU и т.д. То есть `Promise<PermissionStatus>` или `MediaDeviceInfo[]` не `Core` придумывает.
+
+2. Реальный браузерный слой.
+- После спецификаций идёт фактический Chromium shape: где реально лежит дескриптор, кто `descriptorOwner`, accessor это или data, что выбрасывается на bad receiver, какие `ownKeys`, как выглядит `prototype`.
+
+
+1 object/function/proxy/property kinds; 
+2 descriptor/receiver/apply path 
+и
+3. Конситетнтости  используемых  внутренних ярлыков
+
+
+
+
+
+

@@ -86,11 +86,40 @@ function __ensureGeoTransitState__() {
   return state;
 }
 
+function __ensureLangTransitState__() {
+  let state = (stateRoot.__LANG_STATE__ && typeof stateRoot.__LANG_STATE__ === 'object')
+    ? stateRoot.__LANG_STATE__
+    : null;
+  if (!state) {
+    state = Object.create(null);
+    state.primaryLanguage = null;
+    state.normalizedLanguages = null;
+    Object.defineProperty(stateRoot, '__LANG_STATE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (C.__LANG_STATE__ !== state) {
+    Object.defineProperty(C, '__LANG_STATE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  return state;
+}
+
 const __geoTransitState__ = __ensureGeoTransitState__();
+const __langTransitState__ = __ensureLangTransitState__();
 const __bootstrapLatitude__ = W.__LATITUDE__;
 const __bootstrapLongitude__ = W.__LONGITUDE__;
 const __bootstrapTimezone__ = W.__TIMEZONE__;
 const __bootstrapOffsetMinutes__ = W.__OFFSET_MINUTES__;
+const __bootstrapPrimaryLanguage__ = W.__primaryLanguage;
+const __bootstrapNormalizedLanguages__ = W.__normalizedLanguages;
 if (
   __isFiniteNumber__(__bootstrapLatitude__) &&
   __isFiniteNumber__(__bootstrapLongitude__) &&
@@ -101,6 +130,14 @@ if (
   __geoTransitState__.longitude = __bootstrapLongitude__;
   __geoTransitState__.timezone = __bootstrapTimezone__;
   __geoTransitState__.offsetMinutes = __bootstrapOffsetMinutes__;
+}
+if (
+  typeof __bootstrapPrimaryLanguage__ === 'string' && __bootstrapPrimaryLanguage__ &&
+  Array.isArray(__bootstrapNormalizedLanguages__) &&
+  __bootstrapNormalizedLanguages__.length > 0
+) {
+  __langTransitState__.primaryLanguage = __bootstrapPrimaryLanguage__;
+  __langTransitState__.normalizedLanguages = __bootstrapNormalizedLanguages__;
 }
 
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
@@ -133,6 +170,15 @@ function __geoTransitOwnerReady__() {
     __isFiniteNumber__(state.offsetMinutes);
 }
 
+function __langTransitOwnerReady__() {
+  const state = __ensureLangTransitState__();
+  return !!state &&
+    typeof state.primaryLanguage === 'string' && !!state.primaryLanguage &&
+    Array.isArray(state.normalizedLanguages) &&
+    state.normalizedLanguages.length > 0 &&
+    state.normalizedLanguages[0] === state.primaryLanguage;
+}
+
 function __canSanitizeBootstrapKey__(key) {
   if (
     key === '__LATITUDE__' ||
@@ -141,6 +187,12 @@ function __canSanitizeBootstrapKey__(key) {
     key === '__OFFSET_MINUTES__'
   ) {
     return __geoTransitOwnerReady__();
+  }
+  if (
+    key === '__primaryLanguage' ||
+    key === '__normalizedLanguages'
+  ) {
+    return __langTransitOwnerReady__();
   }
   return true;
 }
