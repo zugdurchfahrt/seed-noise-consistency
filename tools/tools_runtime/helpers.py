@@ -91,21 +91,13 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
 
     # 1) primary
     _add(language)
-    # 1.1) base in primary
-    base_primary = _base(language)
-    if "-" in language:
-        _add(base_primary)
 
     # 2) rest
     for tag in canon[1:]:
         if not tag:
             continue
         _add(tag)
-        b = _base(tag)
-        # не дублируем базу первичного и саму базу tag
-        if "-" in tag and b != base_primary:
-            _add(b)
-
+    
     logger.info("[LANG] Languages after normalisation: %s", result)
     return language, result
     

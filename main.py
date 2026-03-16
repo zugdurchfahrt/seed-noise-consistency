@@ -427,6 +427,13 @@ def init_driver(
             DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
             __DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
             })(window);
+            (function runBootstrapEnvCleanup(win) {
+                const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
+                    ? win.CanvasPatchContext
+                    : null;
+                if (!C || typeof C.__sanitizeBootstrapEnvSurface__ !== 'function') return;
+                C.__sanitizeBootstrapEnvSurface__(win);
+            })(window);
             """
         ]
         return "\n;\n".join(parts)
@@ -1265,7 +1272,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
 
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.

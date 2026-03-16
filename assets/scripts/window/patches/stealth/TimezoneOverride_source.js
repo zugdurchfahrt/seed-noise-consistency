@@ -98,8 +98,26 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       }
     }
 
-    const timezone = window.__TIMEZONE__;
-    const offsetMinutes = window.__OFFSET_MINUTES__;
+    function __resolveGeoTransitState() {
+      const C = window && window.CanvasPatchContext;
+      if (!C || typeof C !== 'object') return null;
+      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+      if (stateRoot && stateRoot.__GEO_STATE__ && typeof stateRoot.__GEO_STATE__ === 'object') {
+        return stateRoot.__GEO_STATE__;
+      }
+      if (C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') {
+        return C.__GEO_STATE__;
+      }
+      return null;
+    }
+
+    const geoTransitState = __resolveGeoTransitState();
+    const timezone = (geoTransitState && typeof geoTransitState.timezone === "string" && geoTransitState.timezone)
+      ? geoTransitState.timezone
+      : window.__TIMEZONE__;
+    const offsetMinutes = (geoTransitState && typeof geoTransitState.offsetMinutes === "number")
+      ? geoTransitState.offsetMinutes
+      : window.__OFFSET_MINUTES__;
 
     const spoofedLocales = Array.isArray(window.__normalizedLanguages)
       ? window.__normalizedLanguages
@@ -121,7 +139,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
 
     if (!timezone || typeof timezone !== "string") {
       diagPipeline("error", "tz:missing_timezone", {
-        key: __flagKey,
+        key: 'state.__GEO_STATE__.timezone',
         stage: "preflight",
         message: "timezone source missing",
         data: { outcome: "skip", reason: "missing_timezone" }
@@ -131,7 +149,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     }
     if (typeof offsetMinutes !== "number") {
       diagPipeline("error", "tz:missing_offsetMinutes", {
-        key: __flagKey,
+        key: 'state.__GEO_STATE__.offsetMinutes',
         stage: "preflight",
         message: "offsetMinutes source missing",
         data: { outcome: "skip", reason: "missing_offsetMinutes", timezone: timezone }
