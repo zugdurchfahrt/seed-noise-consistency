@@ -64,6 +64,19 @@ def setup_logger(child_levels=None):
         sw_relay_logger.propagate = False
         sw_relay_logger.addHandler(sw_relay_fh)
         
+        
+        brandmauer_log_file = PROJECT_ROOT / 'logs' / 'brandmauer.log'
+        brandmauer_fh = logging.FileHandler(brandmauer_log_file, encoding="utf-8")
+        brandmauer_fh.setLevel(logging.INFO)
+        brandmauer_fh.setFormatter(formatter)
+
+        brandmauer_logger = logger.getChild("brandmauer")
+        brandmauer_logger.setLevel(logging.INFO)
+        brandmauer_logger.propagate = False
+        brandmauer_logger.addHandler(brandmauer_fh)
+        
+        
+        
         # StreamHandler To log in the console
         ch = logging.StreamHandler(sys.stdout)
         ch.setLevel(logging.INFO)

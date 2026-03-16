@@ -1,7 +1,10 @@
 (() => {
   const __MODULE = 'GeoOverride';
   const __SURFACE = 'geolocation';
-  const __D = window.__DEGRADE__;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __ALLOWED_STAGES = {
     preflight: true,
@@ -30,7 +33,6 @@
 
   function __resolveStage(code, stage) {
     if (typeof stage === 'string' && __ALLOWED_STAGES[stage]) return stage;
-    if (code === 'geo:already_patched') return 'guard';
     if (__codeIncludes(code, 'rollback')) return 'rollback';
     if (__codeIncludes(code, 'invalid_plan_item') || __codeIncludes(code, 'descriptor_postcheck_mismatch')) return 'contract';
     if (__codeIncludes(code, ':apply') || __codeIncludes(code, ':patched')) return 'apply';
@@ -53,14 +55,14 @@
     if (typeof level === 'string' && level) return level;
     if (__codeIncludes(code, '_failed')) return 'error';
     if (code === 'geo:patched') return 'info';
-    if (__codeIncludes(code, '_skipped') || __codeIncludes(code, '_missing') || code === 'geo:already_patched') return 'warn';
+    if (__codeIncludes(code, '_skipped') || __codeIncludes(code, '_missing')) return 'warn';
     return 'warn';
   }
 
   function __resolveOutcome(code, outcome) {
     if (typeof outcome === 'string' && outcome) return outcome;
     if (__codeIncludes(code, 'rollback')) return 'rollback';
-    if (__codeIncludes(code, '_skipped') || __codeIncludes(code, '_missing') || code === 'geo:already_patched') return 'skip';
+    if (__codeIncludes(code, '_skipped') || __codeIncludes(code, '_missing')) return 'skip';
     if (__codeIncludes(code, '_failed')) return 'throw';
     if (__codeIncludes(code, ':patched')) return 'return';
     return 'return';
@@ -81,6 +83,9 @@
     return data;
   }
 
+  const __tag = __MODULE;
+  const __flagKey = '__PATCH_GEOLOCATION__';
+  const C = window && window.CanvasPatchContext;
   const Core = window && window.Core;
   function degrade(code, err, extra) {
     const x = (extra && typeof extra === 'object') ? extra : {};
@@ -99,29 +104,6 @@
     };
     __emit(level, code, ctx, err || null);
   }
-
-  if (window.__GEO_PATCHED__) {
-    degrade('geo:already_patched', null, {
-      stage: 'guard',
-      message: '[GeoOverride] patch already applied',
-      type: 'ok',
-      data: { outcome: 'skip', reason: 'already_patched' }
-    });
-    return;
-  }
-
-  if (!Core || typeof Core.applyTargets !== 'function') {
-    degrade('geo:core_missing', new Error('[GeoOverride] Core.applyTargets is required'), {
-      stage: 'preflight',
-      message: '[GeoOverride] Core.applyTargets is required',
-      type: 'pipeline missing data',
-      data: { outcome: 'skip', reason: 'core_missing' }
-    });
-    return;
-  }
-
-  const latitude = window.__LATITUDE__;
-  const longitude = window.__LONGITUDE__;
 
   function cloneDesc(d) {
     if (!d) return null;
@@ -304,7 +286,75 @@
     }
   }
 
-  function patchGeolocation(lat, lon) {
+  function __cloneGeoStateValue(state) {
+    if (!state || typeof state !== 'object') return null;
+    return {
+      latitude: state.latitude,
+      longitude: state.longitude
+    };
+  }
+
+  function __restoreGeoStateValue(state, snapshot) {
+    if (!state || typeof state !== 'object') return;
+    state.latitude = snapshot ? snapshot.latitude : null;
+    state.longitude = snapshot ? snapshot.longitude : null;
+  }
+
+  function __ensureGeoState() {
+    const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+    if (stateRoot && Object.prototype.hasOwnProperty.call(stateRoot, '__GEO_STATE__')) {
+      const shared = (stateRoot.__GEO_STATE__ && typeof stateRoot.__GEO_STATE__ === 'object') ? stateRoot.__GEO_STATE__ : null;
+      if (shared && C.__GEO_STATE__ !== shared) {
+        Object.defineProperty(C, '__GEO_STATE__', {
+          value: shared,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      return shared;
+    }
+    if (Object.prototype.hasOwnProperty.call(C, '__GEO_STATE__')) {
+      const existing = (C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') ? C.__GEO_STATE__ : null;
+      if (existing && stateRoot && stateRoot.__GEO_STATE__ !== existing) {
+        Object.defineProperty(stateRoot, '__GEO_STATE__', {
+          value: existing,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      return existing;
+    }
+    const state = {
+      latitude: null,
+      longitude: null
+    };
+    if (stateRoot) {
+      Object.defineProperty(stateRoot, '__GEO_STATE__', {
+        value: state,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    Object.defineProperty(C, '__GEO_STATE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return state;
+  }
+
+  function __runGeoHidePass() {
+    return;
+  }
+
+  function patchGeolocation() {
+    const geoState = __ensureGeoState();
+    const lat = geoState ? geoState.latitude : null;
+    const lon = geoState ? geoState.longitude : null;
     if (typeof lat !== 'number' || typeof lon !== 'number') {
       degrade('geo:coords_missing', new Error('[GeoOverride] geolocation missing latitude/longitude'), {
         stage: 'preflight',
@@ -502,13 +552,157 @@
     return true;
   }
 
-  if (!Object.prototype.hasOwnProperty.call(window, 'patchGeolocation')) {
-    Object.defineProperty(window, 'patchGeolocation', {
-      value: patchGeolocation,
-      writable: true,
-      configurable: true,
-      enumerable: false
+  if (!C) {
+    degrade('geo:canvas_patch_context_missing', new Error('[GeoOverride] CanvasPatchContext is required'), {
+      stage: 'preflight',
+      key: 'CanvasPatchContext',
+      message: '[GeoOverride] CanvasPatchContext is required',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
     });
+    return;
   }
-  if (patchGeolocation(latitude, longitude)) window.__GEO_PATCHED__ = true;
+
+  if (!Core) {
+    degrade('geo:core_missing', new Error('[GeoOverride] Core is required'), {
+      stage: 'preflight',
+      key: 'Core',
+      message: '[GeoOverride] Core is required',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'core_missing' }
+    });
+    return;
+  }
+  if (typeof Core.applyTargets !== 'function') {
+    degrade('geo:core_apply_targets_missing', new Error('[GeoOverride] Core.applyTargets is required'), {
+      stage: 'preflight',
+      key: 'Core.applyTargets',
+      message: '[GeoOverride] Core.applyTargets is required',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'core_apply_targets_missing' }
+    });
+    return;
+  }
+  if (typeof Core.registerPatchedTarget !== 'function') {
+    degrade('geo:core_register_patched_target_missing', new Error('[GeoOverride] Core.registerPatchedTarget is required'), {
+      stage: 'preflight',
+      key: 'Core.registerPatchedTarget',
+      message: '[GeoOverride] Core.registerPatchedTarget is required',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'core_register_patched_target_missing' }
+    });
+    return;
+  }
+  if (typeof Core.guardFlag !== 'function') {
+    degrade('geo:guard_missing', null, {
+      key: __flagKey,
+      stage: 'guard',
+      message: 'Core.guardFlag missing',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+    });
+    return;
+  }
+  if (typeof Core.resolveDescriptor !== 'function') {
+    degrade('geo:core_resolve_descriptor_missing', new Error('[GeoOverride] Core.resolveDescriptor is required'), {
+      stage: 'preflight',
+      key: 'Core.resolveDescriptor',
+      message: '[GeoOverride] Core.resolveDescriptor is required',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'core_resolve_descriptor_missing' }
+    });
+    return;
+  }
+
+  let __guardToken = null;
+  try {
+    __guardToken = Core.guardFlag(__flagKey, __tag);
+  } catch (e) {
+    degrade('geo:guard_failed', e, {
+      key: __flagKey,
+      stage: 'guard',
+      message: 'guardFlag threw',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'guard_failed' }
+    });
+    return;
+  }
+  if (!__guardToken) return;
+
+  function __releaseGuard(rollbackOk) {
+    try {
+      if (Core && typeof Core.releaseGuardFlag === 'function') {
+        Core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __tag);
+      }
+    } catch (e) {
+      degrade('geo:guard_release_exception', e, {
+        key: __flagKey,
+        stage: 'rollback',
+        message: 'releaseGuardFlag failed',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_exception' }
+      });
+    }
+  }
+
+  let __geoState = null;
+  let __geoStateSnapshot = null;
+  let __applyStarted = false;
+  try {
+    __geoState = __ensureGeoState();
+    if (!__geoState) {
+      degrade('geo:geo_state_missing', new Error('[GeoOverride] CanvasPatchContext.state.__GEO_STATE__ is required'), {
+        stage: 'preflight',
+        key: 'state.__GEO_STATE__',
+        message: '[GeoOverride] CanvasPatchContext.state.__GEO_STATE__ is required',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'geo_state_missing' }
+      });
+      __releaseGuard(true);
+      return;
+    }
+    __geoStateSnapshot = __cloneGeoStateValue(__geoState);
+
+    const latitude = window.__LATITUDE__;
+    const longitude = window.__LONGITUDE__;
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      degrade('geo:coords_missing', new Error('[GeoOverride] geolocation missing latitude/longitude'), {
+        stage: 'preflight',
+        key: '__LATITUDE__/__LONGITUDE__',
+        message: '[GeoOverride] geolocation missing latitude/longitude',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'coords_missing' }
+      });
+      __releaseGuard(true);
+      return;
+    }
+
+    __geoState.latitude = latitude;
+    __geoState.longitude = longitude;
+    __runGeoHidePass();
+    __applyStarted = true;
+
+    if (!patchGeolocation()) {
+      __restoreGeoStateValue(__geoState, __geoStateSnapshot);
+      __releaseGuard(true);
+      return;
+    }
+  } catch (e) {
+    let rollbackErr = null;
+    if (__applyStarted) {
+      try {
+        __restoreGeoStateValue(__geoState, __geoStateSnapshot);
+      } catch (re) {
+        rollbackErr = re;
+      }
+    }
+    degrade('geo:fatal', rollbackErr || e, {
+      stage: 'apply',
+      message: '[GeoOverride] fatal module error',
+      type: 'browser structure missing data',
+      data: { outcome: 'throw', reason: 'fatal', rollbackOk: !rollbackErr }
+    });
+    __releaseGuard(!rollbackErr);
+    throw (rollbackErr || e);
+  }
 })();

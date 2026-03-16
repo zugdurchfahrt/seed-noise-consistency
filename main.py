@@ -63,6 +63,10 @@ from profile_data_source.datashell_win32 import data_4_win32
 from profile_data_source.macintel import macintel_data
 # ----------------------- MODULES-----------------------
 import tools.tools_runtime.cdp_catapult as cdp
+import tools.tools_runtime.helpers as helpers_module
+import tools.tools_runtime.headers_adapter as headers_adapter_module
+import tools.tools_infra.vpn_utils as vpn_utils_module
+import profile_data_source.plugins_dict as plugins_dict_module
 from profile_data_source.plugins_dict import build_plugins_profile
 from tools.tools_runtime.helpers import (
     build_device_metrics,
@@ -77,16 +81,40 @@ from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
 from tools.generators.rand_met import generate_font_manifest
+# from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
     "vpn_utils": logging.DEBUG,
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
+    "brandmauer": logging.INFO,
 })
 
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
+
+
+def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
+    if not isinstance(global_seed, str) or not global_seed.strip():
+        raise ValueError("global_seed must be a non-empty string")
+
+    root = "__RAND_SEED_POOL__"
+
+    def _rng_for(label: str) -> random.Random:
+        if not isinstance(label, str) or not label.strip():
+            raise ValueError("rng pool label must be a non-empty string")
+        material = f"{root}|{label}|{global_seed}".encode("utf-8")
+        numeric_seed = int.from_bytes(hashlib.sha256(material).digest()[:8], "big")
+        return random.Random(numeric_seed)
+
+    return {
+        "profile": _rng_for("profile"),
+        "plugins": _rng_for("plugins"),
+        "headers": _rng_for("headers"),
+        "vpn": _rng_for("vpn"),
+    }
+
 # ----------------------- PROFILE FUNCTION -----------------------
 def get_random_profile(country_data, platform):
     return {}
@@ -186,12 +214,11 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
 
 # ----------------------- function init_driver -----------------------
 def init_driver(
-    profile, country_data, platform, user_agent, screen_width, screen_height,
-    webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer, devices_conf, generated_version, generated_platform, generated_platform_version,
-    generated_oscpu, expected_client_hints, vendor_value, language, normalized_languages, device_memory_value, hardware_concurrency_value, device_dpr_value,
-    plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type,
+    profile, country_data, platform, user_agent, screen_width, screen_height, webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
+    devices_conf, generated_platform, generated_platform_version, expected_client_hints, vendor_value, 
+    language, normalized_languages, device_memory_value, hardware_concurrency_value, device_dpr_value,
+    plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type, global_seed,
 ):
-    global global_seed
     timezone = country_data["timezone"]
     offset_minutes = country_data["offset_minutes"]
     latitude = country_data["latitude"]
@@ -216,8 +243,7 @@ def init_driver(
         chrome_debug_port = int(chrome_debug_port_raw)
     except ValueError as exc:
         raise ValueError("CHROME_DEBUG_PORT must be an integer") from exc
-    chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
-    chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
+    chrome_options.debugger_address = f"127.0.0.1:{chrome_debug_port}"
     chrome_options.add_argument("--remote-allow-origins=*")
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -226,16 +252,11 @@ def init_driver(
     if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
         chrome_options.add_argument("--auto-open-devtools-for-tabs")
     chrome_options.binary_location = CHROME_BINARY
-    driver_kwargs = {
-        "driver_executable_path": CHROMEDRIVER_PATH,
-        "options": chrome_options,
-    }
-    driver_kwargs["port"] = chrome_debug_port
     driver = uc.Chrome(
-        **driver_kwargs,
+        driver_executable_path=CHROMEDRIVER_PATH,
+        options=chrome_options,
     )
     logger.info("Initiating Webdriver...")
-    driver._stealth_seed = global_seed
 
     def _get_cdp_port(driver, user_data_dir):
         # 1) самый надёжный вариант: debuggerAddress от chromedriver
@@ -251,8 +272,6 @@ def init_driver(
                 return int(p.read_text(encoding="utf-8").splitlines()[0].strip())
             time.sleep(0.1)
 
-        # 3) fallback: requested port
-        return chrome_debug_port
     
     cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
     if vscode_cdp_debug and cdp.PORT != chrome_debug_port:
@@ -338,22 +357,21 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
+            Path(SCRIPTS_CORE / "bootstrap_hide.js").read_text("utf-8"),
+            "BootstrapHideModule(window);",
             # --- set_log ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
-            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
             # --- core window ---
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
             # --- RTC ---
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
-            # --- hide_webdriver (markAsNative provider) ---
+            # --- hide_webdriver  ---
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
-            # --- workers (bootstrap/hooks). No direct module call here unless you have one.
-            Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
-            "WrkModule(window);",
             # --- rng params ---
             Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
             "RNGsetModule(window);",
@@ -377,6 +395,9 @@ def init_driver(
             # --- webgl ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "webgl.js").read_text("utf-8"),
             "WebglPatchModule(window);",
+            #  --- workers (bootstrap/hooks). No direct module call here unless you have one.
+            Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
+            "WrkModule(window);",
             # --- webgpu WL ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "WebgpuWL.js").read_text("utf-8"),
             "WebgpuWLBootstrap(window);",
@@ -391,7 +412,9 @@ def init_driver(
             "ContextPatchModule(window);",
             """
             // —————— Register all hooks here ——————//
-            if (typeof window.registerAllHooks === 'function') window.registerAllHooks();
+            if (window.CanvasPatchContext && typeof window.CanvasPatchContext.registerAllHooks === 'function') {
+                window.CanvasPatchContext.registerAllHooks();
+            }
             (function applyAllPatchesCustomOrder(win) {
                 const C = window.CanvasPatchContext; if (!C) return;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
@@ -399,7 +422,10 @@ def init_driver(
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             // ——— Worker env diagnostics (pre-bootstrap) ———//
-            // console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
+            //  console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
+            __PROBE_LIVE_READER__.start();
+            DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
+            __DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
             })(window);
             """
         ]
@@ -408,23 +434,176 @@ def init_driver(
     # --- creation of window.__ objects ---
     init_params = f"""
     // ——— Globals Bootstrap ———
-    window.__GLOBAL_SEED                = {json.dumps(global_seed)};
-    window.__EXPECTED_CLIENT_HINTS      = {json.dumps(expected_client_hints, ensure_ascii=False)};
-    window.__NAV_PLATFORM__             = {json.dumps(profile['platform'], ensure_ascii=False)};
-    window.__GENERATED_PLATFORM         = {json.dumps(generated_platform, ensure_ascii=False)};
-    window.__GENERATED_PLATFORM_VERSION = {json.dumps(generated_platform_version, ensure_ascii=False)};
-    window.__USER_AGENT                 = {json.dumps(user_agent, ensure_ascii=False)};
-    window.__VENDOR                     = {json.dumps(vendor_value, ensure_ascii=False)};
-    window.__LATITUDE__                 = {json.dumps(latitude)};
-    window.__LONGITUDE__                = {json.dumps(longitude)};
-    window.__TIMEZONE__                 = {json.dumps(timezone)};
-    window.__OFFSET_MINUTES__           = {json.dumps(offset_minutes)};
-    window.__WIDTH                      = {json.dumps(screen_width)};
-    window.__HEIGHT                     = {json.dumps(screen_height)};
-    window.__COLOR_DEPTH                = 24;
-    window.__DPR                        = {json.dumps(device_dpr_value)};
-    window.__primaryLanguage            = {json.dumps(profile['language'], ensure_ascii=False)};
-    window.__normalizedLanguages        = {json.dumps(profile['languages'], ensure_ascii=False)};
+    Object.defineProperties(window, {{
+        __GLOBAL_SEED: {{
+            value: {json.dumps(global_seed)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __EXPECTED_CLIENT_HINTS: {{
+            value: {json.dumps(expected_client_hints, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __NAV_PLATFORM__: {{
+            value: {json.dumps(profile['platform'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GENERATED_PLATFORM: {{
+            value: {json.dumps(generated_platform, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GENERATED_PLATFORM_VERSION: {{
+            value: {json.dumps(generated_platform_version, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __USER_AGENT: {{
+            value: {json.dumps(user_agent, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __VENDOR: {{
+            value: {json.dumps(vendor_value, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __LATITUDE__: {{
+            value: {json.dumps(latitude)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __LONGITUDE__: {{
+            value: {json.dumps(longitude)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __TIMEZONE__: {{
+            value: {json.dumps(timezone)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __OFFSET_MINUTES__: {{
+            value: {json.dumps(offset_minutes)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WIDTH: {{
+            value: {json.dumps(screen_width)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __HEIGHT: {{
+            value: {json.dumps(screen_height)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __COLOR_DEPTH: {{
+            value: 24,
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __DPR: {{
+            value: {json.dumps(device_dpr_value)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __primaryLanguage: {{
+            value: {json.dumps(profile['language'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __normalizedLanguages: {{
+            value: {json.dumps(profile['languages'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __cpu: {{
+            value: {json.dumps(hardware_concurrency_value)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __memory: {{
+            value: {json.dumps(device_memory_value)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WEBGL_RENDERER__: {{
+            value: {json.dumps(webgl_renderer, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WEBGL_VENDOR__: {{
+            value: {json.dumps(webgl_vendor, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WEBGL_UNMASKED_VENDOR__: {{
+            value: {json.dumps(webgl_unmasked_vendor, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __WEBGL_UNMASKED_RENDERER__: {{
+            value: {json.dumps(webgl_unmasked_renderer, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GPU_TYPE__: {{
+            value: {json.dumps(gpu_type, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GPU_ARCHITECTURE__: {{
+            value: {json.dumps(gpu_architecture, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __GPU_VENDOR__: {{
+            value: {json.dumps(gpu_vendor, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __DEVICES_LABELS: {{
+            value: {json.dumps(devices_conf, ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __PLUGIN_PROFILES__: {{
+            value: {json.dumps(profile.get("plugins", []), ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }}
+    }});
 
     // Languages stable final setting (moved here to guarantee availability before nav_total_set.js)
     // FrozenArray semantics (минимально приближенно): массив заморожен
@@ -441,17 +620,6 @@ def init_driver(
     if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
         throw new Error('THW: language != languages[0]');
     }}
-    window.__cpu                        = {json.dumps(hardware_concurrency_value)};
-    window.__memory                     = {json.dumps(device_memory_value)};
-    window.__WEBGL_RENDERER__           = {json.dumps(webgl_renderer, ensure_ascii=False)};
-    window.__WEBGL_VENDOR__             = {json.dumps(webgl_vendor, ensure_ascii=False)};
-    window.__WEBGL_UNMASKED_VENDOR__    = {json.dumps(webgl_unmasked_vendor, ensure_ascii=False)};
-    window.__WEBGL_UNMASKED_RENDERER__  = {json.dumps(webgl_unmasked_renderer, ensure_ascii=False)};
-    window.__GPU_TYPE__                 = {json.dumps(gpu_type, ensure_ascii=False)};
-    window.__GPU_ARCHITECTURE__         = {json.dumps(gpu_architecture, ensure_ascii=False)};
-    window.__GPU_VENDOR__               = {json.dumps(gpu_vendor, ensure_ascii=False)};
-    window.__DEVICES_LABELS             = {json.dumps(devices_conf, ensure_ascii=False)};
-    window.__PLUGIN_PROFILES__          = {json.dumps(profile.get("plugins", []), ensure_ascii=False)};
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
@@ -469,7 +637,36 @@ def init_driver(
     # --- publish worker core into __ENV_BRIDGE__ (stable for external worker_bootstrap.js) ---
     worker_bootstrap_env_js = f"""
     (() => {{
-        const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {{}});
+        const bridgeDesc = Object.getOwnPropertyDescriptor(window, '__ENV_BRIDGE__');
+        let BR = bridgeDesc ? (('value' in bridgeDesc) ? bridgeDesc.value : window.__ENV_BRIDGE__) : window.__ENV_BRIDGE__;
+        if (BR == null) {{
+            BR = {{}};
+            Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                value: BR,
+                writable: true,
+                configurable: true,
+                enumerable: false
+            }});
+        }} else if (typeof BR !== 'object') {{
+            throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+        }} else if (bridgeDesc && bridgeDesc.enumerable !== false) {{
+            if (bridgeDesc.configurable === false) throw new Error('WorkerBootstrap: __ENV_BRIDGE__ non-configurable enumerable');
+            if ('value' in bridgeDesc) {{
+                Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                    value: BR,
+                    writable: !!bridgeDesc.writable,
+                    configurable: true,
+                    enumerable: false
+                }});
+            }} else {{
+                Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                    get: bridgeDesc.get,
+                    set: bridgeDesc.set,
+                    configurable: true,
+                    enumerable: false
+                }});
+            }}
+        }}
         if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
         const core = {json.dumps(core)};
         const set_reflect = {json.dumps(set_reflect)};
@@ -620,11 +817,11 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         def _inject_time_machine(driver):
             tz_src = Path(SCRIPTS_PATCHES_STEALTH / "TimezoneOverride_source.js").read_text("utf-8")
             geo_src = Path(SCRIPTS_PATCHES_STEALTH / "GeoOverride_source.js").read_text("utf-8")
-            init_tz = "TimezonePatchModule(window);"
+            init_tz = "const __patchTimeZone = TimezonePatchModule(window);"
             call_tz = r'''
             
         Promise.resolve().then(() => {
-        if (typeof patchTimeZone === "function") patchTimeZone();
+        if (typeof __patchTimeZone === "function") __patchTimeZone();
         });
         '''.strip()
             timegeo_js = "\n;\n".join([
@@ -675,17 +872,14 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
 def main():
     global global_seed, profile
     global_seed = uuid.uuid4().hex
-    seed_int = int(hashlib.md5(global_seed.encode('utf-8')).hexdigest()[:8], 16)
-    random.seed(seed_int)
+    seed_int = _build_rng_pools(global_seed)
     os.environ['__GLOBAL_SEED'] = global_seed
     logger.info(f"Seed for the current session has been generated: {global_seed}")
-    try:
-        seed_fp = hashlib.sha256(global_seed.encode("utf-8")).hexdigest()[:12]
-        logger.info("Seed fingerprint rule: sha256_12 = sha256(seed)[:12]")
-        logger.info("Seed fingerprint: len=%s sha256_12=%s", len(global_seed), seed_fp)
-    except Exception:
-        logger.info("Seed fingerprint: unavailable")
+
+    vpn_rng = seed_int["vpn"]
+    vpn_utils_module.random = vpn_rng
     client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
+    # enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer"))
     try:
         json_path = str(PROFILE_DATA_SRC/ "profile.json")
         if os.path.exists(json_path):
@@ -698,15 +892,25 @@ def main():
         # client.connect()
         client._kill_old_processes()
         client._clean_directories()
-       
-       
         client.post()
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()
         country_data = data["country_data"]
-        profile = get_random_profile(country_data, None)
-
+       
+        # -------- Getting PRNG random for each module -------------------
+        profile_rng = seed_int["profile"]
+        plugins_rng = seed_int["plugins"]
+        headers_rng = seed_int["headers"]
+        helpers_module.random = profile_rng
+        plugins_dict_module.random = plugins_rng
+        
+        if hasattr(headers_adapter_module, "_pick_nav_template"):
+            headers_adapter_module._pick_nav_template.cache_clear()
+        headers_adapter_module.random = headers_rng
+        
         # -------- Your PLATFORM and BROWSER preferences for random selection -------------------
+        profile = get_random_profile(country_data, None)
+        
         config = {
             # Supported platforms List
             "enabled_platforms": ["Win32", "MacIntel"],
@@ -719,11 +923,11 @@ def main():
             },
         }
         # --------PLATFORM selection -------------------
-        platform = random.choices(config["enabled_platforms"],
-                                weights=config["platform_weights"], k=1)[0]
+        platform = profile_rng.choices(config["enabled_platforms"],
+                                       weights=config["platform_weights"], k=1)[0]
         data = data_4_win32 if platform == "Win32" else macintel_data
         # -------- OS selection -------------------
-        os_opt = random.choice(data["os_options"]) # dict: {os_info, os_name, os_version}
+        os_opt = profile_rng.choice(data["os_options"]) # dict: {os_info, os_name, os_version}
         os_info = os_opt["os_info"]
         os_name = os_opt["os_name"].replace("(", "").replace(")", "").strip()
 
@@ -763,7 +967,7 @@ def main():
         )
 
         # --------BROWSER selection -------------------
-        browser_choice = random.choices(
+        browser_choice = profile_rng.choices(
             *config["browser_weights"][platform], k=1
         )[0]
         # as Windows version branches are hard-pinned to kernel browser versions
@@ -776,8 +980,8 @@ def main():
             prefixes = CHROMIUM_PREFIX_MAP.get(platform_version)
             if not prefixes:
                 # for macOS use whole pool, without being tied to browser kernel version
-                return random.choice([v.split(".")[0] for v in chrome_versions])
-            return random.choice(prefixes).rstrip(".")  # "134" / "135" / "137"
+                return profile_rng.choice([v.split(".")[0] for v in chrome_versions])
+            return profile_rng.choice(prefixes).rstrip(".")  # "134" / "135" / "137"
 
         def pick_product_version(src: list[str], major: str) -> str:
             """
@@ -789,7 +993,7 @@ def main():
             if not filt:
                 #  Avoiding incompatible version pairs
                 raise RuntimeError(f"No builds {major}.* in source")
-            return random.choice(filt)
+            return profile_rng.choice(filt)
 
         def split_version(version: str) -> tuple[str, str]:
             """
@@ -821,7 +1025,7 @@ def main():
             else:  # MacIntel
                 if browser_choice == "chrome":
                     # macOS does not have binding to Windows CHROMIUM_PREFIX_MAP
-                    version = random.choice(chrome_versions)
+                    version = profile_rng.choice(chrome_versions)
                     version, version_ua = split_version(version)
                     os_info_chrome = os_info  # formatted for typing like "Macintosh; Intel Mac OS X 10_15_7"
                     user_agent = (
@@ -829,10 +1033,10 @@ def main():
                         f"(KHTML, like Gecko) Chrome/{version_ua} Safari/537.36"
                     )
         elif browser_choice == "firefox":
-            version = random.choice(firefox_versions)
+            version = profile_rng.choice(firefox_versions)
             user_agent = f"Mozilla/5.0 ({os_info}; rv:{version}) Gecko/20100101 Firefox/{version}"
         elif browser_choice == "safari":
-            version = random.choice(safari_versions)
+            version = profile_rng.choice(safari_versions)
             os_info_safari = os_info.replace("_", ".")
             user_agent = f"Mozilla/5.0 ({os_info_safari}) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{version} Safari/605.1.15"
         else:
@@ -856,23 +1060,23 @@ def main():
         device_memory_value, hardware_concurrency_value = choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac)
 
         # -----------------------  navigator.plugins и navigator.mimeTypes -----------------------
-        plugins_final, mime_types_final = build_plugins_profile(browser_choice, strict=False)
+        plugins_final, mime_types_final = build_plugins_profile(browser_choice, rng=plugins_rng, strict=False)
 
         # ----------------------- mediaDevices.enumerateDevices -----------------------
-        audioinput = random.choice(data["audioinput"])['name']
-        videoinput = random.choice(data["videoinput"])['name']
-        audiooutput = random.choice(data["headphone"])['name']
+        audioinput = profile_rng.choice(data["audioinput"])['name']
+        videoinput = profile_rng.choice(data["videoinput"])['name']
+        audiooutput = profile_rng.choice(data["headphone"])['name']
         devices_conf = {"audioinput": audioinput, "videoinput": videoinput, "audiooutput": audiooutput}
 
 
         # # ----------------------------Setting up GPU and Screen -----------------------
-        gpu = random.choice(data["GPU"])
+        gpu = profile_rng.choice(data["GPU"])
         gpu_architecture = str(gpu.get("architecture", "")).strip()
         gpu_type = str(gpu.get("type", ""))
         gpu_name = gpu["name"]
         gpu_code = gpu["prod_code"]
 
-        screen_res = random.choice(gpu["resolution"])
+        screen_res = profile_rng.choice(gpu["resolution"])
         if not isinstance(screen_res, str) or not re.fullmatch(r"[1-9]\d{2,4}x[1-9]\d{2,4}", screen_res):
             raise ValueError(f"invalid screen resolution from GPU dictionary: {screen_res!r}")
         screen_width, screen_height = map(int, screen_res.split("x", 1))
@@ -946,9 +1150,7 @@ def main():
         elif profile["platform"]  == "MacIntel":
             generated_platform = "macOS"
 
-        generated_oscpu = profile["os_info"] if profile["platform"] == "Win32" and "firefox" in user_agent.lower() else f"Intel Mac OS X {profile['platform_version']}" if "firefox" in user_agent.lower() else None
         generated_platform_version = profile["platform_version"]
-        generated_version = profile["browser_version"]
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
         profile["browser_brand"] = browser_brand
         profile["browser_major_version"] = major_version
@@ -1005,10 +1207,11 @@ def main():
             profile, country_data, profile["platform"], profile["user_agent"],
             profile["screen_width"], profile["screen_height"], profile["webgl_vendor"], profile["webgl_renderer"],
             profile["webgl_unmasked_vendor"], profile["webgl_unmasked_renderer"],
-            profile["devices_conf"], generated_version, generated_platform, generated_platform_version,
-            generated_oscpu, expected_client_hints, profile["vendor_value"], profile["language"], profile["languages"],
+            profile["devices_conf"], generated_platform, generated_platform_version,
+            expected_client_hints, profile["vendor_value"], profile["language"], profile["languages"],
             profile["deviceMemory"], profile["hardwareConcurrency"], profile["device_dpr_value"],
-            profile["plugins"], profile["mimeTypes"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"]
+            profile["plugins"], profile["mimeTypes"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"],
+            global_seed,
         )
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
@@ -1062,16 +1265,38 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/fonts")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
-        # PLEASE, DO NO REMOVE THIS, AS IT PROTECTS DEVTOOLS FROM PERMANENT MALFUNCTION, OTHER Explicit Waits, EC, DONT WORK HERE AS WELL!
+
+        # Keep main thread alive; otherwise daemon CDP threads die on process exit.
+        # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.
+        def _hold_until_driver_end():
+            logger.warning("stdin is unavailable; keepalive mode is active (Ctrl+C to exit)")
+            while True:
+                try:
+                    driver.execute_script("return 1")
+                except Exception:
+                    logger.info("Driver session ended; keepalive loop finished")
+                    break
+                time.sleep(1.0)
+
         time.sleep(0.5)
-        input("press Enter for exit...")
+        try:
+            if sys.stdin is not None and sys.stdin.isatty():
+                input("press Enter for exit...")
+            else:
+                _hold_until_driver_end()
+        except EOFError:
+            _hold_until_driver_end()
+        except KeyboardInterrupt:
+            logger.info("Interrupted by user (Ctrl+C)")
 
     except Exception as e:
         logger.error(f"Error in main block: {e}", exc_info=True)
         logger.info(f"Error: {e}")
-        # ----------------------- THAT'S ALL, FOLKS!  -----------------------
+
+
+    # ----------------------- THAT'S ALL, FOLKS!  -----------------------
     # finally:
     #     # Wait for mitmproxy to complete, then close the file
     #     mitmproxy_proc.terminate()

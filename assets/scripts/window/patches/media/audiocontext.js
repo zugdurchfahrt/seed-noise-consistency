@@ -5,7 +5,10 @@ const AudioContextModule = function AudioContextModule(window) {
   const __MODULE = 'audiocontext';
   const __SURFACE = 'audio';
 
-  const __D = window.__DEGRADE__;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   function __emit(level, code, ctx, err) {
     try {
@@ -59,9 +62,39 @@ const AudioContextModule = function AudioContextModule(window) {
     });
     return;
   }
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    degrade('audiocontext:canvas_patch_state_missing', new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available'), {
+      stage: 'preflight',
+      level: 'fatal',
+      type: __audioTypePipeline,
+      key: 'CanvasPatchContext.state',
+      data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
+    });
+    return;
+  }
+  if (!(__stateRoot.__AUDIOCONTEXT__ && typeof __stateRoot.__AUDIOCONTEXT__ === 'object')) {
+    Object.defineProperty(__stateRoot, '__AUDIOCONTEXT__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
 
-  const rand = window.rand;
-  if (!rand || typeof rand.use !== 'function') {
+  const __core = window.Core;
+  const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
+    ? __core.__internal
+    : null;
+  const __prngState = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+    ? __coreInternal.prng
+    : ((__stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
+    ? __stateRoot.__PRNG_STATE__
+    : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
+  const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
+    ? __prngState.rand
+    : null;
+  if (!__randSource || typeof __randSource.use !== 'function') {
     degrade('audiocontext:rand_missing', new Error('[AudioContextPatch] rand.use missing'), {
       stage: 'preflight',
       level: 'fatal',
@@ -73,7 +106,7 @@ const AudioContextModule = function AudioContextModule(window) {
   }
   let R = null;
   try {
-    R = rand.use('audio');
+    R = __randSource.use('audio');
   } catch (e) {
     degrade('audiocontext:rand_use_failed', e, {
       stage: 'preflight',
@@ -112,14 +145,13 @@ const AudioContextModule = function AudioContextModule(window) {
   })();
   if (!markAsNative) return;
   const safeDefine = (typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
-  const __wrapNativeApply = (typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
-  const __wrapNativeAccessor = (typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
-  const __core = window.Core;
-  const __corePreflightTarget = (window.Core && typeof window.Core.preflightTarget === 'function')
-    ? window.Core.preflightTarget
+  const __wrapNativeApply = (__core && typeof __core.__wrapNativeApply === 'function') ? __core.__wrapNativeApply : null;
+  const __wrapNativeAccessor = (__core && typeof __core.__wrapNativeAccessor === 'function') ? __core.__wrapNativeAccessor : null;
+  const __corePreflightTarget = (__core && typeof __core.preflightTarget === 'function')
+    ? __core.preflightTarget
     : null;
-  const __coreApplyTargets = (window.Core && typeof window.Core.applyTargets === 'function')
-    ? window.Core.applyTargets
+  const __coreApplyTargets = (__core && typeof __core.applyTargets === 'function')
+    ? __core.applyTargets
     : null;
   if (typeof safeDefine !== 'function') {
     degrade('audiocontext:safe_define_missing', new Error('[AudioContextPatch] __safeDefine missing'), {
@@ -132,21 +164,21 @@ const AudioContextModule = function AudioContextModule(window) {
     return;
   }
   if (typeof __wrapNativeApply !== 'function') {
-    degrade('audiocontext:wrap_native_apply_missing', new Error('[AudioContextPatch] __wrapNativeApply missing'), {
+    degrade('audiocontext:wrap_native_apply_missing', new Error('[AudioContextPatch] Core.__wrapNativeApply missing'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: '__wrapNativeApply',
+      key: 'Core.__wrapNativeApply',
       data: { outcome: 'skip', reason: 'wrap_native_apply_missing' }
     });
     return;
   }
   if (typeof __wrapNativeAccessor !== 'function') {
-    degrade('audiocontext:wrap_native_accessor_missing', new Error('[AudioContextPatch] __wrapNativeAccessor missing'), {
+    degrade('audiocontext:wrap_native_accessor_missing', new Error('[AudioContextPatch] Core.__wrapNativeAccessor missing'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: '__wrapNativeAccessor',
+      key: 'Core.__wrapNativeAccessor',
       data: { outcome: 'skip', reason: 'wrap_native_accessor_missing' }
     });
     return;
@@ -170,7 +202,7 @@ const AudioContextModule = function AudioContextModule(window) {
   let __guardToken = null;
   try {
     if (!__core || typeof __core.guardFlag !== 'function') {
-      window.__DEGRADE__?.diag?.('warn', __tag + ':guard_missing', {
+      __D?.diag?.('warn', __tag + ':guard_missing', {
         module: __tag,
         diagTag: __tag,
         surface: __surface,
@@ -184,7 +216,7 @@ const AudioContextModule = function AudioContextModule(window) {
     }
     __guardToken = __core.guardFlag(__flagKey, __tag);
   } catch (e) {
-    window.__DEGRADE__?.diag?.('warn', __tag + ':guard_failed', {
+    __D?.diag?.('warn', __tag + ':guard_failed', {
       module: __tag,
       diagTag: __tag,
       surface: __surface,
@@ -200,10 +232,10 @@ const AudioContextModule = function AudioContextModule(window) {
 
   try {
 
-  const GUARD = globalThis.__AUDIO_CTX_GUARD__ || (globalThis.__AUDIO_CTX_GUARD__ = {
+  const GUARD = {
     counts: {},
     last: null
-  });
+  };
 
   function noteIssue(code, detail) {
     const key = String(code);
@@ -882,7 +914,7 @@ const AudioContextModule = function AudioContextModule(window) {
     });
   } catch (e) {
     const rollbackErr = e;
-    window.__DEGRADE__?.diag?.('error', __tag + ':fatal', {
+    __D?.diag?.('error', __tag + ':fatal', {
       module: __tag,
       diagTag: __tag,
       surface: __surface,
@@ -897,7 +929,7 @@ const AudioContextModule = function AudioContextModule(window) {
         __core.releaseGuardFlag(__flagKey, __guardToken, false, __tag);
       }
     } catch (eRelease) {
-      window.__DEGRADE__?.diag?.('warn', __tag + ':guard_release_failed', {
+      __D?.diag?.('warn', __tag + ':guard_release_failed', {
         module: __tag,
         diagTag: __tag,
         surface: __surface,

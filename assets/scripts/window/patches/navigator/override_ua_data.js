@@ -8,7 +8,10 @@
   const Core = g && g.Core;
 
   // ---- NORMATIVE: local diag adapter (single gateway; no local normalization) ----
-  const __D = g.__DEGRADE__;
+  const __loggerRoot = (g && g.CanvasPatchContext && g.CanvasPatchContext.__logger && typeof g.CanvasPatchContext.__logger === 'object')
+    ? g.CanvasPatchContext.__logger
+    : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   function __emit(level, code, ctx, err) {
     try {

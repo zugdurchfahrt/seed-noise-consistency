@@ -1,7 +1,10 @@
 (function () {
   const g = window;
   function emitDegrade(level, code, err, extra) {
-    const d = g.__DEGRADE__;
+    const __loggerRoot = (g && g.CanvasPatchContext && g.CanvasPatchContext.__logger && typeof g.CanvasPatchContext.__logger === 'object')
+      ? g.CanvasPatchContext.__logger
+      : null;
+    const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     if (typeof d !== 'function') return;
     const e = err instanceof Error
       ? err

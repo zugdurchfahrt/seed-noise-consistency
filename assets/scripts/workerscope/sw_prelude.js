@@ -20,9 +20,18 @@
     return out;
   }
 
+  const __swDiagBindingName = '__SW_REPORT_DIAG__';
+  const __swDiagReporter =
+    (G && typeof G[__swDiagBindingName] === 'function') ? G[__swDiagBindingName] : null;
+
+  const __swDiagBindingDesc = G ? Object.getOwnPropertyDescriptor(G, __swDiagBindingName) : null;
+  if (__swDiagBindingDesc && __swDiagBindingDesc.configurable === true) {
+    delete G[__swDiagBindingName];
+  }
+
   function __relaySWDiag(level, code, ctx, err) {
     try {
-      const reporter = G && G.__SW_REPORT_DIAG__;
+      const reporter = __swDiagReporter;
       if (typeof reporter !== 'function') return;
       const x = (ctx && typeof ctx === 'object') ? ctx : {};
       reporter(JSON.stringify({
@@ -413,7 +422,8 @@
               type: 'browser structure missing data',
               data: { outcome: 'skip', reason: 'getter_runtime_failed' }
             }, e);
-            if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
+            // Disabled temporarily: valid SW profile reads must come only from __SW_ENV__.
+            // if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
             throw e;
           }
         }
@@ -540,14 +550,16 @@
         if (!(hint in map)) continue;
         const val = map[hint];
         if (val === undefined || val === null || (typeof val === 'string' && !val && hint !== 'model') || (Array.isArray(val) && !val.length)) {
-          __swDiag('warn', 'sw_prelude:get_high_entropy_values_native_fallback', {
+          __swDiag('error', 'sw_prelude:get_high_entropy_values_contract_missing', {
             stage: 'runtime',
             key: hint,
-            message: 'service worker getHighEntropyValues fallback to native',
+            message: 'service worker getHighEntropyValues contract value missing',
             type: 'pipeline missing data',
-            data: { outcome: 'skip', reason: 'get_high_entropy_values_native_fallback' }
+            data: { outcome: 'throw', reason: 'get_high_entropy_values_contract_missing' }
           }, null);
-          return Reflect.apply(origGHEV, this, [keys]);
+          // Disabled temporarily: valid SW profile reads must not fall back to native HE data.
+          // return Reflect.apply(origGHEV, this, [keys]);
+          throw new Error('SW getHighEntropyValues contract missing ' + hint);
         }
         result[hint] = val;
       }

@@ -6,7 +6,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenSurface = 'screen';
   const __core = window.Core;
   const __flagKey = '__PATCH_SCREEN__';
-  const __D = window.__DEGRADE__;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __emit = (level, code, ctx, err) => {
     try {
@@ -33,53 +36,51 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   let __guardToken = null;
   if (!__core || typeof __core.guardFlag !== 'function') {
-    const err = new Error('[ScreenPatch] Core.guardFlag missing');
-    __screenDiag('fatal', 'screen:guard_missing', {
+    __screenDiag('warn', 'screen:guard_missing', {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: __flagKey,
       message: 'Core.guardFlag missing',
       data: {
-        outcome: 'throw',
-        reason: 'missing_dep_core_guard',
-        substage: 'core.guardFlag'
+        outcome: 'skip',
+        reason: 'missing_dep_core_guard'
       }
-    }, err);
-    throw err;
+    }, null);
+    return;
   }
   try {
     __guardToken = __core.guardFlag(__flagKey, __screenModule);
   } catch (e) {
-    __screenDiag('fatal', 'screen:guard_failed', {
+    __screenDiag('warn', 'screen:guard_failed', {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: __flagKey,
       message: 'guardFlag threw',
       data: {
-        outcome: 'throw',
-        reason: 'guard_failed',
-        substage: 'core.guardFlag'
+        outcome: 'skip',
+        reason: 'guard_failed'
       }
     }, e);
-    throw e;
+    return;
   }
-  if (!__guardToken) return;
+  if (!__guardToken) return; // already_patched: Core emits screen:already_patched
 
+  // Read-only preflight: required dependency check, separate from guard semantics.
   const C = window.CanvasPatchContext;
   if (!C) {
     const canvasMissingErr = new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available');
-    __screenDiag('fatal', 'screen:canvas_patch_context_missing', {
+    __screenDiag('warn', 'screen:canvas_patch_context_missing', {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: 'CanvasPatchContext',
       message: 'CanvasPatchContext is undefined - module registration is not available',
       data: {
-        outcome: 'throw',
+        outcome: 'skip',
         reason: 'canvas_patch_context_missing',
-        substage: 'CanvasPatchContext'
+        missing: 'CanvasPatchContext'
       }
     }, canvasMissingErr);
     try {
@@ -87,8 +88,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
       }
     } catch (releaseErr) {
-      __screenDiag('error', 'screen:guard_release_failed', {
-        stage: 'rollback',
+      __screenDiag('warn', 'screen:guard_release_failed', {
+        stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
         key: __flagKey,
@@ -96,11 +97,54 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         data: {
           outcome: 'skip',
           reason: 'guard_release_failed',
-          substage: 'preflight'
+          substage: 'CanvasPatchContext'
         }
       }, releaseErr);
     }
-    throw canvasMissingErr;
+    return;
+  }
+  const __screenStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__screenStateRoot) {
+    const stateMissingErr = new Error('[CanvasPatch] CanvasPatchContext.state is undefined - module registration is not available');
+    __screenDiag('warn', 'screen:canvas_patch_state_missing', {
+      stage: 'preflight',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: 'CanvasPatchContext.state',
+      message: 'CanvasPatchContext.state is undefined - module registration is not available',
+      data: {
+        outcome: 'skip',
+        reason: 'canvas_patch_state_missing',
+        missing: 'CanvasPatchContext.state'
+      }
+    }, stateMissingErr);
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
+      }
+    } catch (releaseErr) {
+      __screenDiag('warn', 'screen:guard_release_failed', {
+        stage: 'preflight',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: __flagKey,
+        message: 'guard release failed after state registration skip',
+        data: {
+          outcome: 'skip',
+          reason: 'guard_release_failed',
+          substage: 'CanvasPatchContext.state'
+        }
+      }, releaseErr);
+    }
+    return;
+  }
+  if (!(__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')) {
+    Object.defineProperty(__screenStateRoot, '__SCREEN__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
   }
   const __moduleRollbackStack = [];
 
@@ -149,11 +193,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     });
   }
-  function makeNamedGetter(prop, getter) {
-    if (typeof getter === 'function' && getter.name) return getter;
-    const acc = ({ get [prop]() { return getter.call(this); } });
-    return Object.getOwnPropertyDescriptor(acc, prop).get;
-  }
   let __screenReceiverCheckDiagSent = false;
   function receiverMatchesTarget(target, thisArg) {
     try {
@@ -186,7 +225,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       if (!__screenReceiverCheckDiagSent) {
         __screenReceiverCheckDiagSent = true;
         __screenDiag('warn', 'screen:receiver_matches_target_failed', {
-          stage: 'guard',
+          stage: 'apply',
           type: __screenTypeBrowser,
           diagTag: 'screen',
           key: null,
@@ -362,7 +401,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       return;
     }
     if (typeof d.get !== 'function') throw new Error(`${prop} getter missing`);
-    const namedGet = (typeof getterOrValue === 'function') ? makeNamedGetter(prop, getterOrValue) : null;
     applyCoreTargetsGroup(groupTag, [{
       owner: target,
       key: prop,
@@ -376,7 +414,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       },
       invalidThis: 'throw',
       getImpl: function screenAccessorGetImpl() {
-        if (namedGet) return Reflect.apply(namedGet, this, []);
+        if (typeof getterOrValue === 'function') return getterOrValue.call(this);
         return getterOrValue;
       }
     }], 'skip');
@@ -434,7 +472,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       if (!__screenMatchMediaThisCheckDiagSent) {
         __screenMatchMediaThisCheckDiagSent = true;
         __screenDiag('warn', 'screen:matchMedia_window_this_check_failed', {
-          stage: 'guard',
+          stage: 'apply',
           type: __screenTypeBrowser,
           diagTag: 'screen:matchMedia',
           key: 'matchMedia',
@@ -560,10 +598,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     diagTag: 'screen:matchMedia',
     validThis: isMatchMediaThis,
     invalidThis: 'throw',
-    // validThis() {
-    //   return true;
-    // },
-    // invalidThis: 'throw',
     invoke: matchMediaInvokeCore
   }], 'throw');
 

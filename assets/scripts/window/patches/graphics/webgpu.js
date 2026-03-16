@@ -5,7 +5,10 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
   const __flagKey = '__PATCH_WEBGPU__';
   const __webgpuTypePipeline = 'pipeline missing data';
   const __webgpuTypeBrowser = 'browser structure missing data';
-  const __webgpuDegrade = (typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __webgpuDegrade = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __webgpuDegradeDiag = (__webgpuDegrade && typeof __webgpuDegrade.diag === 'function')
     ? __webgpuDegrade.diag.bind(__webgpuDegrade)
     : null;
@@ -104,6 +107,26 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     releaseEntryGuard(true);
     return;
   }
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    degrade('fatal', 'webgpu:canvas_patch_state_missing', new Error('[CanvasPatch] CanvasPatchContext.state is undefined - module registration is not available'), {
+      stage: 'preflight',
+      type: __webgpuTypePipeline,
+      key: 'CanvasPatchContext.state',
+      message: 'CanvasPatchContext.state is undefined',
+      data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
+    });
+    releaseEntryGuard(true);
+    return;
+  }
+  if (!(__stateRoot.__WEBGPU__ && typeof __stateRoot.__WEBGPU__ === 'object')) {
+    Object.defineProperty(__stateRoot, '__WEBGPU__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
 
   const Core = __core;
   if (!Core || typeof Core.applyTargets !== 'function') {
@@ -136,6 +159,19 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     releaseEntryGuard(true);
     return;
   }
+
+    const __webgpuWLState = (__stateRoot.__WEBGPU_WL_STATE__ && typeof __stateRoot.__WEBGPU_WL_STATE__ === 'object')
+      ? __stateRoot.__WEBGPU_WL_STATE__
+      : null;
+    const __webgpuWLStore = (__webgpuWLState && __webgpuWLState.store && typeof __webgpuWLState.store === 'object')
+      ? __webgpuWLState.store
+      : null;
+    const __webgpuFeaturesWhitelist = (__webgpuWLStore && Array.isArray(__webgpuWLStore.featuresWhitelist))
+      ? __webgpuWLStore.featuresWhitelist
+      : (Array.isArray(window.__WEBGPU_FEATURES_WHITELIST__) ? window.__WEBGPU_FEATURES_WHITELIST__ : []);
+    const __webgpuLimitsWhitelist = (__webgpuWLStore && Array.isArray(__webgpuWLStore.limitsWhitelist))
+      ? __webgpuWLStore.limitsWhitelist
+      : (Array.isArray(window.__WEBGPU_LIMITS_WHITELIST__) ? window.__WEBGPU_LIMITS_WHITELIST__ : []);
 
     function isSameDescriptor(actual, expected) {
       if (!actual || !expected) return false;
@@ -295,13 +331,9 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       };
     }
 
-    const __WL_FEATURES__ = new Set(Array.isArray(window.__WEBGPU_FEATURES_WHITELIST__)
-      ? window.__WEBGPU_FEATURES_WHITELIST__
-      : []);
+    const __WL_FEATURES__ = new Set(__webgpuFeaturesWhitelist);
 
-    const __WL_LIMITS__ = new Set(Array.isArray(window.__WEBGPU_LIMITS_WHITELIST__)
-      ? window.__WEBGPU_LIMITS_WHITELIST__
-      : []);
+    const __WL_LIMITS__ = new Set(__webgpuLimitsWhitelist);
 
     const __MaskedLimitsCache__ = new WeakMap();
     function __maskLimits(nativeLimits) {
@@ -537,9 +569,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     function readNativeAdapterInfo(adapter) {
       const resolved = resolveDescriptorOnProtoChain(adapter, 'info');
       const nativeInfoGet = resolved && resolved.owner ? __adapterInfoGetterByOwner__.get(resolved.owner) : null;
-      if (typeof nativeInfoGet === 'function') {
+      const fallbackGet = resolved && resolved.desc && typeof resolved.desc.get === 'function' ? resolved.desc.get : null;
+      const getter = (typeof nativeInfoGet === 'function') ? nativeInfoGet : fallbackGet;
+      if (typeof getter === 'function') {
         try {
-          return Reflect.apply(nativeInfoGet, adapter, []);
+          return Reflect.apply(getter, adapter, []);
         } catch (e) {
           degrade('warn', 'webgpu:adapter:info_native_throw', e, {
             stage: 'runtime',
@@ -719,7 +753,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             const first = input.length ? input[0] : undefined;
             const opts = (first && typeof first === 'object') ? Object.assign({}, first) : {};
             const req = new Set(Array.isArray(opts.requiredFeatures) ? opts.requiredFeatures : []);
-            const autoEnable = Array.isArray(window.__WEBGPU_FEATURES_WHITELIST__) ? window.__WEBGPU_FEATURES_WHITELIST__ : [];
+            const autoEnable = __webgpuFeaturesWhitelist;
 
             const thisFeatures = this.features;
             const thisHas = thisFeatures && Reflect.get(thisFeatures, 'has', thisFeatures);
@@ -836,19 +870,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             }
             let nativeInfo = {};
             if (typeof origGet === 'function') {
-              try {
-                nativeInfo = Reflect.apply(origGet, this, []);
-              } catch (e) {
-                degrade('warn', 'webgpu:adapter:info_native_throw', e, {
-                  stage: 'runtime',
-                  type: __webgpuTypeBrowser,
-                  diagTag: 'webgpu',
-                  key: 'GPUAdapter.info',
-                  message: 'GPUAdapter.info getter threw',
-                  data: { outcome: 'throw', reason: 'native_throw' }
-                });
-                throw e;
-              }
+              nativeInfo = readNativeAdapterInfo(this);
             }
             const built = buildAdapterInfo(nativeInfo);
             __adapterInfoValueCache__.set(this, built);
@@ -968,10 +990,9 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       owner: gpu,
       key: 'requestAdapter',
       kind: 'promise_method',
-      wrapLayer: 'named_wrapper',
+      wrapLayer: 'core_wrapper',
       resolve: 'proto_chain',
       invokeClass: 'brand_strict',
-      allowNamedWrapperBrandStrict: true,
       policy: 'throw',
       diagTag: 'webgpu:navigator:requestAdapter',
       validThis: function validGPUThis(self) {

@@ -122,6 +122,66 @@ const WrkModule = function WrkModule(window) {
       return m;
     })();
 
+    const __hiddenSurfaceState = {
+      preapply: [
+        '__ENV_BRIDGE__',
+        '__ENV_HUB__',
+        '__lastSnap__',
+        '__LAST_UACH_HE__',
+        '__UACH_HE_READY__',
+        '__UACH_HE_PROMISE__',
+        '__PATCHED_SAFE_WORKER__',
+        '__PATCHED_SHARED_WORKER__',
+        '__PATCHED_SERVICE_WORKER__',
+        '__BLOB_URL_STORE__',
+        '__LAST_WORKER_BOOTSTRAP_ERROR__',
+        '__LAST_WORKER_USER_URL_LOADED__',
+        '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
+        '__LAST_SHARED_WORKER_USER_URL_LOADED__',
+        '__LAST_SHARED_WORKER_PATCH_OK__',
+        'WorkerPatchHooks',
+        'WrkModule',
+        'SafeWorkerOverride',
+        'SafeSharedWorkerOverride',
+        'ServiceWorkerOverride'
+      ],
+      final: [
+        '__ENV_BRIDGE__',
+        '__ENV_HUB__',
+        '__lastSnap__',
+        '__LAST_UACH_HE__',
+        '__UACH_HE_READY__',
+        '__UACH_HE_PROMISE__',
+        '__PATCHED_SAFE_WORKER__',
+        '__PATCHED_SHARED_WORKER__',
+        '__PATCHED_SERVICE_WORKER__',
+        '__BLOB_URL_STORE__',
+        '__LAST_WORKER_BOOTSTRAP_ERROR__',
+        '__LAST_WORKER_USER_URL_LOADED__',
+        '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
+        '__LAST_SHARED_WORKER_USER_URL_LOADED__',
+        '__LAST_SHARED_WORKER_PATCH_OK__',
+        'WrkModule',
+        'SafeWorkerOverride',
+        'SafeSharedWorkerOverride',
+        'ServiceWorkerOverride',
+        'WorkerPatchHooks',
+        'CanvasPatchContext',
+        '__CORE_TOSTRING_STATE__'
+      ],
+      applied: Object.create(null)
+    };
+    for (const k of __hiddenSurfaceState.preapply) {
+      const d = Object.getOwnPropertyDescriptor(G, k);
+      if (!d) {
+        throw new Error('[WrkModule] bootstrap owner slot missing: ' + k);
+      }
+      if (d.enumerable !== false) {
+        throw new Error('[WrkModule] bootstrap owner slot visible: ' + k);
+      }
+      __hiddenSurfaceState.applied[k] = 'already_hidden';
+    }
+
 // 1) Источник снапшотов
 function EnvBus(G){
   function envSnapshot(){
@@ -934,8 +994,17 @@ function requireWorkerSnapshot(snap, label) {
 function installBlobURLStore(G) {
   if (!G || !G.URL || typeof G.URL.createObjectURL !== 'function') return;
   if (G.__BLOB_URL_STORE__) return;
+  const storeDesc = Object.getOwnPropertyDescriptor(G, '__BLOB_URL_STORE__');
+  if (!storeDesc) {
+    throw new Error('[WorkerOverride] __BLOB_URL_STORE__ slot missing');
+  }
   const store = new Map();
-  Object.defineProperty(G, '__BLOB_URL_STORE__', { value: store, configurable: false, writable: false });
+  Object.defineProperty(G, '__BLOB_URL_STORE__', {
+    value: store,
+    configurable: false,
+    writable: false,
+    enumerable: false
+  });
   if (typeof mark !== 'function') {
     throw new Error('[WorkerOverride] markAsNative missing');
   }
@@ -1263,7 +1332,30 @@ function SafeWorkerOverride(G){
     }, null);
   }
 }
-window.SafeWorkerOverride = SafeWorkerOverride;
+const __safeWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'SafeWorkerOverride');
+const __safeWorkerExportDesc = __safeWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'SafeWorkerOverride') : null;
+const __safeWorkerCanFillPlaceholder = !!(__safeWorkerExportDesc && __safeWorkerExportDesc.configurable !== false && window.SafeWorkerOverride === undefined);
+if (!__safeWorkerExportOwn || __safeWorkerCanFillPlaceholder) {
+  if (!__safeWorkerExportOwn) {
+    throw new Error('[WrkModule] bootstrap owner slot missing: SafeWorkerOverride');
+  }
+  Object.defineProperty(window, 'SafeWorkerOverride', {
+    value: SafeWorkerOverride,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} else {
+  const d = Object.getOwnPropertyDescriptor(window, 'SafeWorkerOverride');
+  if (d && d.enumerable !== false && d.configurable !== false && typeof window.SafeWorkerOverride === 'function') {
+    Object.defineProperty(window, 'SafeWorkerOverride', {
+      value: window.SafeWorkerOverride,
+      writable: !!d.writable,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}
 
 
 // === SafeSharedWorkerOverride (Shared) ===
@@ -1458,7 +1550,30 @@ function SafeSharedWorkerOverride(G){
     }, null);
   }
 }
-window.SafeSharedWorkerOverride = SafeSharedWorkerOverride;
+const __safeSharedWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'SafeSharedWorkerOverride');
+const __safeSharedWorkerExportDesc = __safeSharedWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'SafeSharedWorkerOverride') : null;
+const __safeSharedWorkerCanFillPlaceholder = !!(__safeSharedWorkerExportDesc && __safeSharedWorkerExportDesc.configurable !== false && window.SafeSharedWorkerOverride === undefined);
+if (!__safeSharedWorkerExportOwn || __safeSharedWorkerCanFillPlaceholder) {
+  if (!__safeSharedWorkerExportOwn) {
+    throw new Error('[WrkModule] bootstrap owner slot missing: SafeSharedWorkerOverride');
+  }
+  Object.defineProperty(window, 'SafeSharedWorkerOverride', {
+    value: SafeSharedWorkerOverride,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} else {
+  const d = Object.getOwnPropertyDescriptor(window, 'SafeSharedWorkerOverride');
+  if (d && d.enumerable !== false && d.configurable !== false && typeof window.SafeSharedWorkerOverride === 'function') {
+    Object.defineProperty(window, 'SafeSharedWorkerOverride', {
+      value: window.SafeSharedWorkerOverride,
+      writable: !!d.writable,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}
 
 
 
@@ -1788,7 +1903,30 @@ function ServiceWorkerOverride(G){
     data: { outcome: 'return' }
   }, null);
 }
-window.ServiceWorkerOverride = ServiceWorkerOverride;
+const __serviceWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'ServiceWorkerOverride');
+const __serviceWorkerExportDesc = __serviceWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'ServiceWorkerOverride') : null;
+const __serviceWorkerCanFillPlaceholder = !!(__serviceWorkerExportDesc && __serviceWorkerExportDesc.configurable !== false && window.ServiceWorkerOverride === undefined);
+if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
+  if (!__serviceWorkerExportOwn) {
+    throw new Error('[WrkModule] bootstrap owner slot missing: ServiceWorkerOverride');
+  }
+  Object.defineProperty(window, 'ServiceWorkerOverride', {
+    value: ServiceWorkerOverride,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} else {
+  const d = Object.getOwnPropertyDescriptor(window, 'ServiceWorkerOverride');
+  if (d && d.enumerable !== false && d.configurable !== false && typeof window.ServiceWorkerOverride === 'function') {
+    Object.defineProperty(window, 'ServiceWorkerOverride', {
+      value: window.ServiceWorkerOverride,
+      writable: !!d.writable,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}
 
 // === WorkerPatchHooks: оркестратор ===
 (function WorkerPatchHooks(G){
@@ -1927,47 +2065,6 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
     data: { outcome: 'return' }
   }, null);
 
-  // reduce visibility of pipeline globals in Window realm (non-enumerable)
-  try {
-    const win = G;
-    if (win && (typeof win === 'object' || typeof win === 'function')) {
-      const keys = [
-        '__ENV_BRIDGE__',
-        '__ENV_HUB__',
-        'CanvasPatchContext',
-        '__CORE_TOSTRING_STATE__'
-      ];
-      for (const k of keys) {
-        if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
-        const d = Object.getOwnPropertyDescriptor(win, k);
-        if (!d || d.enumerable === false) continue;
-        if (d.configurable === false) {
-          const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
-          __wrkDiag('warn', 'wrk:hide_pipeline_surface_nonconfigurable', {
-            stage: 'apply',
-            key: k,
-            message: 'hide pipeline surface skipped: non-configurable',
-            type: 'browser structure missing data',
-            data: { outcome: 'skip', reason: 'hide_pipeline_surface_nonconfigurable' }
-          }, e);
-          continue;
-        }
-        if ('value' in d) {
-          Object.defineProperty(win, k, { value: win[k], writable: !!d.writable, configurable: !!d.configurable, enumerable: false });
-        } else {
-          Object.defineProperty(win, k, { get: d.get, set: d.set, configurable: !!d.configurable, enumerable: false });
-        }
-      }
-    }
-  } catch (e) {
-    __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
-      stage: 'apply',
-      key: '__ENV_BRIDGE__',
-      message: 'hide pipeline surface failed',
-      type: 'browser structure missing data',
-      data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }
-    }, e);
-  }
     __wrkDiag('info', 'wrk:init:return', {
       stage: 'apply',
       key: '__PATCH_WRK__',
@@ -1997,9 +2094,27 @@ window.ServiceWorkerOverride = ServiceWorkerOverride;
 }; // <-- закрыли WrkModule
 
 // --- export WrkModule globally (stable regardless of load order) ---
-Object.defineProperty(globalThis, 'WrkModule', {
-  value: WrkModule,
-  writable: true,
-  configurable: false,
-  enumerable: false,
-});
+const __wrkModuleExportOwn = Object.prototype.hasOwnProperty.call(globalThis, 'WrkModule');
+const __wrkModuleExportDesc = __wrkModuleExportOwn ? Object.getOwnPropertyDescriptor(globalThis, 'WrkModule') : null;
+const __wrkModuleCanFillPlaceholder = !!(__wrkModuleExportDesc && __wrkModuleExportDesc.configurable !== false && globalThis.WrkModule === undefined);
+if (!__wrkModuleExportOwn || __wrkModuleCanFillPlaceholder) {
+  if (!__wrkModuleExportOwn) {
+    throw new Error('[WrkModule] bootstrap owner slot missing: WrkModule');
+  }
+  Object.defineProperty(globalThis, 'WrkModule', {
+    value: WrkModule,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+} else {
+  const d = Object.getOwnPropertyDescriptor(globalThis, 'WrkModule');
+  if (d && d.enumerable !== false && d.configurable !== false && typeof globalThis.WrkModule === 'function') {
+    Object.defineProperty(globalThis, 'WrkModule', {
+      value: globalThis.WrkModule,
+      writable: !!d.writable,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}

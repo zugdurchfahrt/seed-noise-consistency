@@ -43,10 +43,11 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
   window = G;
 }
 
-const C  = G.CanvasPatchContext || (G.CanvasPatchContext = {});
+const C  = G.CanvasPatchContext;
+const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
-    const d = G.__DEGRADE__;
+    const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     if (typeof d !== 'function') return;
     const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
     const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
@@ -65,6 +66,26 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return;
     }
     d(eventCode, e, ctx);
+  }
+  function __resolvePrngState() {
+    const __core = G && G.Core;
+    const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
+      ? __core.__internal
+      : null;
+    const corePrng = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+      ? __coreInternal.prng
+      : null;
+    const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+    const state = corePrng || ((stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
+      ? stateRoot.__PRNG_STATE__
+      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
+    return {
+      seed: (state && typeof state.seed === 'string' && state.seed)
+        ? state.seed
+        : ((typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) ? G.__GLOBAL_SEED : ''),
+      strToSeed: (state && typeof state.strToSeed === 'function') ? state.strToSeed : null,
+      mulberry32: (state && typeof state.mulberry32 === 'function') ? state.mulberry32 : null
+    };
   }
 
 
@@ -112,7 +133,28 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   // === MODULE INITIALIZATION ===
   // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
-  C.state = C.state || { domReady: false, offscreenReady: false };
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    throw new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available');
+  }
+  const __canvasState = (function ensureCanvasStateSlot() {
+    const existing = __stateRoot.__CANVAS_STATE__;
+    if (existing && typeof existing === 'object') return existing;
+    const slot = { domReady: false, offscreenReady: false };
+    if (!__defineHidden__(
+      __stateRoot,
+      '__CANVAS_STATE__',
+      slot,
+      'canvas:init:apply:canvas_state_slot_define_failed',
+      '__CANVAS_STATE__',
+      'canvas state slot defineProperty failed; fallback assign used'
+    )) {
+      throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS_STATE__ unavailable');
+    }
+    return (__stateRoot.__CANVAS_STATE__ && typeof __stateRoot.__CANVAS_STATE__ === 'object')
+      ? __stateRoot.__CANVAS_STATE__
+      : slot;
+  })();
 
   // keep internal handles inside CanvasPatchContext (non-enumerable),
   // do not publish generic aliases like window.canvas/window.div/window.offscreenCanvas.
@@ -152,11 +194,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   // создаём скрытый HTML-canvas в окне
   function _ensureDomOnce() {
-    if (C.state.domReady) return;
+    if (__canvasState.domReady) return;
 
     const doc = G && G.document;
     if (!doc || !doc.body || typeof doc.createElement !== 'function') {
-      C.state.domReady = false;
+      __canvasState.domReady = false;
       return; // нет DOM — выходим
     }
 
@@ -164,7 +206,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const existingCanvas = (C && C.__DOM_CANVAS__);
     const existingHost = (C && C.__DOM_CANVAS_HOST__);
     if (existingCanvas && existingHost && existingHost.contains(existingCanvas) && existingHost.parentNode) {
-      C.state.domReady = true;
+      __canvasState.domReady = true;
       return;
     }
 
@@ -188,7 +230,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const baseCanvasWidth = 300;
     const baseCanvasHeight = 150;
     const div = doc.createElement('div');
-    if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED) {
+    const __prng = __resolvePrngState();
+    if (typeof __prng.seed !== 'string' || !__prng.seed) {
       emitCanvasDiag('warn', 'canvas:init:preflight:global_seed_missing', null, {
         stage: 'preflight',
         key: '__GLOBAL_SEED',
@@ -196,7 +239,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       });
       return;
     }
-    if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function') {
+    if (typeof __prng.strToSeed !== 'function' || typeof __prng.mulberry32 !== 'function') {
       emitCanvasDiag('warn', 'canvas:init:preflight:prng_helpers_missing', null, {
         stage: 'preflight',
         key: 'strToSeed/mulberry32',
@@ -204,7 +247,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       });
       return;
     }
-    const rng = G.mulberry32(G.strToSeed(G.__GLOBAL_SEED + '|canvasId'));
+    const rng = __prng.mulberry32(__prng.strToSeed(__prng.seed + '|canvasId'));
     const u1 = rng();
     const u2 = rng();
 
@@ -241,12 +284,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       '__DOM_CANVAS_HOST__',
       'DOM host defineProperty failed; fallback assign used'
     );
-    C.state.domReady = true;
+    __canvasState.domReady = true;
   }
 
   // создаём OffscreenCanvas (и в окне, и в воркере)
   function _ensureOffscreenOnce() {
-    if (C.state.offscreenReady) return;
+    if (__canvasState.offscreenReady) return;
     if (typeof G.OffscreenCanvas === 'undefined') return;
 
     const screenWidth = G.__WIDTH;
@@ -268,7 +311,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         'offscreen defineProperty failed; fallback assign used'
       );
     }
-    C.state.offscreenReady = true;
+    __canvasState.offscreenReady = true;
   }
 
   // Воркеру нужен Offscreen без ожидания DOM; в окне — это тоже безопасно
@@ -293,42 +336,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   } else if (typeof G.document !== 'undefined') {
     realInit();
   }
-
-
-
-  function get2DProto(ctx) {
-    
-    if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && ctx instanceof OffscreenCanvasRenderingContext2D) {
-      return OffscreenCanvasRenderingContext2D.prototype;
-    }
-    if (typeof CanvasRenderingContext2D !== 'undefined' && ctx instanceof CanvasRenderingContext2D) {
-      return CanvasRenderingContext2D.prototype;
-    }
-    
-    return Object.getPrototypeOf(ctx);
-  }
-
-  function nativeGetImageData(P, ctx, x, y, w, h) {
-    const fn = P && typeof P.getImageData === 'function' ? P.getImageData : ctx.getImageData;
-    return fn.call(ctx, x, y, w, h);
-  }
-  function nativePutImageData(P, ctx, img, x, y) {
-    const fn = P && typeof P.putImageData === 'function' ? P.putImageData : ctx.putImageData;
-    return fn.call(ctx, img, x, y);
-  }
-  function nativeDrawImage(P, ctx, src, dx, dy) {
-    const fn = P && typeof P.drawImage === 'function' ? P.drawImage : ctx.drawImage;
-    return fn.call(ctx, src, dx, dy);
-  }
-  function nativeTranslate(P, ctx, x, y) {
-    const fn = P && typeof P.translate === 'function' ? P.translate : ctx.translate;
-    return fn.call(ctx, x, y);
-  }
-  function nativeSetTransform(P, ctx, a, b, c, d, e, f) {
-    const fn = P && typeof P.setTransform === 'function' ? P.setTransform : ctx.setTransform;
-    return fn.call(ctx, a, b, c, d, e, f);
-  }
-
+ 
 
   function stringHash(str) {
     let h = 2166136261;
@@ -342,11 +350,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   function stableNoiseFromString(str, min, max) {
   //The ONLY source: __GLOBAL_SEED + key -> mulberry32(strToSeed(...))
-  if (typeof G.__GLOBAL_SEED !== 'string' || !G.__GLOBAL_SEED)
+  const __prng = __resolvePrngState();
+  if (typeof __prng.seed !== 'string' || !__prng.seed)
     throw new Error('[PRNG] __GLOBAL_SEED is required');
-  if (typeof G.strToSeed !== 'function' || typeof G.mulberry32 !== 'function')
+  if (typeof __prng.strToSeed !== 'function' || typeof __prng.mulberry32 !== 'function')
     throw new Error('[PRNG] strToSeed/mulberry32 are required')
-    const seedStr = str + ':' + (G.__GLOBAL_SEED);
+    const seedStr = str + ':' + (__prng.seed);
     let x = stringHash(seedStr);
     x ^= x >>> 16;
     x = Math.imul(x, 0x7feb352d);
@@ -486,14 +495,15 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const managedFontCfg = getManagedFontConfig(fontStr);
       const isManagedFont = !!managedFontCfg;
 
-      const fontsReadyFlag =
-        (Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__')
-          ? (window.__FONTS_READY__ === true)
-          : false);
+      const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+      const fontsState = (stateRoot && stateRoot.__FONTS_STATE__ && typeof stateRoot.__FONTS_STATE__ === 'object')
+        ? stateRoot.__FONTS_STATE__
+        : ((C && C.__FONTS_STATE__ && typeof C.__FONTS_STATE__ === 'object') ? C.__FONTS_STATE__ : null);
+      const fontsReadyFlag = !!(fontsState && fontsState.ready === true);
 
       const nativeFontsReady = !!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded');
 
-      // Managed fonts stay on the explicit __FONTS_READY__ gate.
+      // Managed fonts stay on the explicit CanvasPatchContext.__FONTS_STATE__.ready gate.
       // Unmanaged/custom CSS fonts must follow only native FontFaceSet readiness.
       const fontsReady = isManagedFont ? fontsReadyFlag : nativeFontsReady;
       if (!fontsReady) return nativeMetrics;
@@ -501,7 +511,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       // measureTextNoiseHook itself must not change returned metrics for consistency.
       const info = measureTextNoiseHook.call(this, nativeMetrics, text, fontStr);
       if (!info || typeof info !== 'object') return nativeMetrics;
-      const C  = window.CanvasPatchContext || (window.CanvasPatchContext = {});
       const TM = C.__TextMetrics__ || (C.__TextMetrics__ = { cache: new Map() });
       const key = (typeof info.key === 'string' && info.key.length) ? info.key : null;
       return new Proxy(nativeMetrics, {

@@ -225,20 +225,24 @@
       throw e;
     }
 
-    // sanity: toString bridge must reflect labels written by seed markAsNative
+    // sanity: worker follows window-style nativeization.
+    // markAsNative must write labels into shared CORE state; public Function.prototype.toString stays native.
     {
+      const st = self.__CORE_TOSTRING_STATE__;
       const probe = function probe(){};
       const nativeProbe = Reflect.apply(nativeToString, probe, []);
       markAsNative(probe);
-      const actual = Function.prototype.toString.call(probe);
-      if (actual === nativeProbe) {
-        const e = new Error('UACHPatch: toString bridge missing');
-        emitDegrade('error', 'worker_patch_src:tostring:contract:bridge_missing', {
+      const actual = st && st.overrideMap && typeof st.overrideMap.get === 'function'
+        ? st.overrideMap.get(probe)
+        : undefined;
+      if (typeof actual !== 'string' || actual === nativeProbe) {
+        const e = new Error('UACHPatch: toString override map missing label');
+        emitDegrade('error', 'worker_patch_src:tostring_state:contract:label_missing', {
           type: 'pipeline missing data',
           stage: 'contract',
           module: 'WORKER_PATCH_SRC',
-          surface: 'Function.prototype.toString',
-          key: 'toString',
+          surface: '__CORE_TOSTRING_STATE__',
+          key: '__CORE_TOSTRING_STATE__',
           policy: 'throw',
           action: 'throw'
         }, e);
@@ -246,7 +250,7 @@
       }
       const directProbe = function workerPatchDirectProbe(){};
       const expectedNative = Reflect.apply(nativeToString, directProbe, []);
-      const actualNative = Function.prototype.toString.call(directProbe);
+      const actualNative = Reflect.apply(Function.prototype.toString, directProbe, []);
       if (actualNative !== expectedNative) {
         const e = new Error('UACHPatch: toString native forwarding mismatch');
         emitDegrade('error', 'worker_patch_src:tostring:contract:forwarding_mismatch', {
@@ -657,69 +661,57 @@
       value: getHighEntropyValues
     });
 
-    const makeGuardedGetter = (k, owner, patchedGet, origGet) => {
+    const wrapStrictAccessor = (typeof self.__wrapStrictAccessor === 'function') ? self.__wrapStrictAccessor : null;
+    if (typeof wrapStrictAccessor !== 'function') {
+      throw new Error('UACHPatch: worker native accessor bridge missing');
+    }
+
+    const makeGuardedGetter = (k, owner, patchedGet, origGet, desc) => {
       if (typeof origGet !== 'function') {
         throw new Error(`UACHPatch: ${k} native getter missing`);
       }
-      const impl = function(){
-        const recv = this;
-        if (recv === nav) {
-          try {
-            return Reflect.apply(patchedGet, recv, []);
-          } catch (e) {
-            emitDegrade('warn', 'worker_patch_src:getter_native_fallback', {
-              stage: 'runtime',
-              surface: 'WorkerNavigator',
-              key: k,
-              message: 'worker navigator getter fallback to native',
-              type: 'pipeline missing data',
-              data: { outcome: 'skip', reason: 'getter_native_fallback' }
-            }, e);
-            return Reflect.apply(origGet, recv, []);
-          }
-        }
+      const guardedPatchedGet = function() {
         try {
-          return Reflect.apply(origGet, recv, []);
+          return Reflect.apply(patchedGet, this, []);
         } catch (e) {
-          emitDegrade('warn', 'worker_patch_src:workernavigator_illegal_invocation', {
+          emitDegrade('warn', 'worker_patch_src:getter_native_fallback', {
             stage: 'runtime',
             surface: 'WorkerNavigator',
             key: k,
-            message: 'worker navigator getter illegal invocation',
-            type: 'browser structure missing data',
-            data: { outcome: 'throw', reason: 'native_illegal_invocation' }
+            message: 'worker navigator getter fallback to native',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'getter_native_fallback' }
           }, e);
-          throw e;
+          return Reflect.apply(origGet, this, []);
         }
       };
-
-      // IMPORTANT: native getters have stable `name` like "get hardwareConcurrency".
-      // Avoid `new Function`/eval in Worker scope: CSP can disable it and force a fallback to a normal function
-      // (constructable + has `.prototype`), which cascades into detector failures.
-      // Object-literal getter yields a non-constructable accessor and does not require eval.
-      let wrapped = impl;
-      try {
-        const acc = ({ get [k]() { return impl.call(this); } });
-        const d = Object.getOwnPropertyDescriptor(acc, k);
-        if (d && typeof d.get === 'function') wrapped = d.get;
-      } catch (e) {
-        emitDegrade('warn', 'worker_patch_src:getter:apply:name_failed', {
-          type: 'browser structure missing data',
-          stage: 'apply',
-          module: 'WORKER_PATCH_SRC',
-          surface: 'makeGuardedGetter',
-          key: 'name',
-          policy: 'skip',
-          action: 'skip'
-        }, e);
-      }
-
-      return markAsNative(wrapped, `get ${k}`);
+      const sourceDesc = desc && typeof desc === 'object'
+        ? {
+            configurable: !!desc.configurable,
+            enumerable: !!desc.enumerable,
+            get: origGet,
+            set: undefined
+          }
+        : {
+            configurable: true,
+            enumerable: true,
+            get: origGet,
+            set: undefined
+          };
+      return wrapStrictAccessor(k, guardedPatchedGet, sourceDesc, function(recv) {
+        return recv === nav;
+      }, {
+        name: `get ${k}`
+      });
     };
 
     const def = (obj, k, getter, enumerable = true) => {
       // По методологии: не молчим, если некуда ставить
       if (!nav) throw new Error(`UACHPatch: cannot define ${k} (no navigator)`);
+      const targetOwner = (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype) || obj || null;
+      if (!targetOwner) {
+        throw new Error(`UACHPatch: cannot define ${k} (no WorkerNavigator.prototype)`);
+      }
       const resolveNativeGetter = (desc, where) => {
         if (desc && typeof desc.get === 'function') return desc.get;
         const isData = !!desc
@@ -733,64 +725,41 @@
         throw new Error(`UACHPatch: ${k} missing native getter on ${where}`);
       };
 
-      // 1) Если свойство уже есть как OWN на navigator — патчим ТУДА.
-      // Иначе прототипный getter никогда не сработает.
-      const own = Object.getOwnPropertyDescriptor(nav, k);
-      if (own) {
-        if (own.configurable === false) {
-          throw new Error(`UACHPatch: ${k} not configurable on navigator`);
+      // WorkerNavigator.* must land on WorkerNavigator.prototype as own accessor.
+      let d = null;
+      for (let o = targetOwner; o; o = Object.getPrototypeOf(o)) {
+        try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
+        catch (e) {
+          d = null;
+          emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
+            type: 'browser structure missing data',
+            stage: 'runtime',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'descriptor',
+            key: String(k || ''),
+            policy: 'skip',
+            action: 'native',
+            data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
+          }, e);
         }
-        const ownOrigGet = resolveNativeGetter(own, 'navigator');
-        const ownGuardedGet = makeGuardedGetter(k, nav, getter, ownOrigGet);
-        trackedDefineProperty(nav, k, {
-          configurable: !!own.configurable,
-          enumerable: !!own.enumerable,
-          get: ownGuardedGet,
-          set: own && Object.prototype.hasOwnProperty.call(own, 'set') ? own.set : undefined
-        });
-        return;
+        if (d) break;
       }
-
-      // 2) Иначе — патчим на proto (как раньше)
-      if (obj) {
-        // CORE 4.1: descriptor-owner по proto-chain (не всегда OWN на ближайшем proto)
-        let owner = obj;
-        let d = null;
-        for (let o = obj; o; o = Object.getPrototypeOf(o)) {
-          try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
-          catch (e) {
-            d = null;
-            emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
-              type: 'browser structure missing data',
-              stage: 'runtime',
-              module: 'WORKER_PATCH_SRC',
-              surface: 'descriptor',
-              key: String(k || ''),
-              policy: 'skip',
-              action: 'native',
-              data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
-            }, e);
-          }
-          if (d) { owner = o; break; }
-        }
-        if (!d) {
-          throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
-        }
-        if (d.configurable === false) {
-          throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
-        }
-        const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
-        const protoGuardedGet = makeGuardedGetter(k, obj, getter, protoOrigGet);
-        trackedDefineProperty(owner, k, {
-          configurable: d ? !!d.configurable : true,
-          enumerable: d ? !!d.enumerable : !!enumerable,
-          get: protoGuardedGet,
-          set: d && Object.prototype.hasOwnProperty.call(d, 'set') ? d.set : undefined
-        });
-        return;
+      if (!d) {
+        throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
       }
+      if (d.configurable === false) {
+        throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
+      }
+      const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
+      const protoGuardedGet = makeGuardedGetter(k, targetOwner, getter, protoOrigGet, d);
+      trackedDefineProperty(targetOwner, k, {
+        configurable: d ? !!d.configurable : true,
+        enumerable: d ? !!d.enumerable : !!enumerable,
+        get: protoGuardedGet,
+        set: undefined
+      });
+      return;
 
-      throw new Error(`UACHPatch: cannot define ${k} (no proto)`);
     };
 
     const failWorkerNavigatorSanity = (code, key, message, data) => {
@@ -816,24 +785,20 @@
           `UACHPatch: ${k} descriptor owner missing`
         );
       }
-      // CORE 4.1: descriptor-owner по proto-chain
       let d = null;
-      for (let o = owner; o; o = Object.getPrototypeOf(o)) {
-        try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
-        catch (e) {
-          d = null;
-          emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
-            type: 'browser structure missing data',
-            stage: 'runtime',
-            module: 'WORKER_PATCH_SRC',
-            surface: 'descriptor',
-            key: String(k || ''),
-            policy: 'skip',
-            action: 'native',
-            data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
-          }, e);
-        }
-        if (d) break;
+      try { d = Object.getOwnPropertyDescriptor(owner, k) || null; }
+      catch (e) {
+        d = null;
+        emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
+          type: 'browser structure missing data',
+          stage: 'runtime',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'descriptor',
+          key: String(k || ''),
+          policy: 'skip',
+          action: 'native',
+          data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
+        }, e);
       }
       if (!d) {
         failWorkerNavigatorSanity(
@@ -844,7 +809,8 @@
       }
       const hasGetter = typeof d.get === 'function';
       const hasValue = Object.prototype.hasOwnProperty.call(d, 'value');
-      if (!hasGetter || hasValue) {
+      const hasOwnOnNavigator = !!Object.getOwnPropertyDescriptor(nav, k);
+      if (!hasGetter || hasValue || hasOwnOnNavigator) {
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator_descriptor:sanity:mismatch',
           k,
@@ -853,6 +819,7 @@
             hasGetter,
             hasSetter: typeof d.set === 'function',
             hasValue,
+            hasOwnOnNavigator,
             configurable: !!d.configurable,
             enumerable: !!d.enumerable
           }

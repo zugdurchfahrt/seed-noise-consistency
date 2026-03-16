@@ -6,19 +6,103 @@ const LOGGingModule = function LOGGingModule() {
       {};
     const W = (typeof window !== "undefined" && window) ? window : null;
 
-    if (!G.__PATCH_MYTYPER__) {
-    G.__PATCH_MYTYPER__ = true;
-
     const global = G;
-    const C = ((W || G).CanvasPatchContext = (W || G).CanvasPatchContext || {});
+    const C = (W || G).CanvasPatchContext;
+    if (!C || (typeof C !== "object" && typeof C !== "function")) {
+      throw new Error("[LOGGingModule] CanvasPatchContext missing");
+    }
+      const __loggerRoot = (C.__logger && typeof C.__logger === "object") ? C.__logger : null;
+      if (!__loggerRoot) {
+        throw new Error("[LOGGingModule] CanvasPatchContext.__logger missing");
+      }
+
+    function __defineWindowLoggerAccessor(name, getter, setter) {
+      if (!W) return;
+      Object.defineProperty(W, name, {
+        get: getter,
+        set: setter,
+        configurable: true,
+        enumerable: false
+      });
+    }
+
+    function __defineWindowLoggerValue(name, value, writable) {
+      if (!W || typeof value === "undefined") return;
+      Object.defineProperty(W, name, {
+        value: value,
+        writable: writable !== false,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    function __defineLoggerHiddenValue(name, value, writable) {
+      Object.defineProperty(__loggerRoot, name, {
+        value: value,
+        writable: writable !== false,
+        configurable: true,
+        enumerable: false
+      });
+      return value;
+    }
+    function __ensureLoggerHiddenValue(name, fallbackFactory, validator, writable) {
+      const current = __loggerRoot[name];
+      const isValid = (typeof validator === "function") ? validator(current) : !!current;
+      const nextValue = isValid ? current : fallbackFactory();
+      return __defineLoggerHiddenValue(name, nextValue, writable);
+    }
+    function __defineGlobalCompatValue(name, value, writable) {
+      Object.defineProperty(global, name, {
+        value: value,
+        writable: writable !== false,
+        configurable: true,
+        enumerable: false
+      });
+      return value;
+    }
+
+    function rebindWindowLoggerShell() {
+      if (!W) return;
+      __defineWindowLoggerAccessor("__DEGRADE__", function () { return __loggerRoot.__DEGRADE__; }, undefined);
+      __defineWindowLoggerAccessor("__DEBUG__", function () { return __loggerRoot.__DEBUG__; }, function (v) { __loggerRoot.__DEBUG__ = !!v; });
+      __defineWindowLoggerAccessor("_logLevel", function () { return __loggerRoot._logLevel; }, function (v) {
+        if (typeof v === "string" && v) __loggerRoot._logLevel = v;
+      });
+      __defineWindowLoggerAccessor("_logConfig", function () { return __loggerRoot._logConfig; }, function (v) {
+        if (v && typeof v === "object") __loggerRoot._logConfig = v;
+      });
+      __defineWindowLoggerValue("__LOGGER_GUARD_MODE__", __loggerRoot.__LOGGER_GUARD_MODE__, true);
+      __defineWindowLoggerValue("__DIAG_SCREEN__", __loggerRoot.__DIAG_SCREEN__, true);
+      __defineWindowLoggerValue("__PROBE_LIVE_READER__", __loggerRoot.__PROBE_LIVE_READER__, false);
+      __defineWindowLoggerValue("__DIAG_ALERTS__", __loggerRoot.__DIAG_ALERTS__, false);
+      __defineWindowLoggerValue("DIAG_SCREEN_ON", __loggerRoot.DIAG_SCREEN_ON, false);
+      __defineWindowLoggerValue("DIAG_SCREEN_OFF", __loggerRoot.DIAG_SCREEN_OFF, false);
+      __defineWindowLoggerValue("DIAG_SCREEN_RESET", __loggerRoot.DIAG_SCREEN_RESET, false);
+      __defineWindowLoggerValue("DIAG_SCREEN_SNAPSHOT", __loggerRoot.DIAG_SCREEN_SNAPSHOT, false);
+      __defineWindowLoggerValue("log", __loggerRoot.log, false);
+      __defineWindowLoggerValue("exportMyDebugLog", __loggerRoot.exportMyDebugLog, false);
+      __defineWindowLoggerValue("DEBUG_ALL_ON", __loggerRoot.DEBUG_ALL_ON, false);
+      __defineWindowLoggerValue("DEBUG_ALL_OFF", __loggerRoot.DEBUG_ALL_OFF, false);
+      __defineWindowLoggerValue("DEBUG_ALL_TOGGLE", __loggerRoot.DEBUG_ALL_TOGGLE, false);
+      __defineWindowLoggerValue("DEBUG_DEGRADES_ON", __loggerRoot.DEBUG_DEGRADES_ON, false);
+      __defineWindowLoggerValue("DEBUG_DEGRADES_OFF", __loggerRoot.DEBUG_DEGRADES_OFF, false);
+      __defineWindowLoggerValue("DEBUG_DEGRADES_TOGGLE", __loggerRoot.DEBUG_DEGRADES_TOGGLE, false);
+      __defineWindowLoggerValue("EXPECTED_RECEIVER_THROW_GUARD_ON", __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_ON, false);
+      __defineWindowLoggerValue("EXPECTED_RECEIVER_THROW_GUARD_OFF", __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_OFF, false);
+      __defineWindowLoggerValue("EXPECTED_RECEIVER_THROW_GUARD_TOGGLE", __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_TOGGLE, false);
+    }
+
+    if (!__loggerRoot.__PATCH_MYTYPER__) {
+    __defineLoggerHiddenValue("__PATCH_MYTYPER__", true, true);
 
     // ===== 0) Central store: private buffer only =====
-    const STORE = new WeakMap();
-    const FALLBACK_BUF = [];
+    const STORE = (__loggerRoot.STORE instanceof WeakMap) ? __loggerRoot.STORE : new WeakMap();
+    const FALLBACK_BUF = Array.isArray(__loggerRoot.FALLBACK_BUF) ? __loggerRoot.FALLBACK_BUF : [];
+    __defineLoggerHiddenValue("STORE", STORE, true);
+    __defineLoggerHiddenValue("FALLBACK_BUF", FALLBACK_BUF, true);
     let degradeFn = null;
 
     function _buf() {
-      const key = degradeFn || G.__DEGRADE__;
+      const key = degradeFn || __loggerRoot.__DEGRADE__;
       if (typeof key !== "function") return FALLBACK_BUF;
       if (!STORE.has(key)) STORE.set(key, []);
       return STORE.get(key);
@@ -147,6 +231,19 @@ const LOGGingModule = function LOGGingModule() {
         if (!Object.prototype.hasOwnProperty.call(DIAG_RUNTIME_TYPES, entryType)) return null;
         const lvl = DIAG_RUNTIME_TYPES[entryType];
         const msg = (typeof entry.message === "string" && entry.message) ? entry.message : null;
+        const runtimeData = {};
+        if (Object.prototype.hasOwnProperty.call(entry, "data")) {
+          runtimeData.data = normalizeForJSON(entry.data);
+        }
+        if (typeof entry.stack === "string" && entry.stack) runtimeData.stack = entry.stack;
+        if (typeof entry.source === "string" && entry.source) runtimeData.source = entry.source;
+        if (typeof entry.filename === "string" && entry.filename) runtimeData.filename = entry.filename;
+        if (typeof entry.lineno === "number") runtimeData.lineno = entry.lineno;
+        if (typeof entry.colno === "number") runtimeData.colno = entry.colno;
+        if (Object.prototype.hasOwnProperty.call(entry, "error")) {
+          runtimeData.error = normalizeForJSON(entry.error);
+        }
+        const hasRuntimeData = Object.keys(runtimeData).length > 0;
         return {
           idx: (typeof idx === "number") ? idx : null,
           timestamp: safeEntryTimestamp(entry),
@@ -162,7 +259,7 @@ const LOGGingModule = function LOGGingModule() {
           errName: null,
           errMessage: msg,
           diagType: "browser structure missing data",
-          data: null
+          data: hasRuntimeData ? runtimeData : null
         };
       } catch (_) {
         return null;
@@ -170,8 +267,10 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     function diagScreenGetConfig() {
-      global.__DIAG_SCREEN__ = (global.__DIAG_SCREEN__ && typeof global.__DIAG_SCREEN__ === "object") ? global.__DIAG_SCREEN__ : {};
-      const cfg = global.__DIAG_SCREEN__;
+      __ensureLoggerHiddenValue("__DIAG_SCREEN__", function () { return {}; }, function (v) {
+        return !!(v && typeof v === "object");
+      }, true);
+      const cfg = __loggerRoot.__DIAG_SCREEN__;
       if (!Object.prototype.hasOwnProperty.call(cfg, "enabled")) cfg.enabled = false;
       if (!Object.prototype.hasOwnProperty.call(cfg, "criticalOnly")) cfg.criticalOnly = true;
       if (!Object.prototype.hasOwnProperty.call(cfg, "lastN")) cfg.lastN = 30;
@@ -300,16 +399,26 @@ const LOGGingModule = function LOGGingModule() {
 
 
     // Debug flag
-    G.__DEBUG__ =
-      typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : true;
-      // typeof global.__DEBUG__ !== "undefined" ? global.__DEBUG__ : false;
-    
-    global.env = global.env || {};
-    // Toggle for *logger self-diagnostics visibility*.
-    // IMPORTANT: must not change runtime behavior by throwing from the logger.
-    global.env.DEBUG_DEGRADES = true;   // включить
-    // global.env.DEBUG_DEGRADES = false; // выключить
-    const env = global.env;
+    __ensureLoggerHiddenValue("__DEBUG__", function () {
+      return (
+        // Toggle for *logger self-diagnostics visibility*.
+        // IMPORTANT: must not change runtime behavior by throwing from the logger.
+        typeof global.__DEBUG__ !== "undefined" ? !!global.__DEBUG__ : true
+      );
+      // typeof global.__DEBUG__ !== "undefined" ? !!global.__DEBUG__ : false;
+    }, function (v) {
+      return typeof v === "boolean";
+    }, true);
+
+    const env = (function () {
+      const existingEnv = (global.env && typeof global.env === "object") ? global.env : Object.create(null);
+      __defineGlobalCompatValue("env", existingEnv, true);
+      if (!Object.prototype.hasOwnProperty.call(existingEnv, "DEBUG_DEGRADES")) existingEnv.DEBUG_DEGRADES = true;
+      // existingEnv.DEBUG_DEGRADES = false; // выключить
+      // existingEnv.EXPECTED_RECEIVER_THROW_GUARD = true;   // включить special logger_guard for expected Illegal invocation / incompatible receiver
+      if (!Object.prototype.hasOwnProperty.call(existingEnv, "EXPECTED_RECEIVER_THROW_GUARD")) existingEnv.EXPECTED_RECEIVER_THROW_GUARD = false;
+      return existingEnv;
+    })();
 
 
     // Save original console methods
@@ -323,15 +432,27 @@ const LOGGingModule = function LOGGingModule() {
     };
 
     function getLoggerGuard() {
-      if (!G.__LOGGER_GUARD__) {
-        Object.defineProperty(G, "__LOGGER_GUARD__", {
-          value: { count: 0, last: null, lastAt: null },
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
+      __ensureLoggerHiddenValue("__LOGGER_GUARD__", function () {
+        return { count: 0, last: null, lastAt: null };
+      }, function (v) {
+        return !!(v && typeof v === "object");
+      }, true);
+      return __loggerRoot.__LOGGER_GUARD__;
+    }
+
+    function getLoggerGuardMode() {
+      try {
+        __ensureLoggerHiddenValue("__LOGGER_GUARD_MODE__", function () { return {}; }, function (v) {
+          return !!(v && typeof v === "object");
+        }, true);
+        const mode = __loggerRoot.__LOGGER_GUARD_MODE__;
+        if (!Object.prototype.hasOwnProperty.call(mode, "expectedReceiverThrow")) {
+          mode.expectedReceiverThrow = !(env && env.EXPECTED_RECEIVER_THROW_GUARD === false);
+        }
+        return mode;
+      } catch (_) {
+        return null;
       }
-      return G.__LOGGER_GUARD__;
     }
 
     function recordLoggerError(err, where) {
@@ -356,10 +477,19 @@ const LOGGingModule = function LOGGingModule() {
 
     function isProbeReceiverGuardActive() {
       try {
-        const mode = G.__LOGGER_GUARD_MODE__;
+        const mode = getLoggerGuardMode();
         return !!(mode && typeof mode === "object" && Number(mode.probeExpectedThrowDepth) > 0);
       } catch (_) {
         return false;
+      }
+    }
+
+    function isExpectedReceiverThrowGuardActive() {
+      try {
+        const mode = getLoggerGuardMode();
+        return !(mode && mode.expectedReceiverThrow === false);
+      } catch (_) {
+        return true;
       }
     }
 
@@ -472,7 +602,11 @@ const LOGGingModule = function LOGGingModule() {
 
     // Supported logging levels
     const LOG_LEVELS = ["error", "warn", "log", "info", "debug", "trace"];
-    G._logLevel = global._logLevel || "log";
+    __ensureLoggerHiddenValue("_logLevel", function () {
+      return (typeof global._logLevel === "string" && global._logLevel) ? global._logLevel : "log";
+    }, function (v) {
+      return typeof v === "string" && !!v;
+    }, true);
 
     function levelAllows(currentLevel, eventLevel) {
       const idx = LOG_LEVELS.indexOf(currentLevel);
@@ -645,8 +779,8 @@ const LOGGingModule = function LOGGingModule() {
 
 
     // ===== 2.5) Swallowed/degrade marker (explicit) =====
-    G.__DEGRADE__ = function (code, err, extra) {
-    degradeFn = G.__DEGRADE__;
+    const __degradeApi = function (code, err, extra) {
+    degradeFn = __degradeApi;
       try {
         if (typeof pushEntry !== "function") {
           if (env && env.DEBUG_DEGRADES) {
@@ -683,8 +817,10 @@ const LOGGingModule = function LOGGingModule() {
         }
         }
     };
+    degradeFn = __degradeApi;
+    __defineLoggerHiddenValue("__DEGRADE__", __degradeApi, true);
 
-    Object.defineProperty(G.__DEGRADE__, "getBuffer", {
+    Object.defineProperty(__degradeApi, "getBuffer", {
       value() {
         return _buf().slice();
       },
@@ -706,7 +842,7 @@ const LOGGingModule = function LOGGingModule() {
      * Записывает в shape: { type:'degrade', code, error, extra:{ level, type, ... }, timestamp }.
      * Fail-safe: не бросает исключения и не пишет в console.
      */
-    Object.defineProperty(G.__DEGRADE__, "diag", {
+  Object.defineProperty(__degradeApi, "diag", {
       value(level, code, ctx, err) {
         try {
           const validLevels = ["info", "warn", "error", "fatal"];
@@ -756,11 +892,13 @@ const LOGGingModule = function LOGGingModule() {
       }
 
       if (isExpectedReceiverThrow(normalizedCode, extraObj, err || null)) {
-        recordExpectedReceiverThrow(normalizedCode, err || null, extraObj);
+        if (isExpectedReceiverThrowGuardActive()) {
+          recordExpectedReceiverThrow(normalizedCode, err || null, extraObj);
+        }
         return;
       }
 
-      G.__DEGRADE__(normalizedCode, err, extraObj);
+      __degradeApi(normalizedCode, err, extraObj);
 
       } catch (e) { try { recordLoggerError(e, "diag"); } catch (_) {} }
 
@@ -769,71 +907,267 @@ const LOGGingModule = function LOGGingModule() {
     writable: false,
     configurable: false
   });
-  global.__DEGRADE__ = G.__DEGRADE__;
+  if (!Object.prototype.hasOwnProperty.call(__loggerRoot, "__PROBE_LIVE_READER__")) {
+    const __probeLiveCfg = (global.__PROBE_LIVE_READER_CONFIG__ && typeof global.__PROBE_LIVE_READER_CONFIG__ === "object")
+      ? global.__PROBE_LIVE_READER_CONFIG__
+      : {};
+    const __probeLiveState = {
+      intervalMs: toPosInt(__probeLiveCfg.intervalMs, 1000),
+      maxRows: toPosInt(__probeLiveCfg.maxRows, 80),
+      panelId: (typeof __probeLiveCfg.panelId === "string" && __probeLiveCfg.panelId) ? __probeLiveCfg.panelId : "__probe_live_reader__",
+      enabled: false,
+      timerId: null,
+      lastIndex: 0,
+      rows: [],
+      lastRenderSig: "",
+      startedAt: null
+    };
+
+    function __probeLiveDiag(level, code, message, data, err) {
+      try {
+        __degradeApi.diag(level, code, {
+          module: "set_log",
+          diagTag: "set_log:probe_live_reader",
+          surface: "logger",
+          key: "__PROBE_LIVE_READER__",
+          stage: "runtime",
+          message: message,
+          data: data == null ? null : data,
+          type: "pipeline telemetry"
+        }, err || null);
+      } catch (_) {}
+    }
+
+    function __probeLiveGetBuffer() {
+      try {
+        const buf = __degradeApi.getBuffer();
+        return Array.isArray(buf) ? buf : [];
+      } catch (e) {
+        __probeLiveDiag("warn", "set_log:probe_live_reader_buffer_failed", "__DEGRADE__.getBuffer failed", {
+          outcome: "skip",
+          reason: "buffer_failed"
+        }, e);
+        return [];
+      }
+    }
+
+    function __probeLiveEnsurePanel() {
+      if (!G || !G.documentElement || !G.body) return null;
+      let host = G.getElementById(__probeLiveState.panelId);
+      if (host) return host;
+      host = G.createElement("div");
+      host.id = __probeLiveState.panelId;
+      host.setAttribute("data-probe-live-reader", "1");
+      host.style.position = "fixed";
+      host.style.right = "12px";
+      host.style.bottom = "12px";
+      host.style.zIndex = "2147483647";
+      host.style.width = "420px";
+      host.style.maxHeight = "40vh";
+      host.style.overflow = "auto";
+      host.style.background = "rgba(12,12,14,0.95)";
+      host.style.color = "#e8e8e8";
+      host.style.border = "1px solid rgba(255,255,255,0.18)";
+      host.style.borderRadius = "8px";
+      host.style.boxShadow = "0 6px 18px rgba(0,0,0,0.35)";
+      host.style.padding = "8px 10px";
+      host.style.font = "12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      host.style.whiteSpace = "pre-wrap";
+      host.style.wordBreak = "break-word";
+      host.style.pointerEvents = "auto";
+      G.body.appendChild(host);
+      return host;
+    }
+
+    function __probeLiveEntryToRow(entry, index) {
+      const safeEntry = (entry && typeof entry === "object") ? entry : null;
+      const extra = (safeEntry && safeEntry.extra && typeof safeEntry.extra === "object") ? safeEntry.extra : null;
+      const error = (safeEntry && safeEntry.error && typeof safeEntry.error === "object") ? safeEntry.error : null;
+      const entryType = (safeEntry && safeEntry.type) ? String(safeEntry.type) : "";
+      const runtimeLevel = (entryType && Object.prototype.hasOwnProperty.call(DIAG_RUNTIME_TYPES, entryType))
+        ? DIAG_RUNTIME_TYPES[entryType]
+        : "";
+      const runtimeTag = runtimeLevel ? "runtime" : "";
+      const topMessage = (safeEntry && typeof safeEntry.message === "string") ? safeEntry.message : "";
+      const topError = (safeEntry && typeof safeEntry.error === "string") ? safeEntry.error : "";
+      const resolvedMessage = extra && typeof extra.message === "string"
+        ? extra.message
+        : (topMessage || (error && typeof error.message === "string" ? error.message : ""));
+      return {
+        idx: index,
+        timestamp: safeEntry && safeEntry.timestamp ? String(safeEntry.timestamp) : "",
+        type: entryType,
+        level: (extra && typeof extra.level === "string" && extra.level)
+          ? extra.level
+          : ((safeEntry && typeof safeEntry.level === "string" && safeEntry.level) ? safeEntry.level : runtimeLevel),
+        code: (safeEntry && safeEntry.code) ? String(safeEntry.code) : entryType,
+        module: (extra && typeof extra.module === "string" && extra.module)
+          ? extra.module
+          : ((safeEntry && typeof safeEntry.module === "string" && safeEntry.module) ? safeEntry.module : runtimeTag),
+        diagTag: (extra && typeof extra.diagTag === "string" && extra.diagTag)
+          ? extra.diagTag
+          : ((safeEntry && typeof safeEntry.diagTag === "string" && safeEntry.diagTag) ? safeEntry.diagTag : runtimeTag),
+        key: (extra && typeof extra.key === "string" && extra.key)
+          ? extra.key
+          : ((safeEntry && typeof safeEntry.key === "string" && safeEntry.key) ? safeEntry.key : ""),
+        message: resolvedMessage,
+        error: (error && typeof error.name === "string" && error.name)
+          ? error.name
+          : (topError || resolvedMessage)
+      };
+    }
+
+    function __probeLiveFormatRows(rows) {
+      const arr = Array.isArray(rows) ? rows : [];
+      if (!arr.length) return "[probe-live] waiting for __DEGRADE__ events";
+      return arr.map((row) => {
+        return [
+          row.timestamp || "",
+          row.level || row.type || "",
+          row.code || "",
+          row.module || row.diagTag || "",
+          row.key || "",
+          row.message || row.error || ""
+        ].filter(Boolean).join(" | ");
+      }).join("\n");
+    }
+
+    function __probeLiveRender(force) {
+      const host = __probeLiveEnsurePanel();
+      if (!host) return false;
+      const text = __probeLiveFormatRows(__probeLiveState.rows);
+      if (!force && text === __probeLiveState.lastRenderSig) return false;
+      __probeLiveState.lastRenderSig = text;
+      const header = "[probe-live] __DEGRADE__ buffer";
+      const meta = "rows=" + __probeLiveState.rows.length + ", intervalMs=" + __probeLiveState.intervalMs;
+      host.textContent = header + "\n" + meta + "\n\n" + text;
+      return true;
+    }
+
+    function __probeLivePoll() {
+      const buf = __probeLiveGetBuffer();
+      if (!buf.length) {
+        __probeLiveRender(false);
+        return __probeLiveState.rows.slice();
+      }
+      if (buf.length < __probeLiveState.lastIndex) {
+        __probeLiveState.lastIndex = 0;
+        __probeLiveState.rows = [];
+      }
+      if (buf.length === __probeLiveState.lastIndex) {
+        __probeLiveRender(false);
+        return __probeLiveState.rows.slice();
+      }
+      for (let i = __probeLiveState.lastIndex; i < buf.length; i++) {
+        __probeLiveState.rows.push(__probeLiveEntryToRow(buf[i], i));
+      }
+      if (__probeLiveState.rows.length > __probeLiveState.maxRows) {
+        __probeLiveState.rows = __probeLiveState.rows.slice(-__probeLiveState.maxRows);
+      }
+      __probeLiveState.lastIndex = buf.length;
+      __probeLiveRender(false);
+      return __probeLiveState.rows.slice();
+    }
+
+    function __probeLiveStart() {
+      if (__probeLiveState.enabled) return true;
+      if (!G || G.documentElement) {
+        __probeLiveDiag("warn", "set_log:probe_live_reader_not_window_realm", "probe live reader requires document", {
+          outcome: "skip",
+          reason: "document_missing"
+        }, null);
+        return false;
+      }
+      __probeLiveState.enabled = true;
+      __probeLiveState.startedAt = Date.now();
+      try {
+        __probeLiveRender(true);
+        __probeLivePoll();
+        __probeLiveState.timerId = global.setInterval(__probeLivePoll, __probeLiveState.intervalMs);
+        __probeLiveDiag("info", "set_log:probe_live_reader_started", "probe live reader started", {
+          outcome: "return",
+          reason: "started",
+          intervalMs: __probeLiveState.intervalMs,
+          maxRows: __probeLiveState.maxRows
+        }, null);
+        return true;
+      } catch (e) {
+        __probeLiveState.enabled = false;
+        __probeLiveState.timerId = null;
+        __probeLiveDiag("error", "set_log:probe_live_reader_start_failed", "probe live reader start failed", {
+          outcome: "skip",
+          reason: "start_failed"
+        }, e);
+        return false;
+      }
+    }
+
+    function __probeLiveStop() {
+      if (__probeLiveState.timerId != null) {
+        try { global.clearInterval(__probeLiveState.timerId); } catch (_) {}
+      }
+      __probeLiveState.timerId = null;
+      __probeLiveState.enabled = false;
+      return true;
+    }
+
+    __defineLoggerHiddenValue("__PROBE_LIVE_READER__", {
+      start: __probeLiveStart,
+      stop: __probeLiveStop,
+      poll: __probeLivePoll,
+      snapshot() {
+        return {
+          enabled: __probeLiveState.enabled,
+          intervalMs: __probeLiveState.intervalMs,
+          maxRows: __probeLiveState.maxRows,
+          lastIndex: __probeLiveState.lastIndex,
+          rows: __probeLiveState.rows.slice(),
+          startedAt: __probeLiveState.startedAt
+        };
+      }
+    }, false);
+
+    __probeLiveStart();
+  }
 
   // ===== Stage 0/1: runtime-evaluate alerts + optional live-summary state =====
-  Object.defineProperty(global, "__DIAG_ALERTS__", {
-    value: function (opts) { return pullDiagAlerts(opts); },
-    enumerable: false,
-    writable: false,
-    configurable: true
-  });
+  __defineLoggerHiddenValue("__DIAG_ALERTS__", function (opts) { return pullDiagAlerts(opts); }, false);
 
-  Object.defineProperty(global, "DIAG_SCREEN_ON", {
-    value: function (opts) {
-      try {
-        const cfg = diagScreenGetConfig();
-        if (isPlainObject(opts)) {
-          if (Object.prototype.hasOwnProperty.call(opts, "criticalOnly")) cfg.criticalOnly = !!opts.criticalOnly;
-          if (Object.prototype.hasOwnProperty.call(opts, "includeData")) cfg.includeData = !!opts.includeData;
-          if (Object.prototype.hasOwnProperty.call(opts, "lastN")) cfg.lastN = toPosInt(opts.lastN, 30);
-        }
-        cfg.enabled = true;
-      } catch (_) {}
-      return diagScreenSnapshot();
-    },
-    enumerable: false,
-    writable: false,
-    configurable: true
-  });
+  __defineLoggerHiddenValue("DIAG_SCREEN_ON", function (opts) {
+    try {
+      const cfg = diagScreenGetConfig();
+      if (isPlainObject(opts)) {
+        if (Object.prototype.hasOwnProperty.call(opts, "criticalOnly")) cfg.criticalOnly = !!opts.criticalOnly;
+        if (Object.prototype.hasOwnProperty.call(opts, "includeData")) cfg.includeData = !!opts.includeData;
+        if (Object.prototype.hasOwnProperty.call(opts, "lastN")) cfg.lastN = toPosInt(opts.lastN, 30);
+      }
+      cfg.enabled = true;
+    } catch (_) {}
+    return diagScreenSnapshot();
+  }, false);
 
-  Object.defineProperty(global, "DIAG_SCREEN_OFF", {
-    value: function () {
-      try {
-        const cfg = diagScreenGetConfig();
-        cfg.enabled = false;
-      } catch (_) {}
-      return diagScreenSnapshot();
-    },
-    enumerable: false,
-    writable: false,
-    configurable: true
-  });
+  __defineLoggerHiddenValue("DIAG_SCREEN_OFF", function () {
+    try {
+      const cfg = diagScreenGetConfig();
+      cfg.enabled = false;
+    } catch (_) {}
+    return diagScreenSnapshot();
+  }, false);
 
-  Object.defineProperty(global, "DIAG_SCREEN_RESET", {
-    value: function () {
-      resetDiagScreenState();
-      return diagScreenSnapshot();
-    },
-    enumerable: false,
-    writable: false,
-    configurable: true
-  });
+  __defineLoggerHiddenValue("DIAG_SCREEN_RESET", function () {
+    resetDiagScreenState();
+    return diagScreenSnapshot();
+  }, false);
 
-  Object.defineProperty(global, "DIAG_SCREEN_SNAPSHOT", {
-    value: function () {
-      return diagScreenSnapshot();
-    },
-    enumerable: false,
-    writable: false,
-    configurable: true
-  });
+  __defineLoggerHiddenValue("DIAG_SCREEN_SNAPSHOT", function () {
+    return diagScreenSnapshot();
+  }, false);
 
 
     // ===== 2) Core logger: pushLog (console + errors) =====
     function pushLog(level, args, withStack, module) {
       try {
-        if (!levelAllows(G._logLevel, level)) return;
+        if (!levelAllows(__loggerRoot._logLevel, level)) return;
 
         const normArgs = normalizeForJSON(args);
         const msgParts = [];
@@ -903,25 +1237,27 @@ const LOGGingModule = function LOGGingModule() {
           "console"
         );
 
-        if (G.__DEBUG__) {
+        if (__loggerRoot.__DEBUG__) {
           guardedApply(orig, console, args, "console." + level);
         }
       };
     }
 
     // ===== 4) Module logger window.log (no double logging) =====
-    global._logConfig = global._logConfig || {
+    __ensureLoggerHiddenValue("_logConfig", function () { return {
       global: { enabled: true, level: "log" },
       WEBGLlogger: { enabled: true, level: "log" },
       CanvasLogger: { enabled: true, level: "debug" },
       Contextlogger: { enabled: true, level: "debug" },
       Navigatorlogger: { enabled: true, level: "debug" },
       WRKlogger: { enabled: true, level: "debug" },
-    };
+    }; }, function (v) {
+      return !!(v && typeof v === "object");
+    }, true);
 
-    global.log = function (module, level) {
+    __defineLoggerHiddenValue("log", function (module, level) {
       const args = Array.prototype.slice.call(arguments, 2);
-      const config = global._logConfig[module] || global._logConfig.global;
+      const config = __loggerRoot._logConfig[module] || __loggerRoot._logConfig.global;
       if (!config || !config.enabled) return;
       if (!levelAllows(config.level, level)) return;
 
@@ -937,7 +1273,7 @@ const LOGGingModule = function LOGGingModule() {
 
       // Store entry
       pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
-    };
+    }, false);
 
     // ===== 5) Uncaught errors + unhandled rejections (consistent, no logError) =====
 
@@ -1088,11 +1424,11 @@ const LOGGingModule = function LOGGingModule() {
      }
 
     // ===== 6) Export helper (in-session) =====
-    global.exportMyDebugLog = function () {
+    __defineLoggerHiddenValue("exportMyDebugLog", function () {
       try {
         if (typeof document === "undefined" || !document) return;
-        const list = (typeof G.__DEGRADE__ === "function" && typeof G.__DEGRADE__.getBuffer === "function")
-          ? G.__DEGRADE__.getBuffer()
+        const list = (typeof __loggerRoot.__DEGRADE__ === "function" && typeof __loggerRoot.__DEGRADE__.getBuffer === "function")
+          ? __loggerRoot.__DEGRADE__.getBuffer()
           : [];
         const data = JSON.stringify(list, null, 2);
         const blob = new Blob([data], { type: "application/json" });
@@ -1126,21 +1462,21 @@ const LOGGingModule = function LOGGingModule() {
           try { recordLoggerError(e, "exportMyDebugLog"); } catch (_) {}
         }
       }
-    };
+    }, false);
 
     // ===== 7) One-click toggles (no markers) =====
-    global.DEBUG_ALL_ON = function () {
+    __defineLoggerHiddenValue("DEBUG_ALL_ON", function () {
       try {
-        global.__DEBUG__ = true;
-        global._logLevel = "trace";
-        if (global._logConfig) {
-          for (const k in global._logConfig) {
-            global._logConfig[k].enabled = true;
-            global._logConfig[k].level = "trace";
+        __loggerRoot.__DEBUG__ = true;
+        __loggerRoot._logLevel = "trace";
+        if (__loggerRoot._logConfig) {
+          for (const k in __loggerRoot._logConfig) {
+            __loggerRoot._logConfig[k].enabled = true;
+            __loggerRoot._logConfig[k].level = "trace";
           }
         }
-        if (typeof global.__DEGRADE__ === "function") {
-          global.__DEGRADE__("DEBUG_ALL_ON", null);
+        if (typeof __loggerRoot.__DEGRADE__ === "function") {
+          __loggerRoot.__DEGRADE__("DEBUG_ALL_ON", null);
         }
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
@@ -1148,19 +1484,19 @@ const LOGGingModule = function LOGGingModule() {
           try { recordLoggerError(e, "DEBUG_ALL_ON"); } catch (_) {}
         }
       }
-    };
+    }, false);
 
-    global.DEBUG_ALL_OFF = function () {
+    __defineLoggerHiddenValue("DEBUG_ALL_OFF", function () {
       try {
-        global.__DEBUG__ = false;
-        global._logLevel = "error";
-        if (global._logConfig) {
-          for (const k in global._logConfig) {
-            global._logConfig[k].enabled = false;
+        __loggerRoot.__DEBUG__ = false;
+        __loggerRoot._logLevel = "error";
+        if (__loggerRoot._logConfig) {
+          for (const k in __loggerRoot._logConfig) {
+            __loggerRoot._logConfig[k].enabled = false;
           }
         }
-        if (typeof global.__DEGRADE__ === "function") {
-          global.__DEGRADE__("DEBUG_ALL_OFF", null);
+        if (typeof __loggerRoot.__DEGRADE__ === "function") {
+          __loggerRoot.__DEGRADE__("DEBUG_ALL_OFF", null);
         }
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
@@ -1168,74 +1504,90 @@ const LOGGingModule = function LOGGingModule() {
           try { recordLoggerError(e, "DEBUG_ALL_OFF"); } catch (_) {}
         }
       }
-    };
+    }, false);
 
-    global.DEBUG_ALL_TOGGLE = function () {
+    __defineLoggerHiddenValue("DEBUG_ALL_TOGGLE", function () {
       try {
-        if (global.__DEBUG__) global.DEBUG_ALL_OFF();
-        else global.DEBUG_ALL_ON();
+        if (__loggerRoot.__DEBUG__) __loggerRoot.DEBUG_ALL_OFF();
+        else __loggerRoot.DEBUG_ALL_ON();
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
           try { recordLoggerError(e, "DEBUG_ALL_TOGGLE"); } catch (_) {}
         }
       }
-    };
+    }, false);
 
     // Logger self-diagnostics mode toggles (controls verbosity, not runtime throws)
-    global.DEBUG_DEGRADES_ON = function () {
+    __defineLoggerHiddenValue("DEBUG_DEGRADES_ON", function () {
       try {
-        global.env = global.env || {};
-        global.env.DEBUG_DEGRADES = true;
-        if (typeof global.__DEGRADE__ === "function") global.__DEGRADE__("DEBUG_DEGRADES_ON", null);
+        env.DEBUG_DEGRADES = true;
+        if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_ON", null);
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "DEBUG_DEGRADES_ON"); } catch (_) {}
       }
-    };
+    }, false);
 
-    global.DEBUG_DEGRADES_OFF = function () {
+    __defineLoggerHiddenValue("DEBUG_DEGRADES_OFF", function () {
       try {
-        global.env = global.env || {};
-        global.env.DEBUG_DEGRADES = false;
-        if (typeof global.__DEGRADE__ === "function") global.__DEGRADE__("DEBUG_DEGRADES_OFF", null);
+        env.DEBUG_DEGRADES = false;
+        if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_OFF", null);
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "DEBUG_DEGRADES_OFF"); } catch (_) {}
       }
-    };
+    }, false);
 
-    global.DEBUG_DEGRADES_TOGGLE = function () {
+    __defineLoggerHiddenValue("DEBUG_DEGRADES_TOGGLE", function () {
       try {
-        global.env = global.env || {};
-        global.env.DEBUG_DEGRADES = !global.env.DEBUG_DEGRADES;
-        if (typeof global.__DEGRADE__ === "function") global.__DEGRADE__("DEBUG_DEGRADES_TOGGLE", null, { enabled: !!global.env.DEBUG_DEGRADES });
+        env.DEBUG_DEGRADES = !env.DEBUG_DEGRADES;
+        if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_TOGGLE", null, { enabled: !!env.DEBUG_DEGRADES });
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
       }
-    };
-    // DIAG_SCREEN_ON({ includeData: true })
+    }, false);
 
-    DIAG_SCREEN_ON({ criticalOnly:true, includeData:true, lastN:180 })
-
-        // after all logger globals are assigned (Window realm only):
-      if (W) {
-        Object.defineProperty(W, "_logLevel",   { value: W._logLevel,   writable:true, configurable:true, enumerable:false });
-        Object.defineProperty(W, "_logConfig",  { value: W._logConfig,  writable:true, configurable:true, enumerable:false });
-        Object.defineProperty(W, "__DEBUG__",   { value: W.__DEBUG__,   writable:true, configurable:true, enumerable:false });
-        Object.defineProperty(W, "__DEGRADE__", { value: W.__DEGRADE__, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "log",         { value: W.log,         writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "exportMyDebugLog", { value: W.exportMyDebugLog, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DEBUG_ALL_ON",     { value: W.DEBUG_ALL_ON,     writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DEBUG_ALL_OFF",    { value: W.DEBUG_ALL_OFF,    writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DEBUG_ALL_TOGGLE", { value: W.DEBUG_ALL_TOGGLE, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "__DIAG_ALERTS__", { value: W.__DIAG_ALERTS__, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DIAG_SCREEN_ON", { value: W.DIAG_SCREEN_ON, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DIAG_SCREEN_OFF", { value: W.DIAG_SCREEN_OFF, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DIAG_SCREEN_RESET", { value: W.DIAG_SCREEN_RESET, writable:false, configurable:true, enumerable:false });
-        Object.defineProperty(W, "DIAG_SCREEN_SNAPSHOT", { value: W.DIAG_SCREEN_SNAPSHOT, writable:false, configurable:true, enumerable:false });
+    __defineLoggerHiddenValue("EXPECTED_RECEIVER_THROW_GUARD_ON", function () {
+      try {
+        env.EXPECTED_RECEIVER_THROW_GUARD = true;
+        const mode = getLoggerGuardMode();
+        if (mode) mode.expectedReceiverThrow = true;
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_ON"); } catch (_) {}
       }
+    }, false);
+
+    __defineLoggerHiddenValue("EXPECTED_RECEIVER_THROW_GUARD_OFF", function () {
+      try {
+        env.EXPECTED_RECEIVER_THROW_GUARD = false;
+        const mode = getLoggerGuardMode();
+        if (mode) mode.expectedReceiverThrow = false;
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_OFF"); } catch (_) {}
+      }
+    }, false);
+
+    __defineLoggerHiddenValue("EXPECTED_RECEIVER_THROW_GUARD_TOGGLE", function () {
+      try {
+        const mode = getLoggerGuardMode();
+        const next = !(mode && mode.expectedReceiverThrow === false);
+        if (mode) mode.expectedReceiverThrow = !next;
+        env.EXPECTED_RECEIVER_THROW_GUARD = !!(mode && mode.expectedReceiverThrow !== false);
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_TOGGLE"); } catch (_) {}
+      }
+    }, false);
+      Object.defineProperty(__loggerRoot, "rebindWindowLoggerShell", {
+        value: rebindWindowLoggerShell,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      rebindWindowLoggerShell();
     }
-    
 }

@@ -118,7 +118,7 @@
         throw new Error('UACHPatch: Function.prototype.toString missing');
       }
 
-      if (!existingCoreToStringStateOk) {
+      function publishCoreToStringState() {
         try {
           Object.defineProperty(self, '__CORE_TOSTRING_STATE__', {
             value: {
@@ -143,6 +143,10 @@
         }
       }
 
+      if (!existingCoreToStringStateOk) {
+        publishCoreToStringState();
+      }
+
       function baseMarkAsNative(func, name = "") {
         if (typeof func !== 'function') return func;
         const t = toStringProxyTargetMap.get(func);
@@ -160,6 +164,221 @@
         if (memoMarkAsNative) return memoMarkAsNative;
         memoMarkAsNative = baseMarkAsNative;
         return memoMarkAsNative;
+      }
+
+      function __throwWrapFactoryPreflight(code, key, message, err) {
+        __wrkDiag('error', code, {
+          stage: 'preflight',
+          key: (typeof key === 'string' && key) ? key : null,
+          message: message,
+          type: 'contract violation',
+          data: { outcome: 'throw' }
+        }, err);
+        throw err;
+      }
+
+      function __requireMarkAsNative(key, wrapperName) {
+        const ensure = (self && typeof self.__ensureMarkAsNative === 'function') ? self.__ensureMarkAsNative : null;
+        const m = ensure ? ensure() : null;
+        if (typeof m !== 'function') {
+          const e = new Error('[WrkBridge] markAsNative missing');
+          __throwWrapFactoryPreflight(
+            'wrk:wrap_factory:mark_missing',
+            key,
+            (wrapperName || 'wrapFactory') + ': markAsNative missing',
+            e
+          );
+        }
+        return m;
+      }
+
+      function __resolveWrappedBridgeTarget(nativeFn, wrapperName) {
+        let bridgeTarget = (nativeFn && typeof nativeFn.__coreBridgeTarget__ === 'function')
+          ? nativeFn.__coreBridgeTarget__
+          : nativeFn;
+        const seenBridgeTargets = new WeakSet();
+        while (typeof bridgeTarget === 'function') {
+          if (seenBridgeTargets.has(bridgeTarget)) {
+            throw new Error('[WrkBridge] ' + wrapperName + ': proxyTargetMap cycle');
+          }
+          seenBridgeTargets.add(bridgeTarget);
+          const nextTarget = toStringProxyTargetMap.get(bridgeTarget);
+          if (typeof nextTarget !== 'function') break;
+          bridgeTarget = nextTarget;
+        }
+        if (typeof bridgeTarget !== 'function') {
+          throw new TypeError('[WrkBridge] ' + wrapperName + ': bridge target must be function');
+        }
+        return bridgeTarget;
+      }
+
+      function __exportWrapFactory(exportName, exportValue) {
+        const hasOwnExport = Object.prototype.hasOwnProperty.call(self, exportName);
+        if (!hasOwnExport || typeof self[exportName] !== 'function') {
+          if (hasOwnExport && typeof self[exportName] !== 'function') {
+            __wrkDiag('warn', 'wrk:export_conflict', {
+              stage: 'contract',
+              key: exportName,
+              message: 'export conflict: existing own property is not a function; overwriting',
+              type: 'contract violation',
+              data: { outcome: 'return', typeof: typeof self[exportName] }
+            }, null);
+          }
+          Object.defineProperty(self, exportName, {
+            value: exportValue,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        }
+      }
+
+      function __wrapNativeApply(nativeFn, name, applyImpl) {
+        if (typeof nativeFn !== 'function') {
+          const e = new TypeError('[WrkBridge] __wrapNativeApply: nativeFn must be function');
+          __throwWrapFactoryPreflight('wrk:wrapNativeApply:bad_nativeFn', name, '__wrapNativeApply: nativeFn must be function', e);
+        }
+        if (typeof applyImpl !== 'function') {
+          const e = new TypeError('[WrkBridge] __wrapNativeApply: applyImpl must be function');
+          __throwWrapFactoryPreflight('wrk:wrapNativeApply:bad_applyImpl', name, '__wrapNativeApply: applyImpl must be function', e);
+        }
+        const markAsNative = __requireMarkAsNative(name || (nativeFn && nativeFn.name) || null, 'wrapNativeApply');
+        const wrapped = new Proxy(nativeFn, {
+          apply(target, thisArg, argList) {
+            return applyImpl(target, thisArg, argList);
+          }
+        });
+        try {
+          const bridgeTarget = __resolveWrappedBridgeTarget(nativeFn, '__wrapNativeApply');
+          toStringProxyTargetMap.set(wrapped, bridgeTarget);
+          const wrappedName = name || nativeFn.name || '';
+          const nativeName = bridgeTarget.name || '';
+          markAsNative(bridgeTarget, nativeName);
+          const wrappedLabel = wrappedName
+            ? ('function ' + wrappedName + '() { [native code] }')
+            : 'function () { [native code] }';
+          toStringOverrideMap.set(wrapped, wrappedLabel);
+          if (toStringProxyTargetMap.get(wrapped) !== bridgeTarget || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
+            throw new Error('[WrkBridge] __wrapNativeApply: bridge registration failed');
+          }
+        } catch (e) {
+          __wrkDiag('error', 'wrk:wrapNativeApply:mark_failed', {
+            stage: 'apply',
+            key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : null),
+            message: '__wrapNativeApply mark/bridge registration failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'throw' }
+          }, e);
+          throw e;
+        }
+        return wrapped;
+      }
+
+      function __wrapNativeAccessor(origGetOrSet, name, applyImpl) {
+        if (typeof origGetOrSet !== 'function') {
+          const e = new TypeError('[WrkBridge] __wrapNativeAccessor: origGetOrSet must be function');
+          __throwWrapFactoryPreflight('wrk:wrapNativeAccessor:bad_origGetOrSet', name, '__wrapNativeAccessor: origGetOrSet must be function', e);
+        }
+        if (typeof applyImpl !== 'function') {
+          const e = new TypeError('[WrkBridge] __wrapNativeAccessor: applyImpl must be function');
+          __throwWrapFactoryPreflight('wrk:wrapNativeAccessor:bad_applyImpl', name, '__wrapNativeAccessor: applyImpl must be function', e);
+        }
+        return __wrapNativeApply(origGetOrSet, name, applyImpl);
+      }
+
+      function __wrapNativeCtor(nativeFn, name, argsImpl) {
+        if (typeof nativeFn !== 'function') {
+          const e = new TypeError('[WrkBridge] __wrapNativeCtor: nativeFn must be function');
+          __throwWrapFactoryPreflight('wrk:wrapNativeCtor:bad_nativeFn', name || '__wrapNativeCtor', '__wrapNativeCtor: nativeFn must be function', e);
+        }
+        if (typeof argsImpl !== 'function') {
+          const e = new TypeError('[WrkBridge] __wrapNativeCtor: argsImpl must be function');
+          __throwWrapFactoryPreflight('wrk:wrapNativeCtor:bad_argsImpl', name || '__wrapNativeCtor', '__wrapNativeCtor: argsImpl must be function', e);
+        }
+        const markAsNative = __requireMarkAsNative(name || (nativeFn && nativeFn.name) || '__wrapNativeCtor', 'wrapNativeCtor');
+        const wrapped = new Proxy(nativeFn, {
+          apply(target, thisArg, argList) {
+            const nextArgs = argsImpl(argList || [], false);
+            return Reflect.apply(target, thisArg, nextArgs);
+          },
+          construct(target, argList, newTarget) {
+            const nextArgs = argsImpl(argList || [], true);
+            return Reflect.construct(target, nextArgs, newTarget || target);
+          }
+        });
+        try {
+          const bridgeTarget = __resolveWrappedBridgeTarget(nativeFn, '__wrapNativeCtor');
+          toStringProxyTargetMap.set(wrapped, bridgeTarget);
+          const wrappedName = name || nativeFn.name || '';
+          const nativeName = bridgeTarget.name || '';
+          markAsNative(bridgeTarget, nativeName);
+          const wrappedLabel = wrappedName
+            ? ('function ' + wrappedName + '() { [native code] }')
+            : 'function () { [native code] }';
+          toStringOverrideMap.set(wrapped, wrappedLabel);
+          if (toStringProxyTargetMap.get(wrapped) !== bridgeTarget || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
+            throw new Error('[WrkBridge] __wrapNativeCtor: bridge registration failed');
+          }
+        } catch (e) {
+          __wrkDiag('error', 'wrk:wrapNativeCtor:mark_failed', {
+            stage: 'apply',
+            key: '__wrapNativeCtor',
+            message: '__wrapNativeCtor native mark/bridge registration failed',
+            type: 'apply_failed',
+            data: { outcome: 'throw' }
+          }, e);
+          throw e;
+        }
+        return wrapped;
+      }
+
+      function __wrapStrictAccessor(key, getter, desc, validThis, options) {
+        if (typeof key !== 'string' || !key) {
+          const e = new TypeError('[WrkBridge] __wrapStrictAccessor: key must be non-empty string');
+          __throwWrapFactoryPreflight('wrk:wrapStrictAccessor:bad_key', null, '__wrapStrictAccessor: key must be non-empty string', e);
+        }
+        const opts = options || {};
+        const onAccess = (typeof opts.onAccess === 'function') ? opts.onAccess : null;
+        const name = (typeof opts.name === 'string' && opts.name) ? opts.name : ('get ' + key);
+        const isData = !!desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
+        if (isData) return getter;
+
+        const markAsNative = __requireMarkAsNative(name || key, 'wrapStrictAccessor');
+        const valueFromGetter = function(thisArg) {
+          return (typeof getter === 'function') ? getter.call(thisArg) : getter;
+        };
+        const checkThis = (typeof validThis === 'function') ? validThis : null;
+        const origGet = desc && desc.get;
+        const syntheticBridgeTarget = (typeof origGet === 'function')
+          ? origGet
+          : ((typeof getter === 'function' && typeof getter.__coreBridgeTarget__ === 'function')
+              ? getter.__coreBridgeTarget__
+              : ((typeof getter === 'function') ? toStringProxyTargetMap.get(getter) : null));
+        const nativeBridgeTarget = (typeof syntheticBridgeTarget === 'function')
+          ? __resolveWrappedBridgeTarget(syntheticBridgeTarget, '__wrapStrictAccessor')
+          : null;
+
+        let wrapped;
+        const synthetic = Object.getOwnPropertyDescriptor(({ get [key]() {
+          if (onAccess) onAccess(key, wrapped, this);
+          if (checkThis && !checkThis(this)) {
+            if (typeof nativeBridgeTarget === 'function') {
+              return Reflect.apply(nativeBridgeTarget, this, []);
+            }
+            throw new TypeError();
+          }
+          return valueFromGetter(this);
+        }}), key).get;
+        if (typeof nativeBridgeTarget === 'function') {
+          Object.defineProperty(synthetic, '__coreBridgeTarget__', {
+            value: nativeBridgeTarget,
+            writable: false,
+            configurable: true,
+            enumerable: false
+          });
+        }
+        wrapped = markAsNative(synthetic, name);
+        return wrapped;
       }
 
       if (typeof self.__ensureMarkAsNative !== 'function') {
@@ -186,268 +405,20 @@
       if (seedExpected === undefined) {
         throw new Error('UACHPatch: toString probe missing label');
       }
-
-      const toString = function toString(...argList) {
-        const target = nativeToString;
-        const thisArg = this;
-        if (typeof thisArg !== 'function') {
-          try {
-            return Reflect.apply(target, thisArg, argList);
-          } catch (e) {
-            try {
-              var d = self && self.__DEGRADE__;
-              if (typeof d === 'function') {
-                var ctx = {
-                  type: 'browser structure missing data',
-                  stage: 'runtime',
-                  module: 'wrk',
-                  diagTag: 'wrk',
-                  surface: 'worker_bootstrap',
-                  key: 'Function.prototype.toString',
-                  message: 'Function.prototype.toString illegal invocation',
-                  data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-                };
-                if (typeof d.diag === 'function') d.diag('warn', 'wrk:toString_illegal_invocation', ctx, e);
-                else d('wrk:toString_illegal_invocation', e, Object.assign({}, ctx, { level: 'warn' }));
-              }
-            } catch (_e) {}
-            throw e;
-          }
-        }
-        try {
-          var direct = toStringOverrideMap.get(thisArg);
-          if (direct !== undefined) return direct;
-
-          var bridgeTarget = toStringProxyTargetMap.get(thisArg);
-          if (typeof bridgeTarget === 'function') {
-            var seenBridgeTargets = new WeakSet();
-            while (typeof bridgeTarget === 'function') {
-              if (seenBridgeTargets.has(bridgeTarget)) {
-                try {
-                  var d1 = self && self.__DEGRADE__;
-                  if (typeof d1 === 'function') {
-                    var ctx1 = {
-                      type: 'contract violation',
-                      stage: 'runtime',
-                      module: 'wrk',
-                      diagTag: 'wrk',
-                      surface: 'worker_bootstrap',
-                      key: 'Function.prototype.toString',
-                      message: 'Function.prototype.toString bridge cycle',
-                      data: { outcome: 'return', reason: 'bridge_cycle', fallback: 'native' }
-                    };
-                    if (typeof d1.diag === 'function') d1.diag('error', 'wrk:toString_bridge_cycle', ctx1, null);
-                    else d1('wrk:toString_bridge_cycle', null, Object.assign({}, ctx1, { level: 'error' }));
-                  }
-                } catch (_e1) {}
-                return Reflect.apply(target, thisArg, argList);
-              }
-              seenBridgeTargets.add(bridgeTarget);
-
-              var bridgeLabel = toStringOverrideMap.get(bridgeTarget);
-              if (bridgeLabel !== undefined) return bridgeLabel;
-
-              var nextBridgeTarget = toStringProxyTargetMap.get(bridgeTarget);
-              if (typeof nextBridgeTarget !== 'function') break;
-              bridgeTarget = nextBridgeTarget;
-            }
-            if (bridgeTarget !== thisArg && typeof bridgeTarget === 'function') {
-              try {
-                return Reflect.apply(target, bridgeTarget, argList);
-              } catch (mappedErr) {
-                try {
-                  var d2 = self && self.__DEGRADE__;
-                  if (typeof d2 === 'function') {
-                    var ctx2 = {
-                      type: 'browser structure missing data',
-                      stage: 'hook',
-                      module: 'wrk',
-                      diagTag: 'wrk',
-                      surface: 'worker_bootstrap',
-                      key: 'Function.prototype.toString',
-                      message: 'Function.prototype.toString mapped forward failed',
-                      data: { outcome: 'return', reason: 'mapped_forward_failed', fallback: 'native' }
-                    };
-                    if (typeof d2.diag === 'function') d2.diag('warn', 'wrk:toString_mapped_forward_failed', ctx2, mappedErr);
-                    else d2('wrk:toString_mapped_forward_failed', mappedErr, Object.assign({}, ctx2, { level: 'warn' }));
-                  }
-                } catch (_e2) {}
-              }
-            }
-          }
-          return Reflect.apply(target, thisArg, argList);
-        } catch (e) {
-          try {
-            var d3 = self && self.__DEGRADE__;
-            if (typeof d3 === 'function') {
-              var ctx3 = {
-                type: 'browser structure missing data',
-                stage: 'runtime',
-                module: 'wrk',
-                diagTag: 'wrk',
-                surface: 'worker_bootstrap',
-                key: 'Function.prototype.toString',
-                message: 'Function.prototype.toString apply failed',
-                data: { outcome: 'return', reason: 'apply_failed', fallback: 'native' }
-              };
-              if (typeof d3.diag === 'function') d3.diag('error', 'wrk:toString_apply_failed', ctx3, e);
-              else d3('wrk:toString_apply_failed', e, Object.assign({}, ctx3, { level: 'error' }));
-            }
-          } catch (_e3) {}
-          try {
-            return Reflect.apply(target, thisArg, argList);
-          } catch (nativeErr) {
-            throw nativeErr;
-          }
-        }
-      };
-
-      const installDesc = {
-        value: toString,
-        writable: fpToStringDesc ? !!fpToStringDesc.writable : true,
-        configurable: fpToStringDesc ? !!fpToStringDesc.configurable : true,
-        enumerable: fpToStringDesc ? !!fpToStringDesc.enumerable : false
-      };
-      try {
-        toStringProxyTargetMap.set(toString, nativeToString);
-        markAsNative(toString, 'toString');
-
-        Object.defineProperty(Function.prototype, 'toString', installDesc);
-
-        const installedDesc = nativeGetOwnProp(Function.prototype, 'toString');
-        if (!installedDesc || installedDesc.value !== toString) {
-          throw new Error('UACHPatch: toString install descriptor mismatch');
-        }
-        if (!!installedDesc.writable !== !!installDesc.writable
-          || !!installedDesc.configurable !== !!installDesc.configurable
-          || !!installedDesc.enumerable !== !!installDesc.enumerable) {
-          throw new Error('UACHPatch: toString install flags mismatch');
-        }
-
-        let nonFnErr = null;
-        try {
-          Reflect.apply(toString, {}, []);
-        } catch (e) {
-          nonFnErr = e;
-        }
-        if (!nonFnErr) {
-          throw new Error('UACHPatch: toString brand-check lost');
-        }
-
-        const directProbe = function directProbe(){};
-        const expectedNative = Reflect.apply(nativeToString, directProbe, []);
-        const actualNative = Reflect.apply(toString, directProbe, []);
-        if (actualNative !== expectedNative) {
-          throw new Error('UACHPatch: toString native forwarding mismatch');
-        }
-
-        try {
-          var p = Reflect.getPrototypeOf(toString);
-          var ok = Reflect.setPrototypeOf(toString, p);
-          if (ok !== true) {
-            try {
-              var d4 = self && self.__DEGRADE__;
-              if (typeof d4 === 'function') {
-                var ctx4 = {
-                  type: 'contract violation',
-                  stage: 'contract',
-                  module: 'wrk',
-                  diagTag: 'wrk',
-                  surface: 'worker_bootstrap',
-                  key: 'Function.prototype.toString',
-                  message: 'Reflect.setPrototypeOf(toString, currentProto) returned false',
-                  data: { outcome: 'return', ok: false }
-                };
-                if (typeof d4.diag === 'function') d4.diag('warn', 'wrk:toString_setProto_failed', ctx4, null);
-                else d4('wrk:toString_setProto_failed', null, Object.assign({}, ctx4, { level: 'warn' }));
-              }
-            } catch (_e4) {}
-          }
-        } catch (setProtoErr) {
-          try {
-            var d5 = self && self.__DEGRADE__;
-            if (typeof d5 === 'function') {
-              var ctx5 = {
-                type: 'contract violation',
-                stage: 'contract',
-                module: 'wrk',
-                diagTag: 'wrk',
-                surface: 'worker_bootstrap',
-                key: 'Function.prototype.toString',
-                message: 'Reflect.setPrototypeOf(toString, currentProto) threw',
-                data: { outcome: 'return' }
-              };
-              if (typeof d5.diag === 'function') d5.diag('error', 'wrk:toString_setProto_threw', ctx5, setProtoErr);
-              else d5('wrk:toString_setProto_threw', setProtoErr, Object.assign({}, ctx5, { level: 'error' }));
-            }
-          } catch (_e5) {}
-        }
-
-      } catch (e) {
-        toStringProxyTargetMap.delete(toString);
-        toStringOverrideMap.delete(toString);
-
-        if (typeof currentToString === 'function') {
-          Object.defineProperty(Function.prototype, 'toString', {
-            value: currentToString,
-            writable: fpToStringDesc ? !!fpToStringDesc.writable : true,
-            configurable: fpToStringDesc ? !!fpToStringDesc.configurable : true,
-            enumerable: fpToStringDesc ? !!fpToStringDesc.enumerable : false
-          });
-        }
-
-        throw e;
-      }
+      __exportWrapFactory('__wrapNativeApply', __wrapNativeApply);
+      __exportWrapFactory('__wrapNativeAccessor', __wrapNativeAccessor);
+      __exportWrapFactory('__wrapStrictAccessor', __wrapStrictAccessor);
+      __exportWrapFactory('__wrapNativeCtor', __wrapNativeCtor);
     } catch (e) {
       self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);
       throw e;
     }
-    __wrkDiag('info', 'wrk:worker_function.prototype_bridge_ready', {
+    __wrkDiag('info', 'wrk:worker_function.prototype_state_ready', {
       stage: 'apply',
-      key: 'function.prototype_bridge',
-      message: 'function.prototype_bridge ready',
+      key: 'function.prototype_state',
+      message: 'function.prototype_state ready',
       type: 'pipeline missing data',
       data: { outcome: 'return' }
     }, null);
 
-    // reduce visibility of pipeline globals in Window realm (non-enumerable)
-    try {
-      const win = G;
-      if (win && (typeof win === 'object' || typeof win === 'function')) {
-        const keys = [
-          '__ENV_BRIDGE__',
-          'CanvasPatchContext'
-        ];
-        for (const k of keys) {
-          if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
-          const d = Object.getOwnPropertyDescriptor(win, k);
-          if (!d || d.enumerable === false) continue;
-          if (d.configurable === false) {
-            const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
-            __wrkDiag('warn', 'wrk:hide_pipeline_surface_nonconfigurable', {
-              stage: 'apply',
-              key: k,
-              message: 'hide pipeline surface skipped: non-configurable',
-              type: 'browser structure missing data',
-              data: { outcome: 'skip', reason: 'hide_pipeline_surface_nonconfigurable' }
-            }, e);
-            continue;
-          }
-          if ('value' in d) {
-            Object.defineProperty(win, k, { value: win[k], writable: !!d.writable, configurable: !!d.configurable, enumerable: false });
-          } else {
-            Object.defineProperty(win, k, { get: d.get, set: d.set, configurable: !!d.configurable, enumerable: false });
-          }
-        }
-      }
-    } catch (e) {
-    __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
-      stage: 'apply',
-      key: '__ENV_BRIDGE__',
-      message: 'hide pipeline surface failed',
-      type: 'browser structure missing data',
-      data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }
-    }, e);
-  }
-  ;
 })(self); // <-- закрыли WrkModule

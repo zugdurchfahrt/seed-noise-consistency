@@ -5,14 +5,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       || (typeof self !== 'undefined' && self)
       || (typeof window !== 'undefined' && window)
       || {};
+    const __tag = 'nav_total_set';
+    const __surface = 'navigator';
+    const __flagKey = '__PATCH_NAVTOTALSET__';
+    const __core = window.Core;
     const __navTypePipeline = 'pipeline missing data';
     const __navTypeBrowser = 'browser structure missing data';
 
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
-    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-      ? window.CanvasPatchContext.__logger
-      : null;
-    const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
+    const __D = (window && window.__DEGRADE__) || null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
     const __emit = (level, code, ctx, err) => {
       try {
@@ -31,9 +32,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       try {
         const x = (extra && typeof extra === 'object') ? extra : {};
         const ctx = {
-          module: 'nav_total_set',
-          diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'nav_total_set',
-          surface: 'navigator',
+          module: __tag,
+          diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag,
+          surface: __surface,
           key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
           stage: x.stage,
           message: x.message,
@@ -56,69 +57,68 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const x = (extra && typeof extra === 'object') ? extra : {};
       return __navDiag(level, code, Object.assign({}, x, {
         type: (typeof x.type === 'string' && x.type) ? x.type : __navTypePipeline,
-        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'nav_total_set'
+        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag
       }), err);
     }
     function __navDiagBrowser(level, code, extra, err) {
       const x = (extra && typeof extra === 'object') ? extra : {};
       return __navDiag(level, code, Object.assign({}, x, {
         type: (typeof x.type === 'string' && x.type) ? x.type : __navTypeBrowser,
-        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'nav_total_set'
+        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag
       }), err);
     }
-    const __navResolveDescriptor = (window.Core && typeof window.Core.resolveDescriptor === 'function')
-      ? window.Core.resolveDescriptor.bind(window.Core)
+    function __navReleaseEntryGuard(rollbackOk, stage, substage) {
+      try {
+        if (__navGuardToken && __core && typeof __core.releaseGuardFlag === 'function') {
+          __core.releaseGuardFlag(__flagKey, __navGuardToken, rollbackOk === true, __tag);
+        }
+      } catch (e) {
+        __navDiagPipeline('warn', __tag + ':guard_release_failed', {
+          stage: stage === 'rollback' ? 'rollback' : 'preflight',
+          key: __flagKey,
+          message: 'releaseGuardFlag threw',
+          data: {
+            outcome: 'skip',
+            reason: 'guard_release_failed',
+            substage: (typeof substage === 'string' && substage) ? substage : null
+          }
+        }, e);
+      }
+    }
+    const __navResolveDescriptor = (__core && typeof __core.resolveDescriptor === 'function')
+      ? __core.resolveDescriptor.bind(__core)
       : null;
 
-    let __navHasGuard = false;
-    try {
-      const __navCore = window.Core;
-      if (__navCore && typeof __navCore.guardFlag === 'function') {
-        __navHasGuard = true;
-        __navGuardToken = __navCore.guardFlag('__PATCH_NAVTOTALSET__', 'nav_total_set');
-      }
-    } catch (e) {
-      __navDiagPipeline('warn', 'nav_total_set:guard_failed', {
+    // ===== MODULE: canonical guard client =====
+    if (!__core || typeof __core.guardFlag !== 'function') {
+      __navDiagPipeline('warn', __tag + ':guard_missing', {
         stage: 'guard',
-        key: '__PATCH_NAVTOTALSET__',
+        key: __flagKey,
+        message: 'Core.guardFlag missing',
+        data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
+      }, null);
+      return;
+    }
+    try {
+      __navGuardToken = __core.guardFlag(__flagKey, __tag);
+    } catch (e) {
+      __navDiagPipeline('warn', __tag + ':guard_failed', {
+        stage: 'guard',
+        key: __flagKey,
         message: 'guardFlag threw',
         data: { outcome: 'skip', reason: 'guard_failed' }
       }, e);
       return;
     }
-    if (!__navHasGuard) {
-      __navDiagPipeline('warn', 'nav_total_set:guard_missing', {
-        stage: 'guard',
-        key: '__PATCH_NAVTOTALSET__',
-        message: 'Core.guardFlag missing',
-        data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
-      });
-      return;
-    }
     if (!__navGuardToken) return; // already_patched: Core emits nav_total_set:already_patched
-    function __navReleaseGuard(rollbackOk) {
-      try {
-        const __navCore = window.Core;
-        if (__navGuardToken && __navCore && typeof __navCore.releaseGuardFlag === 'function') {
-          __navCore.releaseGuardFlag('__PATCH_NAVTOTALSET__', __navGuardToken, rollbackOk === true, 'nav_total_set');
-        }
-      } catch (e) {
-        __navDiagPipeline('warn', 'nav_total_set:guard_release_failed', {
-          stage: 'guard',
-          key: '__PATCH_NAVTOTALSET__',
-          message: 'releaseGuardFlag threw',
-          data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, e);
-      }
-    }
     // Must run in Window realm (not Worker)
     if (typeof document === 'undefined' || !window || window.document !== document) {
-      __navDiagBrowser('fatal', 'nav_total_set:not_window_realm', {
+      __navDiagBrowser('warn', 'nav_total_set:not_window_realm', {
         stage: 'preflight',
         message: 'not in Window realm',
         data: { outcome: 'skip', reason: 'not_window_realm' }
       });
-      __navReleaseGuard(true);
+      __navReleaseEntryGuard(true, 'preflight', 'not_window_realm');
       return;
     }
 
@@ -126,43 +126,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!C) {
       __navDiagPipeline('warn', 'nav_total_set:canvas_patch_context_missing', {
         stage: 'preflight',
-        message: 'CanvasPatchContext missing',
-        data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
-      });
-      __navReleaseGuard(true);
-      return;
-    }
-    const __stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-    if (!__stateRoot) {
-      __navDiagPipeline('warn', 'nav_total_set:canvas_patch_state_missing', {
-        stage: 'preflight',
-        message: 'CanvasPatchContext.state missing',
-        data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
-      });
-      __navReleaseGuard(true);
-      return;
-    }
-    if (!(__stateRoot.__NAV_TOTAL_SET__ && typeof __stateRoot.__NAV_TOTAL_SET__ === 'object')) {
-      Object.defineProperty(__stateRoot, '__NAV_TOTAL_SET__', {
-        value: Object.create(null),
-        writable: true,
-        configurable: true,
-        enumerable: false
+        key: 'CanvasPatchContext',
+        message: 'CanvasPatchContext missing; fallback to window.rand',
+        data: { outcome: 'return', reason: 'canvas_patch_context_missing', policy: 'continue', action: 'fallback_window_rand' }
       });
     }
 
     // basic random from the existing seed initialization
-    const __navCoreInternal = (window.Core && window.Core.__internal && typeof window.Core.__internal === 'object')
-      ? window.Core.__internal
-      : null;
-    const __prngState = (__navCoreInternal && __navCoreInternal.prng && typeof __navCoreInternal.prng === 'object')
-      ? __navCoreInternal.prng
-      : ((__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
-      ? __stateRoot.__PRNG_STATE__
-      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
+    const __prngState = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
     const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
       ? __prngState.rand
-      : null;
+      : window.rand;
     const R = (__randSource && typeof __randSource.use === 'function') ? __randSource.use('nav') : null;
     if (typeof R !== 'function') {
       __navDiagPipeline('warn', 'nav_total_set:rand_missing', {
@@ -179,7 +153,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: '__ensureMarkAsNative failed',
         data: { outcome: 'skip', reason: 'ensure_mark_as_native_failed', policy: 'skip', action: 'native' }
       }, e);
-      __navReleaseGuard(true);
+      __navReleaseEntryGuard(true, 'preflight', 'mark_as_native_failed');
       return;
     }
     if (typeof mark !== 'function') {
@@ -188,18 +162,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'markAsNative missing',
         data: { outcome: 'skip', reason: 'missing_dep_mark_as_native', policy: 'skip', action: 'native' }
       });
-      __navReleaseGuard(true);
+      __navReleaseEntryGuard(true, 'preflight', 'mark_as_native_missing');
       return;
     }
     const __navMark = mark;
-    const wrapStrictAccessor = (window.Core && typeof window.Core.__wrapStrictAccessor === 'function') ? window.Core.__wrapStrictAccessor : null;
+    const wrapStrictAccessor = (typeof window.__wrapStrictAccessor === 'function') ? window.__wrapStrictAccessor : null;
     if (typeof wrapStrictAccessor !== 'function') {
       __navDiagPipeline('warn', 'nav_total_set:wrap_strict_accessor_missing', {
         stage: 'preflight',
-        message: 'Core.__wrapStrictAccessor missing',
+        message: 'wrapStrictAccessor missing',
         data: { outcome: 'skip', reason: 'missing_dep_wrap_strict_accessor', policy: 'skip', action: 'native' }
       });
-      __navReleaseGuard(true);
+      __navReleaseEntryGuard(true, 'preflight', 'wrap_strict_accessor_missing');
       return;
     }
     function registerPatchedTarget(owner, key, tag) {
@@ -249,13 +223,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     if (!Number.isFinite(dpr) || dpr <= 0) {
-      __navDiagPipeline('fatal', 'nav_total_set:bad_dpr', {
+      __navDiagPipeline('error', 'nav_total_set:bad_dpr', {
         stage: 'preflight',
         key: 'devicePixelRatio',
         message: 'bad __DPR',
         data: { outcome: 'skip', reason: 'bad_dpr', dpr: dpr }
       });
-      __navReleaseGuard(true);
+      __navReleaseEntryGuard(true, 'preflight', 'bad_dpr');
       return;
     }
 
@@ -286,7 +260,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         return self === navigator;
       } catch (e) {
         __navDiag('warn', 'nav_total_set:navigator_this_check_failed', {
-          stage: 'guard',
+          stage: 'runtime',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set',
           key: null,
@@ -316,7 +290,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // guards (inputs must be present)
     if (!gen) {
-      __navDiag('fatal', 'nav_total_set:generated_platform_missing', {
+      __navDiag('error', 'nav_total_set:generated_platform_missing', {
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
@@ -324,11 +298,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'GENERATED_PLATFORM missing',
         data: { outcome: 'skip', reason: 'missing_generated_platform' }
       });
-      __navReleaseGuard(true);
+      __navReleaseEntryGuard(true, 'preflight', 'generated_platform_missing');
       return;
     }
     if (!navPlat) {
-      __navDiag('fatal', 'nav_total_set:nav_platform_missing', {
+      __navDiag('error', 'nav_total_set:nav_platform_missing', {
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
@@ -336,7 +310,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'NAV_PLATFORM__ missing',
         data: { outcome: 'skip', reason: 'missing_nav_platform' }
       });
-      __navReleaseGuard(true);
+      __navReleaseEntryGuard(true, 'preflight', 'nav_platform_missing');
       return;
     }
 
@@ -345,7 +319,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (looksDom(chPlatform)) {
       const normalized = asOS(chPlatform);
       if (STRICT) {
-        __navDiag('fatal', 'nav_total_set:ch_platform_dom_like', {
+        __navDiag('error', 'nav_total_set:ch_platform_dom_like', {
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set',
@@ -353,7 +327,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: `CH.platform '${chPlatform}' is DOM-like; expected OS-string (e.g. 'Windows'/'macOS')`,
           data: { outcome: 'skip', reason: 'ch_platform_dom_like', from: chPlatform, to: normalized }
         });
-        __navReleaseGuard(true);
+        __navReleaseEntryGuard(true, 'preflight', 'ch_platform_dom_like');
         return;
       } else {
         __navDiag('warn', 'nav_total_set:ch_platform_normalized', {
@@ -371,7 +345,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (navPlat !== expectedNavPlat) {
       const msg = `NAV_PLATFORM__ (${navPlat}) inconsistent with ${gen} (expected ${expectedNavPlat})`;
       if (STRICT) {
-        __navDiag('fatal', 'nav_total_set:nav_platform_inconsistent', {
+        __navDiag('error', 'nav_total_set:nav_platform_inconsistent', {
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set',
@@ -379,7 +353,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: msg,
           data: { outcome: 'skip', reason: 'nav_platform_inconsistent', navPlat, generatedPlatform: gen, expectedNavPlat }
         });
-        __navReleaseGuard(true);
+        __navReleaseEntryGuard(true, 'preflight', 'nav_platform_inconsistent');
         return;
       } else {
         __navDiag('warn', 'nav_total_set:nav_platform_inconsistent', {
@@ -838,108 +812,167 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return applied.length;
     }
 
-    // Critical - only a prototype (without a fallback)
+    // Bucket: strict scalar accessors on Navigator.prototype.
+    function patchStrictScalarAccessor(key, getter, diagTag) {
+      if (!(key in navProto)) return false;
+      const d = Object.getOwnPropertyDescriptor(navProto, key);
+      if (!d) {
+        __navDiag('error', `${diagTag}_descriptor_missing`, {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `${key} descriptor missing`
+        });
+        return false;
+      }
+      if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
+      const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      __navRegisterKey(key);
+      const applied = applyCoreTargetsGroup(diagTag, [{
+        owner: navProto,
+        key: key,
+        kind: 'accessor',
+        wrapLayer: 'strict_accessor_gateway',
+        resolve: 'proto_chain',
+        policy: 'strict',
+        diagTag: diagTag,
+        allowCreate: false,
+        configurable: !!d.configurable,
+        enumerable: !!d.enumerable,
+        allowShapeChange: !!isData,
+        validThis: __isNavigatorThis,
+        invalidThis: 'native',
+        getImpl: function navStrictScalarGetImpl() {
+          __navLogAccess(key, null);
+          return getter.call(this);
+        }
+      }], 'throw');
+      if (applied !== 1) {
+        __navDiag('error', `${diagTag}_define_failed`, {
+          stage: 'apply',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `failed to define ${key}`
+        });
+        return false;
+      }
+      return true;
+    }
+
+    // Bucket: object-return identity surfaces.
+    function patchObjectReturnAccessor(key, getter, diagTag) {
+      if (!(key in navProto)) return false;
+      const d = Object.getOwnPropertyDescriptor(navProto, key);
+      if (!d) {
+        __navDiag('error', `${diagTag}_descriptor_missing`, {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `${key} descriptor missing`
+        });
+        return false;
+      }
+      if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
+      const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      __navRegisterKey(key);
+      const applied = applyCoreTargetsGroup(diagTag, [{
+        owner: navProto,
+        key: key,
+        kind: 'accessor',
+        wrapLayer: 'object_return_gateway',
+        resolve: 'proto_chain',
+        policy: 'strict',
+        diagTag: diagTag,
+        allowCreate: false,
+        configurable: !!d.configurable,
+        enumerable: !!d.enumerable,
+        allowShapeChange: !!isData,
+        validThis: __isNavigatorThis,
+        invalidThis: 'native',
+        getImpl: function navObjectReturnGetImpl() {
+          __navLogAccess(key, null);
+          return getter.call(this);
+        }
+      }], 'throw');
+      if (applied !== 1) {
+        __navDiag('error', `${diagTag}_define_failed`, {
+          stage: 'apply',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `failed to define ${key}`
+        });
+        return false;
+      }
+      return true;
+    }
+
+    function __navReadNativeScalarFallback(desc, receiver, key, diagTag) {
+      try {
+        if (desc && typeof desc.get === 'function') return Reflect.apply(desc.get, receiver, []);
+        if (desc && Object.prototype.hasOwnProperty.call(desc, 'value')) return desc.value;
+      } catch (e) {
+        __navDiagBrowser('warn', (diagTag || 'nav_total_set') + '_native_fallback_failed', {
+          stage: 'runtime',
+          diagTag: diagTag || 'nav_total_set',
+          key: key || null,
+          message: 'native scalar fallback failed',
+          data: { outcome: 'return', reason: 'native_fallback_failed' }
+        }, e);
+      }
+      return undefined;
+    }
+
+    function __navIsValidLanguageList(value) {
+      if (!Array.isArray(value) || !value.length) return false;
+      for (let i = 0; i < value.length; i++) {
+        if (typeof value[i] !== 'string' || !value[i]) return false;
+      }
+      return true;
+    }
+
+    function __navIsValidDeviceMemoryValue(value) {
+      return Number.isFinite(value) && value > 0;
+    }
+
+    function __navIsValidHardwareConcurrencyValue(value) {
+      return Number.isInteger(value) && value > 0;
+    }
+
     // Important: like native - not enumerable
     // [REGISTRY] userAgent is handled in `override_ua_data.js` (opt-in gate).
-    // Here we keep only the synthetic_named trio on Navigator.prototype.
+    // Here we keep only strict scalar accessor surfaces on Navigator.prototype.
     const critical = new Set(['platform','vendor','appVersion']);
-    (function patchCriticalOnProto(){
-      const patch = (key, getter) => {
-        const d = Object.getOwnPropertyDescriptor(navProto, key);
-        if (!d) throw new TypeError(`${key}: descriptor missing`);
-        if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
-        __navRegisterKey(key);
-         const applied = applyCoreTargetsGroup('nav_total_set:critical', [{
-           owner: navProto,
-           key: key,
-           kind: 'accessor',
-           // [REGISTRY] synthetic_named path (no Proxy) for Navigator.prototype.* trio.
-           // Cross-realm probes may still flag toString, but Proxy-wrapping these accessors is forbidden by registry.
-           wrapLayer: 'named_wrapper_strict',
-           resolve: 'proto_chain',
-           policy: 'strict',
-           diagTag: 'nav_total_set:critical',
-           allowCreate: false,
-           configurable: !!d.configurable,
-           enumerable: !!d.enumerable,
-           validThis: __isNavigatorThis,
-          // [NORMATIVE] invalid receiver must be validated by the engine and rethrown unchanged.
-          invalidThis: 'native',
-          getImpl: function navCriticalGetImpl() {
-            __navLogAccess(key, null);
-            return getter.call(this);
-          }
-        }], 'throw');
-        if (applied !== 1) throw new TypeError(`failed to define ${key}`);
-      };      
-      patch('platform',   () => navPlatformOut);
-      patch('vendor',     () => vendor);
-      patch('appVersion', () => {
+    const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages','webdriver']);
+    const objectReturnKeys = new Set(['plugins','mimeTypes','userAgentData']);
+    (function patchStrictScalarAccessorsOnProto(){
+      patchStrictScalarAccessor('platform', 'platform' in navProto ? () => navPlatformOut : null, 'nav_total_set:platform');
+      patchStrictScalarAccessor('vendor', 'vendor' in navProto ? () => vendor : null, 'nav_total_set:vendor');
+      patchStrictScalarAccessor('appVersion', 'appVersion' in navProto ? () => {
         const pfx = "Mozilla/";
         return (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
           ? userAgent.slice(pfx.length)
           : userAgent;
-      });
+      } : null, 'nav_total_set:appVersion');
+      patchStrictScalarAccessor('productSub', 'productSub' in navProto ? () => "20030107" : null, 'nav_total_set:productSub');
+      patchStrictScalarAccessor('vendorSub', 'vendorSub' in navProto ? () => "" : null, 'nav_total_set:vendorSub');
+      patchStrictScalarAccessor('maxTouchPoints', 'maxTouchPoints' in navProto ? () => 0 : null, 'nav_total_set:maxTouchPoints');
     })();
-
 
     // rest
     const navigatorPatches = [
-      ['productSub',           () => "20030107"],
-      ['maxTouchPoints',       () => 0],
       ['buildID',              () => "20230501"],
-      ['globalPrivacyControl', () => false],
-      ['vendorSub',            () => ""]
+      ['globalPrivacyControl', () => false]
     ];
       navigatorPatches.forEach(([prop, getter]) => {
-        if (critical.has(prop)) return; 
+        if (critical.has(prop) || strictScalarKeys.has(prop) || objectReturnKeys.has(prop)) return; 
         if (!(prop in navProto)) return;
         const d = Object.getOwnPropertyDescriptor(navProto, prop);
-        const isData = !!(d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set);
-        if (d && !isData) {
-          __navRegisterKey(prop);
-          const origGet = (d && typeof d.get === 'function') ? d.get : null;
-          const resolved = (!origGet && __navResolveDescriptor)
-            ? __navResolveDescriptor(navProto, prop, { mode: 'proto_chain' })
-            : null;
-          const nativeGet = origGet || ((resolved && resolved.desc && typeof resolved.desc.get === 'function') ? resolved.desc.get : null);
-          const namedGet = Object.getOwnPropertyDescriptor(({ get [prop]() {
-            __navLogAccess(prop, namedGet);
-            if (!__isNavigatorThis(this)) {
-              if (typeof nativeGet === 'function') {
-                try {
-                  return Reflect.apply(nativeGet, this, arguments);
-                } catch (e) {
-                  __navDiag('warn', 'nav_total_set:' + String(prop) + '_illegal_invocation', {
-                    stage: 'runtime',
-                    type: __navTypeBrowser,
-                    diagTag: 'nav_total_set:' + String(prop),
-                    key: String(prop),
-                    message: String(prop) + ' illegal invocation',
-                    data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-                  }, e);
-                  throw e;
-                }
-              }
-              const e = new TypeError();
-              __navDiag('error', 'nav_total_set:' + String(prop) + '_native_get_missing', {
-                stage: 'runtime',
-                type: __navTypePipeline,
-                diagTag: 'nav_total_set:' + String(prop),
-                key: String(prop),
-                message: String(prop) + ' native getter missing on invalid receiver',
-                data: { outcome: 'throw', reason: 'native_get_missing' }
-              }, e);
-              throw e;
-            }
-            return getter.call(this);
-          }}), prop).get;
-          __navRegisterFn(namedGet);
-          safeDefineAcc(navProto, prop, namedGet);
-        } else {
-          const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
-          safeDefineAcc(navProto, prop, wrapped);
-        }
+        const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
+        safeDefineAcc(navProto, prop, wrapped);
       });
 
     // ——— D. devicePixelRatio & screen.* ———
@@ -1114,7 +1147,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   owner: uadOwner,
                   key: spec.key,
                   kind: 'accessor',
-                  wrapLayer: 'named_wrapper_strict',
+                  wrapLayer: 'strict_accessor_gateway',
                   resolve: 'proto_chain',
                   policy: 'strict',
                   diagTag: 'nav_total_set:' + fullKey,
@@ -1209,23 +1242,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                // Public API path must not leak service errors; pass-through native behavior.
                return Reflect.apply(orig, this, args || []);
              }
-             const fullVersionList = (meta && meta.fullVersionList != null)
-               ? meta.fullVersionList
-               : window.__FULL_VERSION_LIST;
-              const map = {
-                architecture: meta.architecture,
-                bitness: meta.bitness,
+              const safeDeviceMemory = __navIsValidDeviceMemoryValue(mem) ? mem : undefined;
+              const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(cpu) ? cpu : undefined;
+              const fullVersionList = (meta && meta.fullVersionList != null)
+                ? meta.fullVersionList
+                : window.__FULL_VERSION_LIST;
+               const map = {
+                 architecture: meta.architecture,
+                 bitness: meta.bitness,
                 model: meta.model,
                 brands: meta.brands,
-                mobile: meta.mobile,
-                platform: chPlatform,
-                platformVersion: meta.platformVersion,
-                fullVersionList: fullVersionList,
-                deviceMemory: mem,
-                hardwareConcurrency: cpu,
-                wow64: meta.wow64,
-                formFactors: meta.formFactors
-              };
+                 mobile: meta.mobile,
+                 platform: chPlatform,
+                 platformVersion: meta.platformVersion,
+                 fullVersionList: fullVersionList,
+                 deviceMemory: safeDeviceMemory,
+                 hardwareConcurrency: safeHardwareConcurrency,
+                 wow64: meta.wow64,
+                 formFactors: meta.formFactors
+               };
              const result = {};
              for (const hint of keys) {
                if (typeof hint !== 'string' || !hint) {
@@ -1245,13 +1280,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                }
                result[hint] = val;
              }
-             return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
-               try {
-                 const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : {};
-                 const out = Object.assign({}, base, result);
-                 return out;
-               } catch (e) {
-                 __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
+              return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
+                try {
+                  const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : null;
+                  if (!base) {
+                    return Object.keys(result).length ? Object.assign({}, result) : nativeResolved;
+                  }
+                  const out = Object.assign({}, base);
+                  for (const hint of Object.keys(result)) {
+                    const current = out[hint];
+                    if (current === undefined || current === null || (typeof current === 'string' && !current && hint !== 'model') || (Array.isArray(current) && !current.length)) {
+                      out[hint] = result[hint];
+                    }
+                  }
+                  return out;
+                } catch (e) {
+                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
                    stage: 'runtime',
                    type: __navTypePipeline,
                    diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
@@ -1292,8 +1336,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           invalidThis: 'throw',
           invoke(orig, args) {
             __navLogAccess('userAgentData.toJSON', null);
+            let nativeOut;
             try {
-              return { platform: this.platform, brands: this.brands, mobile: this.mobile };
+              nativeOut = Reflect.apply(orig, this, args || []);
             } catch (e) {
               __navDiag('error', 'nav_total_set:userAgentData_toJSON_runtime_failed', {
                 stage: 'runtime',
@@ -1302,7 +1347,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 key: 'userAgentData.toJSON',
                 message: 'uaData.toJSON runtime failed'
               }, e);
-              return Reflect.apply(orig, this, args || []);
+              throw e;
+            }
+            try {
+              const out = (nativeOut && typeof nativeOut === 'object') ? Object.assign({}, nativeOut) : {};
+              if (out.platform == null) out.platform = this.platform;
+              if (out.brands == null) out.brands = this.brands;
+              if (out.mobile == null) out.mobile = this.mobile;
+              return out;
+            } catch (e) {
+              __navDiag('error', 'nav_total_set:userAgentData_toJSON_post_failed', {
+                stage: 'runtime',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:userAgentData.toJSON',
+                key: 'userAgentData.toJSON',
+                message: 'uaData.toJSON post failed'
+              }, e);
+              return nativeOut;
             }
           }
         }], 'throw');
@@ -1326,69 +1387,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       });
     } else {
-      __navRegisterKey('userAgentData');
-      const getUserAgentData = Object.getOwnPropertyDescriptor(({ get userAgentData() {
-        __navLogAccess('userAgentData', getUserAgentData);
-        if (!__isNavigatorThis(this)) {
-          const origGet = (dUaData && typeof dUaData.get === 'function') ? dUaData.get : null;
-          const resolvedGet = (dUaDataResolved && dUaDataResolved.desc && typeof dUaDataResolved.desc.get === 'function')
-            ? dUaDataResolved.desc.get
-            : null;
-          const nativeGet = origGet || resolvedGet;
-          if (nativeGet) {
-            try {
-              return Reflect.apply(nativeGet, this, []);
-            } catch (e) {
-              __navDiag('warn', 'nav_total_set:userAgentData_illegal_invocation', {
-                stage: 'runtime',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:userAgentData',
-                key: 'userAgentData',
-                message: 'userAgentData illegal invocation',
-                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-              }, e);
-              throw e;
-            }
-          }
-          const e = new TypeError();
-          __navDiag('error', 'nav_total_set:userAgentData_native_get_missing', {
-            stage: 'runtime',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:userAgentData',
-            key: 'userAgentData',
-            message: 'userAgentData native getter missing on invalid receiver',
-            data: { outcome: 'throw', reason: 'native_get_missing' }
-          }, e);
-          throw e;
-        }
+      const appliedUaData = patchObjectReturnAccessor('userAgentData', function userAgentDataAccessorValue() {
         return nativeUAD;
-      }}), 'userAgentData').get;
-      __navRegisterFn(getUserAgentData);
-      const appliedUaData = applyCoreTargetsGroup('nav_total_set:userAgentData', [{
-        owner: navProto,
-        key: 'userAgentData',
-        kind: 'accessor',
-        wrapLayer: 'named_wrapper_strict',
-        resolve: 'proto_chain',
-        policy: 'strict',
-        diagTag: 'nav_total_set:userAgentData',
-        configurable: !!dUaData.configurable,
-        enumerable: !!dUaData.enumerable,
-        validThis: __isNavigatorThis,
-        invalidThis: 'throw',
-        getImpl: function getUserAgentDataImpl() {
-          return Reflect.apply(getUserAgentData, this, []);
-        }
-      }], 'throw');
-      if (appliedUaData !== 1) {
-        __navDiag('error', 'nav_total_set:userAgentData_define_failed', {
-          stage: 'apply',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set:userAgentData',
-          key: 'userAgentData',
-          message: 'failed to define userAgentData'
-        });
-      } else {
+      }, 'nav_total_set:userAgentData');
+      if (appliedUaData) {
         const uadTag = Object.prototype.toString.call(nativeUAD);
         if (uadTag === '[object Object]') {
           __navDiag('warn', 'nav_total_set:userAgentData_tag_suspicious', {
@@ -1423,339 +1425,70 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     }
 
-    // ——— F. deviceMemory/hardwareConcurrency ———
-    const hasDeviceMemory = ('deviceMemory' in navigator);
-    const dDeviceMemory = Object.getOwnPropertyDescriptor(navProto, 'deviceMemory');
-    const dDeviceMemoryResolved = __navResolveDescriptor
-      ? __navResolveDescriptor(navProto, 'deviceMemory', { mode: 'proto_chain' })
-      : null;
-    const nativeDeviceMemoryGet = (dDeviceMemory && typeof dDeviceMemory.get === 'function')
-      ? dDeviceMemory.get
-      : ((dDeviceMemoryResolved && dDeviceMemoryResolved.desc && typeof dDeviceMemoryResolved.desc.get === 'function')
-        ? dDeviceMemoryResolved.desc.get
-        : null);
-    const getDeviceMemory = Object.getOwnPropertyDescriptor(({ get deviceMemory() {
-      __navLogAccess('deviceMemory', getDeviceMemory);
-      if (!__isNavigatorThis(this)) {
-        if (typeof nativeDeviceMemoryGet === 'function') {
-          try {
-            return Reflect.apply(nativeDeviceMemoryGet, this, []);
-          } catch (e) {
-            __navDiag('warn', 'nav_total_set:deviceMemory_illegal_invocation', {
-              stage: 'runtime',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:deviceMemory',
-              key: 'deviceMemory',
-              message: 'deviceMemory illegal invocation',
-              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-            }, e);
-            throw e;
-          }
-        }
-        const e = new TypeError();
-        __navDiag('error', 'nav_total_set:deviceMemory_native_get_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:deviceMemory',
-          key: 'deviceMemory',
-          message: 'deviceMemory native getter missing on invalid receiver',
-          data: { outcome: 'throw', reason: 'native_get_missing' }
-        }, e);
-        throw e;
-      }
-      return mem;
-    }}), 'deviceMemory').get;
-    __navRegisterKey('deviceMemory');
-    __navRegisterFn(getDeviceMemory);
-    if (hasDeviceMemory) {
-      if (!dDeviceMemory) {
-        __navDiag('error', 'nav_total_set:deviceMemory_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set',
-          key: 'deviceMemory',
-          message: 'deviceMemory descriptor missing'
-        });
-      } else {
-        const dmIsData = Object.prototype.hasOwnProperty.call(dDeviceMemory, 'value') && !dDeviceMemory.get && !dDeviceMemory.set;
-        const appliedDeviceMemory = applyCoreTargetsGroup('nav_total_set:deviceMemory', [{
-          owner: navProto,
-          key: 'deviceMemory',
-          kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'nav_total_set:deviceMemory',
-          configurable: !!dDeviceMemory.configurable,
-          enumerable: !!dDeviceMemory.enumerable,
-          allowShapeChange: !!dmIsData,
-          validThis: __isNavigatorThis,
-          invalidThis: 'throw',
-          getImpl: function deviceMemoryGetImpl() {
-            return Reflect.apply(getDeviceMemory, this, []);
-          }
-        }], 'throw');
-        if (appliedDeviceMemory !== 1) {
-          __navDiag('error', 'nav_total_set:deviceMemory_define_failed', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set',
-            key: 'deviceMemory',
-            message: 'failed to define deviceMemory'
-          });
-        }
-      }
-    }
+    // ——— F/G. strict scalar runtime-backed accessors ———
+    const nativeDeviceMemoryDesc = ('deviceMemory' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'deviceMemory') : null;
+    const nativeHardwareConcurrencyDesc = ('hardwareConcurrency' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency') : null;
+    const nativeLanguageDesc = ('language' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'language') : null;
+    const nativeLanguagesDesc = ('languages' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'languages') : null;
 
-    const hasHardwareConcurrency = ('hardwareConcurrency' in navigator);
-    const dHardwareConcurrency = Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency');
-    const dHardwareConcurrencyResolved = __navResolveDescriptor
-      ? __navResolveDescriptor(navProto, 'hardwareConcurrency', { mode: 'proto_chain' })
-      : null;
-    const nativeHardwareConcurrencyGet = (dHardwareConcurrency && typeof dHardwareConcurrency.get === 'function')
-      ? dHardwareConcurrency.get
-      : ((dHardwareConcurrencyResolved && dHardwareConcurrencyResolved.desc && typeof dHardwareConcurrencyResolved.desc.get === 'function')
-        ? dHardwareConcurrencyResolved.desc.get
-        : null);
-    const getHardwareConcurrency = Object.getOwnPropertyDescriptor(({ get hardwareConcurrency() {
-      __navLogAccess('hardwareConcurrency', getHardwareConcurrency);
-      if (!__isNavigatorThis(this)) {
-        if (typeof nativeHardwareConcurrencyGet === 'function') {
-          try {
-            return Reflect.apply(nativeHardwareConcurrencyGet, this, []);
-          } catch (e) {
-            __navDiag('warn', 'nav_total_set:hardwareConcurrency_illegal_invocation', {
-              stage: 'runtime',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:hardwareConcurrency',
-              key: 'hardwareConcurrency',
-              message: 'hardwareConcurrency illegal invocation',
-              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-            }, e);
-            throw e;
-          }
-        }
-        const e = new TypeError();
-        __navDiag('error', 'nav_total_set:hardwareConcurrency_native_get_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:hardwareConcurrency',
-          key: 'hardwareConcurrency',
-          message: 'hardwareConcurrency native getter missing on invalid receiver',
-          data: { outcome: 'throw', reason: 'native_get_missing' }
-        }, e);
-        throw e;
+    patchStrictScalarAccessor('deviceMemory', 'deviceMemory' in navProto ? function navDeviceMemoryValue() {
+      if (__navIsValidDeviceMemoryValue(mem)) return mem;
+      __navDiagPipeline('warn', 'nav_total_set:deviceMemory_invalid_profile', {
+        stage: 'runtime',
+        key: 'deviceMemory',
+        message: 'invalid deviceMemory profile value',
+        data: { outcome: 'return', reason: 'invalid_profile_value', value: mem }
+      });
+      return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
+    } : null, 'nav_total_set:deviceMemory');
+    patchStrictScalarAccessor('hardwareConcurrency', 'hardwareConcurrency' in navProto ? function navHardwareConcurrencyValue() {
+      if (__navIsValidHardwareConcurrencyValue(cpu)) return cpu;
+      __navDiagPipeline('warn', 'nav_total_set:hardwareConcurrency_invalid_profile', {
+        stage: 'runtime',
+        key: 'hardwareConcurrency',
+        message: 'invalid hardwareConcurrency profile value',
+        data: { outcome: 'return', reason: 'invalid_profile_value', value: cpu }
+      });
+      return __navReadNativeScalarFallback(nativeHardwareConcurrencyDesc, this, 'hardwareConcurrency', 'nav_total_set:hardwareConcurrency');
+    } : null, 'nav_total_set:hardwareConcurrency');
+    patchStrictScalarAccessor('language', 'language' in navProto ? function navLanguageValue() {
+      const primaryLanguage = window.__primaryLanguage;
+      const normalizedLanguages = window.__normalizedLanguages;
+      if (__navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0]) {
+        return primaryLanguage;
       }
-      return cpu;
-    }}), 'hardwareConcurrency').get;
-    __navRegisterKey('hardwareConcurrency');
-    __navRegisterFn(getHardwareConcurrency);
-    if (hasHardwareConcurrency) {
-      if (!dHardwareConcurrency) {
-        __navDiag('error', 'nav_total_set:hardwareConcurrency_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set',
-          key: 'hardwareConcurrency',
-          message: 'hardwareConcurrency descriptor missing'
-        });
-      } else {
-        const hcIsData = Object.prototype.hasOwnProperty.call(dHardwareConcurrency, 'value') && !dHardwareConcurrency.get && !dHardwareConcurrency.set;
-        const appliedHardwareConcurrency = applyCoreTargetsGroup('nav_total_set:hardwareConcurrency', [{
-          owner: navProto,
-          key: 'hardwareConcurrency',
-          kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'nav_total_set:hardwareConcurrency',
-          configurable: !!dHardwareConcurrency.configurable,
-          enumerable: !!dHardwareConcurrency.enumerable,
-          allowShapeChange: !!hcIsData,
-          validThis: __isNavigatorThis,
-          invalidThis: 'throw',
-          getImpl: function hardwareConcurrencyGetImpl() {
-            return Reflect.apply(getHardwareConcurrency, this, []);
-          }
-        }], 'throw');
-        if (appliedHardwareConcurrency !== 1) {
-          __navDiag('error', 'nav_total_set:hardwareConcurrency_define_failed', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set',
-            key: 'hardwareConcurrency',
-            message: 'failed to define hardwareConcurrency'
-          });
+      __navDiagPipeline('warn', 'nav_total_set:language_invalid_profile', {
+        stage: 'runtime',
+        key: 'language',
+        message: 'invalid language profile value',
+        data: {
+          outcome: 'return',
+          reason: 'invalid_profile_value',
+          primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
+          normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
         }
+      });
+      return __navReadNativeScalarFallback(nativeLanguageDesc, this, 'language', 'nav_total_set:language');
+    } : null, 'nav_total_set:language');
+    patchStrictScalarAccessor('languages', 'languages' in navProto ? function navLanguagesValue() {
+      const primaryLanguage = window.__primaryLanguage;
+      const normalizedLanguages = window.__normalizedLanguages;
+      if (__navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0]) {
+        return normalizedLanguages;
       }
-    }
-
-    // ——— G. language(s) ———
-    const hasLanguage = ('language' in navigator);
-    const dLanguage = Object.getOwnPropertyDescriptor(navProto, 'language');
-    const dLanguageResolved = __navResolveDescriptor
-      ? __navResolveDescriptor(navProto, 'language', { mode: 'proto_chain' })
-      : null;
-    const nativeLanguageGet = (dLanguage && typeof dLanguage.get === 'function')
-      ? dLanguage.get
-      : ((dLanguageResolved && dLanguageResolved.desc && typeof dLanguageResolved.desc.get === 'function')
-        ? dLanguageResolved.desc.get
-        : null);
-    const getLanguage = Object.getOwnPropertyDescriptor(({ get language() {
-      __navLogAccess('language', getLanguage);
-      if (!__isNavigatorThis(this)) {
-        if (typeof nativeLanguageGet === 'function') {
-          try {
-            return Reflect.apply(nativeLanguageGet, this, []);
-          } catch (e) {
-            __navDiag('warn', 'nav_total_set:language_illegal_invocation', {
-              stage: 'runtime',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:language',
-              key: 'language',
-              message: 'language illegal invocation',
-              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-            }, e);
-            throw e;
-          }
+      __navDiagPipeline('warn', 'nav_total_set:languages_invalid_profile', {
+        stage: 'runtime',
+        key: 'languages',
+        message: 'invalid languages profile value',
+        data: {
+          outcome: 'return',
+          reason: 'invalid_profile_value',
+          primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
+          normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
         }
-        const e = new TypeError();
-        __navDiag('error', 'nav_total_set:language_native_get_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:language',
-          key: 'language',
-          message: 'language native getter missing on invalid receiver',
-          data: { outcome: 'throw', reason: 'native_get_missing' }
-        }, e);
-        throw e;
-      }
-      return window.__primaryLanguage;
-    }}), 'language').get;
-    __navRegisterKey('language');
-    __navRegisterFn(getLanguage);
-    if (hasLanguage) {
-      if (!dLanguage) {
-        __navDiag('error', 'nav_total_set:language_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set',
-          key: 'language',
-          message: 'language descriptor missing'
-        });
-      } else {
-        const langIsData = Object.prototype.hasOwnProperty.call(dLanguage, 'value') && !dLanguage.get && !dLanguage.set;
-        const appliedLanguage = applyCoreTargetsGroup('nav_total_set:language', [{
-          owner: navProto,
-          key: 'language',
-          kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'nav_total_set:language',
-          configurable: !!dLanguage.configurable,
-          enumerable: !!dLanguage.enumerable,
-          allowShapeChange: !!langIsData,
-          validThis: __isNavigatorThis,
-          invalidThis: 'throw',
-          getImpl: function languageGetImpl() {
-            return Reflect.apply(getLanguage, this, []);
-          }
-        }], 'throw');
-        if (appliedLanguage !== 1) {
-          __navDiag('error', 'nav_total_set:language_define_failed', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set',
-            key: 'language',
-            message: 'failed to define language'
-          });
-        }
-      }
-    }
-
-    const hasLanguages = ('languages' in navigator);
-    const dLanguages = Object.getOwnPropertyDescriptor(navProto, 'languages');
-    const dLanguagesResolved = __navResolveDescriptor
-      ? __navResolveDescriptor(navProto, 'languages', { mode: 'proto_chain' })
-      : null;
-    const nativeLanguagesGet = (dLanguages && typeof dLanguages.get === 'function')
-      ? dLanguages.get
-      : ((dLanguagesResolved && dLanguagesResolved.desc && typeof dLanguagesResolved.desc.get === 'function')
-        ? dLanguagesResolved.desc.get
-        : null);
-    const getLanguages = Object.getOwnPropertyDescriptor(({ get languages() {
-      __navLogAccess('languages', getLanguages);
-      if (!__isNavigatorThis(this)) {
-        if (typeof nativeLanguagesGet === 'function') {
-          try {
-            return Reflect.apply(nativeLanguagesGet, this, []);
-          } catch (e) {
-            __navDiag('warn', 'nav_total_set:languages_illegal_invocation', {
-              stage: 'runtime',
-              type: __navTypeBrowser,
-              diagTag: 'nav_total_set:languages',
-              key: 'languages',
-              message: 'languages illegal invocation',
-              data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-            }, e);
-            throw e;
-          }
-        }
-        const e = new TypeError();
-        __navDiag('error', 'nav_total_set:languages_native_get_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:languages',
-          key: 'languages',
-          message: 'languages native getter missing on invalid receiver',
-          data: { outcome: 'throw', reason: 'native_get_missing' }
-        }, e);
-        throw e;
-      }
-      return window.__normalizedLanguages;
-    }}), 'languages').get;
-    __navRegisterKey('languages');
-    __navRegisterFn(getLanguages);
-    if (hasLanguages) {
-      if (!dLanguages) {
-        __navDiag('error', 'nav_total_set:languages_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set',
-          key: 'languages',
-          message: 'languages descriptor missing'
-        });
-      } else {
-        const langsIsData = Object.prototype.hasOwnProperty.call(dLanguages, 'value') && !dLanguages.get && !dLanguages.set;
-        const appliedLanguages = applyCoreTargetsGroup('nav_total_set:languages', [{
-          owner: navProto,
-          key: 'languages',
-          kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'nav_total_set:languages',
-          configurable: !!dLanguages.configurable,
-          enumerable: !!dLanguages.enumerable,
-          allowShapeChange: !!langsIsData,
-          validThis: __isNavigatorThis,
-          invalidThis: 'throw',
-          getImpl: function languagesGetImpl() {
-            return Reflect.apply(getLanguages, this, []);
-          }
-        }], 'throw');
-        if (appliedLanguages !== 1) {
-          __navDiag('error', 'nav_total_set:languages_define_failed', {
-            stage: 'apply',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set',
-            key: 'languages',
-            message: 'failed to define languages'
-          });
-        }
-      }
-    }
+      });
+      return __navReadNativeScalarFallback(nativeLanguagesDesc, this, 'languages', 'nav_total_set:languages');
+    } : null, 'nav_total_set:languages');
 
   
    
@@ -1791,72 +1524,111 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
       } else {
         __navRegisterKey('permissions.query');
-        applyCoreTargetsGroup('nav_total_set:permissions.query', [{
-        owner: permOwner,
-        key: 'query',
-        resolve: 'proto_chain',
-        kind: 'promise_method',
-        wrapLayer: 'named_wrapper',
-        invokeClass: 'brand_strict',
-        allowNamedWrapperBrandStrict: true,
-        policy: 'throw',
-        diagTag: 'nav_total_set:permissions.query',
-        validThis(self) {
-          return self === navigator.permissions;
-        },
-        invalidThis: 'throw',
-        invoke(orig, args) {
-          const parameters = (args && args.length) ? args[0] : undefined;
-          const permName = (parameters && typeof parameters === 'object' && typeof parameters.name === 'string')
-            ? parameters.name
-            : null;
-          if (permName === 'microphone') {
-            const sourceName = 'audioinput';
-
-          const label = (devicesLabels && typeof devicesLabels === 'object') ? devicesLabels[sourceName] : undefined;
-          const out = Reflect.apply(orig, this, args || []);
-          if (!label) {
-            __navDiag('warn', 'nav_total_set:permissions_query_devices_label_missing', {
-              stage: 'runtime',
-              type: __navTypePipeline,
+        const origQuery = permDesc.value || navigator.permissions.query;
+        if (typeof origQuery !== 'function') {
+          __navDiag('error', 'nav_total_set:permissions_query_original_missing', {
+            stage: 'preflight',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:permissions.query',
+            key: 'permissions.query',
+            message: 'permissions.query original missing'
+          });
+        } else {
+          const patchedQuery = __navMark(({ query(parameters) {
+            const args = arguments;
+            if (this !== navigator.permissions) {
+              return Reflect.apply(origQuery, this, args);
+            }
+            const permName = (parameters && typeof parameters === 'object' && typeof parameters.name === 'string')
+              ? parameters.name
+              : null;
+            if (permName === 'microphone') {
+              const sourceName = 'audioinput';
+              const label = (devicesLabels && typeof devicesLabels === 'object') ? devicesLabels[sourceName] : undefined;
+              const out = Reflect.apply(origQuery, this, args);
+              if (!label) {
+                __navDiag('warn', 'nav_total_set:permissions_query_devices_label_missing', {
+                  stage: 'runtime',
+                  type: __navTypePipeline,
+                  diagTag: 'nav_total_set:permissions.query',
+                  key: 'permissions.query',
+                  message: 'devices_labels.audioinput missing for permissions.query("microphone")'
+                });
+              }
+              return Promise.resolve(out).then(function onPermissionsQueryResolved(status) {
+                const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
+                mediaMicGranted = state === 'granted';
+                syncMediaLabelsUnlocked();
+                __navLogAccess('permissions.query', patchedQuery, {
+                  permission: permName,
+                  source: sourceName,
+                  state,
+                  mediaDevicesLabelsUnlocked
+                });
+                return status;
+              });
+            }
+            if (permName === 'camera') {
+              const out = Reflect.apply(origQuery, this, args);
+              return Promise.resolve(out).then(function onPermissionsQueryResolved(status) {
+                const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
+                mediaCameraGranted = state === 'granted';
+                syncMediaLabelsUnlocked();
+                __navLogAccess('permissions.query', patchedQuery, {
+                  permission: permName,
+                  state,
+                  mediaDevicesLabelsUnlocked
+                });
+                return status;
+              });
+            }
+            __navLogAccess('permissions.query', patchedQuery);
+            return Reflect.apply(origQuery, this, args);
+          } }).query, 'query');
+          const permNextDesc = {
+            configurable: !!permDesc.configurable,
+            enumerable: !!permDesc.enumerable,
+            writable: Object.prototype.hasOwnProperty.call(permDesc, 'writable') ? !!permDesc.writable : true,
+            value: patchedQuery
+          };
+          let permApplied = false;
+          try {
+            Object.defineProperty(permOwner, 'query', permNextDesc);
+            permApplied = true;
+            const afterPerm = Object.getOwnPropertyDescriptor(permOwner, 'query');
+            if (!isSameDescriptor(afterPerm, permNextDesc)) {
+              throw new Error('descriptor post-check mismatch');
+            }
+            __navRegisterFn(patchedQuery);
+            registerPatchedTarget(permOwner, 'query', 'nav_total_set:permissions.query');
+            rememberModuleApplied({ owner: permOwner, key: 'query', origDesc: permDesc });
+          } catch (e) {
+            let rollbackErr = null;
+            if (permApplied) {
+              try {
+                Object.defineProperty(permOwner, 'query', permDesc);
+              } catch (re) {
+                rollbackErr = re;
+                __navDiag('error', 'nav_total_set:permissions.query:rollback_failed', {
+                  stage: 'rollback',
+                  type: __navTypeBrowser,
+                  diagTag: 'nav_total_set:permissions.query',
+                  key: 'permissions.query',
+                  data: { outcome: 'rollback', reason: 'rollback_failed' }
+                }, re);
+              }
+            }
+            if (rollbackErr) throw rollbackErr;
+            __navDiag('error', 'nav_total_set:permissions.query:apply_failed', {
+              stage: 'apply',
+              type: __navTypeBrowser,
               diagTag: 'nav_total_set:permissions.query',
               key: 'permissions.query',
-              message: 'devices_labels.audioinput missing for permissions.query("microphone")'
-            });
+              data: { outcome: 'throw', reason: 'apply_failed' }
+            }, e);
+            throw e;
           }
-
-          return Promise.resolve(out).then(function onPermissionsQueryResolved(status) {
-            const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
-            mediaMicGranted = state === 'granted';
-            syncMediaLabelsUnlocked();
-            __navLogAccess('permissions.query', null, {
-              permission: permName,
-              source: sourceName,
-              state,
-              mediaDevicesLabelsUnlocked
-            });
-            return status;
-          });
-
-          }
-          if (permName === 'camera') {
-            const out = Reflect.apply(orig, this, args || []);
-            return Promise.resolve(out).then(function onPermissionsQueryResolved(status) {
-              const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
-              mediaCameraGranted = state === 'granted';
-              syncMediaLabelsUnlocked();
-              __navLogAccess('permissions.query', null, {
-                permission: permName,
-                state,
-                mediaDevicesLabelsUnlocked
-              });
-              return status;
-            });
-          }
-          __navLogAccess('permissions.query', null);
-          return Reflect.apply(orig, this, args || []);
         }
-      }], 'throw');
       }
     }
 
@@ -1892,82 +1664,125 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
       } else {
         __navRegisterKey('mediaDevices.enumerateDevices');
-        applyCoreTargetsGroup('nav_total_set:mediaDevices.enumerateDevices', [{
-        owner: mediaOwner,
-        key: 'enumerateDevices',
-        resolve: 'proto_chain',
-        kind: 'promise_method',
-        wrapLayer: 'named_wrapper',
-        invokeClass: 'brand_strict',
-        allowNamedWrapperBrandStrict: true,
-        policy: 'throw',
-        diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-        validThis(self) {
-          return self === navigator.mediaDevices;
-        },
-        invalidThis: 'throw',
-        invoke(orig, args) {
-          if (!devicesLabels || typeof devicesLabels !== 'object') {
-            __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_missing', {
-              stage: 'runtime',
-              type: __navTypePipeline,
-              diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-              key: 'mediaDevices.enumerateDevices',
-              message: 'devices labels missing'
-            });
-            return Reflect.apply(orig, this, args || []);
-          }
-          if (typeof devicesLabels.audioinput !== 'string'
-            || typeof devicesLabels.videoinput !== 'string'
-            || typeof devicesLabels.audiooutput !== 'string') {
-            __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_invalid', {
-              stage: 'runtime',
-              type: __navTypePipeline,
-              diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-              key: 'mediaDevices.enumerateDevices',
-              message: 'devices labels invalid'
-            });
-            return Reflect.apply(orig, this, args || []);
-          }
-          if (typeof R !== 'function') {
-            return Reflect.apply(orig, this, args || []);
-          }
-          const generateHexId = (len = 64) => {
-            let s = '';
-            for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
-            return s;
-          };
-          const audioUnlocked = !!mediaMicGranted;
-          const videoUnlocked = !!mediaCameraGranted;
-          __navLogAccess('mediaDevices.enumerateDevices', null, {
-            multimediaDevices: { speakers: 1, micros: 1, webcams: 1 },
-            labelsHidden: !(audioUnlocked || videoUnlocked),
-            audioUnlocked,
-            videoUnlocked
+        const origEnumerateDevices = mediaDesc.value || navigator.mediaDevices.enumerateDevices;
+        if (typeof origEnumerateDevices !== 'function') {
+          __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_original_missing', {
+            stage: 'preflight',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+            key: 'mediaDevices.enumerateDevices',
+            message: 'mediaDevices.enumerateDevices original missing'
           });
-          const groupId = generateHexId(64);
-          return Promise.resolve([
-            {
-              kind: 'audioinput',
-              label: audioUnlocked ? devicesLabels.audioinput : '',
-              deviceId: audioUnlocked ? generateHexId(64) : '',
-              groupId: audioUnlocked ? groupId : ''
-            },
-            {
-              kind: 'videoinput',
-              label: videoUnlocked ? devicesLabels.videoinput : '',
-              deviceId: videoUnlocked ? generateHexId(64) : '',
-              groupId: videoUnlocked ? groupId : ''
-            },
-            {
-              kind: 'audiooutput',
-              label: audioUnlocked ? devicesLabels.audiooutput : '',
-              deviceId: audioUnlocked ? generateHexId(64) : '',
-              groupId: audioUnlocked ? generateHexId(64) : ''
+        } else {
+          const patchedEnumerateDevices = __navMark(({ enumerateDevices() {
+            const args = arguments;
+            if (this !== navigator.mediaDevices) {
+              return Reflect.apply(origEnumerateDevices, this, args);
             }
-          ]);
+            if (!devicesLabels || typeof devicesLabels !== 'object') {
+              __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_missing', {
+                stage: 'runtime',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+                key: 'mediaDevices.enumerateDevices',
+                message: 'devices labels missing'
+              });
+              return Reflect.apply(origEnumerateDevices, this, args);
+            }
+            if (typeof devicesLabels.audioinput !== 'string'
+              || typeof devicesLabels.videoinput !== 'string'
+              || typeof devicesLabels.audiooutput !== 'string') {
+              __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_invalid', {
+                stage: 'runtime',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+                key: 'mediaDevices.enumerateDevices',
+                message: 'devices labels invalid'
+              });
+              return Reflect.apply(origEnumerateDevices, this, args);
+            }
+            if (typeof R !== 'function') {
+              return Reflect.apply(origEnumerateDevices, this, args);
+            }
+            const generateHexId = (len = 64) => {
+              let s = '';
+              for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
+              return s;
+            };
+            const audioUnlocked = !!mediaMicGranted;
+            const videoUnlocked = !!mediaCameraGranted;
+            __navLogAccess('mediaDevices.enumerateDevices', patchedEnumerateDevices, {
+              multimediaDevices: { speakers: 1, micros: 1, webcams: 1 },
+              labelsHidden: !(audioUnlocked || videoUnlocked),
+              audioUnlocked,
+              videoUnlocked
+            });
+            const groupId = generateHexId(64);
+            return Promise.resolve([
+              {
+                kind: 'audioinput',
+                label: audioUnlocked ? devicesLabels.audioinput : '',
+                deviceId: audioUnlocked ? generateHexId(64) : '',
+                groupId: audioUnlocked ? groupId : ''
+              },
+              {
+                kind: 'videoinput',
+                label: videoUnlocked ? devicesLabels.videoinput : '',
+                deviceId: videoUnlocked ? generateHexId(64) : '',
+                groupId: videoUnlocked ? groupId : ''
+              },
+              {
+                kind: 'audiooutput',
+                label: audioUnlocked ? devicesLabels.audiooutput : '',
+                deviceId: audioUnlocked ? generateHexId(64) : '',
+                groupId: audioUnlocked ? generateHexId(64) : ''
+              }
+            ]);
+          } }).enumerateDevices, 'enumerateDevices');
+          const mediaNextDesc = {
+            configurable: !!mediaDesc.configurable,
+            enumerable: !!mediaDesc.enumerable,
+            writable: Object.prototype.hasOwnProperty.call(mediaDesc, 'writable') ? !!mediaDesc.writable : true,
+            value: patchedEnumerateDevices
+          };
+          let mediaApplied = false;
+          try {
+            Object.defineProperty(mediaOwner, 'enumerateDevices', mediaNextDesc);
+            mediaApplied = true;
+            const afterMedia = Object.getOwnPropertyDescriptor(mediaOwner, 'enumerateDevices');
+            if (!isSameDescriptor(afterMedia, mediaNextDesc)) {
+              throw new Error('descriptor post-check mismatch');
+            }
+            __navRegisterFn(patchedEnumerateDevices);
+            registerPatchedTarget(mediaOwner, 'enumerateDevices', 'nav_total_set:mediaDevices.enumerateDevices');
+            rememberModuleApplied({ owner: mediaOwner, key: 'enumerateDevices', origDesc: mediaDesc });
+          } catch (e) {
+            let rollbackErr = null;
+            if (mediaApplied) {
+              try {
+                Object.defineProperty(mediaOwner, 'enumerateDevices', mediaDesc);
+              } catch (re) {
+                rollbackErr = re;
+                __navDiag('error', 'nav_total_set:mediaDevices.enumerateDevices:rollback_failed', {
+                  stage: 'rollback',
+                  type: __navTypeBrowser,
+                  diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+                  key: 'mediaDevices.enumerateDevices',
+                  data: { outcome: 'rollback', reason: 'rollback_failed' }
+                }, re);
+              }
+            }
+            if (rollbackErr) throw rollbackErr;
+            __navDiag('error', 'nav_total_set:mediaDevices.enumerateDevices:apply_failed', {
+              stage: 'apply',
+              type: __navTypeBrowser,
+              diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+              key: 'mediaDevices.enumerateDevices',
+              data: { outcome: 'throw', reason: 'apply_failed' }
+            }, e);
+            throw e;
+          }
         }
-      }], 'throw');
       }
     }
 
@@ -2029,26 +1844,58 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
       } else {
         __navRegisterKey('storage.estimate');
-        applyCoreTargetsGroup('nav_total_set:storage.estimate', [{
-        owner: storageOwner,
-        key: 'estimate',
-        resolve: 'proto_chain',
-        kind: 'promise_method',
-        wrapLayer: 'named_wrapper',
-        invokeClass: 'brand_strict',
-        allowNamedWrapperBrandStrict: true,
-        policy: 'throw',
-        diagTag: 'nav_total_set:storage.estimate',
-        validThis(self) {
-          return self === navigator.storage;
-        },
-        invalidThis: 'throw',
-        invoke(_orig, _args) {
-          __navLogAccess('storage.estimate', null);
+        const patchedEstimate = __navMark(({ estimate() {
+          const args = arguments;
+          if (this !== navigator.storage) {
+            return Reflect.apply(origEstimate, this, args);
+          }
+          __navLogAccess('storage.estimate', patchedEstimate);
           tickUsage();
           return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
+        } }).estimate, 'estimate');
+        const storageNextDesc = {
+          configurable: !!storageDesc.configurable,
+          enumerable: !!storageDesc.enumerable,
+          writable: Object.prototype.hasOwnProperty.call(storageDesc, 'writable') ? !!storageDesc.writable : true,
+          value: patchedEstimate
+        };
+        let storageApplied = false;
+        try {
+          Object.defineProperty(storageOwner, 'estimate', storageNextDesc);
+          storageApplied = true;
+          const afterStorage = Object.getOwnPropertyDescriptor(storageOwner, 'estimate');
+          if (!isSameDescriptor(afterStorage, storageNextDesc)) {
+            throw new Error('descriptor post-check mismatch');
+          }
+          __navRegisterFn(patchedEstimate);
+          registerPatchedTarget(storageOwner, 'estimate', 'nav_total_set:storage.estimate');
+          rememberModuleApplied({ owner: storageOwner, key: 'estimate', origDesc: storageDesc });
+        } catch (e) {
+          let rollbackErr = null;
+          if (storageApplied) {
+            try {
+              Object.defineProperty(storageOwner, 'estimate', storageDesc);
+            } catch (re) {
+              rollbackErr = re;
+              __navDiag('error', 'nav_total_set:storage.estimate:rollback_failed', {
+                stage: 'rollback',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:storage.estimate',
+                key: 'storage.estimate',
+                data: { outcome: 'rollback', reason: 'rollback_failed' }
+              }, re);
+            }
+          }
+          if (rollbackErr) throw rollbackErr;
+          __navDiag('error', 'nav_total_set:storage.estimate:apply_failed', {
+            stage: 'apply',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:storage.estimate',
+            key: 'storage.estimate',
+            data: { outcome: 'throw', reason: 'apply_failed' }
+          }, e);
+          throw e;
         }
-      }], 'throw');
       }
       if (navigator.webkitTemporaryStorage) {
         const tmpProto = Object.getPrototypeOf(navigator.webkitTemporaryStorage) || navigator.webkitTemporaryStorage;
@@ -2551,12 +2398,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
       // Getters - like in ORIG: enumerable: true
       if ('plugins' in navigator) {
-        const dPlugins = Object.getOwnPropertyDescriptor(navProto, 'plugins');
-        safeDefineAcc(navProto, 'plugins', __wrapGetter('plugins', () => createPluginArray(fakePlugins), dPlugins, __isNavigatorThis), { enumerable: true });
+        patchObjectReturnAccessor('plugins', function pluginsAccessorValue() {
+          return createPluginArray(fakePlugins);
+        }, 'nav_total_set:plugins');
       }
       if ('mimeTypes' in navigator) {
-        const dMimeTypes = Object.getOwnPropertyDescriptor(navProto, 'mimeTypes');
-        safeDefineAcc(navProto, 'mimeTypes', __wrapGetter('mimeTypes', () => createMimeTypeArray(fakePlugins), dMimeTypes, __isNavigatorThis), { enumerable: true });
+        patchObjectReturnAccessor('mimeTypes', function mimeTypesAccessorValue() {
+          return createMimeTypeArray(fakePlugins);
+        }, 'nav_total_set:mimeTypes');
       }
 
    
@@ -2596,10 +2445,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         diagTag: 'nav_total_set',
         key: null,
         message: 'fatal module error',
-        data: { outcome: rollbackErr ? 'skip' : 'rollback', reason: 'fatal', rollbackOk: !rollbackErr, action: 'native' }
+        data: { outcome: 'throw', reason: 'fatal', rollbackOk: !rollbackErr, action: 'native' }
       }, rollbackErr || e);
-      __navReleaseGuard(!rollbackErr);
-      return;
+      __navReleaseEntryGuard(!rollbackErr, 'rollback', 'module_catch');
+      throw (rollbackErr || e);
     }
   }
 }

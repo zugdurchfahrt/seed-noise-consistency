@@ -3,7 +3,10 @@ const WEBglDICKts = function WEBglDICKts(window) {
     const __surface = 'webgl';
     const __typePipeline = 'pipeline missing data';
     const __typeBrowser = 'browser structure missing data';
-    const __D = (window && window.__DEGRADE__) || null;
+    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+      ? window.CanvasPatchContext.__logger
+      : null;
+    const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
 
     function diag(level, code, extra, err) {
@@ -39,18 +42,6 @@ const WEBglDICKts = function WEBglDICKts(window) {
         }
     }
 
-    const C = window.CanvasPatchContext;
-    if (!C) {
-        diag('fatal', 'webglstorage:canvas_patch_context_missing', {
-            stage: 'preflight',
-            key: null,
-            message: 'CanvasPatchContext is undefined — no further execution',
-            type: __typePipeline,
-            data: { outcome: 'throw' }
-        }, null);
-        throw new Error('[CanvasPatch] CanvasPatchContext is undefined — no futher execution');
-    }
-
     const __core = window.Core;
     const __flagKey = '__PATCH_WEBGLSTORAGE__';
     let __guardToken = null;
@@ -78,12 +69,154 @@ const WEBglDICKts = function WEBglDICKts(window) {
     }
     if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
 
+    function __releaseGuard(rollbackOk) {
+        try {
+            if (__core && typeof __core.releaseGuardFlag === 'function') {
+                __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __tag);
+            }
+        } catch (_) {}
+    }
+
+    const C = window.CanvasPatchContext;
+    if (!C) {
+        diag('fatal', 'webglstorage:canvas_patch_context_missing', {
+            stage: 'preflight',
+            key: 'CanvasPatchContext',
+            message: 'CanvasPatchContext is undefined — module registration is not available',
+            type: __typePipeline,
+            data: { outcome: 'skip', reason: 'missing_canvas_patch_context' }
+        }, null);
+        __releaseGuard(true);
+        return;
+    }
+    const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+    if (!__stateRoot) {
+        diag('fatal', 'webglstorage:canvas_patch_state_missing', {
+            stage: 'preflight',
+            key: 'CanvasPatchContext.state',
+            message: 'CanvasPatchContext.state is undefined — module registration is not available',
+            type: __typePipeline,
+            data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
+        }, null);
+        __releaseGuard(true);
+        return;
+    }
+
+    function __captureDescriptorState(target, key) {
+        return {
+            target: target,
+            key: key,
+            exists: !!(target && Object.prototype.hasOwnProperty.call(target, key)),
+            desc: (target && Object.getOwnPropertyDescriptor(target, key)) || null
+        };
+    }
+
+    function __restoreDescriptorState(state) {
+        try {
+            const target = state && state.target;
+            if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+                throw new Error('restore target missing');
+            }
+            if (state.exists && state.desc) {
+                Object.defineProperty(target, state.key, state.desc);
+            } else {
+                delete target[state.key];
+            }
+            return true;
+        } catch (e) {
+            diag('error', 'webglstorage:rollback_failed', {
+                stage: 'rollback',
+                key: state && state.key ? state.key : null,
+                message: 'Rollback failed',
+                type: __typeBrowser,
+                data: { outcome: 'skip', reason: 'rollback_failed' }
+            }, e);
+            return false;
+        }
+    }
+
+    function __hideOwnSurface(target, key) {
+        try {
+            if (!target || (typeof target !== 'object' && typeof target !== 'function')) return true;
+            if (!Object.prototype.hasOwnProperty.call(target, key)) return true;
+            const d = Object.getOwnPropertyDescriptor(target, key);
+            if (!d || d.enumerable === false) return true;
+            if (d.configurable === false) {
+                diag('warn', 'webglstorage:hide_surface_nonconfigurable', {
+                    stage: 'apply',
+                    key: key,
+                    message: 'Hide surface skipped: non-configurable',
+                    type: __typeBrowser,
+                    data: { outcome: 'skip', reason: 'hide_surface_nonconfigurable' }
+                }, null);
+                return false;
+            }
+            if ('value' in d) {
+                Object.defineProperty(target, key, {
+                    value: d.value,
+                    writable: !!d.writable,
+                    configurable: !!d.configurable,
+                    enumerable: false
+                });
+            } else {
+                Object.defineProperty(target, key, {
+                    get: d.get,
+                    set: d.set,
+                    configurable: !!d.configurable,
+                    enumerable: false
+                });
+            }
+            return true;
+        } catch (e) {
+            diag('warn', 'webglstorage:hide_surface_failed', {
+                stage: 'apply',
+                key: key,
+                message: 'Hide surface failed',
+                type: __typeBrowser,
+                data: { outcome: 'skip', reason: 'hide_surface_failed' }
+            }, e);
+            return false;
+        }
+    }
+
+    function __setHiddenValue(target, key, value) {
+        const own = !!(target && Object.prototype.hasOwnProperty.call(target, key));
+        const d = own ? (Object.getOwnPropertyDescriptor(target, key) || null) : null;
+        if (d && d.configurable === false) {
+            target[key] = value;
+            __hideOwnSurface(target, key);
+            return;
+        }
+        Object.defineProperty(target, key, {
+            value: value,
+            writable: d ? !!d.writable : true,
+            configurable: d ? !!d.configurable : true,
+            enumerable: false
+        });
+    }
+
+    const __state = {
+    webglState: __captureDescriptorState(__stateRoot, '__WEBGL_STATE__')
+    };
     try {
+    const __existingWebGLState = (__stateRoot.__WEBGL_STATE__ && typeof __stateRoot.__WEBGL_STATE__ === 'object')
+        ? __stateRoot.__WEBGL_STATE__
+        : null;
+    const __webglState = __existingWebGLState
+        ? {
+            paramWhitelist: Array.isArray(__existingWebGLState.paramWhitelist) ? __existingWebGLState.paramWhitelist.slice() : [],
+            extensionsWhitelist: Array.isArray(__existingWebGLState.extensionsWhitelist) ? __existingWebGLState.extensionsWhitelist.slice() : []
+          }
+        : {
+            paramWhitelist: [],
+            extensionsWhitelist: []
+          };
+    __setHiddenValue(__stateRoot, '__WEBGL_STATE__', __webglState);
     const WebGLRenderingContext = window.WebGLRenderingContext || {};
     const WebGL2RenderingContext = window.WebGL2RenderingContext || {};
     
     // === WHITELIST (use YOR device specification list)===
-    window.__WEBGL_PARAM_WHITELIST__ = [
+    __webglState.paramWhitelist = [
     0x1F00,
     0x1F01,
     WebGLRenderingContext.DEPTH_BUFFER_BIT,
@@ -946,7 +1079,7 @@ const WEBglDICKts = function WEBglDICKts(window) {
     ];
     // Object.freeze(window.__WEBGL_PARAM_WHITELIST__);
         
-    window.__EXTENSIONS_WHITELIST__ = [
+    __webglState.extensionsWhitelist = [
     "EXT_clip_control",
     "EXT_color_buffer_float",
     "EXT_color_buffer_half_float",
@@ -982,8 +1115,8 @@ const WEBglDICKts = function WEBglDICKts(window) {
     ];
     // Object.freeze(window.__EXTENSIONS_WHITELIST__);
     function extendParamWhitelistFromExtensions() {
-        const wl = window.__WEBGL_PARAM_WHITELIST__;
-        const extList = window.__EXTENSIONS_WHITELIST__;
+        const wl = __webglState.paramWhitelist;
+        const extList = __webglState.extensionsWhitelist;
         if (!Array.isArray(wl) || !Array.isArray(extList) || extList.length === 0) return;
         const seen = (typeof Set === 'function') ? new Set() : null;
         if (seen) {
@@ -1054,8 +1187,7 @@ const WEBglDICKts = function WEBglDICKts(window) {
     }, null);
     } catch (e) {
         let rollbackOk = true;
-        try { delete window.__WEBGL_PARAM_WHITELIST__; } catch (_) { rollbackOk = false; }
-        try { delete window.__EXTENSIONS_WHITELIST__; } catch (_) { rollbackOk = false; }
+        rollbackOk = __restoreDescriptorState(__state.webglState) && rollbackOk;
 
         diag('error', 'webglstorage:apply_failed', {
             stage: 'apply',
@@ -1065,11 +1197,7 @@ const WEBglDICKts = function WEBglDICKts(window) {
             data: { outcome: 'throw', rollbackOk: rollbackOk }
         }, e);
 
-        try {
-            if (__core && typeof __core.releaseGuardFlag === 'function') {
-                __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __tag);
-            }
-        } catch (_) {}
+        __releaseGuard(rollbackOk);
         throw e;
     }
 }  

@@ -9,7 +9,10 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const __MODULE = 'rtc';
   const __SURFACE = 'rtcp';
   const __FLAG_KEY = '__PATCH_RTCPEERCONNECTION__';
-  const __rtcDegrade = (window && typeof window.__DEGRADE__ === 'function') ? window.__DEGRADE__ : null;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __rtcDegrade = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   function __rtcDiag(level, code, extra, err) {
     try {
       const x = (extra && typeof extra === 'object') ? extra : {};
@@ -98,6 +101,62 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return;
   }
 
+  if (!C) {
+    __rtcDiag('fatal', 'rtc:canvas_patch_context_missing', {
+      stage: 'preflight',
+      key: 'CanvasPatchContext',
+      message: 'CanvasPatchContext missing',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
+    }, new Error('[RTC] CanvasPatchContext missing'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on CanvasPatchContext preflight skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
+    return;
+  }
+  const __rtcStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__rtcStateRoot) {
+    __rtcDiag('fatal', 'rtc:canvas_patch_state_missing', {
+      stage: 'preflight',
+      key: 'CanvasPatchContext.state',
+      message: 'CanvasPatchContext.state missing',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
+    }, new Error('[RTC] CanvasPatchContext.state missing'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
+      }
+    } catch (releaseErr) {
+      __rtcDiag('warn', 'rtc:guard_release_failed', {
+        stage: 'guard',
+        key: __FLAG_KEY,
+        message: 'releaseGuardFlag threw on CanvasPatchContext.state preflight skip',
+        type: 'pipeline missing data',
+        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
+      }, releaseErr);
+    }
+    return;
+  }
+  if (!(__rtcStateRoot.__RTCPeerConnection__ && typeof __rtcStateRoot.__RTCPeerConnection__ === 'object')) {
+    Object.defineProperty(__rtcStateRoot, '__RTCPeerConnection__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+
   const safeDefine = (function() {
     const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
     if (typeof sd !== 'function') return null;
@@ -128,18 +187,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   const wrapApply = (function() {
-    const wrap = (window && typeof window.__wrapNativeApply === 'function') ? window.__wrapNativeApply : null;
+    const wrap = (__core && typeof __core.__wrapNativeApply === 'function') ? __core.__wrapNativeApply : null;
     if (typeof wrap !== 'function') return null;
     return wrap;
   })();
   if (typeof wrapApply !== 'function') {
     __rtcDiag('fatal', 'rtc:wrap_native_apply_missing', {
       stage: 'preflight',
-      key: '__wrapNativeApply',
-      message: '__wrapNativeApply missing',
+      key: 'Core.__wrapNativeApply',
+      message: 'Core.__wrapNativeApply missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_wrap_native_apply' }
-    }, new Error('[RTC] __wrapNativeApply missing'));
+    }, new Error('[RTC] Core.__wrapNativeApply missing'));
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
@@ -157,18 +216,18 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   const wrapAcc = (function() {
-    const wrap = (window && typeof window.__wrapNativeAccessor === 'function') ? window.__wrapNativeAccessor : null;
+    const wrap = (__core && typeof __core.__wrapNativeAccessor === 'function') ? __core.__wrapNativeAccessor : null;
     if (typeof wrap !== 'function') return null;
     return wrap;
   })();
   if (typeof wrapAcc !== 'function') {
     __rtcDiag('fatal', 'rtc:wrap_native_accessor_missing', {
       stage: 'preflight',
-      key: '__wrapNativeAccessor',
-      message: '__wrapNativeAccessor missing',
+      key: 'Core.__wrapNativeAccessor',
+      message: 'Core.__wrapNativeAccessor missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_wrap_native_accessor' }
-    }, new Error('[RTC] __wrapNativeAccessor missing'));
+    }, new Error('[RTC] Core.__wrapNativeAccessor missing'));
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
@@ -233,30 +292,6 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         stage: 'guard',
         key: __FLAG_KEY,
         message: 'releaseGuardFlag threw on missing API skip',
-        type: 'pipeline missing data',
-        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
-    }
-    return;
-  }
-
-  if (Orig.__PATCH_RTCPEERCONNECTION__) {
-    __rtcDiag('info', 'rtc:already_patched_marker', {
-      stage: 'guard',
-      key: 'RTCPeerConnection',
-      message: 'RTCPeerConnection already patched by marker',
-      type: 'pipeline missing data',
-      data: { outcome: 'skip', reason: 'already_patched_marker' }
-    }, null);
-    try {
-      if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
-      }
-    } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
-        stage: 'guard',
-        key: __FLAG_KEY,
-        message: 'releaseGuardFlag threw on already patched marker skip',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
       }, releaseErr);
