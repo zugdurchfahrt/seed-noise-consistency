@@ -191,7 +191,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       : null;
     if (typeof markAsNative !== "function") {
       diagPipeline("warn", "tz:missing_markAsNative", {
-        key: __flagKey,
+        key: "__ensureMarkAsNative",
         stage: "preflight",
         message: "__ensureMarkAsNative missing",
         data: { outcome: "skip", reason: "missing_dep_markAsNative", timezone: timezone }
@@ -275,7 +275,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       const nowOff = (new Date()).getTimezoneOffset();
       if (nowOff !== -offsetMinutes) {
         diagPipeline("error", "tz:offset_mismatch", {
-          key: __flagKey,
+          key:Date.prototype.getTimezoneOffset,
           stage: "preflight",
           message: "current timezone offset mismatch",
           data: { outcome: "skip", reason: "offset_mismatch", nowOff: nowOff, expected: -offsetMinutes, timezone: timezone }
@@ -285,7 +285,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       }
     } else {
       diagBrowser("warn", "tz:missing_getTimezoneOffset", {
-        key: __flagKey,
+        key: Date.prototype.getTimezoneOffset,
         stage: "preflight",
         message: "Date.prototype.getTimezoneOffset missing",
         data: { outcome: "skip", reason: "missing_getTimezoneOffset", timezone: timezone }
@@ -523,7 +523,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       redefineMethod(Date.prototype, "toLocaleTimeString", patchedToLocaleTimeString, "tz:Date:toLocaleTimeString");
 
       diagPipeline("info", "tz:applied", {
-        key: __flagKey,
+        key: null,
         stage: "apply",
         message: "timezone patch applied",
         data: { outcome: "return", timezone: timezone, offsetMinutes: Number(offsetMinutes), locale: spoofedLocale }

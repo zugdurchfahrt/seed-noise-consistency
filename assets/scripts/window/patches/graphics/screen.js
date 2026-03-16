@@ -1,7 +1,6 @@
 const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenTypePipeline = 'pipeline missing data';
   const __screenTypeBrowser = 'browser structure missing data';
-  const __screenTypeContract = 'contract violation';
   const __screenModule = 'screen';
   const __screenSurface = 'screen';
   const __core = window.Core;

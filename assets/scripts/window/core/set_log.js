@@ -210,10 +210,10 @@ const LOGGingModule = function LOGGingModule() {
             ? errObj.message
             : (typeof entry.error === "string" ? entry.error : null);
           return {
+            idx: (typeof idx === "number") ? idx : null,
             diagTag: (typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null,
             module: (typeof extra.module === "string" && extra.module) ? extra.module : null,
             key: (typeof extra.key === "string") ? extra.key : null,
-            idx: (typeof idx === "number") ? idx : null,
             timestamp: safeEntryTimestamp(entry),
             entryType: "degrade",
             level: String(level),
@@ -245,10 +245,10 @@ const LOGGingModule = function LOGGingModule() {
         }
         const hasRuntimeData = Object.keys(runtimeData).length > 0;
         return {
+          idx: (typeof idx === "number") ? idx : null,
           diagTag: "runtime",
           module: "runtime",
           key: null,
-          idx: (typeof idx === "number") ? idx : null,
           timestamp: safeEntryTimestamp(entry),
           entryType: entryType,
           level: lvl,
