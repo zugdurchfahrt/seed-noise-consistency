@@ -197,13 +197,20 @@ function EnvBus(G){
     }
     return v;
   }
+  const __langStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__LANG_STATE__ && typeof G.CanvasPatchContext.state.__LANG_STATE__ === 'object')
+    ? G.CanvasPatchContext.state.__LANG_STATE__
+    : ((G && G.CanvasPatchContext && G.CanvasPatchContext.__LANG_STATE__ && typeof G.CanvasPatchContext.__LANG_STATE__ === 'object') ? G.CanvasPatchContext.__LANG_STATE__ : null);
   const __envLangs = (() => {
-    const src = G.__normalizedLanguages;
+    const src = (__langStateRoot && Array.isArray(__langStateRoot.normalizedLanguages))
+      ? __langStateRoot.normalizedLanguages
+      : G.__normalizedLanguages;
     if (Array.isArray(src)) return src.slice();
     if (typeof src === 'string' && src) return [src];
     return null;
   })();
-  const __envLang = (typeof G.__primaryLanguage === 'string' && G.__primaryLanguage) ? G.__primaryLanguage : null;
+  const __envLang = (__langStateRoot && typeof __langStateRoot.primaryLanguage === 'string' && __langStateRoot.primaryLanguage)
+    ? __langStateRoot.primaryLanguage
+    : ((typeof G.__primaryLanguage === 'string' && G.__primaryLanguage) ? G.__primaryLanguage : null);
   const __envUa = (typeof G.__USER_AGENT === 'string' && G.__USER_AGENT) ? G.__USER_AGENT : null;
   const __envVendor = (typeof G.__VENDOR === 'string') ? G.__VENDOR : null;
   const __envDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null;
@@ -217,11 +224,11 @@ function EnvBus(G){
     const nav = G.navigator;
     let langs = __envLangs;
     if (!Array.isArray(langs)) {
-      throw new Error('EnvBus: __normalizedLanguages missing');
+      throw new Error('EnvBus: state.__LANG_STATE__.normalizedLanguages missing');
     }
     langs = langs.slice();
     const lang     = __envLang;
-    if (!lang) throw new Error('EnvBus: __primaryLanguage missing');
+    if (!lang) throw new Error('EnvBus: state.__LANG_STATE__.primaryLanguage missing');
     const ua       = __envUa;
     const vendor   = __envVendor;
     if (typeof ua !== 'string' || !ua) throw new Error('EnvBus: __USER_AGENT missing');

@@ -205,12 +205,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'wrap_strict_accessor_missing');
       return;
     }
-    const __navPrimaryLanguage = (typeof window.__primaryLanguage === 'string' && window.__primaryLanguage)
-      ? window.__primaryLanguage
-      : null;
-    const __navNormalizedLanguages = Array.isArray(window.__normalizedLanguages)
-      ? window.__normalizedLanguages.slice()
-      : null;
+    const __navLangState = (__stateRoot && __stateRoot.__LANG_STATE__ && typeof __stateRoot.__LANG_STATE__ === 'object')
+      ? __stateRoot.__LANG_STATE__
+      : ((C && C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') ? C.__LANG_STATE__ : null);
+    const __navPrimaryLanguage = (__navLangState && typeof __navLangState.primaryLanguage === 'string' && __navLangState.primaryLanguage)
+      ? __navLangState.primaryLanguage
+      : ((typeof window.__primaryLanguage === 'string' && window.__primaryLanguage) ? window.__primaryLanguage : null);
+    const __navNormalizedLanguages = (__navLangState && Array.isArray(__navLangState.normalizedLanguages))
+      ? __navLangState.normalizedLanguages.slice()
+      : (Array.isArray(window.__normalizedLanguages) ? window.__normalizedLanguages.slice() : null);
     if (Array.isArray(__navNormalizedLanguages)) {
       try {
         Object.freeze(__navNormalizedLanguages);
