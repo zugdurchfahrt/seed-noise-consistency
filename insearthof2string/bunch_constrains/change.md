@@ -1,4 +1,5 @@
 
+## Object/function/proxy/property kinds / descriptor/receiver/apply path fulfulling alighnment plan
 
 **Статический trace**
 
@@ -21,13 +22,13 @@
 
 **Нормативная рамка**
 
-Сверять надо только с внешним контрактом:
+Сверять соответствие Object/function/proxy/property kinds / descriptor/receiver/apply path  **только** с внешним контрактом:
 - ECMAScript: `Proxy exotic object`, `[[Call]]`, descriptor semantics, `Function.prototype.toString` observable behavior. Источник: <https://tc39.es/ecma262/>
 - Web IDL: regular attributes/operations, interface prototype object, implementation-checked receiver. Источник: <https://webidl.spec.whatwg.org/>
 - Chromium fact для `navigator.webdriver`: accessor на prototype, `configurable: true`, `enumerable: true`, `set === undefined`. Источник: <https://chromium.googlesource.com/chromium/src/%2B/66.0.3359.158/third_party/WebKit/LayoutTests/navigator_webdriver/navigator_webdriver_enabled.html>
 - `GPU.requestAdapter()` обязан оставаться Promise-returning method surface. Источник: <https://developer.mozilla.org/en-US/docs/Web/API/GPU/requestAdapter>
 
-Отсюда критерии аудита:
+Отсюда уставлены критерии :
 - `wrapperClass` не нормативен вообще; он должен лишь правдиво описывать runtime.
 - `wrapLayer` тоже не нормативен; он допустим только пока сохраняет observable surface.
 - единственные реальные ограничения: object/function/proxy kind, descriptor shape, receiver contract, apply/call path, native bad-receiver behavior, public `toString` surface.

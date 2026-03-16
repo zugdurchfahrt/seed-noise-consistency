@@ -11,7 +11,6 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     throw new Error("[probe] navigator is missing");
   }
 
-
   const W = (typeof window !== "undefined") ? window : null;
   const __probeLoggerRoot = (W && W.CanvasPatchContext && W.CanvasPatchContext.__logger && typeof W.CanvasPatchContext.__logger === "object")
     ? W.CanvasPatchContext.__logger

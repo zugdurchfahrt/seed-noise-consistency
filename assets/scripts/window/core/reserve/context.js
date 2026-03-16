@@ -820,15 +820,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
       if (patchedMethods.has(proto[method])) return false;
 
       const orig = resolveKeptNative(proto, method) || proto[method];
-      const wrapApply = (global && typeof global.__wrapNativeApply === 'function')
-        ? global.__wrapNativeApply
+      const wrapApply = (global && global.Core && typeof global.Core.__wrapNativeApply === 'function')
+        ? global.Core.__wrapNativeApply
         : null;
       if (typeof wrapApply !== 'function') {
         emitContextDiag('error', 'context:ctx2d:guard:wrap_native_apply_missing', null, {
           stage: 'guard',
           key: method,
           type: 'pipeline missing data',
-          data: { need: '__wrapNativeApply' }
+          data: { need: 'Core.__wrapNativeApply' }
         });
         return false;
       }

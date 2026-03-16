@@ -2065,6 +2065,58 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
     data: { outcome: 'return' }
   }, null);
 
+  // reduce visibility of pipeline globals in Window realm (non-enumerable)
+  try {
+    const win = G;
+    if (win && (typeof win === 'object' || typeof win === 'function')) {
+      for (const k of __hiddenSurfaceState.final) {
+        if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
+        const d = Object.getOwnPropertyDescriptor(win, k);
+        if (!d) continue;
+        if (d.enumerable === false) {
+          __hiddenSurfaceState.applied[k] = 'already_hidden';
+          continue;
+        }
+        if (d.configurable === false) {
+          __hiddenSurfaceState.applied[k] = 'skip_nonconfigurable';
+          const e = new Error('[WrkModule] hidePipelineSurface non-configurable: ' + k);
+          __wrkDiag('warn', 'wrk:hide_pipeline_surface_nonconfigurable', {
+            stage: 'apply',
+            key: k,
+            message: 'hide pipeline surface skipped: non-configurable',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'hide_pipeline_surface_nonconfigurable' }
+          }, e);
+          continue;
+        }
+        if ('value' in d) {
+          Object.defineProperty(win, k, {
+            value: win[k],
+            writable: !!d.writable,
+            configurable: !!d.configurable,
+            enumerable: false
+          });
+        } else {
+          Object.defineProperty(win, k, {
+            get: d.get,
+            set: d.set,
+            configurable: !!d.configurable,
+            enumerable: false
+          });
+        }
+        __hiddenSurfaceState.applied[k] = 'hidden';
+      }
+    }
+  } catch (e) {
+    __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
+      stage: 'apply',
+      key: '__ENV_BRIDGE__',
+      message: 'hide pipeline surface failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }
+    }, e);
+  }
+
     __wrkDiag('info', 'wrk:init:return', {
       stage: 'apply',
       key: '__PATCH_WRK__',
