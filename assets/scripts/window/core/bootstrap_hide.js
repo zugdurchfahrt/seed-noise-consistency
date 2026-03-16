@@ -138,6 +138,20 @@ if (
 ) {
   __langTransitState__.primaryLanguage = __bootstrapPrimaryLanguage__;
   __langTransitState__.normalizedLanguages = __bootstrapNormalizedLanguages__;
+  if (Array.isArray(__langTransitState__.normalizedLanguages) && !Object.isFrozen(__langTransitState__.normalizedLanguages)) {
+    Object.freeze(__langTransitState__.normalizedLanguages);
+  }
+  if (
+    typeof __langTransitState__.primaryLanguage !== 'string' ||
+    !__langTransitState__.primaryLanguage ||
+    !Array.isArray(__langTransitState__.normalizedLanguages) ||
+    __langTransitState__.normalizedLanguages.length === 0 ||
+    __langTransitState__.normalizedLanguages[0] !== __langTransitState__.primaryLanguage
+  ) {
+    throw new Error('[module] CanvasPatchContext.__LANG_STATE__ bootstrap invalid');
+  }
+  __defineHiddenValue__(W, '__primaryLanguage', __langTransitState__.primaryLanguage);
+  __defineHiddenValue__(W, '__normalizedLanguages', __langTransitState__.normalizedLanguages);
 }
 
 function __emitCleanupDiag__(level, code, key, message, reason, err) {

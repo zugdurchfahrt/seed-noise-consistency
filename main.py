@@ -214,7 +214,8 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
 
 # ----------------------- function init_driver -----------------------
 def init_driver(
-    profile, country_data, platform, user_agent, screen_width, screen_height, webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
+    profile, country_data, platform, user_agent, screen_width, screen_height,
+    webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
     devices_conf, generated_platform, generated_platform_version, expected_client_hints, vendor_value, 
     language, normalized_languages, device_memory_value, hardware_concurrency_value, device_dpr_value,
     plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type, global_seed,
@@ -597,73 +598,20 @@ def init_driver(
             writable: true,
             configurable: true,
             enumerable: false
+        }},
+        __primaryLanguage: {{
+            value: {json.dumps(profile['language'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __normalizedLanguages: {{
+            value: {json.dumps(profile['languages'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
         }}
     }});
-
-    (function initLanguageHiddenProducerPath(win) {{
-        function defineHidden(obj, key, value) {{
-            const desc = Object.getOwnPropertyDescriptor(obj, key);
-            if (desc && desc.configurable === false) {{
-                throw new Error('THW: ' + key + ' non-configurable');
-            }}
-            Object.defineProperty(obj, key, {{
-                value,
-                writable: true,
-                configurable: true,
-                enumerable: false
-            }});
-            return value;
-        }}
-
-        const primaryLanguage = {json.dumps(profile['language'], ensure_ascii=False)};
-        const normalizedLanguages = {json.dumps(profile['languages'], ensure_ascii=False)};
-
-        let C = (win.CanvasPatchContext && (typeof win.CanvasPatchContext === 'object' || typeof win.CanvasPatchContext === 'function'))
-            ? win.CanvasPatchContext
-            : null;
-        if (!C) {{
-            C = defineHidden(win, 'CanvasPatchContext', {{}});
-        }} else {{
-            defineHidden(win, 'CanvasPatchContext', C);
-        }}
-
-        let stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-        if (!stateRoot) {{
-            stateRoot = defineHidden(C, 'state', Object.create(null));
-        }} else {{
-            defineHidden(C, 'state', stateRoot);
-        }}
-
-        let langState = (stateRoot.__LANG_STATE__ && typeof stateRoot.__LANG_STATE__ === 'object')
-            ? stateRoot.__LANG_STATE__
-            : null;
-        if (!langState) {{
-            langState = Object.create(null);
-            defineHidden(stateRoot, '__LANG_STATE__', langState);
-        }} else {{
-            defineHidden(stateRoot, '__LANG_STATE__', langState);
-        }}
-        defineHidden(C, '__LANG_STATE__', langState);
-
-        langState.primaryLanguage = primaryLanguage;
-        langState.normalizedLanguages = normalizedLanguages;
-
-        if (Array.isArray(langState.normalizedLanguages)) {{
-            Object.freeze(langState.normalizedLanguages);
-        }}
-        if (typeof langState.primaryLanguage !== 'string' || !langState.primaryLanguage) {{
-            throw new Error('THW: __LANG_STATE__.primaryLanguage invalid');
-        }}
-        if (!Array.isArray(langState.normalizedLanguages) || langState.normalizedLanguages.length === 0) {{
-            throw new Error('THW: __LANG_STATE__.normalizedLanguages invalid');
-        }}
-        if (langState.normalizedLanguages[0] !== langState.primaryLanguage) {{
-            throw new Error('THW: __LANG_STATE__ language != languages[0]');
-        }}
-
-        defineHidden(win, '__primaryLanguage', langState.primaryLanguage);
-        defineHidden(win, '__normalizedLanguages', langState.normalizedLanguages);
-    }})(window);
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
