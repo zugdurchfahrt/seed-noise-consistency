@@ -68,7 +68,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         offscreenAsync: Object.freeze(['convertToBlob']),
         offscreenFactory: Object.freeze(['getContext']),
         ctx2DRead: Object.freeze(['getImageData']),
-        ctx2DCore: Object.freeze(['putImageData', 'measureText', 'fillText', 'strokeText', 'fillRect', 'drawImage']),
+        ctx2DCore: Object.freeze(['measureText', 'fillText', 'strokeText', 'fillRect', 'drawImage']),
         webgl: Object.freeze(['getParameter', 'getSupportedExtensions', 'getExtension', 'readPixels', 'getShaderPrecisionFormat', 'shaderSource', 'getUniform'])
       });
   if (!Object.prototype.hasOwnProperty.call(C, '__GATEWAY_METHODS__')) {
@@ -812,21 +812,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const proto = getCtx2DProto(ctx);
     if (!ctx || !proto) return ctx;
     captureKeepNativeRefs();
-    const core = (global && global.Core && typeof global.Core === 'object')
-      ? global.Core
-      : null;
-    const wrapApply = (core && typeof core.__wrapNativeApply === 'function')
-      ? core.__wrapNativeApply
-      : null;
-    if (typeof wrapApply !== 'function') {
-      emitContextDiag('error', 'context:ctx2d:guard:wrap_native_apply_missing', null, {
-        stage: 'guard',
-        key: 'ctx2dGateway',
-        type: 'pipeline missing data',
-        data: { need: '__wrapNativeApply', outcome: 'skip', reason: 'wrap_native_apply_missing' }
-      });
-      return ctx;
-    }
 
     // Patch once-per-method: if already patched, do nothing
     function patchOnce(method, makeApplyImpl){
@@ -835,6 +820,18 @@ const ContextPatchModule = function ContextPatchModule(window) {
       if (patchedMethods.has(proto[method])) return false;
 
       const orig = resolveKeptNative(proto, method) || proto[method];
+      const wrapApply = (global && typeof global.__wrapNativeApply === 'function')
+        ? global.__wrapNativeApply
+        : null;
+      if (typeof wrapApply !== 'function') {
+        emitContextDiag('error', 'context:ctx2d:guard:wrap_native_apply_missing', null, {
+          stage: 'guard',
+          key: method,
+          type: 'pipeline missing data',
+          data: { need: '__wrapNativeApply' }
+        });
+        return false;
+      }
       const applyImpl = makeApplyImpl(orig);
       const wrapped = wrapApply(orig, method, applyImpl);
 
@@ -863,11 +860,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
     // --- getImageData: route read-path through gateway without changing native answer ---
     patchOnce('getImageData', (orig) => (target, thisArg, argList) => {
-      return Reflect.apply(target, thisArg, argList || []);
-    });
-
-    // --- putImageData: route write-path through gateway without changing native answer ---
-    patchOnce('putImageData', (orig) => (target, thisArg, argList) => {
       return Reflect.apply(target, thisArg, argList || []);
     });
 
@@ -908,35 +900,35 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const x = argList && argList.length > 1 ? argList[1] : undefined;
       const y = argList && argList.length > 2 ? argList[2] : undefined;
       const rest = (argList && argList.length > 3) ? Array.prototype.slice.call(argList, 3) : [];
-      const H = getHooks();
-      if (H && typeof H.applyFillTextHook === 'function') {
-        try {
+      try {
+        const H = getHooks();
+
+        if (H && typeof H.applyFillTextHook === 'function') {
           const callOrig = (...a) => Reflect.apply(target, thisArg, a);
           return H.applyFillTextHook.call(thisArg, callOrig, text, x, y, ...rest);
-        } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, {
-            stage: 'hook',
-            key: 'fillText',
-            type: 'browser structure missing data',
-            data: { outcome: 'throw', reason: 'hook_apply_failed' }
-          });
-          throw e;
         }
-      }
-      let callArgs = [text, x, y, ...rest];
-      if (H && typeof H.fillTextNoiseHook === 'function') {
-        try {
-          const a = H.fillTextNoiseHook.apply(thisArg, callArgs);
-          if (Array.isArray(a)) callArgs = a;
-        } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, {
-            stage: 'hook',
-            key: 'fillText',
-            data: { outcome: 'skip', reason: 'hook_exception' }
-          });
+
+        if (H && typeof H.fillTextNoiseHook === 'function') {
+          const a = H.fillTextNoiseHook.apply(thisArg, [text, x, y, ...rest]) || [text, x, y, ...rest];
+          return Reflect.apply(target, thisArg, a);
         }
+      } catch (e) {
+        const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+        const isBadReceiver = !guardInstance(proto, thisArg);
+        const extra = {
+          stage: 'hook',
+          key: 'fillText',
+          data: {
+            outcome: (isIllegal || isBadReceiver) ? 'throw' : 'skip',
+            reason: isIllegal ? 'illegal_invocation' : (isBadReceiver ? 'invalid_receiver' : 'hook_exception')
+          }
+        };
+        if (isIllegal || isBadReceiver) extra.type = 'browser structure missing data';
+        emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, extra);
+        if (isIllegal || isBadReceiver) throw e;
       }
-      return Reflect.apply(target, thisArg, callArgs);
+
+      return Reflect.apply(target, thisArg, [text, x, y, ...rest]);
     });
 
     // --- strokeText ---
@@ -945,35 +937,35 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const x = argList && argList.length > 1 ? argList[1] : undefined;
       const y = argList && argList.length > 2 ? argList[2] : undefined;
       const rest = (argList && argList.length > 3) ? Array.prototype.slice.call(argList, 3) : [];
-      const H = getHooks();
-      if (H && typeof H.applyStrokeTextHook === 'function') {
-        try {
+      try {
+        const H = getHooks();
+
+        if (H && typeof H.applyStrokeTextHook === 'function') {
           const callOrig = (...a) => Reflect.apply(target, thisArg, a);
           return H.applyStrokeTextHook.call(thisArg, callOrig, text, x, y, ...rest);
-        } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, {
-            stage: 'hook',
-            key: 'strokeText',
-            type: 'browser structure missing data',
-            data: { outcome: 'throw', reason: 'hook_apply_failed' }
-          });
-          throw e;
         }
-      }
-      let callArgs = [text, x, y, ...rest];
-      if (H && typeof H.strokeTextNoiseHook === 'function') {
-        try {
-          const a = H.strokeTextNoiseHook.apply(thisArg, callArgs);
-          if (Array.isArray(a)) callArgs = a;
-        } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, {
-            stage: 'hook',
-            key: 'strokeText',
-            data: { outcome: 'skip', reason: 'hook_exception' }
-          });
+
+        if (H && typeof H.strokeTextNoiseHook === 'function') {
+          const a = H.strokeTextNoiseHook.apply(thisArg, [text, x, y, ...rest]) || [text, x, y, ...rest];
+          return Reflect.apply(target, thisArg, a);
         }
+      } catch (e) {
+        const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+        const isBadReceiver = !guardInstance(proto, thisArg);
+        const extra = {
+          stage: 'hook',
+          key: 'strokeText',
+          data: {
+            outcome: (isIllegal || isBadReceiver) ? 'throw' : 'skip',
+            reason: isIllegal ? 'illegal_invocation' : (isBadReceiver ? 'invalid_receiver' : 'hook_exception')
+          }
+        };
+        if (isIllegal || isBadReceiver) extra.type = 'browser structure missing data';
+        emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, extra);
+        if (isIllegal || isBadReceiver) throw e;
       }
-      return Reflect.apply(target, thisArg, callArgs);
+
+      return Reflect.apply(target, thisArg, [text, x, y, ...rest]);
     });
 
     // --- fillRect ---
@@ -982,40 +974,53 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const y = argList && argList.length > 1 ? argList[1] : undefined;
       const w = argList && argList.length > 2 ? argList[2] : undefined;
       const h = argList && argList.length > 3 ? argList[3] : undefined;
-      const H = getHooks();
-      let callArgs = [x, y, w, h];
-      if (H && typeof H.fillRectNoiseHook === 'function') {
-        try {
+      try {
+        const H = getHooks();
+        if (H && typeof H.fillRectNoiseHook === 'function') {
           const a = H.fillRectNoiseHook.call(thisArg, x, y, w, h);
-          if (Array.isArray(a)) callArgs = a;
-        } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:fillRect_failed', e, {
-            stage: 'hook',
-            key: 'fillRect',
-            data: { outcome: 'skip', reason: 'hook_exception' }
-          });
+          if (Array.isArray(a)) return Reflect.apply(target, thisArg, a);
         }
+      } catch (e) {
+        const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+        const isBadReceiver = !guardInstance(proto, thisArg);
+        const extra = {
+          stage: 'hook',
+          key: 'fillRect',
+          data: {
+            outcome: (isIllegal || isBadReceiver) ? 'throw' : 'skip',
+            reason: isIllegal ? 'illegal_invocation' : (isBadReceiver ? 'invalid_receiver' : 'hook_exception')
+          }
+        };
+        if (isIllegal || isBadReceiver) extra.type = 'browser structure missing data';
+        emitContextDiag('warn', 'context:ctx2d:hook:fillRect_failed', e, extra);
+        if (isIllegal || isBadReceiver) throw e;
       }
-      return Reflect.apply(target, thisArg, callArgs);
+      return Reflect.apply(target, thisArg, [x, y, w, h]);
     });
 
     // --- drawImage ---
     patchOnce('drawImage', (orig) => (target, thisArg, argList) => {
       const args = (argList && argList.length) ? Array.prototype.slice.call(argList) : [];
-      const H = getHooks();
-      if (H && typeof H.applyDrawImageHook === 'function') {
-        try {
+      try {
+        const H = getHooks();
+        if (H && typeof H.applyDrawImageHook === 'function') {
           const callOrig = (...a) => Reflect.apply(target, thisArg, a);
           return H.applyDrawImageHook.call(thisArg, callOrig, ...args);
-        } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:drawImage_failed', e, {
-            stage: 'hook',
-            key: 'drawImage',
-            type: 'browser structure missing data',
-            data: { outcome: 'throw', reason: 'hook_apply_failed' }
-          });
-          throw e;
         }
+      } catch (e) {
+        const isIllegal = !!(e && e.name === 'TypeError' && /Illegal invocation/i.test(e.message || ''));
+        const isBadReceiver = !guardInstance(proto, thisArg);
+        const extra = {
+          stage: 'hook',
+          key: 'drawImage',
+          data: {
+            outcome: (isIllegal || isBadReceiver) ? 'throw' : 'skip',
+            reason: isIllegal ? 'illegal_invocation' : (isBadReceiver ? 'invalid_receiver' : 'hook_exception')
+          }
+        };
+        if (isIllegal || isBadReceiver) extra.type = 'browser structure missing data';
+        emitContextDiag('warn', 'context:ctx2d:hook:drawImage_failed', e, extra);
+        if (isIllegal || isBadReceiver) throw e;
       }
       return Reflect.apply(target, thisArg, args);
     });
