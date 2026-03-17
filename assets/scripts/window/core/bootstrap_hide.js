@@ -53,6 +53,208 @@ if (!loggerRoot) {
 } else {
   __defineHiddenValue__(C, '__logger', loggerRoot);
 }
+
+function __isFiniteNumber__(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function __ensureGeoTransitState__() {
+  let state = (stateRoot.__GEO_STATE__ && typeof stateRoot.__GEO_STATE__ === 'object')
+    ? stateRoot.__GEO_STATE__
+    : null;
+  if (!state) {
+    state = Object.create(null);
+    state.latitude = null;
+    state.longitude = null;
+    state.timezone = null;
+    state.offsetMinutes = null;
+    Object.defineProperty(stateRoot, '__GEO_STATE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (C.__GEO_STATE__ !== state) {
+    Object.defineProperty(C, '__GEO_STATE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  return state;
+}
+
+function __ensureLangTransitState__() {
+  let state = (stateRoot.__LANG_STATE__ && typeof stateRoot.__LANG_STATE__ === 'object')
+    ? stateRoot.__LANG_STATE__
+    : null;
+  if (!state) {
+    state = Object.create(null);
+    state.primaryLanguage = null;
+    state.normalizedLanguages = null;
+    Object.defineProperty(stateRoot, '__LANG_STATE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (C.__LANG_STATE__ !== state) {
+    Object.defineProperty(C, '__LANG_STATE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  return state;
+}
+
+const __geoTransitState__ = __ensureGeoTransitState__();
+const __langTransitState__ = __ensureLangTransitState__();
+const __bootstrapLatitude__ = W.__LATITUDE__;
+const __bootstrapLongitude__ = W.__LONGITUDE__;
+const __bootstrapTimezone__ = W.__TIMEZONE__;
+const __bootstrapOffsetMinutes__ = W.__OFFSET_MINUTES__;
+const __bootstrapPrimaryLanguage__ = W.__primaryLanguage;
+const __bootstrapNormalizedLanguages__ = W.__normalizedLanguages;
+if (
+  __isFiniteNumber__(__bootstrapLatitude__) &&
+  __isFiniteNumber__(__bootstrapLongitude__) &&
+  typeof __bootstrapTimezone__ === 'string' && __bootstrapTimezone__ &&
+  __isFiniteNumber__(__bootstrapOffsetMinutes__)
+) {
+  __geoTransitState__.latitude = __bootstrapLatitude__;
+  __geoTransitState__.longitude = __bootstrapLongitude__;
+  __geoTransitState__.timezone = __bootstrapTimezone__;
+  __geoTransitState__.offsetMinutes = __bootstrapOffsetMinutes__;
+}
+if (
+  typeof __bootstrapPrimaryLanguage__ === 'string' && __bootstrapPrimaryLanguage__ &&
+  Array.isArray(__bootstrapNormalizedLanguages__) &&
+  __bootstrapNormalizedLanguages__.length > 0
+) {
+  __langTransitState__.primaryLanguage = __bootstrapPrimaryLanguage__;
+  __langTransitState__.normalizedLanguages = __bootstrapNormalizedLanguages__;
+  if (Array.isArray(__langTransitState__.normalizedLanguages) && !Object.isFrozen(__langTransitState__.normalizedLanguages)) {
+    Object.freeze(__langTransitState__.normalizedLanguages);
+  }
+  if (
+    typeof __langTransitState__.primaryLanguage !== 'string' ||
+    !__langTransitState__.primaryLanguage ||
+    !Array.isArray(__langTransitState__.normalizedLanguages) ||
+    __langTransitState__.normalizedLanguages.length === 0 ||
+    __langTransitState__.normalizedLanguages[0] !== __langTransitState__.primaryLanguage
+  ) {
+    throw new Error('[module] CanvasPatchContext.__LANG_STATE__ bootstrap invalid');
+  }
+  __defineHiddenValue__(W, '__primaryLanguage', __langTransitState__.primaryLanguage);
+  __defineHiddenValue__(W, '__normalizedLanguages', __langTransitState__.normalizedLanguages);
+}
+
+function __emitCleanupDiag__(level, code, key, message, reason, err) {
+  const D = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
+  const diag = (D && typeof D.diag === 'function') ? D.diag.bind(D) : null;
+  try {
+    const ctx = {
+      module: 'bootstrap_hide',
+      diagTag: 'bootstrap_hide',
+      surface: 'window',
+      key: key,
+      stage: 'cleanup',
+      message: message,
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: reason }
+    };
+    if (diag) return diag(level, code, ctx, err || null);
+    if (typeof D === 'function') return D(code, err || null, Object.assign({ level: level }, ctx));
+  } catch (emitErr) {
+    return undefined;
+  }
+}
+
+function __geoTransitOwnerReady__() {
+  const state = __ensureGeoTransitState__();
+  return !!state &&
+    __isFiniteNumber__(state.latitude) &&
+    __isFiniteNumber__(state.longitude) &&
+    typeof state.timezone === 'string' && !!state.timezone &&
+    __isFiniteNumber__(state.offsetMinutes);
+}
+
+function __langTransitOwnerReady__() {
+  const state = __ensureLangTransitState__();
+  return !!state &&
+    typeof state.primaryLanguage === 'string' && !!state.primaryLanguage &&
+    Array.isArray(state.normalizedLanguages) &&
+    state.normalizedLanguages.length > 0 &&
+    state.normalizedLanguages[0] === state.primaryLanguage;
+}
+
+function __canSanitizeBootstrapKey__(key) {
+  if (
+    key === '__LATITUDE__' ||
+    key === '__LONGITUDE__' ||
+    key === '__TIMEZONE__' ||
+    key === '__OFFSET_MINUTES__'
+  ) {
+    return __geoTransitOwnerReady__();
+  }
+  if (
+    key === '__primaryLanguage' ||
+    key === '__normalizedLanguages'
+  ) {
+    return __langTransitOwnerReady__();
+  }
+  return true;
+}
+
+function __sanitizeBootstrapEnvSurface__(win) {
+  const keys = [
+    '__GLOBAL_SEED',
+    '__EXPECTED_CLIENT_HINTS',
+    '__NAV_PLATFORM__',
+    '__GENERATED_PLATFORM',
+    '__GENERATED_PLATFORM_VERSION',
+    '__USER_AGENT',
+    '__VENDOR',
+    '__LATITUDE__',
+    '__LONGITUDE__',
+    '__TIMEZONE__',
+    '__OFFSET_MINUTES__',
+    '__WIDTH',
+    '__HEIGHT',
+    '__COLOR_DEPTH',
+    '__DPR',
+    '__primaryLanguage',
+    '__normalizedLanguages',
+    '__cpu',
+    '__memory',
+    '__DEVICES_LABELS',
+    '__PLUGIN_PROFILES__',
+    '__ORIENTATION'
+  ];
+  for (const key of keys) {
+    if (!__canSanitizeBootstrapKey__(key)) {
+      __emitCleanupDiag__('warn', 'bootstrap_hide:cleanup_env_owner_not_ready', key, 'env surface cleanup skipped: owner not ready', 'cleanup_env_owner_not_ready', null);
+      continue;
+    }
+    const desc = Object.getOwnPropertyDescriptor(win, key);
+    if (!desc) continue;
+    if (desc.configurable === false) {
+      __emitCleanupDiag__('warn', 'bootstrap_hide:cleanup_env_nonconfigurable', key, 'env surface cleanup skipped: non-configurable', 'cleanup_env_nonconfigurable', null);
+      continue;
+    }
+    try {
+      delete win[key];
+    } catch (e) {
+      __emitCleanupDiag__('warn', 'bootstrap_hide:cleanup_env_delete_failed', key, 'env surface cleanup delete failed', 'cleanup_env_delete_failed', e);
+    }
+  }
+}
+__defineHiddenValue__(C, '__sanitizeBootstrapEnvSurface__', __sanitizeBootstrapEnvSurface__);
   
   
   const hiddenSurfaceState = {
@@ -88,6 +290,10 @@ if (!loggerRoot) {
     "__safeDefine",
     "__CORE_TOSTRING_STATE__",
     "__ensureMarkAsNative",
+    "__wrapNativeApply",
+    "__wrapNativeAccessor",
+    "__wrapStrictAccessor",
+    "__wrapNativeCtor",
     "__CORE_WINDOW_LOADED__",
     "Core",
     "__ENV_BRIDGE__",

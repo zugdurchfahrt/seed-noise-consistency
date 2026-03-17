@@ -446,6 +446,23 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       Object.defineProperty(__store, 'collectSnapshot', {
         value: async function collectWebGPUSnapshot() {
           if (!('gpu' in navigator)) return { error: 'WebGPU not available' };
+          const requestAdapterResolved = (__core && typeof __core.resolveDescriptor === 'function')
+            ? __core.resolveDescriptor(navigator.gpu, 'requestAdapter', { mode: 'proto_chain' })
+            : null;
+          const requestAdapterOwner = (requestAdapterResolved && requestAdapterResolved.owner)
+            ? requestAdapterResolved.owner
+            : navigator.gpu;
+          if (__core && typeof __core.isTargetRegistered === 'function'
+              && !__core.isTargetRegistered(requestAdapterOwner, 'requestAdapter')) {
+            __moduleDiag('warn', __module + ':requestAdapter_patch_not_ready', {
+              stage: 'preflight',
+              key: 'navigator.gpu.requestAdapter',
+              message: 'requestAdapter patch not registered yet; snapshot skipped',
+              type: 'pipeline missing data',
+              data: { outcome: 'return', reason: 'requestAdapter_patch_not_ready' }
+            }, null);
+            return { error: 'requestAdapter patch not ready' };
+          }
           const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
                         || await navigator.gpu.requestAdapter();
           if (!adapter) return { error: 'No adapter' };

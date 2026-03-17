@@ -98,12 +98,44 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       }
     }
 
-    const timezone = window.__TIMEZONE__;
-    const offsetMinutes = window.__OFFSET_MINUTES__;
+    function __resolveGeoTransitState() {
+      const C = window && window.CanvasPatchContext;
+      if (!C || typeof C !== 'object') return null;
+      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+      if (stateRoot && stateRoot.__GEO_STATE__ && typeof stateRoot.__GEO_STATE__ === 'object') {
+        return stateRoot.__GEO_STATE__;
+      }
+      if (C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') {
+        return C.__GEO_STATE__;
+      }
+      return null;
+    }
 
-    const spoofedLocales = Array.isArray(window.__normalizedLanguages)
-      ? window.__normalizedLanguages
-      : (typeof window.__normalizedLanguages === "string" ? [window.__normalizedLanguages] : null);
+    function __resolveLangTransitState() {
+      const C = window && window.CanvasPatchContext;
+      if (!C || typeof C !== 'object') return null;
+      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+      if (stateRoot && stateRoot.__LANG_STATE__ && typeof stateRoot.__LANG_STATE__ === 'object') {
+        return stateRoot.__LANG_STATE__;
+      }
+      if (C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') {
+        return C.__LANG_STATE__;
+      }
+      return null;
+    }
+
+    const geoTransitState = __resolveGeoTransitState();
+    const langTransitState = __resolveLangTransitState();
+    const timezone = (geoTransitState && typeof geoTransitState.timezone === "string" && geoTransitState.timezone)
+      ? geoTransitState.timezone
+      : null;
+    const offsetMinutes = (geoTransitState && typeof geoTransitState.offsetMinutes === "number")
+      ? geoTransitState.offsetMinutes
+      : null;
+
+    const spoofedLocales = (langTransitState && Array.isArray(langTransitState.normalizedLanguages))
+      ? langTransitState.normalizedLanguages
+      : null;
 
     const spoofedLocale = spoofedLocales ? spoofedLocales[0] : null;
 
@@ -121,7 +153,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
 
     if (!timezone || typeof timezone !== "string") {
       diagPipeline("error", "tz:missing_timezone", {
-        key: __flagKey,
+        key: 'state.__GEO_STATE__.timezone',
         stage: "preflight",
         message: "timezone source missing",
         data: { outcome: "skip", reason: "missing_timezone" }
@@ -131,7 +163,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     }
     if (typeof offsetMinutes !== "number") {
       diagPipeline("error", "tz:missing_offsetMinutes", {
-        key: __flagKey,
+        key: 'state.__GEO_STATE__.offsetMinutes',
         stage: "preflight",
         message: "offsetMinutes source missing",
         data: { outcome: "skip", reason: "missing_offsetMinutes", timezone: timezone }
@@ -141,7 +173,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     }
     if (!spoofedLocales || !spoofedLocales.length || typeof spoofedLocale !== "string" || !spoofedLocale) {
       diagPipeline("error", "tz:missing_normalizedLanguages", {
-        key: __flagKey,
+        key: 'state.__LANG_STATE__.normalizedLanguages',
         stage: "preflight",
         message: "normalized languages missing",
         data: { outcome: "skip", reason: "missing_normalizedLanguages", timezone: timezone }
@@ -159,7 +191,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       : null;
     if (typeof markAsNative !== "function") {
       diagPipeline("warn", "tz:missing_markAsNative", {
-        key: __flagKey,
+        key: "__ensureMarkAsNative",
         stage: "preflight",
         message: "__ensureMarkAsNative missing",
         data: { outcome: "skip", reason: "missing_dep_markAsNative", timezone: timezone }
@@ -243,7 +275,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       const nowOff = (new Date()).getTimezoneOffset();
       if (nowOff !== -offsetMinutes) {
         diagPipeline("error", "tz:offset_mismatch", {
-          key: __flagKey,
+          key:Date.prototype.getTimezoneOffset,
           stage: "preflight",
           message: "current timezone offset mismatch",
           data: { outcome: "skip", reason: "offset_mismatch", nowOff: nowOff, expected: -offsetMinutes, timezone: timezone }
@@ -253,7 +285,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       }
     } else {
       diagBrowser("warn", "tz:missing_getTimezoneOffset", {
-        key: __flagKey,
+        key: Date.prototype.getTimezoneOffset,
         stage: "preflight",
         message: "Date.prototype.getTimezoneOffset missing",
         data: { outcome: "skip", reason: "missing_getTimezoneOffset", timezone: timezone }
@@ -386,10 +418,6 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           try {
             options = Reflect.apply(origResolvedOptions, this, []);
           } catch (e) {
-            const nativeThrowMsg = (e && e.message) ? String(e.message) : "";
-            if (e instanceof TypeError && /(?:illegal invocation|incompatible receiver|called on incompatible receiver)/i.test(nativeThrowMsg)) {
-              throw e;
-            }
             diagBrowser("warn", "tz:IntlResolvedOptions:native_throw", {
               stage: "runtime",
               message: "native resolvedOptions threw",
@@ -495,7 +523,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       redefineMethod(Date.prototype, "toLocaleTimeString", patchedToLocaleTimeString, "tz:Date:toLocaleTimeString");
 
       diagPipeline("info", "tz:applied", {
-        key: __flagKey,
+        key: null,
         stage: "apply",
         message: "timezone patch applied",
         data: { outcome: "return", timezone: timezone, offsetMinutes: Number(offsetMinutes), locale: spoofedLocale }

@@ -211,6 +211,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   __fontsState.familySnapshot = __fontFamilySnapshot;
 
   const Core = window && window.Core;
+  const __fontNavPlatform = (typeof window.__NAV_PLATFORM__ === 'string' && window.__NAV_PLATFORM__)
+    ? window.__NAV_PLATFORM__
+    : null;
   if (!Core) {
     __fontDiagPipeline('warn', 'fonts:core_missing', {
       stage: 'preflight',
@@ -703,7 +706,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
   function getPlatformScopedFontConfigs(winArg) {
     const win = (winArg && (typeof winArg === 'object' || typeof winArg === 'function')) ? winArg : ((typeof window !== 'undefined') ? window : G);
-    const domPlat = (win && typeof win.__NAV_PLATFORM__ === 'string') ? win.__NAV_PLATFORM__ : null;
+    const domPlat = (win && typeof win.__NAV_PLATFORM__ === 'string')
+      ? win.__NAV_PLATFORM__
+      : __fontNavPlatform;
     const cfgs = Array.isArray(win && win.fontPatchConfigs) ? win.fontPatchConfigs : [];
     const hasPlatformDom = cfgs.some(f => f && typeof f.platform_dom === 'string');
     const filteredCfgs = (domPlat && hasPlatformDom) ? cfgs.filter(f => f && f.platform_dom === domPlat) : cfgs;
@@ -1357,7 +1362,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }], 'skip');
 })();
 
-  const domPlat = window.__NAV_PLATFORM__;
+  const domPlat = __fontNavPlatform;
   if (!domPlat) {
     // preflight soft-skip: keep awaitFontsReady as native document.fonts.ready where possible
     __fontDiagPipeline('warn', 'fonts:nav_platform_missing', {
@@ -1407,7 +1412,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     // в worker’е документа нет — выходим
     if (typeof document === 'undefined') return;
 
-    const domPlat = window.__NAV_PLATFORM__;
+    const domPlat = __fontNavPlatform;
     if (!domPlat) {
       __fontDiagPipeline('warn', 'fonts:dom_override_nav_platform_missing', {
         stage: 'preflight',
