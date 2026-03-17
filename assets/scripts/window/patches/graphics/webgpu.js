@@ -858,12 +858,12 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: adapter,
           key: 'info',
           kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
-          policy: 'strict',
+          policy: 'throw',
           diagTag: 'webgpu:adapter:info',
           validThis: validAdapterThis,
-          invalidThis: 'native',
+          invalidThis: 'throw',
           getImpl: function webgpuAdapterInfoGet(origGet) {
             if (__adapterInfoValueCache__.has(this)) {
               return __adapterInfoValueCache__.get(this);
@@ -885,12 +885,12 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: adapter,
           key: 'features',
           kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
-          policy: 'strict',
+          policy: 'throw',
           diagTag: 'webgpu:adapter:features',
           validThis: validAdapterThis,
-          invalidThis: 'native',
+          invalidThis: 'throw',
           getImpl: function webgpuAdapterFeaturesGet(origGet) {
             let nativeFeatures;
             try {
@@ -917,12 +917,12 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           owner: adapter,
           key: 'limits',
           kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
+          wrapLayer: 'core_wrapper',
           resolve: 'proto_chain',
-          policy: 'strict',
+          policy: 'throw',
           diagTag: 'webgpu:adapter:limits',
           validThis: validAdapterThis,
-          invalidThis: 'native',
+          invalidThis: 'throw',
           getImpl: function webgpuAdapterLimitsGet(origGet) {
             let nativeLimits;
             try {
@@ -990,16 +990,15 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       owner: gpu,
       key: 'requestAdapter',
       kind: 'promise_method',
-      wrapLayer: 'named_wrapper',
+      wrapLayer: 'core_wrapper',
       resolve: 'proto_chain',
       invokeClass: 'brand_strict',
-      allowNamedWrapperBrandStrict: true,
       policy: 'throw',
       diagTag: 'webgpu:navigator:requestAdapter',
       validThis: function validGPUThis(self) {
         return self === gpu;
       },
-      invalidThis: 'native',
+      invalidThis: 'throw',
       invoke: function webgpuRequestAdapterInvoke(orig, args) {
         const input = Array.isArray(args) ? args : [];
         let out;
