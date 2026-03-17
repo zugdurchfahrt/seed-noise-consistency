@@ -214,7 +214,8 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
 
 # ----------------------- function init_driver -----------------------
 def init_driver(
-    profile, country_data, platform, user_agent, screen_width, screen_height, webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
+    profile, country_data, platform, user_agent, screen_width, screen_height,
+    webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
     devices_conf, generated_platform, generated_platform_version, expected_client_hints, vendor_value, 
     language, normalized_languages, device_memory_value, hardware_concurrency_value, device_dpr_value,
     plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type, global_seed,
@@ -427,6 +428,13 @@ def init_driver(
             DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
             __DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
             })(window);
+            (function runBootstrapEnvCleanup(win) {
+                const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
+                    ? win.CanvasPatchContext
+                    : null;
+                if (!C || typeof C.__sanitizeBootstrapEnvSurface__ !== 'function') return;
+                C.__sanitizeBootstrapEnvSurface__(win);
+            })(window);
             """
         ]
         return "\n;\n".join(parts)
@@ -525,18 +533,6 @@ def init_driver(
             configurable: true,
             enumerable: false
         }},
-        __primaryLanguage: {{
-            value: {json.dumps(profile['language'], ensure_ascii=False)},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
-        __normalizedLanguages: {{
-            value: {json.dumps(profile['languages'], ensure_ascii=False)},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
         __cpu: {{
             value: {json.dumps(hardware_concurrency_value)},
             writable: true,
@@ -602,24 +598,20 @@ def init_driver(
             writable: true,
             configurable: true,
             enumerable: false
+        }},
+        __primaryLanguage: {{
+            value: {json.dumps(profile['language'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __normalizedLanguages: {{
+            value: {json.dumps(profile['languages'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
         }}
     }});
-
-    // Languages stable final setting (moved here to guarantee availability before nav_total_set.js)
-    // FrozenArray semantics (минимально приближенно): массив заморожен
-    if (Array.isArray(window.__normalizedLanguages)) {{
-        Object.freeze(window.__normalizedLanguages);
-    }}
-    // fail-fast: типы и консистентность
-    if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
-        throw new Error('THW: __primaryLanguage invalid');
-    }}
-    if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
-        throw new Error('THW: __normalizedLanguages invalid');
-    }}
-    if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
-        throw new Error('THW: language != languages[0]');
-    }}
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
@@ -1265,7 +1257,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.

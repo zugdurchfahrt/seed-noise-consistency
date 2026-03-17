@@ -6,6 +6,7 @@
   const __TYPE_PIPELINE = 'pipeline missing data';
   const __TYPE_BROWSER = 'browser structure missing data';
   const Core = g && g.Core;
+  const __uaSnapshot = (typeof g.__USER_AGENT === 'string' && g.__USER_AGENT) ? g.__USER_AGENT : null;
 
   // ---- NORMATIVE: local diag adapter (single gateway; no local normalization) ----
   const __loggerRoot = (g && g.CanvasPatchContext && g.CanvasPatchContext.__logger && typeof g.CanvasPatchContext.__logger === 'object')
@@ -285,7 +286,7 @@
       }
 
       const targets = [];
-      if (!(typeof g.__USER_AGENT === 'string' && g.__USER_AGENT)) {
+      if (!(typeof __uaSnapshot === 'string' && __uaSnapshot)) {
         __diagPipeline('warn', __tag + ':ua_missing', {
           diagTag: __tag,
           surface: __surface,
@@ -353,7 +354,7 @@
         invalidThis: 'native',
         getImpl: function getUAImpl(origGet){
           if (!isObj(this)) return Reflect.apply(origGet, this, []);
-          return g.__USER_AGENT;
+          return __uaSnapshot;
         }
       });
 

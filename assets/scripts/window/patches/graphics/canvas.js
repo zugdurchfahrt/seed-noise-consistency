@@ -45,6 +45,10 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 
 const C  = G.CanvasPatchContext;
 const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+const __canvasGlobalSeed = (typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) ? String(G.__GLOBAL_SEED) : '';
+const __canvasScreenWidth = Number(G.__WIDTH);
+const __canvasScreenHeight = Number(G.__HEIGHT);
+const __canvasDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : NaN;
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
     const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
@@ -82,7 +86,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return {
       seed: (state && typeof state.seed === 'string' && state.seed)
         ? state.seed
-        : ((typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) ? G.__GLOBAL_SEED : ''),
+        : __canvasGlobalSeed,
       strToSeed: (state && typeof state.strToSeed === 'function') ? state.strToSeed : null,
       mulberry32: (state && typeof state.mulberry32 === 'function') ? state.mulberry32 : null
     };
@@ -210,8 +214,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return;
     }
 
-    const screenWidth = G.__WIDTH;
-    const screenHeight = G.__HEIGHT;
+    const screenWidth = __canvasScreenWidth;
+    const screenHeight = __canvasScreenHeight;
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
       emitCanvasDiag('warn', 'canvas:init:preflight:screen_dims_missing', null, {
         stage: 'preflight',
@@ -292,8 +296,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (__canvasState.offscreenReady) return;
     if (typeof G.OffscreenCanvas === 'undefined') return;
 
-    const screenWidth = G.__WIDTH;
-    const screenHeight = G.__HEIGHT;
+    const screenWidth = __canvasScreenWidth;
+    const screenHeight = __canvasScreenHeight;
     if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
       emitCanvasDiag('warn', 'canvas:init:preflight:screen_dims_missing', null, {
         stage: 'preflight',
@@ -314,7 +318,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     __canvasState.offscreenReady = true;
   }
 
-  // Воркеру нужен Offscreen без ожидания DOM; в окне — это тоже безопасно
+  // Воркеру нужен Offscreen без ожидания DOM; в window — это тоже безопасно
   _ensureOffscreenOnce();
 
   // Фасад для окна: создаёт DOM и гарантирует Offscreen (идемпотентно)
@@ -445,8 +449,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     // Don't make any noise here, otherwise  "width" will ruin the consistency
     const dpr = (typeof devicePixelRatio === 'number' && devicePixelRatio > 0)
       ? +devicePixelRatio
-      : ((typeof globalThis !== 'undefined' && typeof globalThis.__DPR === 'number' && globalThis.__DPR > 0)
-          ? +globalThis.__DPR
+      : (Number.isFinite(__canvasDpr) && __canvasDpr > 0
+          ? __canvasDpr
           : undefined);
 
     const key = `${fStr}\u241F${txt}\u241F${dpr}`;
