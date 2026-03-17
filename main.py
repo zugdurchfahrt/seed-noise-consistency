@@ -66,7 +66,6 @@ import tools.tools_runtime.cdp_catapult as cdp
 import tools.tools_runtime.helpers as helpers_module
 import tools.tools_runtime.headers_adapter as headers_adapter_module
 import tools.tools_infra.vpn_utils as vpn_utils_module
-import tools.generators.rand_met as rand_met_module
 import profile_data_source.plugins_dict as plugins_dict_module
 from profile_data_source.plugins_dict import build_plugins_profile
 from tools.tools_runtime.helpers import (
@@ -81,6 +80,7 @@ from tools.tools_runtime.helpers import (
 from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
+from tools.generators.rand_met import generate_font_manifest
 # from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
@@ -234,18 +234,21 @@ def init_driver(
     chrome_options.add_argument(f"--user-agent={user_agent}")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
-    chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-features=CanvasNoise")
     vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
-    chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
-    if chrome_debug_port_raw.lower() in {"0", "auto"}:
-        raise ValueError("CHROME_DEBUG_PORT must be a fixed integer port")
-    try:
-        chrome_debug_port = int(chrome_debug_port_raw)
-    except ValueError as exc:
-        raise ValueError("CHROME_DEBUG_PORT must be an integer") from exc
-    chrome_options.debugger_address = f"127.0.0.1:{chrome_debug_port}"
+    if vscode_cdp_debug:
+        chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
+        if chrome_debug_port_raw.lower() in {"0", "auto"}:
+            raise ValueError("CHROME_DEBUG_PORT must be fixed when VSCODE_CDP_DEBUG=1")
+        try:
+            chrome_debug_port = int(chrome_debug_port_raw)
+        except ValueError as exc:
+            raise ValueError("CHROME_DEBUG_PORT must be an integer when VSCODE_CDP_DEBUG=1") from exc
+    else:
+        chrome_debug_port = 9222
+    chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
+    chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
     chrome_options.add_argument("--remote-allow-origins=*")
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -257,6 +260,7 @@ def init_driver(
     driver = uc.Chrome(
         driver_executable_path=CHROMEDRIVER_PATH,
         options=chrome_options,
+        port=chrome_debug_port,
     )
     logger.info("Initiating Webdriver...")
 
@@ -274,11 +278,14 @@ def init_driver(
                 return int(p.read_text(encoding="utf-8").splitlines()[0].strip())
             time.sleep(0.1)
 
+        # 3) fallback: твой желаемый порт
+        return chrome_debug_port
     
     cdp.PORT = _get_cdp_port(driver, USER_DATA_DIR)
     if vscode_cdp_debug and cdp.PORT != chrome_debug_port:
         raise RuntimeError(f"CDP port mismatch: requested {chrome_debug_port}, got {cdp.PORT}")
-    logger.info("Chrome DevTools port: %s", cdp.PORT)
+    if vscode_cdp_debug:
+        logger.info("Chrome DevTools port: %s", cdp.PORT)
           
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
@@ -326,7 +333,7 @@ def init_driver(
     )
 
     # --- Initial fonts patch ---
-    rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
+    generate_font_manifest(MANIFEST_PATH, platform)
       
     cdp.SW_META = expected_client_hints
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
@@ -866,7 +873,7 @@ def main():
     global global_seed, profile
     global_seed = uuid.uuid4().hex
     seed_int = _build_rng_pools(global_seed)
-    
+    os.environ['__GLOBAL_SEED'] = global_seed
     logger.info(f"Seed for the current session has been generated: {global_seed}")
 
     vpn_rng = seed_int["vpn"]
@@ -891,13 +898,11 @@ def main():
         country_data = data["country_data"]
        
         # -------- Getting PRNG random for each module -------------------
-       
         profile_rng = seed_int["profile"]
         plugins_rng = seed_int["plugins"]
         headers_rng = seed_int["headers"]
         helpers_module.random = profile_rng
         plugins_dict_module.random = plugins_rng
-        rand_met_module.set_global_seed(global_seed)
         
         if hasattr(headers_adapter_module, "_pick_nav_template"):
             headers_adapter_module._pick_nav_template.cache_clear()
