@@ -262,7 +262,6 @@ def init_driver(
         port=chrome_debug_port,
     )
     logger.info("Initiating Webdriver...")
-    driver._stealth_seed = global_seed
 
     def _get_cdp_port(driver, user_data_dir):
         # 1) самый надёжный вариант: debuggerAddress от chromedriver
@@ -287,10 +286,6 @@ def init_driver(
     if vscode_cdp_debug:
         logger.info("Chrome DevTools port: %s", cdp.PORT)
 
-
-
-
-          
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
         Centralized module for setting browser engine parameters via CDP.
@@ -877,7 +872,6 @@ def main():
     global global_seed, profile
     global_seed = uuid.uuid4().hex
     seed_int = _build_rng_pools(global_seed)
-    
     logger.info(f"Seed for the current session has been generated: {global_seed}")
 
     vpn_rng = seed_int["vpn"]
@@ -1269,9 +1263,9 @@ def main():
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
+        
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/fonts")
-
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.
