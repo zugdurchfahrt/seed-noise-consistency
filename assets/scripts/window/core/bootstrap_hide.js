@@ -290,7 +290,6 @@ __defineHiddenValue__(C, '__sanitizeBootstrapEnvSurface__', __sanitizeBootstrapE
     "__safeDefine",
     "__CORE_TOSTRING_STATE__",
     "__ensureMarkAsNative",
-    "__wrapNativeApply",
     "__wrapNativeAccessor",
     "__wrapStrictAccessor",
     "__wrapNativeCtor",

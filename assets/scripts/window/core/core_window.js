@@ -1667,6 +1667,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
+      safeDefine(Core, '__ensureMarkAsNative', {
+        value: ensureMarkAsNative,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       safeDefine(Core, '__wrapNativeApply', {
         value: __wrapNativeApply,
         writable: true,
