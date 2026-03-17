@@ -1543,49 +1543,11 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       const loaded = results.filter((r) => r.status === 'fulfilled').length;
       const failed = results.filter((r) => r.status === 'rejected').length;
 
-      // controlled settle: если native document.fonts.ready завис, разрываем pending через double RAF fallback
-      let nativeReadySettled = false;
-      const nativeReady = (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function')
-        ? Promise.resolve(document.fonts.ready)
-            .then(() => __doubleRafBarrier())
-            .then(() => {
-              nativeReadySettled = true;
-              return { kind: 'native_ready' };
-            }, (e) => {
-              nativeReadySettled = true;
-              throw e;
-            })
-        : Promise.resolve({ kind: 'native_ready_missing' });
-      const readyFallback = __doubleRafBarrier().then(() => ({ kind: 'fallback_raf' }));
-
-      return Promise.race([nativeReady, readyFallback]).then((readyInfo) => {
-          if (readyInfo && readyInfo.kind === 'fallback_raf') {
-            return __doubleRafBarrier().then(() => {
-              const nativeStatus = (document.fonts && typeof document.fonts.status === 'string') ? document.fonts.status : null;
-              const ownAwaitState = (__fontsState.awaitReadyStatus === 'pending')
-                ? __fontsState.awaitReadyStatus
-                : null;
-              if (!nativeReadySettled && ownAwaitState === 'pending' && nativeStatus === 'loading') {
-                __fontDiagPipeline('warn', 'fonts:await_ready_native_pending_fallback', {
-                  stage: 'runtime',
-                  diagTag: 'fonts',
-                  key: 'awaitFontsReady',
-                  message: 'document.fonts.ready pending; fallback settle used',
-                  data: {
-                    outcome: 'return',
-                    reason: 'await_ready_native_pending_fallback',
-                    loaded: loaded,
-                    failed: failed,
-                    nativeStatus: nativeStatus,
-                    ownAwaitState: ownAwaitState
-                  }
-                }, null);
-              }
-              return readyInfo;
-            });
-          }
-          return readyInfo;
-        }).then((readyInfo) => {
+      // strict settle: wait for native document.fonts.ready + double RAF before exposing fontsready
+      return Promise.resolve()
+        .then(() => (document.fonts && document.fonts.ready) || Promise.resolve())
+        .then(() => __doubleRafBarrier())
+        .then(() => {
           if (failed > 0) {
             const first = results.find((r) => r.status === 'rejected');
             const err = first && ('reason' in first) ? first.reason : new Error('font load failed');

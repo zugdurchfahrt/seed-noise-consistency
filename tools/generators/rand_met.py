@@ -27,9 +27,6 @@ MANIFEST_PATH       = ASSETS/ 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS/ 'JS_fonts_patch' / 'font_patch.generated.js'
 FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
-DESIGNER_BY_FAMILY_PATH = PROFILE_DATA_SOURCE / 'FONTS_DESIGNER_BY_FAMILY_JSON.json'
-LICENSE_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_LICENSE_BY_FAMILY_JSON.json'
-VERSION_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_VERSION_BY_FAMILY_JSON.json'
 # ----------------------- UTILS -----------------------
 SYS_FONTS_WIN = [
         'Arial', 'Aptos','Verdana','Tahoma','Times New Roman','Courier New','Georgia',
@@ -76,88 +73,38 @@ PUA_RANGES = [
 
 _MANIFEST_SEED = None
 _META_RNG = None
-_GLOBAL_SEED = None
-_DESIGNER_BY_FAMILY = None
-_LICENSE_BY_FAMILY = None
-_VERSION_BY_FAMILY = None
 
 
-def set_global_seed(seed: str) -> None:
-    global _GLOBAL_SEED
-    v = str(seed or "").strip()
+def _seed_env() -> str:
+    v = os.environ.get("__GLOBAL_SEED")
+    if v is None:
+        raise RuntimeError("[fonts] __GLOBAL_SEED env is required (missing)")
+    v = str(v).strip()
     if not v:
-        raise RuntimeError("[fonts] global seed is required")
-    _GLOBAL_SEED = v
-
-
-def _seed_value() -> str:
-    if _GLOBAL_SEED is None:
-        raise RuntimeError("[fonts] global seed is required (not initialized)")
-    v = str(_GLOBAL_SEED).strip()
-    if not v:
-        raise RuntimeError("[fonts] global seed is required (empty)")
+        raise RuntimeError("[fonts] __GLOBAL_SEED env is required (empty)")
     return v
 
 
 def _seed_namespace() -> str:
-    raw = _seed_value()
+    raw = _seed_env()
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", raw).strip("._-")
     if not safe:
-        raise RuntimeError("[fonts] global seed is not usable for namespace (sanitized to empty)")
+        raise RuntimeError("[fonts] __GLOBAL_SEED env is not usable for namespace (sanitized to empty)")
     return safe
 
 
 def _rng_for_manifest(platform: str, all_names: list) -> random.Random:
     global _MANIFEST_SEED
-    _MANIFEST_SEED = _seed_value()
+    seed_env = _seed_env()
+    _seed_src = f"{seed_env}|{platform}|" + "|".join(sorted(all_names))
+    _MANIFEST_SEED = int(hashlib.md5(_seed_src.encode("utf-8")).hexdigest()[:8], 16)
     return random.Random(_MANIFEST_SEED)
-
-
-def _rng_for_meta(platform: str, fingerprint_names: list) -> random.Random:
-    return random.Random(_seed_value())
 
 
 def _meta_rng() -> random.Random:
     if _META_RNG is None:
         raise RuntimeError("[fonts] META_RNG is required (not initialized)")
     return _META_RNG
-
-
-def _load_family_mapping(path: pathlib.Path, cache_name: str) -> dict:
-    cached = globals().get(cache_name)
-    if cached is not None:
-        return cached
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as e:
-        raise RuntimeError(f"[fonts] failed to load family mapping {path}: {e}") from e
-    if not isinstance(data, dict):
-        raise RuntimeError(f"[fonts] family mapping must be a JSON object: {path}")
-    globals()[cache_name] = data
-    return data
-
-
-def _family_mapping_value(path: pathlib.Path, cache_name: str, family: str) -> str | None:
-    mapping = _load_family_mapping(path, cache_name)
-    family_norm = _normalize_whitespace(family)
-    if not family_norm:
-        return None
-    if family_norm in mapping:
-        value = mapping[family_norm]
-    else:
-        value = None
-        lookup_key = family_norm.casefold()
-        for key, item in mapping.items():
-            if isinstance(key, str) and _normalize_whitespace(key).casefold() == lookup_key:
-                value = item
-                break
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise RuntimeError(f"[fonts] family mapping value must be a string for {family_norm}: {path}")
-    value_norm = _normalize_whitespace(value)
-    return value_norm or None
 
 
 
@@ -506,13 +453,10 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     subfamily = rng.choice(subfamilies)
     unique_id = f"{family[:2]}-{random_string(12)}"
     full_name = f"{family} {subfamily}".strip()
-    fallback_version = f"Version {rng.randint(1,5)}.{rng.randint(0,9999)}"
+    version = f"Version {rng.randint(1,5)}.{rng.randint(0,9999)}"
     ps_name = f"{family}-{subfamily}".replace(" ", "")
-    fallback_designer = rng.choice(designers)
-    fallback_license_desc = rng.choice(licenses)
-    version = _family_mapping_value(VERSION_BY_FAMILY_PATH, "_VERSION_BY_FAMILY", family) or fallback_version
-    designer = _family_mapping_value(DESIGNER_BY_FAMILY_PATH, "_DESIGNER_BY_FAMILY", family) or fallback_designer
-    license_desc = _family_mapping_value(LICENSE_BY_FAMILY_PATH, "_LICENSE_BY_FAMILY", family) or fallback_license_desc
+    designer = rng.choice(designers)
+    license_desc = rng.choice(licenses)
 
     return {
         1: family,
@@ -549,7 +493,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         raise ValueError(f"[fonts] Unknown platform: {platform}")
 
     # Fail-fast: seed is a required session parameter (before any filesystem mutations).
-    _seed_value()
+    _seed_env()
 
     # === Step 1: Copy new files from fonts_raw → target_dir ===
     target_dir = get_target_dir_for(platform)
@@ -638,7 +582,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         logger.warning(f'[WARNING] for {platform} is no .woff2 in {target_dir}')
         return []
 
-    # Stabilized seed from the shared __GLOBAL_SEED derivation path.
+    # Stabilized seed for manifest(env + platform + file composition)
     _rng = _rng_for_manifest(platform, all_names)
     _seed = _MANIFEST_SEED
     if _seed is None:
@@ -674,7 +618,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     try:
         global _META_RNG
         _prev_meta_rng = _META_RNG
-        _META_RNG = _rng_for_meta(platform, fingerprint_names)
+        _META_RNG = random.Random(_seed)
         for fname in fingerprint_names:
             rec = files_map.get(fname)
             if not rec:

@@ -235,7 +235,6 @@ def init_driver(
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-features=CanvasNoise")
     vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
     if vscode_cdp_debug:
         chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
@@ -263,6 +262,7 @@ def init_driver(
         port=chrome_debug_port,
     )
     logger.info("Initiating Webdriver...")
+    driver._stealth_seed = global_seed
 
     def _get_cdp_port(driver, user_data_dir):
         # 1) самый надёжный вариант: debuggerAddress от chromedriver
@@ -286,6 +286,10 @@ def init_driver(
         raise RuntimeError(f"CDP port mismatch: requested {chrome_debug_port}, got {cdp.PORT}")
     if vscode_cdp_debug:
         logger.info("Chrome DevTools port: %s", cdp.PORT)
+
+
+
+
           
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
@@ -343,7 +347,7 @@ def init_driver(
     logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
 
-    # Inject global seed into Dedicated/Shared workers via CDP as CDP_GLOBAL_SEED (pauses workers on start).
+    # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
     # if the CDP websocket drops mid-session, paused workers may remain paused.
     if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
         cdp.enable_worker_seed_inject(global_seed)
@@ -1265,7 +1269,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/fonts")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/fonts.html")
 
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
