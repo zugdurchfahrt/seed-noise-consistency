@@ -88,10 +88,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       : null;
     return {
       ready: state.ready === true,
-      pageReady: state.pageReady === true,
-      pageReadyReason: Object.prototype.hasOwnProperty.call(state, 'pageReadyReason') ? state.pageReadyReason : null,
-      glyphReady: state.glyphReady === true,
-      glyphReadyReason: Object.prototype.hasOwnProperty.call(state, 'glyphReadyReason') ? state.glyphReadyReason : null,
       error: Object.prototype.hasOwnProperty.call(state, 'error') ? state.error : null,
       awaitReady: state.awaitReady || null,
       awaitReadyStatus: state.awaitReadyStatus || null,
@@ -139,10 +135,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
     const state = {
       ready: false,
-      pageReady: false,
-      pageReadyReason: null,
-      glyphReady: false,
-      glyphReadyReason: null,
       error: null,
       awaitReady: null,
       awaitReadyStatus: null,
@@ -174,10 +166,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   if (!__fontsState) return;
 
   if (__fontsState.ready !== true) __fontsState.ready = false;
-  if (__fontsState.pageReady !== true) __fontsState.pageReady = false;
-  if (!Object.prototype.hasOwnProperty.call(__fontsState, 'pageReadyReason')) __fontsState.pageReadyReason = null;
-  if (__fontsState.glyphReady !== true) __fontsState.glyphReady = false;
-  if (!Object.prototype.hasOwnProperty.call(__fontsState, 'glyphReadyReason')) __fontsState.glyphReadyReason = null;
   if (!Object.prototype.hasOwnProperty.call(__fontsState, 'error')) __fontsState.error = null;
   if (!Object.prototype.hasOwnProperty.call(__fontsState, 'awaitReady')) __fontsState.awaitReady = null;
   if (!Object.prototype.hasOwnProperty.call(__fontsState, 'awaitReadyStatus')) __fontsState.awaitReadyStatus = null;
@@ -435,10 +423,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   function __restoreFontsStateValue(snapshot) {
     if (!snapshot || !__fontsState || typeof __fontsState !== 'object') return;
     __fontsState.ready = snapshot.ready === true;
-    __fontsState.pageReady = snapshot.pageReady === true;
-    __fontsState.pageReadyReason = Object.prototype.hasOwnProperty.call(snapshot, 'pageReadyReason') ? snapshot.pageReadyReason : null;
-    __fontsState.glyphReady = snapshot.glyphReady === true;
-    __fontsState.glyphReadyReason = Object.prototype.hasOwnProperty.call(snapshot, 'glyphReadyReason') ? snapshot.glyphReadyReason : null;
     __fontsState.error = Object.prototype.hasOwnProperty.call(snapshot, 'error') ? snapshot.error : null;
     __fontsState.awaitReady = snapshot.awaitReady || null;
     __fontsState.awaitReadyStatus = snapshot.awaitReadyStatus || null;
@@ -512,7 +496,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   function __runFontsHidePass() {
     __hideLegacyFontSurface('awaitFontsReady');
     __hideLegacyFontSurface('__FONTS_READY__');
-    __hideLegacyFontSurface('__FONTS_GLYPH_READY__');
     __hideLegacyFontSurface('__FONTS_ERROR__');
   }
 
@@ -537,85 +520,17 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
   }
 
-  function __syncFontsStatusMirrors() {
-    try {
-      Object.defineProperty(window, '__FONTS_READY__', {
-        value: __fontsState.pageReady === true,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:ready_mirror_define_failed', {
-        stage: 'apply',
-        diagTag: 'fonts:data:__FONTS_READY__',
-        key: '__FONTS_READY__',
-        message: '__FONTS_READY__ mirror define failed',
-        data: { outcome: 'throw', reason: 'ready_mirror_define_failed' }
-      }, e);
-      return false;
-    }
-    try {
-      Object.defineProperty(window, '__FONTS_GLYPH_READY__', {
-        value: __fontsState.glyphReady === true,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:glyph_ready_mirror_define_failed', {
-        stage: 'apply',
-        diagTag: 'fonts:data:__FONTS_GLYPH_READY__',
-        key: '__FONTS_GLYPH_READY__',
-        message: '__FONTS_GLYPH_READY__ mirror define failed',
-        data: { outcome: 'throw', reason: 'glyph_ready_mirror_define_failed' }
-      }, e);
-      return false;
-    }
-    try {
-      Object.defineProperty(window, '__FONTS_ERROR__', {
-        value: (__fontsState.error == null) ? null : __fontsState.error,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      return true;
-    } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:error_mirror_define_failed', {
-        stage: 'apply',
-        diagTag: 'fonts:data:__FONTS_ERROR__',
-        key: '__FONTS_ERROR__',
-        message: '__FONTS_ERROR__ mirror define failed',
-        data: { outcome: 'throw', reason: 'error_mirror_define_failed' }
-      }, e);
-      return false;
-    }
-  }
-
   function __setFontsAwaitState(promiseValue, status, resolveFn, rejectFn) {
     __fontsState.awaitReady = promiseValue || null;
     __fontsState.awaitReadyStatus = status || null;
     __fontsState.awaitReadyResolve = (typeof resolveFn === 'function') ? resolveFn : null;
     __fontsState.awaitReadyReject = (typeof rejectFn === 'function') ? rejectFn : null;
-    return (__syncAwaitFontsMirror() && __syncFontsStatusMirrors());
+    return __syncAwaitFontsMirror();
   }
 
   function __setFontsRuntimeState(readyValue, errorValue) {
     __fontsState.ready = readyValue === true;
     __fontsState.error = (errorValue == null) ? null : errorValue;
-    return __syncFontsStatusMirrors();
-  }
-
-  function __setFontsPageState(readyValue, reasonValue) {
-    __fontsState.pageReady = readyValue === true;
-    __fontsState.pageReadyReason = (typeof reasonValue === 'string' && reasonValue) ? reasonValue : null;
-    return __syncFontsStatusMirrors();
-  }
-
-  function __setFontsGlyphState(readyValue, reasonValue) {
-    __fontsState.glyphReady = readyValue === true;
-    __fontsState.glyphReadyReason = (typeof reasonValue === 'string' && reasonValue) ? reasonValue : null;
-    return __syncFontsStatusMirrors();
   }
 
   function __releaseGuardOnSkip(message, key, reason) {
@@ -676,8 +591,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     awaitFontsReadyDesc: Object.getOwnPropertyDescriptor(window, 'awaitFontsReady') || null,
     fontsReadyOwn: Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__'),
     fontsReadyDesc: Object.getOwnPropertyDescriptor(window, '__FONTS_READY__') || null,
-    fontsGlyphReadyOwn: Object.prototype.hasOwnProperty.call(window, '__FONTS_GLYPH_READY__'),
-    fontsGlyphReadyDesc: Object.getOwnPropertyDescriptor(window, '__FONTS_GLYPH_READY__') || null,
     fontsErrorOwn: Object.prototype.hasOwnProperty.call(window, '__FONTS_ERROR__'),
     fontsErrorDesc: Object.getOwnPropertyDescriptor(window, '__FONTS_ERROR__') || null
   };
@@ -701,9 +614,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   (function exposeFontsReady(){
     const hasDocFonts = (typeof document === 'object' && document && document.fonts && document.fonts.ready);
 
-    // В window-ветке:
-    // - __fontsState.ready = внутренняя готовность патча для glyph/text metrics
-    // - awaitFontsReady = внешняя готовность страницы; не должна висеть бесконечно
+    // В window-ветке нам нужна "внешне резолвимая" точка
     if (hasDocFonts) {
       if (!__fontsState.awaitReady || typeof __fontsState.awaitReady.then !== 'function' || __fontsState.awaitReadyStatus !== 'pending') {
         let resolveFn, rejectFn;
@@ -714,12 +625,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       } else if (!__syncAwaitFontsMirror()) {
         throw new Error('awaitFontsReady mirror define failed');
       }
-      if (!__setFontsPageState(false, 'pending_external')) {
-        throw new Error('__FONTS_READY__ mirror define failed');
-      }
-      if (!__setFontsGlyphState(false, 'pending_glyph')) {
-        throw new Error('__FONTS_GLYPH_READY__ mirror define failed');
-      }
       return;
     }
     // В non-window (worker) НЕ подменяем нативный ready на pending-промис, который никто не резолвит
@@ -727,21 +632,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       if (!__setFontsAwaitState(window.fonts.ready, 'native', null, null)) {
         throw new Error('awaitFontsReady mirror define failed');
       }
-      if (!__setFontsPageState(true, 'native_passthrough')) {
-        throw new Error('__FONTS_READY__ mirror define failed');
-      }
-      if (!__setFontsGlyphState(true, 'native_passthrough')) {
-        throw new Error('__FONTS_GLYPH_READY__ mirror define failed');
-      }
     } else {
       if (!__setFontsAwaitState(Promise.resolve(), 'native', null, null)) {
         throw new Error('awaitFontsReady mirror define failed');
-      }
-      if (!__setFontsPageState(true, 'native_passthrough')) {
-        throw new Error('__FONTS_READY__ mirror define failed');
-      }
-      if (!__setFontsGlyphState(true, 'native_passthrough')) {
-        throw new Error('__FONTS_GLYPH_READY__ mirror define failed');
       }
     }
   })();
@@ -1482,8 +1375,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     try {
       if (typeof document === 'object' && document && document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
         __setFontsAwaitState(document.fonts.ready, 'native', null, null);
-        __setFontsPageState(true, 'native_passthrough');
-        __setFontsGlyphState(true, 'native_passthrough');
       }
     } catch (eRestore) {
       degrade('fonts:await_ready_restore_failed', eRestore);
@@ -1651,82 +1542,23 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     ).then((results) => {
       const loaded = results.filter((r) => r.status === 'fulfilled').length;
       const failed = results.filter((r) => r.status === 'rejected').length;
-      const nativeReadyBarrier = Promise.resolve()
+
+      // strict settle: wait for native document.fonts.ready + double RAF before exposing fontsready
+      return Promise.resolve()
         .then(() => (document.fonts && document.fonts.ready) || Promise.resolve())
         .then(() => __doubleRafBarrier())
-        .then(() => ({ reason: 'native_ready' }));
-      const glyphReadyBarrier = nativeReadyBarrier
-        .then(() => __doubleRafBarrier())
-        .then(() => ({ reason: 'glyph_native_ready' }));
-      let nativeReadySettled = false;
-      nativeReadyBarrier.then(() => {
-        nativeReadySettled = true;
-      }, () => {
-        nativeReadySettled = true;
-      });
-      const managedReadyBarrier = __doubleRafBarrier().then(() => ({ reason: 'managed_ready' }));
-
-      // Internal readiness is bounded by managed font load + visual settle.
-      // External readiness never waits forever once internal readiness has been reached.
-      return managedReadyBarrier
         .then(() => {
           if (failed > 0) {
-            return { failed: failed, loaded: loaded, releaseReason: null };
-          }
-          if (!__setFontsRuntimeState(true, null)) {
-            throw new Error('__FONTS_ERROR__ mirror define failed');
-          }
-          glyphReadyBarrier.then((glyphInfo) => {
-            if (!__setFontsGlyphState(true, (glyphInfo && glyphInfo.reason) ? glyphInfo.reason : 'glyph_native_ready')) {
-              throw new Error('__FONTS_GLYPH_READY__ mirror define failed');
-            }
-            try {
-              if (window.dispatchEvent) window.dispatchEvent(new Event('fontsglyphready'));
-            } catch (eEvt) {
-              degrade('fonts:glyph:event:dispatch_failed', eEvt);
-            }
-            __fontDiagPipeline('info', 'fonts:glyph_ready', {
-              stage: 'runtime',
-              diagTag: 'fonts',
-              key: 'document.fonts',
-              message: 'glyph/render ready settled',
-              data: {
-                outcome: 'return',
-                loaded: loaded,
-                failed: failed,
-                glyphReason: (glyphInfo && glyphInfo.reason) ? glyphInfo.reason : 'glyph_native_ready'
-              }
-            }, null);
-          }).catch((glyphErr) => {
-            __setFontsGlyphState(false, 'glyph_pending_native');
-            __fontDiagBrowser('warn', 'fonts:glyph_ready_failed', {
-              stage: 'runtime',
-              diagTag: 'fonts',
-              key: 'document.fonts',
-              message: 'glyph/render ready failed',
-              data: { outcome: 'skip', reason: 'glyph_ready_failed' }
-            }, glyphErr);
-          });
-          return (nativeReadySettled ? nativeReadyBarrier : Promise.resolve({ reason: 'managed_ready' }))
-            .then((releaseInfo) => ({
-              failed: failed,
-              loaded: loaded,
-              releaseReason: (releaseInfo && releaseInfo.reason) ? releaseInfo.reason : 'managed_ready'
-            }));
-        })
-        .then((state) => {
-          if (!state || state.failed > 0) {
             const first = results.find((r) => r.status === 'rejected');
             const err = first && ('reason' in first) ? first.reason : new Error('font load failed');
 
+            __setFontsRuntimeState(false, null);
             try {
               __fontsState.error = String((err && (err.stack || err.message)) || err);
             } catch (eSet) {
               degrade('fonts:data:set_error_failed', eSet);
             }
-            __setFontsRuntimeState(false, __fontsState.error);
-            __setFontsPageState(false, 'managed_failed');
-            __setFontsGlyphState(false, 'managed_failed');
+
             __settleAwaitFontsReady('rejected', err);
             __fontDiagBrowser('warn', 'fonts:load_settled_with_failures', {
               stage: 'runtime',
@@ -1738,12 +1570,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             return;
           }
 
-          __setFontsPageState(true, state.releaseReason || 'managed_ready');
-          __settleAwaitFontsReady('resolved', {
-            releaseReason: state.releaseReason || 'managed_ready',
-            loaded: state.loaded,
-            failed: state.failed
-          });
+          __setFontsRuntimeState(true, null);
+          __settleAwaitFontsReady('resolved');
           try {
             if (window.dispatchEvent) window.dispatchEvent(new Event('fontsready'));
           } catch (eEvt) {
@@ -1753,25 +1581,18 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
              stage: 'runtime',
              diagTag: 'fonts',
              key: 'document.fonts',
-              message: 'font load settled',
-              data: {
-                outcome: 'return',
-                loaded: state.loaded,
-                failed: state.failed,
-                releaseReason: state.releaseReason || 'managed_ready'
-              }
-             }, null);
+             message: 'font load settled',
+             data: { outcome: 'return', loaded: loaded, failed: failed }
+            }, null);
           });
     }).catch((e) => {
       // no "наружу": перехватываем неожиданные промис-ошибки и оставляем нативное состояние
-      __setFontsPageState(false, 'unexpected_rejection');
-      __setFontsGlyphState(false, 'unexpected_rejection');
+      __setFontsRuntimeState(false, null);
       try {
         __fontsState.error = String((e && (e.stack || e.message)) || e);
       } catch (eSet) {
         degrade('fonts:data:set_error_failed', eSet);
       }
-      __setFontsRuntimeState(false, __fontsState.error);
       try {
         __settleAwaitFontsReady('rejected', e);
       } catch (eRej) {
@@ -1838,13 +1659,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           }
         } else {
           delete window.__FONTS_READY__;
-        }
-        if (__rollbackSnapshot.fontsGlyphReadyOwn) {
-          if (__rollbackSnapshot.fontsGlyphReadyDesc) {
-            Object.defineProperty(window, '__FONTS_GLYPH_READY__', __rollbackSnapshot.fontsGlyphReadyDesc);
-          }
-        } else {
-          delete window.__FONTS_GLYPH_READY__;
         }
         if (__rollbackSnapshot.fontsErrorOwn) {
           if (__rollbackSnapshot.fontsErrorDesc) {
