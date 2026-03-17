@@ -70,9 +70,84 @@ const CoreWindowModule = function CoreWindowModule(window) {
   const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
   const existingToString = fpToStringDesc && fpToStringDesc.value;
 
-  const nativeToString = (typeof existingToString === 'function')
+  const existingCoreToStringState = window && window.__CORE_TOSTRING_STATE__;
+  const existingCoreToStringStateOk = !!(existingCoreToStringState
+    && existingCoreToStringState.__CORE_TOSTRING_STATE__ === true
+    && typeof existingCoreToStringState.nativeToString === 'function'
+    && (existingCoreToStringState.overrideMap instanceof WeakMap)
+    && (existingCoreToStringState.proxyTargetMap instanceof WeakMap));
+
+  let sharedCoreToStringState = existingCoreToStringStateOk ? existingCoreToStringState : null;
+  if (!sharedCoreToStringState) {
+    try {
+      const parentWin = window && window.parent;
+      const parentState = (parentWin && parentWin !== window) ? parentWin.__CORE_TOSTRING_STATE__ : null;
+      const parentOk = !!(parentState
+        && parentState.__CORE_TOSTRING_STATE__ === true
+        && typeof parentState.nativeToString === 'function'
+        && (parentState.overrideMap instanceof WeakMap)
+        && (parentState.proxyTargetMap instanceof WeakMap));
+      if (parentOk) {
+        sharedCoreToStringState = parentState;
+      }
+    } catch (e) {
+      __emit('warn', 'core_window:toString_parent_state_access_failed', {
+        module: 'core',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: '__CORE_TOSTRING_STATE__',
+        stage: 'preflight',
+        message: 'parent state access failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'return', fallback: 'local' }
+      }, e);
+    }
+  }
+
+  const toStringOverrideMap = sharedCoreToStringState
+    ? sharedCoreToStringState.overrideMap
+    : new WeakMap();
+  const toStringProxyTargetMap = sharedCoreToStringState
+    ? sharedCoreToStringState.proxyTargetMap
+    : new WeakMap();
+
+  const currentRealmToString = (typeof existingToString === 'function')
     ? existingToString
     : Function.prototype.toString;
+
+  function resolveToStringBridgeTarget(candidate) {
+    if (typeof candidate !== 'function') return null;
+    let bridgeTarget = candidate;
+    const seenBridgeTargets = new WeakSet();
+    while (typeof bridgeTarget === 'function') {
+      if (seenBridgeTargets.has(bridgeTarget)) {
+        __emit('warn', 'core_window:toString_native_candidate_cycle', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'preflight',
+          message: 'nativeToString candidate chain cycle detected; fallback to current realm toString',
+          type: 'contract violation',
+          data: { outcome: 'return', fallback: 'current_realm_toString' }
+        }, new Error('[CoreWindow] nativeToString candidate cycle'));
+        return null;
+      }
+      seenBridgeTargets.add(bridgeTarget);
+      const nextTarget = toStringProxyTargetMap.get(bridgeTarget);
+      if (typeof nextTarget !== 'function') break;
+      bridgeTarget = nextTarget;
+    }
+    return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
+  }
+
+  const nativeToStringCandidate = sharedCoreToStringState
+    ? sharedCoreToStringState.nativeToString
+    : currentRealmToString;
+
+  const nativeToString = resolveToStringBridgeTarget(nativeToStringCandidate)
+    || resolveToStringBridgeTarget(currentRealmToString)
+    || null;
 
   if (typeof nativeToString !== 'function') {
     throw new Error('[CoreWindow] Function.prototype.toString missing');
@@ -81,6 +156,27 @@ const CoreWindowModule = function CoreWindowModule(window) {
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
+    try {
+      const mapped = toStringProxyTargetMap.get(func);
+      if (typeof mapped === 'function') func = mapped;
+      const nativeName = name || func.name || "";
+      const label = nativeName
+        ? `function ${nativeName}() { [native code] }`
+        : 'function () { [native code] }';
+      toStringOverrideMap.set(func, label);
+    } catch (e) {
+      __emit('error', 'core_window:WeakMap.set', {
+        module: 'core',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: 'Function.prototype.toString',
+        stage: 'apply',
+        message: 'WeakMap.set failed in toString override map',
+        type: 'apply_failed',
+        data: { outcome: 'throw' }
+      }, e);
+      throw e;
+    }
     return func;
   }
 
@@ -89,6 +185,24 @@ const CoreWindowModule = function CoreWindowModule(window) {
     if (memoMarkAsNative) return memoMarkAsNative;
     memoMarkAsNative = baseMarkAsNative;
     return memoMarkAsNative;
+  }
+
+  function publishCoreToStringState() {
+    safeDefine(window, '__CORE_TOSTRING_STATE__', {
+      value: {
+        __CORE_TOSTRING_STATE__: true,
+        nativeToString: nativeToString,
+        overrideMap: toStringOverrideMap,
+        proxyTargetMap: toStringProxyTargetMap
+      },
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+  }
+
+  if (!existingCoreToStringStateOk) {
+    publishCoreToStringState();
   }
 
   if (typeof window.__ensureMarkAsNative !== 'function') {
@@ -127,6 +241,26 @@ const CoreWindowModule = function CoreWindowModule(window) {
       );
     }
     return m;
+  }
+
+  function __resolveWrappedBridgeTarget(nativeFn, wrapperName) {
+    let bridgeTarget = (nativeFn && typeof nativeFn.__coreBridgeTarget__ === 'function')
+      ? nativeFn.__coreBridgeTarget__
+      : nativeFn;
+    const seenBridgeTargets = new WeakSet();
+    while (typeof bridgeTarget === 'function') {
+      if (seenBridgeTargets.has(bridgeTarget)) {
+        throw new Error(`[CoreWindow] ${wrapperName}: proxyTargetMap cycle`);
+      }
+      seenBridgeTargets.add(bridgeTarget);
+      const nextTarget = toStringProxyTargetMap.get(bridgeTarget);
+      if (typeof nextTarget !== 'function') break;
+      bridgeTarget = nextTarget;
+    }
+    if (typeof bridgeTarget !== 'function') {
+      throw new TypeError(`[CoreWindow] ${wrapperName}: bridge target must be function`);
+    }
+    return bridgeTarget;
   }
 
   function __exportWrapFactory(exportName, exportValue) {
@@ -169,7 +303,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }
     });
     try {
-      markAsNative(wrapped, name || nativeFn.name || "");
+      const bridgeTarget = __resolveWrappedBridgeTarget(nativeFn, '__wrapNativeApply');
+      toStringProxyTargetMap.set(wrapped, bridgeTarget);
+      const wrappedName = name || nativeFn.name || "";
+      const nativeName = bridgeTarget.name || "";
+      markAsNative(bridgeTarget, nativeName);
+      const wrappedLabel = wrappedName
+        ? `function ${wrappedName}() { [native code] }`
+        : 'function () { [native code] }';
+      toStringOverrideMap.set(wrapped, wrappedLabel);
+      if (toStringProxyTargetMap.get(wrapped) !== bridgeTarget || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
+        throw new Error('[CoreWindow] __wrapNativeApply: bridge registration failed');
+      }
     } catch (e) {
       __emit('error', 'core_window:wrapNativeApply:mark_failed', {
         module: 'core',
@@ -207,7 +352,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
       }
     });
     try {
-      markAsNative(wrapped, name || nativeFn.name || "");
+      const bridgeTarget = __resolveWrappedBridgeTarget(nativeFn, '__wrapNativeCtor');
+      toStringProxyTargetMap.set(wrapped, bridgeTarget);
+      const wrappedName = name || nativeFn.name || "";
+      const nativeName = bridgeTarget.name || "";
+      markAsNative(bridgeTarget, nativeName);
+      const wrappedLabel = wrappedName
+        ? `function ${wrappedName}() { [native code] }`
+        : 'function () { [native code] }';
+      toStringOverrideMap.set(wrapped, wrappedLabel);
+      if (toStringProxyTargetMap.get(wrapped) !== bridgeTarget || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
+        throw new Error('[CoreWindow] __wrapNativeCtor: bridge registration failed');
+      }
     } catch (e) {
       __emit('error', 'core_window:wrapNativeCtor:mark_failed', {
         module: 'core',

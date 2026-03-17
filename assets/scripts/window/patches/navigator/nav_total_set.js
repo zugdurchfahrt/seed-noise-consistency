@@ -943,7 +943,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         validThis: __isNavigatorThis,
         invalidThis: 'native',
         getImpl: function navStrictScalarGetImpl() {
-          __navLogAccess(key, null);
+          __navLogAccess(key, null, { bucket: 'strict_accessor_gateway' });
           return getter.call(this);
         }
       }], 'throw');
@@ -994,7 +994,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         validThis: __isNavigatorThis,
         invalidThis: 'native',
         getImpl: function navObjectReturnGetImpl() {
-          __navLogAccess(key, null);
+          __navLogAccess(key, null, { bucket: 'object_return_gateway' });
           return getter.call(this);
         }
       }], 'throw');
