@@ -73,31 +73,37 @@ PUA_RANGES = [
 
 _MANIFEST_SEED = None
 _META_RNG = None
+_GLOBAL_SEED = None
 
 
-def _seed_env() -> str:
-    v = os.environ.get("__GLOBAL_SEED")
-    if v is None:
-        raise RuntimeError("[fonts] __GLOBAL_SEED env is required (missing)")
-    v = str(v).strip()
+def set_global_seed(seed: str) -> None:
+    global _GLOBAL_SEED
+    v = str(seed or "").strip()
     if not v:
-        raise RuntimeError("[fonts] __GLOBAL_SEED env is required (empty)")
+        raise RuntimeError("[fonts] global seed is required")
+    _GLOBAL_SEED = v
+
+
+def _seed_value() -> str:
+    if _GLOBAL_SEED is None:
+        raise RuntimeError("[fonts] global seed is required (not initialized)")
+    v = str(_GLOBAL_SEED).strip()
+    if not v:
+        raise RuntimeError("[fonts] global seed is required (empty)")
     return v
 
 
 def _seed_namespace() -> str:
-    raw = _seed_env()
+    raw = _seed_value()
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", raw).strip("._-")
     if not safe:
-        raise RuntimeError("[fonts] __GLOBAL_SEED env is not usable for namespace (sanitized to empty)")
+        raise RuntimeError("[fonts] global seed is not usable for namespace (sanitized to empty)")
     return safe
 
 
 def _rng_for_manifest(platform: str, all_names: list) -> random.Random:
     global _MANIFEST_SEED
-    seed_env = _seed_env()
-    _seed_src = f"{seed_env}|{platform}|" + "|".join(sorted(all_names))
-    _MANIFEST_SEED = int(hashlib.md5(_seed_src.encode("utf-8")).hexdigest()[:8], 16)
+    _MANIFEST_SEED = _seed_value()
     return random.Random(_MANIFEST_SEED)
 
 
@@ -493,7 +499,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         raise ValueError(f"[fonts] Unknown platform: {platform}")
 
     # Fail-fast: seed is a required session parameter (before any filesystem mutations).
-    _seed_env()
+    _seed_value()
 
     # === Step 1: Copy new files from fonts_raw → target_dir ===
     target_dir = get_target_dir_for(platform)
@@ -582,7 +588,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         logger.warning(f'[WARNING] for {platform} is no .woff2 in {target_dir}')
         return []
 
-    # Stabilized seed for manifest(env + platform + file composition)
+    # Stabilized seed from the shared global seed path.
     _rng = _rng_for_manifest(platform, all_names)
     _seed = _MANIFEST_SEED
     if _seed is None:

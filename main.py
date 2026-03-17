@@ -66,6 +66,7 @@ import tools.tools_runtime.cdp_catapult as cdp
 import tools.tools_runtime.helpers as helpers_module
 import tools.tools_runtime.headers_adapter as headers_adapter_module
 import tools.tools_infra.vpn_utils as vpn_utils_module
+import tools.generators.rand_met as rand_met_module
 import profile_data_source.plugins_dict as plugins_dict_module
 from profile_data_source.plugins_dict import build_plugins_profile
 from tools.tools_runtime.helpers import (
@@ -80,7 +81,6 @@ from tools.tools_runtime.helpers import (
 from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
-from tools.generators.rand_met import generate_font_manifest
 # from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
@@ -337,7 +337,7 @@ def init_driver(
     )
 
     # --- Initial fonts patch ---
-    generate_font_manifest(MANIFEST_PATH, platform)
+    rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
       
     cdp.SW_META = expected_client_hints
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
@@ -877,7 +877,7 @@ def main():
     global global_seed, profile
     global_seed = uuid.uuid4().hex
     seed_int = _build_rng_pools(global_seed)
-    os.environ['__GLOBAL_SEED'] = global_seed
+    
     logger.info(f"Seed for the current session has been generated: {global_seed}")
 
     vpn_rng = seed_int["vpn"]
@@ -907,6 +907,7 @@ def main():
         headers_rng = seed_int["headers"]
         helpers_module.random = profile_rng
         plugins_dict_module.random = plugins_rng
+        rand_met_module.set_global_seed(global_seed)
         
         if hasattr(headers_adapter_module, "_pick_nav_template"):
             headers_adapter_module._pick_nav_template.cache_clear()
@@ -1269,7 +1270,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/fonts.html")
+        driver.get("https://browserleaks.com/fonts")
 
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
