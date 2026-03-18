@@ -911,25 +911,79 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return applied.length;
     }
 
-    // Bucket: strict scalar accessors on Navigator.prototype.
-    function patchStrictScalarAccessor(key, getter, diagTag) {
-      if (!(key in navProto)) return false;
-      const d = Object.getOwnPropertyDescriptor(navProto, key);
-      if (!d) {
-        __navDiag('error', `${diagTag}_descriptor_missing`, {
+    function __navResolvePrototypeAccessorTarget(key, diagTag, options) {
+      const opts = (options && typeof options === 'object') ? options : {};
+      const descriptorCode = (typeof opts.descriptorCode === 'string' && opts.descriptorCode)
+        ? opts.descriptorCode
+        : `${diagTag}_descriptor_missing`;
+      const ownerMismatchCode = (typeof opts.ownerMismatchCode === 'string' && opts.ownerMismatchCode)
+        ? opts.ownerMismatchCode
+        : `${diagTag}_owner_mismatch`;
+      const accessorKindCode = (typeof opts.accessorKindCode === 'string' && opts.accessorKindCode)
+        ? opts.accessorKindCode
+        : `${diagTag}_descriptor_kind_mismatch`;
+      const resolved = __navResolveDescriptor
+        ? __navResolveDescriptor(navProto, key, { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(navProto, key) ? navProto : null,
+            desc: Object.getOwnPropertyDescriptor(navProto, key) || null
+          };
+      const desc = resolved ? resolved.desc : null;
+      const owner = (resolved && resolved.owner) ? resolved.owner : navProto;
+      if (!desc) {
+        __navDiag('error', descriptorCode, {
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: diagTag,
           key: key,
           message: `${key} descriptor missing`
         });
-        return false;
+        return null;
       }
+      if (owner === navigator) {
+        __navDiag('error', ownerMismatchCode, {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `${key} resolved to instance owner`,
+          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+        });
+        return null;
+      }
+      if (!Object.prototype.hasOwnProperty.call(desc, 'get') && !Object.prototype.hasOwnProperty.call(desc, 'set')) {
+        __navDiag('error', accessorKindCode, {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: `${key} is not accessor-shaped on prototype`
+        });
+        return null;
+      }
+      return { owner, desc };
+    }
+
+    function __navResolveNativeAccessorDesc(key) {
+      const resolved = __navResolveDescriptor
+        ? __navResolveDescriptor(navProto, key, { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(navProto, key) ? navProto : null,
+            desc: Object.getOwnPropertyDescriptor(navProto, key) || null
+          };
+      return (resolved && resolved.desc) ? resolved.desc : null;
+    }
+
+    // Bucket: strict scalar accessors on Navigator.prototype.
+    function patchStrictScalarAccessor(key, getter, diagTag) {
+      const resolved = __navResolvePrototypeAccessorTarget(key, diagTag);
+      if (!resolved) return false;
+      const owner = resolved.owner;
+      const d = resolved.desc;
       if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
-      const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
       __navRegisterKey(key);
       const applied = applyCoreTargetsGroup(diagTag, [{
-        owner: navProto,
+        owner: owner,
         key: key,
         kind: 'accessor',
         wrapLayer: 'strict_accessor_gateway',
@@ -939,7 +993,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         allowCreate: false,
         configurable: !!d.configurable,
         enumerable: !!d.enumerable,
-        allowShapeChange: !!isData,
+        allowShapeChange: false,
         validThis: __isNavigatorThis,
         invalidThis: 'native',
         getImpl: function navStrictScalarGetImpl() {
@@ -960,27 +1014,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return true;
     }
 
-    // Bucket: object-return identity surfaces. The getter gateway is separate
-    // from scalar accessors even though current Core accessor contract still
-    // requires named_wrapper_strict for strict accessor policy.
+    // Bucket: object-return identity surfaces.
     function patchObjectReturnAccessor(key, getter, diagTag) {
-      if (!(key in navProto)) return false;
-      const d = Object.getOwnPropertyDescriptor(navProto, key);
-      if (!d) {
-        __navDiag('error', `${diagTag}_descriptor_missing`, {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: diagTag,
-          key: key,
-          message: `${key} descriptor missing`
-        });
-        return false;
-      }
+      const resolved = __navResolvePrototypeAccessorTarget(key, diagTag);
+      if (!resolved) return false;
+      const owner = resolved.owner;
+      const d = resolved.desc;
       if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
-      const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
       __navRegisterKey(key);
       const applied = applyCoreTargetsGroup(diagTag, [{
-        owner: navProto,
+        owner: owner,
         key: key,
         kind: 'accessor',
         wrapLayer: 'object_return_gateway',
@@ -990,7 +1033,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         allowCreate: false,
         configurable: !!d.configurable,
         enumerable: !!d.enumerable,
-        allowShapeChange: !!isData,
+        allowShapeChange: false,
         validThis: __isNavigatorThis,
         invalidThis: 'native',
         getImpl: function navObjectReturnGetImpl() {
@@ -1527,10 +1570,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     // ——— F/G. strict scalar runtime-backed accessors ———
-    const nativeDeviceMemoryDesc = ('deviceMemory' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'deviceMemory') : null;
-    const nativeHardwareConcurrencyDesc = ('hardwareConcurrency' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'hardwareConcurrency') : null;
-    const nativeLanguageDesc = ('language' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'language') : null;
-    const nativeLanguagesDesc = ('languages' in navProto) ? Object.getOwnPropertyDescriptor(navProto, 'languages') : null;
+    const nativeDeviceMemoryDesc = __navResolveNativeAccessorDesc('deviceMemory');
+    const nativeHardwareConcurrencyDesc = __navResolveNativeAccessorDesc('hardwareConcurrency');
+    const nativeLanguageDesc = __navResolveNativeAccessorDesc('language');
+    const nativeLanguagesDesc = __navResolveNativeAccessorDesc('languages');
 
     patchStrictScalarAccessor('deviceMemory', 'deviceMemory' in navProto ? function navDeviceMemoryValue() {
       if (__navIsValidDeviceMemoryValue(mem)) return mem;

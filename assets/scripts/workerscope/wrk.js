@@ -95,15 +95,15 @@ const WrkModule = function WrkModule(window) {
     const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
       ? G.CanvasPatchContext
       : null;
-    if (!C || typeof C.__sanitizeBootstrapEnvSurface__ !== 'function') return;
+    if (!C || typeof C.__runBootstrapEnvCleanup__ !== 'function') return;
     __wrkBestEffort('wrk:bootstrap_cleanup_retry_failed', {
       stage: 'cleanup',
-      key: 'CanvasPatchContext.__sanitizeBootstrapEnvSurface__',
+      key: 'CanvasPatchContext.__runBootstrapEnvCleanup__',
       message: 'bootstrap env cleanup retry failed',
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'bootstrap_cleanup_retry_failed' }
     }, () => {
-      C.__sanitizeBootstrapEnvSurface__(G);
+      C.__runBootstrapEnvCleanup__(G, 'worker_snapshot_ready');
     });
   }
 

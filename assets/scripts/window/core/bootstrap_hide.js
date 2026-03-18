@@ -275,6 +275,22 @@ function __workerTransitSnapshotReady__() {
   return ready;
 }
 
+function __ensureBootstrapCleanupState__() {
+  let cleanup = (__bootstrapTransitStatus__.retention.cleanup && typeof __bootstrapTransitStatus__.retention.cleanup === 'object')
+    ? __bootstrapTransitStatus__.retention.cleanup
+    : null;
+  if (!cleanup) {
+    cleanup = Object.create(null);
+    __bootstrapTransitStatus__.retention.cleanup = cleanup;
+  }
+  if (typeof cleanup.requested !== 'boolean') cleanup.requested = false;
+  if (typeof cleanup.completed !== 'boolean') cleanup.completed = false;
+  if (typeof cleanup.deferred !== 'boolean') cleanup.deferred = false;
+  if (typeof cleanup.lastTrigger !== 'string' && cleanup.lastTrigger !== null) cleanup.lastTrigger = null;
+  if (typeof cleanup.reason !== 'string' && cleanup.reason !== null) cleanup.reason = null;
+  return cleanup;
+}
+
 function __getBootstrapSanitizeGate__(key) {
   if (
     key === '__LATITUDE__' ||
@@ -366,6 +382,34 @@ function __sanitizeBootstrapEnvSurface__(win) {
   }
 }
 __defineHiddenValue__(C, '__sanitizeBootstrapEnvSurface__', __sanitizeBootstrapEnvSurface__);
+
+function __runBootstrapEnvCleanup__(win, trigger) {
+  const cleanupState = __ensureBootstrapCleanupState__();
+  const nextTrigger = (typeof trigger === 'string' && trigger) ? trigger : 'runtime';
+  cleanupState.requested = true;
+  cleanupState.lastTrigger = nextTrigger;
+  if (cleanupState.completed) {
+    cleanupState.deferred = false;
+    cleanupState.reason = 'already_completed';
+    return { outcome: 'skip', reason: 'already_completed' };
+  }
+  if (!__workerTransitSnapshotReady__()) {
+    cleanupState.deferred = true;
+    cleanupState.reason = 'worker_snapshot_not_ready';
+    __bootstrapTransitStatus__.retention.cleanupDeferred = true;
+    __bootstrapTransitStatus__.retention.cleanupDeferredReason = 'worker_snapshot_not_ready';
+    return { outcome: 'defer', reason: 'worker_snapshot_not_ready' };
+  }
+  cleanupState.deferred = false;
+  cleanupState.reason = 'ready';
+  __bootstrapTransitStatus__.retention.cleanupDeferred = false;
+  __bootstrapTransitStatus__.retention.cleanupDeferredReason = null;
+  __sanitizeBootstrapEnvSurface__(win);
+  cleanupState.completed = true;
+  cleanupState.reason = 'completed';
+  return { outcome: 'return', reason: 'completed' };
+}
+__defineHiddenValue__(C, '__runBootstrapEnvCleanup__', __runBootstrapEnvCleanup__);
   
   
   const hiddenSurfaceState = {

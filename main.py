@@ -440,8 +440,8 @@ def init_driver(
                 const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
                     ? win.CanvasPatchContext
                     : null;
-                if (!C || typeof C.__sanitizeBootstrapEnvSurface__ !== 'function') return;
-                C.__sanitizeBootstrapEnvSurface__(win);
+                if (!C || typeof C.__runBootstrapEnvCleanup__ !== 'function') return;
+                C.__runBootstrapEnvCleanup__(win, 'bundle_finalize');
             })(window);
             """
         ]
@@ -1266,7 +1266,7 @@ def main():
         
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/fonts")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.

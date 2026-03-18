@@ -1045,7 +1045,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         const descIsAccessor = !!desc && hasAccessorShape(desc);
         const descIsData = !!desc && hasDataShape(desc);
-        const canShapeChange = strictScalarContract && allowShapeChange && descIsData;
+        const canShapeChange = wrapLayer === 'named_wrapper_strict' && allowShapeChange && descIsData;
         if (desc && !descIsAccessor && !canShapeChange) {
           const e = new TypeError('[Core.applyTargets] kind mismatch for accessor');
           return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -1564,7 +1564,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (desc && kind === 'accessor') {
           const accessorShape = hasAccessorShape(desc);
           const dataShape = hasDataShape(desc);
-          const canShapeChange = isStrictScalarAccessorGatewayWrapLayer(wrapLayer) && allowShapeChange && dataShape;
+          const canShapeChange = wrapLayer === 'named_wrapper_strict' && allowShapeChange && dataShape;
           if (!accessorShape && !canShapeChange) {
             return { ok: false, reason: 'kind_mismatch', error: new TypeError('[Core.applyTargets] kind mismatch for accessor'), tag, policy, targetId, key, kind };
           }
