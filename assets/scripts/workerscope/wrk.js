@@ -201,7 +201,7 @@ function EnvBus(G){
   }
   const __langStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__LANG_STATE__ && typeof G.CanvasPatchContext.state.__LANG_STATE__ === 'object')
     ? G.CanvasPatchContext.state.__LANG_STATE__
-    : ((G && G.CanvasPatchContext && G.CanvasPatchContext.__LANG_STATE__ && typeof G.CanvasPatchContext.__LANG_STATE__ === 'object') ? G.CanvasPatchContext.__LANG_STATE__ : null);
+    : null;
   const __envLangs = (() => {
     const src = (__langStateRoot && Array.isArray(__langStateRoot.normalizedLanguages))
       ? __langStateRoot.normalizedLanguages
