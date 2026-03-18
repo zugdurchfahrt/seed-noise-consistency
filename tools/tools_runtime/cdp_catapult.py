@@ -755,11 +755,13 @@ def run_worker_seed():
 
     msg_id = {"v": 0}
     injected = set()   # targetId set
+    injecting = set()  # targetId set (attached, prelude/sanity in progress)
     manual_attach_sent = set()  # targetId set for emergency fallback manual attach
     fallback_attach_timers = {}  # targetId -> Timer
     created_targets = {}  # targetId -> {type,url}
     autoattach_state = {"ready": False}
     sess_meta = {}  # sessionId -> {targetId,type,url}
+    target_injection_state = {}  # targetId -> {primary_session, duplicate_sessions, prelude_ok, sanity_ok, resumed, type, url}
     seed_prelude = _build_worker_seed_prelude(CDP_GLOBAL_SEED)
     sanity_expr = (
         "(() => {"
@@ -813,6 +815,8 @@ def run_worker_seed():
         _cancel_fallback_timer(target_id)
         created_targets.pop(target_id, None)
         manual_attach_sent.discard(target_id)
+        injecting.discard(target_id)
+        target_injection_state.pop(target_id, None)
 
     def _cleanup_session_state(session_id):
         if not session_id:
@@ -820,6 +824,14 @@ def run_worker_seed():
         meta = sess_meta.pop(session_id, None)
         for key in [k for k in list(pending_sess.keys()) if k[0] == session_id]:
             pending_sess.pop(key, None)
+        if meta:
+            target_id = meta.get("targetId")
+            state = target_injection_state.get(target_id)
+            if state:
+                if state.get("primary_session") == session_id:
+                    _drop_target_state(target_id)
+                else:
+                    state.get("duplicate_sessions", set()).discard(session_id)
         return meta
 
     def _cleanup_worker_runtime_state():
@@ -835,6 +847,31 @@ def run_worker_seed():
         pending_sess.clear()
         pending.clear()
         injected.clear()
+        injecting.clear()
+        target_injection_state.clear()
+
+    def _maybe_resume_injected_target(ws, target_id):
+        state = target_injection_state.get(target_id)
+        if not state or state.get("resumed"):
+            return
+        if not state.get("prelude_ok") or not state.get("sanity_ok"):
+            return
+        session_ids = [state.get("primary_session")] + sorted(state.get("duplicate_sessions", set()))
+        for session_id in session_ids:
+            if not session_id:
+                continue
+            try:
+                send_sess(ws, session_id, "Runtime.runIfWaitingForDebugger")
+            except Exception as e:
+                _fatal(
+                    ws,
+                    "worker resume failed",
+                    {"sessionId": session_id, "target": sess_meta.get(session_id) or state, "error": repr(e)},
+                )
+                return
+        state["resumed"] = True
+        injecting.discard(target_id)
+        injected.add(target_id)
 
     def _schedule_manual_attach_fallback(ws, target_id: str, target_type: str, target_url: str):
         if not target_id:
@@ -967,6 +1004,13 @@ def run_worker_seed():
                 if exc:
                     _fatal(ws, "worker seed Runtime.evaluate exceptionDetails", exc)
                     return
+                meta = sess_meta.get(sid) or {}
+                tid = meta.get("targetId")
+                state = target_injection_state.get(tid) if tid else None
+                if tag == "Runtime.evaluate:worker_seed_prelude":
+                    if state:
+                        state["prelude_ok"] = True
+                        _maybe_resume_injected_target(ws, tid)
                 if tag == "Runtime.evaluate:worker_seed_sanity":
                     try:
                         out = (res.get("result") or {}).get("value")
@@ -979,10 +1023,10 @@ def run_worker_seed():
                                 {"expected_len": len(expected_seed), "got": out, "target": sess_meta.get(sid)},
                             )
                             return
-                        meta = sess_meta.get(sid) or {}
                         ttype = meta.get("type")
-                        tid = meta.get("targetId")
                         turl = meta.get("url")
+                        if state:
+                            state["sanity_ok"] = True
                         logger.info(
                             "Worker seed inject: sanity logging successful; CDP_GLOBAL_SEED verified type=%s targetId=%s url=%r seed_len=%s",
                             ttype,
@@ -990,6 +1034,8 @@ def run_worker_seed():
                             turl,
                             len(expected_seed),
                         )
+                        if state:
+                            _maybe_resume_injected_target(ws, tid)
                     except Exception as e:
                         _fatal(ws, "worker seed sanity: parse/compare failed", e)
             return
@@ -1051,7 +1097,27 @@ def run_worker_seed():
             except Exception as e:
                 _fatal(ws, "worker duplicate session resume failed", e)
             return
-        injected.add(tid)
+        if tid in injecting:
+            logger.warning(
+                "Worker seed inject: duplicate attached session targetId=%s sessionId=%s url=%r; waiting for primary prelude+sanity",
+                tid,
+                sessionId,
+                turl,
+            )
+            state = target_injection_state.get(tid)
+            if state is not None:
+                state.setdefault("duplicate_sessions", set()).add(sessionId)
+            return
+        injecting.add(tid)
+        target_injection_state[tid] = {
+            "primary_session": sessionId,
+            "duplicate_sessions": set(),
+            "prelude_ok": False,
+            "sanity_ok": False,
+            "resumed": False,
+            "type": ttype,
+            "url": turl,
+        }
 
         logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
         try:
@@ -1060,11 +1126,6 @@ def run_worker_seed():
             send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
         except Exception as e:
             _fatal(ws, "worker seed inject failed", e)
-        finally:
-            try:
-                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-            except Exception as e:
-                _fatal(ws, "worker resume failed", e)
 
     def on_error(ws, err):
         if _is_ws_disconnect_error(err):
