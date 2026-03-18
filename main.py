@@ -62,10 +62,11 @@ from profile_data_source.depo_browser import chrome_versions, edge_versions, saf
 from profile_data_source.datashell_win32 import data_4_win32
 from profile_data_source.macintel import macintel_data
 # ----------------------- MODULES-----------------------
-import tools.tools_runtime.cdp_catapult as cdp
+import tools.generators.cdp_catapult as cdp
 import tools.tools_runtime.helpers as helpers_module
 import tools.tools_runtime.headers_adapter as headers_adapter_module
 import tools.tools_infra.vpn_utils as vpn_utils_module
+
 import tools.generators.rand_met as rand_met_module
 import profile_data_source.plugins_dict as plugins_dict_module
 from profile_data_source.plugins_dict import build_plugins_profile
