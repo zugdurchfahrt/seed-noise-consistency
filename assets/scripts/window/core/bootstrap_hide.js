@@ -112,6 +112,58 @@ function __ensureLangTransitState__() {
   return state;
 }
 
+function __emitBootstrapTransferDiag__(level, code, key, message, reason, err, extraData) {
+  const D = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
+  const diag = (D && typeof D.diag === 'function') ? D.diag.bind(D) : null;
+  try {
+    const data = { outcome: 'skip', reason: reason };
+    if (extraData && typeof extraData === 'object') {
+      Object.assign(data, extraData);
+    }
+    const ctx = {
+      module: 'bootstrap_hide',
+      diagTag: 'bootstrap_hide',
+      surface: 'window',
+      key: key,
+      stage: 'bootstrap',
+      message: message,
+      type: 'browser structure missing data',
+      data: data
+    };
+    if (diag) return diag(level, code, ctx, err || null);
+    if (typeof D === 'function') return D(code, err || null, Object.assign({ level: level }, ctx));
+  } catch (emitErr) {
+    return undefined;
+  }
+}
+
+function __ensureBootstrapTransitStatus__() {
+  let status = (C.__bootstrapTransitStatus__ && typeof C.__bootstrapTransitStatus__ === 'object')
+    ? C.__bootstrapTransitStatus__
+    : null;
+  if (!status) {
+    status = Object.create(null);
+  }
+  __defineHiddenValue__(C, '__bootstrapTransitStatus__', status);
+  if (!status.geo || typeof status.geo !== 'object') status.geo = Object.create(null);
+  if (!status.lang || typeof status.lang !== 'object') status.lang = Object.create(null);
+  if (!status.retention || typeof status.retention !== 'object') status.retention = Object.create(null);
+  return status;
+}
+
+const __bootstrapTransitStatus__ = __ensureBootstrapTransitStatus__();
+
+function __setBootstrapTransferStatus__(slot, ready, reason, extraData) {
+  if (!__bootstrapTransitStatus__[slot] || typeof __bootstrapTransitStatus__[slot] !== 'object') {
+    __bootstrapTransitStatus__[slot] = Object.create(null);
+  }
+  const status = __bootstrapTransitStatus__[slot];
+  status.ready = !!ready;
+  status.status = ready ? 'ready' : 'incomplete';
+  status.reason = reason || (ready ? 'ready' : 'incomplete');
+  status.data = (extraData && typeof extraData === 'object') ? Object.assign({}, extraData) : null;
+}
+
 const __geoTransitState__ = __ensureGeoTransitState__();
 const __langTransitState__ = __ensureLangTransitState__();
 const __bootstrapLatitude__ = W.__LATITUDE__;
@@ -120,22 +172,33 @@ const __bootstrapTimezone__ = W.__TIMEZONE__;
 const __bootstrapOffsetMinutes__ = W.__OFFSET_MINUTES__;
 const __bootstrapPrimaryLanguage__ = W.__primaryLanguage;
 const __bootstrapNormalizedLanguages__ = W.__normalizedLanguages;
-if (
-  __isFiniteNumber__(__bootstrapLatitude__) &&
-  __isFiniteNumber__(__bootstrapLongitude__) &&
-  typeof __bootstrapTimezone__ === 'string' && __bootstrapTimezone__ &&
-  __isFiniteNumber__(__bootstrapOffsetMinutes__)
-) {
+const __geoMissingKeys__ = [];
+if (!__isFiniteNumber__(__bootstrapLatitude__)) __geoMissingKeys__.push('__LATITUDE__');
+if (!__isFiniteNumber__(__bootstrapLongitude__)) __geoMissingKeys__.push('__LONGITUDE__');
+if (!(typeof __bootstrapTimezone__ === 'string' && __bootstrapTimezone__)) __geoMissingKeys__.push('__TIMEZONE__');
+if (!__isFiniteNumber__(__bootstrapOffsetMinutes__)) __geoMissingKeys__.push('__OFFSET_MINUTES__');
+if (__geoMissingKeys__.length === 0) {
   __geoTransitState__.latitude = __bootstrapLatitude__;
   __geoTransitState__.longitude = __bootstrapLongitude__;
   __geoTransitState__.timezone = __bootstrapTimezone__;
   __geoTransitState__.offsetMinutes = __bootstrapOffsetMinutes__;
+  __setBootstrapTransferStatus__('geo', true, 'owner_ready', { source: 'window_transit' });
+} else {
+  __setBootstrapTransferStatus__('geo', false, 'bootstrap_input_incomplete', { missingKeys: __geoMissingKeys__.slice() });
+  __emitBootstrapTransferDiag__(
+    'warn',
+    'bootstrap_hide:geo_transfer_incomplete',
+    'state.__GEO_STATE__',
+    'geo owner-transfer incomplete',
+    'bootstrap_input_incomplete',
+    null,
+    { missingKeys: __geoMissingKeys__.slice() }
+  );
 }
-if (
-  typeof __bootstrapPrimaryLanguage__ === 'string' && __bootstrapPrimaryLanguage__ &&
-  Array.isArray(__bootstrapNormalizedLanguages__) &&
-  __bootstrapNormalizedLanguages__.length > 0
-) {
+const __langMissingKeys__ = [];
+if (!(typeof __bootstrapPrimaryLanguage__ === 'string' && __bootstrapPrimaryLanguage__)) __langMissingKeys__.push('__primaryLanguage');
+if (!(Array.isArray(__bootstrapNormalizedLanguages__) && __bootstrapNormalizedLanguages__.length > 0)) __langMissingKeys__.push('__normalizedLanguages');
+if (__langMissingKeys__.length === 0) {
   __langTransitState__.primaryLanguage = __bootstrapPrimaryLanguage__;
   __langTransitState__.normalizedLanguages = __bootstrapNormalizedLanguages__;
   if (Array.isArray(__langTransitState__.normalizedLanguages) && !Object.isFrozen(__langTransitState__.normalizedLanguages)) {
@@ -150,8 +213,20 @@ if (
   ) {
     throw new Error('[module] CanvasPatchContext.__LANG_STATE__ bootstrap invalid');
   }
+  __setBootstrapTransferStatus__('lang', true, 'owner_ready', { source: 'window_transit' });
   __defineHiddenValue__(W, '__primaryLanguage', __langTransitState__.primaryLanguage);
   __defineHiddenValue__(W, '__normalizedLanguages', __langTransitState__.normalizedLanguages);
+} else {
+  __setBootstrapTransferStatus__('lang', false, 'bootstrap_input_incomplete', { missingKeys: __langMissingKeys__.slice() });
+  __emitBootstrapTransferDiag__(
+    'warn',
+    'bootstrap_hide:lang_transfer_incomplete',
+    'state.__LANG_STATE__',
+    'language owner-transfer incomplete',
+    'bootstrap_input_incomplete',
+    null,
+    { missingKeys: __langMissingKeys__.slice() }
+  );
 }
 
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
@@ -193,22 +268,51 @@ function __langTransitOwnerReady__() {
     state.normalizedLanguages[0] === state.primaryLanguage;
 }
 
-function __canSanitizeBootstrapKey__(key) {
+function __workerTransitSnapshotReady__() {
+  const ready = !!(C && C.__workerEnvSnapshotReady__ === true);
+  __bootstrapTransitStatus__.retention.workerEnvSnapshotReady = ready;
+  __bootstrapTransitStatus__.retention.workerEnvSnapshotStage = ready ? 'ready' : 'pending';
+  return ready;
+}
+
+function __getBootstrapSanitizeGate__(key) {
   if (
     key === '__LATITUDE__' ||
     key === '__LONGITUDE__' ||
     key === '__TIMEZONE__' ||
     key === '__OFFSET_MINUTES__'
   ) {
-    return __geoTransitOwnerReady__();
+    return {
+      ready: __geoTransitOwnerReady__(),
+      reason: 'geo_owner_not_ready'
+    };
   }
   if (
     key === '__primaryLanguage' ||
     key === '__normalizedLanguages'
   ) {
-    return __langTransitOwnerReady__();
+    return {
+      ready: __langTransitOwnerReady__(),
+      reason: 'lang_owner_not_ready'
+    };
   }
-  return true;
+  if (
+    key === '__EXPECTED_CLIENT_HINTS' ||
+    key === '__USER_AGENT' ||
+    key === '__VENDOR' ||
+    key === '__DPR' ||
+    key === '__cpu' ||
+    key === '__memory'
+  ) {
+    return {
+      ready: __workerTransitSnapshotReady__(),
+      reason: 'worker_snapshot_not_ready'
+    };
+  }
+  return {
+    ready: true,
+    reason: 'ready'
+  };
 }
 
 function __sanitizeBootstrapEnvSurface__(win) {
@@ -237,8 +341,15 @@ function __sanitizeBootstrapEnvSurface__(win) {
     '__ORIENTATION'
   ];
   for (const key of keys) {
-    if (!__canSanitizeBootstrapKey__(key)) {
-      __emitCleanupDiag__('warn', 'bootstrap_hide:cleanup_env_owner_not_ready', key, 'env surface cleanup skipped: owner not ready', 'cleanup_env_owner_not_ready', null);
+    const gate = __getBootstrapSanitizeGate__(key);
+    if (!gate.ready) {
+      const code = gate.reason === 'worker_snapshot_not_ready'
+        ? 'bootstrap_hide:cleanup_env_retention_not_ready'
+        : 'bootstrap_hide:cleanup_env_owner_not_ready';
+      const message = gate.reason === 'worker_snapshot_not_ready'
+        ? 'env surface cleanup skipped: retention not ready'
+        : 'env surface cleanup skipped: owner not ready';
+      __emitCleanupDiag__('warn', code, key, message, gate.reason, null);
       continue;
     }
     const desc = Object.getOwnPropertyDescriptor(win, key);

@@ -50,6 +50,65 @@ const WrkModule = function WrkModule(window) {
     }
   }
 
+  function __setHiddenValue__(obj, key, value) {
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+    const d = Object.getOwnPropertyDescriptor(obj, key);
+    if (d && d.configurable === false) {
+      if (Object.prototype.hasOwnProperty.call(d, 'value')) return d.value;
+      return value;
+    }
+    Object.defineProperty(obj, key, {
+      value: value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return value;
+  }
+
+  function __updateWorkerSnapshotStatus__(ready, stage) {
+    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+      ? G.CanvasPatchContext
+      : null;
+    if (!C) return;
+    __wrkBestEffort('wrk:worker_snapshot_status_update_failed', {
+      stage: 'apply',
+      key: 'CanvasPatchContext.__workerEnvSnapshotReady__',
+      message: 'worker snapshot status update failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'worker_snapshot_status_update_failed' }
+    }, () => {
+      __setHiddenValue__(C, '__workerEnvSnapshotReady__', !!ready);
+      const status = (C.__bootstrapTransitStatus__ && typeof C.__bootstrapTransitStatus__ === 'object')
+        ? C.__bootstrapTransitStatus__
+        : null;
+      if (!status) return;
+      if (!status.retention || typeof status.retention !== 'object') {
+        status.retention = Object.create(null);
+      }
+      status.retention.workerEnvSnapshotReady = !!ready;
+      status.retention.workerEnvSnapshotStage = (typeof stage === 'string' && stage) ? stage : null;
+    });
+  }
+
+  function __retryBootstrapEnvCleanup__() {
+    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+      ? G.CanvasPatchContext
+      : null;
+    if (!C || typeof C.__sanitizeBootstrapEnvSurface__ !== 'function') return;
+    __wrkBestEffort('wrk:bootstrap_cleanup_retry_failed', {
+      stage: 'cleanup',
+      key: 'CanvasPatchContext.__sanitizeBootstrapEnvSurface__',
+      message: 'bootstrap env cleanup retry failed',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'bootstrap_cleanup_retry_failed' }
+    }, () => {
+      C.__sanitizeBootstrapEnvSurface__(G);
+    });
+  }
+
+  __updateWorkerSnapshotStatus__(false, 'pending');
+
   function relayWorkerDiagEnvelope(G, scope, payload) {
     const d = G && G.__DEGRADE__;
     if (typeof d !== 'function' || !payload || typeof payload !== 'object') return false;
@@ -202,23 +261,28 @@ function EnvBus(G){
   const __langStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__LANG_STATE__ && typeof G.CanvasPatchContext.state.__LANG_STATE__ === 'object')
     ? G.CanvasPatchContext.state.__LANG_STATE__
     : null;
+  const __geoStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__GEO_STATE__ && typeof G.CanvasPatchContext.state.__GEO_STATE__ === 'object')
+    ? G.CanvasPatchContext.state.__GEO_STATE__
+    : null;
   const __envLangs = (() => {
     const src = (__langStateRoot && Array.isArray(__langStateRoot.normalizedLanguages))
       ? __langStateRoot.normalizedLanguages
-      : G.__normalizedLanguages;
+      : null;
     if (Array.isArray(src)) return src.slice();
     if (typeof src === 'string' && src) return [src];
     return null;
   })();
   const __envLang = (__langStateRoot && typeof __langStateRoot.primaryLanguage === 'string' && __langStateRoot.primaryLanguage)
     ? __langStateRoot.primaryLanguage
-    : ((typeof G.__primaryLanguage === 'string' && G.__primaryLanguage) ? G.__primaryLanguage : null);
+    : null;
   const __envUa = (typeof G.__USER_AGENT === 'string' && G.__USER_AGENT) ? G.__USER_AGENT : null;
   const __envVendor = (typeof G.__VENDOR === 'string') ? G.__VENDOR : null;
   const __envDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null;
   const __envCpu = (G.__cpu != null) ? G.__cpu : null;
   const __envMem = (G.__memory != null) ? G.__memory : null;
-  const __envTimeZone = (typeof G.__TIMEZONE__ === 'string' && G.__TIMEZONE__) ? G.__TIMEZONE__ : null;
+  const __envTimeZone = (__geoStateRoot && typeof __geoStateRoot.timezone === 'string' && __geoStateRoot.timezone)
+    ? __geoStateRoot.timezone
+    : null;
   const __envContract = (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object')
     ? __cloneEnvValue(G.__EXPECTED_CLIENT_HINTS)
     : null;
@@ -242,7 +306,7 @@ function EnvBus(G){
     if (cpu == null) throw new Error('EnvBus: __cpu missing');
     if (mem == null) throw new Error('EnvBus: __memory missing');
     const timeZone = __envTimeZone;
-    if (!timeZone) throw new Error('EnvBus: __TIMEZONE__ missing');
+    if (!timeZone) throw new Error('EnvBus: state.__GEO_STATE__.timezone missing');
 
     // UAData (Window runtime) is the primary source for Worker snapshots.
     const UAD = nav && nav.userAgentData;
@@ -1995,6 +2059,8 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
       throw new Error('[WorkerInit] hub missing');
     }
     G.__ENV_HUB__.publish(snap);
+    __updateWorkerSnapshotStatus__(true, 'snapshot_ready');
+    __retryBootstrapEnvCleanup__();
     return snap;
   }
 
@@ -2071,6 +2137,7 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
   // 5) Полный сценарий
   function initAll(opts){
     const o = Object.assign({ publishHE: true, heKeys: null }, opts);
+    __updateWorkerSnapshotStatus__(false, 'pending');
     // Install overrides first to prevent early native SharedWorker creation before async HE readiness.
     installOverrides(); // Hub -> Overrides
     // Strict UAData mode: obtain HE first; only then publish snapshots.

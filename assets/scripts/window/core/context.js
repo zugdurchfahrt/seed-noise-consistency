@@ -16,13 +16,50 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return; // in case is already initialized
   }
 
-  C.__READY__ = true;
-  const patchState = C.__patchState || (C.__patchState = {
-    canvas: false,
-    offscreen: false,
-    webgl: false,
-    hooksRegistered: false,
-  });
+  function __defineHiddenValue__(obj, key, value) {
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+    const d = Object.getOwnPropertyDescriptor(obj, key);
+    if (d && d.configurable === false) {
+      if (Object.prototype.hasOwnProperty.call(d, 'value')) return d.value;
+      return value;
+    }
+    Object.defineProperty(obj, key, {
+      value: value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return value;
+  }
+
+  __defineHiddenValue__(C, '__READY__', true);
+  const patchState = (() => {
+    const existing = (C.__patchState && typeof C.__patchState === 'object') ? C.__patchState : null;
+    if (existing) {
+      __defineHiddenValue__(C, '__patchState', existing);
+      return existing;
+    }
+    return __defineHiddenValue__(C, '__patchState', {
+      canvas: false,
+      offscreen: false,
+      webgl: false,
+      hooksRegistered: false,
+    });
+  })();
+  function __ensurePatchState__(owner) {
+    const target = (owner && (typeof owner === 'object' || typeof owner === 'function'))
+      ? owner
+      : C;
+    const existing = (target.__patchState && typeof target.__patchState === 'object')
+      ? target.__patchState
+      : null;
+    if (existing) {
+      __defineHiddenValue__(target, '__patchState', existing);
+      return existing;
+    }
+    __defineHiddenValue__(target, '__patchState', patchState);
+    return patchState;
+  }
   const hookModeStore = (C.__hookModeStore && typeof C.__hookModeStore === 'object')
     ? C.__hookModeStore
     : {};
@@ -1102,7 +1139,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   // === 6. applying of patches===
   C.applyCanvasElementPatches = function(){
-    const state = this.__patchState || (this.__patchState = patchState);
+    const state = __ensurePatchState__(this);
     if (state.canvas) return 0;
     if (typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype) return 0;
     captureKeepNativeRefs();
@@ -1137,7 +1174,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
   };
 
   C.applyOffscreenPatches = function(){
-    const state = this.__patchState || (this.__patchState = patchState);
+    const state = __ensurePatchState__(this);
     if (state.offscreen) return 0;
     const Ctx = this;
     let applied = 0, total = 0;
@@ -1170,7 +1207,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
   };
 
   C.applyWebGLContextPatches = function () {
-      const state = this.__patchState || (this.__patchState = patchState);
+      const state = __ensurePatchState__(this);
       if (state.webgl) return 0;
       captureKeepNativeRefs();
       let applied = 0, total = 0;
@@ -1217,7 +1254,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
   function registerAllHooks() {
     const C = window.CanvasPatchContext;
     if (!C) return;
-    const state = C.__patchState || (C.__patchState = patchState);
+    const state = __ensurePatchState__(C);
     if (state.hooksRegistered) return;
 
     // 1) We guarantee the presence of registers
