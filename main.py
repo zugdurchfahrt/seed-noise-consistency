@@ -358,6 +358,10 @@ def init_driver(
             worker_seed_thread.ident,
             cdp.PORT,
         )
+        if not cdp.wait_worker_seed_ready():
+            logger.error("Worker seed inject: autoAttach ready-barrier failed on port %s", cdp.PORT)
+            raise RuntimeError("Worker seed inject: autoAttach ready-barrier failed")
+        logger.info("Worker seed inject: autoAttach ready-barrier satisfied on port %s", cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_worker_seed_thread_start")
 
 

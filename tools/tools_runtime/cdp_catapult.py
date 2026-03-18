@@ -29,6 +29,7 @@ SW_META = None
 WORKER_SEED_INJECT_ENABLED = True
 CDP_GLOBAL_SEED = None
 _RUNNING_WORKER_SEED = False
+_WORKER_SEED_AUTOATTACH_READY = threading.Event()
 _RUNNING = False
 _SW_WS = None
 _WORKER_SEED_WS = None
@@ -176,6 +177,18 @@ def enable_worker_seed_inject(global_seed: str):
         raise ValueError("Worker seed inject: global_seed must be non-empty str")
     CDP_GLOBAL_SEED = global_seed
     WORKER_SEED_INJECT_ENABLED = True
+    _WORKER_SEED_AUTOATTACH_READY.clear()
+
+
+def wait_worker_seed_ready(timeout_s: float = 10.0) -> bool:
+    deadline = time.time() + float(timeout_s)
+    while time.time() < deadline:
+        if _WORKER_SEED_AUTOATTACH_READY.is_set():
+            return True
+        if not _RUNNING_WORKER_SEED and _WORKER_SEED_WS is None:
+            return False
+        time.sleep(0.02)
+    return _WORKER_SEED_AUTOATTACH_READY.is_set()
 
 
 def stop():
@@ -201,6 +214,7 @@ def stop_worker_seed():
     if ws is None:
         return False
     _WORKER_SEED_STOPPING = True
+    _WORKER_SEED_AUTOATTACH_READY.clear()
     try:
         ws.keep_running = False
     except Exception:
@@ -713,13 +727,16 @@ def run_worker_seed():
         return
     _RUNNING_WORKER_SEED = True
     _WORKER_SEED_STOPPING = False
+    _WORKER_SEED_AUTOATTACH_READY.clear()
 
     if not WORKER_SEED_INJECT_ENABLED:
         _RUNNING_WORKER_SEED = False
+        _WORKER_SEED_AUTOATTACH_READY.clear()
         logger.error("Worker seed inject: contract violation: injector is disabled while worker bootstrap expects CDP_GLOBAL_SEED")
         raise RuntimeError("Worker seed inject: disabled")
     if not isinstance(CDP_GLOBAL_SEED, str) or not CDP_GLOBAL_SEED.strip():
         _RUNNING_WORKER_SEED = False
+        _WORKER_SEED_AUTOATTACH_READY.clear()
         logger.error("Worker seed inject: contract violation: CDP_GLOBAL_SEED missing; enable_worker_seed_inject() must run before worker bootstrap")
         raise RuntimeError("Worker seed inject: seed missing")
 
@@ -727,6 +744,7 @@ def run_worker_seed():
         ws_url = get_ws_url()
     except Exception as e:
         _RUNNING_WORKER_SEED = False
+        _WORKER_SEED_AUTOATTACH_READY.clear()
         logger.exception("Worker seed inject: get_ws_url failed (PATCH_SKIPPED)")
         raise ValueError("Worker seed inject: fail") from e
 
@@ -913,6 +931,7 @@ def run_worker_seed():
                 return
             if tag == "autoattach_worker_seed":
                 autoattach_state["ready"] = True
+                _WORKER_SEED_AUTOATTACH_READY.set()
                 for target_id, info in list(created_targets.items()):
                     _schedule_manual_attach_fallback(
                         ws,
@@ -1062,6 +1081,7 @@ def run_worker_seed():
         global _RUNNING_WORKER_SEED, _WORKER_SEED_WS, _WORKER_SEED_STOPPING
         _RUNNING_WORKER_SEED = False
         _WORKER_SEED_WS = None
+        _WORKER_SEED_AUTOATTACH_READY.clear()
         _cleanup_worker_runtime_state()
         if _WORKER_SEED_STOPPING:
             logger.info("Worker seed inject: websocket closed by stop request code=%r msg=%r", code, msg)
@@ -1079,6 +1099,7 @@ def run_worker_seed():
         _WORKER_SEED_WS = None
         _RUNNING_WORKER_SEED = False
         _WORKER_SEED_STOPPING = False
+        _WORKER_SEED_AUTOATTACH_READY.clear()
         _cleanup_worker_runtime_state()
     if fatal["err"]:
         raise fatal["err"]

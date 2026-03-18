@@ -8,6 +8,8 @@ const WrkModule = function WrkModule(window) {
     || {};
   const __MODULE = 'wrk';
   const __SURFACE = 'wrk';
+  const __tag = 'wrk';
+  const __flagKey = '__PATCH_WRK__';
   const __D = G && G.__DEGRADE__;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
 
@@ -92,18 +94,18 @@ const WrkModule = function WrkModule(window) {
     if (!__core || typeof __core.guardFlag !== 'function') {
       __wrkDiag('warn', __MODULE + ':guard_missing', {
         stage: 'guard',
-        key: '__PATCH_WRK__',
+        key: __flagKey,
         message: 'Core.guardFlag missing',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
       }, null);
       return;
     }
-    __guardToken = __core.guardFlag('__PATCH_WRK__', __MODULE);
+    __guardToken = __core.guardFlag(__flagKey, __tag);
   } catch (e) {
     __wrkDiag('warn', __MODULE + ':guard_failed', {
       stage: 'guard',
-      key: '__PATCH_WRK__',
+      key: __flagKey,
       message: 'guardFlag threw',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'guard_failed' }
@@ -2159,7 +2161,7 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
     __wrkDiag('info', 'wrk:init:return', {
       stage: 'apply',
-      key: '__PATCH_WRK__',
+      key: __flagKey,
       message: 'WrkModule initialized',
       type: 'pipeline missing data',
       data: { outcome: 'return' }
@@ -2167,19 +2169,19 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
   } catch (e) {
     __wrkDiag('error', 'wrk:fatal', {
       stage: 'apply',
-      key: '__PATCH_WRK__',
+      key: __flagKey,
       message: 'WrkModule fatal',
       type: 'browser structure missing data',
       data: { outcome: 'throw', reason: 'fatal', rollbackOk: false }
     }, e);
     __wrkBestEffort('wrk:guard_release_failed', {
       stage: 'guard',
-      key: '__PATCH_WRK__',
+      key: __flagKey,
       message: 'releaseGuardFlag failed',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'guard_release_failed' }
     }, () => (__core && typeof __core.releaseGuardFlag === 'function')
-      ? __core.releaseGuardFlag('__PATCH_WRK__', __guardToken, false, __MODULE)
+      ? __core.releaseGuardFlag(__flagKey, __guardToken, false, __tag)
       : false);
     throw e;
   }
