@@ -1,5 +1,4 @@
 # cdp_catapult.py  (SW injector only)
-import atexit
 import json
 import time
 import threading
@@ -209,20 +208,6 @@ def stop_worker_seed():
     except Exception:
         return False
     return True
-
-
-def _stop_injectors_atexit():
-    try:
-        stop_worker_seed()
-    except Exception:
-        pass
-    try:
-        stop()
-    except Exception:
-        pass
-
-
-atexit.register(_stop_injectors_atexit)
 
 
 def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
@@ -457,16 +442,13 @@ def run():
         msg_id["v"] += 1
         mid = msg_id["v"]
         tag = method
-        if params and isinstance(params, dict):
+        if method == "Runtime.evaluate" and params and isinstance(params, dict):
             try:
-                if method == "Runtime.evaluate":
-                    expr = params.get("expression")
-                    if expr == sw_prelude:
-                        tag = "Runtime.evaluate:sw_prelude"
-                    elif expr == sanity_expr:
-                        tag = "Runtime.evaluate:sw_sanity"
-                elif method == "Runtime.addBinding" and params.get("name") == _SW_DIAG_BINDING:
-                    tag = "Runtime.addBinding:sw_diag"
+                expr = params.get("expression")
+                if expr == sw_prelude:
+                    tag = "Runtime.evaluate:sw_prelude"
+                elif expr == sanity_expr:
+                    tag = "Runtime.evaluate:sw_sanity"
             except Exception:
                 pass
         pending_sess[(sessionId, mid)] = tag
@@ -510,14 +492,6 @@ def run():
                 return
             # Session-level response error handling (flatten protocol).
             if sid and msg.get("error"):
-                if tag == "Runtime.addBinding:sw_diag":
-                    logger.warning(
-                        "SW inject: diag relay binding unavailable sessionId=%s target=%r err=%r",
-                        sid,
-                        session_targets.get(sid),
-                        msg.get("error"),
-                    )
-                    return
                 _fatal(ws, f"session cmd failed: {tag or 'unknown'}", msg.get("error"))
                 return
             # Runtime.evaluate may include exceptionDetails inside result.
@@ -776,27 +750,6 @@ def run_worker_seed():
         except Exception:
             pass
 
-    def _drop_target_state(target_id):
-        if not target_id:
-            return
-        manual_attach_sent.discard(target_id)
-        injected.discard(target_id)
-
-    def _cleanup_session_state(session_id):
-        if not session_id:
-            return None
-        meta = sess_meta.pop(session_id, None)
-        for key in [k for k in list(pending_sess.keys()) if k[0] == session_id]:
-            pending_sess.pop(key, None)
-        return meta
-
-    def _cleanup_worker_runtime_state():
-        manual_attach_sent.clear()
-        sess_meta.clear()
-        pending_sess.clear()
-        pending.clear()
-        injected.clear()
-
     def send(ws, method, params=None, tag=None):
         msg_id["v"] += 1
         mid = msg_id["v"]
@@ -919,19 +872,6 @@ def run_worker_seed():
                     _patch_skipped("manual attach send failed", e)
             return
 
-        if msg.get("method") == "Target.targetDestroyed":
-            p = msg.get("params") or {}
-            _drop_target_state(p.get("targetId"))
-            return
-
-        if msg.get("method") == "Target.detachedFromTarget":
-            p = msg.get("params") or {}
-            sid = p.get("sessionId") or msg.get("sessionId")
-            meta = _cleanup_session_state(sid)
-            if meta:
-                _drop_target_state(meta.get("targetId"))
-            return
-
         if msg.get("method") != "Target.attachedToTarget":
             return
 
@@ -988,7 +928,6 @@ def run_worker_seed():
         global _RUNNING_WORKER_SEED, _WORKER_SEED_WS, _WORKER_SEED_STOPPING
         _RUNNING_WORKER_SEED = False
         _WORKER_SEED_WS = None
-        _cleanup_worker_runtime_state()
         if _WORKER_SEED_STOPPING:
             logger.info("Worker seed inject: websocket closed by stop request code=%r msg=%r", code, msg)
         elif fatal["disconnect"]:
@@ -1005,6 +944,5 @@ def run_worker_seed():
         _WORKER_SEED_WS = None
         _RUNNING_WORKER_SEED = False
         _WORKER_SEED_STOPPING = False
-        _cleanup_worker_runtime_state()
     if fatal["err"]:
         raise fatal["err"]

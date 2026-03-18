@@ -29,6 +29,7 @@ SW_META = None
 WORKER_SEED_INJECT_ENABLED = True
 CDP_GLOBAL_SEED = None
 _RUNNING_WORKER_SEED = False
+_WORKER_SEED_AUTOATTACH_READY = threading.Event()
 _RUNNING = False
 _SW_WS = None
 _WORKER_SEED_WS = None
@@ -169,12 +170,25 @@ def enable_worker_seed_inject(global_seed: str):
     """
     Enable Dedicated/Shared worker injection for CDP_GLOBAL_SEED.
     Call this BEFORE starting run_worker_seed().
+    This contract is mandatory wherever worker bootstrap expects CDP_GLOBAL_SEED.
     """
     global WORKER_SEED_INJECT_ENABLED, CDP_GLOBAL_SEED
     if not isinstance(global_seed, str) or not global_seed.strip():
         raise ValueError("Worker seed inject: global_seed must be non-empty str")
     CDP_GLOBAL_SEED = global_seed
     WORKER_SEED_INJECT_ENABLED = True
+    _WORKER_SEED_AUTOATTACH_READY.clear()
+
+
+def wait_worker_seed_ready(timeout_s: float = 10.0) -> bool:
+    deadline = time.time() + float(timeout_s)
+    while time.time() < deadline:
+        if _WORKER_SEED_AUTOATTACH_READY.is_set():
+            return True
+        if not _RUNNING_WORKER_SEED and _WORKER_SEED_WS is None:
+            return False
+        time.sleep(0.02)
+    return _WORKER_SEED_AUTOATTACH_READY.is_set()
 
 
 def stop():
@@ -200,6 +214,7 @@ def stop_worker_seed():
     if ws is None:
         return False
     _WORKER_SEED_STOPPING = True
+    _WORKER_SEED_AUTOATTACH_READY.clear()
     try:
         ws.keep_running = False
     except Exception:
@@ -712,20 +727,24 @@ def run_worker_seed():
         return
     _RUNNING_WORKER_SEED = True
     _WORKER_SEED_STOPPING = False
+    _WORKER_SEED_AUTOATTACH_READY.clear()
 
     if not WORKER_SEED_INJECT_ENABLED:
         _RUNNING_WORKER_SEED = False
-        logger.error("Worker seed inject: disabled flag encountered (PATCH_SKIPPED)")
+        _WORKER_SEED_AUTOATTACH_READY.clear()
+        logger.error("Worker seed inject: contract violation: injector is disabled while worker bootstrap expects CDP_GLOBAL_SEED")
         raise RuntimeError("Worker seed inject: disabled")
     if not isinstance(CDP_GLOBAL_SEED, str) or not CDP_GLOBAL_SEED.strip():
         _RUNNING_WORKER_SEED = False
-        logger.error("Worker seed inject: CDP_GLOBAL_SEED missing (PATCH_SKIPPED)")
+        _WORKER_SEED_AUTOATTACH_READY.clear()
+        logger.error("Worker seed inject: contract violation: CDP_GLOBAL_SEED missing; enable_worker_seed_inject() must run before worker bootstrap")
         raise RuntimeError("Worker seed inject: seed missing")
 
     try:
         ws_url = get_ws_url()
     except Exception as e:
         _RUNNING_WORKER_SEED = False
+        _WORKER_SEED_AUTOATTACH_READY.clear()
         logger.exception("Worker seed inject: get_ws_url failed (PATCH_SKIPPED)")
         raise ValueError("Worker seed inject: fail") from e
 
@@ -736,7 +755,10 @@ def run_worker_seed():
 
     msg_id = {"v": 0}
     injected = set()   # targetId set
-    manual_attach_sent = set()  # targetId set for fallback manual attach
+    manual_attach_sent = set()  # targetId set for emergency fallback manual attach
+    fallback_attach_timers = {}  # targetId -> Timer
+    created_targets = {}  # targetId -> {type,url}
+    autoattach_state = {"ready": False}
     sess_meta = {}  # sessionId -> {targetId,type,url}
     seed_prelude = _build_worker_seed_prelude(CDP_GLOBAL_SEED)
     sanity_expr = (
@@ -776,11 +798,21 @@ def run_worker_seed():
         except Exception:
             pass
 
+    def _cancel_fallback_timer(target_id):
+        timer = fallback_attach_timers.pop(target_id, None)
+        if timer is None:
+            return
+        try:
+            timer.cancel()
+        except Exception:
+            pass
+
     def _drop_target_state(target_id):
         if not target_id:
             return
+        _cancel_fallback_timer(target_id)
+        created_targets.pop(target_id, None)
         manual_attach_sent.discard(target_id)
-        injected.discard(target_id)
 
     def _cleanup_session_state(session_id):
         if not session_id:
@@ -791,11 +823,56 @@ def run_worker_seed():
         return meta
 
     def _cleanup_worker_runtime_state():
+        for timer in list(fallback_attach_timers.values()):
+            try:
+                timer.cancel()
+            except Exception:
+                pass
+        fallback_attach_timers.clear()
+        created_targets.clear()
         manual_attach_sent.clear()
         sess_meta.clear()
         pending_sess.clear()
         pending.clear()
         injected.clear()
+
+    def _schedule_manual_attach_fallback(ws, target_id: str, target_type: str, target_url: str):
+        if not target_id:
+            return
+        created_targets[target_id] = {"type": target_type, "url": target_url}
+        if not autoattach_state["ready"]:
+            return
+        if target_id in injected or target_id in manual_attach_sent or target_id in fallback_attach_timers:
+            return
+
+        def _manual_attach_fallback():
+            fallback_attach_timers.pop(target_id, None)
+            if fatal["err"] is not None or _WORKER_SEED_STOPPING or not autoattach_state["ready"]:
+                return
+            info = created_targets.get(target_id)
+            if info is None or target_id in injected or target_id in manual_attach_sent:
+                return
+            manual_attach_sent.add(target_id)
+            logger.warning(
+                "Worker seed inject: auto-attach missing for %s targetId=%s url=%r -> manual fallback attach",
+                info.get("type"),
+                target_id,
+                info.get("url"),
+            )
+            try:
+                send(
+                    ws,
+                    "Target.attachToTarget",
+                    {"targetId": target_id, "flatten": True},
+                    tag=f"attach_worker_seed:{target_id}",
+                )
+            except Exception as e:
+                _fatal(ws, "manual attach send failed", {"targetId": target_id, "target": info, "error": repr(e)})
+
+        timer = threading.Timer(0.5, _manual_attach_fallback)
+        timer.daemon = True
+        fallback_attach_timers[target_id] = timer
+        timer.start()
 
     def send(ws, method, params=None, tag=None):
         msg_id["v"] += 1
@@ -852,14 +929,37 @@ def run_worker_seed():
             if tag == "autoattach_worker_seed" and msg.get("error"):
                 _fatal(ws, "autoattach filter unsupported", msg.get("error"))
                 return
+            if tag == "autoattach_worker_seed":
+                autoattach_state["ready"] = True
+                _WORKER_SEED_AUTOATTACH_READY.set()
+                for target_id, info in list(created_targets.items()):
+                    _schedule_manual_attach_fallback(
+                        ws,
+                        target_id,
+                        info.get("type"),
+                        info.get("url"),
+                    )
+                return
             if isinstance(tag, str) and tag.startswith("attach_worker_seed:"):
                 if msg.get("error"):
                     tid = tag.split(":", 1)[1] if ":" in tag else "unknown"
-                    logger.warning(
-                        "Worker seed inject: manual attach failed targetId=%s err=%r",
-                        tid,
-                        msg.get("error"),
+                    _fatal(
+                        ws,
+                        "worker seed manual attach failed",
+                        {
+                            "targetId": tid,
+                            "target": created_targets.get(tid),
+                            "error": msg.get("error"),
+                        },
                     )
+                    return
+                return
+            if sid and msg.get("error"):
+                _fatal(
+                    ws,
+                    f"worker seed session cmd failed: {tag or 'unknown'}",
+                    {"sessionId": sid, "target": sess_meta.get(sid), "error": msg.get("error")},
+                )
                 return
             if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:worker_seed_prelude", "Runtime.evaluate:worker_seed_sanity"):
                 res = msg.get("result") or {}
@@ -900,23 +1000,8 @@ def run_worker_seed():
             ttype = info.get("type")
             tid = info.get("targetId")
             turl = info.get("url")
-            if ttype in ("worker", "shared_worker") and tid and tid not in injected and tid not in manual_attach_sent:
-                manual_attach_sent.add(tid)
-                logger.info(
-                    "Worker seed inject: targetCreated %s targetId=%s url=%r -> manual attach",
-                    ttype,
-                    tid,
-                    turl,
-                )
-                try:
-                    send(
-                        ws,
-                        "Target.attachToTarget",
-                        {"targetId": tid, "flatten": True},
-                        tag=f"attach_worker_seed:{tid}",
-                    )
-                except Exception as e:
-                    _patch_skipped("manual attach send failed", e)
+            if ttype in ("worker", "shared_worker") and tid:
+                _schedule_manual_attach_fallback(ws, tid, ttype, turl)
             return
 
         if msg.get("method") == "Target.targetDestroyed":
@@ -944,6 +1029,8 @@ def run_worker_seed():
 
         if not sessionId or not tid:
             return
+        _cancel_fallback_timer(tid)
+        created_targets.pop(tid, None)
         if ttype not in ("worker", "shared_worker"):
             _patch_skipped(f"non-worker target attached: {ttype}")
             try:
@@ -951,14 +1038,20 @@ def run_worker_seed():
             except Exception as e:
                 _fatal(ws, "resume non-worker target failed", e)
             return
+        sess_meta[sessionId] = {"targetId": tid, "type": ttype, "url": turl}
         if tid in injected:
+            logger.warning(
+                "Worker seed inject: duplicate attached session targetId=%s sessionId=%s url=%r; resuming duplicate session only",
+                tid,
+                sessionId,
+                turl,
+            )
+            try:
+                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+            except Exception as e:
+                _fatal(ws, "worker duplicate session resume failed", e)
             return
         injected.add(tid)
-
-        try:
-            sess_meta[sessionId] = {"targetId": tid, "type": ttype, "url": turl}
-        except Exception:
-            pass
 
         logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
         try:
@@ -988,6 +1081,7 @@ def run_worker_seed():
         global _RUNNING_WORKER_SEED, _WORKER_SEED_WS, _WORKER_SEED_STOPPING
         _RUNNING_WORKER_SEED = False
         _WORKER_SEED_WS = None
+        _WORKER_SEED_AUTOATTACH_READY.clear()
         _cleanup_worker_runtime_state()
         if _WORKER_SEED_STOPPING:
             logger.info("Worker seed inject: websocket closed by stop request code=%r msg=%r", code, msg)
@@ -1005,6 +1099,7 @@ def run_worker_seed():
         _WORKER_SEED_WS = None
         _RUNNING_WORKER_SEED = False
         _WORKER_SEED_STOPPING = False
+        _WORKER_SEED_AUTOATTACH_READY.clear()
         _cleanup_worker_runtime_state()
     if fatal["err"]:
         raise fatal["err"]
