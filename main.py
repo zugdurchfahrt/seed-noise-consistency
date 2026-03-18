@@ -342,7 +342,7 @@ def init_driver(
     logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
 
-    # Inject __GLOBAL_SEED into Dedicated/Shared workers via CDP (pauses workers on start).
+    # Inject global seed into Dedicated/Shared workers via CDP as CDP_GLOBAL_SEED (pauses workers on start).
     # if the CDP websocket drops mid-session, paused workers may remain paused.
     if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
         cdp.enable_worker_seed_inject(global_seed)
@@ -358,10 +358,6 @@ def init_driver(
             worker_seed_thread.ident,
             cdp.PORT,
         )
-        if not cdp.wait_worker_seed_ready():
-            logger.error("Worker seed inject: autoAttach ready-barrier failed on port %s", cdp.PORT)
-            raise RuntimeError("Worker seed inject: autoAttach ready-barrier failed")
-        logger.info("Worker seed inject: autoAttach ready-barrier satisfied on port %s", cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_worker_seed_thread_start")
 
 
@@ -1269,7 +1265,7 @@ def main():
         
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://browserleaks.com/fonts")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.
