@@ -208,7 +208,7 @@ pip install --no-cache-dir -r requirements.txt
 ## Issues/TODO
 - Синхронизация Canvas(window) -Canvas(SharedWorkerGlobalScope) .  
 - Интегрировать модуль `getClientRects` / `getBoundingClientRect` (проксирование).  
-- Фикс для Adapter “core‑features‑and‑limits” для WebGPU.  
 - Ротация TLS‑отпечатка через OpenSSL.  
-
-
+- события `success/ready` из мест, где фиксируется только факт установки хуков считать только `applied`: механика поставлена, но результат еще не доказан.  
+- Итоговый `success` ставить только после постусловия на наблюдаемой поверхности.  
+- Для font-модуля фиксировать `success` только если после завершения текущей цепочки состояние уже наблюдается через `DOM/CSS/font-measurement surface`, а не только через внутренние структуры; иначе фиксировать `applied_but_not_effective` или не ставить `success`.  

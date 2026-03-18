@@ -212,6 +212,7 @@ NO_PROXY_START.bat
 
 - Synchronize window ↔ SharedWorkerScope completely.
 - Integrate `getClientRects` / `getBoundingClientRect` proxying.
-- Fix Adapter “core-features-and-limits” for WebGPU.
-- Switch hooks patching to prototypes (not instances) + correct descriptors.
 - Implement TLS fingerprint rotation via OpenSSL.
+- Treat `success/ready` events from places that only record hook installation only as `applied`: the mechanism is installed, but the result is not yet proven.
+- Emit final `success` only after a postcondition on the observable surface.
+- For the font module, emit `success` only if the state is observable after the current chain through the `DOM/CSS/font-measurement surface`, not only through internal structures; otherwise mark `applied_but_not_effective` or emit no `success`.
