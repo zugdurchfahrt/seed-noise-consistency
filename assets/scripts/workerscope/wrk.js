@@ -598,7 +598,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
   return `
     (async function(){
       'use strict';
-      self.__GW_BOOTSTRAP__ = true;
+      Object.defineProperty(self, '__GW_BOOTSTRAP__', { value: true, writable: true, configurable: true, enumerable: false });
       var __ENV_EMIT_Q__ = [];
       var __ENV_DIAG_RELAY_ACTIVE__ = false;
       var __serializeDiagErr = function(err){
@@ -939,7 +939,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
   return `
     (function(){
       'use strict';
-      self.__GW_BOOTSTRAP__ = true;
+      Object.defineProperty(self, '__GW_BOOTSTRAP__', { value: true, writable: true, configurable: true, enumerable: false });
       var __ENV_EMIT_Q__ = [];
       var __ENV_DIAG_RELAY_ACTIVE__ = false;
       var __serializeDiagErr = function(err){
