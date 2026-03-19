@@ -57,7 +57,63 @@
   }
 
   try {
-    const BR = (window.__ENV_BRIDGE__ = window.__ENV_BRIDGE__ || {});
+    const bridgeDesc = Object.getOwnPropertyDescriptor(window, '__ENV_BRIDGE__');
+    let BR = bridgeDesc
+      ? (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value') ? bridgeDesc.value : window.__ENV_BRIDGE__)
+      : window.__ENV_BRIDGE__;
+    if (BR == null) {
+      BR = {};
+      Object.defineProperty(window, '__ENV_BRIDGE__', {
+        value: BR,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    } else if (typeof BR !== 'object') {
+      const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+      __moduleDiag('error', __MODULE + ':bridge_missing', {
+        stage: 'preflight',
+        key: '__ENV_BRIDGE__',
+        message: '__ENV_BRIDGE__ missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'bridge_missing' }
+      }, err);
+      throw err;
+    } else if (!bridgeDesc) {
+      Object.defineProperty(window, '__ENV_BRIDGE__', {
+        value: BR,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    } else if (bridgeDesc.enumerable !== false) {
+      if (bridgeDesc.configurable === false) {
+        const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ non-configurable enumerable');
+        __moduleDiag('error', __MODULE + ':bridge_descriptor_invalid', {
+          stage: 'contract',
+          key: '__ENV_BRIDGE__',
+          message: '__ENV_BRIDGE__ non-configurable enumerable',
+          type: 'contract violation',
+          data: { outcome: 'throw', reason: 'bridge_descriptor_invalid' }
+        }, err);
+        throw err;
+      }
+      if (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value')) {
+        Object.defineProperty(window, '__ENV_BRIDGE__', {
+          value: BR,
+          writable: !!bridgeDesc.writable,
+          configurable: true,
+          enumerable: false
+        });
+      } else {
+        Object.defineProperty(window, '__ENV_BRIDGE__', {
+          get: bridgeDesc.get,
+          set: bridgeDesc.set,
+          configurable: true,
+          enumerable: false
+        });
+      }
+    }
     if (!BR || typeof BR !== 'object') {
       const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
       __moduleDiag('error', __MODULE + ':bridge_missing', {
