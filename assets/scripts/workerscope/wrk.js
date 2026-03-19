@@ -754,11 +754,16 @@ function mkModuleWorkerSource(snapshot, absUrl){
         }
         return s;
       };
-      self.__applyEnvSnapshot__ = s => {
-        if (self.__ENV_SNAP_APPLIED__ === s) return;
-        self.__lastSnap__ = __requireSnap(s);
-        self.__ENV_SNAP_APPLIED__ = s;
-      };
+      Object.defineProperty(self, '__applyEnvSnapshot__', {
+        value: function __applyEnvSnapshot__(s){
+          if (self.__ENV_SNAP_APPLIED__ === s) return;
+          self.__lastSnap__ = __requireSnap(s);
+          self.__ENV_SNAP_APPLIED__ = s;
+        },
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       try {
         self.__applyEnvSnapshot__(${SNAP});
       } catch (e) {

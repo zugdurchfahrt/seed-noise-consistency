@@ -1182,7 +1182,12 @@
         { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
       );
     }
-    self.__UACH_MIRROR_INSTALLED__ = true;
+    trackedDefineProperty(self, '__UACH_MIRROR_INSTALLED__', {
+      value: true,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
 
     const __workerCtx = {
       module: "WORKER_PATCH_SRC",
