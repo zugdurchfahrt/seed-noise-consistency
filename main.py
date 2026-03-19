@@ -366,15 +366,18 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
-            Path(SCRIPTS_CORE / "bootstrap_hide.js").read_text("utf-8"),
-            "BootstrapHideModule(window);",
-            # --- set_log ---
+            # --- set_log shell first: logger/context must exist before bootstrap operations ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
-            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "bootstrap_hide.js").read_text("utf-8"),
+            "BootstrapHideModule(window);",
             # --- core window ---
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
+            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+                
+ 
             # --- RTC ---
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
@@ -1266,7 +1269,7 @@ def main():
         
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.

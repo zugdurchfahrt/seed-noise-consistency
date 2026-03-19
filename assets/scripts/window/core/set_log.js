@@ -7,13 +7,38 @@ const LOGGingModule = function LOGGingModule() {
     const W = (typeof window !== "undefined" && window) ? window : null;
 
     const global = G;
-    const C = (W || G).CanvasPatchContext;
-    if (!C || (typeof C !== "object" && typeof C !== "function")) {
-      throw new Error("[LOGGingModule] CanvasPatchContext missing");
+    function __defineHiddenCompatValue(target, key, value) {
+      if (!target || (typeof target !== "object" && typeof target !== "function")) return null;
+      const current = Object.getOwnPropertyDescriptor(target, key);
+      if (current && current.configurable === false) return null;
+      Object.defineProperty(target, key, {
+        value: value,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      return value;
     }
-    const __loggerRoot = (C.__logger && typeof C.__logger === "object") ? C.__logger : null;
+    let C = (W || G).CanvasPatchContext;
+    if (!C || (typeof C !== "object" && typeof C !== "function")) {
+      C = __defineHiddenCompatValue(W || G, "CanvasPatchContext", Object.create(null));
+      if (!C) throw new Error("[LOGGingModule] CanvasPatchContext bootstrap failed");
+    } else {
+      __defineHiddenCompatValue(W || G, "CanvasPatchContext", C);
+    }
+    let stateRoot = (C.state && typeof C.state === "object") ? C.state : null;
+    if (!stateRoot) {
+      stateRoot = __defineHiddenCompatValue(C, "state", Object.create(null));
+      if (!stateRoot) throw new Error("[LOGGingModule] CanvasPatchContext.state bootstrap failed");
+    } else {
+      __defineHiddenCompatValue(C, "state", stateRoot);
+    }
+    let __loggerRoot = (C.__logger && typeof C.__logger === "object") ? C.__logger : null;
     if (!__loggerRoot) {
-      throw new Error("[LOGGingModule] CanvasPatchContext.__logger missing");
+      __loggerRoot = __defineHiddenCompatValue(C, "__logger", Object.create(null));
+      if (!__loggerRoot) throw new Error("[LOGGingModule] CanvasPatchContext.__logger bootstrap failed");
+    } else {
+      __defineHiddenCompatValue(C, "__logger", __loggerRoot);
     }
 
     function __defineWindowLoggerAccessor(name, getter, setter) {

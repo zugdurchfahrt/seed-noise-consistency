@@ -57,6 +57,12 @@ Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
     stepMs: __probeNum(__probeTimeoutCfg.stepMs, 8000),
     totalMs: __probeNum(__probeTimeoutCfg.totalMs, 30000)
   };
+  const __probeFlagsCfg =
+    (globalThis.__PROBE_FLAGS__ && typeof globalThis.__PROBE_FLAGS__ === "object")
+      ? globalThis.__PROBE_FLAGS__
+      : {};
+  const __PROBE_ENABLE_RECEIVER_CHECKS__ = __probeFlagsCfg.receiverChecks === true;
+  const __PROBE_ENABLE_BRAND_CHECK__ = __probeFlagsCfg.brandCheck === true;
   const __probeRunStartedAt = Date.now();
 
   function __probeBuildTimeoutError(meta, timeoutMs, elapsedMs) {
@@ -1886,7 +1892,7 @@ function printToStringCrossRealmChecks() {
   }
 
   // 2) Brand / receiver invariants (hard): non-function receiver must throw (TypeError in Chromium)
-  (function brandCheck() {
+  if (__PROBE_ENABLE_BRAND_CHECK__) (function brandCheck() {
     const ourFn = Function.prototype.toString;
     const theirFn = w.Function && w.Function.prototype && w.Function.prototype.toString;
 
@@ -2192,9 +2198,10 @@ function printToStringCrossRealmChecks() {
   // - runtime rows are built only from __DEGRADE__ buffer;
   // - patch rows are shown only for modules that already emit grouped patch diagnostics.
   const PROBE_MODULE_CHECK_SLOTS = [
-    { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "missing", functions: "none" },
-    { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none" },
+    { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "diag", functions: "none" },
+    { module: "bootstrap_hide", diagTag: "bootstrap_hide", codePrefix: "bootstrap_hide", source: "bundle", emitter: "diag", functions: "none" },
     { module: "core_window", diagTag: "core_window", codePrefix: "core_window", source: "bundle", emitter: "diag", functions: "none" },
+    { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none" },
     { module: "rtc", diagTag: "rtc", codePrefix: "rtc", source: "bundle", emitter: "diag", functions: "auto" },
     { module: "hide_webdriver", diagTag: "hide_webdriver", codePrefix: "hide_webdriver", source: "bundle", emitter: "diag", functions: "auto" },
     { module: "wrk", diagTag: "wrk", codePrefix: "wrk", source: "bundle", emitter: "diag", functions: "none" },
@@ -2213,7 +2220,21 @@ function printToStringCrossRealmChecks() {
     { module: "uad_override", diagTag: "uad_override", codePrefix: "uad_override", source: "cdp", emitter: "diag", functions: "auto" },
     { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto" },
     { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto" },
-    { module: "WORKER_PATCH_SRC", diagTag: "worker_patch", codePrefix: "worker_patch_src", source: "cdp", emitter: "diag", functions: "none", aliases: ["WORKER_PATCH_SRC"] },
+    {
+      module: "WORKER_PATCH_SRC",
+      diagTag: "worker_patch",
+      codePrefix: "worker_patch_src",
+      source: "cdp",
+      emitter: "diag",
+      functions: "none",
+      aliases: ["WORKER_PATCH_SRC"],
+      requiresResultProof: true,
+      critical: true,
+      locate: {
+        file: "sunami/assets/scripts/workerscope/WORKER_PATCH_SRC.js",
+        triggerCode: "worker_patch_src:apply:installed"
+      }
+    },
     { module: "worker_bootstrap", diagTag: "worker_bootstrap", codePrefix: "worker_bootstrap", source: "cdp", emitter: "diag", functions: "none" }
   ];
 
@@ -2239,6 +2260,7 @@ function printToStringCrossRealmChecks() {
     if (typeof code !== "string" || !code) return false;
     return (
       code.endsWith(":ready") ||
+      code.endsWith(":installed") ||
       code.endsWith(":applied") ||
       code.endsWith(":patched") ||
       code.endsWith(":patches_applied") ||
@@ -2316,11 +2338,46 @@ function printToStringCrossRealmChecks() {
     }
     if (level === "fatal" || level === "error") return "error";
     if (level === "warn") return "warn";
+    if (slot && slot.requiresResultProof === true && __probeSummaryCode(entry.code)) return "apply_only";
     return __probeSummaryCode(entry.code) ? "ok" : "seen";
+  }
+
+  function __probeEmitCriticalModuleSignal(slot, entry, status) {
+    try {
+      if (!slot || slot.critical !== true) return;
+      if (status !== "apply_only" && status !== "warn" && status !== "error" && status !== "not_emitted" && status !== "missing_emitter") return;
+      const locate = (slot.locate && typeof slot.locate === "object") ? slot.locate : null;
+      const code =
+        status === "apply_only"
+          ? "probe:critical_module_result_missing"
+          : "probe:critical_module_status";
+      const message =
+        status === "apply_only"
+          ? "critical module emitted only apply/install signal; result proof missing"
+          : "critical module status is not ok";
+      __probeDiag("error", code, {
+        diagTag: "probe:module_check",
+        key: (typeof slot.module === "string" && slot.module) ? slot.module : null,
+        stage: "runtime",
+        message,
+        type: "pipeline missing data",
+        data: {
+          outcome: "return",
+          reason: status,
+          module: slot.module || null,
+          code: (entry && typeof entry.code === "string") ? entry.code : null,
+          source: slot.source || null,
+          file: locate && typeof locate.file === "string" ? locate.file : null,
+          triggerCode: locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null
+        }
+      }, null);
+    } catch (_) {}
   }
 
   function __probeMakeRow(index, slot, entry, kind, unit, status) {
     const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+    const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+    const locate = (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
     return {
       idx: index,
       kind: kind,
@@ -2339,6 +2396,14 @@ function printToStringCrossRealmChecks() {
         : (extra && typeof extra.module === "string" ? extra.module : null),
       stage: extra && typeof extra.stage === "string" ? extra.stage : null,
       key: extra && (typeof extra.key === "string" || extra.key === null) ? extra.key : null,
+      triggerCode: data && typeof data.triggerCode === "string"
+        ? data.triggerCode
+        : (data && typeof data.code === "string"
+          ? data.code
+          : (locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null)),
+      file: data && typeof data.file === "string"
+        ? data.file
+        : (locate && typeof locate.file === "string" ? locate.file : null),
       message: (extra && typeof extra.message === "string")
         ? extra.message
         : (entry && entry.error && typeof entry.error === "object" && typeof entry.error.message === "string")
@@ -2412,6 +2477,7 @@ function printToStringCrossRealmChecks() {
         const moduleEvent = __probePickModuleEvent(slot, events);
         const moduleStatus = __probeRowStatus(slot, moduleEvent);
         rows.push(__probeMakeRow(rowIndex++, slot, moduleEvent, "module", slot.module, moduleStatus));
+        __probeEmitCriticalModuleSignal(slot, moduleEvent, moduleStatus);
 
         if (slot.functions !== "none") {
           const latestByUnit = Object.create(null);
@@ -2443,8 +2509,21 @@ function printToStringCrossRealmChecks() {
     __probeLogAsyncTimeout(fieldsMeta, fieldsWait.elapsedMs, fieldsWait.timeoutMs, fieldsWait.error);
   }
   const receiverMeta = { check: "__PROBE__", phase: "build", method: "printReceiverChecks" };
-  const receiverWait = await __probeAwaitWithinBudget(printReceiverChecks(), receiverMeta);
-  if (!receiverWait.ok && receiverWait.timedOut) {
+  const receiverWait = __PROBE_ENABLE_RECEIVER_CHECKS__
+    ? await __probeAwaitWithinBudget(printReceiverChecks(), receiverMeta)
+    : {
+        ok: true,
+        value: {
+          ok: true,
+          rows: [],
+          skipped: true,
+          reason: "disabled_by_probe_flags"
+        },
+        timedOut: false,
+        elapsedMs: 0,
+        timeoutMs: 0
+      };
+  if (__PROBE_ENABLE_RECEIVER_CHECKS__ && !receiverWait.ok && receiverWait.timedOut) {
     __probeLogAsyncTimeout(receiverMeta, receiverWait.elapsedMs, receiverWait.timeoutMs, receiverWait.error);
   }
 
@@ -2496,7 +2575,7 @@ function printToStringCrossRealmChecks() {
         timeoutMs: fieldsWait.timeoutMs
       },
       receiverChecks: {
-        state: receiverWait.ok ? "resolved" : (receiverWait.timedOut ? "timed_out" : "rejected"),
+        state: __PROBE_ENABLE_RECEIVER_CHECKS__ ? (receiverWait.ok ? "resolved" : (receiverWait.timedOut ? "timed_out" : "rejected")) : "disabled",
         elapsedMs: receiverWait.elapsedMs,
         timeoutMs: receiverWait.timeoutMs
       }

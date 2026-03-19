@@ -611,6 +611,18 @@
               }
             }
           }
+          const nativeOut = origGHEV.call(this, keys);
+          if (!nativeOut || typeof nativeOut.then !== 'function') {
+            emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_promise_contract_failed', {
+              stage: 'runtime',
+              surface: 'WorkerNavigatorUAData',
+              key: 'getHighEntropyValues',
+              message: 'promise contract failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'return', reason: 'promise_contract_failed' }
+            }, null);
+            return origGHEV.call(this, keys);
+          }
           const s = cache.snap;
           const le = s.uaData;
           if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
@@ -630,22 +642,38 @@
           };
           const out = {};
           for (const k of keys) {
-            if (!(k in map)) continue;
             const v = map[k];
             if (v === undefined || v === null || (typeof v === 'string' && !v && k !== 'model') || (Array.isArray(v) && !v.length)) {
-              emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_native_fallback', {
-                stage: 'runtime',
-                surface: 'WorkerNavigatorUAData',
-                key: k,
-                message: 'getHighEntropyValues fallback to native',
-                type: 'pipeline missing data',
-                data: { outcome: 'skip', reason: 'get_high_entropy_values_native_fallback' }
-              }, null);
-              return origGHEV.call(this, keys);
+              continue;
             }
             out[k] = deep(v);
           }
-          return Promise.resolve(out);
+          return nativeOut.then(function workerGetHighEntropyValuesPost(nativeResolved) {
+            try {
+              const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : null;
+              if (!base) {
+                return Object.keys(out).length ? Object.assign({}, out) : nativeResolved;
+              }
+              const merged = Object.assign({}, base);
+              for (const k of Object.keys(out)) {
+                const current = merged[k];
+                if (current === undefined || current === null || (typeof current === 'string' && !current && k !== 'model') || (Array.isArray(current) && !current.length)) {
+                  merged[k] = out[k];
+                }
+              }
+              return merged;
+            } catch (e) {
+              emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_hooks_post_failed', {
+                stage: 'runtime',
+                surface: 'WorkerNavigatorUAData',
+                key: 'getHighEntropyValues',
+                message: 'getHighEntropyValues hooksPost failed',
+                type: 'pipeline missing data',
+                data: { outcome: 'return', reason: 'hooks_post_failed' }
+              }, e);
+              return nativeResolved;
+            }
+          });
         } catch (e) {
           emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_native_fallback', {
             stage: 'runtime',
