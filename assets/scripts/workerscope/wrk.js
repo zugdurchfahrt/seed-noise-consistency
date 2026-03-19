@@ -703,6 +703,95 @@ function mkModuleWorkerSource(snapshot, absUrl){
         __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ });
         throw e;
       }
+      var __requireWebGLSnap__ = function(){
+        var snap = self.__lastSnap__;
+        if (!snap || typeof snap !== 'object') throw new Error('UACHPatch: no snapshot');
+        var webgl = snap.webgl;
+        if (!webgl || typeof webgl !== 'object') throw new Error('UACHPatch: missing webgl');
+        if (typeof webgl.vendor !== 'string' || !webgl.vendor) throw new Error('UACHPatch: bad webgl.vendor');
+        if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
+        if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
+        if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
+        return webgl;
+      };
+      var __installEarlyWorkerWebGLMirror__ = function(){
+        __requireWebGLSnap__();
+        if (typeof OffscreenCanvas !== 'function' || !OffscreenCanvas.prototype) return;
+        var oscProto = OffscreenCanvas.prototype;
+        var dGetContext = Object.getOwnPropertyDescriptor(oscProto, 'getContext');
+        if (!dGetContext || typeof dGetContext.value !== 'function' || dGetContext.configurable === false) {
+          throw new Error('UACHPatch: OffscreenCanvas.getContext descriptor missing');
+        }
+        var nativeGetContext = dGetContext.value;
+        var patchedContexts = new WeakSet();
+        var debugInfoCache = new WeakMap();
+        var patchContextInstance = function(ctx){
+          if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) return ctx;
+          if (patchedContexts.has(ctx)) return ctx;
+          patchedContexts.add(ctx);
+          var dGetParameter = Object.getOwnPropertyDescriptor(ctx, 'getParameter');
+          var nativeGetParameter = (dGetParameter && typeof dGetParameter.value === 'function')
+            ? dGetParameter.value
+            : (typeof ctx.getParameter === 'function' ? ctx.getParameter : null);
+          if (!nativeGetParameter) throw new Error('UACHPatch: worker WebGL getParameter missing');
+          var dGetExtension = Object.getOwnPropertyDescriptor(ctx, 'getExtension');
+          var nativeGetExtension = (dGetExtension && typeof dGetExtension.value === 'function')
+            ? dGetExtension.value
+            : (typeof ctx.getExtension === 'function' ? ctx.getExtension : null);
+          if (typeof nativeGetExtension === 'function') {
+            Object.defineProperty(ctx, 'getExtension', {
+              configurable: dGetExtension ? !!dGetExtension.configurable : true,
+              enumerable: dGetExtension ? !!dGetExtension.enumerable : false,
+              writable: dGetExtension && Object.prototype.hasOwnProperty.call(dGetExtension, 'writable') ? dGetExtension.writable : true,
+              value: function getExtension(name) {
+                var ext = Reflect.apply(nativeGetExtension, this, arguments);
+                if (name === 'WEBGL_debug_renderer_info') {
+                  debugInfoCache.set(this, ext || null);
+                }
+                return ext;
+              }
+            });
+          }
+          Object.defineProperty(ctx, 'getParameter', {
+            configurable: dGetParameter ? !!dGetParameter.configurable : true,
+            enumerable: dGetParameter ? !!dGetParameter.enumerable : false,
+            writable: dGetParameter && Object.prototype.hasOwnProperty.call(dGetParameter, 'writable') ? dGetParameter.writable : true,
+            value: function getParameter(pname) {
+              var live = __requireWebGLSnap__();
+              var dbg = debugInfoCache.has(this) ? debugInfoCache.get(this) : undefined;
+              if (dbg === undefined) {
+                dbg = null;
+                if (typeof nativeGetExtension === 'function') {
+                  try { dbg = Reflect.apply(nativeGetExtension, this, ['WEBGL_debug_renderer_info']); } catch (_e) { dbg = null; }
+                }
+                debugInfoCache.set(this, dbg);
+              }
+              if (dbg) {
+                if (pname === dbg.UNMASKED_VENDOR_WEBGL) return live.unmaskedVendor;
+                if (pname === dbg.UNMASKED_RENDERER_WEBGL) return live.unmaskedRenderer;
+              }
+              if (pname === this.VENDOR || pname === 0x1F00) return live.vendor;
+              if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
+              return Reflect.apply(nativeGetParameter, this, arguments);
+            }
+          });
+          return ctx;
+        };
+        Object.defineProperty(oscProto, 'getContext', {
+          configurable: !!dGetContext.configurable,
+          enumerable: !!dGetContext.enumerable,
+          writable: dGetContext && Object.prototype.hasOwnProperty.call(dGetContext, 'writable') ? dGetContext.writable : true,
+          value: function getContext(kind) {
+            var res = Reflect.apply(nativeGetContext, this, arguments);
+            if (!res) return res;
+            if (kind === 'webgl' || kind === 'webgl2' || kind === 'experimental-webgl') {
+              return patchContextInstance(res);
+            }
+            return res;
+          }
+        });
+      };
+      __installEarlyWorkerWebGLMirror__();
       if (!self.__ENV_SYNC_BC_INSTALLED__) {
         try {
           if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
@@ -957,6 +1046,95 @@ function mkClassicWorkerSource(snapshot, absUrl){
         __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ });
         throw e;
       }
+      var __requireWebGLSnap__ = function(){
+        var snap = self.__lastSnap__;
+        if (!snap || typeof snap !== 'object') throw new Error('UACHPatch: no snapshot');
+        var webgl = snap.webgl;
+        if (!webgl || typeof webgl !== 'object') throw new Error('UACHPatch: missing webgl');
+        if (typeof webgl.vendor !== 'string' || !webgl.vendor) throw new Error('UACHPatch: bad webgl.vendor');
+        if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
+        if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
+        if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
+        return webgl;
+      };
+      var __installEarlyWorkerWebGLMirror__ = function(){
+        __requireWebGLSnap__();
+        if (typeof OffscreenCanvas !== 'function' || !OffscreenCanvas.prototype) return;
+        var oscProto = OffscreenCanvas.prototype;
+        var dGetContext = Object.getOwnPropertyDescriptor(oscProto, 'getContext');
+        if (!dGetContext || typeof dGetContext.value !== 'function' || dGetContext.configurable === false) {
+          throw new Error('UACHPatch: OffscreenCanvas.getContext descriptor missing');
+        }
+        var nativeGetContext = dGetContext.value;
+        var patchedContexts = new WeakSet();
+        var debugInfoCache = new WeakMap();
+        var patchContextInstance = function(ctx){
+          if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) return ctx;
+          if (patchedContexts.has(ctx)) return ctx;
+          patchedContexts.add(ctx);
+          var dGetParameter = Object.getOwnPropertyDescriptor(ctx, 'getParameter');
+          var nativeGetParameter = (dGetParameter && typeof dGetParameter.value === 'function')
+            ? dGetParameter.value
+            : (typeof ctx.getParameter === 'function' ? ctx.getParameter : null);
+          if (!nativeGetParameter) throw new Error('UACHPatch: worker WebGL getParameter missing');
+          var dGetExtension = Object.getOwnPropertyDescriptor(ctx, 'getExtension');
+          var nativeGetExtension = (dGetExtension && typeof dGetExtension.value === 'function')
+            ? dGetExtension.value
+            : (typeof ctx.getExtension === 'function' ? ctx.getExtension : null);
+          if (typeof nativeGetExtension === 'function') {
+            Object.defineProperty(ctx, 'getExtension', {
+              configurable: dGetExtension ? !!dGetExtension.configurable : true,
+              enumerable: dGetExtension ? !!dGetExtension.enumerable : false,
+              writable: dGetExtension && Object.prototype.hasOwnProperty.call(dGetExtension, 'writable') ? dGetExtension.writable : true,
+              value: function getExtension(name) {
+                var ext = Reflect.apply(nativeGetExtension, this, arguments);
+                if (name === 'WEBGL_debug_renderer_info') {
+                  debugInfoCache.set(this, ext || null);
+                }
+                return ext;
+              }
+            });
+          }
+          Object.defineProperty(ctx, 'getParameter', {
+            configurable: dGetParameter ? !!dGetParameter.configurable : true,
+            enumerable: dGetParameter ? !!dGetParameter.enumerable : false,
+            writable: dGetParameter && Object.prototype.hasOwnProperty.call(dGetParameter, 'writable') ? dGetParameter.writable : true,
+            value: function getParameter(pname) {
+              var live = __requireWebGLSnap__();
+              var dbg = debugInfoCache.has(this) ? debugInfoCache.get(this) : undefined;
+              if (dbg === undefined) {
+                dbg = null;
+                if (typeof nativeGetExtension === 'function') {
+                  try { dbg = Reflect.apply(nativeGetExtension, this, ['WEBGL_debug_renderer_info']); } catch (_e) { dbg = null; }
+                }
+                debugInfoCache.set(this, dbg);
+              }
+              if (dbg) {
+                if (pname === dbg.UNMASKED_VENDOR_WEBGL) return live.unmaskedVendor;
+                if (pname === dbg.UNMASKED_RENDERER_WEBGL) return live.unmaskedRenderer;
+              }
+              if (pname === this.VENDOR || pname === 0x1F00) return live.vendor;
+              if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
+              return Reflect.apply(nativeGetParameter, this, arguments);
+            }
+          });
+          return ctx;
+        };
+        Object.defineProperty(oscProto, 'getContext', {
+          configurable: !!dGetContext.configurable,
+          enumerable: !!dGetContext.enumerable,
+          writable: dGetContext && Object.prototype.hasOwnProperty.call(dGetContext, 'writable') ? dGetContext.writable : true,
+          value: function getContext(kind) {
+            var res = Reflect.apply(nativeGetContext, this, arguments);
+            if (!res) return res;
+            if (kind === 'webgl' || kind === 'webgl2' || kind === 'experimental-webgl') {
+              return patchContextInstance(res);
+            }
+            return res;
+          }
+        });
+      };
+      __installEarlyWorkerWebGLMirror__();
       if (!self.__ENV_SYNC_BC_INSTALLED__) {
         try {
           if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
