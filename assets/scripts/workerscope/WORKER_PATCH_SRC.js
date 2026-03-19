@@ -334,7 +334,15 @@
     if (!nativeUAD) throw new Error('worker_patch_src: worker navigator.userAgentData missing');
     const uadProto = Object.getPrototypeOf(nativeUAD);
     if (!uadProto) throw new Error('worker_patch_src: worker navigator.userAgentData proto missing');
-    const isUadThis = (self) => (self === nativeUAD);
+    const isUadThis = (recv) => {
+      if (recv === nativeUAD) return true;
+      if (!recv || (typeof recv !== 'object' && typeof recv !== 'function')) return false;
+      try {
+        return Object.getPrototypeOf(recv) === uadProto;
+      } catch (_) {
+        return false;
+      }
+    };
     const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
     const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
     const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
@@ -580,38 +588,30 @@
         try {
           if (!cache.snap) throw new Error('UACHPatch: no snap');
           if (!Array.isArray(keys)) {
-            try {
-              return origGHEV.call(this, keys);
-            } catch (e) {
-              emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
+            emitDegrade('error', 'worker_patch_src:get_high_entropy_values_bad_keys', {
+              stage: 'runtime',
+              surface: 'WorkerNavigatorUAData',
+              key: 'getHighEntropyValues',
+              message: 'bad highEntropy keys',
+              type: 'pipeline missing data',
+              data: { outcome: 'return', reason: 'bad_keys' }
+            }, null);
+            return Reflect.apply(origGHEV, this, [keys]);
+          }
+          const nativeOut = Reflect.apply(origGHEV, this, [keys]);
+          for (const k of keys) {
+            if (typeof k !== 'string' || !k) {
+              emitDegrade('error', 'worker_patch_src:get_high_entropy_values_bad_hint', {
                 stage: 'runtime',
                 surface: 'WorkerNavigatorUAData',
                 key: 'getHighEntropyValues',
-                message: 'getHighEntropyValues illegal invocation',
-                type: 'browser structure missing data',
-                data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-              }, e);
-              throw e;
+                message: 'bad highEntropy key item',
+                type: 'pipeline missing data',
+                data: { outcome: 'return', reason: 'bad_hint' }
+              }, null);
+              return nativeOut;
             }
           }
-          for (const k of keys) {
-            if (typeof k !== 'string' || !k) {
-              try {
-                return origGHEV.call(this, keys);
-              } catch (e) {
-                emitDegrade('warn', 'worker_patch_src:uadata_illegal_invocation', {
-                  stage: 'runtime',
-                  surface: 'WorkerNavigatorUAData',
-                  key: 'getHighEntropyValues',
-                  message: 'getHighEntropyValues illegal invocation',
-                  type: 'browser structure missing data',
-                  data: { outcome: 'throw', reason: 'native_illegal_invocation' }
-                }, e);
-                throw e;
-              }
-            }
-          }
-          const nativeOut = origGHEV.call(this, keys);
           if (!nativeOut || typeof nativeOut.then !== 'function') {
             emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_promise_contract_failed', {
               stage: 'runtime',
@@ -626,8 +626,13 @@
           const s = cache.snap;
           const le = s.uaData;
           if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
-          const src = s.highEntropy;
+          const src = (le.he && typeof le.he === 'object') ? le.he : s.highEntropy;
           if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
+          const safeDeviceMemory = Number.isFinite(Number(s.deviceMemory)) ? Number(s.deviceMemory) : undefined;
+          const safeHardwareConcurrency = Number.isFinite(Number(s.hardwareConcurrency)) ? Number(s.hardwareConcurrency) : undefined;
+          const fullVersionList = (src.fullVersionList != null)
+            ? src.fullVersionList
+            : ((le.he && le.he.fullVersionList != null) ? le.he.fullVersionList : undefined);
           const map = {
             brands: le.brands,
             mobile: le.mobile,
@@ -636,7 +641,9 @@
             bitness: src.bitness,
             model: src.model,
             platformVersion: src.platformVersion,
-            fullVersionList: src.fullVersionList,
+            fullVersionList: fullVersionList,
+            deviceMemory: safeDeviceMemory,
+            hardwareConcurrency: safeHardwareConcurrency,
             wow64: src.wow64,
             formFactors: src.formFactors
           };
