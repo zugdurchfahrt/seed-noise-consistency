@@ -264,6 +264,9 @@ function EnvBus(G){
   const __geoStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__GEO_STATE__ && typeof G.CanvasPatchContext.state.__GEO_STATE__ === 'object')
     ? G.CanvasPatchContext.state.__GEO_STATE__
     : null;
+  const __webglStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__WEBGL_STATE__ && typeof G.CanvasPatchContext.state.__WEBGL_STATE__ === 'object')
+    ? G.CanvasPatchContext.state.__WEBGL_STATE__
+    : null;
   const __envLangs = (() => {
     const src = (__langStateRoot && Array.isArray(__langStateRoot.normalizedLanguages))
       ? __langStateRoot.normalizedLanguages
@@ -298,6 +301,84 @@ function EnvBus(G){
   const __envContract = (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object')
     ? __cloneEnvValue(G.__EXPECTED_CLIENT_HINTS)
     : null;
+  function __collectWindowWebGLCapabilities() {
+    const whitelist = Array.isArray(__webglStateRoot && __webglStateRoot.extensionsWhitelist)
+      ? __webglStateRoot.extensionsWhitelist.slice()
+      : null;
+    if (!Array.isArray(whitelist) || whitelist.length === 0) {
+      throw new Error('EnvBus: state.__WEBGL_STATE__.extensionsWhitelist missing');
+    }
+    let canvas = null;
+    try {
+      if (G.document && typeof G.document.createElement === 'function') {
+        canvas = G.document.createElement('canvas');
+        if (canvas) {
+          canvas.width = 1;
+          canvas.height = 1;
+        }
+      } else if (typeof G.OffscreenCanvas === 'function') {
+        canvas = new G.OffscreenCanvas(1, 1);
+      }
+    } catch (_) {
+      canvas = null;
+    }
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      throw new Error('EnvBus: window webgl canvas missing');
+    }
+    let ctx = null;
+    const contextIds = ['webgl2', 'webgl', 'experimental-webgl'];
+    for (let i = 0; i < contextIds.length; i++) {
+      const contextId = contextIds[i];
+      try {
+        ctx = canvas.getContext(contextId);
+      } catch (_) {
+        ctx = null;
+      }
+      if (ctx) break;
+    }
+    if (!ctx) {
+      throw new Error('EnvBus: window webgl context missing');
+    }
+    let supportedExtensions = null;
+    try {
+      supportedExtensions = (typeof ctx.getSupportedExtensions === 'function')
+        ? ctx.getSupportedExtensions()
+        : null;
+    } catch (_) {
+      supportedExtensions = null;
+    }
+    if (!Array.isArray(supportedExtensions)) {
+      throw new Error('EnvBus: window webgl supportedExtensions missing');
+    }
+    supportedExtensions = supportedExtensions.slice();
+    let compressedTextureFormats = null;
+    const compressedToken = (typeof ctx.COMPRESSED_TEXTURE_FORMATS === 'number')
+      ? ctx.COMPRESSED_TEXTURE_FORMATS
+      : (((G.WebGLRenderingContext || G.WebGL2RenderingContext) && typeof (G.WebGLRenderingContext || G.WebGL2RenderingContext).COMPRESSED_TEXTURE_FORMATS === 'number')
+        ? (G.WebGLRenderingContext || G.WebGL2RenderingContext).COMPRESSED_TEXTURE_FORMATS
+        : null);
+    if (compressedToken == null) {
+      throw new Error('EnvBus: COMPRESSED_TEXTURE_FORMATS token missing');
+    }
+    try {
+      compressedTextureFormats = (typeof ctx.getParameter === 'function')
+        ? ctx.getParameter(compressedToken)
+        : null;
+    } catch (_) {
+      compressedTextureFormats = null;
+    }
+    if (ArrayBuffer.isView(compressedTextureFormats)) {
+      compressedTextureFormats = Array.prototype.slice.call(compressedTextureFormats);
+    } else if (Array.isArray(compressedTextureFormats)) {
+      compressedTextureFormats = compressedTextureFormats.slice();
+    } else {
+      throw new Error('EnvBus: window webgl compressedTextureFormats missing');
+    }
+    return {
+      supportedExtensions,
+      compressedTextureFormats
+    };
+  }
   function envSnapshot(){
     const nav = G.navigator;
     let langs = __envLangs;
@@ -327,6 +408,7 @@ function EnvBus(G){
     if (typeof webglRenderer !== 'string' || !webglRenderer) throw new Error('EnvBus: __WEBGL_RENDERER__ missing');
     if (typeof webglUnmaskedVendor !== 'string' || !webglUnmaskedVendor) throw new Error('EnvBus: __WEBGL_UNMASKED_VENDOR__ missing');
     if (typeof webglUnmaskedRenderer !== 'string' || !webglUnmaskedRenderer) throw new Error('EnvBus: __WEBGL_UNMASKED_RENDERER__ missing');
+    const webglCapabilities = __collectWindowWebGLCapabilities();
 
     // UAData (Window runtime) is the primary source for Worker snapshots.
     const UAD = nav && nav.userAgentData;
@@ -447,7 +529,9 @@ function EnvBus(G){
         vendor: webglVendor,
         renderer: webglRenderer,
         unmaskedVendor: webglUnmaskedVendor,
-        unmaskedRenderer: webglUnmaskedRenderer
+        unmaskedRenderer: webglUnmaskedRenderer,
+        supportedExtensions: webglCapabilities.supportedExtensions,
+        compressedTextureFormats: webglCapabilities.compressedTextureFormats
       },
       hardwareConcurrency: cpu,
       deviceMemory: mem,
@@ -712,6 +796,8 @@ function mkModuleWorkerSource(snapshot, absUrl){
         if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
         if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
         if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
+        if (!Array.isArray(webgl.supportedExtensions)) throw new Error('UACHPatch: bad webgl.supportedExtensions');
+        if (!Array.isArray(webgl.compressedTextureFormats)) throw new Error('UACHPatch: bad webgl.compressedTextureFormats');
         return webgl;
       };
       var __installEarlyWorkerWebGLMirror__ = function(){
@@ -738,17 +824,33 @@ function mkModuleWorkerSource(snapshot, absUrl){
           var nativeGetExtension = (dGetExtension && typeof dGetExtension.value === 'function')
             ? dGetExtension.value
             : (typeof ctx.getExtension === 'function' ? ctx.getExtension : null);
+          var dGetSupportedExtensions = Object.getOwnPropertyDescriptor(ctx, 'getSupportedExtensions');
+          var nativeGetSupportedExtensions = (dGetSupportedExtensions && typeof dGetSupportedExtensions.value === 'function')
+            ? dGetSupportedExtensions.value
+            : (typeof ctx.getSupportedExtensions === 'function' ? ctx.getSupportedExtensions : null);
           if (typeof nativeGetExtension === 'function') {
             Object.defineProperty(ctx, 'getExtension', {
               configurable: dGetExtension ? !!dGetExtension.configurable : true,
               enumerable: dGetExtension ? !!dGetExtension.enumerable : false,
               writable: dGetExtension && Object.prototype.hasOwnProperty.call(dGetExtension, 'writable') ? dGetExtension.writable : true,
               value: function getExtension(name) {
+                var live = __requireWebGLSnap__();
+                if (typeof name === 'string' && live.supportedExtensions.indexOf(name) === -1) return null;
                 var ext = Reflect.apply(nativeGetExtension, this, arguments);
                 if (name === 'WEBGL_debug_renderer_info') {
                   debugInfoCache.set(this, ext || null);
                 }
                 return ext;
+              }
+            });
+          }
+          if (typeof nativeGetSupportedExtensions === 'function') {
+            Object.defineProperty(ctx, 'getSupportedExtensions', {
+              configurable: dGetSupportedExtensions ? !!dGetSupportedExtensions.configurable : true,
+              enumerable: dGetSupportedExtensions ? !!dGetSupportedExtensions.enumerable : false,
+              writable: dGetSupportedExtensions && Object.prototype.hasOwnProperty.call(dGetSupportedExtensions, 'writable') ? dGetSupportedExtensions.writable : true,
+              value: function getSupportedExtensions() {
+                return __requireWebGLSnap__().supportedExtensions.slice();
               }
             });
           }
@@ -772,6 +874,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
               }
               if (pname === this.VENDOR || pname === 0x1F00) return live.vendor;
               if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
+              if (pname === this.COMPRESSED_TEXTURE_FORMATS || pname === 0x86A3) return live.compressedTextureFormats.slice();
               return Reflect.apply(nativeGetParameter, this, arguments);
             }
           });
@@ -1055,6 +1158,8 @@ function mkClassicWorkerSource(snapshot, absUrl){
         if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
         if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
         if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
+        if (!Array.isArray(webgl.supportedExtensions)) throw new Error('UACHPatch: bad webgl.supportedExtensions');
+        if (!Array.isArray(webgl.compressedTextureFormats)) throw new Error('UACHPatch: bad webgl.compressedTextureFormats');
         return webgl;
       };
       var __installEarlyWorkerWebGLMirror__ = function(){
@@ -1081,17 +1186,33 @@ function mkClassicWorkerSource(snapshot, absUrl){
           var nativeGetExtension = (dGetExtension && typeof dGetExtension.value === 'function')
             ? dGetExtension.value
             : (typeof ctx.getExtension === 'function' ? ctx.getExtension : null);
+          var dGetSupportedExtensions = Object.getOwnPropertyDescriptor(ctx, 'getSupportedExtensions');
+          var nativeGetSupportedExtensions = (dGetSupportedExtensions && typeof dGetSupportedExtensions.value === 'function')
+            ? dGetSupportedExtensions.value
+            : (typeof ctx.getSupportedExtensions === 'function' ? ctx.getSupportedExtensions : null);
           if (typeof nativeGetExtension === 'function') {
             Object.defineProperty(ctx, 'getExtension', {
               configurable: dGetExtension ? !!dGetExtension.configurable : true,
               enumerable: dGetExtension ? !!dGetExtension.enumerable : false,
               writable: dGetExtension && Object.prototype.hasOwnProperty.call(dGetExtension, 'writable') ? dGetExtension.writable : true,
               value: function getExtension(name) {
+                var live = __requireWebGLSnap__();
+                if (typeof name === 'string' && live.supportedExtensions.indexOf(name) === -1) return null;
                 var ext = Reflect.apply(nativeGetExtension, this, arguments);
                 if (name === 'WEBGL_debug_renderer_info') {
                   debugInfoCache.set(this, ext || null);
                 }
                 return ext;
+              }
+            });
+          }
+          if (typeof nativeGetSupportedExtensions === 'function') {
+            Object.defineProperty(ctx, 'getSupportedExtensions', {
+              configurable: dGetSupportedExtensions ? !!dGetSupportedExtensions.configurable : true,
+              enumerable: dGetSupportedExtensions ? !!dGetSupportedExtensions.enumerable : false,
+              writable: dGetSupportedExtensions && Object.prototype.hasOwnProperty.call(dGetSupportedExtensions, 'writable') ? dGetSupportedExtensions.writable : true,
+              value: function getSupportedExtensions() {
+                return __requireWebGLSnap__().supportedExtensions.slice();
               }
             });
           }
@@ -1115,6 +1236,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
               }
               if (pname === this.VENDOR || pname === 0x1F00) return live.vendor;
               if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
+              if (pname === this.COMPRESSED_TEXTURE_FORMATS || pname === 0x86A3) return live.compressedTextureFormats.slice();
               return Reflect.apply(nativeGetParameter, this, arguments);
             }
           });
