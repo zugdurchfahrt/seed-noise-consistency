@@ -283,6 +283,18 @@ function EnvBus(G){
   const __envTimeZone = (__geoStateRoot && typeof __geoStateRoot.timezone === 'string' && __geoStateRoot.timezone)
     ? __geoStateRoot.timezone
     : null;
+  const __envWebGLVendor = (typeof G.__WEBGL_VENDOR__ === 'string' && G.__WEBGL_VENDOR__)
+    ? G.__WEBGL_VENDOR__
+    : null;
+  const __envWebGLRenderer = (typeof G.__WEBGL_RENDERER__ === 'string' && G.__WEBGL_RENDERER__)
+    ? G.__WEBGL_RENDERER__
+    : null;
+  const __envWebGLUnmaskedVendor = (typeof G.__WEBGL_UNMASKED_VENDOR__ === 'string' && G.__WEBGL_UNMASKED_VENDOR__)
+    ? G.__WEBGL_UNMASKED_VENDOR__
+    : null;
+  const __envWebGLUnmaskedRenderer = (typeof G.__WEBGL_UNMASKED_RENDERER__ === 'string' && G.__WEBGL_UNMASKED_RENDERER__)
+    ? G.__WEBGL_UNMASKED_RENDERER__
+    : null;
   const __envContract = (G.__EXPECTED_CLIENT_HINTS && typeof G.__EXPECTED_CLIENT_HINTS === 'object')
     ? __cloneEnvValue(G.__EXPECTED_CLIENT_HINTS)
     : null;
@@ -307,6 +319,14 @@ function EnvBus(G){
     if (mem == null) throw new Error('EnvBus: __memory missing');
     const timeZone = __envTimeZone;
     if (!timeZone) throw new Error('EnvBus: state.__GEO_STATE__.timezone missing');
+    const webglVendor = __envWebGLVendor;
+    const webglRenderer = __envWebGLRenderer;
+    const webglUnmaskedVendor = __envWebGLUnmaskedVendor;
+    const webglUnmaskedRenderer = __envWebGLUnmaskedRenderer;
+    if (typeof webglVendor !== 'string' || !webglVendor) throw new Error('EnvBus: __WEBGL_VENDOR__ missing');
+    if (typeof webglRenderer !== 'string' || !webglRenderer) throw new Error('EnvBus: __WEBGL_RENDERER__ missing');
+    if (typeof webglUnmaskedVendor !== 'string' || !webglUnmaskedVendor) throw new Error('EnvBus: __WEBGL_UNMASKED_VENDOR__ missing');
+    if (typeof webglUnmaskedRenderer !== 'string' || !webglUnmaskedRenderer) throw new Error('EnvBus: __WEBGL_UNMASKED_RENDERER__ missing');
 
     // UAData (Window runtime) is the primary source for Worker snapshots.
     const UAD = nav && nav.userAgentData;
@@ -423,6 +443,12 @@ function EnvBus(G){
       ua, vendor, language: lang, languages: langs, dpr, cpu, mem, timeZone,
       uaData,
       highEntropy: he,
+      webgl: {
+        vendor: webglVendor,
+        renderer: webglRenderer,
+        unmaskedVendor: webglUnmaskedVendor,
+        unmaskedRenderer: webglUnmaskedRenderer
+      },
       hardwareConcurrency: cpu,
       deviceMemory: mem,
       windowKeys
