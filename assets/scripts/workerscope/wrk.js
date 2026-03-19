@@ -877,6 +877,27 @@ function mkModuleWorkerSource(snapshot, absUrl){
       }
 
       ${ENV_WRK_SRC}
+      const __workerPatchBridge = self.__ENV_BRIDGE__;
+      if (!__workerPatchBridge || typeof __workerPatchBridge !== 'object') throw new Error('UACHPatch: __ENV_BRIDGE__ missing');
+      if (!Object.prototype.hasOwnProperty.call(__workerPatchBridge, 'installWorkerUACHMirror')) {
+        let __installWorkerUACHMirror__;
+        Object.defineProperty(__workerPatchBridge, 'installWorkerUACHMirror', {
+          configurable: true,
+          enumerable: false,
+          get: function(){ return __installWorkerUACHMirror__; },
+          set: function(v){
+            __installWorkerUACHMirror__ = v;
+            if (typeof v === 'function') {
+              Object.defineProperty(__workerPatchBridge, 'installWorkerUACHMirror', {
+                value: v,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
+            }
+          }
+        });
+      }
       let __patchOK = false;
       try {
         // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
@@ -1223,6 +1244,27 @@ function mkClassicWorkerSource(snapshot, absUrl){
       }
 
       ${ENV_WRK_SRC}
+      var __workerPatchBridge = self.__ENV_BRIDGE__;
+      if (!__workerPatchBridge || typeof __workerPatchBridge !== 'object') throw new Error('UACHPatch: __ENV_BRIDGE__ missing');
+      if (!Object.prototype.hasOwnProperty.call(__workerPatchBridge, 'installWorkerUACHMirror')) {
+        var __installWorkerUACHMirror__;
+        Object.defineProperty(__workerPatchBridge, 'installWorkerUACHMirror', {
+          configurable: true,
+          enumerable: false,
+          get: function(){ return __installWorkerUACHMirror__; },
+          set: function(v){
+            __installWorkerUACHMirror__ = v;
+            if (typeof v === 'function') {
+              Object.defineProperty(__workerPatchBridge, 'installWorkerUACHMirror', {
+                value: v,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
+            }
+          }
+        });
+      }
       let __patchOK = false;
       try {
         // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>

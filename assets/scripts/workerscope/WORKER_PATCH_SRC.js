@@ -16,12 +16,15 @@
   if (Object.prototype.hasOwnProperty.call(W, '__WORKER_PATCH_LOADED__')) {
     throw new Error('UACHPatch: WORKER_PATCH_SRC already loaded');
   }
-  if (Object.prototype.hasOwnProperty.call(BR, 'installWorkerUACHMirror')) {
+  const installDesc = Object.getOwnPropertyDescriptor(BR, 'installWorkerUACHMirror');
+  if (!installDesc) {
+    throw new Error('UACHPatch: installWorkerUACHMirror slot missing');
+  }
+  if (!installDesc.get && !installDesc.set) {
     throw new Error('UACHPatch: installWorkerUACHMirror already defined');
   }
 
-  Object.defineProperty(BR, 'installWorkerUACHMirror', {
-    value: function installWorkerUACHMirror(){
+  BR.installWorkerUACHMirror = function installWorkerUACHMirror(){
     if (self.__UACH_MIRROR_INSTALLED__) {
       throw new Error('UACHPatch: already installed');
     }
@@ -1225,9 +1228,5 @@
       }, rollbackErr || e);
       throw (rollbackErr || e);
     }
-  },
-  writable: true,
-  configurable: true,
-  enumerable: false
-  });
+  };
 })();
