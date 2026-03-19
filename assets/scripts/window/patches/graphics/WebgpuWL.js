@@ -446,25 +446,24 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       Object.defineProperty(__store, 'collectSnapshot', {
         value: async function collectWebGPUSnapshot() {
           if (!('gpu' in navigator)) return { error: 'WebGPU not available' };
-          const requestAdapterResolved = (__core && typeof __core.resolveDescriptor === 'function')
-            ? __core.resolveDescriptor(navigator.gpu, 'requestAdapter', { mode: 'proto_chain' })
+          const __webgpuState = (__stateRoot && __stateRoot.__WEBGPU__ && typeof __stateRoot.__WEBGPU__ === 'object')
+            ? __stateRoot.__WEBGPU__
             : null;
-          const requestAdapterOwner = (requestAdapterResolved && requestAdapterResolved.owner)
-            ? requestAdapterResolved.owner
-            : navigator.gpu;
-          if (__core && typeof __core.isTargetRegistered === 'function'
-              && !__core.isTargetRegistered(requestAdapterOwner, 'requestAdapter')) {
+          const requestAdapterSnapshotGate = (__webgpuState && typeof __webgpuState.__requestAdapterSnapshotGate__ === 'function')
+            ? __webgpuState.__requestAdapterSnapshotGate__
+            : null;
+          if (typeof requestAdapterSnapshotGate !== 'function') {
             __moduleDiag('warn', __module + ':requestAdapter_patch_not_ready', {
               stage: 'preflight',
               key: 'navigator.gpu.requestAdapter',
-              message: 'requestAdapter patch not registered yet; snapshot skipped',
+              message: 'requestAdapter internal snapshot gate not ready; snapshot skipped',
               type: 'pipeline missing data',
               data: { outcome: 'return', reason: 'requestAdapter_patch_not_ready' }
             }, null);
             return { error: 'requestAdapter patch not ready' };
           }
-          const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
-                        || await navigator.gpu.requestAdapter();
+          const adapter = await requestAdapterSnapshotGate({ powerPreference: 'high-performance' })
+                        || await requestAdapterSnapshotGate();
           if (!adapter) return { error: 'No adapter' };
 
           let adapterInfo = null;

@@ -127,6 +127,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       enumerable: false
     });
   }
+  const __webgpuState = __stateRoot.__WEBGPU__;
 
   const Core = __core;
   if (!Core || typeof Core.applyTargets !== 'function') {
@@ -738,7 +739,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
 
       const targets = [
         {
-          owner: adapter,
+          owner: requestDeviceResolved.owner || adapterProto,
           key: 'requestDevice',
           kind: 'promise_method',
           wrapLayer: 'core_wrapper',
@@ -803,7 +804,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       const requestAdapterInfoResolved = resolveDescriptorOnProtoChain(adapter, 'requestAdapterInfo');
       if (requestAdapterInfoResolved.desc && typeof requestAdapterInfoResolved.desc.value === 'function') {
         targets.push({
-          owner: adapter,
+          owner: requestAdapterInfoResolved.owner || adapterProto,
           key: 'requestAdapterInfo',
           kind: 'promise_method',
           wrapLayer: 'core_wrapper',
@@ -853,12 +854,12 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
         });
       }
 
-      if (infoResolved.desc && (typeof infoResolved.desc.get === 'function' || typeof infoResolved.desc.set === 'function')) {
+      if (infoResolved.desc && typeof infoResolved.desc.get === 'function') {
         targets.push({
-          owner: adapter,
+          owner: infoResolved.owner || adapterProto,
           key: 'info',
           kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
+          wrapLayer: 'object_return_gateway',
           resolve: 'proto_chain',
           policy: 'strict',
           diagTag: 'webgpu:adapter:info',
@@ -879,13 +880,13 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
         });
       }
 
-      const adapterFeaturesDesc = resolveDescriptorOnProtoChain(adapter, 'features').desc;
-      if (adapterFeaturesDesc && typeof adapterFeaturesDesc.get === 'function') {
+      const adapterFeaturesResolved = resolveDescriptorOnProtoChain(adapter, 'features');
+      if (adapterFeaturesResolved.desc && typeof adapterFeaturesResolved.desc.get === 'function') {
         targets.push({
-          owner: adapter,
+          owner: adapterFeaturesResolved.owner || adapterProto,
           key: 'features',
           kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
+          wrapLayer: 'object_return_gateway',
           resolve: 'proto_chain',
           policy: 'strict',
           diagTag: 'webgpu:adapter:features',
@@ -911,13 +912,13 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
         });
       }
 
-      const adapterLimitsDesc = resolveDescriptorOnProtoChain(adapter, 'limits').desc;
-      if (adapterLimitsDesc && typeof adapterLimitsDesc.get === 'function') {
+      const adapterLimitsResolved = resolveDescriptorOnProtoChain(adapter, 'limits');
+      if (adapterLimitsResolved.desc && typeof adapterLimitsResolved.desc.get === 'function') {
         targets.push({
-          owner: adapter,
+          owner: adapterLimitsResolved.owner || adapterProto,
           key: 'limits',
           kind: 'accessor',
-          wrapLayer: 'named_wrapper_strict',
+          wrapLayer: 'object_return_gateway',
           resolve: 'proto_chain',
           policy: 'strict',
           diagTag: 'webgpu:adapter:limits',
@@ -985,15 +986,54 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       releaseEntryGuard(true);
       return;
     }
+    const requestAdapterResolved = resolveDescriptorOnProtoChain(gpu, 'requestAdapter');
+    const requestAdapterDesc = requestAdapterResolved ? requestAdapterResolved.desc : null;
+    const requestAdapterOwner = (requestAdapterResolved && requestAdapterResolved.owner) ? requestAdapterResolved.owner : gpu;
+    const origRequestAdapter = requestAdapterDesc ? requestAdapterDesc.value : null;
+    if (!requestAdapterDesc) {
+      degrade('error', 'webgpu:navigator:requestAdapter_descriptor_missing', new Error('[WebGPU] navigator.gpu.requestAdapter descriptor missing'), {
+        stage: 'preflight',
+        type: __webgpuTypeBrowser,
+        diagTag: 'webgpu',
+        key: 'navigator.gpu.requestAdapter',
+        message: 'navigator.gpu.requestAdapter descriptor missing',
+        data: { outcome: 'skip', reason: 'missing_navigator_gpu_requestAdapter_descriptor' }
+      });
+      releaseEntryGuard(true);
+      return;
+    }
+    if (requestAdapterOwner === gpu) {
+      degrade('error', 'webgpu:navigator:requestAdapter_owner_mismatch', new Error('[WebGPU] navigator.gpu.requestAdapter resolved to instance owner'), {
+        stage: 'preflight',
+        type: __webgpuTypeBrowser,
+        diagTag: 'webgpu',
+        key: 'navigator.gpu.requestAdapter',
+        message: 'navigator.gpu.requestAdapter resolved to instance owner',
+        data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+      });
+      releaseEntryGuard(true);
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(requestAdapterDesc, 'value') || typeof origRequestAdapter !== 'function') {
+      degrade('error', 'webgpu:navigator:requestAdapter_descriptor_kind_mismatch', new Error('[WebGPU] navigator.gpu.requestAdapter is not method-shaped on prototype'), {
+        stage: 'preflight',
+        type: __webgpuTypeBrowser,
+        diagTag: 'webgpu',
+        key: 'navigator.gpu.requestAdapter',
+        message: 'navigator.gpu.requestAdapter is not method-shaped on prototype',
+        data: { outcome: 'skip', reason: 'descriptor_kind_mismatch' }
+      });
+      releaseEntryGuard(true);
+      return;
+    }
 
     const requestAdapterTargets = [{
-      owner: gpu,
+      owner: requestAdapterOwner,
       key: 'requestAdapter',
       kind: 'promise_method',
-      wrapLayer: 'named_wrapper',
+      wrapLayer: 'core_wrapper',
       resolve: 'proto_chain',
       invokeClass: 'brand_strict',
-      allowNamedWrapperBrandStrict: true,
       policy: 'throw',
       diagTag: 'webgpu:navigator:requestAdapter',
       validThis: function validGPUThis(self) {
@@ -1062,6 +1102,19 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       releaseEntryGuard(true);
       return;
     }
+
+    Object.defineProperty(__webgpuState, '__requestAdapterSnapshotGate__', {
+      value: async function webgpuRequestAdapterSnapshotGate(options) {
+        const args = (typeof options === 'undefined') ? [] : [options];
+        const adapter = await Reflect.apply(origRequestAdapter, gpu, args);
+        if (!adapter) return null;
+        patchAdapterPrototype(adapter);
+        return adapter;
+      },
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
 
     degrade('info', 'webgpu:ready', null, {
       stage: 'apply',

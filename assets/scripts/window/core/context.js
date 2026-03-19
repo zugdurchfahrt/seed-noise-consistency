@@ -306,12 +306,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
     let wrapLayer = (typeof cfg.wrapLayer === 'string' && cfg.wrapLayer) ? cfg.wrapLayer : null;
     if (!wrapLayer) {
       if (kind === 'data') wrapLayer = 'descriptor_only';
-      else if (kind === 'accessor') wrapLayer = 'named_wrapper_strict';
+      else if (kind === 'accessor') {
+        throw new Error(`[ContextPatch] accessor wrapLayer required for ${String(key)}`);
+      }
       else wrapLayer = 'named_wrapper';
     }
     const policy = (typeof cfg.policy === 'string' && cfg.policy)
       ? cfg.policy
-      : ((kind === 'accessor' && wrapLayer === 'named_wrapper_strict') ? 'strict' : 'throw');
+      : ((kind === 'accessor' && (wrapLayer === 'strict_accessor_gateway' || wrapLayer === 'object_return_gateway')) ? 'strict' : 'throw');
     const core = global && global.Core;
     if (!core || typeof core.preflightTarget !== 'function') {
       throw new Error('[ContextPatch] Core.preflightTarget missing');

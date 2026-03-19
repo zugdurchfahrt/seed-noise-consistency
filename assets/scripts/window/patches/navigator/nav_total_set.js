@@ -1334,9 +1334,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       }
 
-      const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
-      const origGHEV = ghevDesc && ghevDesc.value;
-      if (!ghevDesc || typeof origGHEV !== 'function') {
+      const ghevResolved = __navResolveDescriptor
+        ? __navResolveDescriptor(uadProto, 'getHighEntropyValues', { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues') ? uadProto : nativeUAD,
+            desc: Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues')
+              || Object.getOwnPropertyDescriptor(nativeUAD, 'getHighEntropyValues')
+              || null
+          };
+      const ghevDesc = ghevResolved ? ghevResolved.desc : null;
+      const ghevOwner = (ghevResolved && ghevResolved.owner) ? ghevResolved.owner : uadProto;
+      const origGHEV = ghevDesc ? ghevDesc.value : null;
+      if (!ghevDesc) {
         __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_missing', {
           stage: 'preflight',
           type: __navTypeBrowser,
@@ -1344,13 +1353,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'userAgentData.getHighEntropyValues',
           message: 'uaData.getHighEntropyValues missing'
         });
+      } else if (ghevOwner === nativeUAD) {
+        __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_owner_mismatch', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+          key: 'userAgentData.getHighEntropyValues',
+          message: 'uaData.getHighEntropyValues resolved to instance owner',
+          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+        });
+      } else if (typeof origGHEV !== 'function') {
+        __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_original_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+          key: 'userAgentData.getHighEntropyValues',
+          message: 'uaData.getHighEntropyValues original missing'
+        });
       } else {
         __navRegisterKey('userAgentData.getHighEntropyValues');
         dropOwnIfConfigurable(nativeUAD, 'getHighEntropyValues');
         applyCoreTargetsGroup('nav_total_set:userAgentData.getHighEntropyValues', [{
-          owner: uadProto,
+          owner: ghevOwner,
           key: 'getHighEntropyValues',
           kind: 'promise_method',
+          resolve: 'proto_chain',
           wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           wrapperClass: 'core_proxy',
@@ -1454,9 +1481,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           }], 'throw');
        }
 
-      const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
-      const origToJSON = toJsonDesc && toJsonDesc.value;
-      if (!toJsonDesc || typeof origToJSON !== 'function') {
+      const toJsonResolved = __navResolveDescriptor
+        ? __navResolveDescriptor(uadProto, 'toJSON', { mode: 'proto_chain' })
+        : {
+            owner: Object.getOwnPropertyDescriptor(uadProto, 'toJSON') ? uadProto : nativeUAD,
+            desc: Object.getOwnPropertyDescriptor(uadProto, 'toJSON')
+              || Object.getOwnPropertyDescriptor(nativeUAD, 'toJSON')
+              || null
+          };
+      const toJsonDesc = toJsonResolved ? toJsonResolved.desc : null;
+      const toJsonOwner = (toJsonResolved && toJsonResolved.owner) ? toJsonResolved.owner : uadProto;
+      const origToJSON = toJsonDesc ? toJsonDesc.value : null;
+      if (!toJsonDesc) {
         __navDiag('error', 'nav_total_set:userAgentData_toJSON_missing', {
           stage: 'preflight',
           type: __navTypeBrowser,
@@ -1464,13 +1500,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'userAgentData.toJSON',
           message: 'uaData.toJSON missing'
         });
+      } else if (toJsonOwner === nativeUAD) {
+        __navDiag('error', 'nav_total_set:userAgentData_toJSON_owner_mismatch', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:userAgentData.toJSON',
+          key: 'userAgentData.toJSON',
+          message: 'uaData.toJSON resolved to instance owner',
+          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
+        });
+      } else if (typeof origToJSON !== 'function') {
+        __navDiag('error', 'nav_total_set:userAgentData_toJSON_original_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:userAgentData.toJSON',
+          key: 'userAgentData.toJSON',
+          message: 'uaData.toJSON original missing'
+        });
       } else {
         __navRegisterKey('userAgentData.toJSON');
         dropOwnIfConfigurable(nativeUAD, 'toJSON');
         applyCoreTargetsGroup('nav_total_set:userAgentData.toJSON', [{
-          owner: uadProto,
+          owner: toJsonOwner,
           key: 'toJSON',
           kind: 'method',
+          resolve: 'proto_chain',
           wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
           wrapperClass: 'core_proxy',
@@ -1657,6 +1711,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'permissions.query',
           message: 'permissions.query descriptor missing'
         });
+      } else if (!Object.prototype.hasOwnProperty.call(permDesc, 'value') || typeof permDesc.value !== 'function') {
+        __navDiag('error', 'nav_total_set:permissions_query_descriptor_kind_mismatch', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:permissions.query',
+          key: 'permissions.query',
+          message: 'permissions.query is not method-shaped on prototype'
+        });
       } else if (permOwner === navigator.permissions) {
         __navDiag('error', 'nav_total_set:permissions_query_owner_mismatch', {
           stage: 'preflight',
@@ -1668,7 +1730,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
       } else {
         __navRegisterKey('permissions.query');
-        const origQuery = permDesc.value || navigator.permissions.query;
+        const origQuery = permDesc.value;
         if (typeof origQuery !== 'function') {
           __navDiag('error', 'nav_total_set:permissions_query_original_missing', {
             stage: 'preflight',
@@ -1768,6 +1830,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'mediaDevices.enumerateDevices',
           message: 'mediaDevices.enumerateDevices descriptor missing'
         });
+      } else if (!Object.prototype.hasOwnProperty.call(mediaDesc, 'value') || typeof mediaDesc.value !== 'function') {
+        __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_descriptor_kind_mismatch', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+          key: 'mediaDevices.enumerateDevices',
+          message: 'mediaDevices.enumerateDevices is not method-shaped on prototype'
+        });
       } else if (mediaOwner === navigator.mediaDevices) {
         __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_owner_mismatch', {
           stage: 'preflight',
@@ -1779,7 +1849,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
       } else {
         __navRegisterKey('mediaDevices.enumerateDevices');
-        const origEnumerateDevices = mediaDesc.value || navigator.mediaDevices.enumerateDevices;
+        const origEnumerateDevices = mediaDesc.value;
         if (typeof origEnumerateDevices !== 'function') {
           __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_original_missing', {
             stage: 'preflight',
@@ -1884,19 +1954,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           };
       const storageDesc = storageResolved ? storageResolved.desc : null;
       const storageOwner = (storageResolved && storageResolved.owner) ? storageResolved.owner : storageProto;
-        if (!storageDesc) {
-          __navDiag('error', 'nav_total_set:storage_estimate_descriptor_missing', {
-            surface: 'navigator',
-            stage: 'preflight',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set:storage.estimate',
-          key: 'storage.estimate',
-          message: 'storage.estimate descriptor missing'
-        });
-      } else if (storageOwner === navigator.storage) {
-        __navDiag('error', 'nav_total_set:storage_estimate_owner_mismatch', {
-          surface: 'navigator',
-          stage: 'preflight',
+         if (!storageDesc) {
+           __navDiag('error', 'nav_total_set:storage_estimate_descriptor_missing', {
+             surface: 'navigator',
+             stage: 'preflight',
+             type: __navTypeBrowser,
+             diagTag: 'nav_total_set:storage.estimate',
+           key: 'storage.estimate',
+           message: 'storage.estimate descriptor missing'
+         });
+       } else if (!Object.prototype.hasOwnProperty.call(storageDesc, 'value') || typeof storageDesc.value !== 'function') {
+         __navDiag('error', 'nav_total_set:storage_estimate_descriptor_kind_mismatch', {
+           surface: 'navigator',
+           stage: 'preflight',
+           type: __navTypeBrowser,
+           diagTag: 'nav_total_set:storage.estimate',
+           key: 'storage.estimate',
+           message: 'storage.estimate is not method-shaped on prototype'
+         });
+       } else if (storageOwner === navigator.storage) {
+         __navDiag('error', 'nav_total_set:storage_estimate_owner_mismatch', {
+           surface: 'navigator',
+           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:storage.estimate',
           key: 'storage.estimate',
@@ -1910,13 +1989,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       let usageBytes   = Math.max(0, Math.floor(quotaBytes * USED_PCT / 100));
 
       // Monotonous “jitter” of usage within a few KB, on R(), so as not to break the module’s entropy
-      const tickUsage = __navMark(function tickUsage() {
-        if (typeof R === 'function') {
-          usageBytes = Math.min(quotaBytes - 4096, usageBytes + Math.floor(R() * 4096));
-        }
-      }, 'tickUsage');
+       const tickUsage = __navMark(function tickUsage() {
+         if (typeof R === 'function') {
+           usageBytes = Math.min(quotaBytes - 4096, usageBytes + Math.floor(R() * 4096));
+         }
+       }, 'tickUsage');
 
-        const origEstimate = storageDesc.value || navigator.storage.estimate;
+        const origEstimate = storageDesc.value;
         if (typeof origEstimate !== 'function') {
           __navDiag('error', 'nav_total_set:storage_estimate_original_missing', {
             surface: 'navigator',

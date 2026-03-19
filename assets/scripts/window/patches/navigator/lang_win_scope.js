@@ -1,16 +1,32 @@
-    // Languages stable final setting (moved here to guarantee availability before nav_total_set.js)
-    // FrozenArray semantics (минимально приближенно): массив заморожен
-    if (Array.isArray(window.__normalizedLanguages)) {{
-        Object.freeze(window.__normalizedLanguages);
+    const __langContext = (window && window.CanvasPatchContext && typeof window.CanvasPatchContext === 'object')
+        ? window.CanvasPatchContext
+        : null;
+    const __langStateRoot = (__langContext && __langContext.state && typeof __langContext.state === 'object')
+        ? __langContext.state
+        : null;
+    const __langState = (__langStateRoot && __langStateRoot.__LANG_STATE__ && typeof __langStateRoot.__LANG_STATE__ === 'object')
+        ? __langStateRoot.__LANG_STATE__
+        : null;
+    if (!__langState) {{
+        throw new Error('[lang_win_scope] __LANG_STATE__ invalid');
     }}
 
-    // fail-fast: типы и консистентность
-    if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
-        throw new Error('THW: __primaryLanguage invalid');
+    const __primaryLanguage = (typeof __langState.primaryLanguage === 'string' && __langState.primaryLanguage)
+        ? __langState.primaryLanguage
+        : null;
+    const __normalizedLanguages = Array.isArray(__langState.normalizedLanguages)
+        ? __langState.normalizedLanguages
+        : null;
+
+    if (Array.isArray(__normalizedLanguages)) {{
+        Object.freeze(__normalizedLanguages);
     }}
-    if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
-        throw new Error('THW: __normalizedLanguages invalid');
+    if (typeof __primaryLanguage !== 'string' || !__primaryLanguage) {{
+        throw new Error('[lang_win_scope] primaryLanguage invalid');
     }}
-    if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
-        throw new Error('THW: language != languages[0]');
+    if (!Array.isArray(__normalizedLanguages) || __normalizedLanguages.length === 0) {{
+        throw new Error('[lang_win_scope] normalizedLanguages invalid');
+    }}
+    if (__normalizedLanguages[0] !== __primaryLanguage) {{
+        throw new Error('[lang_win_scope] language != languages[0]');
     }}
