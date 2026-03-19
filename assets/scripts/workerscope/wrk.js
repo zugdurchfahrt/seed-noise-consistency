@@ -883,8 +883,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
         const PATCH_URL = ${PATCH_URL};
         if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchModule URL');
         await import(PATCH_URL);
-        if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-        self.installWorkerUACHMirror();
+        const installWorkerUACHMirror = self.__ENV_BRIDGE__ && self.__ENV_BRIDGE__.installWorkerUACHMirror;
+        if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
+        installWorkerUACHMirror();
         if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
         if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
@@ -1228,8 +1229,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
         const PATCH_URL = ${PATCH_URL};
         if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchClassic URL');
         importScripts(PATCH_URL);
-        if (typeof self.installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-        self.installWorkerUACHMirror();
+        const installWorkerUACHMirror = self.__ENV_BRIDGE__ && self.__ENV_BRIDGE__.installWorkerUACHMirror;
+        if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
+        installWorkerUACHMirror();
         if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
         if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;

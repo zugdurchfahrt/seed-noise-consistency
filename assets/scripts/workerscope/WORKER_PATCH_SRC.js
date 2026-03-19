@@ -9,20 +9,18 @@
     throw new Error('UACHPatch: not in WorkerGlobalScope');
   }
   const W = self;
+  const BR = (self.__ENV_BRIDGE__ && typeof self.__ENV_BRIDGE__ === 'object') ? self.__ENV_BRIDGE__ : null;
+  if (!BR) {
+    throw new Error('UACHPatch: __ENV_BRIDGE__ missing');
+  }
   if (Object.prototype.hasOwnProperty.call(W, '__WORKER_PATCH_LOADED__')) {
     throw new Error('UACHPatch: WORKER_PATCH_SRC already loaded');
   }
-  Object.defineProperty(W, '__WORKER_PATCH_LOADED__', {
-    value: true,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
-  if (Object.prototype.hasOwnProperty.call(W, 'installWorkerUACHMirror')) {
+  if (Object.prototype.hasOwnProperty.call(BR, 'installWorkerUACHMirror')) {
     throw new Error('UACHPatch: installWorkerUACHMirror already defined');
   }
 
-  Object.defineProperty(W, 'installWorkerUACHMirror', {
+  Object.defineProperty(BR, 'installWorkerUACHMirror', {
     value: function installWorkerUACHMirror(){
     if (self.__UACH_MIRROR_INSTALLED__) {
       throw new Error('UACHPatch: already installed');
@@ -1182,6 +1180,12 @@
         { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
       );
     }
+    trackedDefineProperty(self, '__WORKER_PATCH_LOADED__', {
+      value: true,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
     trackedDefineProperty(self, '__UACH_MIRROR_INSTALLED__', {
       value: true,
       writable: true,
