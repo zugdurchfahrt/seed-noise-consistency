@@ -13,7 +13,7 @@
   if (!BR) {
     throw new Error('UACHPatch: __ENV_BRIDGE__ missing');
   }
-  if (Object.prototype.hasOwnProperty.call(W, '__WORKER_PATCH_LOADED__')) {
+  if (Object.prototype.hasOwnProperty.call(BR, '__WORKER_PATCH_LOADED__')) {
     throw new Error('UACHPatch: WORKER_PATCH_SRC already loaded');
   }
   const installDesc = Object.getOwnPropertyDescriptor(BR, 'installWorkerUACHMirror');
@@ -25,7 +25,7 @@
   }
 
   BR.installWorkerUACHMirror = function installWorkerUACHMirror(){
-    if (self.__UACH_MIRROR_INSTALLED__) {
+    if (BR.__UACH_MIRROR_INSTALLED__) {
       throw new Error('UACHPatch: already installed');
     }
     if (!self.__GW_BOOTSTRAP__) {
@@ -84,8 +84,8 @@
       }
     };
     const rollbackAppliedDescriptors = () => {
-      for (let i = appliedDescriptors.length - 1; i >= 0; i -= 1) {
-        const item = appliedDescriptors[i];
+      while (appliedDescriptors.length) {
+        const item = appliedDescriptors.pop();
         if (!item || !item.obj) continue;
         if (item.hadOwn && item.prevDesc) {
           Object.defineProperty(item.obj, item.key, item.prevDesc);
@@ -94,6 +94,36 @@
         }
       }
     };
+    const verifyRollbackRepeatApply = () => {
+      const probeKey = '__WORKER_PATCH_SELFTEST__';
+      if (Object.prototype.hasOwnProperty.call(BR, probeKey)) {
+        throw new Error('UACHPatch: rollback selftest residue');
+      }
+      const runAttempt = () => {
+        let forced = null;
+        try {
+          trackedDefineProperty(BR, probeKey, {
+            value: true,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          throw new Error('UACHPatch: rollback selftest trigger');
+        } catch (e) {
+          forced = e;
+          rollbackAppliedDescriptors();
+        }
+        if (!forced) {
+          throw new Error('UACHPatch: rollback selftest missing forced failure');
+        }
+        if (Object.prototype.hasOwnProperty.call(BR, probeKey)) {
+          throw new Error('UACHPatch: rollback selftest failed');
+        }
+      };
+      runAttempt();
+      runAttempt();
+    };
+    verifyRollbackRepeatApply();
     const validDpr = v => Number.isFinite(v) && v > 0;
     const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
     const LE_KEYS = ['brands','mobile','platform'];
@@ -1183,13 +1213,13 @@
         { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
       );
     }
-    trackedDefineProperty(self, '__WORKER_PATCH_LOADED__', {
+    trackedDefineProperty(BR, '__WORKER_PATCH_LOADED__', {
       value: true,
       writable: true,
       configurable: true,
       enumerable: false
     });
-    trackedDefineProperty(self, '__UACH_MIRROR_INSTALLED__', {
+    trackedDefineProperty(BR, '__UACH_MIRROR_INSTALLED__', {
       value: true,
       writable: true,
       configurable: true,
@@ -1205,7 +1235,7 @@
       message: "worker patch installed",
       data: {
         core: true,
-        mirror: !!self.__UACH_MIRROR_INSTALLED__,
+        mirror: !!BR.__UACH_MIRROR_INSTALLED__,
         scope: !!self.__SCOPE_CONSISTENCY_PATCHED__
       },
       type: "pipeline missing data"

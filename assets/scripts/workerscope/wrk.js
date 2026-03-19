@@ -361,7 +361,6 @@ function EnvBus(G){
     };
   }
   function envSnapshot(){
-    const nav = G.navigator;
     let langs = __envLangs;
     if (!Array.isArray(langs)) {
       throw new Error('EnvBus: state.__LANG_STATE__.normalizedLanguages missing');
@@ -391,44 +390,43 @@ function EnvBus(G){
     if (typeof webglUnmaskedRenderer !== 'string' || !webglUnmaskedRenderer) throw new Error('EnvBus: __WEBGL_UNMASKED_RENDERER__ missing');
     const webglCapabilities = __collectWindowWebGLCapabilities();
 
-    // UAData (Window runtime) is the primary source for Worker snapshots.
-    const UAD = nav && nav.userAgentData;
-    if (!UAD) throw new Error('EnvBus: navigator.userAgentData missing');
+    // Worker low-entropy UAData comes from the early contract container.
+    // Do not gate this path on live navigator.userAgentData readiness.
 
-    // Contract snapshot is used only for validation (not as a data source).
     const contract = __envContract;
     if (!contract || typeof contract !== 'object') {
       throw new Error('EnvBus: __EXPECTED_CLIENT_HINTS missing');
     }
 
     const uaData = (() => {
-      const platform = (typeof UAD.platform === 'string' && UAD.platform) ? UAD.platform : null;
-      if (!platform) throw new Error('EnvBus: uaData.platform missing');
-      const brandsSrc = Array.isArray(UAD.brands) ? UAD.brands : null;
-      if (!brandsSrc) throw new Error('EnvBus: uaData.brands missing');
+      const platform = (typeof contract.platform === 'string' && contract.platform) ? contract.platform : null;
+      if (!platform) throw new Error('EnvBus: contract.platform missing');
+      const brandsSrc = Array.isArray(contract.brands) ? contract.brands
+        : (Array.isArray(contract.fullVersionList) ? contract.fullVersionList : null);
+      if (!brandsSrc) throw new Error('EnvBus: contract.brands missing');
       const brands = brandsSrc.map(x => {
-        if (!x || typeof x !== 'object') throw new Error('EnvBus: uaData.brand entry');
+        if (!x || typeof x !== 'object') throw new Error('EnvBus: contract.brands entry');
         const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
                     : (typeof x.name === 'string' && x.name) ? x.name
                     : null;
-        if (!brand) throw new Error('EnvBus: uaData.brand missing');
+        if (!brand) throw new Error('EnvBus: contract.brands entry');
         let versionRaw = null;
         if (typeof x.version === 'string') {
-          if (!x.version) throw new Error('EnvBus: uaData.brand version missing');
+          if (!x.version) throw new Error('EnvBus: contract.brands entry');
           versionRaw = x.version;
         } else if (typeof x.version === 'number' && Number.isFinite(x.version)) {
           versionRaw = String(x.version);
         } else {
-          throw new Error('EnvBus: uaData.brand version missing');
+          throw new Error('EnvBus: contract.brands entry');
         }
         const major = String(versionRaw).split('.')[0];
-        if (!major) throw new Error('EnvBus: uaData.brand version missing');
+        if (!major) throw new Error('EnvBus: contract.brands entry');
         return { brand: String(brand), version: String(major) };
       });
-      return { platform, brands, mobile: !!UAD.mobile };
+      return { platform, brands, mobile: !!contract.mobile };
     })();
 
-    // Validate UAData LE vs contract snapshot (fail-fast, no fallback).
+    // Validate the contract-backed low-entropy snapshot shape (fail-fast, no fallback).
     (function validateUaDataLE() {
       const expPlatform = contract.platform;
       if (typeof expPlatform !== 'string' || !expPlatform) throw new Error('EnvBus: contract.platform missing');
@@ -580,7 +578,47 @@ function WorkerOverrides_install(G, hub) {
 
 // === env-worker-bridge (главный бандл) ===
 (function setupEnvBridge(global){
-  const BR = (global.__ENV_BRIDGE__ = global.__ENV_BRIDGE__ || {});
+  const bridgeDesc = Object.getOwnPropertyDescriptor(global, '__ENV_BRIDGE__');
+  let BR = bridgeDesc
+    ? (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value') ? bridgeDesc.value : global.__ENV_BRIDGE__)
+    : global.__ENV_BRIDGE__;
+  if (BR == null) {
+    BR = {};
+    Object.defineProperty(global, '__ENV_BRIDGE__', {
+      value: BR,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  } else if (typeof BR !== 'object') {
+    throw new Error('EnvBridge: __ENV_BRIDGE__ missing');
+  } else if (!bridgeDesc) {
+    Object.defineProperty(global, '__ENV_BRIDGE__', {
+      value: BR,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  } else if (bridgeDesc.enumerable !== false) {
+    if (bridgeDesc.configurable === false) {
+      throw new Error('EnvBridge: __ENV_BRIDGE__ non-configurable enumerable');
+    }
+    if (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value')) {
+      Object.defineProperty(global, '__ENV_BRIDGE__', {
+        value: BR,
+        writable: !!bridgeDesc.writable,
+        configurable: true,
+        enumerable: false
+      });
+    } else {
+      Object.defineProperty(global, '__ENV_BRIDGE__', {
+        get: bridgeDesc.get,
+        set: bridgeDesc.set,
+        configurable: true,
+        enumerable: false
+      });
+    }
+  }
 
 const ENV_WRK_SRC = (BR && typeof BR.inlineReflect === 'string') ? BR.inlineReflect : null;
 if (typeof ENV_WRK_SRC !== 'string' || !ENV_WRK_SRC) {
@@ -904,11 +942,12 @@ function mkModuleWorkerSource(snapshot, absUrl){
         const PATCH_URL = ${PATCH_URL};
         if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchModule URL');
         await import(PATCH_URL);
-        const installWorkerUACHMirror = self.__ENV_BRIDGE__ && self.__ENV_BRIDGE__.installWorkerUACHMirror;
+        const __workerPatchBridge = self.__ENV_BRIDGE__;
+        const installWorkerUACHMirror = __workerPatchBridge && __workerPatchBridge.installWorkerUACHMirror;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
-        if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
-        if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
+        if (!(__workerPatchBridge && __workerPatchBridge.__WORKER_PATCH_LOADED__)) throw new Error('UACHPatch: patch marker missing');
+        if (!(__workerPatchBridge && __workerPatchBridge.__UACH_MIRROR_INSTALLED__)) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
       } catch (e) {
         __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
@@ -1274,8 +1313,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
         const installWorkerUACHMirror = self.__ENV_BRIDGE__ && self.__ENV_BRIDGE__.installWorkerUACHMirror;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
-        if (!self.__WORKER_PATCH_LOADED__) throw new Error('UACHPatch: patch marker missing');
-        if (!self.__UACH_MIRROR_INSTALLED__) throw new Error('UACHPatch: mirror not installed');
+        var __workerPatchBridge = self.__ENV_BRIDGE__;
+        if (!(__workerPatchBridge && __workerPatchBridge.__WORKER_PATCH_LOADED__)) throw new Error('UACHPatch: patch marker missing');
+        if (!(__workerPatchBridge && __workerPatchBridge.__UACH_MIRROR_INSTALLED__)) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
       } catch (e) {
         __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
