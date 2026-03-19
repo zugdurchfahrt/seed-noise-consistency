@@ -26,7 +26,7 @@
 
   const __swDiagBindingDesc = G ? Object.getOwnPropertyDescriptor(G, __swDiagBindingName) : null;
   if (__swDiagBindingDesc && __swDiagBindingDesc.configurable === true) {
-    delete G[__swDiagBindingName];
+    __trackDeleteOwnIfConfigurable(G, __swDiagBindingName);
   }
 
   function __relaySWDiag(level, code, ctx, err) {
@@ -50,10 +50,12 @@
         error: __serializeRelayErr(err)
       }));
     } catch (relayErr) {
-      try {
-        G.__SW_REPORT_DIAG_ERROR__ = String((relayErr && (relayErr.stack || relayErr.message)) || relayErr);
-      } catch (storeErr) {
-        G.__SW_REPORT_DIAG_STORE_ERROR__ = String((storeErr && (storeErr.stack || storeErr.message)) || storeErr);
+      if (!__storeHiddenDiagSlot(G, '__SW_REPORT_DIAG_ERROR__', relayErr)) {
+        try {
+          __storeHiddenDiagSlot(G, '__SW_REPORT_DIAG_STORE_ERROR__', relayErr);
+        } catch (storeErr) {
+          __storeHiddenDiagSlot(G, '__SW_REPORT_DIAG_STORE_ERROR__', storeErr);
+        }
       }
     }
   }
@@ -68,10 +70,12 @@
         __D(code, safeErr, Object.assign({}, safeCtx, { level: level || 'info' }));
       }
     } catch (emitErr) {
-      try {
-        G.__SW_EMIT_ERROR__ = String((emitErr && (emitErr.stack || emitErr.message)) || emitErr);
-      } catch (storeErr) {
-        G.__SW_EMIT_STORE_ERROR__ = String((storeErr && (storeErr.stack || storeErr.message)) || storeErr);
+      if (!__storeHiddenDiagSlot(G, '__SW_EMIT_ERROR__', emitErr)) {
+        try {
+          __storeHiddenDiagSlot(G, '__SW_EMIT_STORE_ERROR__', emitErr);
+        } catch (storeErr) {
+          __storeHiddenDiagSlot(G, '__SW_EMIT_STORE_ERROR__', storeErr);
+        }
       }
     }
     __relaySWDiag(level, code, ctx, err);
@@ -120,6 +124,27 @@
     if (!ownDesc || ownDesc.configurable !== true) return;
     delete obj[key];
     __applied.push({ obj, key, hadOwn: true, prevDesc: ownDesc });
+  }
+
+  function __storeHiddenDiagSlot(obj, key, value) {
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return false;
+    let text;
+    try {
+      text = String((value && (value.stack || value.message)) || value);
+    } catch (e) {
+      text = String(value);
+    }
+    try {
+      Object.defineProperty(obj, key, {
+        value: text,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function __rollbackApplied() {
