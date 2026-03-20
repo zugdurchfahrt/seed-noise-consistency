@@ -45,7 +45,6 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 
 const C  = G.CanvasPatchContext;
 const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
-const __canvasGlobalSeed = (typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) ? String(G.__GLOBAL_SEED) : '';
 const __canvasScreenWidth = Number(G.__WIDTH);
 const __canvasScreenHeight = Number(G.__HEIGHT);
 const __canvasDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : NaN;
@@ -76,17 +75,13 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
       ? __core.__internal
       : null;
-    const corePrng = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+    const state = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
       ? __coreInternal.prng
       : null;
-    const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-    const state = corePrng || ((stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
-      ? stateRoot.__PRNG_STATE__
-      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
     return {
       seed: (state && typeof state.seed === 'string' && state.seed)
         ? state.seed
-        : __canvasGlobalSeed,
+        : '',
       strToSeed: (state && typeof state.strToSeed === 'function') ? state.strToSeed : null,
       mulberry32: (state && typeof state.mulberry32 === 'function') ? state.mulberry32 : null
     };
@@ -236,17 +231,17 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const div = doc.createElement('div');
     const __prng = __resolvePrngState();
     if (typeof __prng.seed !== 'string' || !__prng.seed) {
-      emitCanvasDiag('warn', 'canvas:init:preflight:global_seed_missing', null, {
+      emitCanvasDiag('warn', 'canvas:init:preflight:core_prng_seed_missing', null, {
         stage: 'preflight',
-        key: '__GLOBAL_SEED',
+        key: 'Core.__internal.prng.seed',
         type: 'pipeline missing data'
       });
       return;
     }
     if (typeof __prng.strToSeed !== 'function' || typeof __prng.mulberry32 !== 'function') {
-      emitCanvasDiag('warn', 'canvas:init:preflight:prng_helpers_missing', null, {
+      emitCanvasDiag('warn', 'canvas:init:preflight:core_prng_helpers_missing', null, {
         stage: 'preflight',
-        key: 'strToSeed/mulberry32',
+        key: 'Core.__internal.prng.strToSeed/Core.__internal.prng.mulberry32',
         type: 'pipeline missing data'
       });
       return;
@@ -353,12 +348,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
 
   function stableNoiseFromString(str, min, max) {
-  //The ONLY source: __GLOBAL_SEED + key -> mulberry32(strToSeed(...))
+  // The ONLY source: Core.__internal.prng + key.
   const __prng = __resolvePrngState();
   if (typeof __prng.seed !== 'string' || !__prng.seed)
-    throw new Error('[PRNG] __GLOBAL_SEED is required');
+    throw new Error('[PRNG] Core.__internal.prng.seed is required');
   if (typeof __prng.strToSeed !== 'function' || typeof __prng.mulberry32 !== 'function')
-    throw new Error('[PRNG] strToSeed/mulberry32 are required')
+    throw new Error('[PRNG] Core.__internal.prng.strToSeed/mulberry32 are required')
     const seedStr = str + ':' + (__prng.seed);
     let x = stringHash(seedStr);
     x ^= x >>> 16;

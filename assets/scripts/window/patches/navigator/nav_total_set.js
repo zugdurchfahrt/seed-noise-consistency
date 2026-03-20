@@ -237,6 +237,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navLangState = (__stateRoot && __stateRoot.__LANG_STATE__ && typeof __stateRoot.__LANG_STATE__ === 'object')
       ? __stateRoot.__LANG_STATE__
       : ((C && C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') ? C.__LANG_STATE__ : null);
+    const __navScreenState = (__stateRoot && __stateRoot.__SCREEN__ && typeof __stateRoot.__SCREEN__ === 'object')
+      ? __stateRoot.__SCREEN__
+      : null;
     const __navPrimaryLanguage = (__navLangState && typeof __navLangState.primaryLanguage === 'string' && __navLangState.primaryLanguage)
       ? __navLangState.primaryLanguage
       : null;
@@ -293,7 +296,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     __navProfileState.colorDepth = Number((__navEnvProfile && typeof __navEnvProfile.colorDepth !== 'undefined') ? __navEnvProfile.colorDepth : window.__COLOR_DEPTH);
     __navProfileState.orientationDom = (__navEnvProfile && typeof __navEnvProfile.orientationDom !== 'undefined')
       ? __navEnvProfile.orientationDom
-      : (window.__ORIENTATION ?? (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary'));
+      : ((__navScreenState && typeof __navScreenState.orientationDom === 'string' && __navScreenState.orientationDom)
+        ? __navScreenState.orientationDom
+        : (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary'));
     __navProfileState.strict = (__navEnvProfile && typeof __navEnvProfile.strict !== 'undefined') ? !!__navEnvProfile.strict : ((window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true);
     __navProfileState.debug = (__navEnvProfile && typeof __navEnvProfile.debug !== 'undefined') ? !!__navEnvProfile.debug : !!window.__NAV_PATCH_DEBUG__;
     __navProfileState.fullVersionList = __navCloneStateValue((__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'fullVersionList')) ? __navEnvProfile.fullVersionList : window.__FULL_VERSION_LIST);

@@ -117,34 +117,51 @@ const WebglPatchModule = function WebglPatchModule(window) {
       });
       throw new Error('CanvasPatchContext.state missing');
     }
-    if (!(__stateRoot.__WEBGL__ && typeof __stateRoot.__WEBGL__ === 'object')) {
-      Object.defineProperty(__stateRoot, '__WEBGL__', {
-        value: Object.create(null),
-        writable: true,
-        configurable: true,
-        enumerable: false
+    const __envProfileState = (__stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+      ? __stateRoot.__ENV_PROFILE__
+      : null;
+    if (!__envProfileState) {
+      __webglDiagPipeline('fatal', 'webgl:env_profile_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__ENV_PROFILE__',
+        message: 'CanvasPatchContext.state.__ENV_PROFILE__ missing',
+        data: { outcome: 'throw' }
       });
+      throw new Error('CanvasPatchContext.state.__ENV_PROFILE__ missing');
     }
     const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
       ? __core.__internal
       : null;
-    const __prngState = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
-      ? __coreInternal.prng
-      : ((__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
-      ? __stateRoot.__PRNG_STATE__
-      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
-    const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
-      ? __prngState.rand
-      : null;
-    const R = (__randSource && typeof __randSource.use === 'function') ? __randSource.use('webgl') : null;
-    if (typeof R !== 'function') {
-      __webglDiagPipeline('fatal', 'webgl:rand_missing', {
-        stage: 'preflight',
-        key: null,
-        message: 'rand source missing',
-        data: { outcome: 'throw' }
-      });
-      throw new Error('rand source missing');
+    let __webglRandFn = null;
+    function __requireWebglRand() {
+      if (typeof __webglRandFn === 'function') return __webglRandFn;
+      const __prngState = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+        ? __coreInternal.prng
+        : null;
+      if (!__prngState) {
+        __webglDiagPipeline('fatal', 'webgl:core_prng_missing', {
+          stage: 'runtime',
+          key: 'Core.__internal.prng',
+          message: 'Core.__internal.prng missing',
+          data: { outcome: 'throw' }
+        }, null);
+        throw new Error('Core.__internal.prng missing');
+      }
+      const __randSource = (__prngState.rand && typeof __prngState.rand.use === 'function')
+        ? __prngState.rand
+        : null;
+      const __rand = (__randSource && typeof __randSource.use === 'function') ? __randSource.use('webgl') : null;
+      if (typeof __rand !== 'function') {
+        __webglDiagPipeline('fatal', 'webgl:core_prng_rand_missing', {
+          stage: 'runtime',
+          key: 'Core.__internal.prng.rand',
+          message: 'Core.__internal.prng.rand missing',
+          data: { outcome: 'throw' }
+        }, null);
+        throw new Error('Core.__internal.prng.rand missing');
+      }
+      __webglRandFn = __rand;
+      return __webglRandFn;
     }
     
     // Internal markers: avoid leaving visible properties on WebGL instances/objects
@@ -186,7 +203,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
     
     function noiseAt(x, y, w, h) {
       const mix = (((x*73856093) ^ (y*19349663) ^ (w*83492791) ^ (h*2654435761)) >>> 0);
-      const r = R()
+      const r = __requireWebglRand()()
       return ((r - 0.5) * 3) | 0;       // integral shift [-1..+1]
     }
 
@@ -236,11 +253,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
       }
     }
     if (dbg) {
-        if (pname === dbg.UNMASKED_VENDOR_WEBGL)   return window.__WEBGL_UNMASKED_VENDOR__;
-        if (pname === dbg.UNMASKED_RENDERER_WEBGL) return window.__WEBGL_UNMASKED_RENDERER__;
+        if (pname === dbg.UNMASKED_VENDOR_WEBGL)   return __envProfileState.webglUnmaskedVendor;
+        if (pname === dbg.UNMASKED_RENDERER_WEBGL) return __envProfileState.webglUnmaskedRenderer;
     }
-    if (pname === this.VENDOR   || pname === 0x1F00) return window.__WEBGL_VENDOR__;
-    if (pname === this.RENDERER || pname === 0x1F01) return window.__WEBGL_RENDERER__;
+    if (pname === this.VENDOR   || pname === 0x1F00) return __envProfileState.webglVendor;
+    if (pname === this.RENDERER || pname === 0x1F01) return __envProfileState.webglRenderer;
     //others - do not touch
     return;  // undefined → The original will work out
     }
@@ -296,9 +313,9 @@ const WebglPatchModule = function WebglPatchModule(window) {
         // (markAsNative), without forcing Proxy-based wrapping.
         const wrappedGetParameter = ({ getParameter(pname) {
           if (pname === this.UNMASKED_VENDOR_WEBGL)
-            return window.__WEBGL_UNMASKED_VENDOR__;
+            return __envProfileState.webglUnmaskedVendor;
           if (pname === this.UNMASKED_RENDERER_WEBGL)
-            return window.__WEBGL_UNMASKED_RENDERER__;
+            return __envProfileState.webglUnmaskedRenderer;
           return Reflect.apply(origGetParameter, this, [pname]);
         }}).getParameter;
 
@@ -413,7 +430,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
   function webglGetShaderPrecisionFormatHook(orig, shaderType, precisionType) {
     const res = Reflect.apply(orig, this, [shaderType, precisionType]);
     if (!res) return res;
-    const v = (R() - 0.5);
+    const v = (__requireWebglRand()() - 0.5);
     const rangeMin = Math.round(res.rangeMin + v);
     const rangeMax = Math.round(res.rangeMax + v);
     const precision = Math.round(res.precision + v);
@@ -493,33 +510,41 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (typeof res === 'number' && (!Number.isFinite(res) || Number.isNaN(res) || res === 0)) {
       return res;
     }
-    if (typeof res === 'number' && typeof R === 'function') {
-      return res + (R() - 0.5) * 1e-4;
+    if (typeof res === 'number') {
+      return res + (__requireWebglRand()() - 0.5) * 1e-4;
     }
     return res;
   }
 
   // === 6.export hooks to context.js ===
-  const __webglHooksEntry = {
-    webglGetParameterMask,
-    webglWhitelistParameterHook,
-    webglGetSupportedExtensionsPatch,
-    webglGetExtensionPatch,
-    webglGetContextPatch,
-    webglReadPixelsHook,
-    webglGetShaderPrecisionFormatHook,
-    webglShaderSourceHook,
-    webglGetUniformHook
-  };
+  const __hasOwnWebglHooks = Object.prototype.hasOwnProperty.call(window, 'webglHooks');
+  const __currentWebglHooks = __hasOwnWebglHooks ? window.webglHooks : null;
+  const __webglHooksEntry = (__currentWebglHooks && (typeof __currentWebglHooks === 'object' || typeof __currentWebglHooks === 'function'))
+    ? __currentWebglHooks
+    : Object.create(null);
+  __webglHooksEntry.webglGetParameterMask = webglGetParameterMask;
+  __webglHooksEntry.webglWhitelistParameterHook = webglWhitelistParameterHook;
+  __webglHooksEntry.webglGetSupportedExtensionsPatch = webglGetSupportedExtensionsPatch;
+  __webglHooksEntry.webglGetExtensionPatch = webglGetExtensionPatch;
+  __webglHooksEntry.webglGetContextPatch = webglGetContextPatch;
+  __webglHooksEntry.webglReadPixelsHook = webglReadPixelsHook;
+  __webglHooksEntry.webglGetShaderPrecisionFormatHook = webglGetShaderPrecisionFormatHook;
+  __webglHooksEntry.webglShaderSourceHook = webglShaderSourceHook;
+  __webglHooksEntry.webglGetUniformHook = webglGetUniformHook;
   try {
-    const __hasOwnWebglHooks = Object.prototype.hasOwnProperty.call(window, 'webglHooks');
-    const __currentWebglHooks = __hasOwnWebglHooks ? window.webglHooks : null;
-    if (__hasOwnWebglHooks && __currentWebglHooks && typeof __currentWebglHooks === 'object' &&
-        typeof __currentWebglHooks.webglGetParameterMask === 'function') {
+    if (__hasOwnWebglHooks) {
       const __currentDesc = Object.getOwnPropertyDescriptor(window, 'webglHooks');
-      if (__currentDesc && __currentDesc.configurable && __currentDesc.enumerable) {
+      const __hasUsableCurrentHooks = !!(__currentWebglHooks && (typeof __currentWebglHooks === 'object' || typeof __currentWebglHooks === 'function'));
+      if (!__hasUsableCurrentHooks && (!__currentDesc || __currentDesc.configurable)) {
         Object.defineProperty(window, 'webglHooks', {
-          value: __currentWebglHooks,
+          value: __webglHooksEntry,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      } else if (__currentDesc && __currentDesc.configurable && __currentDesc.enumerable) {
+        Object.defineProperty(window, 'webglHooks', {
+          value: __webglHooksEntry,
           writable: true,
           configurable: true,
           enumerable: false

@@ -73,6 +73,12 @@ const AudioContextModule = function AudioContextModule(window) {
     });
     return;
   }
+  const __envProfileState = (__stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+    ? __stateRoot.__ENV_PROFILE__
+    : null;
+  const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
+    ? __envProfileState.profile
+    : null;
   if (!(__stateRoot.__AUDIOCONTEXT__ && typeof __stateRoot.__AUDIOCONTEXT__ === 'object')) {
     Object.defineProperty(__stateRoot, '__AUDIOCONTEXT__', {
       value: Object.create(null),
@@ -306,7 +312,7 @@ const AudioContextModule = function AudioContextModule(window) {
     const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
     let plans = [];
     try {
-      plans = __coreApplyTargets(targets, window.__PROFILE__, []);
+      plans = __coreApplyTargets(targets, __profile, []);
     } catch (e) {
       degrade(groupTag + ':preflight_failed', e, {
         stage: 'preflight',

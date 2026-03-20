@@ -289,7 +289,21 @@ __envProfileState__.width = Number(W.__WIDTH ?? (W.screen && W.screen.width));
 __envProfileState__.height = Number(W.__HEIGHT ?? (W.screen && W.screen.height));
 __envProfileState__.devicesLabels = __cloneProfileValue__(W.__DEVICES_LABELS);
 __envProfileState__.colorDepth = Number(W.__COLOR_DEPTH);
-__envProfileState__.orientationDom = W.__ORIENTATION ?? (((__envProfileState__.height >= __envProfileState__.width)) ? 'portrait-primary' : 'landscape-primary');
+__envProfileState__.webglRenderer = W.__WEBGL_RENDERER__;
+__envProfileState__.webglVendor = W.__WEBGL_VENDOR__;
+__envProfileState__.webglUnmaskedVendor = W.__WEBGL_UNMASKED_VENDOR__;
+__envProfileState__.webglUnmaskedRenderer = W.__WEBGL_UNMASKED_RENDERER__;
+__envProfileState__.gpuType = W.__GPU_TYPE__;
+__envProfileState__.gpuArchitecture = W.__GPU_ARCHITECTURE__;
+__envProfileState__.gpuVendor = W.__GPU_VENDOR__;
+__envProfileState__.webgpuDevice = W.__WEBGPU_DEVICE__;
+const __screenState = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
+  ? stateRoot.__SCREEN__
+  : null;
+__envProfileState__.orientationDom = (__screenState && typeof __screenState.orientationDom === 'string' && __screenState.orientationDom)
+  ? __screenState.orientationDom
+  : (((__envProfileState__.height >= __envProfileState__.width)) ? 'portrait-primary' : 'landscape-primary');
+__envProfileState__.profile = __cloneProfileValue__((W.__PROFILE__ && typeof W.__PROFILE__ === 'object') ? W.__PROFILE__ : null);
 __envProfileState__.strict = (W.__NAV_PATCH_STRICT__ !== undefined) ? !!W.__NAV_PATCH_STRICT__ : true;
 __envProfileState__.debug = !!W.__NAV_PATCH_DEBUG__;
 __envProfileState__.fullVersionList = __cloneProfileValue__(W.__FULL_VERSION_LIST);
@@ -411,9 +425,17 @@ function __sanitizeBootstrapEnvSurface__(win) {
     '__normalizedLanguages',
     '__cpu',
     '__memory',
+    '__WEBGL_RENDERER__',
+    '__WEBGL_VENDOR__',
+    '__WEBGL_UNMASKED_VENDOR__',
+    '__WEBGL_UNMASKED_RENDERER__',
+    '__GPU_TYPE__',
+    '__GPU_ARCHITECTURE__',
+    '__GPU_VENDOR__',
+    '__WEBGPU_DEVICE__',
+    '__PROFILE__',
     '__DEVICES_LABELS',
-    '__PLUGIN_PROFILES__',
-    '__ORIENTATION'
+    '__PLUGIN_PROFILES__'
   ];
   for (const key of keys) {
     const gate = __getBootstrapSanitizeGate__(key);
@@ -499,8 +521,10 @@ __defineHiddenValue__(C, '__runBootstrapEnvCleanup__', __runBootstrapEnvCleanup_
     "__GPU_TYPE__",
     "__GPU_ARCHITECTURE__",
     "__GPU_VENDOR__",
+    "__WEBGPU_DEVICE__",
     "__DEVICES_LABELS",
     "__PLUGIN_PROFILES__",
+    "__PROFILE__",
     "__safeDefine",
     "__CORE_TOSTRING_STATE__",
     "__ensureMarkAsNative",

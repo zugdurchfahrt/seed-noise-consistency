@@ -137,13 +137,92 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
-  if (!(__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')) {
-    Object.defineProperty(__screenStateRoot, '__SCREEN__', {
-      value: Object.create(null),
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
+  const __screenEnvProfile = (__screenStateRoot.__ENV_PROFILE__ && typeof __screenStateRoot.__ENV_PROFILE__ === 'object')
+    ? __screenStateRoot.__ENV_PROFILE__
+    : null;
+  const __screenProfile = (__screenEnvProfile && __screenEnvProfile.profile && typeof __screenEnvProfile.profile === 'object')
+    ? __screenEnvProfile.profile
+    : null;
+  let __screenState = (__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')
+    ? __screenStateRoot.__SCREEN__
+    : null;
+  if (!__screenState) {
+    try {
+      Object.defineProperty(__screenStateRoot, '__SCREEN__', {
+        value: Object.create(null),
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      __screenState = (__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')
+        ? __screenStateRoot.__SCREEN__
+        : null;
+    } catch (stateDefineErr) {
+      __screenDiag('warn', 'screen:screen_state_define_failed', {
+        stage: 'preflight',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: 'CanvasPatchContext.state.__SCREEN__',
+        message: 'Object.defineProperty(CanvasPatchContext.state,"__SCREEN__") failed',
+        data: {
+          outcome: 'skip',
+          reason: 'screen_state_define_failed',
+          missing: 'CanvasPatchContext.state.__SCREEN__'
+        }
+      }, stateDefineErr);
+      try {
+        if (__core && typeof __core.releaseGuardFlag === 'function') {
+          __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
+        }
+      } catch (releaseErr) {
+        __screenDiag('warn', 'screen:guard_release_failed', {
+          stage: 'preflight',
+          type: __screenTypePipeline,
+          diagTag: 'screen',
+          key: __flagKey,
+          message: 'guard release failed after screen state define skip',
+          data: {
+            outcome: 'skip',
+            reason: 'guard_release_failed',
+            substage: 'CanvasPatchContext.state.__SCREEN__'
+          }
+        }, releaseErr);
+      }
+      return;
+    }
+  }
+  if (!__screenState) {
+    __screenDiag('warn', 'screen:screen_state_missing', {
+      stage: 'preflight',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: 'CanvasPatchContext.state.__SCREEN__',
+      message: 'CanvasPatchContext.state.__SCREEN__ unavailable',
+      data: {
+        outcome: 'skip',
+        reason: 'screen_state_missing',
+        missing: 'CanvasPatchContext.state.__SCREEN__'
+      }
+    }, new Error('[ScreenPatch] CanvasPatchContext.state.__SCREEN__ unavailable'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
+      }
+    } catch (releaseErr) {
+      __screenDiag('warn', 'screen:guard_release_failed', {
+        stage: 'preflight',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: __flagKey,
+        message: 'guard release failed after screen state missing skip',
+        data: {
+          outcome: 'skip',
+          reason: 'guard_release_failed',
+          substage: 'CanvasPatchContext.state.__SCREEN__'
+        }
+      }, releaseErr);
+    }
+    return;
   }
   const __moduleRollbackStack = [];
 
@@ -249,7 +328,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
     try {
-      plans = __coreApplyTargets(targets, window.__PROFILE__, []);
+      plans = __coreApplyTargets(targets, __screenProfile, []);
     } catch (e) {
       __screenDiag('error', groupTag + ':preflight_failed', {
         stage: 'preflight',
@@ -549,7 +628,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       matches = matches && actual === orientation[1];
     }
     const actualOrientationDom = (SCREEN_WIDTH > SCREEN_HEIGHT) ? "landscape-primary" : "portrait-primary";
-    window.__ORIENTATION = actualOrientationDom;
+    __screenState.orientationDom = actualOrientationDom;
 
     const color = q.match(/\(color:\s*(\d+)\)/);
     if (color) {

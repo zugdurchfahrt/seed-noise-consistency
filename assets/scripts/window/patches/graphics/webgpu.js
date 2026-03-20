@@ -119,6 +119,23 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     releaseEntryGuard(true);
     return;
   }
+  const __envProfileState = (__stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+    ? __stateRoot.__ENV_PROFILE__
+    : null;
+  if (!__envProfileState) {
+    degrade('fatal', 'webgpu:env_profile_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__ENV_PROFILE__ is required'), {
+      stage: 'preflight',
+      type: __webgpuTypePipeline,
+      key: 'CanvasPatchContext.state.__ENV_PROFILE__',
+      message: 'CanvasPatchContext.state.__ENV_PROFILE__ is required',
+      data: { outcome: 'skip', reason: 'missing_env_profile' }
+    });
+    releaseEntryGuard(true);
+    return;
+  }
+  const __profile = (__envProfileState.profile && typeof __envProfileState.profile === 'object')
+    ? __envProfileState.profile
+    : null;
   if (!(__stateRoot.__WEBGPU__ && typeof __stateRoot.__WEBGPU__ === 'object')) {
     Object.defineProperty(__stateRoot, '__WEBGPU__', {
       value: Object.create(null),
@@ -164,15 +181,59 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     const __webgpuWLState = (__stateRoot.__WEBGPU_WL_STATE__ && typeof __stateRoot.__WEBGPU_WL_STATE__ === 'object')
       ? __stateRoot.__WEBGPU_WL_STATE__
       : null;
-    const __webgpuWLStore = (__webgpuWLState && __webgpuWLState.store && typeof __webgpuWLState.store === 'object')
+    if (!__webgpuWLState) {
+      degrade('fatal', 'webgpu:wl_state_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__WEBGPU_WL_STATE__ is required'), {
+        stage: 'preflight',
+        type: __webgpuTypePipeline,
+        key: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__',
+        message: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__ is required',
+        data: { outcome: 'skip', reason: 'missing_webgpu_wl_state' }
+      });
+      releaseEntryGuard(true);
+      return;
+    }
+    const __webgpuWLStore = (__webgpuWLState.store && typeof __webgpuWLState.store === 'object')
       ? __webgpuWLState.store
       : null;
-    const __webgpuFeaturesWhitelist = (__webgpuWLStore && Array.isArray(__webgpuWLStore.featuresWhitelist))
+    if (!__webgpuWLStore) {
+      degrade('fatal', 'webgpu:wl_store_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__WEBGPU_WL_STATE__.store is required'), {
+        stage: 'preflight',
+        type: __webgpuTypePipeline,
+        key: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__.store',
+        message: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__.store is required',
+        data: { outcome: 'skip', reason: 'missing_webgpu_wl_store' }
+      });
+      releaseEntryGuard(true);
+      return;
+    }
+    const __webgpuFeaturesWhitelist = Array.isArray(__webgpuWLStore.featuresWhitelist)
       ? __webgpuWLStore.featuresWhitelist
-      : (Array.isArray(window.__WEBGPU_FEATURES_WHITELIST__) ? window.__WEBGPU_FEATURES_WHITELIST__ : []);
-    const __webgpuLimitsWhitelist = (__webgpuWLStore && Array.isArray(__webgpuWLStore.limitsWhitelist))
+      : null;
+    if (!__webgpuFeaturesWhitelist) {
+      degrade('fatal', 'webgpu:features_whitelist_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__WEBGPU_WL_STATE__.store.featuresWhitelist is required'), {
+        stage: 'preflight',
+        type: __webgpuTypePipeline,
+        key: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__.store.featuresWhitelist',
+        message: 'featuresWhitelist is required',
+        data: { outcome: 'skip', reason: 'missing_features_whitelist' }
+      });
+      releaseEntryGuard(true);
+      return;
+    }
+    const __webgpuLimitsWhitelist = Array.isArray(__webgpuWLStore.limitsWhitelist)
       ? __webgpuWLStore.limitsWhitelist
-      : (Array.isArray(window.__WEBGPU_LIMITS_WHITELIST__) ? window.__WEBGPU_LIMITS_WHITELIST__ : []);
+      : null;
+    if (!__webgpuLimitsWhitelist) {
+      degrade('fatal', 'webgpu:limits_whitelist_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__WEBGPU_WL_STATE__.store.limitsWhitelist is required'), {
+        stage: 'preflight',
+        type: __webgpuTypePipeline,
+        key: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__.store.limitsWhitelist',
+        message: 'limitsWhitelist is required',
+        data: { outcome: 'skip', reason: 'missing_limits_whitelist' }
+      });
+      releaseEntryGuard(true);
+      return;
+    }
 
     function isSameDescriptor(actual, expected) {
       if (!actual || !expected) return false;
@@ -190,7 +251,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
       let plans = [];
       try {
-        plans = Core.applyTargets(targets, window.__PROFILE__, []);
+        plans = Core.applyTargets(targets, __profile, []);
       } catch (e) {
         e.__rollbackOk = true;
         degrade('error', groupTag + ':preflight_failed', e, {
@@ -315,11 +376,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     function buildAdapterInfo(nativeInfo) {
       const info = nativeInfo && typeof nativeInfo === 'object' ? nativeInfo : {};
       return {
-        vendor: (window.__GPU_VENDOR__ !== undefined ? window.__GPU_VENDOR__ : info.vendor),
-        architecture: (window.__GPU_ARCHITECTURE__ !== undefined ? window.__GPU_ARCHITECTURE__ : info.architecture),
-        device: (window.__WEBGPU_DEVICE__ !== undefined ? window.__WEBGPU_DEVICE__ : info.device),
+        vendor: (__envProfileState.gpuVendor !== undefined ? __envProfileState.gpuVendor : info.vendor),
+        architecture: (__envProfileState.gpuArchitecture !== undefined ? __envProfileState.gpuArchitecture : info.architecture),
+        device: (__envProfileState.webgpuDevice !== undefined ? __envProfileState.webgpuDevice : info.device),
         description: info.description,
-        type: (window.__GPU_TYPE__ !== undefined ? window.__GPU_TYPE__ : info.type),
+        type: (__envProfileState.gpuType !== undefined ? __envProfileState.gpuType : info.type),
         isFallbackAdapter: info.isFallbackAdapter,
         driver: info.driver,
         backend: info.backend,

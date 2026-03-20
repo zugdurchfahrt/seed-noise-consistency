@@ -526,14 +526,16 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
             isFallbackAdapter: adapter.isFallbackAdapter ?? null
           };
 
-          return (window.__WEBGPU_SNAPSHOT__ = {
+          const snapshot = {
             adapterInfo: adapterInfo,
             features: features,
             formats: formats,
             adapterLimits: adapterLimits,
             deviceLimits: deviceLimits,
             summary: summary
-          });
+          };
+          __setHiddenOwnerValue(__store, 'lastSnapshot', snapshot);
+          return snapshot;
         },
         writable: true,
         configurable: true,

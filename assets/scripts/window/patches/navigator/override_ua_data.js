@@ -56,8 +56,16 @@
 
   // ---- TEMPORARY: module is present but disabled by default (opt-in via profile) ----
   // Purpose: keep legacy file available without accidental activation/conflicts in pipeline.
-  // Enable only by setting: window.__PROFILE__.override_ua_data_enabled === true
-  const __profile = g.__PROFILE__;
+  // Enable only by setting: CanvasPatchContext.state.__ENV_PROFILE__.profile.override_ua_data_enabled === true
+  const __stateRoot = (g && g.CanvasPatchContext && g.CanvasPatchContext.state && typeof g.CanvasPatchContext.state === 'object')
+    ? g.CanvasPatchContext.state
+    : null;
+  const __envProfileState = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+    ? __stateRoot.__ENV_PROFILE__
+    : null;
+  const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
+    ? __envProfileState.profile
+    : null;
   const __moduleEnabled = !!(__profile && __profile.override_ua_data_enabled === true);
   if (!__moduleEnabled) {
     __diagPipeline('info', __MODULE + ':disabled', {
@@ -112,7 +120,7 @@
     let plans = [];
     try {
       __groupStage = 'preflight';
-      plans = Core.applyTargets(targets, g.__PROFILE__, []);
+      plans = Core.applyTargets(targets, __profile, []);
     } catch (e) {
       __groupOutcome = 'skip';
       __groupReason = 'preflight_failed';

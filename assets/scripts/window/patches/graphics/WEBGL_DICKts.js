@@ -74,7 +74,15 @@ const WEBglDICKts = function WEBglDICKts(window) {
             if (__core && typeof __core.releaseGuardFlag === 'function') {
                 __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __tag);
             }
-        } catch (_) {}
+        } catch (e) {
+            diag('warn', 'webglstorage:guard_release_failed', {
+                stage: rollbackOk === true ? 'preflight' : 'rollback',
+                key: __flagKey,
+                message: 'releaseGuardFlag failed',
+                type: __typePipeline,
+                data: { outcome: 'skip', reason: 'guard_release_failed' }
+            }, e);
+        }
     }
 
     const C = window.CanvasPatchContext;

@@ -119,6 +119,12 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }, null);
     return;
   }
+  const __envProfileState = (C.state && typeof C.state === 'object' && C.state.__ENV_PROFILE__ && typeof C.state.__ENV_PROFILE__ === 'object')
+    ? C.state.__ENV_PROFILE__
+    : null;
+  const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
+    ? __envProfileState.profile
+    : null;
 
   function __ensureFontsStateSlot() {
     if (Object.prototype.hasOwnProperty.call(C, '__FONTS_STATE__')) {
@@ -311,7 +317,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
     let plans = [];
     try {
-      plans = Core.applyTargets(targets, window.__PROFILE__, []);
+      plans = Core.applyTargets(targets, __profile, []);
     } catch (e) {
       __fontDiagPipeline(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':preflight_failed', {
         stage: 'preflight',

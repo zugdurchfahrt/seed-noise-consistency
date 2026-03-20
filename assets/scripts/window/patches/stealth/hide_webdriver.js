@@ -65,6 +65,12 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     });
     return;
   }
+  const __envProfileState = (__stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+    ? __stateRoot.__ENV_PROFILE__
+    : null;
+  const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
+    ? __envProfileState.profile
+    : null;
   if (!(__stateRoot.__HIDE_WEBDRIVER__ && typeof __stateRoot.__HIDE_WEBDRIVER__ === 'object')) {
     Object.defineProperty(__stateRoot, '__HIDE_WEBDRIVER__', {
       value: Object.create(null),
@@ -185,7 +191,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
     let plans = [];
     try {
-      plans = Core.applyTargets(targets, window.__PROFILE__, []);
+      plans = Core.applyTargets(targets, __profile, []);
     } catch (e) {
       degrade(groupTag + ':preflight_failed', e, {
         level: 'error',
