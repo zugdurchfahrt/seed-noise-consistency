@@ -206,7 +206,8 @@ pip install --no-cache-dir -r requirements.txt
 ```
 
 ## Issues/TODO
-- Синхронизация Canvas(window) -Canvas(SharedWorkerGlobalScope) .  
+- Синхронизация Canvas(window) -Canvas(SharedWorkerGlobalScope).
+- Синхронизация GPU(window) -GPU(ServiveWorkerGlobalScope).
 - Интегрировать модуль `getClientRects` / `getBoundingClientRect` (проксирование).  
 - Ротация TLS‑отпечатка через OpenSSL.  
 - события `success/ready` из мест, где фиксируется только факт установки хуков считать только `applied`: механика поставлена, но результат еще не доказан.  

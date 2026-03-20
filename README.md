@@ -210,7 +210,8 @@ NO_PROXY_START.bat
 
 ## Issues/TODO
 
-- Synchronize window ↔ SharedWorkerScope completely.
+- Synchronize window Canvas ↔ SharedWorkerScope Canvas.
+- Synchronize window GPU ↔ ServiceWorkerScope GPU.
 - Integrate `getClientRects` / `getBoundingClientRect` proxying.
 - Implement TLS fingerprint rotation via OpenSSL.
 - Treat `success/ready` events from places that only record hook installation only as `applied`: the mechanism is installed, but the result is not yet proven.
