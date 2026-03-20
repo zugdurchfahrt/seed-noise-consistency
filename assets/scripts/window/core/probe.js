@@ -1,4 +1,5 @@
-Object.defineProperty(globalThis, "__PROBE__", { value: async function(){
+(function(){
+const __probeRun = async function(){
   "use strict";
 
   if (typeof globalThis === "undefined") {
@@ -2835,4 +2836,19 @@ try {
 
 
 return result;
-}, configurable: true });
+};
+try {
+  const W = (typeof window !== "undefined") ? window : null;
+  const L = (W && W.CanvasPatchContext && W.CanvasPatchContext.__logger && typeof W.CanvasPatchContext.__logger === "object")
+    ? W.CanvasPatchContext.__logger
+    : null;
+  if (L) {
+    Object.defineProperty(L, "__PROBE__", {
+      value: __probeRun,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+} catch (_) {}
+})();

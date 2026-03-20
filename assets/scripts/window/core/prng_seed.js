@@ -319,6 +319,31 @@
         }, e);
       }
     })();
+
+    try {
+      if (C && (typeof C === 'object' || typeof C === 'function')) {
+        let prngRuntime = (C.__prngRuntime__ && typeof C.__prngRuntime__ === 'object') ? C.__prngRuntime__ : null;
+        if (!prngRuntime) {
+          prngRuntime = Object.create(null);
+          Object.defineProperty(C, '__prngRuntime__', {
+            value: prngRuntime,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+        }
+        Object.defineProperty(prngRuntime, 'RNGsetModule', {
+          value: RNGsetModule,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      const exportDesc = Object.getOwnPropertyDescriptor(G, 'RNGsetModule');
+      if (exportDesc && exportDesc.configurable !== false) {
+        delete G.RNGsetModule;
+      }
+    } catch (_) {}
   }
 
   // Function export*

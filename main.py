@@ -435,9 +435,16 @@ def init_driver(
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             // ——— Worker env diagnostics (pre-bootstrap) ———//
             //  console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
-            __PROBE_LIVE_READER__.start();
-            DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
-            __DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
+            const L = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+            if (L && L.__PROBE_LIVE_READER__ && typeof L.__PROBE_LIVE_READER__.start === 'function') {
+                L.__PROBE_LIVE_READER__.start();
+            }
+            if (L && typeof L.DIAG_SCREEN_ON === 'function') {
+                L.DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
+            }
+            if (L && typeof L.__DIAG_ALERTS__ === 'function') {
+                L.__DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
+            }
             })(window);
             (function runBootstrapEnvCleanup(win) {
                 const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')

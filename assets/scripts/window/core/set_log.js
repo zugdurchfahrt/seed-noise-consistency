@@ -96,24 +96,7 @@ const LOGGingModule = function LOGGingModule() {
         if (v && typeof v === "object") __loggerRoot._logConfig = v;
       });
       __defineWindowLoggerValue("__LOGGER_GUARD_MODE__", __loggerRoot.__LOGGER_GUARD_MODE__, true);
-      __defineWindowLoggerValue("__DIAG_SCREEN__", __loggerRoot.__DIAG_SCREEN__, true);
-      __defineWindowLoggerValue("__PROBE_LIVE_READER__", __loggerRoot.__PROBE_LIVE_READER__, false);
-      __defineWindowLoggerValue("__DIAG_ALERTS__", __loggerRoot.__DIAG_ALERTS__, false);
-      __defineWindowLoggerValue("DIAG_SCREEN_ON", __loggerRoot.DIAG_SCREEN_ON, false);
-      __defineWindowLoggerValue("DIAG_SCREEN_OFF", __loggerRoot.DIAG_SCREEN_OFF, false);
-      __defineWindowLoggerValue("DIAG_SCREEN_RESET", __loggerRoot.DIAG_SCREEN_RESET, false);
-      __defineWindowLoggerValue("DIAG_SCREEN_SNAPSHOT", __loggerRoot.DIAG_SCREEN_SNAPSHOT, false);
       __defineWindowLoggerValue("log", __loggerRoot.log, false);
-      __defineWindowLoggerValue("exportMyDebugLog", __loggerRoot.exportMyDebugLog, false);
-      __defineWindowLoggerValue("DEBUG_ALL_ON", __loggerRoot.DEBUG_ALL_ON, false);
-      __defineWindowLoggerValue("DEBUG_ALL_OFF", __loggerRoot.DEBUG_ALL_OFF, false);
-      __defineWindowLoggerValue("DEBUG_ALL_TOGGLE", __loggerRoot.DEBUG_ALL_TOGGLE, false);
-      __defineWindowLoggerValue("DEBUG_DEGRADES_ON", __loggerRoot.DEBUG_DEGRADES_ON, false);
-      __defineWindowLoggerValue("DEBUG_DEGRADES_OFF", __loggerRoot.DEBUG_DEGRADES_OFF, false);
-      __defineWindowLoggerValue("DEBUG_DEGRADES_TOGGLE", __loggerRoot.DEBUG_DEGRADES_TOGGLE, false);
-      __defineWindowLoggerValue("EXPECTED_RECEIVER_THROW_GUARD_ON", __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_ON, false);
-      __defineWindowLoggerValue("EXPECTED_RECEIVER_THROW_GUARD_OFF", __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_OFF, false);
-      __defineWindowLoggerValue("EXPECTED_RECEIVER_THROW_GUARD_TOGGLE", __loggerRoot.EXPECTED_RECEIVER_THROW_GUARD_TOGGLE, false);
     }
 
     if (!__loggerRoot.__PATCH_MYTYPER__) {

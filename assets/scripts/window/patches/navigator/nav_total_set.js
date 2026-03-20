@@ -243,6 +243,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navNormalizedLanguages = (__navLangState && Array.isArray(__navLangState.normalizedLanguages))
       ? __navLangState.normalizedLanguages.slice()
       : null;
+    const __navEnvProfile = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+      ? __stateRoot.__ENV_PROFILE__
+      : null;
     if (Array.isArray(__navNormalizedLanguages)) {
       try {
         Object.freeze(__navNormalizedLanguages);
@@ -275,26 +278,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     try {
-    __navProfileState.meta = __navCloneStateValue(window.__EXPECTED_CLIENT_HINTS || {});
-    __navProfileState.navPlat = window.__NAV_PLATFORM__;
-    __navProfileState.generatedPlatform = window.__GENERATED_PLATFORM;
-    __navProfileState.generatedPlatformVersion = window.__GENERATED_PLATFORM_VERSION;
-    __navProfileState.userAgent = window.__USER_AGENT;
-    __navProfileState.vendor = window.__VENDOR;
-    __navProfileState.mem = Number(window.__memory);
-    __navProfileState.cpu = Number(window.__cpu);
-    __navProfileState.dpr = Number(window.__DPR);
-    __navProfileState.width = Number(window.__WIDTH ?? (window.screen && window.screen.width));
-    __navProfileState.height = Number(window.__HEIGHT ?? (window.screen && window.screen.height));
-    __navProfileState.devicesLabels = __navCloneStateValue(window.__DEVICES_LABELS);
-    __navProfileState.colorDepth = Number(window.__COLOR_DEPTH);
-    __navProfileState.orientationDom = window.__ORIENTATION ?? (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary');
-    __navProfileState.strict = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
-    __navProfileState.debug = !!window.__NAV_PATCH_DEBUG__;
-    __navProfileState.fullVersionList = __navCloneStateValue(window.__FULL_VERSION_LIST);
-    __navProfileState.storageQuotaMb = window.__STORAGE_QUOTA_MB;
-    __navProfileState.storageUsedPct = window.__STORAGE_USED_PCT;
-    __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(window.__PLUGIN_PROFILES__) ? window.__PLUGIN_PROFILES__ : []);
+    __navProfileState.meta = __navCloneStateValue((__navEnvProfile && typeof __navEnvProfile.meta === 'object') ? __navEnvProfile.meta : (window.__EXPECTED_CLIENT_HINTS || {}));
+    __navProfileState.navPlat = (__navEnvProfile && typeof __navEnvProfile.navPlat !== 'undefined') ? __navEnvProfile.navPlat : window.__NAV_PLATFORM__;
+    __navProfileState.generatedPlatform = (__navEnvProfile && typeof __navEnvProfile.generatedPlatform !== 'undefined') ? __navEnvProfile.generatedPlatform : window.__GENERATED_PLATFORM;
+    __navProfileState.generatedPlatformVersion = (__navEnvProfile && typeof __navEnvProfile.generatedPlatformVersion !== 'undefined') ? __navEnvProfile.generatedPlatformVersion : window.__GENERATED_PLATFORM_VERSION;
+    __navProfileState.userAgent = (__navEnvProfile && typeof __navEnvProfile.userAgent !== 'undefined') ? __navEnvProfile.userAgent : window.__USER_AGENT;
+    __navProfileState.vendor = (__navEnvProfile && typeof __navEnvProfile.vendor !== 'undefined') ? __navEnvProfile.vendor : window.__VENDOR;
+    __navProfileState.mem = Number((__navEnvProfile && typeof __navEnvProfile.mem !== 'undefined') ? __navEnvProfile.mem : window.__memory);
+    __navProfileState.cpu = Number((__navEnvProfile && typeof __navEnvProfile.cpu !== 'undefined') ? __navEnvProfile.cpu : window.__cpu);
+    __navProfileState.dpr = Number((__navEnvProfile && typeof __navEnvProfile.dpr !== 'undefined') ? __navEnvProfile.dpr : window.__DPR);
+    __navProfileState.width = Number((__navEnvProfile && typeof __navEnvProfile.width !== 'undefined') ? __navEnvProfile.width : (window.__WIDTH ?? (window.screen && window.screen.width)));
+    __navProfileState.height = Number((__navEnvProfile && typeof __navEnvProfile.height !== 'undefined') ? __navEnvProfile.height : (window.__HEIGHT ?? (window.screen && window.screen.height)));
+    __navProfileState.devicesLabels = __navCloneStateValue((__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'devicesLabels')) ? __navEnvProfile.devicesLabels : window.__DEVICES_LABELS);
+    __navProfileState.colorDepth = Number((__navEnvProfile && typeof __navEnvProfile.colorDepth !== 'undefined') ? __navEnvProfile.colorDepth : window.__COLOR_DEPTH);
+    __navProfileState.orientationDom = (__navEnvProfile && typeof __navEnvProfile.orientationDom !== 'undefined')
+      ? __navEnvProfile.orientationDom
+      : (window.__ORIENTATION ?? (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary'));
+    __navProfileState.strict = (__navEnvProfile && typeof __navEnvProfile.strict !== 'undefined') ? !!__navEnvProfile.strict : ((window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true);
+    __navProfileState.debug = (__navEnvProfile && typeof __navEnvProfile.debug !== 'undefined') ? !!__navEnvProfile.debug : !!window.__NAV_PATCH_DEBUG__;
+    __navProfileState.fullVersionList = __navCloneStateValue((__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'fullVersionList')) ? __navEnvProfile.fullVersionList : window.__FULL_VERSION_LIST);
+    __navProfileState.storageQuotaMb = (__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'storageQuotaMb')) ? __navEnvProfile.storageQuotaMb : window.__STORAGE_QUOTA_MB;
+    __navProfileState.storageUsedPct = (__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'storageUsedPct')) ? __navEnvProfile.storageUsedPct : window.__STORAGE_USED_PCT;
+    __navProfileState.pluginProfiles = __navCloneStateValue((__navEnvProfile && Array.isArray(__navEnvProfile.pluginProfiles)) ? __navEnvProfile.pluginProfiles : (Array.isArray(window.__PLUGIN_PROFILES__) ? window.__PLUGIN_PROFILES__ : []));
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
     const meta          = __navProfileState.meta || {};

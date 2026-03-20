@@ -139,6 +139,36 @@ function __ensureLangTransitState__() {
   return state;
 }
 
+function __cloneProfileValue__(value) {
+  if (Array.isArray(value)) return value.map(__cloneProfileValue__);
+  if (value && typeof value === 'object') {
+    const out = Object.create(null);
+    const keys = Object.keys(value);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      out[key] = __cloneProfileValue__(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+function __ensureEnvProfileState__() {
+  let state = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+    ? stateRoot.__ENV_PROFILE__
+    : null;
+  if (!state) {
+    state = Object.create(null);
+    Object.defineProperty(stateRoot, '__ENV_PROFILE__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  return state;
+}
+
 function __emitBootstrapTransferDiag__(level, code, key, message, reason, err, extraData) {
   const data = { outcome: 'skip', reason: reason };
   if (extraData && typeof extraData === 'object') {
@@ -184,6 +214,7 @@ function __setBootstrapTransferStatus__(slot, ready, reason, extraData) {
 
 const __geoTransitState__ = __ensureGeoTransitState__();
 const __langTransitState__ = __ensureLangTransitState__();
+const __envProfileState__ = __ensureEnvProfileState__();
 const __bootstrapLatitude__ = W.__LATITUDE__;
 const __bootstrapLongitude__ = W.__LONGITUDE__;
 const __bootstrapTimezone__ = W.__TIMEZONE__;
@@ -232,8 +263,6 @@ if (__langMissingKeys__.length === 0) {
     throw new Error('[module] CanvasPatchContext.__LANG_STATE__ bootstrap invalid');
   }
   __setBootstrapTransferStatus__('lang', true, 'owner_ready', { source: 'window_transit' });
-  __defineHiddenValue__(W, '__primaryLanguage', __langTransitState__.primaryLanguage);
-  __defineHiddenValue__(W, '__normalizedLanguages', __langTransitState__.normalizedLanguages);
 } else {
   __setBootstrapTransferStatus__('lang', false, 'bootstrap_input_incomplete', { missingKeys: __langMissingKeys__.slice() });
   __emitBootstrapTransferDiag__(
@@ -246,6 +275,27 @@ if (__langMissingKeys__.length === 0) {
     { missingKeys: __langMissingKeys__.slice() }
   );
 }
+
+__envProfileState__.meta = __cloneProfileValue__(W.__EXPECTED_CLIENT_HINTS || {});
+__envProfileState__.navPlat = W.__NAV_PLATFORM__;
+__envProfileState__.generatedPlatform = W.__GENERATED_PLATFORM;
+__envProfileState__.generatedPlatformVersion = W.__GENERATED_PLATFORM_VERSION;
+__envProfileState__.userAgent = W.__USER_AGENT;
+__envProfileState__.vendor = W.__VENDOR;
+__envProfileState__.mem = Number(W.__memory);
+__envProfileState__.cpu = Number(W.__cpu);
+__envProfileState__.dpr = Number(W.__DPR);
+__envProfileState__.width = Number(W.__WIDTH ?? (W.screen && W.screen.width));
+__envProfileState__.height = Number(W.__HEIGHT ?? (W.screen && W.screen.height));
+__envProfileState__.devicesLabels = __cloneProfileValue__(W.__DEVICES_LABELS);
+__envProfileState__.colorDepth = Number(W.__COLOR_DEPTH);
+__envProfileState__.orientationDom = W.__ORIENTATION ?? (((__envProfileState__.height >= __envProfileState__.width)) ? 'portrait-primary' : 'landscape-primary');
+__envProfileState__.strict = (W.__NAV_PATCH_STRICT__ !== undefined) ? !!W.__NAV_PATCH_STRICT__ : true;
+__envProfileState__.debug = !!W.__NAV_PATCH_DEBUG__;
+__envProfileState__.fullVersionList = __cloneProfileValue__(W.__FULL_VERSION_LIST);
+__envProfileState__.storageQuotaMb = W.__STORAGE_QUOTA_MB;
+__envProfileState__.storageUsedPct = W.__STORAGE_USED_PCT;
+__envProfileState__.pluginProfiles = __cloneProfileValue__(Array.isArray(W.__PLUGIN_PROFILES__) ? W.__PLUGIN_PROFILES__ : []);
 
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
   return __bootstrapHideEmit__(level, code, {

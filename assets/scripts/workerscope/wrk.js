@@ -66,6 +66,42 @@ const WrkModule = function WrkModule(window) {
     return value;
   }
 
+  const __wrkCtx = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+    ? G.CanvasPatchContext
+    : null;
+  const __wrkStateRoot = (__wrkCtx && __wrkCtx.state && typeof __wrkCtx.state === 'object')
+    ? __wrkCtx.state
+    : null;
+  const __wrkRuntimeRoot = (__wrkCtx && __wrkCtx.__wrkRuntime__ && typeof __wrkCtx.__wrkRuntime__ === 'object')
+    ? __wrkCtx.__wrkRuntime__
+    : (__wrkCtx ? __setHiddenValue__(__wrkCtx, '__wrkRuntime__', Object.create(null)) : null);
+  const __wrkHooksRoot = (__wrkCtx && __wrkCtx.__wrkHooks__ && typeof __wrkCtx.__wrkHooks__ === 'object')
+    ? __wrkCtx.__wrkHooks__
+    : (__wrkCtx ? __setHiddenValue__(__wrkCtx, '__wrkHooks__', Object.create(null)) : null);
+
+  function __wrkRuntimeSet(key, value) {
+    if (__wrkRuntimeRoot && typeof key === 'string' && key) {
+      __setHiddenValue__(__wrkRuntimeRoot, key, value);
+    }
+    return value;
+  }
+
+  function __wrkRuntimeGet(key) {
+    if (__wrkRuntimeRoot && typeof key === 'string' && key && Object.prototype.hasOwnProperty.call(__wrkRuntimeRoot, key)) {
+      return __wrkRuntimeRoot[key];
+    }
+    return G ? G[key] : undefined;
+  }
+
+  function __dropGlobalSurfaceKey__(obj, key) {
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return false;
+    const d = Object.getOwnPropertyDescriptor(obj, key);
+    if (!d) return true;
+    if (d.configurable === false) return false;
+    delete obj[key];
+    return !Object.prototype.hasOwnProperty.call(obj, key);
+  }
+
   function __updateWorkerSnapshotStatus__(ready, stage) {
     const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
       ? G.CanvasPatchContext
@@ -264,6 +300,9 @@ function EnvBus(G){
   const __geoStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__GEO_STATE__ && typeof G.CanvasPatchContext.state.__GEO_STATE__ === 'object')
     ? G.CanvasPatchContext.state.__GEO_STATE__
     : null;
+  const __envProfileRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__ENV_PROFILE__ && typeof G.CanvasPatchContext.state.__ENV_PROFILE__ === 'object')
+    ? G.CanvasPatchContext.state.__ENV_PROFILE__
+    : null;
   const __webglStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__WEBGL_STATE__ && typeof G.CanvasPatchContext.state.__WEBGL_STATE__ === 'object')
     ? G.CanvasPatchContext.state.__WEBGL_STATE__
     : null;
@@ -278,11 +317,21 @@ function EnvBus(G){
   const __envLang = (__langStateRoot && typeof __langStateRoot.primaryLanguage === 'string' && __langStateRoot.primaryLanguage)
     ? __langStateRoot.primaryLanguage
     : null;
-  const __envUa = (typeof G.__USER_AGENT === 'string' && G.__USER_AGENT) ? G.__USER_AGENT : null;
-  const __envVendor = (typeof G.__VENDOR === 'string') ? G.__VENDOR : null;
-  const __envDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null;
-  const __envCpu = (G.__cpu != null) ? G.__cpu : null;
-  const __envMem = (G.__memory != null) ? G.__memory : null;
+  const __envUa = (__envProfileRoot && typeof __envProfileRoot.userAgent === 'string' && __envProfileRoot.userAgent)
+    ? __envProfileRoot.userAgent
+    : ((typeof G.__USER_AGENT === 'string' && G.__USER_AGENT) ? G.__USER_AGENT : null);
+  const __envVendor = (__envProfileRoot && typeof __envProfileRoot.vendor === 'string')
+    ? __envProfileRoot.vendor
+    : ((typeof G.__VENDOR === 'string') ? G.__VENDOR : null);
+  const __envDpr = (__envProfileRoot && Number(__envProfileRoot.dpr) > 0)
+    ? Number(__envProfileRoot.dpr)
+    : ((typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null);
+  const __envCpu = (__envProfileRoot && __envProfileRoot.cpu != null)
+    ? __envProfileRoot.cpu
+    : ((G.__cpu != null) ? G.__cpu : null);
+  const __envMem = (__envProfileRoot && __envProfileRoot.mem != null)
+    ? __envProfileRoot.mem
+    : ((G.__memory != null) ? G.__memory : null);
   const __envTimeZone = (__geoStateRoot && typeof __geoStateRoot.timezone === 'string' && __geoStateRoot.timezone)
     ? __geoStateRoot.timezone
     : null;
@@ -420,8 +469,10 @@ function EnvBus(G){
     })();
 
     const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
-    const heSource = (G.__UACH_HE_READY__ && G.__LAST_UACH_HE__ && typeof G.__LAST_UACH_HE__ === 'object')
-      ? G.__LAST_UACH_HE__
+    const __heReady = __wrkRuntimeGet('__UACH_HE_READY__');
+    const __heLast = __wrkRuntimeGet('__LAST_UACH_HE__');
+    const heSource = (__heReady && __heLast && typeof __heLast === 'object')
+      ? __heLast
       : null;
     if (!heSource) throw new Error('EnvBus: high entropy missing');
     const he = {};
@@ -501,7 +552,12 @@ function EnvHub_init(G){
     },
     installWorkerNavMirror(scope){
       if (!scope) throw new Error('EnvHub: installWorkerNavMirror missing scope');
-      scope.__ENV_HUB__ = hub;
+      Object.defineProperty(scope, '__ENV_HUB__', {
+        value: hub,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
     }
   };
   return hub;
@@ -511,7 +567,8 @@ function EnvHub_init(G){
 // 2a) Обёртка для вызова из бандла
 function EnvHubPatchModule(G){
   const hub = EnvHub_init(G);
-  G.__ENV_HUB__ = hub;   // здесь фикс: записываем в глобал один раз
+  __wrkRuntimeSet('__ENV_HUB__', hub);
+  return hub;
 }
 
 // 3) Установка оверрайдов (Worker/Shared/SW).Используем SafeWorkerOverride.
@@ -571,6 +628,7 @@ function WorkerOverrides_install(G, hub) {
       });
     }
   }
+  __wrkRuntimeSet('__ENV_BRIDGE__', BR);
 
 const ENV_WRK_SRC = (BR && typeof BR.inlineReflect === 'string') ? BR.inlineReflect : null;
 if (typeof ENV_WRK_SRC !== 'string' || !ENV_WRK_SRC) {
@@ -580,7 +638,7 @@ if (typeof ENV_WRK_SRC !== 'string' || !ENV_WRK_SRC) {
 function mkModuleWorkerSource(snapshot, absUrl){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkModuleWorkerSource bad snapshot');
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkModuleWorkerSource bad absUrl');
-  const patchUrl = global.__ENV_BRIDGE__ && global.__ENV_BRIDGE__.urls && global.__ENV_BRIDGE__.urls.workerPatchModule;
+  const patchUrl = BR && BR.urls && BR.urls.workerPatchModule;
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkModuleWorkerSource bad workerPatchModule url');
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
@@ -962,7 +1020,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
 function mkClassicWorkerSource(snapshot, absUrl){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkClassicWorkerSource bad snapshot');
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkClassicWorkerSource bad absUrl');
-  const patchUrl = global.__ENV_BRIDGE__ && global.__ENV_BRIDGE__.urls && global.__ENV_BRIDGE__.urls.workerPatchClassic;
+  const patchUrl = BR && BR.urls && BR.urls.workerPatchClassic;
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkClassicWorkerSource bad workerPatchClassic url');
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
@@ -1434,18 +1492,9 @@ function requireWorkerSnapshot(snap, label) {
 
 function installBlobURLStore(G) {
   if (!G || !G.URL || typeof G.URL.createObjectURL !== 'function') return;
-  if (G.__BLOB_URL_STORE__) return;
-  const storeDesc = Object.getOwnPropertyDescriptor(G, '__BLOB_URL_STORE__');
-  if (!storeDesc) {
-    throw new Error('[WorkerOverride] __BLOB_URL_STORE__ slot missing');
-  }
+  if (__wrkRuntimeGet('__BLOB_URL_STORE__')) return;
   const store = new Map();
-  Object.defineProperty(G, '__BLOB_URL_STORE__', {
-    value: store,
-    configurable: false,
-    writable: false,
-    enumerable: false
-  });
+  __wrkRuntimeSet('__BLOB_URL_STORE__', store);
   if (typeof mark !== 'function') {
     throw new Error('[WorkerOverride] markAsNative missing');
   }
@@ -1475,7 +1524,7 @@ function installBlobURLStore(G) {
 function resolveUserScriptURL(G, absUrl, label) {
   if (typeof absUrl !== 'string' || !absUrl) return absUrl;
   if (absUrl.slice(0, 5) !== 'blob:') return absUrl;
-  const store = G && G.__BLOB_URL_STORE__;
+  const store = __wrkRuntimeGet('__BLOB_URL_STORE__');
   if (!store || !store.has(absUrl)) {
     const l = label ? ` (${label})` : '';
     throw new Error(`[WorkerOverride] blob URL missing from store${l}`);
@@ -1576,7 +1625,7 @@ function SafeWorkerOverride(G){
   const WrappedWorker = mark(function Worker(url, opts) {
   const abs = new URL(url, location.href).href;
   const workerType = resolveWorkerType(abs, opts, 'Worker');
-  const bridge = G.__ENV_BRIDGE__;
+  const bridge = __wrkRuntimeGet('__ENV_BRIDGE__');
   if (!bridge
       || typeof bridge.mkClassicWorkerSource !== 'function'
       || typeof bridge.mkModuleWorkerSource !== 'function'
@@ -1593,7 +1642,7 @@ function SafeWorkerOverride(G){
     throw e;
   }
   const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
-  G.__lastSnap__ = snap;
+  __wrkRuntimeSet('__lastSnap__', snap);
   bridge.publishSnapshot(snap);
 
   // Important: for module workers, do not "clone" blob: URLs.
@@ -1689,7 +1738,7 @@ function SafeWorkerOverride(G){
           message: 'worker bootstrap error store failed',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'worker_bootstrap_error_store_failed' }
-        }, () => { G.__LAST_WORKER_BOOTSTRAP_ERROR__ = bootErr; });
+        }, () => { __wrkRuntimeSet('__LAST_WORKER_BOOTSTRAP_ERROR__', bootErr); });
         emitWorkerBootstrapDegrade(G, 'Worker', bootErr);
         __wrkBestEffort('wrk:worker_bootstrap_stop_propagation_failed', {
           stage: 'runtime',
@@ -1721,7 +1770,7 @@ function SafeWorkerOverride(G){
           message: 'worker loaded url store failed',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'worker_loaded_store_failed' }
-        }, () => { G.__LAST_WORKER_USER_URL_LOADED__ = loaded; });
+        }, () => { __wrkRuntimeSet('__LAST_WORKER_USER_URL_LOADED__', loaded); });
         // скрываем внутренний сигнал от внешних слушателей
         __wrkBestEffort('wrk:worker_loaded_stop_propagation_failed', {
           stage: 'runtime',
@@ -1763,7 +1812,7 @@ function SafeWorkerOverride(G){
       message: 'worker debug mark failed',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'worker_debug_mark_failed' }
-    }, () => { G.__PATCHED_SAFE_WORKER__ = true; });
+    }, () => { __wrkRuntimeSet('__PATCHED_SAFE_WORKER__', true); });
     __wrkDiag('info', 'wrk:worker_installed', {
       stage: 'apply',
       key: 'Worker',
@@ -1826,7 +1875,7 @@ function SafeSharedWorkerOverride(G){
     const optsForResolve = hasOptsObj ? nameOrOpts : (name !== undefined ? { name } : null);
     const workerType = resolveWorkerType(abs, optsForResolve, 'SharedWorker');
 
-    const bridge = G.__ENV_BRIDGE__;
+    const bridge = __wrkRuntimeGet('__ENV_BRIDGE__');
     if (!bridge
         || typeof bridge.mkClassicWorkerSource !== 'function'
         || typeof bridge.mkModuleWorkerSource !== 'function'
@@ -1837,7 +1886,7 @@ function SafeSharedWorkerOverride(G){
     }
 
     const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
-    G.__lastSnap__ = snap;
+    __wrkRuntimeSet('__lastSnap__', snap);
     bridge.publishSnapshot(snap);
 
   // Same reasoning as Worker(): keep original blob: URL for module SharedWorker scripts.
@@ -1893,7 +1942,7 @@ function SafeSharedWorkerOverride(G){
               message: 'shared worker bootstrap error store failed',
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'shared_worker_bootstrap_error_store_failed' }
-            }, () => { G.__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__ = bootErr; });
+            }, () => { __wrkRuntimeSet('__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__', bootErr); });
             emitWorkerBootstrapDegrade(G, 'SharedWorker', bootErr);
           }
           const loaded = data.__ENV_USER_URL_LOADED__;
@@ -1905,7 +1954,7 @@ function SafeSharedWorkerOverride(G){
               message: 'shared worker loaded url store failed',
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'shared_worker_loaded_store_failed' }
-            }, () => { G.__LAST_SHARED_WORKER_USER_URL_LOADED__ = loaded; });
+            }, () => { __wrkRuntimeSet('__LAST_SHARED_WORKER_USER_URL_LOADED__', loaded); });
           }
           const ok = data.__ENV_PATCH_OK__;
           if (ok === true) {
@@ -1929,7 +1978,7 @@ function SafeSharedWorkerOverride(G){
               message: 'shared worker patch-ok store failed',
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'shared_worker_patch_ok_store_failed' }
-            }, () => { G.__LAST_SHARED_WORKER_PATCH_OK__ = true; });
+            }, () => { __wrkRuntimeSet('__LAST_SHARED_WORKER_PATCH_OK__', true); });
           }
           if (internal) {
             __wrkBestEffort('wrk:shared_worker_stop_propagation_failed', {
@@ -1973,7 +2022,7 @@ function SafeSharedWorkerOverride(G){
       message: 'shared worker debug mark failed',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'shared_worker_debug_mark_failed' }
-    }, () => { G.__PATCHED_SHARED_WORKER__ = true; });
+    }, () => { __wrkRuntimeSet('__PATCHED_SHARED_WORKER__', true); });
     __wrkDiag('info', 'wrk:shared_worker_installed', {
       stage: 'apply',
       key: 'SharedWorker',
@@ -2068,7 +2117,7 @@ function ServiceWorkerOverride(G){
           message: 'service worker already-installed mark failed',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'service_worker_already_mark_failed' }
-        }, () => { G.__PATCHED_SERVICE_WORKER__ = true; });
+        }, () => { __wrkRuntimeSet('__PATCHED_SERVICE_WORKER__', true); });
       }
       __wrkDiag('info', 'wrk:service_worker_already_installed', {
         stage: 'guard',
@@ -2326,7 +2375,7 @@ function ServiceWorkerOverride(G){
       message: 'service worker debug mark failed',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'service_worker_debug_mark_failed' }
-    }, () => { G.__PATCHED_SERVICE_WORKER__ = true; });
+    }, () => { __wrkRuntimeSet('__PATCHED_SERVICE_WORKER__', true); });
   }
   __wrkDiag('info', 'wrk:service_worker_installed', {
     stage: 'apply',
@@ -2363,11 +2412,12 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
 // === WorkerPatchHooks: оркестратор ===
 (function WorkerPatchHooks(G){
-  if (!G || G.WorkerPatchHooks) return;
+  if (!G) return;
+  if ((__wrkHooksRoot && __wrkHooksRoot.WorkerPatchHooks) || __wrkRuntimeGet('WorkerPatchHooks')) return;
 
   // 1) Hub (идемпотентно, без сайд-эффектов)
   function initHub(){
-    const hub = G.__ENV_HUB__ || EnvHubPatchModule(G) || G.__ENV_HUB__;
+    const hub = __wrkRuntimeGet('__ENV_HUB__') || EnvHubPatchModule(G) || __wrkRuntimeGet('__ENV_HUB__');
     if (!hub) throw new Error('[WorkerInit] EnvHub missing');
     return hub;
   }
@@ -2381,14 +2431,16 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
   // 3) Первый снапшот (LE) из текущего состояния
   function snapshotOnce(){
-    const envSnapshot = (G.__ENV_BRIDGE__ && typeof G.__ENV_BRIDGE__.envSnapshot === 'function')
-      ? G.__ENV_BRIDGE__.envSnapshot
+    const __bridge = __wrkRuntimeGet('__ENV_BRIDGE__');
+    const envSnapshot = (__bridge && typeof __bridge.envSnapshot === 'function')
+      ? __bridge.envSnapshot
       : EnvBus(G).envSnapshot;
     const snap = envSnapshot();
-    if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
+    const hub = __wrkRuntimeGet('__ENV_HUB__');
+    if (!hub || typeof hub.publish !== 'function') {
       throw new Error('[WorkerInit] hub missing');
     }
-    G.__ENV_HUB__.publish(snap);
+    hub.publish(snap);
     __updateWorkerSnapshotStatus__(true, 'snapshot_ready');
     __retryBootstrapEnvCleanup__();
     return snap;
@@ -2396,7 +2448,8 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
   // 4) HE-догонка (не блокирует загрузку, без «N»/«Nav»)
   function snapshotHE(keys){
-    if (G.__UACH_HE_PROMISE__) return G.__UACH_HE_PROMISE__;
+    const __hePromise = __wrkRuntimeGet('__UACH_HE_PROMISE__');
+    if (__hePromise) return __hePromise;
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','fullVersionList','formFactors','wow64'];
@@ -2412,11 +2465,11 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
         if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
         if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
       }
-      G.__LAST_UACH_HE__ = he;
-      G.__UACH_HE_READY__ = true;
+      __wrkRuntimeSet('__LAST_UACH_HE__', he);
+      __wrkRuntimeSet('__UACH_HE_READY__', true);
       return he;
     });
-    G.__UACH_HE_PROMISE__ = p;
+    __wrkRuntimeSet('__UACH_HE_PROMISE__', p);
     return p;
   }
 
@@ -2433,12 +2486,12 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
   // 6) Diagnostics
   function diag(){
     if (!G.__DEBUG__) return {};
-    const BR = G.__ENV_BRIDGE__;
+    const BR = __wrkRuntimeGet('__ENV_BRIDGE__');
     return {
-      hasHub:        !!G.__ENV_HUB__,
+      hasHub:        !!__wrkRuntimeGet('__ENV_HUB__'),
       workerWrapped: !!(G.Worker && (G.Worker.__ENV_WRAPPED__ || /WrappedWorker/.test(String(G.Worker)))),
       sharedWrapped: !!(G.SharedWorker && G.SharedWorker.__ENV_WRAPPED__),
-      swWrapped:     !!G.__PATCHED_SERVICE_WORKER__,
+      swWrapped:     !!__wrkRuntimeGet('__PATCHED_SERVICE_WORKER__'),
       bridge: {
         mkClassic: typeof BR.mkClassicWorkerSource === 'function',
         mkModule:  typeof BR.mkModuleWorkerSource  === 'function',
@@ -2447,7 +2500,12 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
       }
     };
   }
-  G.WorkerPatchHooks = { initHub, installOverrides, snapshotOnce, snapshotHE, initAll, diag };
+  const __workerPatchHooks__ = { initHub, installOverrides, snapshotOnce, snapshotHE, initAll, diag };
+  if (__wrkHooksRoot) {
+    __setHiddenValue__(__wrkHooksRoot, 'WorkerPatchHooks', __workerPatchHooks__);
+  } else {
+    __wrkRuntimeSet('WorkerPatchHooks', __workerPatchHooks__);
+  }
 
 })(G); // <-- закрыли и СРАЗУ вызвали WorkerPatchHooks(G)
 
@@ -2511,6 +2569,59 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
       data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }
     }, e);
   }
+
+    if (__wrkHooksRoot) {
+      __setHiddenValue__(__wrkHooksRoot, 'WrkModule', WrkModule);
+      __setHiddenValue__(__wrkHooksRoot, 'SafeWorkerOverride', SafeWorkerOverride);
+      __setHiddenValue__(__wrkHooksRoot, 'SafeSharedWorkerOverride', SafeSharedWorkerOverride);
+      __setHiddenValue__(__wrkHooksRoot, 'ServiceWorkerOverride', ServiceWorkerOverride);
+    }
+
+    const __dropAfterInitKeys = [
+      'WorkerPatchHooks',
+      'SafeWorkerOverride',
+      'SafeSharedWorkerOverride',
+      'ServiceWorkerOverride',
+      'WrkModule',
+      '__ENV_BRIDGE__',
+      '__ENV_HUB__',
+      '__lastSnap__',
+      '__LAST_UACH_HE__',
+      '__UACH_HE_READY__',
+      '__UACH_HE_PROMISE__',
+      '__PATCHED_SAFE_WORKER__',
+      '__PATCHED_SHARED_WORKER__',
+      '__PATCHED_SERVICE_WORKER__',
+      '__BLOB_URL_STORE__',
+      '__LAST_WORKER_BOOTSTRAP_ERROR__',
+      '__LAST_WORKER_USER_URL_LOADED__',
+      '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
+      '__LAST_SHARED_WORKER_USER_URL_LOADED__',
+      '__LAST_SHARED_WORKER_PATCH_OK__'
+    ];
+    for (let i = 0; i < __dropAfterInitKeys.length; i++) {
+      const k = __dropAfterInitKeys[i];
+      try {
+        const dropped = __dropGlobalSurfaceKey__(G, k);
+        if (!dropped) {
+          __wrkDiag('warn', 'wrk:drop_global_surface_failed', {
+            stage: 'cleanup',
+            key: k,
+            message: 'drop global surface failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'drop_global_surface_failed' }
+          }, null);
+        }
+      } catch (e) {
+        __wrkDiag('warn', 'wrk:drop_global_surface_failed', {
+          stage: 'cleanup',
+          key: k,
+          message: 'drop global surface failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'drop_global_surface_failed' }
+        }, e);
+      }
+    }
 
     __wrkDiag('info', 'wrk:init:return', {
       stage: 'apply',
