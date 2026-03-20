@@ -652,7 +652,12 @@ function mkModuleWorkerSource(snapshot, absUrl){
       };
       var __sendRelayMsg = function(msg){
         var sent = false;
-        try { if (typeof self.postMessage === 'function') { self.postMessage(msg); sent = true; } } catch(_e) {}
+        try {
+          if (!(typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) && typeof self.postMessage === 'function') {
+            self.postMessage(msg);
+            sent = true;
+          }
+        } catch(_e) {}
         try {
           if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
             for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
@@ -722,8 +727,12 @@ function mkModuleWorkerSource(snapshot, absUrl){
       };
       var __emit = function(msg){
         var sent = false;
-        try { if (typeof self.postMessage === 'function') self.postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
-        try { sent = sent || (typeof self.postMessage === 'function'); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage_probe' }); }
+        try {
+          if (!(typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) && typeof self.postMessage === 'function') {
+            self.postMessage(msg);
+            sent = true;
+          }
+        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
         try {
           if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
             for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
@@ -1196,7 +1205,12 @@ function mkClassicWorkerSource(snapshot, absUrl){
       };
       var __sendRelayMsg = function(msg){
         var sent = false;
-        try { if (typeof self.postMessage === 'function') { self.postMessage(msg); sent = true; } } catch(_e) {}
+        try {
+          if (!(typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) && typeof self.postMessage === 'function') {
+            self.postMessage(msg);
+            sent = true;
+          }
+        } catch(_e) {}
         try {
           if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
             for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
@@ -1266,8 +1280,12 @@ function mkClassicWorkerSource(snapshot, absUrl){
       };
       var __emit = function(msg){
         var sent = false;
-        try { if (typeof self.postMessage === 'function') self.postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
-        try { sent = sent || (typeof self.postMessage === 'function'); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage_probe' }); }
+        try {
+          if (!(typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) && typeof self.postMessage === 'function') {
+            self.postMessage(msg);
+            sent = true;
+          }
+        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
         try {
           if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
             for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
@@ -2206,7 +2224,7 @@ function SafeSharedWorkerOverride(G){
         let sharedVerifySeq = 0;
         let sharedVerifyPendingId = null;
         const requestSharedVerify = (reason) => {
-          if (sharedVerifyDone || !port || typeof port.postMessage !== 'function') return;
+          if (sharedVerifyDone || sharedVerifyPendingId !== null || !port || typeof port.postMessage !== 'function') return;
           const reqId = `shared-uad-${++sharedVerifySeq}`;
           sharedVerifyPendingId = reqId;
           __wrkBestEffort('wrk:shared_worker_verify_request_failed', {
@@ -2350,6 +2368,9 @@ function SafeSharedWorkerOverride(G){
           if (typeof loaded === 'string' && !sharedVerifyDone) {
             requestSharedVerify('user_loaded');
           }
+          if (!internal && !sharedVerifyDone) {
+            requestSharedVerify('user_message');
+          }
           if (internal) {
             __wrkBestEffort('wrk:shared_worker_stop_propagation_failed', {
               stage: 'runtime',
@@ -2368,6 +2389,7 @@ function SafeSharedWorkerOverride(G){
           type: 'browser structure missing data',
           data: { outcome: 'skip', reason: 'shared_worker_port_start_failed' }
         }, () => { if (typeof port.start === 'function') port.start(); });
+        requestSharedVerify('port_start');
       }
     } catch(e) {
       __wrkDiag('warn', 'wrk:shared_worker_handshake_failed', {

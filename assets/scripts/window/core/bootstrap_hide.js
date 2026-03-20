@@ -54,6 +54,33 @@ if (!loggerRoot) {
   __defineHiddenValue__(C, '__logger', loggerRoot);
 }
 
+const __MODULE = 'bootstrap_hide';
+const __SURFACE = 'bootstrap_hide';
+const __D = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
+const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+
+function __bootstrapHideEmit__(level, code, extra, err) {
+  const x = (extra && typeof extra === 'object') ? extra : {};
+  const ctx = {
+    module: __MODULE,
+    diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+    surface: (typeof x.surface === 'string' && x.surface) ? x.surface : __SURFACE,
+    key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+    stage: x.stage,
+    message: x.message,
+    data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+    type: x.type
+  };
+  try {
+    if (__diag) return __diag(level, code, ctx, err || null);
+    if (typeof __D === 'function') {
+      return __D(code, err || null, Object.assign({}, ctx, { level: level || 'info' }));
+    }
+  } catch (_emitErr) {
+    return undefined;
+  }
+}
+
 function __isFiniteNumber__(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -113,28 +140,19 @@ function __ensureLangTransitState__() {
 }
 
 function __emitBootstrapTransferDiag__(level, code, key, message, reason, err, extraData) {
-  const D = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
-  const diag = (D && typeof D.diag === 'function') ? D.diag.bind(D) : null;
-  try {
-    const data = { outcome: 'skip', reason: reason };
-    if (extraData && typeof extraData === 'object') {
-      Object.assign(data, extraData);
-    }
-    const ctx = {
-      module: 'bootstrap_hide',
-      diagTag: 'bootstrap_hide',
-      surface: 'window',
-      key: key,
-      stage: 'bootstrap',
-      message: message,
-      type: 'browser structure missing data',
-      data: data
-    };
-    if (diag) return diag(level, code, ctx, err || null);
-    if (typeof D === 'function') return D(code, err || null, Object.assign({ level: level }, ctx));
-  } catch (emitErr) {
-    return undefined;
+  const data = { outcome: 'skip', reason: reason };
+  if (extraData && typeof extraData === 'object') {
+    Object.assign(data, extraData);
   }
+  return __bootstrapHideEmit__(level, code, {
+    diagTag: 'bootstrap_hide',
+    surface: 'window',
+    key: key,
+    stage: 'bootstrap',
+    message: message,
+    type: 'browser structure missing data',
+    data: data
+  }, err);
 }
 
 function __ensureBootstrapTransitStatus__() {
@@ -230,24 +248,15 @@ if (__langMissingKeys__.length === 0) {
 }
 
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
-  const D = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
-  const diag = (D && typeof D.diag === 'function') ? D.diag.bind(D) : null;
-  try {
-    const ctx = {
-      module: 'bootstrap_hide',
-      diagTag: 'bootstrap_hide',
-      surface: 'window',
-      key: key,
-      stage: 'cleanup',
-      message: message,
-      type: 'browser structure missing data',
-      data: { outcome: 'skip', reason: reason }
-    };
-    if (diag) return diag(level, code, ctx, err || null);
-    if (typeof D === 'function') return D(code, err || null, Object.assign({ level: level }, ctx));
-  } catch (emitErr) {
-    return undefined;
-  }
+  return __bootstrapHideEmit__(level, code, {
+    diagTag: 'bootstrap_hide',
+    surface: 'window',
+    key: key,
+    stage: 'cleanup',
+    message: message,
+    type: 'browser structure missing data',
+    data: { outcome: 'skip', reason: reason }
+  }, err);
 }
 
 function __geoTransitOwnerReady__() {
@@ -515,4 +524,13 @@ __defineHiddenValue__(C, '__runBootstrapEnvCleanup__', __runBootstrapEnvCleanup_
     }
     hiddenSurfaceState.applied[key] = "hidden";
   }
+  __bootstrapHideEmit__('info', 'bootstrap_hide:ready', {
+    diagTag: 'bootstrap_hide',
+    surface: 'window',
+    key: 'bootstrap_hide',
+    stage: 'apply',
+    message: 'bootstrap_hide ready',
+    type: 'pipeline missing data',
+    data: { outcome: 'return', reason: 'ready' }
+  }, null);
 };
