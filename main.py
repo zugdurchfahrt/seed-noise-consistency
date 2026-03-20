@@ -253,7 +253,7 @@ def init_driver(
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
-    chrome_options.add_argument("--start-maximized")
+    # chrome_options.add_argument("--start-maximized")
     if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
         chrome_options.add_argument("--auto-open-devtools-for-tabs")
     chrome_options.binary_location = CHROME_BINARY
@@ -366,18 +366,17 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         parts = [
             init_params,
-            # --- set_log shell first: logger/context must exist before bootstrap operations ---
+            # --- closure bootstrap ---
+            Path(SCRIPTS_CORE / "bootstrap_hide.js").read_text("utf-8"),
+            "BootstrapHideModule(window);",
+            # --- logger after bootstrap owner-space ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
             Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
-            Path(SCRIPTS_CORE / "bootstrap_hide.js").read_text("utf-8"),
-            "BootstrapHideModule(window);",
             # --- core window ---
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
             Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
-                
- 
             # --- RTC ---
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
             "RtcpeerconnectionPatchModule(window);",
