@@ -7,59 +7,15 @@ const LOGGingModule = function LOGGingModule() {
     const W = (typeof window !== "undefined" && window) ? window : null;
 
     const global = G;
-    function __defineHiddenCompatValue(target, key, value) {
-      if (!target || (typeof target !== "object" && typeof target !== "function")) return null;
-      const current = Object.getOwnPropertyDescriptor(target, key);
-      if (current && current.configurable === false) return null;
-      Object.defineProperty(target, key, {
-        value: value,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      return value;
-    }
-    let C = (W || G).CanvasPatchContext;
-    if (!C || (typeof C !== "object" && typeof C !== "function")) {
-      C = __defineHiddenCompatValue(W || G, "CanvasPatchContext", Object.create(null));
-      if (!C) throw new Error("[LOGGingModule] CanvasPatchContext bootstrap failed");
-    } else {
-      __defineHiddenCompatValue(W || G, "CanvasPatchContext", C);
-    }
-    let stateRoot = (C.state && typeof C.state === "object") ? C.state : null;
-    if (!stateRoot) {
-      stateRoot = __defineHiddenCompatValue(C, "state", Object.create(null));
-      if (!stateRoot) throw new Error("[LOGGingModule] CanvasPatchContext.state bootstrap failed");
-    } else {
-      __defineHiddenCompatValue(C, "state", stateRoot);
-    }
-    let __loggerRoot = (C.__logger && typeof C.__logger === "object") ? C.__logger : null;
-    if (!__loggerRoot) {
-      __loggerRoot = __defineHiddenCompatValue(C, "__logger", Object.create(null));
-      if (!__loggerRoot) throw new Error("[LOGGingModule] CanvasPatchContext.__logger bootstrap failed");
-    } else {
-      __defineHiddenCompatValue(C, "__logger", __loggerRoot);
-    }
+    const C = ((W || G).CanvasPatchContext && (typeof (W || G).CanvasPatchContext === "object" || typeof (W || G).CanvasPatchContext === "function"))
+      ? (W || G).CanvasPatchContext
+      : null;
+    if (!C) throw new Error("[LOGGingModule] CanvasPatchContext missing");
+    const stateRoot = (C.state && typeof C.state === "object") ? C.state : null;
+    if (!stateRoot) throw new Error("[LOGGingModule] CanvasPatchContext.state missing");
+    const __loggerRoot = (C.__logger && typeof C.__logger === "object") ? C.__logger : null;
+    if (!__loggerRoot) throw new Error("[LOGGingModule] CanvasPatchContext.__logger missing");
 
-    function __defineWindowLoggerAccessor(name, getter, setter) {
-      if (!W) return;
-      Object.defineProperty(W, name, {
-        get: getter,
-        set: setter,
-        configurable: true,
-        enumerable: false
-      });
-    }
-
-    function __defineWindowLoggerValue(name, value, writable) {
-      if (!W || typeof value === "undefined") return;
-      Object.defineProperty(W, name, {
-        value: value,
-        writable: writable !== false,
-        configurable: true,
-        enumerable: false
-      });
-    }
     function __defineLoggerHiddenValue(name, value, writable) {
       Object.defineProperty(__loggerRoot, name, {
         value: value,
@@ -85,18 +41,60 @@ const LOGGingModule = function LOGGingModule() {
       return value;
     }
 
+    const __loggerWindowShellKeys = ["__DEGRADE__", "__DEBUG__", "_logLevel", "_logConfig", "__LOGGER_GUARD_MODE__", "log"];
     function rebindWindowLoggerShell() {
       if (!W) return;
-      __defineWindowLoggerAccessor("__DEGRADE__", function () { return __loggerRoot.__DEGRADE__; }, undefined);
-      __defineWindowLoggerAccessor("__DEBUG__", function () { return __loggerRoot.__DEBUG__; }, function (v) { __loggerRoot.__DEBUG__ = !!v; });
-      __defineWindowLoggerAccessor("_logLevel", function () { return __loggerRoot._logLevel; }, function (v) {
-        if (typeof v === "string" && v) __loggerRoot._logLevel = v;
-      });
-      __defineWindowLoggerAccessor("_logConfig", function () { return __loggerRoot._logConfig; }, function (v) {
-        if (v && typeof v === "object") __loggerRoot._logConfig = v;
-      });
-      __defineWindowLoggerValue("__LOGGER_GUARD_MODE__", __loggerRoot.__LOGGER_GUARD_MODE__, true);
-      __defineWindowLoggerValue("log", __loggerRoot.log, false);
+      const diag = (__loggerRoot && __loggerRoot.__DEGRADE__ && typeof __loggerRoot.__DEGRADE__.diag === "function")
+        ? __loggerRoot.__DEGRADE__.diag.bind(__loggerRoot.__DEGRADE__)
+        : null;
+      for (let i = 0; i < __loggerWindowShellKeys.length; i++) {
+        const key = __loggerWindowShellKeys[i];
+        const desc = Object.getOwnPropertyDescriptor(W, key);
+        if (!desc) continue;
+        if (desc.configurable === false) {
+          if (diag) {
+            diag("warn", "set_log:window_logger_shell_nonconfigurable", {
+              module: "set_log",
+              diagTag: "set_log",
+              surface: "window",
+              key: key,
+              stage: "cleanup",
+              message: "window logger shell cleanup skipped: non-configurable",
+              type: "browser structure missing data",
+              data: { outcome: "skip", reason: "window_logger_shell_nonconfigurable" }
+            }, null);
+          }
+          continue;
+        }
+        try {
+          delete W[key];
+          if (Object.prototype.hasOwnProperty.call(W, key) && diag) {
+            diag("warn", "set_log:window_logger_shell_delete_failed", {
+              module: "set_log",
+              diagTag: "set_log",
+              surface: "window",
+              key: key,
+              stage: "cleanup",
+              message: "window logger shell cleanup delete failed",
+              type: "browser structure missing data",
+              data: { outcome: "skip", reason: "window_logger_shell_delete_failed" }
+            }, null);
+          }
+        } catch (e) {
+          if (diag) {
+            diag("warn", "set_log:window_logger_shell_delete_failed", {
+              module: "set_log",
+              diagTag: "set_log",
+              surface: "window",
+              key: key,
+              stage: "cleanup",
+              message: "window logger shell cleanup delete failed",
+              type: "browser structure missing data",
+              data: { outcome: "skip", reason: "window_logger_shell_delete_failed" }
+            }, e);
+          }
+        }
+      }
     }
 
     if (!__loggerRoot.__PATCH_MYTYPER__) {
@@ -838,7 +836,7 @@ const LOGGingModule = function LOGGingModule() {
     });
 
     /**
-     * window.__DEGRADE__.diag(level, code, ctx, err?)
+     * C.__logger.__DEGRADE__.diag(level, code, ctx, err?)
      *
      * Единый вход для диагностических событий всех модулей.
      *
@@ -1251,7 +1249,7 @@ const LOGGingModule = function LOGGingModule() {
       };
     }
 
-    // ===== 4) Module logger window.log (no double logging) =====
+    // ===== 4) Module logger C.__logger.log (no double logging) =====
     __ensureLoggerHiddenValue("_logConfig", function () { return {
       global: { enabled: true, level: "log" },
       WEBGLlogger: { enabled: true, level: "log" },
