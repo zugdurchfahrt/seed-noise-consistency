@@ -401,8 +401,8 @@ function EnvBus(G){
     const uaData = (() => {
       const platform = (typeof contract.platform === 'string' && contract.platform) ? contract.platform : null;
       if (!platform) throw new Error('EnvBus: contract.platform missing');
-      const brandsSrc = Array.isArray(contract.brands) ? contract.brands
-        : (Array.isArray(contract.fullVersionList) ? contract.fullVersionList : null);
+      const brandsSrc = Array.isArray(contract.fullVersionList) ? contract.fullVersionList
+        : (Array.isArray(contract.brands) ? contract.brands : null);
       if (!brandsSrc) throw new Error('EnvBus: contract.brands missing');
       const brands = brandsSrc.map(x => {
         if (!x || typeof x !== 'object') throw new Error('EnvBus: contract.brands entry');
@@ -432,8 +432,8 @@ function EnvBus(G){
       if (typeof expPlatform !== 'string' || !expPlatform) throw new Error('EnvBus: contract.platform missing');
       const expMobile = !!contract.mobile;
       let expBrandsSrc = null;
-      if (Array.isArray(contract.brands)) expBrandsSrc = contract.brands;
-      else if (Array.isArray(contract.fullVersionList)) expBrandsSrc = contract.fullVersionList;
+      if (Array.isArray(contract.fullVersionList)) expBrandsSrc = contract.fullVersionList;
+      else if (Array.isArray(contract.brands)) expBrandsSrc = contract.brands;
       else throw new Error('EnvBus: contract.brands missing');
       const expNorm = expBrandsSrc
         .filter(x => x && typeof x === 'object')
@@ -1982,14 +1982,6 @@ function SafeSharedWorkerOverride(G){
         data: { outcome: 'skip', reason: 'shared_worker_handshake_failed' }
       }, e);
     }
-    // Post-create resync via BroadcastChannel (avoids interfering with user port messaging)
-    __wrkBestEffort('wrk:shared_worker_publish_snapshot_failed', {
-      stage: 'runtime',
-      key: 'publishSnapshot',
-      message: 'shared worker publish snapshot failed',
-      type: 'pipeline missing data',
-      data: { outcome: 'skip', reason: 'shared_worker_publish_snapshot_failed' }
-    }, () => { bridge && bridge.publishSnapshot && bridge.publishSnapshot(snap); });
     return sw;
   }, 'SharedWorker');
   
