@@ -714,10 +714,7 @@
               }
               const merged = Object.assign({}, base);
               for (const k of Object.keys(out)) {
-                const current = merged[k];
-                if (current === undefined || current === null || (typeof current === 'string' && !current && k !== 'model') || (Array.isArray(current) && !current.length)) {
-                  merged[k] = out[k];
-                }
+                merged[k] = out[k];
               }
               return merged;
             } catch (e) {
