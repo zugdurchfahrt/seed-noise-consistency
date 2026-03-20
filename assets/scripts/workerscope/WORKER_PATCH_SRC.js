@@ -365,11 +365,31 @@
     if (!nativeUAD) throw new Error('worker_patch_src: worker navigator.userAgentData missing');
     const uadProto = Object.getPrototypeOf(nativeUAD);
     if (!uadProto) throw new Error('worker_patch_src: worker navigator.userAgentData proto missing');
+    const dropUadOwnIfConfigurable = (key) => {
+      const ownDesc = Object.getOwnPropertyDescriptor(nativeUAD, key);
+      if (!ownDesc) return;
+      if (ownDesc.configurable === false) {
+        throw new Error(`worker_patch_src: nativeUAD own ${key} not configurable`);
+      }
+      delete nativeUAD[key];
+    };
+    dropUadOwnIfConfigurable('brands');
+    dropUadOwnIfConfigurable('mobile');
+    dropUadOwnIfConfigurable('platform');
+    dropUadOwnIfConfigurable('fullVersionList');
+    dropUadOwnIfConfigurable('getHighEntropyValues');
+    dropUadOwnIfConfigurable('toJSON');
     const isUadThis = (recv) => {
       if (recv === nativeUAD) return true;
       if (!recv || (typeof recv !== 'object' && typeof recv !== 'function')) return false;
       try {
-        return Object.getPrototypeOf(recv) === uadProto;
+        let cur = recv;
+        for (let i = 0; i < 8; i++) {
+          cur = Object.getPrototypeOf(cur);
+          if (!cur) return false;
+          if (cur === uadProto) return true;
+        }
+        return false;
       } catch (_) {
         return false;
       }
@@ -904,6 +924,11 @@
       if (typeof cache.snap.language !== 'string' || cache.snap.language.trim() === '') throw new Error('UACHPatch: bad language');
       return cache.snap.language;
     }, 'get language');
+    const getUserAgentData = markAsNative(function getUserAgentData(){
+      if (!nativeUAD) throw new Error('worker_patch_src: worker navigator.userAgentData missing');
+      return nativeUAD;
+    }, 'get userAgentData');
+    def(proto, 'userAgentData', getUserAgentData, true);
     def(proto,'language', getLanguage, true);
 
     const getLanguages = markAsNative(function getLanguages(){
@@ -941,6 +966,7 @@
       return v;
     }, 'get hardwareConcurrency');
     def(proto, 'hardwareConcurrency', getHardwareConcurrency, true);
+    assertWorkerNavigatorDescriptor('userAgentData');
     assertWorkerNavigatorDescriptor('language');
     assertWorkerNavigatorDescriptor('languages');
     assertWorkerNavigatorDescriptor('deviceMemory');

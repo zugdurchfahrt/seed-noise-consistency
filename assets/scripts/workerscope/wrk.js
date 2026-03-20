@@ -753,6 +753,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
             if (ports && ports.length) {
               for (var j = 0; j < ports.length; j++) {
                 try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
+                __installSharedVerifyPortListener__(ports[j]);
                 self.__ENV_SHARED_PORTS__.push(ports[j]);
               }
             }
@@ -802,6 +803,179 @@ function mkModuleWorkerSource(snapshot, absUrl){
         configurable: true,
         enumerable: false
       });
+      var __isSharedScope__ = (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope);
+      var __stableStringify__ = function(v) {
+        try { return JSON.stringify(v); } catch (_e) { return String(v); }
+      };
+      var __normalizeBrands__ = function(v) {
+        if (!Array.isArray(v)) throw new Error('UACHPatch: bad userAgentData.brands');
+        return v.map(function(x){
+          if (!x || typeof x !== 'object') throw new Error('UACHPatch: bad userAgentData.brands entry');
+          var brand = (typeof x.brand === 'string' && x.brand) ? x.brand
+                    : (typeof x.name === 'string' && x.name) ? x.name
+                    : null;
+          var versionRaw = (typeof x.version === 'string' && x.version) ? x.version
+                         : (typeof x.version === 'number' && isFinite(x.version)) ? String(x.version)
+                         : null;
+          if (!brand || !versionRaw) throw new Error('UACHPatch: bad userAgentData.brands entry');
+          return { brand: String(brand), version: String(versionRaw).split('.')[0] };
+        });
+      };
+      var __failSharedUADRuntimeMismatch__ = function(field, expected, actual){
+        var err = new Error('UACHPatch: shared userAgentData runtime mismatch: ' + field);
+        __emitDiag('wrk:shared_uadata_runtime_mismatch', err, {
+          stage: 'contract',
+          module: 'wrk',
+          diagTag: 'wrk',
+          surface: 'SharedWorker',
+          key: 'userAgentData',
+          message: 'shared worker userAgentData runtime mismatch',
+          data: {
+            outcome: 'throw',
+            reason: 'shared_uadata_runtime_mismatch',
+            field: field,
+            expected: expected,
+            actual: actual,
+            scope: 'SharedWorker'
+          }
+        });
+        throw err;
+      };
+      var __verifySharedUADRuntime__ = async function(){
+        if (!__isSharedScope__) return;
+        var snap = self.__lastSnap__;
+        if (!snap || typeof snap !== 'object' || !snap.uaData || !snap.uaData.he) {
+          throw new Error('UACHPatch: shared UAD sanity missing snapshot');
+        }
+        var uad = self.navigator && self.navigator.userAgentData;
+        if (!uad || typeof uad !== 'object') throw new Error('UACHPatch: shared userAgentData missing');
+        var runtimeBrands = __normalizeBrands__(uad.brands);
+        var expectedBrands = __normalizeBrands__(snap.uaData.brands);
+        if (__stableStringify__(runtimeBrands) !== __stableStringify__(expectedBrands)) {
+          __failSharedUADRuntimeMismatch__('brands', expectedBrands, runtimeBrands);
+        }
+        if (uad.mobile !== snap.uaData.mobile) {
+          __failSharedUADRuntimeMismatch__('mobile', snap.uaData.mobile, uad.mobile);
+        }
+        if (uad.platform !== snap.uaData.platform) {
+          __failSharedUADRuntimeMismatch__('platform', snap.uaData.platform, uad.platform);
+        }
+        if (typeof uad.getHighEntropyValues !== 'function') {
+          throw new Error('UACHPatch: shared getHighEntropyValues missing');
+        }
+        var he = await uad.getHighEntropyValues(['fullVersionList', 'platformVersion']);
+        if (!he || typeof he !== 'object') throw new Error('UACHPatch: shared high entropy missing');
+        if (__stableStringify__(he.fullVersionList) !== __stableStringify__(snap.uaData.he.fullVersionList)) {
+          __failSharedUADRuntimeMismatch__('fullVersionList', snap.uaData.he.fullVersionList, he.fullVersionList);
+        }
+        if (he.platformVersion !== snap.uaData.he.platformVersion) {
+          __failSharedUADRuntimeMismatch__('platformVersion', snap.uaData.he.platformVersion, he.platformVersion);
+        }
+      };
+      var __collectSharedUADRuntime__ = async function(){
+        if (!__isSharedScope__) throw new Error('UACHPatch: not SharedWorker scope');
+        var uad = self.navigator && self.navigator.userAgentData;
+        if (!uad || typeof uad !== 'object') throw new Error('UACHPatch: shared userAgentData missing');
+        if (typeof uad.getHighEntropyValues !== 'function') throw new Error('UACHPatch: shared getHighEntropyValues missing');
+        var he = await uad.getHighEntropyValues(['fullVersionList', 'platformVersion']);
+        if (!he || typeof he !== 'object') throw new Error('UACHPatch: shared high entropy missing');
+        return {
+          brands: __normalizeBrands__(uad.brands),
+          mobile: uad.mobile,
+          platform: uad.platform,
+          fullVersionList: he.fullVersionList,
+          platformVersion: he.platformVersion
+        };
+      };
+      var __installSharedVerifyPortListener__ = function(port){
+        if (!__isSharedScope__ || !port || typeof port.addEventListener !== 'function') return;
+        try {
+          port.addEventListener('message', function(ev){
+            var data = ev && ev.data;
+            var req = data && typeof data === 'object' ? data.__ENV_VERIFY_SHARED_UAD__ : null;
+            if (!req || typeof req !== 'object') return;
+            try {
+              if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+              if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+            } catch (_e) {}
+            Promise.resolve().then(function(){
+              return __collectSharedUADRuntime__();
+            }).then(function(runtime){
+              try {
+                port.postMessage({
+                  __ENV_VERIFY_SHARED_UAD_RESULT__: {
+                    id: Object.prototype.hasOwnProperty.call(req, 'id') ? req.id : null,
+                    ok: true,
+                    data: runtime
+                  }
+                });
+              } catch (_e) {}
+            }, function(err){
+              try {
+                port.postMessage({
+                  __ENV_VERIFY_SHARED_UAD_RESULT__: {
+                    id: Object.prototype.hasOwnProperty.call(req, 'id') ? req.id : null,
+                    ok: false,
+                    error: __serializeDiagErr(err)
+                  }
+                });
+              } catch (_e) {}
+            });
+          });
+        } catch (_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_verify_listener_install' }); }
+      };
+      var __collectSharedUADRuntime__ = async function(){
+        if (!__isSharedScope__) throw new Error('UACHPatch: not SharedWorker scope');
+        var uad = self.navigator && self.navigator.userAgentData;
+        if (!uad || typeof uad !== 'object') throw new Error('UACHPatch: shared userAgentData missing');
+        if (typeof uad.getHighEntropyValues !== 'function') throw new Error('UACHPatch: shared getHighEntropyValues missing');
+        var he = await uad.getHighEntropyValues(['fullVersionList', 'platformVersion']);
+        if (!he || typeof he !== 'object') throw new Error('UACHPatch: shared high entropy missing');
+        return {
+          brands: __normalizeBrands__(uad.brands),
+          mobile: uad.mobile,
+          platform: uad.platform,
+          fullVersionList: he.fullVersionList,
+          platformVersion: he.platformVersion
+        };
+      };
+      var __installSharedVerifyPortListener__ = function(port){
+        if (!__isSharedScope__ || !port || typeof port.addEventListener !== 'function') return;
+        try {
+          port.addEventListener('message', function(ev){
+            var data = ev && ev.data;
+            var req = data && typeof data === 'object' ? data.__ENV_VERIFY_SHARED_UAD__ : null;
+            if (!req || typeof req !== 'object') return;
+            try {
+              if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+              if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+            } catch (_e) {}
+            Promise.resolve().then(function(){
+              return __collectSharedUADRuntime__();
+            }).then(function(runtime){
+              try {
+                port.postMessage({
+                  __ENV_VERIFY_SHARED_UAD_RESULT__: {
+                    id: Object.prototype.hasOwnProperty.call(req, 'id') ? req.id : null,
+                    ok: true,
+                    data: runtime
+                  }
+                });
+              } catch (_e) {}
+            }, function(err){
+              try {
+                port.postMessage({
+                  __ENV_VERIFY_SHARED_UAD_RESULT__: {
+                    id: Object.prototype.hasOwnProperty.call(req, 'id') ? req.id : null,
+                    ok: false,
+                    error: __serializeDiagErr(err)
+                  }
+                });
+              } catch (_e) {}
+            });
+          });
+        } catch (_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_verify_listener_install' }); }
+      };
       try {
         self.__applyEnvSnapshot__(${SNAP});
       } catch (e) {
@@ -959,6 +1133,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
           // Применяем снимок СЕЙЧАС, уже через реализацию патча:
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
+          await __verifySharedUADRuntime__();
         } catch (e) {
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
@@ -1003,7 +1178,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
   const USER = JSON.stringify(absUrl);
   const PATCH_URL = JSON.stringify(patchUrl);
   return `
-    (function(){
+    (async function(){
       'use strict';
       Object.defineProperty(self, '__GW_BOOTSTRAP__', { value: true, writable: true, configurable: true, enumerable: false });
       var __ENV_EMIT_Q__ = [];
@@ -1122,6 +1297,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
             if (ports && ports.length) {
               for (var j = 0; j < ports.length; j++) {
                 try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
+                __installSharedVerifyPortListener__(ports[j]);
                 self.__ENV_SHARED_PORTS__.push(ports[j]);
               }
             }
@@ -1170,6 +1346,75 @@ function mkClassicWorkerSource(snapshot, absUrl){
         configurable: true,
         enumerable: false
       });
+      var __isSharedScope__ = (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope);
+      var __stableStringify__ = function(v) {
+        try { return JSON.stringify(v); } catch (_e) { return String(v); }
+      };
+      var __normalizeBrands__ = function(v) {
+        if (!Array.isArray(v)) throw new Error('UACHPatch: bad userAgentData.brands');
+        return v.map(function(x){
+          if (!x || typeof x !== 'object') throw new Error('UACHPatch: bad userAgentData.brands entry');
+          var brand = (typeof x.brand === 'string' && x.brand) ? x.brand
+                    : (typeof x.name === 'string' && x.name) ? x.name
+                    : null;
+          var versionRaw = (typeof x.version === 'string' && x.version) ? x.version
+                         : (typeof x.version === 'number' && isFinite(x.version)) ? String(x.version)
+                         : null;
+          if (!brand || !versionRaw) throw new Error('UACHPatch: bad userAgentData.brands entry');
+          return { brand: String(brand), version: String(versionRaw).split('.')[0] };
+        });
+      };
+      var __failSharedUADRuntimeMismatch__ = function(field, expected, actual){
+        var err = new Error('UACHPatch: shared userAgentData runtime mismatch: ' + field);
+        __emitDiag('wrk:shared_uadata_runtime_mismatch', err, {
+          stage: 'contract',
+          module: 'wrk',
+          diagTag: 'wrk',
+          surface: 'SharedWorker',
+          key: 'userAgentData',
+          message: 'shared worker userAgentData runtime mismatch',
+          data: {
+            outcome: 'throw',
+            reason: 'shared_uadata_runtime_mismatch',
+            field: field,
+            expected: expected,
+            actual: actual,
+            scope: 'SharedWorker'
+          }
+        });
+        throw err;
+      };
+      var __verifySharedUADRuntime__ = async function(){
+        if (!__isSharedScope__) return;
+        var snap = self.__lastSnap__;
+        if (!snap || typeof snap !== 'object' || !snap.uaData || !snap.uaData.he) {
+          throw new Error('UACHPatch: shared UAD sanity missing snapshot');
+        }
+        var uad = self.navigator && self.navigator.userAgentData;
+        if (!uad || typeof uad !== 'object') throw new Error('UACHPatch: shared userAgentData missing');
+        var runtimeBrands = __normalizeBrands__(uad.brands);
+        var expectedBrands = __normalizeBrands__(snap.uaData.brands);
+        if (__stableStringify__(runtimeBrands) !== __stableStringify__(expectedBrands)) {
+          __failSharedUADRuntimeMismatch__('brands', expectedBrands, runtimeBrands);
+        }
+        if (uad.mobile !== snap.uaData.mobile) {
+          __failSharedUADRuntimeMismatch__('mobile', snap.uaData.mobile, uad.mobile);
+        }
+        if (uad.platform !== snap.uaData.platform) {
+          __failSharedUADRuntimeMismatch__('platform', snap.uaData.platform, uad.platform);
+        }
+        if (typeof uad.getHighEntropyValues !== 'function') {
+          throw new Error('UACHPatch: shared getHighEntropyValues missing');
+        }
+        var he = await uad.getHighEntropyValues(['fullVersionList', 'platformVersion']);
+        if (!he || typeof he !== 'object') throw new Error('UACHPatch: shared high entropy missing');
+        if (__stableStringify__(he.fullVersionList) !== __stableStringify__(snap.uaData.he.fullVersionList)) {
+          __failSharedUADRuntimeMismatch__('fullVersionList', snap.uaData.he.fullVersionList, he.fullVersionList);
+        }
+        if (he.platformVersion !== snap.uaData.he.platformVersion) {
+          __failSharedUADRuntimeMismatch__('platformVersion', snap.uaData.he.platformVersion, he.platformVersion);
+        }
+      };
       try {
         self.__applyEnvSnapshot__(${SNAP});
       } catch (e) {
@@ -1327,6 +1572,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
           // Применяем снимок СЕЙЧАС, уже через реализацию патча:
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
+          await __verifySharedUADRuntime__();
         } catch (e) {
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
@@ -1833,6 +2079,75 @@ function SafeSharedWorkerOverride(G){
     throw new Error('[SharedWorkerOverride] markAsNative missing');
   }
 
+  const stableStringifySharedVerify = (value) => {
+    try { return JSON.stringify(value); } catch (_e) { return String(value); }
+  };
+  const normalizeSharedVerifyBrands = (value) => {
+    if (!Array.isArray(value)) throw new Error('[SharedWorkerOverride] brands missing');
+    return value.map((entry) => {
+      if (!entry || typeof entry !== 'object') throw new Error('[SharedWorkerOverride] brands entry');
+      const brand = (typeof entry.brand === 'string' && entry.brand) ? entry.brand
+        : (typeof entry.name === 'string' && entry.name) ? entry.name
+        : null;
+      let versionRaw = null;
+      if (typeof entry.version === 'string' && entry.version) versionRaw = entry.version;
+      else if (typeof entry.version === 'number' && Number.isFinite(entry.version)) versionRaw = String(entry.version);
+      if (!brand || !versionRaw) throw new Error('[SharedWorkerOverride] brands entry');
+      return { brand: String(brand), version: String(versionRaw).split('.')[0] };
+    });
+  };
+  const getSharedVerifyMismatch = (snap, runtime) => {
+    const expectedBrands = normalizeSharedVerifyBrands(snap && snap.uaData && snap.uaData.brands);
+    const actualBrands = normalizeSharedVerifyBrands(runtime && runtime.brands);
+    if (stableStringifySharedVerify(expectedBrands) !== stableStringifySharedVerify(actualBrands)) {
+      return { field: 'brands', expected: expectedBrands, actual: actualBrands };
+    }
+    const expectedMobile = !!(snap && snap.uaData && snap.uaData.mobile);
+    if (!!(runtime && runtime.mobile) !== expectedMobile) {
+      return { field: 'mobile', expected: expectedMobile, actual: !!(runtime && runtime.mobile) };
+    }
+    const expectedPlatform = snap && snap.uaData ? snap.uaData.platform : undefined;
+    if ((runtime && runtime.platform) !== expectedPlatform) {
+      return { field: 'platform', expected: expectedPlatform, actual: runtime && runtime.platform };
+    }
+    const expectedFullVersionList = snap && snap.uaData && snap.uaData.he ? snap.uaData.he.fullVersionList : undefined;
+    if (stableStringifySharedVerify(runtime && runtime.fullVersionList) !== stableStringifySharedVerify(expectedFullVersionList)) {
+      return { field: 'fullVersionList', expected: expectedFullVersionList, actual: runtime && runtime.fullVersionList };
+    }
+    const expectedPlatformVersion = snap && snap.uaData && snap.uaData.he ? snap.uaData.he.platformVersion : undefined;
+    if ((runtime && runtime.platformVersion) !== expectedPlatformVersion) {
+      return { field: 'platformVersion', expected: expectedPlatformVersion, actual: runtime && runtime.platformVersion };
+    }
+    return null;
+  };
+  const emitSharedVerifyMismatch = (snap, mismatch, err) => {
+    const mismatchErr = err instanceof Error ? err : new Error(`[SharedWorkerOverride] runtime mismatch: ${mismatch && mismatch.field ? mismatch.field : 'unknown'}`);
+    __wrkDiag('error', 'wrk:shared_uadata_runtime_mismatch', {
+      stage: 'contract',
+      module: 'wrk',
+      diagTag: 'wrk',
+      surface: 'SharedWorker',
+      key: 'userAgentData',
+      message: 'shared worker userAgentData runtime mismatch',
+      type: 'pipeline missing data',
+      data: {
+        outcome: 'throw',
+        reason: 'shared_uadata_runtime_mismatch',
+        field: mismatch && mismatch.field ? mismatch.field : 'unknown',
+        expected: mismatch ? mismatch.expected : null,
+        actual: mismatch ? mismatch.actual : null,
+        scope: 'SharedWorker'
+      }
+    }, mismatchErr);
+    __wrkBestEffort('wrk:shared_worker_bootstrap_error_store_failed', {
+      stage: 'runtime',
+      key: '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
+      message: 'shared worker bootstrap error store failed',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'shared_worker_bootstrap_error_store_failed' }
+    }, () => { G.__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__ = String((mismatchErr && (mismatchErr.stack || mismatchErr.message)) || mismatchErr); });
+  };
+
   // === SharedWorker override wrapper (complete, self-contained) ===
    // Normalize 2nd arg to an options object (always), so `type` is never lost
   const WrappedSharedWorker = mark(function SharedWorker(url, nameOrOpts) {
@@ -1887,10 +2202,87 @@ function SafeSharedWorkerOverride(G){
       const port = sw && sw.port;
       if (port && typeof port.addEventListener === 'function') {
         let sawSharedWorkerPatchDiag = false;
+        let sharedVerifyDone = false;
+        let sharedVerifySeq = 0;
+        let sharedVerifyPendingId = null;
+        const requestSharedVerify = (reason) => {
+          if (sharedVerifyDone || !port || typeof port.postMessage !== 'function') return;
+          const reqId = `shared-uad-${++sharedVerifySeq}`;
+          sharedVerifyPendingId = reqId;
+          __wrkBestEffort('wrk:shared_worker_verify_request_failed', {
+            stage: 'runtime',
+            key: '__ENV_VERIFY_SHARED_UAD__',
+            message: 'shared worker verify request failed',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'shared_worker_verify_request_failed' }
+          }, () => {
+            port.postMessage({ __ENV_VERIFY_SHARED_UAD__: { id: reqId, reason: reason || null } });
+          });
+        };
+        const failSharedVerify = (mismatch, err) => {
+          if (sharedVerifyDone) return;
+          sharedVerifyDone = true;
+          emitSharedVerifyMismatch(snap, mismatch, err);
+          __wrkBestEffort('wrk:shared_worker_listener_remove_failed', {
+            stage: 'runtime',
+            key: 'message',
+            message: 'shared worker listener remove failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'shared_worker_listener_remove_failed' }
+          }, () => { port.removeEventListener('message', onMsg); });
+          __wrkBestEffort('wrk:shared_worker_port_close_failed', {
+            stage: 'runtime',
+            key: 'SharedWorker.port.close',
+            message: 'shared worker port close failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'shared_worker_port_close_failed' }
+          }, () => { if (typeof port.close === 'function') port.close(); });
+        };
         const onMsg = (ev) => {
           const data = ev && ev.data;
           if (!data || typeof data !== 'object') return;
           let internal = false;
+          const verifyResult = data.__ENV_VERIFY_SHARED_UAD_RESULT__;
+          if (verifyResult && typeof verifyResult === 'object') {
+            internal = true;
+            const verifyId = Object.prototype.hasOwnProperty.call(verifyResult, 'id') ? verifyResult.id : null;
+            if (sharedVerifyPendingId === null || verifyId !== sharedVerifyPendingId) {
+              if (internal) {
+                __wrkBestEffort('wrk:shared_worker_stop_propagation_failed', {
+                  stage: 'runtime',
+                  key: 'message',
+                  message: 'shared worker stop propagation failed',
+                  type: 'browser structure missing data',
+                  data: { outcome: 'skip', reason: 'shared_worker_stop_propagation_failed' }
+                }, () => { ev.stopImmediatePropagation(); ev.stopPropagation(); });
+              }
+              return;
+            }
+            sharedVerifyPendingId = null;
+            if (!verifyResult.ok) {
+              const verifyErr = new Error(String((verifyResult.error && (verifyResult.error.stack || verifyResult.error.message)) || 'shared worker verify failed'));
+              failSharedVerify({
+                field: 'userAgentData',
+                expected: snap && snap.uaData ? snap.uaData : null,
+                actual: verifyResult.error || null
+              }, verifyErr);
+            } else {
+              try {
+                const mismatch = getSharedVerifyMismatch(snap, verifyResult.data || null);
+                if (mismatch) {
+                  failSharedVerify(mismatch, new Error(`[SharedWorkerOverride] runtime mismatch: ${mismatch.field}`));
+                } else {
+                  sharedVerifyDone = true;
+                }
+              } catch (verifyCompareErr) {
+                failSharedVerify({
+                  field: 'userAgentData',
+                  expected: snap && snap.uaData ? snap.uaData : null,
+                  actual: verifyResult.data || null
+                }, verifyCompareErr);
+              }
+            }
+          }
           const relayDiag = data.__ENV_DIAG__;
           if (relayDiag && typeof relayDiag === 'object') {
             internal = true;
@@ -1953,6 +2345,10 @@ function SafeSharedWorkerOverride(G){
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'shared_worker_patch_ok_store_failed' }
             }, () => { G.__LAST_SHARED_WORKER_PATCH_OK__ = true; });
+            requestSharedVerify('patch_ok');
+          }
+          if (typeof loaded === 'string' && !sharedVerifyDone) {
+            requestSharedVerify('user_loaded');
           }
           if (internal) {
             __wrkBestEffort('wrk:shared_worker_stop_propagation_failed', {
