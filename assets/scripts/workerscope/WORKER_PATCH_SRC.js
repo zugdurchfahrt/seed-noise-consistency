@@ -13,9 +13,6 @@
   if (!BR) {
     throw new Error('UACHPatch: __ENV_BRIDGE__ missing');
   }
-  if (Object.prototype.hasOwnProperty.call(BR, '__WORKER_PATCH_LOADED__')) {
-    throw new Error('UACHPatch: WORKER_PATCH_SRC already loaded');
-  }
   const installDesc = Object.getOwnPropertyDescriptor(BR, 'installWorkerUACHMirror');
   if (!installDesc) {
     throw new Error('UACHPatch: installWorkerUACHMirror slot missing');
@@ -23,9 +20,10 @@
   if (!installDesc.get && !installDesc.set) {
     throw new Error('UACHPatch: installWorkerUACHMirror already defined');
   }
+  let __uachMirrorInstalled__ = false;
 
   BR.installWorkerUACHMirror = function installWorkerUACHMirror(){
-    if (BR.__UACH_MIRROR_INSTALLED__) {
+    if (__uachMirrorInstalled__) {
       throw new Error('UACHPatch: already installed');
     }
     if (!self.__GW_BOOTSTRAP__) {
@@ -1236,18 +1234,7 @@
         { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
       );
     }
-    trackedDefineProperty(BR, '__WORKER_PATCH_LOADED__', {
-      value: true,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-    trackedDefineProperty(BR, '__UACH_MIRROR_INSTALLED__', {
-      value: true,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
+    __uachMirrorInstalled__ = true;
 
     const __workerCtx = {
       module: "WORKER_PATCH_SRC",
@@ -1258,7 +1245,7 @@
       message: "worker patch installed",
       data: {
         core: true,
-        mirror: !!BR.__UACH_MIRROR_INSTALLED__,
+        mirror: __uachMirrorInstalled__ === true,
         scope: !!self.__SCOPE_CONSISTENCY_PATCHED__
       },
       type: "pipeline missing data"

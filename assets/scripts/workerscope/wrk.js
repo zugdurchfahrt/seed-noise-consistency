@@ -907,8 +907,6 @@ function mkModuleWorkerSource(snapshot, absUrl){
         const installWorkerUACHMirror = __workerPatchBridge && __workerPatchBridge.installWorkerUACHMirror;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
-        if (!(__workerPatchBridge && __workerPatchBridge.__WORKER_PATCH_LOADED__)) throw new Error('UACHPatch: patch marker missing');
-        if (!(__workerPatchBridge && __workerPatchBridge.__UACH_MIRROR_INSTALLED__)) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
       } catch (e) {
         __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
@@ -920,6 +918,12 @@ function mkModuleWorkerSource(snapshot, absUrl){
           // Применяем снимок СЕЙЧАС, уже через реализацию патча:
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
+          if (Object.prototype.hasOwnProperty.call(self, '__ENV_BRIDGE__')) {
+            delete self.__ENV_BRIDGE__;
+          }
+          if (Object.prototype.hasOwnProperty.call(self, '__ENV_BRIDGE__')) {
+            throw new Error('UACHPatch: __ENV_BRIDGE__ visible after patch apply');
+          }
         } catch (e) {
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
@@ -1280,12 +1284,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
         const PATCH_URL = ${PATCH_URL};
         if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchClassic URL');
         importScripts(PATCH_URL);
-        const installWorkerUACHMirror = self.__ENV_BRIDGE__ && self.__ENV_BRIDGE__.installWorkerUACHMirror;
+        const installWorkerUACHMirror = __workerPatchBridge && __workerPatchBridge.installWorkerUACHMirror;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
-        var __workerPatchBridge = self.__ENV_BRIDGE__;
-        if (!(__workerPatchBridge && __workerPatchBridge.__WORKER_PATCH_LOADED__)) throw new Error('UACHPatch: patch marker missing');
-        if (!(__workerPatchBridge && __workerPatchBridge.__UACH_MIRROR_INSTALLED__)) throw new Error('UACHPatch: mirror not installed');
         __patchOK = true;
       } catch (e) {
         __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
@@ -1297,6 +1298,12 @@ function mkClassicWorkerSource(snapshot, absUrl){
           // Применяем снимок СЕЙЧАС, уже через реализацию патча:
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
+          if (Object.prototype.hasOwnProperty.call(self, '__ENV_BRIDGE__')) {
+            delete self.__ENV_BRIDGE__;
+          }
+          if (Object.prototype.hasOwnProperty.call(self, '__ENV_BRIDGE__')) {
+            throw new Error('UACHPatch: __ENV_BRIDGE__ visible after patch apply');
+          }
         } catch (e) {
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
@@ -1392,10 +1399,10 @@ function mkClassicWorkerSource(snapshot, absUrl){
   if (BR.envSnapshot && BR.envSnapshot !== __bridgeEnvBus.envSnapshot) {
     throw new Error('EnvBridge: envSnapshot already set');
   }
-  BR.mkModuleWorkerSource  = mkModuleWorkerSource;
-  BR.mkClassicWorkerSource = mkClassicWorkerSource;
-  BR.publishSnapshot       = publishSnapshot;
-  BR.envSnapshot           = __bridgeEnvBus.envSnapshot;
+  __setHiddenValue__(BR, 'mkModuleWorkerSource', mkModuleWorkerSource);
+  __setHiddenValue__(BR, 'mkClassicWorkerSource', mkClassicWorkerSource);
+  __setHiddenValue__(BR, 'publishSnapshot', publishSnapshot);
+  __setHiddenValue__(BR, 'envSnapshot', __bridgeEnvBus.envSnapshot);
 })(window);
 
 
