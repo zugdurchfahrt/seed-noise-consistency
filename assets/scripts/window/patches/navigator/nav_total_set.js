@@ -186,18 +186,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       : null;
     const __prngState = (__navCoreInternal && __navCoreInternal.prng && typeof __navCoreInternal.prng === 'object')
       ? __navCoreInternal.prng
-      : ((__stateRoot && __stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
-      ? __stateRoot.__PRNG_STATE__
-      : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
+      : null;
     const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
       ? __prngState.rand
       : null;
     const R = (__randSource && typeof __randSource.use === 'function') ? __randSource.use('nav') : null;
     if (typeof R !== 'function') {
-      __navDiagPipeline('warn', 'nav_total_set:rand_missing', {
+      __navDiagPipeline('error', 'nav_total_set:rand_missing', {
         stage: 'preflight',
-        message: 'rand source missing'
+        key: 'Core.__internal.prng.rand',
+        message: 'Core.__internal.prng.rand missing',
+        data: { outcome: 'skip', reason: 'core_internal_prng_rand_missing' }
       });
+      __navReleaseEntryGuard(true, 'preflight', 'rand_missing');
+      return;
     }
     let mark = null;
     try {
@@ -236,7 +238,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     const __navLangState = (__stateRoot && __stateRoot.__LANG_STATE__ && typeof __stateRoot.__LANG_STATE__ === 'object')
       ? __stateRoot.__LANG_STATE__
-      : ((C && C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') ? C.__LANG_STATE__ : null);
+      : null;
     const __navScreenState = (__stateRoot && __stateRoot.__SCREEN__ && typeof __stateRoot.__SCREEN__ === 'object')
       ? __stateRoot.__SCREEN__
       : null;
@@ -249,6 +251,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navEnvProfile = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
       ? __stateRoot.__ENV_PROFILE__
       : null;
+    if (!__navLangState) {
+      __navDiagPipeline('error', 'nav_total_set:lang_state_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__LANG_STATE__',
+        message: 'CanvasPatchContext.state.__LANG_STATE__ missing',
+        data: { outcome: 'skip', reason: 'lang_state_missing' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'lang_state_missing');
+      return;
+    }
+    if (!__navEnvProfile) {
+      __navDiagPipeline('error', 'nav_total_set:env_profile_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__ENV_PROFILE__',
+        message: 'CanvasPatchContext.state.__ENV_PROFILE__ missing',
+        data: { outcome: 'skip', reason: 'env_profile_missing' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'env_profile_missing');
+      return;
+    }
     if (Array.isArray(__navNormalizedLanguages)) {
       try {
         Object.freeze(__navNormalizedLanguages);
@@ -281,30 +303,30 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     try {
-    __navProfileState.meta = __navCloneStateValue((__navEnvProfile && typeof __navEnvProfile.meta === 'object') ? __navEnvProfile.meta : (window.__EXPECTED_CLIENT_HINTS || {}));
-    __navProfileState.navPlat = (__navEnvProfile && typeof __navEnvProfile.navPlat !== 'undefined') ? __navEnvProfile.navPlat : window.__NAV_PLATFORM__;
-    __navProfileState.generatedPlatform = (__navEnvProfile && typeof __navEnvProfile.generatedPlatform !== 'undefined') ? __navEnvProfile.generatedPlatform : window.__GENERATED_PLATFORM;
-    __navProfileState.generatedPlatformVersion = (__navEnvProfile && typeof __navEnvProfile.generatedPlatformVersion !== 'undefined') ? __navEnvProfile.generatedPlatformVersion : window.__GENERATED_PLATFORM_VERSION;
-    __navProfileState.userAgent = (__navEnvProfile && typeof __navEnvProfile.userAgent !== 'undefined') ? __navEnvProfile.userAgent : window.__USER_AGENT;
-    __navProfileState.vendor = (__navEnvProfile && typeof __navEnvProfile.vendor !== 'undefined') ? __navEnvProfile.vendor : window.__VENDOR;
-    __navProfileState.mem = Number((__navEnvProfile && typeof __navEnvProfile.mem !== 'undefined') ? __navEnvProfile.mem : window.__memory);
-    __navProfileState.cpu = Number((__navEnvProfile && typeof __navEnvProfile.cpu !== 'undefined') ? __navEnvProfile.cpu : window.__cpu);
-    __navProfileState.dpr = Number((__navEnvProfile && typeof __navEnvProfile.dpr !== 'undefined') ? __navEnvProfile.dpr : window.__DPR);
-    __navProfileState.width = Number((__navEnvProfile && typeof __navEnvProfile.width !== 'undefined') ? __navEnvProfile.width : (window.__WIDTH ?? (window.screen && window.screen.width)));
-    __navProfileState.height = Number((__navEnvProfile && typeof __navEnvProfile.height !== 'undefined') ? __navEnvProfile.height : (window.__HEIGHT ?? (window.screen && window.screen.height)));
-    __navProfileState.devicesLabels = __navCloneStateValue((__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'devicesLabels')) ? __navEnvProfile.devicesLabels : window.__DEVICES_LABELS);
-    __navProfileState.colorDepth = Number((__navEnvProfile && typeof __navEnvProfile.colorDepth !== 'undefined') ? __navEnvProfile.colorDepth : window.__COLOR_DEPTH);
-    __navProfileState.orientationDom = (__navEnvProfile && typeof __navEnvProfile.orientationDom !== 'undefined')
+    __navProfileState.meta = __navCloneStateValue((typeof __navEnvProfile.meta === 'object') ? __navEnvProfile.meta : null);
+    __navProfileState.navPlat = __navEnvProfile.navPlat;
+    __navProfileState.generatedPlatform = __navEnvProfile.generatedPlatform;
+    __navProfileState.generatedPlatformVersion = __navEnvProfile.generatedPlatformVersion;
+    __navProfileState.userAgent = __navEnvProfile.userAgent;
+    __navProfileState.vendor = __navEnvProfile.vendor;
+    __navProfileState.mem = Number(__navEnvProfile.mem);
+    __navProfileState.cpu = Number(__navEnvProfile.cpu);
+    __navProfileState.dpr = Number(__navEnvProfile.dpr);
+    __navProfileState.width = Number(__navEnvProfile.width);
+    __navProfileState.height = Number(__navEnvProfile.height);
+    __navProfileState.devicesLabels = __navCloneStateValue(__navEnvProfile.devicesLabels);
+    __navProfileState.colorDepth = Number(__navEnvProfile.colorDepth);
+    __navProfileState.orientationDom = (typeof __navEnvProfile.orientationDom !== 'undefined')
       ? __navEnvProfile.orientationDom
       : ((__navScreenState && typeof __navScreenState.orientationDom === 'string' && __navScreenState.orientationDom)
         ? __navScreenState.orientationDom
         : (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary'));
-    __navProfileState.strict = (__navEnvProfile && typeof __navEnvProfile.strict !== 'undefined') ? !!__navEnvProfile.strict : ((window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true);
-    __navProfileState.debug = (__navEnvProfile && typeof __navEnvProfile.debug !== 'undefined') ? !!__navEnvProfile.debug : !!window.__NAV_PATCH_DEBUG__;
-    __navProfileState.fullVersionList = __navCloneStateValue((__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'fullVersionList')) ? __navEnvProfile.fullVersionList : window.__FULL_VERSION_LIST);
-    __navProfileState.storageQuotaMb = (__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'storageQuotaMb')) ? __navEnvProfile.storageQuotaMb : window.__STORAGE_QUOTA_MB;
-    __navProfileState.storageUsedPct = (__navEnvProfile && Object.prototype.hasOwnProperty.call(__navEnvProfile, 'storageUsedPct')) ? __navEnvProfile.storageUsedPct : window.__STORAGE_USED_PCT;
-    __navProfileState.pluginProfiles = __navCloneStateValue((__navEnvProfile && Array.isArray(__navEnvProfile.pluginProfiles)) ? __navEnvProfile.pluginProfiles : (Array.isArray(window.__PLUGIN_PROFILES__) ? window.__PLUGIN_PROFILES__ : []));
+    __navProfileState.strict = !!__navEnvProfile.strict;
+    __navProfileState.debug = !!__navEnvProfile.debug;
+    __navProfileState.fullVersionList = __navCloneStateValue(__navEnvProfile.fullVersionList);
+    __navProfileState.storageQuotaMb = __navEnvProfile.storageQuotaMb;
+    __navProfileState.storageUsedPct = __navEnvProfile.storageUsedPct;
+    __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(__navEnvProfile.pluginProfiles) ? __navEnvProfile.pluginProfiles : []);
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
     const meta          = __navProfileState.meta || {};
