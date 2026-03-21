@@ -5,13 +5,59 @@
     || (typeof self !== 'undefined' && self)
     || (typeof window !== 'undefined' && window)
     || {};
+  const W = (typeof window !== 'undefined' && window) ? window : null;
   const __MODULE = 'worker_bootstrap';
   const __SURFACE = 'worker_bootstrap';
 
+  function __resolveLoggerDegrade() {
+    const C = (W && W.CanvasPatchContext && (typeof W.CanvasPatchContext === 'object' || typeof W.CanvasPatchContext === 'function'))
+      ? W.CanvasPatchContext
+      : null;
+    const loggerRoot = (C && C.__logger && typeof C.__logger === 'object')
+      ? C.__logger
+      : null;
+    return (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function')
+      ? loggerRoot.__DEGRADE__
+      : null;
+  }
+
+  function __ensureWorkerBootstrapState() {
+    const C = (W && W.CanvasPatchContext && (typeof W.CanvasPatchContext === 'object' || typeof W.CanvasPatchContext === 'function'))
+      ? W.CanvasPatchContext
+      : null;
+    const stateRoot = (C && C.state && typeof C.state === 'object')
+      ? C.state
+      : null;
+    if (!stateRoot) return null;
+    let state = (stateRoot.__WORKER_BOOTSTRAP__ && typeof stateRoot.__WORKER_BOOTSTRAP__ === 'object')
+      ? stateRoot.__WORKER_BOOTSTRAP__
+      : null;
+    if (!state) {
+      state = Object.create(null);
+      Object.defineProperty(stateRoot, '__WORKER_BOOTSTRAP__', {
+        value: state,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    return state;
+  }
+
+  function __syncWorkerBootstrapState(patch) {
+    const state = __ensureWorkerBootstrapState();
+    if (!state || !patch || typeof patch !== 'object') return false;
+    const keys = Object.keys(patch);
+    for (let i = 0; i < keys.length; i++) {
+      state[keys[i]] = patch[keys[i]];
+    }
+    return true;
+  }
+
   function __emit(level, code, ctx, err) {
     try {
-      // lazy lookup: __DEGRADE__ may be installed later in the pipeline than this script runs
-      const d = G && G.__DEGRADE__;
+      // lazy lookup: logger-space may be installed later in the pipeline than this script runs
+      const d = __resolveLoggerDegrade();
       const diag = (d && typeof d.diag === 'function') ? d.diag.bind(d) : null;
       if (diag) return diag(level, code, ctx, err);
       if (typeof d === 'function') {
@@ -57,18 +103,23 @@
   }
 
   try {
-    const bridgeDesc = Object.getOwnPropertyDescriptor(window, '__ENV_BRIDGE__');
+    if (!W || (typeof W !== 'object' && typeof W !== 'function')) {
+      throw new Error('WorkerBootstrap: window missing');
+    }
+    const bridgeDesc = Object.getOwnPropertyDescriptor(W, '__ENV_BRIDGE__');
     let BR = bridgeDesc
-      ? (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value') ? bridgeDesc.value : window.__ENV_BRIDGE__)
-      : window.__ENV_BRIDGE__;
-    if (BR == null) {
-      BR = {};
-      Object.defineProperty(window, '__ENV_BRIDGE__', {
-        value: BR,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
+      ? (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value') ? bridgeDesc.value : W.__ENV_BRIDGE__)
+      : W.__ENV_BRIDGE__;
+    if (!bridgeDesc) {
+      const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+      __moduleDiag('error', __MODULE + ':bridge_missing', {
+        stage: 'preflight',
+        key: '__ENV_BRIDGE__',
+        message: '__ENV_BRIDGE__ missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'bridge_missing' }
+        }, err);
+      throw err;
     } else if (typeof BR !== 'object') {
       const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
       __moduleDiag('error', __MODULE + ':bridge_missing', {
@@ -79,13 +130,6 @@
         data: { outcome: 'throw', reason: 'bridge_missing' }
       }, err);
       throw err;
-    } else if (!bridgeDesc) {
-      Object.defineProperty(window, '__ENV_BRIDGE__', {
-        value: BR,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
     } else if (bridgeDesc.enumerable !== false) {
       if (bridgeDesc.configurable === false) {
         const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ non-configurable enumerable');
@@ -125,6 +169,12 @@
       }, err);
       throw err;
     }
+
+    __syncWorkerBootstrapState({
+      bridge: BR,
+      urls: BR.urls,
+      inlinePatchReady: typeof BR.inlinePatch === 'string' && !!BR.inlinePatch
+    });
 
     if (!Object.prototype.hasOwnProperty.call(BR, 'urls')) {
       Object.defineProperty(BR, 'urls', { value: {}, writable: false, configurable: false });
@@ -189,10 +239,29 @@
     Object.freeze(BR.urls);
 
     function boot() {
-      const H = window.WorkerPatchHooks;
+      const H = W.WorkerPatchHooks;
       if (!H || typeof H.initAll !== 'function') return;
 
-      const __core = window.Core;
+      const __workerBootstrapState = __ensureWorkerBootstrapState();
+      if (!__workerBootstrapState) {
+        const err = new Error('WorkerBootstrap: CanvasPatchContext.state.__WORKER_BOOTSTRAP__ unavailable');
+        __moduleDiag('error', __MODULE + ':state_missing', {
+          stage: 'preflight',
+          key: 'CanvasPatchContext.state.__WORKER_BOOTSTRAP__',
+          message: 'worker bootstrap module-state unavailable',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'state_missing' }
+        }, err);
+        throw err;
+      }
+      __syncWorkerBootstrapState({
+        bridge: BR,
+        urls: BR.urls,
+        hooks: H,
+        initRequested: true
+      });
+
+      const __core = W.Core;
       let __guardToken = null;
       try {
         if (!__core || typeof __core.guardFlag !== 'function') {
@@ -219,7 +288,7 @@
       if (!__guardToken) return;
 
       try {
-        if (window.isSecureContext === false) {
+        if (W.isSecureContext === false) {
           __moduleDiag('warn', __MODULE + ':context_ineligible', {
             stage: 'preflight',
             key: 'context_checks',
@@ -228,15 +297,16 @@
             data: {
               outcome: 'skip',
               reason: 'context_ineligible',
-              secureContext: window.isSecureContext,
-              href: (window.location && typeof window.location.href === 'string') ? window.location.href : null
+              secureContext: W.isSecureContext,
+              href: (W.location && typeof W.location.href === 'string') ? W.location.href : null
             }
           }, new Error('WorkerBootstrap: non-secure context'));
+          __syncWorkerBootstrapState({ initRequested: false, initStatus: 'skipped', initReason: 'context_ineligible' });
           __releaseGuard(__guardToken, true);
           return;
         }
 
-        const nav = window.navigator;
+        const nav = W.navigator;
         const uad = nav && nav.userAgentData;
         if (!uad || typeof uad.getHighEntropyValues !== 'function') {
           __moduleDiag('warn', __MODULE + ':context_ineligible', {
@@ -247,50 +317,57 @@
             data: {
               outcome: 'skip',
               reason: 'context_ineligible',
-              secureContext: window.isSecureContext,
-              href: (window.location && typeof window.location.href === 'string') ? window.location.href : null
+              secureContext: W.isSecureContext,
+              href: (W.location && typeof W.location.href === 'string') ? W.location.href : null
             }
           }, new Error('WorkerBootstrap: userAgentData unavailable'));
+          __syncWorkerBootstrapState({ initRequested: false, initStatus: 'skipped', initReason: 'context_ineligible' });
           __releaseGuard(__guardToken, true);
           return;
         }
       } catch (e) {
-        __moduleDiag('warn', __MODULE + ':context_preflight_unstable', {
-          stage: 'preflight',
-          key: 'context_checks',
+          __moduleDiag('warn', __MODULE + ':context_preflight_unstable', {
+            stage: 'preflight',
+            key: 'context_checks',
           message: 'context checks unstable',
           type: 'browser structure missing data',
-          data: { outcome: 'skip', reason: 'context_preflight_unstable' }
-        }, e);
-        __releaseGuard(__guardToken, true);
-        return;
-      }
+            data: { outcome: 'skip', reason: 'context_preflight_unstable' }
+          }, e);
+          __syncWorkerBootstrapState({ initRequested: false, initStatus: 'skipped', initReason: 'context_preflight_unstable' });
+          __releaseGuard(__guardToken, true);
+          return;
+        }
 
       try {
         const initPromise = H.initAll({ publishHE: true });
         if (initPromise && typeof initPromise.then === 'function') {
           initPromise
             .then(() => {
+              __syncWorkerBootstrapState({ initStatus: 'ready', initReason: 'return' });
               __moduleDiag('info', __MODULE + ':initAll_return', {
                 stage: 'apply',
                 key: 'initAll',
                 message: 'initAll resolved',
-                type: 'pipeline missing data',
-                data: { outcome: 'return' }
-              }, null);
-            })
-            .catch((e) => {
-              __moduleDiag('error', __MODULE + ':initAll_failed', {
-                stage: 'apply',
-                key: 'initAll',
+                  type: 'pipeline missing data',
+                  data: { outcome: 'return' }
+                }, null);
+                __releaseGuard(__guardToken, true);
+              })
+              .catch((e) => {
+                __syncWorkerBootstrapState({ initStatus: 'error', initReason: 'initAll_failed' });
+                __moduleDiag('error', __MODULE + ':initAll_failed', {
+                  stage: 'apply',
+                  key: 'initAll',
                 message: 'initAll rejected',
-                type: 'browser structure missing data',
-                data: { outcome: 'throw', reason: 'initAll_failed', rollbackOk: false }
-              }, e);
-            });
+                  type: 'browser structure missing data',
+                  data: { outcome: 'throw', reason: 'initAll_failed', rollbackOk: false }
+                }, e);
+                __releaseGuard(__guardToken, false);
+              });
           return;
         }
 
+        __syncWorkerBootstrapState({ initStatus: 'ready', initReason: 'return' });
         __moduleDiag('info', __MODULE + ':initAll_return', {
           stage: 'apply',
           key: 'initAll',
@@ -298,7 +375,9 @@
           type: 'pipeline missing data',
           data: { outcome: 'return' }
         }, null);
+        __releaseGuard(__guardToken, true);
       } catch (e) {
+        __syncWorkerBootstrapState({ initStatus: 'error', initReason: 'initAll_failed' });
         __moduleDiag('error', __MODULE + ':initAll_failed', {
           stage: 'apply',
           key: 'initAll',
@@ -306,15 +385,16 @@
           type: 'browser structure missing data',
           data: { outcome: 'throw', reason: 'initAll_failed', rollbackOk: false }
         }, e);
+        __releaseGuard(__guardToken, false);
         throw e;
       }
     }
 
-    if ('WorkerPatchHooks' in window && window.WorkerPatchHooks && typeof window.WorkerPatchHooks.initAll === 'function') {
+    if ('WorkerPatchHooks' in W && W.WorkerPatchHooks && typeof W.WorkerPatchHooks.initAll === 'function') {
       boot();
     } else {
       let _h;
-      Object.defineProperty(window, 'WorkerPatchHooks', {
+      Object.defineProperty(W, 'WorkerPatchHooks', {
         configurable: true,
         get() { return _h; },
         set(v) {
@@ -324,7 +404,7 @@
           // with a plain value property to prevent re-entry in the same document.
           if (v && typeof v === 'object' && typeof v.initAll === 'function') {
             try {
-              Object.defineProperty(window, 'WorkerPatchHooks', {
+              Object.defineProperty(W, 'WorkerPatchHooks', {
                 value: v,
                 writable: true,
                 configurable: true,
