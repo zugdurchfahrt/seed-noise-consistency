@@ -985,9 +985,18 @@ function mkModuleWorkerSource(snapshot, absUrl){
           if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
             throw new Error('UACHPatch: __installWorkerUACHMirror__ visible after patch apply');
           }
-          ['__GW_BOOTSTRAP__','__ENV_RELAY_DIAG__','__applyEnvSnapshot__','__lastSnap__','__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor'].forEach(function(key){
+          ['__GW_BOOTSTRAP__','__ENV_RELAY_DIAG__','__applyEnvSnapshot__','__lastSnap__','__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor','__ENV_PATCH_ERROR__','__ENV_PATCH_APPLY_ERROR__','__ENV_SNAP_ERROR__','__ENV_DIAG_ERROR__','__ENV_DIAG_STORE_ERROR__'].forEach(function(key){
+            if (!Object.prototype.hasOwnProperty.call(self, key)) return;
+            try {
+              delete self[key];
+            } catch(_e) {
+              __emitDiag('wrk:worker_bootstrap:apply:cleanup_failed', _e, { transport: 'cleanup_delete', key: key });
+              throw _e;
+            }
             if (Object.prototype.hasOwnProperty.call(self, key)) {
-              try { delete self[key]; } catch(_e) {}
+              var __cleanupErr = new Error('UACHPatch: ' + key + ' visible after patch apply');
+              __emitDiag('wrk:worker_bootstrap:apply:cleanup_failed', __cleanupErr, { transport: 'cleanup_visible', key: key });
+              throw __cleanupErr;
             }
           });
         } catch (e) {
@@ -1350,9 +1359,18 @@ function mkClassicWorkerSource(snapshot, absUrl){
           if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
             throw new Error('UACHPatch: __installWorkerUACHMirror__ visible after patch apply');
           }
-          ['__GW_BOOTSTRAP__','__ENV_RELAY_DIAG__','__applyEnvSnapshot__','__lastSnap__','__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor'].forEach(function(key){
+          ['__GW_BOOTSTRAP__','__ENV_RELAY_DIAG__','__applyEnvSnapshot__','__lastSnap__','__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor','__ENV_PATCH_ERROR__','__ENV_PATCH_APPLY_ERROR__','__ENV_SNAP_ERROR__','__ENV_DIAG_ERROR__','__ENV_DIAG_STORE_ERROR__'].forEach(function(key){
+            if (!Object.prototype.hasOwnProperty.call(self, key)) return;
+            try {
+              delete self[key];
+            } catch(_e) {
+              __emitDiag('wrk:worker_bootstrap:apply:cleanup_failed', _e, { transport: 'cleanup_delete', key: key });
+              throw _e;
+            }
             if (Object.prototype.hasOwnProperty.call(self, key)) {
-              try { delete self[key]; } catch(_e) {}
+              var __cleanupErr = new Error('UACHPatch: ' + key + ' visible after patch apply');
+              __emitDiag('wrk:worker_bootstrap:apply:cleanup_failed', __cleanupErr, { transport: 'cleanup_visible', key: key });
+              throw __cleanupErr;
             }
           });
         } catch (e) {
