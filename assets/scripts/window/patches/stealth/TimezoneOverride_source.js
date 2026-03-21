@@ -339,7 +339,18 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           nextArgs[1] = applyDefaultTimeZoneOption(nextArgs[1]);
           return nextArgs;
         });
-        redefineValue(Intl, "DateTimeFormat", PatchedDTF, "tz:DateTimeFormat");
+        const dtfProtoMismatch = Object.prototype.hasOwnProperty.call(OrigDTF, "prototype") && PatchedDTF.prototype !== OrigDTF.prototype;
+        const dtfChainMismatch = Object.getPrototypeOf(PatchedDTF) !== Object.getPrototypeOf(OrigDTF);
+        if (typeof PatchedDTF !== "function" || dtfProtoMismatch || dtfChainMismatch) {
+          diagPipeline("warn", "tz:wrapNativeCtor_contract_violation", {
+            key: "DateTimeFormat",
+            stage: "contract",
+            message: "Core.__wrapNativeCtor returned invalid constructor surface",
+            data: { outcome: "skip", reason: "invalid_wrap_native_ctor_surface", timezone: timezone }
+          }, new Error("invalid wrap native ctor surface"));
+        } else {
+          redefineValue(Intl, "DateTimeFormat", PatchedDTF, "tz:DateTimeFormat");
+        }
       } else {
         diagPipeline("warn", "tz:wrapNativeCtor_missing", {
           key: "DateTimeFormat",
@@ -398,6 +409,17 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           if (nextArgs[0] == null) nextArgs[0] = spoofedLocales;
           return nextArgs;
         });
+        const ctorProtoMismatch = Object.prototype.hasOwnProperty.call(OrigCtor, "prototype") && PatchedCtor.prototype !== OrigCtor.prototype;
+        const ctorChainMismatch = Object.getPrototypeOf(PatchedCtor) !== Object.getPrototypeOf(OrigCtor);
+        if (typeof PatchedCtor !== "function" || ctorProtoMismatch || ctorChainMismatch) {
+          diagPipeline("warn", "tz:wrapNativeCtor_contract_violation", {
+            key: ctorName,
+            stage: "contract",
+            message: "Core.__wrapNativeCtor returned invalid constructor surface",
+            data: { outcome: "skip", reason: "invalid_wrap_native_ctor_surface", timezone: timezone }
+          }, new Error("invalid wrap native ctor surface"));
+          return;
+        }
         redefineValue(Intl, ctorName, PatchedCtor, "tz:" + ctorName);
       }
 

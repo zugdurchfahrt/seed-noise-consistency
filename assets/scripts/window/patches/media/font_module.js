@@ -1133,6 +1133,18 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           return nextArgs;
         }
       });
+      const ctorProtoMismatch = Object.prototype.hasOwnProperty.call(NativeFontFace, 'prototype') && WrappedFontFace.prototype !== NativeFontFace.prototype;
+      const ctorChainMismatch = Object.getPrototypeOf(WrappedFontFace) !== Object.getPrototypeOf(NativeFontFace);
+      if (typeof WrappedFontFace !== 'function' || ctorProtoMismatch || ctorChainMismatch) {
+        __fontDiagPipeline('warn', 'fonts:wrap_native_ctor_contract_violation', {
+          stage: 'contract',
+          diagTag: 'fonts:fontface',
+          key: 'FontFace',
+          message: 'Core.__wrapNativeCtor returned invalid constructor surface',
+          data: { outcome: 'skip', reason: 'invalid_wrap_native_ctor_surface' }
+        }, new Error('invalid wrap native ctor surface'));
+        WrappedFontFace = null;
+      }
     } catch (e) {
       __fontDiagBrowser('warn', 'fonts:fontface:wrap_failed', {
         stage: 'apply',

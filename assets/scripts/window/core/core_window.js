@@ -308,7 +308,21 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const markAsNative = __requireMarkAsNative(name || (nativeFn && nativeFn.name) || null, 'wrapNativeApply');
     const wrapped = new Proxy(nativeFn, {
       apply(target, thisArg, argList) {
-        return applyImpl(target, thisArg, argList);
+        try {
+          return applyImpl(target, thisArg, argList);
+        } catch (e) {
+          __emit('error', 'core_window:wrapNativeApply:runtime_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : null),
+            stage: 'runtime',
+            message: '__wrapNativeApply apply trap failed',
+            type: 'apply_failed',
+            data: { outcome: 'throw' }
+          }, e);
+          throw e;
+        }
       }
     });
     try {
@@ -321,6 +335,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         ? `function ${wrappedName}() { [native code] }`
         : 'function () { [native code] }';
       toStringOverrideMap.set(wrapped, wrappedLabel);
+      if (Object.getPrototypeOf(wrapped) !== Object.getPrototypeOf(nativeFn)) {
+        throw new Error('[CoreWindow] __wrapNativeApply: function prototype chain mismatch');
+      }
       if (toStringProxyTargetMap.get(wrapped) !== bridgeTarget || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
         throw new Error('[CoreWindow] __wrapNativeApply: bridge registration failed');
       }
@@ -352,12 +369,98 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const markAsNative = __requireMarkAsNative(name || (nativeFn && nativeFn.name) || '__wrapNativeCtor', 'wrapNativeCtor');
     const wrapped = new Proxy(nativeFn, {
       apply(target, thisArg, argList) {
-        const nextArgs = argsImpl(argList || [], false);
-        return Reflect.apply(target, thisArg, nextArgs);
+        let nextArgs;
+        try {
+          nextArgs = argsImpl(argList || [], false);
+        } catch (e) {
+          __emit('error', 'core_window:wrapNativeCtor:args_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
+            stage: 'runtime',
+            message: '__wrapNativeCtor argsImpl failed in apply trap',
+            type: 'apply_failed',
+            data: { outcome: 'throw', path: 'apply' }
+          }, e);
+          throw e;
+        }
+        if (!Array.isArray(nextArgs)) {
+          const e = new TypeError('[CoreWindow] __wrapNativeCtor: argsImpl must return array');
+          __emit('error', 'core_window:wrapNativeCtor:args_shape_invalid', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
+            stage: 'runtime',
+            message: '__wrapNativeCtor argsImpl returned non-array',
+            type: 'contract violation',
+            data: { outcome: 'throw', path: 'apply' }
+          }, e);
+          throw e;
+        }
+        try {
+          return Reflect.apply(target, thisArg, nextArgs);
+        } catch (e) {
+          __emit('error', 'core_window:wrapNativeCtor:native_throw', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
+            stage: 'runtime',
+            message: '__wrapNativeCtor native apply threw',
+            type: 'browser structure missing data',
+            data: { outcome: 'throw', path: 'apply' }
+          }, e);
+          throw e;
+        }
       },
       construct(target, argList, newTarget) {
-        const nextArgs = argsImpl(argList || [], true);
-        return Reflect.construct(target, nextArgs, newTarget || target);
+        let nextArgs;
+        try {
+          nextArgs = argsImpl(argList || [], true);
+        } catch (e) {
+          __emit('error', 'core_window:wrapNativeCtor:args_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
+            stage: 'runtime',
+            message: '__wrapNativeCtor argsImpl failed in construct trap',
+            type: 'apply_failed',
+            data: { outcome: 'throw', path: 'construct' }
+          }, e);
+          throw e;
+        }
+        if (!Array.isArray(nextArgs)) {
+          const e = new TypeError('[CoreWindow] __wrapNativeCtor: argsImpl must return array');
+          __emit('error', 'core_window:wrapNativeCtor:args_shape_invalid', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
+            stage: 'runtime',
+            message: '__wrapNativeCtor argsImpl returned non-array',
+            type: 'contract violation',
+            data: { outcome: 'throw', path: 'construct' }
+          }, e);
+          throw e;
+        }
+        try {
+          return Reflect.construct(target, nextArgs, newTarget || target);
+        } catch (e) {
+          __emit('error', 'core_window:wrapNativeCtor:native_throw', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
+            stage: 'runtime',
+            message: '__wrapNativeCtor native construct threw',
+            type: 'browser structure missing data',
+            data: { outcome: 'throw', path: 'construct' }
+          }, e);
+          throw e;
+        }
       }
     });
     try {
@@ -370,6 +473,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         ? `function ${wrappedName}() { [native code] }`
         : 'function () { [native code] }';
       toStringOverrideMap.set(wrapped, wrappedLabel);
+      if (Object.getPrototypeOf(wrapped) !== Object.getPrototypeOf(nativeFn)) {
+        throw new Error('[CoreWindow] __wrapNativeCtor: function prototype chain mismatch');
+      }
+      if (Object.prototype.hasOwnProperty.call(nativeFn, 'prototype') && wrapped.prototype !== nativeFn.prototype) {
+        throw new Error('[CoreWindow] __wrapNativeCtor: constructor prototype mismatch');
+      }
       if (toStringProxyTargetMap.get(wrapped) !== bridgeTarget || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
         throw new Error('[CoreWindow] __wrapNativeCtor: bridge registration failed');
       }
@@ -904,6 +1013,24 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
 
         const useCoreWrapper = wrapLayer === 'core_wrapper';
+        if (useCoreWrapper) {
+          const e = new TypeError('[Core.wrapGetter] core_wrapper requires native getter');
+          diagDegrade('core:wrapGetter:core_wrapper_requires_native_getter', e, {
+            module: 'core_window',
+            diagTag: 'core:wrapGetter',
+            surface: 'core',
+            key: key || null,
+            stage: 'contract',
+            type: 'contract violation',
+            message: 'core_wrapper getter path requires native getter',
+            data: {
+              outcome: 'throw',
+              reason: 'core_wrapper_requires_native_getter',
+              wrapLayer: wrapLayer
+            }
+          });
+          throw e;
+        }
         if (options.mark === false || !useCoreWrapper) {
           diagDegrade('core:wrapGetter:synthetic_no_native_getter', null, {
             module: 'core_window',
@@ -1112,6 +1239,15 @@ const CoreWindowModule = function CoreWindowModule(window) {
               wrapLayer: wrapLayer
             });
           } else if (getImpl) {
+            if (useCoreWrapper) {
+              const e = new TypeError('[Core.applyTargets] core_wrapper accessor requires native getter');
+              return fail(planItem.policy, planItem.tag, 'wrap_layer_contract_violation', e, {
+                key: planItem.key,
+                kind: planItem.kind,
+                targetId: planItem.targetId,
+                wrapLayer: wrapLayer
+              });
+            }
             const computedGetter = function coreAccessorGetCreate() {
               return getImpl.call(this, undefined);
             };
@@ -1161,19 +1297,22 @@ const CoreWindowModule = function CoreWindowModule(window) {
             }
             knownWrapped.add(setWrapped);
           } else if (setImpl) {
+            if (useCoreWrapper) {
+              const e = new TypeError('[Core.applyTargets] core_wrapper accessor requires native setter');
+              return fail(planItem.policy, planItem.tag, 'wrap_layer_contract_violation', e, {
+                key: planItem.key,
+                kind: planItem.kind,
+                targetId: planItem.targetId,
+                wrapLayer: wrapLayer
+              });
+            }
             const setRaw = buildNamedAccessor(key, 'set', function coreAccessorSetCreate(v) {
               if (validThis && !validThis(this)) {
                 return onInvalidThis(invalidThis, undefined, this, [v]);
               }
               return setImpl.call(this, undefined, v);
             });
-            if (useCoreWrapper) {
-              setWrapped = __wrapNativeAccessor(setRaw, 'set ' + key, function (target, thisArg, argList) {
-                return Reflect.apply(target, thisArg, argList || []);
-              });
-            } else {
-              setWrapped = markAsNative(setRaw, 'set ' + key);
-            }
+            setWrapped = markAsNative(setRaw, 'set ' + key);
             knownWrapped.add(setWrapped);
           }
         } catch (e) {
