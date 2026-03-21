@@ -27,6 +27,15 @@ const CoreWindowModule = function CoreWindowModule(window) {
         return __D(code, _err, extra || null);
       }
     } catch (emitErr) {
+      try {
+        const __console = window && window.console;
+        if (__console && typeof __console.error === 'function') {
+          __console.error('[core_window] diag emit failed', {
+            level: level || 'info',
+            code: code || null
+          }, emitErr);
+        }
+      } catch (_) {}
       return undefined;
     }
     return undefined;
@@ -817,6 +826,23 @@ const CoreWindowModule = function CoreWindowModule(window) {
             throw e;
           }
         }
+        if (invalidPolicy === 'native') {
+          const e = new Error('[Core.onInvalidThis] native invalid-this bridge missing');
+          diagDegrade('core:onInvalidThis:native_bridge_missing', e, {
+            module: 'core_window',
+            diagTag: 'core:onInvalidThis',
+            surface: 'core',
+            key: null,
+            stage: 'runtime',
+            type: 'contract violation',
+            message: 'native invalid-this bridge missing',
+            data: {
+              outcome: 'throw',
+              reason: 'native_bridge_missing'
+            }
+          });
+          throw e;
+        }
         if (invalidPolicy === 'throw') throw new TypeError();
         throw new TypeError();
       }
@@ -866,22 +892,33 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
         if (isData) return getter;
 
-        if (options.mark === false) {
-          const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
-            if (checkThis && !checkThis(this)) {
-              return onInvalidThis(invalidThis, origGet, this, arguments);
+        if (typeof origGet === 'function') {
+          const wrapped = __wrapNativeAccessor(origGet, 'get ' + key, function (target, thisArg, argList) {
+            if (checkThis && !checkThis(thisArg)) {
+              return onInvalidThis(invalidThis, origGet, thisArg, argList || []);
             }
-            return valueFromGetter(this);
-          }}), key).get;
-          const markAsNative = ensureMarkAsNative();
-          const wrapped = markAsNative(namedGet, 'get ' + key);
+            return valueFromGetter(thisArg);
+          });
           knownWrapped.add(wrapped);
           return wrapped;
         }
 
-        // [NORMATIVE] getters may use proxy wrapping only on explicit core_wrapper.
         const useCoreWrapper = wrapLayer === 'core_wrapper';
-        if (!useCoreWrapper) {
+        if (options.mark === false || !useCoreWrapper) {
+          diagDegrade('core:wrapGetter:synthetic_no_native_getter', null, {
+            module: 'core_window',
+            diagTag: 'core:wrapGetter',
+            surface: 'core',
+            key: key || null,
+            stage: 'runtime',
+            type: 'contract violation',
+            message: 'synthetic getter path used because native getter is missing',
+            data: {
+              outcome: 'return',
+              reason: 'synthetic_no_native_getter',
+              wrapLayer: wrapLayer
+            }
+          });
           const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
             if (checkThis && !checkThis(this)) {
               return onInvalidThis(invalidThis, origGet, this, arguments);
@@ -894,10 +931,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return wrapped;
         }
 
-        const baseGet = (typeof origGet === 'function')
-          ? origGet
-          : Object.getOwnPropertyDescriptor(({ get [key]() { return valueFromGetter(this); } }), key).get;
-
+        const baseGet = Object.getOwnPropertyDescriptor(({ get [key]() { return valueFromGetter(this); } }), key).get;
         const wrapped = __wrapNativeAccessor(baseGet, 'get ' + key, function (target, thisArg, argList) {
           if (checkThis && !checkThis(thisArg)) {
             return onInvalidThis(invalidThis, origGet, thisArg, argList || []);
@@ -1489,18 +1523,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] descriptor_only unsupported for non-data kind'), tag, policy, targetId, key, kind };
         }
         if (isAccessorGatewayWrapLayer(wrapLayer) && resolveMode !== 'proto_chain') {
-          const fromMode = resolveMode;
-          resolveMode = 'proto_chain';
-          __emit('warn', 'core_window:strict_accessor_force_proto_chain', {
-            module: 'core',
-            diagTag: tag,
-            surface: 'core',
-            key,
-            stage: 'preflight',
-            message: 'strict accessor requires resolve=proto_chain; forced',
-            type: 'contract violation',
-            data: { outcome: 'return', from: fromMode, to: resolveMode, wrapLayer, policy, kind }
-          }, null);
+          return { ok: false, reason: 'resolve_mode_required',
+            error: new TypeError('[Core.applyTargets] accessor gateway requires resolve=proto_chain'),
+            tag, policy, targetId, key, kind
+          };
+        }
+        if ((kind === 'method' || kind === 'promise_method')
+            && invokeClass === 'normal'
+            && wrapLayer === 'core_wrapper') {
+          return { ok: false, reason: 'wrap_layer_unsupported',
+            error: new TypeError('[Core.applyTargets] normal method cannot use core_wrapper wrapLayer'),
+            tag, policy, targetId, key, kind
+          };
         }
         if ((kind === 'method' || kind === 'promise_method')
             && invokeClass === 'brand_strict'
