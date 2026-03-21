@@ -35,9 +35,9 @@
       throw new Error('UACHPatch: WorkerNavigator unavailable');
     }
     const cache = { snap:null };
+    const relayDiag = (typeof self.__ENV_RELAY_DIAG__ === 'function') ? self.__ENV_RELAY_DIAG__ : null;
     const emitDegrade = (level, code, ctx, err) => {
       const d = (typeof __DEGRADE__ === "function") ? __DEGRADE__ : null;
-      const relay = (typeof self.__ENV_RELAY_DIAG__ === 'function') ? self.__ENV_RELAY_DIAG__ : null;
       const x = (ctx && typeof ctx === 'object') ? ctx : {};
       const normalizedCtx = {
         module: 'WORKER_PATCH_SRC',
@@ -62,8 +62,8 @@
           d(code, err || null, Object.assign({}, normalizedCtx, { level: level || 'info' }));
         }
       }
-      if (relay) {
-        relay(level, code, normalizedCtx, err || null);
+      if (relayDiag) {
+        relayDiag(level, code, normalizedCtx, err || null);
       }
     };
     const appliedDescriptors = [];
@@ -1113,7 +1113,7 @@
     };
 
     const prev = self.__applyEnvSnapshot__;
-    self.__applyEnvSnapshot__ = s => {
+    const applyWorkerSnapshot = s => {
       if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
       if (cache.snap === s) return;
       const prevSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
@@ -1138,6 +1138,7 @@
         throw new Error('UACHPatch: seed mutation is not allowed');
       }
     };
+    self.__applyEnvSnapshot__ = applyWorkerSnapshot;
     cache.snap = requireSnap(self.__lastSnap__, 'bootstrap');
     if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
       const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
@@ -1152,13 +1153,14 @@
       }, e);
       throw e;
     }
-    if (!self.__ENV_SYNC_BC_INSTALLED__) {
+    let __envSyncBcInstalled = false;
+    if (!__envSyncBcInstalled) {
       if (typeof BroadcastChannel !== 'function') {
         throw new Error('UACHPatch: BroadcastChannel missing');
       }
-      self.__ENV_SYNC_BC_INSTALLED__ = true;
+      __envSyncBcInstalled = true;
       const bc = new BroadcastChannel('__ENV_SYNC__');
-      bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
+      bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) applyWorkerSnapshot(s); };
     }
     if (self.Worker && !self.Worker.__ENV_WRAPPED__) {
       const NativeWorker = self.Worker;
@@ -1167,7 +1169,7 @@
       const WrappedWorker = markAsNative(function Worker(url, opts){
         const abs = new URL(url, self.location && self.location.href || undefined).href;
         const workerType = resolveWorkerType(abs, opts);
-        const snap = requireSnap(self.__lastSnap__, 'nested');
+        const snap = requireSnap(cache.snap, 'nested');
         const SNAP = JSON.stringify(snap);
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'

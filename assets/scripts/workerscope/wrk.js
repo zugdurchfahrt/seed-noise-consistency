@@ -181,7 +181,12 @@ const WrkModule = function WrkModule(window) {
     if (!hooksRoot) return hooks;
     __setHiddenValue__(hooksRoot, 'WorkerPatchHooks', hooks);
     if (G && (!Object.prototype.hasOwnProperty.call(G, 'WorkerPatchHooks') || G.WorkerPatchHooks !== hooks)) {
-      __setHiddenValue__(G, 'WorkerPatchHooks', hooks);
+      const globalHooksDesc = Object.getOwnPropertyDescriptor(G, 'WorkerPatchHooks');
+      if (globalHooksDesc && !Object.prototype.hasOwnProperty.call(globalHooksDesc, 'value') && typeof globalHooksDesc.set === 'function') {
+        G.WorkerPatchHooks = hooks;
+      } else {
+        __setHiddenValue__(G, 'WorkerPatchHooks', hooks);
+      }
     }
     __wrkRuntimeSet__('workerPatchHooksReady', true);
     return hooks;
@@ -669,6 +674,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
       Object.defineProperty(self, '__GW_BOOTSTRAP__', { value: true, writable: true, configurable: true, enumerable: false });
       var __ENV_EMIT_Q__ = [];
       var __ENV_DIAG_RELAY_ACTIVE__ = false;
+      var __ENV_SHARED_PORTS__ = [];
+      var __LAST_SNAP__ = null;
+      var __ENV_SNAP_APPLIED__ = null;
       var __serializeDiagErr = function(err){
         if (!err) return null;
         var out = {};
@@ -689,9 +697,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
           }
         } catch(_e) {}
         try {
-          if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
-            for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
-              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) {}
+          if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
+            for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
+              try { __ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) {}
             }
           }
         } catch(_e) {}
@@ -764,9 +772,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
           }
         } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
         try {
-          if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
-            for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
-              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
+          if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
+            for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
+              try { __ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
             }
             sent = true;
           }
@@ -784,7 +792,6 @@ function mkModuleWorkerSource(snapshot, absUrl){
         });
       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
       try {
-        if (!self.__ENV_SHARED_PORTS__) self.__ENV_SHARED_PORTS__ = [];
         // SharedWorker needs port-based signalling; do not rely on onconnect (user code can overwrite it).
         self.addEventListener('connect', function(ev){
           try {
@@ -792,7 +799,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
             if (ports && ports.length) {
               for (var j = 0; j < ports.length; j++) {
                 try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
-                self.__ENV_SHARED_PORTS__.push(ports[j]);
+                __ENV_SHARED_PORTS__.push(ports[j]);
               }
             }
           } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_connect_event' }); }
@@ -831,11 +838,21 @@ function mkModuleWorkerSource(snapshot, absUrl){
         }
         return s;
       };
+      Object.defineProperty(self, '__lastSnap__', {
+        value: null,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      var __bootstrapApplyEnvSnapshot__ = function(s){
+        if (__ENV_SNAP_APPLIED__ === s) return;
+        __LAST_SNAP__ = __requireSnap(s);
+        self.__lastSnap__ = __LAST_SNAP__;
+        __ENV_SNAP_APPLIED__ = s;
+      };
       Object.defineProperty(self, '__applyEnvSnapshot__', {
         value: function __applyEnvSnapshot__(s){
-          if (self.__ENV_SNAP_APPLIED__ === s) return;
-          self.__lastSnap__ = __requireSnap(s);
-          self.__ENV_SNAP_APPLIED__ = s;
+          __bootstrapApplyEnvSnapshot__(s);
         },
         writable: true,
         configurable: true,
@@ -844,13 +861,14 @@ function mkModuleWorkerSource(snapshot, absUrl){
       try {
         self.__applyEnvSnapshot__(${SNAP});
       } catch (e) {
-        self.__lastSnap__ = ${SNAP};
+        __LAST_SNAP__ = ${SNAP};
+        self.__lastSnap__ = __LAST_SNAP__;
         self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
         __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ });
         throw e;
       }
       var __requireWebGLSnap__ = function(){
-        var snap = self.__lastSnap__;
+        var snap = __LAST_SNAP__;
         if (!snap || typeof snap !== 'object') throw new Error('UACHPatch: no snapshot');
         var webgl = snap.webgl;
         if (!webgl || typeof webgl !== 'object') throw new Error('UACHPatch: missing webgl');
@@ -940,19 +958,6 @@ function mkModuleWorkerSource(snapshot, absUrl){
         });
       };
       __installEarlyWorkerWebGLMirror__();
-      if (!self.__ENV_SYNC_BC_INSTALLED__) {
-        try {
-          if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
-          self.__ENV_SYNC_BC_INSTALLED__ = true;
-          const bc = new BroadcastChannel('__ENV_SYNC__');
-          bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
-        } catch (e) {
-          self.__ENV_BC_ERROR__ = String((e && (e.stack || e.message)) || e);
-          __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_BC_ERROR__ });
-          throw e;
-        }
-      }
-
       ${ENV_WRK_SRC}
       let __patchOK = false;
       try {
@@ -972,14 +977,19 @@ function mkModuleWorkerSource(snapshot, absUrl){
       if (__patchOK) {
         try {
           // Применяем снимок СЕЙЧАС, уже через реализацию патча:
-          if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
-          self.__applyEnvSnapshot__(self.__lastSnap__);
+          if (!self.__applyEnvSnapshot__ || !__LAST_SNAP__) throw new Error('UACHPatch: snapshot not applied');
+          self.__applyEnvSnapshot__(__LAST_SNAP__);
           if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
             delete self.__installWorkerUACHMirror__;
           }
           if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
             throw new Error('UACHPatch: __installWorkerUACHMirror__ visible after patch apply');
           }
+          ['__GW_BOOTSTRAP__','__ENV_RELAY_DIAG__','__applyEnvSnapshot__','__lastSnap__','__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor'].forEach(function(key){
+            if (Object.prototype.hasOwnProperty.call(self, key)) {
+              try { delete self[key]; } catch(_e) {}
+            }
+          });
         } catch (e) {
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
@@ -1030,6 +1040,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
       Object.defineProperty(self, '__GW_BOOTSTRAP__', { value: true, writable: true, configurable: true, enumerable: false });
       var __ENV_EMIT_Q__ = [];
       var __ENV_DIAG_RELAY_ACTIVE__ = false;
+      var __ENV_SHARED_PORTS__ = [];
+      var __LAST_SNAP__ = null;
+      var __ENV_SNAP_APPLIED__ = null;
       var __serializeDiagErr = function(err){
         if (!err) return null;
         var out = {};
@@ -1050,9 +1063,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
           }
         } catch(_e) {}
         try {
-          if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
-            for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
-              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) {}
+          if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
+            for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
+              try { __ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) {}
             }
           }
         } catch(_e) {}
@@ -1125,9 +1138,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
           }
         } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
         try {
-          if (self.__ENV_SHARED_PORTS__ && self.__ENV_SHARED_PORTS__.length) {
-            for (var i = 0; i < self.__ENV_SHARED_PORTS__.length; i++) {
-              try { self.__ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
+          if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
+            for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
+              try { __ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
             }
             sent = true;
           }
@@ -1145,7 +1158,6 @@ function mkClassicWorkerSource(snapshot, absUrl){
         });
       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
       try {
-        if (!self.__ENV_SHARED_PORTS__) self.__ENV_SHARED_PORTS__ = [];
         // SharedWorker needs port-based signalling; do not rely on onconnect (user code can overwrite it).
         self.addEventListener('connect', function(ev){
           try {
@@ -1153,7 +1165,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
             if (ports && ports.length) {
               for (var j = 0; j < ports.length; j++) {
                 try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
-                self.__ENV_SHARED_PORTS__.push(ports[j]);
+                __ENV_SHARED_PORTS__.push(ports[j]);
               }
             }
           } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_connect_event' }); }
@@ -1191,11 +1203,21 @@ function mkClassicWorkerSource(snapshot, absUrl){
         }
         return s;
       };
+      Object.defineProperty(self, '__lastSnap__', {
+        value: null,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      var __bootstrapApplyEnvSnapshot__ = function(s){
+        if (__ENV_SNAP_APPLIED__ === s) return;
+        __LAST_SNAP__ = __requireSnap(s);
+        self.__lastSnap__ = __LAST_SNAP__;
+        __ENV_SNAP_APPLIED__ = s;
+      };
       Object.defineProperty(self, '__applyEnvSnapshot__', {
         value: function __applyEnvSnapshot__(s){
-          if (self.__ENV_SNAP_APPLIED__ === s) return;
-          self.__lastSnap__ = __requireSnap(s);
-          self.__ENV_SNAP_APPLIED__ = s;
+          __bootstrapApplyEnvSnapshot__(s);
         },
         writable: true,
         configurable: true,
@@ -1204,13 +1226,14 @@ function mkClassicWorkerSource(snapshot, absUrl){
       try {
         self.__applyEnvSnapshot__(${SNAP});
       } catch (e) {
-        self.__lastSnap__ = ${SNAP};
+        __LAST_SNAP__ = ${SNAP};
+        self.__lastSnap__ = __LAST_SNAP__;
         self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
         __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ });
         throw e;
       }
       var __requireWebGLSnap__ = function(){
-        var snap = self.__lastSnap__;
+        var snap = __LAST_SNAP__;
         if (!snap || typeof snap !== 'object') throw new Error('UACHPatch: no snapshot');
         var webgl = snap.webgl;
         if (!webgl || typeof webgl !== 'object') throw new Error('UACHPatch: missing webgl');
@@ -1300,19 +1323,6 @@ function mkClassicWorkerSource(snapshot, absUrl){
         });
       };
       __installEarlyWorkerWebGLMirror__();
-      if (!self.__ENV_SYNC_BC_INSTALLED__) {
-        try {
-          if (typeof BroadcastChannel !== 'function') throw new Error('UACHPatch: BroadcastChannel missing');
-          self.__ENV_SYNC_BC_INSTALLED__ = true;
-          const bc = new BroadcastChannel('__ENV_SYNC__');
-          bc.onmessage = function(ev){ var s = ev && ev.data && ev.data.__ENV_SYNC__ && ev.data.__ENV_SYNC__.envSnapshot; if (s) self.__applyEnvSnapshot__(s); };
-        } catch (e) {
-          self.__ENV_BC_ERROR__ = String((e && (e.stack || e.message)) || e);
-          __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_BC_ERROR__ });
-          throw e;
-        }
-      }
-
       ${ENV_WRK_SRC}
       let __patchOK = false;
       try {
@@ -1332,14 +1342,19 @@ function mkClassicWorkerSource(snapshot, absUrl){
       if (__patchOK) {
         try {
           // Применяем снимок СЕЙЧАС, уже через реализацию патча:
-          if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
-          self.__applyEnvSnapshot__(self.__lastSnap__);
+          if (!self.__applyEnvSnapshot__ || !__LAST_SNAP__) throw new Error('UACHPatch: snapshot not applied');
+          self.__applyEnvSnapshot__(__LAST_SNAP__);
           if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
             delete self.__installWorkerUACHMirror__;
           }
           if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
             throw new Error('UACHPatch: __installWorkerUACHMirror__ visible after patch apply');
           }
+          ['__GW_BOOTSTRAP__','__ENV_RELAY_DIAG__','__applyEnvSnapshot__','__lastSnap__','__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor'].forEach(function(key){
+            if (Object.prototype.hasOwnProperty.call(self, key)) {
+              try { delete self[key]; } catch(_e) {}
+            }
+          });
         } catch (e) {
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
           self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
