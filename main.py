@@ -364,6 +364,8 @@ def init_driver(
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---
     def build_page_bundle(init_params: str) -> str:
+        worker_patch_src = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
+        worker_reflect_src = Path(SCRIPTS_WORKERSCOPE / "set_reflect.js").read_text("utf-8")
         parts = [
             init_params,
             # --- closure bootstrap ---
@@ -407,6 +409,8 @@ def init_driver(
             Path(SCRIPTS_PATCHES_GRAPHICS / "webgl.js").read_text("utf-8"),
             "WebglPatchModule(window);",
             #  --- workers (bootstrap/hooks). No direct module call here unless you have one.
+            f"const __WORKER_PATCH_INLINE_SRC__ = {json.dumps(worker_patch_src)};",
+            f"const __WORKER_REFLECT_INLINE_SRC__ = {json.dumps(worker_reflect_src)};",
             Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
             "WrkModule(window);",
             # --- webgpu WL ---
@@ -643,62 +647,18 @@ def init_driver(
     logger.info("WORKER_PATCH_SRC.initated")
     set_reflect = Path(SCRIPTS_WORKERSCOPE / "set_reflect.js").read_text("utf-8")
 
-    # --- publish worker core into __ENV_BRIDGE__ (stable for external worker_bootstrap.js) ---
-    worker_bootstrap_env_js = f"""
+    worker_bootstrap_js = f"""
     (() => {{
-        const bridgeDesc = Object.getOwnPropertyDescriptor(window, '__ENV_BRIDGE__');
-        let BR = bridgeDesc ? (('value' in bridgeDesc) ? bridgeDesc.value : window.__ENV_BRIDGE__) : window.__ENV_BRIDGE__;
-        if (BR == null) {{
-            BR = {{}};
-            Object.defineProperty(window, '__ENV_BRIDGE__', {{
-                value: BR,
-                writable: true,
-                configurable: true,
-                enumerable: false
-            }});
-        }} else if (typeof BR !== 'object') {{
-            throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-        }} else if (bridgeDesc && bridgeDesc.enumerable !== false) {{
-            if (bridgeDesc.configurable === false) throw new Error('WorkerBootstrap: __ENV_BRIDGE__ non-configurable enumerable');
-            if ('value' in bridgeDesc) {{
-                Object.defineProperty(window, '__ENV_BRIDGE__', {{
-                    value: BR,
-                    writable: !!bridgeDesc.writable,
-                    configurable: true,
-                    enumerable: false
-                }});
-            }} else {{
-                Object.defineProperty(window, '__ENV_BRIDGE__', {{
-                    get: bridgeDesc.get,
-                    set: bridgeDesc.set,
-                    configurable: true,
-                    enumerable: false
-                }});
-            }}
-        }}
-        if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-        const core = {json.dumps(core)};
-        const set_reflect = {json.dumps(set_reflect)};
-        if (!BR.inlinePatch) {{
-            BR.inlinePatch = core;
-        }} else if (BR.inlinePatch !== core) {{
-            throw new Error('WorkerBootstrap: inlinePatch already set');
-        }}
-        if (!BR.inlineReflect) {{
-            BR.inlineReflect = set_reflect;
-        }} else if (BR.inlineReflect !== set_reflect) {{
-            throw new Error('WorkerBootstrap: inlineReflect already set');
-        }}
+        const __WORKER_PATCH_INLINE_SRC__ = {json.dumps(core)};
+        const __WORKER_REFLECT_INLINE_SRC__ = {json.dumps(set_reflect)};
+        {Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")}
     }})();
-    //# sourceURL=worker_bootstrap_env.js
+    //# sourceURL=worker_bootstrap_bundle.js
     """
-    # # --- prepare worker_bootstrap_js (reads __ENV_BRIDGE__.inlinePatch) ---
-    worker_bootstrap_js = Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")
 
-    # Publish worker patch core first:
-    # - worker_bootstrap_env_js sets __ENV_BRIDGE__.inlinePatch (source text)
-    # This order avoids a transient state where Worker overrides exist but bridge URLs aren't ready yet.
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
+    # Publish worker patch bootstrap first:
+    # - worker_bootstrap.js closes over inline sources and prepares worker patch URLs
+    # This order avoids a transient state where Worker overrides exist but bootstrap URLs aren't ready yet.
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
     # Connect page_js (core + targets + wrk.js and so on)

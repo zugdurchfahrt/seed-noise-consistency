@@ -8,54 +8,6 @@
 
     if (!IS_WORKER) return;
 
-    const bridgeDesc = Object.getOwnPropertyDescriptor(globalThis, '__ENV_BRIDGE__');
-    const BR = (() => {
-      let bridge = bridgeDesc
-        ? (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value') ? bridgeDesc.value : globalThis.__ENV_BRIDGE__)
-        : globalThis.__ENV_BRIDGE__;
-      if (bridge == null) {
-        bridge = {};
-        Object.defineProperty(globalThis, '__ENV_BRIDGE__', {
-          value: bridge,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        return bridge;
-      }
-      if (typeof bridge !== 'object') {
-        throw new Error('UworkerInit: __ENV_BRIDGE__ missing');
-      }
-      if (!bridgeDesc) {
-        Object.defineProperty(globalThis, '__ENV_BRIDGE__', {
-          value: bridge,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      } else if (bridgeDesc.enumerable !== false) {
-        if (bridgeDesc.configurable === false) {
-          throw new Error('UworkerInit: __ENV_BRIDGE__ non-configurable enumerable');
-        }
-        if (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value')) {
-          Object.defineProperty(globalThis, '__ENV_BRIDGE__', {
-            value: bridge,
-            writable: !!bridgeDesc.writable,
-            configurable: true,
-            enumerable: false
-          });
-        } else {
-          Object.defineProperty(globalThis, '__ENV_BRIDGE__', {
-            get: bridgeDesc.get,
-            set: bridgeDesc.set,
-            configurable: true,
-            enumerable: false
-          });
-        }
-      }
-      return bridge;
-    })();
-
     const G = (typeof globalThis !== 'undefined' && globalThis)
         || (typeof self       !== 'undefined' && self)
         || (typeof window     !== 'undefined' && window)

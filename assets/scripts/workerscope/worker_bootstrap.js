@@ -9,10 +9,15 @@
   const __MODULE = 'worker_bootstrap';
   const __SURFACE = 'worker_bootstrap';
 
-  function __resolveLoggerDegrade() {
+  function __resolveCanvasPatchContext() {
     const C = (W && W.CanvasPatchContext && (typeof W.CanvasPatchContext === 'object' || typeof W.CanvasPatchContext === 'function'))
       ? W.CanvasPatchContext
       : null;
+    return C;
+  }
+
+  function __resolveLoggerDegrade() {
+    const C = __resolveCanvasPatchContext();
     const loggerRoot = (C && C.__logger && typeof C.__logger === 'object')
       ? C.__logger
       : null;
@@ -21,25 +26,45 @@
       : null;
   }
 
-  function __ensureWorkerBootstrapState() {
-    const C = (W && W.CanvasPatchContext && (typeof W.CanvasPatchContext === 'object' || typeof W.CanvasPatchContext === 'function'))
-      ? W.CanvasPatchContext
-      : null;
+  function __setHiddenValue(obj, key, value) {
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+    const desc = Object.getOwnPropertyDescriptor(obj, key);
+    if (desc && desc.configurable === false) {
+      if (Object.prototype.hasOwnProperty.call(desc, 'value')) return desc.value;
+      return value;
+    }
+    Object.defineProperty(obj, key, {
+      value: value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return value;
+  }
+
+  function __ensureWrkStateRoot() {
+    const C = __resolveCanvasPatchContext();
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
       : null;
     if (!stateRoot) return null;
-    let state = (stateRoot.__WORKER_BOOTSTRAP__ && typeof stateRoot.__WORKER_BOOTSTRAP__ === 'object')
-      ? stateRoot.__WORKER_BOOTSTRAP__
+    let wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+      ? stateRoot.__WRK__
+      : null;
+    if (!wrkState) {
+      wrkState = __setHiddenValue(stateRoot, '__WRK__', Object.create(null));
+    }
+    return wrkState;
+  }
+
+  function __ensureWorkerBootstrapState() {
+    const wrkState = __ensureWrkStateRoot();
+    if (!wrkState) return null;
+    let state = (wrkState.bootstrap && typeof wrkState.bootstrap === 'object')
+      ? wrkState.bootstrap
       : null;
     if (!state) {
-      state = Object.create(null);
-      Object.defineProperty(stateRoot, '__WORKER_BOOTSTRAP__', {
-        value: state,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
+      state = __setHiddenValue(wrkState, 'bootstrap', Object.create(null));
     }
     return state;
   }
@@ -52,6 +77,64 @@
       state[keys[i]] = patch[keys[i]];
     }
     return true;
+  }
+
+  function __ensureWrkRuntimeRoot() {
+    const C = __resolveCanvasPatchContext();
+    if (!C) return null;
+    const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+      ? C.__wrkRuntime__
+      : null;
+    return wrkRuntime || __setHiddenValue(C, '__wrkRuntime__', Object.create(null));
+  }
+
+  function __syncWrkRuntime(patch) {
+    const runtimeRoot = __ensureWrkRuntimeRoot();
+    if (!runtimeRoot || !patch || typeof patch !== 'object') return false;
+    const keys = Object.keys(patch);
+    for (let i = 0; i < keys.length; i++) {
+      runtimeRoot[keys[i]] = patch[keys[i]];
+    }
+    return true;
+  }
+
+  function __ensureWrkHooksRoot() {
+    const C = __resolveCanvasPatchContext();
+    if (!C) return null;
+    const wrkHooks = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
+      ? C.__wrkHooks__
+      : null;
+    return wrkHooks || __setHiddenValue(C, '__wrkHooks__', Object.create(null));
+  }
+
+  function __captureWorkerPatchHooks(hooks) {
+    const hooksRoot = __ensureWrkHooksRoot();
+    if (!hooksRoot || !hooks || typeof hooks !== 'object' || typeof hooks.initAll !== 'function') return null;
+    __setHiddenValue(hooksRoot, 'WorkerPatchHooks', hooks);
+    __syncWrkRuntime({ workerPatchHooksReady: true });
+    return hooks;
+  }
+
+  function __resolveWorkerPatchHooks() {
+    const hooksRoot = __ensureWrkHooksRoot();
+    const ownedHooks = (hooksRoot && hooksRoot.WorkerPatchHooks && typeof hooksRoot.WorkerPatchHooks === 'object' && typeof hooksRoot.WorkerPatchHooks.initAll === 'function')
+      ? hooksRoot.WorkerPatchHooks
+      : null;
+    if (ownedHooks) return ownedHooks;
+    const globalHooks = (W && W.WorkerPatchHooks && typeof W.WorkerPatchHooks === 'object' && typeof W.WorkerPatchHooks.initAll === 'function')
+      ? W.WorkerPatchHooks
+      : null;
+    return globalHooks ? __captureWorkerPatchHooks(globalHooks) : null;
+  }
+
+  function __resolveInlineWorkerSources() {
+    const inlinePatch = (typeof __WORKER_PATCH_INLINE_SRC__ === 'string' && __WORKER_PATCH_INLINE_SRC__)
+      ? __WORKER_PATCH_INLINE_SRC__
+      : null;
+    const inlineReflect = (typeof __WORKER_REFLECT_INLINE_SRC__ === 'string' && __WORKER_REFLECT_INLINE_SRC__)
+      ? __WORKER_REFLECT_INLINE_SRC__
+      : null;
+    return { inlinePatch, inlineReflect };
   }
 
   function __emit(level, code, ctx, err) {
@@ -106,92 +189,8 @@
     if (!W || (typeof W !== 'object' && typeof W !== 'function')) {
       throw new Error('WorkerBootstrap: window missing');
     }
-    const bridgeDesc = Object.getOwnPropertyDescriptor(W, '__ENV_BRIDGE__');
-    let BR = bridgeDesc
-      ? (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value') ? bridgeDesc.value : W.__ENV_BRIDGE__)
-      : W.__ENV_BRIDGE__;
-    if (!bridgeDesc) {
-      const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-      __moduleDiag('error', __MODULE + ':bridge_missing', {
-        stage: 'preflight',
-        key: '__ENV_BRIDGE__',
-        message: '__ENV_BRIDGE__ missing',
-        type: 'pipeline missing data',
-        data: { outcome: 'throw', reason: 'bridge_missing' }
-        }, err);
-      throw err;
-    } else if (typeof BR !== 'object') {
-      const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-      __moduleDiag('error', __MODULE + ':bridge_missing', {
-        stage: 'preflight',
-        key: '__ENV_BRIDGE__',
-        message: '__ENV_BRIDGE__ missing',
-        type: 'pipeline missing data',
-        data: { outcome: 'throw', reason: 'bridge_missing' }
-      }, err);
-      throw err;
-    } else if (bridgeDesc.enumerable !== false) {
-      if (bridgeDesc.configurable === false) {
-        const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ non-configurable enumerable');
-        __moduleDiag('error', __MODULE + ':bridge_descriptor_invalid', {
-          stage: 'contract',
-          key: '__ENV_BRIDGE__',
-          message: '__ENV_BRIDGE__ non-configurable enumerable',
-          type: 'contract violation',
-          data: { outcome: 'throw', reason: 'bridge_descriptor_invalid' }
-        }, err);
-        throw err;
-      }
-      if (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value')) {
-        Object.defineProperty(window, '__ENV_BRIDGE__', {
-          value: BR,
-          writable: !!bridgeDesc.writable,
-          configurable: true,
-          enumerable: false
-        });
-      } else {
-        Object.defineProperty(window, '__ENV_BRIDGE__', {
-          get: bridgeDesc.get,
-          set: bridgeDesc.set,
-          configurable: true,
-          enumerable: false
-        });
-      }
-    }
-    if (!BR || typeof BR !== 'object') {
-      const err = new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-      __moduleDiag('error', __MODULE + ':bridge_missing', {
-        stage: 'preflight',
-        key: '__ENV_BRIDGE__',
-        message: '__ENV_BRIDGE__ missing',
-        type: 'pipeline missing data',
-        data: { outcome: 'throw', reason: 'bridge_missing' }
-      }, err);
-      throw err;
-    }
-
-    __syncWorkerBootstrapState({
-      bridge: BR,
-      urls: BR.urls,
-      inlinePatchReady: typeof BR.inlinePatch === 'string' && !!BR.inlinePatch
-    });
-
-    if (!Object.prototype.hasOwnProperty.call(BR, 'urls')) {
-      Object.defineProperty(BR, 'urls', { value: {}, writable: false, configurable: false });
-    }
-    if (!BR.urls || typeof BR.urls !== 'object') {
-      const err = new Error('WorkerBootstrap: BR.urls missing');
-      __moduleDiag('error', __MODULE + ':urls_missing', {
-        stage: 'preflight',
-        key: 'urls',
-        message: 'bridge urls missing',
-        type: 'pipeline missing data',
-        data: { outcome: 'throw', reason: 'urls_missing' }
-      }, err);
-      throw err;
-    }
-
-    const core = BR.inlinePatch;
+    const inlineSources = __resolveInlineWorkerSources();
+    const core = inlineSources.inlinePatch;
     if (typeof core !== 'string' || !core) {
       const err = new Error('WorkerBootstrap: inlinePatch missing');
       __moduleDiag('error', __MODULE + ':inline_patch_missing', {
@@ -203,17 +202,30 @@
       }, err);
       throw err;
     }
-
-    if (!BR.urls.workerPatchClassic) {
-      BR.urls.workerPatchClassic = URL.createObjectURL(new Blob([core], { type: 'text/javascript' }));
+    const reflectSource = inlineSources.inlineReflect;
+    if (typeof reflectSource !== 'string' || !reflectSource) {
+      const err = new Error('WorkerBootstrap: inlineReflect missing');
+      __moduleDiag('error', __MODULE + ':inline_reflect_missing', {
+        stage: 'preflight',
+        key: 'inlineReflect',
+        message: 'inlineReflect missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'inline_reflect_missing' }
+      }, err);
+      throw err;
     }
-    if (!BR.urls.workerPatchModule) {
-      BR.urls.workerPatchModule = URL.createObjectURL(
+
+    const __workerPatchUrls = Object.create(null);
+    if (!__workerPatchUrls.workerPatchClassic) {
+      __workerPatchUrls.workerPatchClassic = URL.createObjectURL(new Blob([core], { type: 'text/javascript' }));
+    }
+    if (!__workerPatchUrls.workerPatchModule) {
+      __workerPatchUrls.workerPatchModule = URL.createObjectURL(
         new Blob(['/*module*/\n', core, '\nexport {};\n'], { type: 'text/javascript' })
       );
     }
 
-    if (typeof BR.urls.workerPatchClassic !== 'string' || !BR.urls.workerPatchClassic) {
+    if (typeof __workerPatchUrls.workerPatchClassic !== 'string' || !__workerPatchUrls.workerPatchClassic) {
       const err = new Error('WorkerBootstrap: bad workerPatchClassic url');
       __moduleDiag('error', __MODULE + ':classic_url_bad', {
         stage: 'contract',
@@ -224,7 +236,7 @@
       }, err);
       throw err;
     }
-    if (typeof BR.urls.workerPatchModule !== 'string' || !BR.urls.workerPatchModule) {
+    if (typeof __workerPatchUrls.workerPatchModule !== 'string' || !__workerPatchUrls.workerPatchModule) {
       const err = new Error('WorkerBootstrap: bad workerPatchModule url');
       __moduleDiag('error', __MODULE + ':module_url_bad', {
         stage: 'contract',
@@ -236,28 +248,50 @@
       throw err;
     }
 
-    Object.freeze(BR.urls);
+    Object.freeze(__workerPatchUrls);
+    __syncWrkRuntime({
+      inlinePatch: core,
+      inlineReflect: reflectSource,
+      workerPatchClassic: __workerPatchUrls.workerPatchClassic,
+      workerPatchModule: __workerPatchUrls.workerPatchModule,
+      workerPatchUrlsReady: true,
+      workerPatchHooksReady: false
+    });
+    __syncWorkerBootstrapState({
+      urls: __workerPatchUrls,
+      inlinePatchReady: true,
+      inlineReflectReady: true
+    });
 
     function boot() {
-      const H = W.WorkerPatchHooks;
+      const H = __resolveWorkerPatchHooks();
       if (!H || typeof H.initAll !== 'function') return;
 
       const __workerBootstrapState = __ensureWorkerBootstrapState();
       if (!__workerBootstrapState) {
-        const err = new Error('WorkerBootstrap: CanvasPatchContext.state.__WORKER_BOOTSTRAP__ unavailable');
+        const err = new Error('WorkerBootstrap: CanvasPatchContext.state.__WRK__.bootstrap unavailable');
         __moduleDiag('error', __MODULE + ':state_missing', {
           stage: 'preflight',
-          key: 'CanvasPatchContext.state.__WORKER_BOOTSTRAP__',
+          key: 'CanvasPatchContext.state.__WRK__.bootstrap',
           message: 'worker bootstrap module-state unavailable',
           type: 'pipeline missing data',
           data: { outcome: 'throw', reason: 'state_missing' }
         }, err);
         throw err;
       }
+      __syncWrkRuntime({
+        inlinePatch: core,
+        inlineReflect: reflectSource,
+        workerPatchClassic: __workerPatchUrls.workerPatchClassic,
+        workerPatchModule: __workerPatchUrls.workerPatchModule,
+        workerPatchUrlsReady: true,
+        workerPatchHooks: H,
+        workerPatchHooksReady: true
+      });
       __syncWorkerBootstrapState({
-        bridge: BR,
-        urls: BR.urls,
-        hooks: H,
+        urls: __workerPatchUrls,
+        inlinePatchReady: true,
+        inlineReflectReady: true,
         initRequested: true
       });
 
@@ -390,7 +424,7 @@
       }
     }
 
-    if ('WorkerPatchHooks' in W && W.WorkerPatchHooks && typeof W.WorkerPatchHooks.initAll === 'function') {
+    if (__resolveWorkerPatchHooks()) {
       boot();
     } else {
       let _h;
@@ -404,6 +438,7 @@
           // with a plain value property to prevent re-entry in the same document.
           if (v && typeof v === 'object' && typeof v.initAll === 'function') {
             try {
+              __captureWorkerPatchHooks(v);
               Object.defineProperty(W, 'WorkerPatchHooks', {
                 value: v,
                 writable: true,
@@ -413,7 +448,7 @@
             } catch (e) {
               __moduleDiag('warn', __MODULE + ':hooks_lock_failed', {
                 stage: 'guard',
-                key: 'WorkerPatchHooks',
+                key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
                 message: 'failed to lock WorkerPatchHooks to plain property',
                 type: 'browser structure missing data',
                 data: { outcome: 'skip', reason: 'hooks_lock_failed' }
@@ -425,7 +460,7 @@
 
           __moduleDiag('warn', __MODULE + ':hooks_invalid', {
             stage: 'preflight',
-            key: 'WorkerPatchHooks',
+            key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
             message: 'WorkerPatchHooks set to invalid value; waiting for valid initAll',
             type: 'pipeline missing data',
             data: { outcome: 'skip', reason: 'hooks_invalid' }

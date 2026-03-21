@@ -66,6 +66,127 @@ const WrkModule = function WrkModule(window) {
     return value;
   }
 
+  function __resolveCanvasPatchContext__() {
+    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+      ? G.CanvasPatchContext
+      : null;
+    return C;
+  }
+
+  function __ensureWrkStateRoot__() {
+    const C = __resolveCanvasPatchContext__();
+    const stateRoot = (C && C.state && typeof C.state === 'object')
+      ? C.state
+      : null;
+    if (!stateRoot) return null;
+    const wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+      ? stateRoot.__WRK__
+      : __setHiddenValue__(stateRoot, '__WRK__', Object.create(null));
+    return wrkState;
+  }
+
+  function __ensureWrkRuntimeRoot__() {
+    const C = __resolveCanvasPatchContext__();
+    if (!C) return null;
+    const runtimeRoot = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+      ? C.__wrkRuntime__
+      : __setHiddenValue__(C, '__wrkRuntime__', Object.create(null));
+    return runtimeRoot;
+  }
+
+  function __ensureWrkHooksRoot__() {
+    const C = __resolveCanvasPatchContext__();
+    if (!C) return null;
+    const hooksRoot = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
+      ? C.__wrkHooks__
+      : __setHiddenValue__(C, '__wrkHooks__', Object.create(null));
+    return hooksRoot;
+  }
+
+  function __wrkStateSet__(key, value) {
+    const stateRoot = __ensureWrkStateRoot__();
+    if (stateRoot && typeof key === 'string' && key) stateRoot[key] = value;
+    return value;
+  }
+
+  function __wrkRuntimeSet__(key, value) {
+    const runtimeRoot = __ensureWrkRuntimeRoot__();
+    if (runtimeRoot && typeof key === 'string' && key) __setHiddenValue__(runtimeRoot, key, value);
+    return value;
+  }
+
+  function __wrkRuntimeGet__(key) {
+    const runtimeRoot = __ensureWrkRuntimeRoot__();
+    if (runtimeRoot && typeof key === 'string' && key && Object.prototype.hasOwnProperty.call(runtimeRoot, key)) {
+      return runtimeRoot[key];
+    }
+    return undefined;
+  }
+
+  function __resolveWorkerReflectSource__() {
+    const reflectSrc = (typeof __WORKER_REFLECT_INLINE_SRC__ === 'string' && __WORKER_REFLECT_INLINE_SRC__)
+      ? __WORKER_REFLECT_INLINE_SRC__
+      : null;
+    return reflectSrc;
+  }
+
+  function __requireWorkerPatchRuntime__(reason, stage) {
+    const workerPatchClassic = __wrkRuntimeGet__('workerPatchClassic');
+    const workerPatchModule = __wrkRuntimeGet__('workerPatchModule');
+    const inlineReflect = __wrkRuntimeGet__('inlineReflect') || __resolveWorkerReflectSource__();
+    if (typeof workerPatchClassic === 'string' && workerPatchClassic
+        && typeof workerPatchModule === 'string' && workerPatchModule
+        && typeof inlineReflect === 'string' && inlineReflect) {
+      return {
+        workerPatchClassic,
+        workerPatchModule,
+        inlineReflect
+      };
+    }
+    const err = new Error('[WrkModule] FAIL_FAST: worker patch runtime not ready');
+    __wrkDiag('error', 'wrk:worker_patch_runtime_missing', {
+      stage: (typeof stage === 'string' && stage) ? stage : 'preflight',
+      key: 'CanvasPatchContext.__wrkRuntime__',
+      message: (typeof reason === 'string' && reason) ? reason : 'worker patch runtime not ready',
+      type: 'pipeline missing data',
+      data: { outcome: 'throw', reason: 'worker_patch_runtime_missing' }
+    }, err);
+    throw err;
+  }
+
+  function __captureWorkerPatchApi__(api) {
+    if (!api || typeof api !== 'object') return null;
+    __wrkRuntimeSet__('workerPatchApi', api);
+    __wrkStateSet__('workerPatchApiReady', true);
+    return api;
+  }
+
+  function __requireWorkerPatchApi__(reason, stage) {
+    const api = __wrkRuntimeGet__('workerPatchApi');
+    if (api && typeof api === 'object') return api;
+    const err = new Error('[WrkModule] FAIL_FAST: worker patch api not ready');
+    __wrkDiag('error', 'wrk:worker_patch_api_missing', {
+      stage: (typeof stage === 'string' && stage) ? stage : 'preflight',
+      key: 'CanvasPatchContext.__wrkRuntime__.workerPatchApi',
+      message: (typeof reason === 'string' && reason) ? reason : 'worker patch api not ready',
+      type: 'pipeline missing data',
+      data: { outcome: 'throw', reason: 'worker_patch_api_missing' }
+    }, err);
+    throw err;
+  }
+
+  function __captureWorkerPatchHooks__(hooks) {
+    if (!hooks || typeof hooks !== 'object') return null;
+    const hooksRoot = __ensureWrkHooksRoot__();
+    if (!hooksRoot) return hooks;
+    __setHiddenValue__(hooksRoot, 'WorkerPatchHooks', hooks);
+    if (G && (!Object.prototype.hasOwnProperty.call(G, 'WorkerPatchHooks') || G.WorkerPatchHooks !== hooks)) {
+      __setHiddenValue__(G, 'WorkerPatchHooks', hooks);
+    }
+    __wrkRuntimeSet__('workerPatchHooksReady', true);
+    return hooks;
+  }
+
   function __updateWorkerSnapshotStatus__(ready, stage) {
     const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
       ? G.CanvasPatchContext
@@ -185,7 +306,6 @@ const WrkModule = function WrkModule(window) {
 
     const __hiddenSurfaceState = {
       preapply: [
-        '__ENV_BRIDGE__',
         '__ENV_HUB__',
         '__lastSnap__',
         '__LAST_UACH_HE__',
@@ -207,7 +327,6 @@ const WrkModule = function WrkModule(window) {
         'ServiceWorkerOverride'
       ],
       final: [
-        '__ENV_BRIDGE__',
         '__ENV_HUB__',
         '__lastSnap__',
         '__LAST_UACH_HE__',
@@ -528,59 +647,18 @@ function WorkerOverrides_install(G, hub) {
 
 
 
-// === env-worker-bridge (главный бандл) ===
-(function setupEnvBridge(global){
-  const bridgeDesc = Object.getOwnPropertyDescriptor(global, '__ENV_BRIDGE__');
-  let BR = bridgeDesc
-    ? (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value') ? bridgeDesc.value : global.__ENV_BRIDGE__)
-    : global.__ENV_BRIDGE__;
-  if (BR == null) {
-    BR = {};
-    Object.defineProperty(global, '__ENV_BRIDGE__', {
-      value: BR,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  } else if (typeof BR !== 'object') {
-    throw new Error('EnvBridge: __ENV_BRIDGE__ missing');
-  } else if (!bridgeDesc) {
-    Object.defineProperty(global, '__ENV_BRIDGE__', {
-      value: BR,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  } else if (bridgeDesc.enumerable !== false) {
-    if (bridgeDesc.configurable === false) {
-      throw new Error('EnvBridge: __ENV_BRIDGE__ non-configurable enumerable');
-    }
-    if (Object.prototype.hasOwnProperty.call(bridgeDesc, 'value')) {
-      Object.defineProperty(global, '__ENV_BRIDGE__', {
-        value: BR,
-        writable: !!bridgeDesc.writable,
-        configurable: true,
-        enumerable: false
-      });
-    } else {
-      Object.defineProperty(global, '__ENV_BRIDGE__', {
-        get: bridgeDesc.get,
-        set: bridgeDesc.set,
-        configurable: true,
-        enumerable: false
-      });
-    }
-  }
-
-const ENV_WRK_SRC = (BR && typeof BR.inlineReflect === 'string') ? BR.inlineReflect : null;
+// === worker patch runtime (главный бандл) ===
+(function setupWorkerPatchRuntime(global){
+const ENV_WRK_SRC = __resolveWorkerReflectSource__();
 if (typeof ENV_WRK_SRC !== 'string' || !ENV_WRK_SRC) {
-  throw new Error('EnvBridge: inlineReflect missing');
+  throw new Error('WrkModule: inlineReflect missing');
 }
 
 function mkModuleWorkerSource(snapshot, absUrl){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkModuleWorkerSource bad snapshot');
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkModuleWorkerSource bad absUrl');
-  const patchUrl = global.__ENV_BRIDGE__ && global.__ENV_BRIDGE__.urls && global.__ENV_BRIDGE__.urls.workerPatchModule;
+  const runtime = __requireWorkerPatchRuntime__('workerPatchModule runtime not ready', 'preflight');
+  const patchUrl = runtime && runtime.workerPatchModule;
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkModuleWorkerSource bad workerPatchModule url');
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
@@ -876,35 +954,13 @@ function mkModuleWorkerSource(snapshot, absUrl){
       }
 
       ${ENV_WRK_SRC}
-      const __workerPatchBridge = self.__ENV_BRIDGE__;
-      if (!__workerPatchBridge || typeof __workerPatchBridge !== 'object') throw new Error('UACHPatch: __ENV_BRIDGE__ missing');
-      if (!Object.prototype.hasOwnProperty.call(__workerPatchBridge, 'installWorkerUACHMirror')) {
-        let __installWorkerUACHMirror__;
-        Object.defineProperty(__workerPatchBridge, 'installWorkerUACHMirror', {
-          configurable: true,
-          enumerable: false,
-          get: function(){ return __installWorkerUACHMirror__; },
-          set: function(v){
-            __installWorkerUACHMirror__ = v;
-            if (typeof v === 'function') {
-              Object.defineProperty(__workerPatchBridge, 'installWorkerUACHMirror', {
-                value: v,
-                writable: true,
-                configurable: true,
-                enumerable: false
-              });
-            }
-          }
-        });
-      }
       let __patchOK = false;
       try {
         // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
         const PATCH_URL = ${PATCH_URL};
         if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchModule URL');
         await import(PATCH_URL);
-        const __workerPatchBridge = self.__ENV_BRIDGE__;
-        const installWorkerUACHMirror = __workerPatchBridge && __workerPatchBridge.installWorkerUACHMirror;
+        const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
         __patchOK = true;
@@ -918,11 +974,11 @@ function mkModuleWorkerSource(snapshot, absUrl){
           // Применяем снимок СЕЙЧАС, уже через реализацию патча:
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
-          if (Object.prototype.hasOwnProperty.call(self, '__ENV_BRIDGE__')) {
-            delete self.__ENV_BRIDGE__;
+          if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
+            delete self.__installWorkerUACHMirror__;
           }
-          if (Object.prototype.hasOwnProperty.call(self, '__ENV_BRIDGE__')) {
-            throw new Error('UACHPatch: __ENV_BRIDGE__ visible after patch apply');
+          if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
+            throw new Error('UACHPatch: __installWorkerUACHMirror__ visible after patch apply');
           }
         } catch (e) {
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
@@ -962,7 +1018,8 @@ function mkModuleWorkerSource(snapshot, absUrl){
 function mkClassicWorkerSource(snapshot, absUrl){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkClassicWorkerSource bad snapshot');
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkClassicWorkerSource bad absUrl');
-  const patchUrl = global.__ENV_BRIDGE__ && global.__ENV_BRIDGE__.urls && global.__ENV_BRIDGE__.urls.workerPatchClassic;
+  const runtime = __requireWorkerPatchRuntime__('workerPatchClassic runtime not ready', 'preflight');
+  const patchUrl = runtime && runtime.workerPatchClassic;
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkClassicWorkerSource bad workerPatchClassic url');
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
@@ -1257,34 +1314,13 @@ function mkClassicWorkerSource(snapshot, absUrl){
       }
 
       ${ENV_WRK_SRC}
-      var __workerPatchBridge = self.__ENV_BRIDGE__;
-      if (!__workerPatchBridge || typeof __workerPatchBridge !== 'object') throw new Error('UACHPatch: __ENV_BRIDGE__ missing');
-      if (!Object.prototype.hasOwnProperty.call(__workerPatchBridge, 'installWorkerUACHMirror')) {
-        var __installWorkerUACHMirror__;
-        Object.defineProperty(__workerPatchBridge, 'installWorkerUACHMirror', {
-          configurable: true,
-          enumerable: false,
-          get: function(){ return __installWorkerUACHMirror__; },
-          set: function(v){
-            __installWorkerUACHMirror__ = v;
-            if (typeof v === 'function') {
-              Object.defineProperty(__workerPatchBridge, 'installWorkerUACHMirror', {
-                value: v,
-                writable: true,
-                configurable: true,
-                enumerable: false
-              });
-            }
-          }
-        });
-      }
       let __patchOK = false;
       try {
         // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
         const PATCH_URL = ${PATCH_URL};
         if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchClassic URL');
         importScripts(PATCH_URL);
-        const installWorkerUACHMirror = __workerPatchBridge && __workerPatchBridge.installWorkerUACHMirror;
+        const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
         __patchOK = true;
@@ -1298,11 +1334,11 @@ function mkClassicWorkerSource(snapshot, absUrl){
           // Применяем снимок СЕЙЧАС, уже через реализацию патча:
           if (!self.__applyEnvSnapshot__ || !self.__lastSnap__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(self.__lastSnap__);
-          if (Object.prototype.hasOwnProperty.call(self, '__ENV_BRIDGE__')) {
-            delete self.__ENV_BRIDGE__;
+          if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
+            delete self.__installWorkerUACHMirror__;
           }
-          if (Object.prototype.hasOwnProperty.call(self, '__ENV_BRIDGE__')) {
-            throw new Error('UACHPatch: __ENV_BRIDGE__ visible after patch apply');
+          if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
+            throw new Error('UACHPatch: __installWorkerUACHMirror__ visible after patch apply');
           }
         } catch (e) {
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
@@ -1387,22 +1423,12 @@ function mkClassicWorkerSource(snapshot, absUrl){
     bc.postMessage({ __ENV_SYNC__: { envSnapshot: snap } });
   }
   const __bridgeEnvBus = EnvBus(global);
-  if (BR.mkModuleWorkerSource && BR.mkModuleWorkerSource !== mkModuleWorkerSource) {
-    throw new Error('EnvBridge: mkModuleWorkerSource already set');
-  }
-  if (BR.mkClassicWorkerSource && BR.mkClassicWorkerSource !== mkClassicWorkerSource) {
-    throw new Error('EnvBridge: mkClassicWorkerSource already set');
-  }
-  if (BR.publishSnapshot && BR.publishSnapshot !== publishSnapshot) {
-    throw new Error('EnvBridge: publishSnapshot already set');
-  }
-  if (BR.envSnapshot && BR.envSnapshot !== __bridgeEnvBus.envSnapshot) {
-    throw new Error('EnvBridge: envSnapshot already set');
-  }
-  __setHiddenValue__(BR, 'mkModuleWorkerSource', mkModuleWorkerSource);
-  __setHiddenValue__(BR, 'mkClassicWorkerSource', mkClassicWorkerSource);
-  __setHiddenValue__(BR, 'publishSnapshot', publishSnapshot);
-  __setHiddenValue__(BR, 'envSnapshot', __bridgeEnvBus.envSnapshot);
+  __captureWorkerPatchApi__({
+    mkModuleWorkerSource,
+    mkClassicWorkerSource,
+    publishSnapshot,
+    envSnapshot: __bridgeEnvBus.envSnapshot
+  });
 })(window);
 
 
@@ -1576,25 +1602,25 @@ function SafeWorkerOverride(G){
   const WrappedWorker = mark(function Worker(url, opts) {
   const abs = new URL(url, location.href).href;
   const workerType = resolveWorkerType(abs, opts, 'Worker');
-  const bridge = G.__ENV_BRIDGE__;
-  if (!bridge
-      || typeof bridge.mkClassicWorkerSource !== 'function'
-      || typeof bridge.mkModuleWorkerSource !== 'function'
-      || typeof bridge.publishSnapshot !== 'function'
-      || typeof bridge.envSnapshot !== 'function') {
-    const e = new Error('[WorkerOverride] FAIL_FAST: __ENV_BRIDGE__ not ready');
+  const workerPatchApi = __requireWorkerPatchApi__('worker override runtime api not ready', 'preflight');
+  if (!workerPatchApi
+      || typeof workerPatchApi.mkClassicWorkerSource !== 'function'
+      || typeof workerPatchApi.mkModuleWorkerSource !== 'function'
+      || typeof workerPatchApi.publishSnapshot !== 'function'
+      || typeof workerPatchApi.envSnapshot !== 'function') {
+    const e = new Error('[WorkerOverride] FAIL_FAST: worker patch api not ready');
     __wrkDiag('error', 'wrk:worker_override_bridge_not_ready', {
       stage: 'preflight',
-      key: '__ENV_BRIDGE__',
-      message: 'worker override bridge not ready',
+      key: 'CanvasPatchContext.__wrkRuntime__.workerPatchApi',
+      message: 'worker override runtime api not ready',
       type: 'pipeline missing data',
-      data: { outcome: 'throw', reason: 'bridge_not_ready' }
+      data: { outcome: 'throw', reason: 'worker_patch_api_not_ready' }
     }, e);
     throw e;
   }
-  const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
-  G.__lastSnap__ = snap;
-  bridge.publishSnapshot(snap);
+  const snap = requireWorkerSnapshot(workerPatchApi.envSnapshot(), 'create');
+  __wrkRuntimeSet__('lastSnap', snap);
+  workerPatchApi.publishSnapshot(snap);
 
   // Important: for module workers, do not "clone" blob: URLs.
   // Some real-world bundles embed the original blob URL string for follow-up dynamic imports.
@@ -1603,8 +1629,8 @@ function SafeWorkerOverride(G){
     ? abs
     : resolveUserScriptURL(G, abs, 'Worker');
   const src = workerType === 'module'
-    ? bridge.mkModuleWorkerSource(snap, userURL)
-    : bridge.mkClassicWorkerSource(snap, userURL);
+    ? workerPatchApi.mkModuleWorkerSource(snap, userURL)
+    : workerPatchApi.mkClassicWorkerSource(snap, userURL);
 
   const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
   const w = new NativeWorker(blobURL, { ...(opts), type: workerType });
@@ -1826,27 +1852,27 @@ function SafeSharedWorkerOverride(G){
     const optsForResolve = hasOptsObj ? nameOrOpts : (name !== undefined ? { name } : null);
     const workerType = resolveWorkerType(abs, optsForResolve, 'SharedWorker');
 
-    const bridge = G.__ENV_BRIDGE__;
-    if (!bridge
-        || typeof bridge.mkClassicWorkerSource !== 'function'
-        || typeof bridge.mkModuleWorkerSource !== 'function'
-        || typeof bridge.publishSnapshot !== 'function'
-        || typeof bridge.envSnapshot !== 'function') {
+    const workerPatchApi = __requireWorkerPatchApi__('shared worker override runtime api not ready', 'preflight');
+    if (!workerPatchApi
+        || typeof workerPatchApi.mkClassicWorkerSource !== 'function'
+        || typeof workerPatchApi.mkModuleWorkerSource !== 'function'
+        || typeof workerPatchApi.publishSnapshot !== 'function'
+        || typeof workerPatchApi.envSnapshot !== 'function') {
       // Fail-fast: SharedWorker reuse can lock a native (unpatched) worker for the whole origin.
-      throw new Error('[SharedWorkerOverride] FAIL_FAST: __ENV_BRIDGE__ not ready');
+      throw new Error('[SharedWorkerOverride] FAIL_FAST: worker patch api not ready');
     }
 
-    const snap = requireWorkerSnapshot(bridge.envSnapshot(), 'create');
-    G.__lastSnap__ = snap;
-    bridge.publishSnapshot(snap);
+    const snap = requireWorkerSnapshot(workerPatchApi.envSnapshot(), 'create');
+    __wrkRuntimeSet__('lastSnap', snap);
+    workerPatchApi.publishSnapshot(snap);
 
   // Same reasoning as Worker(): keep original blob: URL for module SharedWorker scripts.
   const userURL = (typeof abs === 'string' && abs.slice(0, 5) === 'blob:' && workerType === 'module')
     ? abs
     : resolveUserScriptURL(G, abs, 'SharedWorker');
     const src = (workerType === 'module')
-      ? bridge.mkModuleWorkerSource(snap, userURL)
-      : bridge.mkClassicWorkerSource(snap, userURL);
+      ? workerPatchApi.mkModuleWorkerSource(snap, userURL)
+      : workerPatchApi.mkClassicWorkerSource(snap, userURL);
 
     const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 
@@ -2363,7 +2389,8 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
 // === WorkerPatchHooks: оркестратор ===
 (function WorkerPatchHooks(G){
-  if (!G || G.WorkerPatchHooks) return;
+  const hooksRoot = __ensureWrkHooksRoot__();
+  if (!G || (hooksRoot && hooksRoot.WorkerPatchHooks)) return;
 
   // 1) Hub (идемпотентно, без сайд-эффектов)
   function initHub(){
@@ -2381,8 +2408,9 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
   // 3) Первый снапшот (LE) из текущего состояния
   function snapshotOnce(){
-    const envSnapshot = (G.__ENV_BRIDGE__ && typeof G.__ENV_BRIDGE__.envSnapshot === 'function')
-      ? G.__ENV_BRIDGE__.envSnapshot
+    const workerPatchApi = __requireWorkerPatchApi__('worker patch hooks runtime api not ready', 'preflight');
+    const envSnapshot = (workerPatchApi && typeof workerPatchApi.envSnapshot === 'function')
+      ? workerPatchApi.envSnapshot
       : EnvBus(G).envSnapshot;
     const snap = envSnapshot();
     if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
@@ -2433,28 +2461,28 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
   // 6) Diagnostics
   function diag(){
     if (!G.__DEBUG__) return {};
-    const BR = G.__ENV_BRIDGE__;
+    const workerPatchApi = __requireWorkerPatchApi__('worker patch hooks diag runtime api not ready', 'runtime');
     return {
       hasHub:        !!G.__ENV_HUB__,
       workerWrapped: !!(G.Worker && (G.Worker.__ENV_WRAPPED__ || /WrappedWorker/.test(String(G.Worker)))),
       sharedWrapped: !!(G.SharedWorker && G.SharedWorker.__ENV_WRAPPED__),
       swWrapped:     !!G.__PATCHED_SERVICE_WORKER__,
       bridge: {
-        mkClassic: typeof BR.mkClassicWorkerSource === 'function',
-        mkModule:  typeof BR.mkModuleWorkerSource  === 'function',
-        publish:   typeof BR.publishSnapshot       === 'function',
-        envSnap:   typeof BR.envSnapshot           === 'function'
+        mkClassic: typeof workerPatchApi.mkClassicWorkerSource === 'function',
+        mkModule:  typeof workerPatchApi.mkModuleWorkerSource  === 'function',
+        publish:   typeof workerPatchApi.publishSnapshot       === 'function',
+        envSnap:   typeof workerPatchApi.envSnapshot           === 'function'
       }
     };
   }
-  G.WorkerPatchHooks = { initHub, installOverrides, snapshotOnce, snapshotHE, initAll, diag };
+  __captureWorkerPatchHooks__({ initHub, installOverrides, snapshotOnce, snapshotHE, initAll, diag });
 
 })(G); // <-- закрыли и СРАЗУ вызвали WorkerPatchHooks(G)
 
 
   __wrkDiag('info', 'wrk:worker_patch_hooks_ready', {
     stage: 'apply',
-    key: 'WorkerPatchHooks',
+    key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
     message: 'WorkerPatchHooks ready',
     type: 'pipeline missing data',
     data: { outcome: 'return' }
@@ -2505,7 +2533,7 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
   } catch (e) {
     __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
       stage: 'apply',
-      key: '__ENV_BRIDGE__',
+      key: 'CanvasPatchContext.__wrkRuntime__',
       message: 'hide pipeline surface failed',
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }

@@ -9,20 +9,17 @@
     throw new Error('UACHPatch: not in WorkerGlobalScope');
   }
   const W = self;
-  const BR = (self.__ENV_BRIDGE__ && typeof self.__ENV_BRIDGE__ === 'object') ? self.__ENV_BRIDGE__ : null;
-  if (!BR) {
-    throw new Error('UACHPatch: __ENV_BRIDGE__ missing');
+  const installDesc = Object.getOwnPropertyDescriptor(self, '__installWorkerUACHMirror__');
+  if (installDesc && installDesc.configurable === false) {
+    throw new Error('UACHPatch: __installWorkerUACHMirror__ non-configurable');
   }
-  const installDesc = Object.getOwnPropertyDescriptor(BR, 'installWorkerUACHMirror');
-  if (!installDesc) {
-    throw new Error('UACHPatch: installWorkerUACHMirror slot missing');
-  }
-  if (!installDesc.get && !installDesc.set) {
-    throw new Error('UACHPatch: installWorkerUACHMirror already defined');
+  if (installDesc && Object.prototype.hasOwnProperty.call(installDesc, 'value') && typeof installDesc.value === 'function') {
+    throw new Error('UACHPatch: __installWorkerUACHMirror__ already defined');
   }
   let __uachMirrorInstalled__ = false;
+  const __rollbackProbeRoot__ = Object.create(null);
 
-  BR.installWorkerUACHMirror = function installWorkerUACHMirror(){
+  const __installWorkerUACHMirror__ = function installWorkerUACHMirror(){
     if (__uachMirrorInstalled__) {
       throw new Error('UACHPatch: already installed');
     }
@@ -94,13 +91,13 @@
     };
     const verifyRollbackRepeatApply = () => {
       const probeKey = '__WORKER_PATCH_SELFTEST__';
-      if (Object.prototype.hasOwnProperty.call(BR, probeKey)) {
+      if (Object.prototype.hasOwnProperty.call(__rollbackProbeRoot__, probeKey)) {
         throw new Error('UACHPatch: rollback selftest residue');
       }
       const runAttempt = () => {
         let forced = null;
         try {
-          trackedDefineProperty(BR, probeKey, {
+          trackedDefineProperty(__rollbackProbeRoot__, probeKey, {
             value: true,
             writable: true,
             configurable: true,
@@ -114,7 +111,7 @@
         if (!forced) {
           throw new Error('UACHPatch: rollback selftest missing forced failure');
         }
-        if (Object.prototype.hasOwnProperty.call(BR, probeKey)) {
+        if (Object.prototype.hasOwnProperty.call(__rollbackProbeRoot__, probeKey)) {
           throw new Error('UACHPatch: rollback selftest failed');
         }
       };
@@ -1269,4 +1266,10 @@
       throw (rollbackErr || e);
     }
   };
+  Object.defineProperty(self, '__installWorkerUACHMirror__', {
+    value: __installWorkerUACHMirror__,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
 })();
