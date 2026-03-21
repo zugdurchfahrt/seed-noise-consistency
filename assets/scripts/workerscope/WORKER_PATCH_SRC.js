@@ -675,8 +675,6 @@
           if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
           const src = (le.he && typeof le.he === 'object') ? le.he : s.highEntropy;
           if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
-          const safeDeviceMemory = Number.isFinite(Number(s.deviceMemory)) ? Number(s.deviceMemory) : undefined;
-          const safeHardwareConcurrency = Number.isFinite(Number(s.hardwareConcurrency)) ? Number(s.hardwareConcurrency) : undefined;
           const fullVersionList = (src.fullVersionList != null)
             ? src.fullVersionList
             : ((le.he && le.he.fullVersionList != null) ? le.he.fullVersionList : undefined);
@@ -689,8 +687,6 @@
             model: src.model,
             platformVersion: src.platformVersion,
             fullVersionList: fullVersionList,
-            deviceMemory: safeDeviceMemory,
-            hardwareConcurrency: safeHardwareConcurrency,
             wow64: src.wow64,
             formFactors: src.formFactors
           };
@@ -749,6 +745,10 @@
     if (typeof wrapStrictAccessor !== 'function') {
       throw new Error('UACHPatch: worker native accessor bridge missing');
     }
+    const languagesCache = {
+      values: null,
+      frozen: null
+    };
 
     const makeGuardedGetter = (k, owner, patchedGet, origGet, desc) => {
       if (typeof origGet !== 'function') {
@@ -937,7 +937,15 @@
     const getLanguages = markAsNative(function getLanguages(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!Array.isArray(cache.snap.languages)) throw new Error('UACHPatch: bad languages');
-      const out = cache.snap.languages.slice();
+      const currentValues = cache.snap.languages;
+      const cachedValues = languagesCache.values;
+      if (Array.isArray(cachedValues)
+          && cachedValues.length === currentValues.length
+          && cachedValues.every(function(value, index) { return value === currentValues[index]; })
+          && Array.isArray(languagesCache.frozen)) {
+        return languagesCache.frozen;
+      }
+      const out = currentValues.slice();
       try { Object.freeze(out); } catch(e) {
         emitDegrade('warn', 'worker_patch_src:languages:freeze_failed', {
           type: 'browser structure missing data',
@@ -949,6 +957,8 @@
           action: 'native'
         }, e);
       }
+      languagesCache.values = out.slice();
+      languagesCache.frozen = out;
       return out;
     }, 'get languages');
     def(proto,'languages', getLanguages, true);

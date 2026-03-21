@@ -341,42 +341,31 @@
         const isData = !!desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
         if (isData) return getter;
 
-        const markAsNative = __requireMarkAsNative(name || key, 'wrapStrictAccessor');
         const valueFromGetter = function(thisArg) {
           return (typeof getter === 'function') ? getter.call(thisArg) : getter;
         };
         const checkThis = (typeof validThis === 'function') ? validThis : null;
         const origGet = desc && desc.get;
-        const syntheticBridgeTarget = (typeof origGet === 'function')
-          ? origGet
-          : ((typeof getter === 'function' && typeof getter.__coreBridgeTarget__ === 'function')
-              ? getter.__coreBridgeTarget__
-              : ((typeof getter === 'function') ? toStringProxyTargetMap.get(getter) : null));
-        const nativeBridgeTarget = (typeof syntheticBridgeTarget === 'function')
-          ? __resolveWrappedBridgeTarget(syntheticBridgeTarget, '__wrapStrictAccessor')
-          : null;
 
-        let wrapped;
-        const synthetic = Object.getOwnPropertyDescriptor(({ get [key]() {
-          if (onAccess) onAccess(key, wrapped, this);
-          if (checkThis && !checkThis(this)) {
-            if (typeof nativeBridgeTarget === 'function') {
-              return Reflect.apply(nativeBridgeTarget, this, []);
+        if (typeof origGet === 'function') {
+          let wrapped;
+          wrapped = __wrapNativeAccessor(origGet, name, function(target, thisArg, argList) {
+            if (onAccess) onAccess(key, wrapped, thisArg);
+            if (checkThis && !checkThis(thisArg)) {
+              return Reflect.apply(target, thisArg, argList || []);
             }
-            throw new TypeError();
-          }
-          return valueFromGetter(this);
-        }}), key).get;
-        if (typeof nativeBridgeTarget === 'function') {
-          Object.defineProperty(synthetic, '__coreBridgeTarget__', {
-            value: nativeBridgeTarget,
-            writable: false,
-            configurable: true,
-            enumerable: false
+            return valueFromGetter(thisArg);
           });
+          return wrapped;
         }
-        wrapped = markAsNative(synthetic, name);
-        return wrapped;
+
+        const e = new Error('[WrkBridge] __wrapStrictAccessor: synthetic strict accessor path forbidden without native getter');
+        __throwWrapFactoryPreflight(
+          'wrk:wrapStrictAccessor:synthetic_path_forbidden',
+          key,
+          '__wrapStrictAccessor: synthetic strict accessor path forbidden without native getter',
+          e
+        );
       }
 
       if (typeof self.__ensureMarkAsNative !== 'function') {
