@@ -119,6 +119,7 @@
       runAttempt();
     };
     verifyRollbackRepeatApply();
+    const __workerNavigatorPatchedOwners__ = Object.create(null);
     const validDpr = v => Number.isFinite(v) && v > 0;
     const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
     const LE_KEYS = ['brands','mobile','platform'];
@@ -808,8 +809,10 @@
         throw new Error(`UACHPatch: ${k} missing native getter on ${where}`);
       };
 
-      // WorkerNavigator.* must land on WorkerNavigator.prototype as own accessor.
+      // Patch the actual native owner on the proto-chain. Forcing a new own
+      // property on WorkerNavigator.prototype leaks through own-property checks.
       let d = null;
+      let resolvedOwner = null;
       for (let o = targetOwner; o; o = Object.getPrototypeOf(o)) {
         try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
         catch (e) {
@@ -825,7 +828,10 @@
             data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
           }, e);
         }
-        if (d) break;
+        if (d) {
+          resolvedOwner = o;
+          break;
+        }
       }
       if (!d) {
         throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
@@ -834,13 +840,15 @@
         throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
       }
       const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
-      const protoGuardedGet = makeGuardedGetter(k, targetOwner, getter, protoOrigGet, d);
-      trackedDefineProperty(targetOwner, k, {
+      const patchOwner = resolvedOwner || targetOwner;
+      const protoGuardedGet = makeGuardedGetter(k, patchOwner, getter, protoOrigGet, d);
+      trackedDefineProperty(patchOwner, k, {
         configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : !!enumerable,
         get: protoGuardedGet,
         set: undefined
       });
+      __workerNavigatorPatchedOwners__[k] = patchOwner;
       return;
 
     };
@@ -860,7 +868,10 @@
       throw err;
     };
     const assertWorkerNavigatorDescriptor = (k) => {
-      const owner = (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype) || proto || null;
+      const owner = __workerNavigatorPatchedOwners__[k]
+        || (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype)
+        || proto
+        || null;
       if (!owner) {
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator_descriptor:sanity:owner_missing',
