@@ -675,6 +675,302 @@ const __probeRun = async function(){
     return rows;
   }
 
+  async function __probeCollectCanonicalScopeValues(scopeLabel, targetNav) {
+    const navTarget = targetNav || null;
+    if (!navTarget) {
+      throw new Error(`[probe] ${scopeLabel} navigator missing`);
+    }
+    const uaData = navTarget.userAgentData || null;
+    const heKeys = ["architecture", "bitness", "model", "platformVersion", "fullVersionList", "wow64", "formFactors"];
+    let he = null;
+    if (!uaData || typeof uaData.getHighEntropyValues !== "function") {
+      throw new Error(`[probe] ${scopeLabel} userAgentData.getHighEntropyValues missing`);
+    }
+    const waited = await __probeAwaitWithTimeout(
+      Reflect.apply(uaData.getHighEntropyValues, uaData, [heKeys]),
+      __PROBE_TIMEOUTS.highEntropyMs,
+      { check: "worker_scope_audit", phase: scopeLabel, method: "NavigatorUAData.getHighEntropyValues" }
+    );
+    if (!waited.ok) {
+      if (waited.timedOut) {
+        __probeLogAsyncTimeout({ check: "worker_scope_audit", phase: scopeLabel, method: "NavigatorUAData.getHighEntropyValues" }, waited.elapsedMs, waited.timeoutMs, waited.error);
+      }
+      throw waited.error || new Error(`[probe] ${scopeLabel} high entropy failed`);
+    }
+    he = waited.value;
+    if (!he || typeof he !== "object") {
+      throw new Error(`[probe] ${scopeLabel} high entropy result invalid`);
+    }
+    return {
+      language: navTarget.language,
+      languages: Array.isArray(navTarget.languages) ? Array.prototype.slice.call(navTarget.languages) : navTarget.languages,
+      deviceMemory: navTarget.deviceMemory,
+      hardwareConcurrency: navTarget.hardwareConcurrency,
+      uaData: {
+        brands: uaData && Array.isArray(uaData.brands) ? JSON.parse(JSON.stringify(uaData.brands)) : uaData ? uaData.brands : null,
+        mobile: uaData ? uaData.mobile : null,
+        platform: uaData ? uaData.platform : null,
+        fullVersionList: uaData && Array.isArray(uaData.fullVersionList) ? JSON.parse(JSON.stringify(uaData.fullVersionList)) : (he && Array.isArray(he.fullVersionList) ? JSON.parse(JSON.stringify(he.fullVersionList)) : null),
+        highEntropy: JSON.parse(JSON.stringify(he))
+      }
+    };
+  }
+
+  function __probeStableStringify(value) {
+    try {
+      return JSON.stringify(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function __probeCompareScopeValues(expectedWindow, actualScope, scopeLabel, variant) {
+    const rows = [];
+    const push = (field, expected, actual) => {
+      rows.push({
+        scope: scopeLabel,
+        variant: variant || null,
+        field,
+        match: __probeStableStringify(actual) === __probeStableStringify(expected),
+        expected: expected == null ? null : JSON.parse(JSON.stringify(expected)),
+        actual: actual == null ? null : JSON.parse(JSON.stringify(actual))
+      });
+    };
+    push("language", expectedWindow.language, actualScope.language);
+    push("languages", expectedWindow.languages, actualScope.languages);
+    push("deviceMemory", expectedWindow.deviceMemory, actualScope.deviceMemory);
+    push("hardwareConcurrency", expectedWindow.hardwareConcurrency, actualScope.hardwareConcurrency);
+    push("userAgentData.brands", expectedWindow.uaData.brands, actualScope.uaData && actualScope.uaData.brands);
+    push("userAgentData.mobile", expectedWindow.uaData.mobile, actualScope.uaData && actualScope.uaData.mobile);
+    push("userAgentData.platform", expectedWindow.uaData.platform, actualScope.uaData && actualScope.uaData.platform);
+    push("userAgentData.fullVersionList", expectedWindow.uaData.fullVersionList, actualScope.uaData && actualScope.uaData.fullVersionList);
+    const heFields = ["architecture", "bitness", "model", "platformVersion", "fullVersionList", "wow64", "formFactors"];
+    for (const field of heFields) {
+      push(`userAgentData.getHighEntropyValues.${field}`, expectedWindow.uaData.highEntropy[field], actualScope.uaData && actualScope.uaData.highEntropy ? actualScope.uaData.highEntropy[field] : null);
+    }
+    return rows;
+  }
+
+  async function __probeRunWorkerScopeAudit() {
+    const windowValues = await __probeCollectCanonicalScopeValues("WindowScope", nav);
+    const dedicatedSource = `
+      (async function(){
+        "use strict";
+        async function collect() {
+          const nav = self.navigator;
+          if (!nav) throw new Error("navigator missing");
+          const uaData = nav.userAgentData;
+          if (!uaData || typeof uaData.getHighEntropyValues !== "function") throw new Error("userAgentData missing");
+          const heKeys = ["architecture","bitness","model","platformVersion","fullVersionList","wow64","formFactors"];
+          const he = await Reflect.apply(uaData.getHighEntropyValues, uaData, [heKeys]);
+          return {
+            language: nav.language,
+            languages: Array.isArray(nav.languages) ? Array.prototype.slice.call(nav.languages) : nav.languages,
+            deviceMemory: nav.deviceMemory,
+            hardwareConcurrency: nav.hardwareConcurrency,
+            uaData: {
+              brands: Array.isArray(uaData.brands) ? JSON.parse(JSON.stringify(uaData.brands)) : uaData.brands,
+              mobile: uaData.mobile,
+              platform: uaData.platform,
+              fullVersionList: Array.isArray(uaData.fullVersionList) ? JSON.parse(JSON.stringify(uaData.fullVersionList)) : (he && Array.isArray(he.fullVersionList) ? JSON.parse(JSON.stringify(he.fullVersionList)) : null),
+              highEntropy: JSON.parse(JSON.stringify(he))
+            }
+          };
+        }
+        try {
+          const values = await collect();
+          self.postMessage({ ok: true, values: values });
+        } catch (error) {
+          self.postMessage({
+            ok: false,
+            error: {
+              name: error && error.name ? String(error.name) : "Error",
+              message: error && error.message ? String(error.message) : String(error),
+              stack: error && error.stack ? String(error.stack) : null
+            }
+          });
+        }
+      })();
+    `;
+    const sharedSource = `
+      "use strict";
+      async function __probeCollectSharedValues__() {
+        const nav = self.navigator;
+        if (!nav) throw new Error("navigator missing");
+        const uaData = nav.userAgentData;
+        if (!uaData || typeof uaData.getHighEntropyValues !== "function") throw new Error("userAgentData missing");
+        const heKeys = ["architecture","bitness","model","platformVersion","fullVersionList","wow64","formFactors"];
+        const he = await Reflect.apply(uaData.getHighEntropyValues, uaData, [heKeys]);
+        return {
+          language: nav.language,
+          languages: Array.isArray(nav.languages) ? Array.prototype.slice.call(nav.languages) : nav.languages,
+          deviceMemory: nav.deviceMemory,
+          hardwareConcurrency: nav.hardwareConcurrency,
+          uaData: {
+            brands: Array.isArray(uaData.brands) ? JSON.parse(JSON.stringify(uaData.brands)) : uaData.brands,
+            mobile: uaData.mobile,
+            platform: uaData.platform,
+            fullVersionList: Array.isArray(uaData.fullVersionList) ? JSON.parse(JSON.stringify(uaData.fullVersionList)) : (he && Array.isArray(he.fullVersionList) ? JSON.parse(JSON.stringify(he.fullVersionList)) : null),
+            highEntropy: JSON.parse(JSON.stringify(he))
+          }
+        };
+      }
+      self.onconnect = function(ev) {
+        const port = ev && ev.ports && ev.ports[0];
+        if (!port) return;
+        Promise.resolve()
+          .then(__probeCollectSharedValues__)
+          .then(function(values) {
+            port.postMessage({ ok: true, values: values });
+          })
+          .catch(function(error) {
+            port.postMessage({
+              ok: false,
+              error: {
+                name: error && error.name ? String(error.name) : "Error",
+                message: error && error.message ? String(error.message) : String(error),
+                stack: error && error.stack ? String(error.stack) : null
+              }
+            });
+          });
+      };
+    `;
+    const dedicatedURL = URL.createObjectURL(new Blob([dedicatedSource], { type: "text/javascript" }));
+    const sharedURL = URL.createObjectURL(new Blob([sharedSource], { type: "text/javascript" }));
+    const sharedName = `probe-shared-${Date.now()}`;
+    const rows = [];
+    const cleanup = [];
+    try {
+      const dedicatedWait = await __probeAwaitWithinBudget((async () => {
+        const worker = new Worker(dedicatedURL);
+        cleanup.push(() => { try { worker.terminate(); } catch (_) {} });
+        return await new Promise((resolve, reject) => {
+          const onMessage = (ev) => {
+            cleanupListeners();
+            const data = ev && ev.data;
+            if (data && data.ok) return resolve(data.values);
+            reject(data && data.error ? new Error(String(data.error.message || data.error.name || "worker error")) : new Error("worker error"));
+          };
+          const onError = (ev) => {
+            cleanupListeners();
+            reject(new Error(ev && ev.message ? String(ev.message) : "worker message error"));
+          };
+          const cleanupListeners = () => {
+            worker.removeEventListener("message", onMessage);
+            worker.removeEventListener("error", onError);
+          };
+          worker.addEventListener("message", onMessage);
+          worker.addEventListener("error", onError);
+        });
+      })(), { check: "worker_scope_audit", phase: "DedicatedWorker", method: "Worker" });
+      const dedicated = dedicatedWait.ok
+        ? { ok: true, values: dedicatedWait.value, comparisons: __probeCompareScopeValues(windowValues, dedicatedWait.value, "DedicatedWorker", "single") }
+        : { ok: false, error: errorShape(dedicatedWait.error), comparisons: [] };
+      if (!dedicated.ok) {
+        rows.push({
+          scope: "DedicatedWorker",
+          variant: "single",
+          field: "__worker__",
+          match: false,
+          expected: "values",
+          actual: dedicated.error
+        });
+      }
+      Array.prototype.push.apply(rows, dedicated.comparisons);
+
+      const sharedCollect = async () => {
+        const shared = new SharedWorker(sharedURL, { name: sharedName, type: "module" });
+        const port = shared.port;
+        cleanup.push(() => {
+          try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
+        });
+        return await new Promise((resolve, reject) => {
+          const onMessage = (ev) => {
+            cleanupListeners();
+            const data = ev && ev.data;
+            if (data && data.ok) return resolve(data.values);
+            reject(data && data.error ? new Error(String(data.error.message || data.error.name || "shared worker error")) : new Error("shared worker error"));
+          };
+          const onError = (ev) => {
+            cleanupListeners();
+            reject(new Error(ev && ev.message ? String(ev.message) : "shared worker message error"));
+          };
+          const cleanupListeners = () => {
+            port.removeEventListener("message", onMessage);
+            port.removeEventListener("messageerror", onError);
+          };
+          port.addEventListener("message", onMessage);
+          port.addEventListener("messageerror", onError);
+          if (typeof port.start === "function") port.start();
+        });
+      };
+
+      const sharedFirstWait = await __probeAwaitWithinBudget(sharedCollect(), { check: "worker_scope_audit", phase: "SharedWorker:first", method: "SharedWorker" });
+      const sharedSecondWait = await __probeAwaitWithinBudget(sharedCollect(), { check: "worker_scope_audit", phase: "SharedWorker:reuse", method: "SharedWorker" });
+
+      const shared = {
+        first: sharedFirstWait.ok
+          ? { ok: true, values: sharedFirstWait.value, comparisons: __probeCompareScopeValues(windowValues, sharedFirstWait.value, "SharedWorker", "first") }
+          : { ok: false, error: errorShape(sharedFirstWait.error), comparisons: [] },
+        second: sharedSecondWait.ok
+          ? { ok: true, values: sharedSecondWait.value, comparisons: __probeCompareScopeValues(windowValues, sharedSecondWait.value, "SharedWorker", "reuse") }
+          : { ok: false, error: errorShape(sharedSecondWait.error), comparisons: [] }
+      };
+      if (!shared.first.ok) {
+        rows.push({
+          scope: "SharedWorker",
+          variant: "first",
+          field: "__worker__",
+          match: false,
+          expected: "values",
+          actual: shared.first.error
+        });
+      }
+      if (!shared.second.ok) {
+        rows.push({
+          scope: "SharedWorker",
+          variant: "reuse",
+          field: "__worker__",
+          match: false,
+          expected: "values",
+          actual: shared.second.error
+        });
+      }
+      Array.prototype.push.apply(rows, shared.first.comparisons);
+      Array.prototype.push.apply(rows, shared.second.comparisons);
+      const reuseMatch = (shared.first.ok && shared.second.ok)
+        ? (__probeStableStringify(shared.first.values) === __probeStableStringify(shared.second.values))
+        : false;
+      rows.push({
+        scope: "SharedWorker",
+        variant: "reuse",
+        field: "reuse.same_values",
+        match: reuseMatch,
+        expected: shared.first.ok ? shared.first.values : null,
+        actual: shared.second.ok ? shared.second.values : null
+      });
+
+      console.group("[probe] worker scope audit");
+      console.table(rows);
+      console.groupEnd();
+
+      return {
+        ok: dedicated.ok === true && shared.first.ok === true && shared.second.ok === true && rows.every((row) => row && row.match === true),
+        window: windowValues,
+        dedicated,
+        shared,
+        rows
+      };
+    } finally {
+      while (cleanup.length) {
+        const fn = cleanup.pop();
+        try { fn(); } catch (_) {}
+      }
+      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {}
+      try { URL.revokeObjectURL(sharedURL); } catch (_) {}
+    }
+  }
+
   function descriptorShape(desc) {
     if (!desc) return null;
     return {
@@ -2527,6 +2823,11 @@ function printToStringCrossRealmChecks() {
   if (__PROBE_ENABLE_RECEIVER_CHECKS__ && !receiverWait.ok && receiverWait.timedOut) {
     __probeLogAsyncTimeout(receiverMeta, receiverWait.elapsedMs, receiverWait.timeoutMs, receiverWait.error);
   }
+  const workerScopeMeta = { check: "__PROBE__", phase: "build", method: "__probeRunWorkerScopeAudit" };
+  const workerScopeWait = await __probeAwaitWithinBudget(__probeRunWorkerScopeAudit(), workerScopeMeta);
+  if (!workerScopeWait.ok && workerScopeWait.timedOut) {
+    __probeLogAsyncTimeout(workerScopeMeta, workerScopeWait.elapsedMs, workerScopeWait.timeoutMs, workerScopeWait.error);
+  }
 
   const result = {
     ok: true,
@@ -2564,6 +2865,19 @@ function printToStringCrossRealmChecks() {
     audioOwnProperty: printAudioOwnPropertyInvariantChecks(),
     prototypeInvariants: printPrototypeInvariantChecks(),
     toStringCrossRealm: printToStringCrossRealmChecks(),
+    workerScopeAudit: workerScopeWait.ok ? workerScopeWait.value : {
+      ok: false,
+      rows: [{
+        scope: "worker_scope_audit",
+        variant: null,
+        field: "__probeRunWorkerScopeAudit",
+        match: false,
+        expected: null,
+        actual: errorShape(workerScopeWait.error)
+      }],
+      error: errorShape(workerScopeWait.error),
+      watchdogState: workerScopeWait.timedOut ? "timed_out" : "rejected"
+    },
     degrade: printLastDegradeEvents(),
     moduleCheck: printModuleCheck(),
     watchdog: {
@@ -2579,6 +2893,11 @@ function printToStringCrossRealmChecks() {
         state: __PROBE_ENABLE_RECEIVER_CHECKS__ ? (receiverWait.ok ? "resolved" : (receiverWait.timedOut ? "timed_out" : "rejected")) : "disabled",
         elapsedMs: receiverWait.elapsedMs,
         timeoutMs: receiverWait.timeoutMs
+      },
+      workerScopeAudit: {
+        state: workerScopeWait.ok ? "resolved" : (workerScopeWait.timedOut ? "timed_out" : "rejected"),
+        elapsedMs: workerScopeWait.elapsedMs,
+        timeoutMs: workerScopeWait.timeoutMs
       }
     }
   };
@@ -2624,6 +2943,7 @@ function printToStringCrossRealmChecks() {
     result.moduleCheckOk = !hasUnexpectedModule;
     result.ok = !!(
       (result.receiverChecks ? result.receiverChecks.ok !== false : true) &&
+      (result.workerScopeAudit ? result.workerScopeAudit.ok !== false : true) &&
       (result.audioOwnProperty ? result.audioOwnProperty.ok !== false : true) &&
       (result.prototypeInvariants ? result.prototypeInvariants.ok !== false : true) &&
       (result.toStringCrossRealm ? result.toStringCrossRealm.ok !== false : true) &&
