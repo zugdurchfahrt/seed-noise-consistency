@@ -120,6 +120,7 @@
     };
     verifyRollbackRepeatApply();
     const __workerNavigatorPatchedOwners__ = Object.create(null);
+    const __workerNavigatorDescriptorModes__ = Object.create(null);
     const validDpr = v => Number.isFinite(v) && v > 0;
     const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
     const LE_KEYS = ['brands','mobile','platform'];
@@ -849,8 +850,57 @@
         set: undefined
       });
       __workerNavigatorPatchedOwners__[k] = patchOwner;
+      __workerNavigatorDescriptorModes__[k] = 'patched';
       return;
 
+    };
+
+    const resolveWorkerNavigatorNativeDescriptor = (k) => {
+      const targetOwner = (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype) || proto || null;
+      if (!targetOwner) {
+        throw new Error(`UACHPatch: cannot resolve ${k} (no WorkerNavigator.prototype)`);
+      }
+      let d = null;
+      let resolvedOwner = null;
+      for (let o = targetOwner; o; o = Object.getPrototypeOf(o)) {
+        try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
+        catch (e) {
+          d = null;
+          emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
+            type: 'browser structure missing data',
+            stage: 'runtime',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'descriptor',
+            key: String(k || ''),
+            policy: 'skip',
+            action: 'native',
+            data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
+          }, e);
+        }
+        if (d) {
+          resolvedOwner = o;
+          break;
+        }
+      }
+      if (!d || !resolvedOwner) {
+        throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
+      }
+      return { owner: resolvedOwner, desc: d };
+    };
+
+    const readWorkerNavigatorNativeValue = (k) => {
+      const resolved = resolveWorkerNavigatorNativeDescriptor(k);
+      const d = resolved.desc;
+      if (d && typeof d.get === 'function') {
+        return { owner: resolved.owner, desc: d, value: d.get.call(nav) };
+      }
+      if (d
+          && Object.prototype.hasOwnProperty.call(d, 'value')
+          && !d.get
+          && !d.set) {
+        return { owner: resolved.owner, desc: d, value: d.value };
+      }
+      throw new Error(`UACHPatch: ${k} missing native getter on proto-chain`);
     };
 
     const failWorkerNavigatorSanity = (code, key, message, data) => {
@@ -868,6 +918,7 @@
       throw err;
     };
     const assertWorkerNavigatorDescriptor = (k) => {
+      const mode = __workerNavigatorDescriptorModes__[k] || null;
       const owner = __workerNavigatorPatchedOwners__[k]
         || (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype)
         || proto
@@ -904,12 +955,33 @@
       const hasGetter = typeof d.get === 'function';
       const hasValue = Object.prototype.hasOwnProperty.call(d, 'value');
       const hasOwnOnNavigator = !!Object.getOwnPropertyDescriptor(nav, k);
+      if (mode === 'native_skip') {
+        const hasDescriptorSurface = hasGetter || hasValue;
+        if (!hasDescriptorSurface || (hasGetter && hasValue) || hasOwnOnNavigator) {
+          failWorkerNavigatorSanity(
+            'worker_patch_src:workernavigator_descriptor:sanity:mismatch',
+            k,
+            `UACHPatch: ${k} descriptor shape mismatch`,
+            {
+              mode,
+              hasGetter,
+              hasSetter: typeof d.set === 'function',
+              hasValue,
+              hasOwnOnNavigator,
+              configurable: !!d.configurable,
+              enumerable: !!d.enumerable
+            }
+          );
+        }
+        return;
+      }
       if (!hasGetter || hasValue || hasOwnOnNavigator) {
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator_descriptor:sanity:mismatch',
           k,
           `UACHPatch: ${k} descriptor shape mismatch`,
           {
+            mode,
             hasGetter,
             hasSetter: typeof d.set === 'function',
             hasValue,
@@ -927,12 +999,34 @@
       if (typeof cache.snap.language !== 'string' || cache.snap.language.trim() === '') throw new Error('UACHPatch: bad language');
       return cache.snap.language;
     }, 'get language');
-    const getUserAgentData = markAsNative(function getUserAgentData(){
-      if (!nativeUAD) throw new Error('worker_patch_src: worker navigator.userAgentData missing');
-      return nativeUAD;
-    }, 'get userAgentData');
-    def(proto, 'userAgentData', getUserAgentData, true);
-    def(proto,'language', getLanguage, true);
+    {
+      const resolvedUserAgentData = resolveWorkerNavigatorNativeDescriptor('userAgentData');
+      __workerNavigatorPatchedOwners__['userAgentData'] = resolvedUserAgentData.owner;
+      __workerNavigatorDescriptorModes__['userAgentData'] = 'native_skip';
+    }
+    let __patchLanguage = true;
+    try {
+      const nativeLanguageResolved = readWorkerNavigatorNativeValue('language');
+      if (nativeLanguageResolved.value === cache.snap.language) {
+        __workerNavigatorPatchedOwners__['language'] = nativeLanguageResolved.owner;
+        __workerNavigatorDescriptorModes__['language'] = 'native_skip';
+        __patchLanguage = false;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'language',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
+      }, e);
+    }
+    if (__patchLanguage) {
+      def(proto,'language', getLanguage, true);
+    }
 
     const getLanguages = markAsNative(function getLanguages(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
@@ -961,7 +1055,34 @@
       languagesCache.frozen = out;
       return out;
     }, 'get languages');
-    def(proto,'languages', getLanguages, true);
+    let __patchLanguages = true;
+    try {
+      const nativeLanguagesResolved = readWorkerNavigatorNativeValue('languages');
+      const nativeLanguages = nativeLanguagesResolved.value;
+      const snapLanguages = cache.snap.languages;
+      if (Array.isArray(nativeLanguages)
+          && Array.isArray(snapLanguages)
+          && nativeLanguages.length === snapLanguages.length
+          && nativeLanguages.every(function(value, index) { return value === snapLanguages[index]; })) {
+        __workerNavigatorPatchedOwners__['languages'] = nativeLanguagesResolved.owner;
+        __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
+        __patchLanguages = false;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'languages',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
+      }, e);
+    }
+    if (__patchLanguages) {
+      def(proto,'languages', getLanguages, true);
+    }
 
 
     const getDeviceMemory = markAsNative(function getDeviceMemory(){
@@ -970,7 +1091,31 @@
       if (!Number.isFinite(v)) throw new Error('UACHPatch: bad deviceMemory');
       return v;
     }, 'get deviceMemory');
-    def(proto, 'deviceMemory', getDeviceMemory, true);
+    let __patchDeviceMemory = true;
+    try {
+      const nativeDeviceMemoryResolved = readWorkerNavigatorNativeValue('deviceMemory');
+      const nativeDeviceMemory = Number(nativeDeviceMemoryResolved.value);
+      const snapDeviceMemory = Number(cache.snap.deviceMemory);
+      if (Number.isFinite(nativeDeviceMemory) && Number.isFinite(snapDeviceMemory) && Object.is(nativeDeviceMemory, snapDeviceMemory)) {
+        __workerNavigatorPatchedOwners__['deviceMemory'] = nativeDeviceMemoryResolved.owner;
+        __workerNavigatorDescriptorModes__['deviceMemory'] = 'native_skip';
+        __patchDeviceMemory = false;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'deviceMemory',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
+      }, e);
+    }
+    if (__patchDeviceMemory) {
+      def(proto, 'deviceMemory', getDeviceMemory, true);
+    }
 
     const getHardwareConcurrency = markAsNative(function getHardwareConcurrency(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
@@ -978,7 +1123,31 @@
       if (!Number.isFinite(v)) throw new Error('UACHPatch: bad hardwareConcurrency');
       return v;
     }, 'get hardwareConcurrency');
-    def(proto, 'hardwareConcurrency', getHardwareConcurrency, true);
+    let __patchHardwareConcurrency = true;
+    try {
+      const nativeHardwareConcurrencyResolved = readWorkerNavigatorNativeValue('hardwareConcurrency');
+      const nativeHardwareConcurrency = Number(nativeHardwareConcurrencyResolved.value);
+      const snapHardwareConcurrency = Number(cache.snap.hardwareConcurrency);
+      if (Number.isFinite(nativeHardwareConcurrency) && Number.isFinite(snapHardwareConcurrency) && Object.is(nativeHardwareConcurrency, snapHardwareConcurrency)) {
+        __workerNavigatorPatchedOwners__['hardwareConcurrency'] = nativeHardwareConcurrencyResolved.owner;
+        __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
+        __patchHardwareConcurrency = false;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'hardwareConcurrency',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
+      }, e);
+    }
+    if (__patchHardwareConcurrency) {
+      def(proto, 'hardwareConcurrency', getHardwareConcurrency, true);
+    }
     assertWorkerNavigatorDescriptor('userAgentData');
     assertWorkerNavigatorDescriptor('language');
     assertWorkerNavigatorDescriptor('languages');
