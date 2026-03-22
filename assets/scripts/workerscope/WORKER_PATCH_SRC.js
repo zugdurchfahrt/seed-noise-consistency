@@ -19,7 +19,7 @@
   let __uachMirrorInstalled__ = false;
   const __rollbackProbeRoot__ = Object.create(null);
 
-  const __installWorkerUACHMirror__ = async function installWorkerUACHMirror(){
+  const __installWorkerUACHMirror__ = function installWorkerUACHMirror(){
     if (__uachMirrorInstalled__) {
       throw new Error('UACHPatch: already installed');
     }
@@ -124,7 +124,6 @@
     const validDpr = v => Number.isFinite(v) && v > 0;
     const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
     const LE_KEYS = ['brands','mobile','platform'];
-    const ALL_KEYS = new Set(HE_KEYS.concat(LE_KEYS));
     const requireSnap = (s, where) => {
       if (!s || typeof s !== 'object') {
         const msg = where ? `UACHPatch: no snapshot (${where})` : 'UACHPatch: no snapshot';
@@ -147,7 +146,7 @@
         const v = he[k];
         if (v === undefined || v === null) throw new Error(`UACHPatch: bad highEntropy.${k}`);
         // if (typeof v === 'string' && !v) throw new Error(`UACHPatch: bad highEntropy.${k}`);
-        if (typeof v === 'string' && !v && k !== 'model') throw new Error(`UACHPatch: bad highEntropy.${k}`);
+        if (typeof v === 'string' && !v && k !== 'model' && k !== 'uaFullVersion') throw new Error(`UACHPatch: bad highEntropy.${k}`);
         if (Array.isArray(v) && !v.length) throw new Error(`UACHPatch: bad highEntropy.${k}`);
       }
       return s;
@@ -646,6 +645,7 @@
             }, null);
             return Reflect.apply(origGHEV, this, [keys]);
           }
+          const nativeOut = Reflect.apply(origGHEV, this, [keys]);
           for (const k of keys) {
             if (typeof k !== 'string' || !k) {
               emitDegrade('error', 'worker_patch_src:get_high_entropy_values_bad_hint', {
@@ -656,11 +656,19 @@
                 type: 'pipeline missing data',
                 data: { outcome: 'return', reason: 'bad_hint' }
               }, null);
-              if (typeof origGHEV === 'function') {
-                return Reflect.apply(origGHEV, this, [keys]);
-              }
-              throw new TypeError('Failed to execute \'getHighEntropyValues\' on \'NavigatorUAData\': invalid hint');
+              return nativeOut;
             }
+          }
+          if (!nativeOut || typeof nativeOut.then !== 'function') {
+            emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_promise_contract_failed', {
+              stage: 'runtime',
+              surface: 'WorkerNavigatorUAData',
+              key: 'getHighEntropyValues',
+              message: 'promise contract failed',
+              type: 'pipeline missing data',
+              data: { outcome: 'return', reason: 'promise_contract_failed' }
+            }, null);
+            return origGHEV.call(this, keys);
           }
           const s = cache.snap;
           const le = s.uaData;
@@ -682,11 +690,7 @@
             wow64: src.wow64,
             formFactors: src.formFactors
           };
-          const out = {
-            brands: deep(le.brands),
-            mobile: le.mobile,
-            platform: le.platform
-          };
+          const out = {};
           for (const k of keys) {
             const v = map[k];
             if (v === undefined || v === null || (typeof v === 'string' && !v && k !== 'model') || (Array.isArray(v) && !v.length)) {
@@ -694,7 +698,29 @@
             }
             out[k] = deep(v);
           }
-          return Promise.resolve(out);
+          return nativeOut.then(function workerGetHighEntropyValuesPost(nativeResolved) {
+            try {
+              const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : null;
+              if (!base) {
+                return Object.keys(out).length ? Object.assign({}, out) : nativeResolved;
+              }
+              const merged = Object.assign({}, base);
+              for (const k of Object.keys(out)) {
+                merged[k] = out[k];
+              }
+              return merged;
+            } catch (e) {
+              emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_hooks_post_failed', {
+                stage: 'runtime',
+                surface: 'WorkerNavigatorUAData',
+                key: 'getHighEntropyValues',
+                message: 'getHighEntropyValues hooksPost failed',
+                type: 'pipeline missing data',
+                data: { outcome: 'return', reason: 'hooks_post_failed' }
+              }, e);
+              return nativeResolved;
+            }
+          });
         } catch (e) {
           emitDegrade('error', 'worker_patch_src:get_high_entropy_values_failed', {
             stage: 'runtime',
@@ -1460,41 +1486,71 @@
         { actual: sanityFullVersionList, expected: cache.snap.uaData.he.fullVersionList }
       );
     }
-    const sanityHe = await sanityUAD.getHighEntropyValues(['platformVersion','fullVersionList','architecture','bitness','model','wow64','formFactors']);
-    const expectedHe = cache.snap.uaData && cache.snap.uaData.he ? cache.snap.uaData.he : null;
-    if (!expectedHe || typeof expectedHe !== 'object') {
-      failWorkerNavigatorSanity(
-        'worker_patch_src:workernavigator:sanity:mismatch',
-        'userAgentData.getHighEntropyValues',
-        'UACHPatch: high entropy snapshot missing',
-        { actual: sanityHe, expected: expectedHe }
-      );
-    }
-    const sanityHeProjection = {
-      platformVersion: sanityHe && sanityHe.platformVersion,
-      fullVersionList: sanityHe && sanityHe.fullVersionList,
-      architecture: sanityHe && sanityHe.architecture,
-      bitness: sanityHe && sanityHe.bitness,
-      model: sanityHe && sanityHe.model,
-      wow64: sanityHe && sanityHe.wow64,
-      formFactors: sanityHe && sanityHe.formFactors
-    };
-    const expectedHeProjection = {
-      platformVersion: expectedHe.platformVersion,
-      fullVersionList: expectedHe.fullVersionList,
-      architecture: expectedHe.architecture,
-      bitness: expectedHe.bitness,
-      model: expectedHe.model,
-      wow64: expectedHe.wow64,
-      formFactors: expectedHe.formFactors
-    };
-    if (!sameJson(sanityHeProjection, expectedHeProjection)) {
-      failWorkerNavigatorSanity(
-        'worker_patch_src:workernavigator:sanity:mismatch',
-        'userAgentData.getHighEntropyValues',
-        'UACHPatch: high entropy mismatch',
-        { actual: sanityHeProjection, expected: expectedHeProjection }
-      );
+    try {
+      const expectedHe = cache.snap.uaData && cache.snap.uaData.he ? cache.snap.uaData.he : null;
+      const sanityHePromise = sanityUAD.getHighEntropyValues(['platformVersion','fullVersionList','architecture','bitness','model','wow64','formFactors']);
+      if (!sanityHePromise || typeof sanityHePromise.then !== 'function') {
+        failWorkerNavigatorSanity(
+          'worker_patch_src:workernavigator:sanity:mismatch',
+          'userAgentData.getHighEntropyValues',
+          'UACHPatch: high entropy promise contract failed',
+          { actual: sanityHePromise, expected: expectedHe }
+        );
+      }
+      sanityHePromise.then(function(sanityHe) {
+        if (!expectedHe || typeof expectedHe !== 'object') {
+          failWorkerNavigatorSanity(
+            'worker_patch_src:workernavigator:sanity:mismatch',
+            'userAgentData.getHighEntropyValues',
+            'UACHPatch: high entropy snapshot missing',
+            { actual: sanityHe, expected: expectedHe }
+          );
+        }
+        const sanityHeProjection = {
+          platformVersion: sanityHe && sanityHe.platformVersion,
+          fullVersionList: sanityHe && sanityHe.fullVersionList,
+          architecture: sanityHe && sanityHe.architecture,
+          bitness: sanityHe && sanityHe.bitness,
+          model: sanityHe && sanityHe.model,
+          wow64: sanityHe && sanityHe.wow64,
+          formFactors: sanityHe && sanityHe.formFactors
+        };
+        const expectedHeProjection = {
+          platformVersion: expectedHe.platformVersion,
+          fullVersionList: expectedHe.fullVersionList,
+          architecture: expectedHe.architecture,
+          bitness: expectedHe.bitness,
+          model: expectedHe.model,
+          wow64: expectedHe.wow64,
+          formFactors: expectedHe.formFactors
+        };
+        if (!sameJson(sanityHeProjection, expectedHeProjection)) {
+          failWorkerNavigatorSanity(
+            'worker_patch_src:workernavigator:sanity:mismatch',
+            'userAgentData.getHighEntropyValues',
+            'UACHPatch: high entropy mismatch',
+            { actual: sanityHeProjection, expected: expectedHeProjection }
+          );
+        }
+      }).catch(function(e) {
+        emitDegrade('warn', 'worker_patch_src:gethighentropyvalues:sanity:failed', {
+          stage: 'runtime',
+          surface: 'WorkerNavigatorUAData',
+          key: 'getHighEntropyValues',
+          message: 'getHighEntropyValues sanity failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'gethighentropyvalues_sanity_failed' }
+        }, e);
+      });
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:gethighentropyvalues:sanity:failed', {
+        stage: 'runtime',
+        surface: 'WorkerNavigatorUAData',
+        key: 'getHighEntropyValues',
+        message: 'getHighEntropyValues sanity failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'gethighentropyvalues_sanity_failed' }
+      }, e);
     }
     __uachMirrorInstalled__ = true;
 

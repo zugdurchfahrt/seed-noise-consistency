@@ -959,7 +959,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
         await import(PATCH_URL);
         const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-        await installWorkerUACHMirror();
+        installWorkerUACHMirror();
         __patchOK = true;
       } catch (e) {
         __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
@@ -1333,7 +1333,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
         importScripts(PATCH_URL);
         const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-        await installWorkerUACHMirror();
+        installWorkerUACHMirror();
         __patchOK = true;
       } catch (e) {
         __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
