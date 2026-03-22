@@ -647,6 +647,55 @@ def init_driver(
     logger.info("WORKER_PATCH_SRC.initated")
     set_reflect = Path(SCRIPTS_WORKERSCOPE / "set_reflect.js").read_text("utf-8")
 
+    worker_bootstrap_env_js = f"""
+    (() => {{
+        const bridgeDesc = Object.getOwnPropertyDescriptor(window, '__ENV_BRIDGE__');
+        let BR = bridgeDesc ? (('value' in bridgeDesc) ? bridgeDesc.value : window.__ENV_BRIDGE__) : window.__ENV_BRIDGE__;
+        if (BR == null) {{
+            BR = {{}};
+            Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                value: BR,
+                writable: true,
+                configurable: true,
+                enumerable: false
+            }});
+        }} else if (typeof BR !== 'object') {{
+            throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+        }} else if (bridgeDesc && bridgeDesc.enumerable !== false) {{
+            if (bridgeDesc.configurable === false) throw new Error('WorkerBootstrap: __ENV_BRIDGE__ non-configurable enumerable');
+            if ('value' in bridgeDesc) {{
+                Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                    value: BR,
+                    writable: !!bridgeDesc.writable,
+                    configurable: true,
+                    enumerable: false
+                }});
+            }} else {{
+                Object.defineProperty(window, '__ENV_BRIDGE__', {{
+                    get: bridgeDesc.get,
+                    set: bridgeDesc.set,
+                    configurable: true,
+                    enumerable: false
+                }});
+            }}
+        }}
+        if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
+        const core = {json.dumps(core)};
+        const set_reflect = {json.dumps(set_reflect)};
+        if (!BR.inlinePatch) {{
+            BR.inlinePatch = core;
+        }} else if (BR.inlinePatch !== core) {{
+            throw new Error('WorkerBootstrap: inlinePatch already set');
+        }}
+        if (!BR.inlineReflect) {{
+            BR.inlineReflect = set_reflect;
+        }} else if (BR.inlineReflect !== set_reflect) {{
+            throw new Error('WorkerBootstrap: inlineReflect already set');
+        }}
+    }})();
+    //# sourceURL=worker_bootstrap_env.js
+    """
+
     worker_bootstrap_js = f"""
     (() => {{
         const __WORKER_PATCH_INLINE_SRC__ = {json.dumps(core)};
@@ -656,9 +705,14 @@ def init_driver(
     //# sourceURL=worker_bootstrap_bundle.js
     """
 
-    # Publish worker patch bootstrap first:
-    # - worker_bootstrap.js closes over inline sources and prepares worker patch URLs
-    # This order avoids a transient state where Worker overrides exist but bootstrap URLs aren't ready yet.
+    # Publish worker patch carrier first:
+    # - worker_bootstrap_env_js sets __ENV_BRIDGE__.inlinePatch/__ENV_BRIDGE__.inlineReflect
+    # This restores a stable shared carrier across script boundaries.
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
+
+    # Publish worker patch bootstrap next:
+    # - worker_bootstrap.js reads stable carrier and still has inline fallback
+    # This preserves existing bootstrap URL preparation while restoring old transport semantics.
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
     # Connect page_js (core + targets + wrk.js and so on)

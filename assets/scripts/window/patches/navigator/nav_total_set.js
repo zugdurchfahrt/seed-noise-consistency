@@ -167,6 +167,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       return value;
     }
+    function __navSetHiddenStateValue(target, key, value) {
+      if (!target || (typeof target !== 'object' && typeof target !== 'function')) return value;
+      const prev = Object.getOwnPropertyDescriptor(target, key);
+      if (prev && prev.configurable === false) {
+        if (Object.prototype.hasOwnProperty.call(prev, 'value')) return prev.value;
+        return value;
+      }
+      Object.defineProperty(target, key, {
+        value: value,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      return value;
+    }
     let __navProfileState = (__navModuleState.__PROFILE_STATE__ && typeof __navModuleState.__PROFILE_STATE__ === 'object')
       ? __navModuleState.__PROFILE_STATE__
       : null;
@@ -238,39 +253,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     const __navLangState = (__stateRoot && __stateRoot.__LANG_STATE__ && typeof __stateRoot.__LANG_STATE__ === 'object')
       ? __stateRoot.__LANG_STATE__
-      : null;
+      : ((C && C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') ? C.__LANG_STATE__ : null);
     const __navScreenState = (__stateRoot && __stateRoot.__SCREEN__ && typeof __stateRoot.__SCREEN__ === 'object')
       ? __stateRoot.__SCREEN__
       : null;
     const __navPrimaryLanguage = (__navLangState && typeof __navLangState.primaryLanguage === 'string' && __navLangState.primaryLanguage)
       ? __navLangState.primaryLanguage
-      : null;
+      : ((typeof window.__primaryLanguage === 'string' && window.__primaryLanguage) ? window.__primaryLanguage : null);
     const __navNormalizedLanguages = (__navLangState && Array.isArray(__navLangState.normalizedLanguages))
       ? __navLangState.normalizedLanguages.slice()
-      : null;
-    const __navEnvProfile = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
-      ? __stateRoot.__ENV_PROFILE__
-      : null;
-    if (!__navLangState) {
-      __navDiagPipeline('error', 'nav_total_set:lang_state_missing', {
-        stage: 'preflight',
-        key: 'CanvasPatchContext.state.__LANG_STATE__',
-        message: 'CanvasPatchContext.state.__LANG_STATE__ missing',
-        data: { outcome: 'skip', reason: 'lang_state_missing' }
-      });
-      __navReleaseEntryGuard(true, 'preflight', 'lang_state_missing');
-      return;
-    }
-    if (!__navEnvProfile) {
-      __navDiagPipeline('error', 'nav_total_set:env_profile_missing', {
-        stage: 'preflight',
-        key: 'CanvasPatchContext.state.__ENV_PROFILE__',
-        message: 'CanvasPatchContext.state.__ENV_PROFILE__ missing',
-        data: { outcome: 'skip', reason: 'env_profile_missing' }
-      });
-      __navReleaseEntryGuard(true, 'preflight', 'env_profile_missing');
-      return;
-    }
+      : (Array.isArray(window.__normalizedLanguages) ? __navCloneStateValue(window.__normalizedLanguages) : null);
     if (Array.isArray(__navNormalizedLanguages)) {
       try {
         Object.freeze(__navNormalizedLanguages);
@@ -303,30 +295,32 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     try {
-    __navProfileState.meta = __navCloneStateValue((typeof __navEnvProfile.meta === 'object') ? __navEnvProfile.meta : null);
-    __navProfileState.navPlat = __navEnvProfile.navPlat;
-    __navProfileState.generatedPlatform = __navEnvProfile.generatedPlatform;
-    __navProfileState.generatedPlatformVersion = __navEnvProfile.generatedPlatformVersion;
-    __navProfileState.userAgent = __navEnvProfile.userAgent;
-    __navProfileState.vendor = __navEnvProfile.vendor;
-    __navProfileState.mem = Number(__navEnvProfile.mem);
-    __navProfileState.cpu = Number(__navEnvProfile.cpu);
-    __navProfileState.dpr = Number(__navEnvProfile.dpr);
-    __navProfileState.width = Number(__navEnvProfile.width);
-    __navProfileState.height = Number(__navEnvProfile.height);
-    __navProfileState.devicesLabels = __navCloneStateValue(__navEnvProfile.devicesLabels);
-    __navProfileState.colorDepth = Number(__navEnvProfile.colorDepth);
-    __navProfileState.orientationDom = (typeof __navEnvProfile.orientationDom !== 'undefined')
-      ? __navEnvProfile.orientationDom
+    __navProfileState.meta = __navCloneStateValue(window.__EXPECTED_CLIENT_HINTS || {});
+    __navProfileState.navPlat = window.__NAV_PLATFORM__;
+    __navProfileState.generatedPlatform = window.__GENERATED_PLATFORM;
+    __navProfileState.generatedPlatformVersion = window.__GENERATED_PLATFORM_VERSION;
+    __navProfileState.userAgent = window.__USER_AGENT;
+    __navProfileState.vendor = window.__VENDOR;
+    __navProfileState.mem = Number(window.__memory);
+    __navProfileState.cpu = Number(window.__cpu);
+    __navProfileState.dpr = Number(window.__DPR);
+    __navProfileState.width = Number(window.__WIDTH ?? (window.screen && window.screen.width));
+    __navProfileState.height = Number(window.__HEIGHT ?? (window.screen && window.screen.height));
+    __navProfileState.devicesLabels = __navCloneStateValue(window.__DEVICES_LABELS);
+    __navProfileState.colorDepth = Number(window.__COLOR_DEPTH);
+    __navProfileState.orientationDom = (typeof window.__ORIENTATION !== 'undefined')
+      ? window.__ORIENTATION
       : ((__navScreenState && typeof __navScreenState.orientationDom === 'string' && __navScreenState.orientationDom)
         ? __navScreenState.orientationDom
         : (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary'));
-    __navProfileState.strict = !!__navEnvProfile.strict;
-    __navProfileState.debug = !!__navEnvProfile.debug;
-    __navProfileState.fullVersionList = __navCloneStateValue(__navEnvProfile.fullVersionList);
-    __navProfileState.storageQuotaMb = __navEnvProfile.storageQuotaMb;
-    __navProfileState.storageUsedPct = __navEnvProfile.storageUsedPct;
-    __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(__navEnvProfile.pluginProfiles) ? __navEnvProfile.pluginProfiles : []);
+    __navProfileState.strict = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
+    __navProfileState.debug = !!window.__NAV_PATCH_DEBUG__;
+    __navProfileState.fullVersionList = __navCloneStateValue(window.__FULL_VERSION_LIST);
+    __navProfileState.storageQuotaMb = window.__STORAGE_QUOTA_MB;
+    __navProfileState.storageUsedPct = window.__STORAGE_USED_PCT;
+    __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(window.__PLUGIN_PROFILES__) ? window.__PLUGIN_PROFILES__ : []);
+    __navProfileState.primaryLanguage = __navPrimaryLanguage;
+    __navProfileState.normalizedLanguages = __navCloneStateValue(__navNormalizedLanguages);
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
     const meta          = __navProfileState.meta || {};
@@ -507,6 +501,89 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'colorDepth missing',
         data: { colorDepth: colorDepth }
       });
+    }
+
+    function publishWorkerEnvSnapshot() {
+      function assert(cond, message) {
+        if (!cond) throw new Error(message);
+      }
+      function isBrandList(value) {
+        if (!Array.isArray(value) || !value.length) return false;
+        for (let i = 0; i < value.length; i++) {
+          const item = value[i];
+          if (!item || typeof item !== 'object') return false;
+          if (typeof item.brand !== 'string' || !item.brand) return false;
+          if (typeof item.version !== 'string' || !item.version) return false;
+        }
+        return true;
+      }
+      function isStringArray(value, allowEmpty) {
+        if (!Array.isArray(value)) return false;
+        if (!allowEmpty && !value.length) return false;
+        for (let i = 0; i < value.length; i++) {
+          if (typeof value[i] !== 'string' || !value[i]) return false;
+        }
+        return true;
+      }
+      try {
+        const packetMeta = (__navProfileState.meta && typeof __navProfileState.meta === 'object')
+          ? __navProfileState.meta
+          : null;
+        assert(packetMeta, 'worker_env_snapshot.meta missing');
+        const packet = {
+          ua: __navProfileState.userAgent,
+          vendor: __navProfileState.vendor,
+          language: __navProfileState.primaryLanguage || packetMeta.language,
+          languages: __navCloneStateValue(__navProfileState.normalizedLanguages || packetMeta.languages),
+          deviceMemory: __navProfileState.mem,
+          hardwareConcurrency: __navProfileState.cpu,
+          uaData: {
+            brands: __navCloneStateValue(packetMeta.brands),
+            mobile: packetMeta.mobile,
+            platform: packetMeta.platform || __navProfileState.generatedPlatform,
+            he: {
+              architecture: packetMeta.architecture,
+              bitness: packetMeta.bitness,
+              model: packetMeta.model,
+              platformVersion: packetMeta.platformVersion || __navProfileState.generatedPlatformVersion,
+              fullVersionList: __navCloneStateValue(packetMeta.fullVersionList != null ? packetMeta.fullVersionList : __navProfileState.fullVersionList),
+              wow64: packetMeta.wow64,
+              formFactors: __navCloneStateValue(packetMeta.formFactors)
+            }
+          }
+        };
+        assert(typeof packet.ua === 'string' && packet.ua, 'worker_env_snapshot.ua missing');
+        assert(typeof packet.vendor === 'string', 'worker_env_snapshot.vendor missing');
+        assert(typeof packet.language === 'string' && packet.language, 'worker_env_snapshot.language missing');
+        assert(isStringArray(packet.languages, false), 'worker_env_snapshot.languages missing');
+        assert(__navIsValidDeviceMemoryValue(packet.deviceMemory), 'worker_env_snapshot.deviceMemory missing');
+        assert(__navIsValidHardwareConcurrencyValue(packet.hardwareConcurrency), 'worker_env_snapshot.hardwareConcurrency missing');
+        assert(isBrandList(packet.uaData.brands), 'worker_env_snapshot.uaData.brands missing');
+        assert(typeof packet.uaData.mobile === 'boolean', 'worker_env_snapshot.uaData.mobile missing');
+        assert(typeof packet.uaData.platform === 'string' && packet.uaData.platform, 'worker_env_snapshot.uaData.platform missing');
+        assert(typeof packet.uaData.he === 'object' && !!packet.uaData.he, 'worker_env_snapshot.uaData.he missing');
+        assert(typeof packet.uaData.he.architecture === 'string' && packet.uaData.he.architecture, 'worker_env_snapshot.uaData.he.architecture missing');
+        assert(typeof packet.uaData.he.bitness === 'string' && packet.uaData.he.bitness, 'worker_env_snapshot.uaData.he.bitness missing');
+        assert(typeof packet.uaData.he.model === 'string', 'worker_env_snapshot.uaData.he.model missing');
+        assert(typeof packet.uaData.he.platformVersion === 'string' && packet.uaData.he.platformVersion, 'worker_env_snapshot.uaData.he.platformVersion missing');
+        assert(isBrandList(packet.uaData.he.fullVersionList), 'worker_env_snapshot.uaData.he.fullVersionList missing');
+        assert(typeof packet.uaData.he.wow64 === 'boolean', 'worker_env_snapshot.uaData.he.wow64 missing');
+        assert(isStringArray(packet.uaData.he.formFactors, false), 'worker_env_snapshot.uaData.he.formFactors missing');
+        __navSetHiddenStateValue(__navProfileState, '__WORKER_ENV_SNAPSHOT__', __navCloneStateValue(packet));
+      } catch (e) {
+        try {
+          const own = Object.getOwnPropertyDescriptor(__navProfileState, '__WORKER_ENV_SNAPSHOT__');
+          if (own && own.configurable) delete __navProfileState.__WORKER_ENV_SNAPSHOT__;
+        } catch (_) {}
+        __navDiag('error', 'nav_total_set:worker_env_snapshot_invalid', {
+          stage: 'apply',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set',
+          key: '__WORKER_ENV_SNAPSHOT__',
+          message: 'worker env snapshot invalid',
+          data: { outcome: 'throw', reason: 'worker_env_snapshot_invalid' }
+        }, e);
+      }
     }
 
     // ——— B. Safe helpers ———
@@ -2588,6 +2665,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       });
     }
+    publishWorkerEnvSnapshot();
     __navDiag('info', 'nav_total_set:applied', {
       stage: 'apply',
       type: __navTypePipeline,
