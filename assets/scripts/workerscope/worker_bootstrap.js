@@ -121,7 +121,10 @@
       ? hooksRoot.WorkerPatchHooks
       : null;
     if (ownedHooks) return ownedHooks;
-    return null;
+    const globalHooks = (W && W.WorkerPatchHooks && typeof W.WorkerPatchHooks === 'object' && typeof W.WorkerPatchHooks.initAll === 'function')
+      ? W.WorkerPatchHooks
+      : null;
+    return globalHooks ? __captureWorkerPatchHooks(globalHooks) : null;
   }
 
   function __resolveInlineWorkerSources() {
@@ -424,31 +427,46 @@
     if (__resolveWorkerPatchHooks()) {
       boot();
     } else {
-      let __hooksWaitAttempts = 0;
-      const __hooksWaitMaxAttempts = 200;
-      const __hooksWaitDelayMs = 10;
-      const __pollWorkerPatchHooks = function() {
-        const hooks = __resolveWorkerPatchHooks();
-        if (hooks) {
-          boot();
-          return;
-        }
-        __hooksWaitAttempts += 1;
-        if (__hooksWaitAttempts >= __hooksWaitMaxAttempts) {
-          __moduleDiag('warn', __MODULE + ':hooks_missing', {
+      let _h;
+      Object.defineProperty(W, 'WorkerPatchHooks', {
+        configurable: true,
+        get() { return _h; },
+        set(v) {
+          _h = v;
+
+          // one-shot: accept the first valid hooks object, run boot(), then replace accessor
+          // with a plain value property to prevent re-entry in the same document.
+          if (v && typeof v === 'object' && typeof v.initAll === 'function') {
+            try {
+              __captureWorkerPatchHooks(v);
+              Object.defineProperty(W, 'WorkerPatchHooks', {
+                value: v,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
+            } catch (e) {
+              __moduleDiag('warn', __MODULE + ':hooks_lock_failed', {
+                stage: 'guard',
+                key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
+                message: 'failed to lock WorkerPatchHooks to plain property',
+                type: 'browser structure missing data',
+                data: { outcome: 'skip', reason: 'hooks_lock_failed' }
+              }, e);
+            }
+            boot();
+            return;
+          }
+
+          __moduleDiag('warn', __MODULE + ':hooks_invalid', {
             stage: 'preflight',
             key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
-            message: 'WorkerPatchHooks missing after bounded wait',
+            message: 'WorkerPatchHooks set to invalid value; waiting for valid initAll',
             type: 'pipeline missing data',
-            data: { outcome: 'skip', reason: 'hooks_missing' }
+            data: { outcome: 'skip', reason: 'hooks_invalid' }
           }, null);
-          __syncWorkerBootstrapState({ initRequested: false, initStatus: 'skipped', initReason: 'hooks_missing' });
-          __releaseGuard(__guardToken, true);
-          return;
         }
-        setTimeout(__pollWorkerPatchHooks, __hooksWaitDelayMs);
-      };
-      __pollWorkerPatchHooks();
+      });
     }
   } catch (e) {
     __moduleDiag('error', __MODULE + ':fatal', {
