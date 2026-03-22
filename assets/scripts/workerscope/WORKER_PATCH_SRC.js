@@ -19,7 +19,7 @@
   let __uachMirrorInstalled__ = false;
   const __rollbackProbeRoot__ = Object.create(null);
 
-  const __installWorkerUACHMirror__ = function installWorkerUACHMirror(){
+  const __installWorkerUACHMirror__ = async function installWorkerUACHMirror(){
     if (__uachMirrorInstalled__) {
       throw new Error('UACHPatch: already installed');
     }
@@ -55,15 +55,15 @@
             },
         type: x.type
       };
+      if (relayDiag) {
+        relayDiag(level, code, normalizedCtx, err || null);
+      }
       if (d) {
         if (typeof d.diag === "function") {
           d.diag(level, code, normalizedCtx, err || null);
         } else {
           d(code, err || null, Object.assign({}, normalizedCtx, { level: level || 'info' }));
         }
-      }
-      if (relayDiag) {
-        relayDiag(level, code, normalizedCtx, err || null);
       }
     };
     const appliedDescriptors = [];
@@ -646,7 +646,6 @@
             }, null);
             return Reflect.apply(origGHEV, this, [keys]);
           }
-          const nativeOut = Reflect.apply(origGHEV, this, [keys]);
           for (const k of keys) {
             if (typeof k !== 'string' || !k) {
               emitDegrade('error', 'worker_patch_src:get_high_entropy_values_bad_hint', {
@@ -657,19 +656,11 @@
                 type: 'pipeline missing data',
                 data: { outcome: 'return', reason: 'bad_hint' }
               }, null);
-              return nativeOut;
+              if (typeof origGHEV === 'function') {
+                return Reflect.apply(origGHEV, this, [keys]);
+              }
+              throw new TypeError('Failed to execute \'getHighEntropyValues\' on \'NavigatorUAData\': invalid hint');
             }
-          }
-          if (!nativeOut || typeof nativeOut.then !== 'function') {
-            emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_promise_contract_failed', {
-              stage: 'runtime',
-              surface: 'WorkerNavigatorUAData',
-              key: 'getHighEntropyValues',
-              message: 'promise contract failed',
-              type: 'pipeline missing data',
-              data: { outcome: 'return', reason: 'promise_contract_failed' }
-            }, null);
-            return origGHEV.call(this, keys);
           }
           const s = cache.snap;
           const le = s.uaData;
@@ -691,7 +682,11 @@
             wow64: src.wow64,
             formFactors: src.formFactors
           };
-          const out = {};
+          const out = {
+            brands: deep(le.brands),
+            mobile: le.mobile,
+            platform: le.platform
+          };
           for (const k of keys) {
             const v = map[k];
             if (v === undefined || v === null || (typeof v === 'string' && !v && k !== 'model') || (Array.isArray(v) && !v.length)) {
@@ -699,39 +694,16 @@
             }
             out[k] = deep(v);
           }
-          return nativeOut.then(function workerGetHighEntropyValuesPost(nativeResolved) {
-            try {
-              const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : null;
-              if (!base) {
-                return Object.keys(out).length ? Object.assign({}, out) : nativeResolved;
-              }
-              const merged = Object.assign({}, base);
-              for (const k of Object.keys(out)) {
-                merged[k] = out[k];
-              }
-              return merged;
-            } catch (e) {
-              emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_hooks_post_failed', {
-                stage: 'runtime',
-                surface: 'WorkerNavigatorUAData',
-                key: 'getHighEntropyValues',
-                message: 'getHighEntropyValues hooksPost failed',
-                type: 'pipeline missing data',
-                data: { outcome: 'return', reason: 'hooks_post_failed' }
-              }, e);
-              return nativeResolved;
-            }
-          });
+          return Promise.resolve(out);
         } catch (e) {
-          emitDegrade('warn', 'worker_patch_src:get_high_entropy_values_native_fallback', {
+          emitDegrade('error', 'worker_patch_src:get_high_entropy_values_failed', {
             stage: 'runtime',
             surface: 'WorkerNavigatorUAData',
             key: 'getHighEntropyValues',
-            message: 'getHighEntropyValues fallback to native',
+            message: 'getHighEntropyValues failed',
             type: 'pipeline missing data',
-            data: { outcome: 'skip', reason: 'get_high_entropy_values_native_fallback' }
+            data: { outcome: 'throw', reason: 'get_high_entropy_values_failed' }
           }, e);
-          if (typeof origGHEV === 'function') return origGHEV.call(this, keys);
           throw e;
         }
       }, 'getHighEntropyValues');
@@ -916,6 +888,13 @@
         data: data || null
       }, err);
       throw err;
+    };
+    const sameJson = (left, right) => {
+      try {
+        return JSON.stringify(left) === JSON.stringify(right);
+      } catch (_) {
+        return false;
+      }
     };
     const assertWorkerNavigatorDescriptor = (k) => {
       const mode = __workerNavigatorDescriptorModes__[k] || null;
@@ -1421,6 +1400,100 @@
         'hardwareConcurrency',
         'UACHPatch: hardwareConcurrency mismatch',
         { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
+      );
+    }
+    const sanityUAD = self.navigator && self.navigator.userAgentData;
+    if (!sanityUAD || typeof sanityUAD !== 'object') {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'userAgentData',
+        'UACHPatch: userAgentData missing',
+        { actual: sanityUAD, expected: cache.snap.uaData }
+      );
+    }
+    if (!sameJson(sanityUAD.brands, cache.snap.uaData.brands)) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'userAgentData.brands',
+        'UACHPatch: brands mismatch',
+        { actual: sanityUAD.brands, expected: cache.snap.uaData.brands }
+      );
+    }
+    if (sanityUAD.mobile !== cache.snap.uaData.mobile) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'userAgentData.mobile',
+        'UACHPatch: mobile mismatch',
+        { actual: sanityUAD.mobile, expected: cache.snap.uaData.mobile }
+      );
+    }
+    if (sanityUAD.platform !== cache.snap.uaData.platform) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'userAgentData.platform',
+        'UACHPatch: platform mismatch',
+        { actual: sanityUAD.platform, expected: cache.snap.uaData.platform }
+      );
+    }
+    let directFullVersionListAvailable = false;
+    let sanityFullVersionList = null;
+    try {
+      directFullVersionListAvailable = ('fullVersionList' in sanityUAD);
+      if (directFullVersionListAvailable) {
+        sanityFullVersionList = sanityUAD.fullVersionList;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:fullversionlist:sanity:read_failed', {
+        stage: 'runtime',
+        surface: 'WorkerNavigatorUAData',
+        key: 'fullVersionList',
+        message: 'fullVersionList sanity read failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'fullversionlist_sanity_read_failed' }
+      }, e);
+    }
+    if (directFullVersionListAvailable && !sameJson(sanityFullVersionList, cache.snap.uaData.he.fullVersionList)) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'userAgentData.fullVersionList',
+        'UACHPatch: fullVersionList mismatch',
+        { actual: sanityFullVersionList, expected: cache.snap.uaData.he.fullVersionList }
+      );
+    }
+    const sanityHe = await sanityUAD.getHighEntropyValues(['platformVersion','fullVersionList','architecture','bitness','model','wow64','formFactors']);
+    const expectedHe = cache.snap.uaData && cache.snap.uaData.he ? cache.snap.uaData.he : null;
+    if (!expectedHe || typeof expectedHe !== 'object') {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'userAgentData.getHighEntropyValues',
+        'UACHPatch: high entropy snapshot missing',
+        { actual: sanityHe, expected: expectedHe }
+      );
+    }
+    const sanityHeProjection = {
+      platformVersion: sanityHe && sanityHe.platformVersion,
+      fullVersionList: sanityHe && sanityHe.fullVersionList,
+      architecture: sanityHe && sanityHe.architecture,
+      bitness: sanityHe && sanityHe.bitness,
+      model: sanityHe && sanityHe.model,
+      wow64: sanityHe && sanityHe.wow64,
+      formFactors: sanityHe && sanityHe.formFactors
+    };
+    const expectedHeProjection = {
+      platformVersion: expectedHe.platformVersion,
+      fullVersionList: expectedHe.fullVersionList,
+      architecture: expectedHe.architecture,
+      bitness: expectedHe.bitness,
+      model: expectedHe.model,
+      wow64: expectedHe.wow64,
+      formFactors: expectedHe.formFactors
+    };
+    if (!sameJson(sanityHeProjection, expectedHeProjection)) {
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'userAgentData.getHighEntropyValues',
+        'UACHPatch: high entropy mismatch',
+        { actual: sanityHeProjection, expected: expectedHeProjection }
       );
     }
     __uachMirrorInstalled__ = true;

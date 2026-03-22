@@ -10,11 +10,21 @@ const WrkModule = function WrkModule(window) {
   const __SURFACE = 'wrk';
   const __tag = 'wrk';
   const __flagKey = '__PATCH_WRK__';
-  const __D = G && G.__DEGRADE__;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+  function __resolveWrkDegrade__() {
+    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+      ? G.CanvasPatchContext
+      : null;
+    const L = (C && C.__logger && typeof C.__logger === 'object')
+      ? C.__logger
+      : null;
+    if (L && typeof L.__DEGRADE__ === 'function') return L.__DEGRADE__;
+    return (G && typeof G.__DEGRADE__ === 'function') ? G.__DEGRADE__ : null;
+  }
 
   function __wrkEmit(level, code, ctx, err) {
     try {
+      const __D = __resolveWrkDegrade__();
+      const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
       if (__diag) return __diag(level, code, ctx, err);
       if (typeof __D === 'function') {
         const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
@@ -64,6 +74,20 @@ const WrkModule = function WrkModule(window) {
       enumerable: false
     });
     return value;
+  }
+
+  function __wrkCloneEnvValue__(v) {
+    if (Array.isArray(v)) return v.map(__wrkCloneEnvValue__);
+    if (v && typeof v === 'object') {
+      const out = {};
+      const keys = Object.keys(v);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        out[key] = __wrkCloneEnvValue__(v[key]);
+      }
+      return out;
+    }
+    return v;
   }
 
   function __resolveCanvasPatchContext__() {
@@ -236,7 +260,7 @@ const WrkModule = function WrkModule(window) {
   __updateWorkerSnapshotStatus__(false, 'pending');
 
   function relayWorkerDiagEnvelope(G, scope, payload) {
-    const d = G && G.__DEGRADE__;
+    const d = __resolveWrkDegrade__();
     if (typeof d !== 'function' || !payload || typeof payload !== 'object') return false;
     const rawCtx = (payload.ctx && typeof payload.ctx === 'object') ? payload.ctx : {};
     const rawData = Object.prototype.hasOwnProperty.call(rawCtx, 'data') ? rawCtx.data : null;
@@ -370,43 +394,68 @@ const WrkModule = function WrkModule(window) {
 // 1) Источник снапшотов
 function EnvBus(G){
   function __cloneEnvValue(v) {
-    if (Array.isArray(v)) return v.map(__cloneEnvValue);
-    if (v && typeof v === 'object') {
-      const out = {};
-      const keys = Object.keys(v);
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        out[key] = __cloneEnvValue(v[key]);
-      }
-      return out;
-    }
-    return v;
+    return __wrkCloneEnvValue__(v);
   }
-  const __langStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__LANG_STATE__ && typeof G.CanvasPatchContext.state.__LANG_STATE__ === 'object')
-    ? G.CanvasPatchContext.state.__LANG_STATE__
-    : null;
+  function __requireWorkerEnvPacket() {
+    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+      ? G.CanvasPatchContext
+      : null;
+    const stateRoot = (C && C.state && typeof C.state === 'object')
+      ? C.state
+      : null;
+    const navModuleState = (stateRoot && stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
+      ? stateRoot.__NAV_TOTAL_SET__
+      : null;
+    const profileState = (navModuleState && navModuleState.__PROFILE_STATE__ && typeof navModuleState.__PROFILE_STATE__ === 'object')
+      ? navModuleState.__PROFILE_STATE__
+      : null;
+    const packet = (profileState && profileState.__WORKER_ENV_SNAPSHOT__ && typeof profileState.__WORKER_ENV_SNAPSHOT__ === 'object')
+      ? profileState.__WORKER_ENV_SNAPSHOT__
+      : null;
+    if (!packet) throw new Error('EnvBus: __WORKER_ENV_SNAPSHOT__ missing');
+    const out = __cloneEnvValue(packet);
+    const isStringArray = (value, allowEmpty) => {
+      if (!Array.isArray(value)) return false;
+      if (!allowEmpty && !value.length) return false;
+      for (let i = 0; i < value.length; i++) {
+        if (typeof value[i] !== 'string' || !value[i]) return false;
+      }
+      return true;
+    };
+    const isBrandList = (value) => {
+      if (!Array.isArray(value) || !value.length) return false;
+      for (let i = 0; i < value.length; i++) {
+        const item = value[i];
+        if (!item || typeof item !== 'object') return false;
+        if (typeof item.brand !== 'string' || !item.brand) return false;
+        if (typeof item.version !== 'string' || !item.version) return false;
+      }
+      return true;
+    };
+    if (typeof out.ua !== 'string' || !out.ua) throw new Error('EnvBus: worker packet ua missing');
+    if (typeof out.vendor !== 'string') throw new Error('EnvBus: worker packet vendor missing');
+    if (typeof out.language !== 'string' || !out.language) throw new Error('EnvBus: worker packet language missing');
+    if (!isStringArray(out.languages, false)) throw new Error('EnvBus: worker packet languages missing');
+    if (!Number.isFinite(Number(out.deviceMemory))) throw new Error('EnvBus: worker packet deviceMemory missing');
+    if (!Number.isFinite(Number(out.hardwareConcurrency))) throw new Error('EnvBus: worker packet hardwareConcurrency missing');
+    if (!out.uaData || typeof out.uaData !== 'object') throw new Error('EnvBus: worker packet uaData missing');
+    if (!isBrandList(out.uaData.brands)) throw new Error('EnvBus: worker packet uaData.brands missing');
+    if (typeof out.uaData.mobile !== 'boolean') throw new Error('EnvBus: worker packet uaData.mobile missing');
+    if (typeof out.uaData.platform !== 'string' || !out.uaData.platform) throw new Error('EnvBus: worker packet uaData.platform missing');
+    if (!out.uaData.he || typeof out.uaData.he !== 'object') throw new Error('EnvBus: worker packet uaData.he missing');
+    if (typeof out.uaData.he.architecture !== 'string' || !out.uaData.he.architecture) throw new Error('EnvBus: worker packet uaData.he.architecture missing');
+    if (typeof out.uaData.he.bitness !== 'string' || !out.uaData.he.bitness) throw new Error('EnvBus: worker packet uaData.he.bitness missing');
+    if (typeof out.uaData.he.model !== 'string') throw new Error('EnvBus: worker packet uaData.he.model missing');
+    if (typeof out.uaData.he.platformVersion !== 'string' || !out.uaData.he.platformVersion) throw new Error('EnvBus: worker packet uaData.he.platformVersion missing');
+    if (!isBrandList(out.uaData.he.fullVersionList)) throw new Error('EnvBus: worker packet uaData.he.fullVersionList missing');
+    if (typeof out.uaData.he.wow64 !== 'boolean') throw new Error('EnvBus: worker packet uaData.he.wow64 missing');
+    if (!isStringArray(out.uaData.he.formFactors, false)) throw new Error('EnvBus: worker packet uaData.he.formFactors missing');
+    return out;
+  }
   const __geoStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__GEO_STATE__ && typeof G.CanvasPatchContext.state.__GEO_STATE__ === 'object')
     ? G.CanvasPatchContext.state.__GEO_STATE__
     : null;
-  const __webglStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__WEBGL_STATE__ && typeof G.CanvasPatchContext.state.__WEBGL_STATE__ === 'object')
-    ? G.CanvasPatchContext.state.__WEBGL_STATE__
-    : null;
-  const __envLangs = (() => {
-    const src = (__langStateRoot && Array.isArray(__langStateRoot.normalizedLanguages))
-      ? __langStateRoot.normalizedLanguages
-      : null;
-    if (Array.isArray(src)) return src.slice();
-    if (typeof src === 'string' && src) return [src];
-    return null;
-  })();
-  const __envLang = (__langStateRoot && typeof __langStateRoot.primaryLanguage === 'string' && __langStateRoot.primaryLanguage)
-    ? __langStateRoot.primaryLanguage
-    : null;
-  const __envUa = (typeof G.__USER_AGENT === 'string' && G.__USER_AGENT) ? G.__USER_AGENT : null;
-  const __envVendor = (typeof G.__VENDOR === 'string') ? G.__VENDOR : null;
   const __envDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null;
-  const __envCpu = (G.__cpu != null) ? G.__cpu : null;
-  const __envMem = (G.__memory != null) ? G.__memory : null;
   const __envTimeZone = (__geoStateRoot && typeof __geoStateRoot.timezone === 'string' && __geoStateRoot.timezone)
     ? __geoStateRoot.timezone
     : null;
@@ -482,23 +531,15 @@ function EnvBus(G){
     };
   }
   function envSnapshot(){
-    let langs = __envLangs;
-    if (!Array.isArray(langs)) {
-      throw new Error('EnvBus: state.__LANG_STATE__.normalizedLanguages missing');
-    }
-    langs = langs.slice();
-    const lang     = __envLang;
-    if (!lang) throw new Error('EnvBus: state.__LANG_STATE__.primaryLanguage missing');
-    const ua       = __envUa;
-    const vendor   = __envVendor;
-    if (typeof ua !== 'string' || !ua) throw new Error('EnvBus: __USER_AGENT missing');
-    if (typeof vendor !== 'string') throw new Error('EnvBus: __VENDOR missing');
+    const packet = __requireWorkerEnvPacket();
+    const langs = packet.languages.slice();
+    const lang = packet.language;
+    const ua = packet.ua;
+    const vendor = packet.vendor;
     const dpr      = __envDpr;
     if (!dpr) throw new Error('EnvBus: __DPR missing');
-    const cpu      = __envCpu;
-    const mem      = __envMem;
-    if (cpu == null) throw new Error('EnvBus: __cpu missing');
-    if (mem == null) throw new Error('EnvBus: __memory missing');
+    const cpu = Number(packet.hardwareConcurrency);
+    const mem = Number(packet.deviceMemory);
     const timeZone = __envTimeZone;
     if (!timeZone) throw new Error('EnvBus: state.__GEO_STATE__.timezone missing');
     const webglVendor = __envWebGLVendor;
@@ -511,57 +552,8 @@ function EnvBus(G){
     if (typeof webglUnmaskedRenderer !== 'string' || !webglUnmaskedRenderer) throw new Error('EnvBus: __WEBGL_UNMASKED_RENDERER__ missing');
     const webglCapabilities = __collectWindowWebGLCapabilities();
 
-    const liveUAD = G.navigator && G.navigator.userAgentData;
-    if (!liveUAD || typeof liveUAD !== 'object') {
-      throw new Error('EnvBus: navigator.userAgentData missing');
-    }
-    const uaData = (() => {
-      const platform = (typeof liveUAD.platform === 'string' && liveUAD.platform) ? liveUAD.platform : null;
-      if (!platform) throw new Error('EnvBus: navigator.userAgentData.platform missing');
-      const brandsSrc = liveUAD.brands;
-      if (!Array.isArray(brandsSrc) || !brandsSrc.length) throw new Error('EnvBus: navigator.userAgentData.brands missing');
-      const brands = brandsSrc.map(x => {
-        if (!x || typeof x !== 'object') throw new Error('EnvBus: navigator.userAgentData.brands entry');
-        const brand = (typeof x.brand === 'string' && x.brand) ? x.brand
-                    : (typeof x.name === 'string' && x.name) ? x.name
-                    : null;
-        if (!brand) throw new Error('EnvBus: navigator.userAgentData.brands entry');
-        let versionRaw = null;
-        if (typeof x.version === 'string') {
-          if (!x.version) throw new Error('EnvBus: navigator.userAgentData.brands entry');
-          versionRaw = x.version;
-        } else if (typeof x.version === 'number' && Number.isFinite(x.version)) {
-          versionRaw = String(x.version);
-        } else {
-          throw new Error('EnvBus: navigator.userAgentData.brands entry');
-        }
-        const major = String(versionRaw).split('.')[0];
-        if (!major) throw new Error('EnvBus: navigator.userAgentData.brands entry');
-        return { brand: String(brand), version: String(major) };
-      });
-      if (typeof liveUAD.mobile !== 'boolean') throw new Error('EnvBus: navigator.userAgentData.mobile missing');
-      return { platform, brands, mobile: liveUAD.mobile };
-    })();
-
-    const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
-    const heSource = (G.__UACH_HE_READY__ && G.__LAST_UACH_HE__ && typeof G.__LAST_UACH_HE__ === 'object')
-      ? G.__LAST_UACH_HE__
-      : null;
-    if (!heSource) throw new Error('EnvBus: high entropy missing');
-    const he = {};
-    for (const k of HE_KEYS) {
-      if (!(k in heSource)) throw new Error(`EnvBus: high entropy missing ${k}`);
-      const v = heSource[k];
-      if (v === undefined || v === null) throw new Error(`EnvBus: high entropy bad ${k}`);
-      if (typeof v === 'string' && !v.trim() && k !== 'model') {
-        throw new Error(`EnvBus: high entropy bad ${k}`);
-      }
-      if (k === 'fullVersionList' && !Array.isArray(v)) {
-        throw new Error('EnvBus: high entropy bad fullVersionList');
-      }
-      if (Array.isArray(v) && !v.length) throw new Error(`EnvBus: high entropy bad ${k}`);
-      he[k] = v;
-    }
+    const uaData = __cloneEnvValue(packet.uaData);
+    const he = __cloneEnvValue(packet.uaData.he);
     uaData.he = he;
 
     const windowKeys = (() => {
@@ -967,7 +959,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
         await import(PATCH_URL);
         const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-        installWorkerUACHMirror();
+        await installWorkerUACHMirror();
         __patchOK = true;
       } catch (e) {
         __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
@@ -1341,7 +1333,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
         importScripts(PATCH_URL);
         const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-        installWorkerUACHMirror();
+        await installWorkerUACHMirror();
         __patchOK = true;
       } catch (e) {
         __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
@@ -1586,24 +1578,26 @@ function definePatchedValue(target, key, value, label) {
 }
 
 function emitWorkerBootstrapDegrade(G, scope, bootErr) {
-  const d = G && G.__DEGRADE__;
+  const d = __resolveWrkDegrade__();
   if (typeof d !== 'function') return;
   const err = bootErr instanceof Error ? bootErr : new Error(String(bootErr || 'Worker bootstrap error'));
   const ctx = {
     type: 'pipeline missing data',
     stage: 'apply',
-    module: 'wrk',
+    module: 'worker_bootstrap',
+    diagTag: 'worker_bootstrap',
     surface: 'worker_bootstrap',
     key: '__ENV_BOOTSTRAP_ERROR__',
     policy: 'throw',
     action: 'throw',
-    scope: scope || null
+    scope: scope || null,
+    data: { outcome: 'throw', reason: 'worker_bootstrap_apply_error', scope: scope || null }
   };
   if (typeof d.diag === 'function') {
-    d.diag('error', 'wrk:worker_bootstrap:apply:error', ctx, err);
+    d.diag('error', 'worker_bootstrap:apply:error', ctx, err);
     return;
   }
-  d('wrk:worker_bootstrap:apply:error', err, ctx);
+  d('worker_bootstrap:apply:error', err, ctx);
 }
 
 function relayWorkerScopeDiag(G, scope, payload) {
@@ -2461,21 +2455,23 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','fullVersionList','formFactors','wow64'];
-    const UAD = G.navigator && G.navigator.userAgentData;
-    if (!UAD || typeof UAD.getHighEntropyValues !== 'function') {
-      throw new Error('[WorkerInit] userAgentData missing');
+    const packet = EnvBus(G).envSnapshot();
+    const heSource = (packet && packet.uaData && packet.uaData.he && typeof packet.uaData.he === 'object')
+      ? packet.uaData.he
+      : null;
+    if (!heSource) throw new Error('[WorkerInit] high entropy missing');
+    const he = {};
+    for (const k of KEYS) {
+      if (!(k in heSource)) throw new Error(`[WorkerInit] high entropy missing ${k}`);
+      const v = heSource[k];
+      if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+      if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
+      he[k] = __wrkCloneEnvValue__(v);
     }
-    const p = UAD.getHighEntropyValues(KEYS).then(he => {
-      if (!he || typeof he !== 'object') throw new Error('[WorkerInit] high entropy missing');
-      for (const k of KEYS) {
-        if (!(k in he)) throw new Error(`[WorkerInit] high entropy missing ${k}`);
-        const v = he[k];
-        if (v === undefined || v === null) throw new Error(`[WorkerInit] high entropy bad ${k}`);
-        if (Array.isArray(v) && !v.length) throw new Error(`[WorkerInit] high entropy bad ${k}`);
-      }
-      G.__LAST_UACH_HE__ = he;
+    const p = Promise.resolve(he).then(result => {
+      G.__LAST_UACH_HE__ = result;
       G.__UACH_HE_READY__ = true;
-      return he;
+      return result;
     });
     G.__UACH_HE_PROMISE__ = p;
     return p;
