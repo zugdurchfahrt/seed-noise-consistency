@@ -50,6 +50,46 @@
     }, err || null);
   }
 
+  function __setHiddenValue(obj, key, value) {
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+    const desc = Object.getOwnPropertyDescriptor(obj, key);
+    if (desc && desc.configurable === false) {
+      if (Object.prototype.hasOwnProperty.call(desc, 'value')) return desc.value;
+      return value;
+    }
+    Object.defineProperty(obj, key, {
+      value: value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return value;
+  }
+
+  function __ensureWorkerCanvasPatchContext() {
+    const existing = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+      ? self.CanvasPatchContext
+      : null;
+    return existing || __setHiddenValue(self, 'CanvasPatchContext', Object.create(null));
+  }
+
+  function __ensureWorkerWrkRuntimeRoot() {
+    const C = __ensureWorkerCanvasPatchContext();
+    if (!C) return null;
+    const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+      ? C.__wrkRuntime__
+      : null;
+    return wrkRuntime || __setHiddenValue(C, '__wrkRuntime__', Object.create(null));
+  }
+
+  function __isCoreToStringStateOk(state) {
+    return !!(state
+      && state.__CORE_TOSTRING_STATE__ === true
+      && typeof state.nativeToString === 'function'
+      && (state.overrideMap instanceof WeakMap)
+      && (state.proxyTargetMap instanceof WeakMap));
+  }
+
       
       
   try {
@@ -57,13 +97,16 @@
     const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
     const currentToString = fpToStringDesc && fpToStringDesc.value;
 
-    // [NORMATIVE] single core bridge state (no module-local WeakMap holders)
-    const existingCoreToStringState = self && self.__CORE_TOSTRING_STATE__;
-    const existingCoreToStringStateOk = !!(existingCoreToStringState
-      && existingCoreToStringState.__CORE_TOSTRING_STATE__ === true
-      && typeof existingCoreToStringState.nativeToString === 'function'
-      && (existingCoreToStringState.overrideMap instanceof WeakMap)
-      && (existingCoreToStringState.proxyTargetMap instanceof WeakMap));
+    // [NORMATIVE] single core bridge state lives in owner-route; self-key is compatibility fallback only.
+    const __wrkRuntimeRoot = __ensureWorkerWrkRuntimeRoot();
+    const ownedCoreToStringState = (__wrkRuntimeRoot && __wrkRuntimeRoot.__CORE_TOSTRING_STATE__)
+      ? __wrkRuntimeRoot.__CORE_TOSTRING_STATE__
+      : null;
+    const fallbackCoreToStringState = self && self.__CORE_TOSTRING_STATE__;
+    const existingCoreToStringState = __isCoreToStringStateOk(ownedCoreToStringState)
+      ? ownedCoreToStringState
+      : fallbackCoreToStringState;
+    const existingCoreToStringStateOk = __isCoreToStringStateOk(existingCoreToStringState);
 
     const toStringOverrideMap = existingCoreToStringStateOk
       ? existingCoreToStringState.overrideMap
@@ -117,14 +160,30 @@
       }
 
       function publishCoreToStringState() {
+        const nextState = {
+          __CORE_TOSTRING_STATE__: true,
+          nativeToString: nativeToString,
+          overrideMap: toStringOverrideMap,
+          proxyTargetMap: toStringProxyTargetMap
+        };
+        try {
+          if (!__wrkRuntimeRoot) {
+            throw new Error('worker bridge runtime root missing');
+          }
+          __setHiddenValue(__wrkRuntimeRoot, '__CORE_TOSTRING_STATE__', nextState);
+        } catch (eState) {
+          __wrkDiag('error', 'wrk:core_tostring_state_owner_define_failed', {
+            stage: 'apply',
+            key: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
+            message: 'failed to define owner-route __CORE_TOSTRING_STATE__',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw' }
+          }, eState);
+          throw eState;
+        }
         try {
           Object.defineProperty(self, '__CORE_TOSTRING_STATE__', {
-            value: {
-              __CORE_TOSTRING_STATE__: true,
-              nativeToString: nativeToString,
-              overrideMap: toStringOverrideMap,
-              proxyTargetMap: toStringProxyTargetMap
-            },
+            value: nextState,
             writable: false,
             configurable: true,
             enumerable: false

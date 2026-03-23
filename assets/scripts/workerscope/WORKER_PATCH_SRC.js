@@ -67,6 +67,28 @@
       }
     };
     const appliedDescriptors = [];
+    const __resolveWorkerWrkRuntimeRoot__ = () => {
+      const C = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+        ? self.CanvasPatchContext
+        : null;
+      const wrkRuntime = (C && C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+        ? C.__wrkRuntime__
+        : null;
+      return wrkRuntime;
+    };
+    const __isCoreToStringStateOk__ = (st) => !!(st
+      && st.__CORE_TOSTRING_STATE__ === true
+      && typeof st.nativeToString === 'function'
+      && (st.overrideMap instanceof WeakMap)
+      && (st.proxyTargetMap instanceof WeakMap));
+    const __resolveCoreToStringState__ = () => {
+      const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
+      const ownedState = runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__;
+      if (__isCoreToStringStateOk__(ownedState)) return ownedState;
+      const fallbackState = self.__CORE_TOSTRING_STATE__;
+      if (__isCoreToStringStateOk__(fallbackState)) return fallbackState;
+      return null;
+    };
     const trackedDefineProperty = (obj, key, desc) => {
       const hadOwn = Object.prototype.hasOwnProperty.call(obj, key);
       const prevDesc = hadOwn ? Object.getOwnPropertyDescriptor(obj, key) : null;
@@ -190,20 +212,16 @@
 
     // [NORMATIVE] use unified core toString bridge state (no module-local WeakMap holders).
     {
-      const st = self.__CORE_TOSTRING_STATE__;
-      const ok = !!(st
-        && st.__CORE_TOSTRING_STATE__ === true
-        && typeof st.nativeToString === 'function'
-        && (st.overrideMap instanceof WeakMap)
-        && (st.proxyTargetMap instanceof WeakMap));
+      const st = __resolveCoreToStringState__();
+      const ok = __isCoreToStringStateOk__(st);
       if (!ok) {
         const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ missing/invalid');
         emitDegrade('error', 'worker_patch_src:tostring_state:preflight:missing', {
           type: 'pipeline missing data',
           stage: 'preflight',
           module: 'WORKER_PATCH_SRC',
-          surface: '__CORE_TOSTRING_STATE__',
-          key: '__CORE_TOSTRING_STATE__',
+          surface: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
+          key: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
           policy: 'throw',
           action: 'throw'
         }, e);
@@ -260,7 +278,7 @@
     // sanity: worker follows window-style nativeization.
     // markAsNative must write labels into shared CORE state; public Function.prototype.toString stays native.
     {
-      const st = self.__CORE_TOSTRING_STATE__;
+      const st = __resolveCoreToStringState__();
       const probe = function probe(){};
       const nativeProbe = Reflect.apply(nativeToString, probe, []);
       markAsNative(probe);
@@ -273,8 +291,8 @@
           type: 'pipeline missing data',
           stage: 'contract',
           module: 'WORKER_PATCH_SRC',
-          surface: '__CORE_TOSTRING_STATE__',
-          key: '__CORE_TOSTRING_STATE__',
+          surface: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
+          key: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
           policy: 'throw',
           action: 'throw'
         }, e);
