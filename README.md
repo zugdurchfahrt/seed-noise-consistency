@@ -93,81 +93,103 @@ If you already have a VPN set up in any other way, the script will simply use th
 │   │   └── Win32/
 │   │       ├── cache_data/
 │   ├── scripts/
-│   │   ├── GeoOverride_source.js
-│   │   ├── RTCPeerConnection.js
-│   │   ├── TimezoneOverride_source.js
-│   │   ├── WORKER_PATCH_SRC.js
-│   │   ├── audiocontext.js
-│   │   ├── canvas.js
-│   │   ├── context.js
-│   │   ├── env_params.js
-│   │   ├── font_module.js
-│   │   ├── headers_interceptor.js
-│   │   ├── hide_webdriver.js
-│   │   ├── nav_total_set.js
-│   │   ├── screen.js
-│   │   ├── set_log.js
-│   │   ├── webgl.js
-│   │   ├── webgpu.js
-│   │   └── wrk.js
+│   │   ├── window/
+│   │   │   ├── core/
+│   │   │   │   ├── bootstrap_hide.js
+│   │   │   │   ├── context.js
+│   │   │   │   ├── core_window.js
+│   │   │   │   ├── prng_seed.js
+│   │   │   │   ├── probe.js
+│   │   │   │   └── set_log.js
+│   │   │   └── patches/
+│   │   │       ├── graphics/
+│   │   │       ├── media/
+│   │   │       ├── navigator/
+│   │   │       └── stealth/
+│   │   └── workerscope/
+│   │       ├── set_reflect.js
+│   │       ├── sw_prelude.js
+│   │       ├── worker_bootstrap.js
+│   │       ├── WORKER_PATCH_SRC.js
+│   │       └── wrk.js
 │   └── templates/
 │       └── font_patch.template.j2
-├── configs/
+├── cfg_vpn/
 ├── logs/
+├── profile_data_source/
+│   ├── datashell_win32.py
+│   ├── depo_browser.py
+│   ├── macintel.py
+│   ├── plugins_dict.py
+│   └── profile.json
 ├── profiles/
+├── tools/
+│   ├── generators/
+│   │   ├── cdp_catapult.py
+│   │   └── rand_met.py
+│   ├── tools_infra/
+│   │   ├── overseer.py
+│   │   └── vpn_utils.py
+│   ├── tools_native_check/
+│   │   ├── core_bridge_firewall.py
+│   │   ├── PROXY_MECHANICS_REGISTRY.md
+│   │   └── validate_proxy_mechanics_registry.ps1
+│   └── tools_runtime/
+│       ├── handle_cors_addon.py
+│       ├── headers_adapter.py
+│       └── helpers.py
 ├── user_data/
-├── NO_PROXY_START.bat
-├── PROXY_START.bat
-├── WEBGL_DICKts.js
-├── WebgpuWL.js
-├── datashell_win32.py
-├── depo_browser.py
-├── handle_cors_addon.py
-├── headers_adapter.py
-├── macintel.py
 ├── main.py
-├── main_no_proxy.py
-├── mitmproxy_full_log.txt
-├── overseer.py
-├── plugins_dict.py
-├── profile.json
-├── rand_met.py
+├── Readme_RUS.md
 ├── requirements.txt
-├── tools.py
-└── vpn_utils.py
+└── README.md
 ```
 
 ## Modules overview (short)
 
-### Python (root)
+### Python
 
-- `main.py` — orchestration: Selenium + undetected-chromedriver, profile build/apply, JS patch injection via the main bundle, CDP control, mitmproxy mode.
-- `main_no_proxy.py` — alternative run without mitmproxy (CORS constraints).
-- `vpn_utils.py` — VPN lifecycle: pick random `.ovpn` from `configs/`, start VPN, prepare regional profile bits (timezone/geolocation).
-- `handle_cors_addon.py` — mitmproxy addon: proper CORS (incl. preflight), service-domain filtering, ring-buffer logs; consumes `profiles/profile.json` for expected Client Hints.
-- `headers_adapter.py` — realistic Accept builder by brand/major version.
-- `rand_met.py` — fonts pipeline: per-platform `generated_fonts/...`, emits `fonts_index.json` and generates `assets/JS_fonts_patch/font_patch.generated.js` from a Jinja2 template.
-- `tools.py` — profile/device metrics helpers (UA-CH, languages, browser versions, header utilities).
-- `depo_browser.py` — browser versions map (Chrome/Firefox/Edge/Safari) for profile composition.
-- `plugins_dict.py` — plugin sets per browser for profile composition.
-- `datashell_win32.py` / `macintel.py` — platform dictionaries for Win32 / MacIntel.
-- `WEBGL_DICKts.js` / `WebgpuWL.js` — static whitelists/limits/parameters for WebGL/WebGPU.
-- `overseer.py` — Python logger.
+- `main.py` — main orchestration entrypoint: builds/loads profile data, prepares CDP injection payloads, launches Selenium + undetected-chromedriver, wires runtime helpers, and applies the staged JS pipeline to window and worker scopes.
+- `profile_data_source/` — source dictionaries and base profile data for platform/browser composition: Win32/MacIntel shells, browser-version maps, plugin sets, and profile defaults.
+- `tools/generators/rand_met.py` — fonts pipeline: prepares per-platform generated fonts, cache metadata, and `assets/JS_fonts_patch/font_patch.generated.js` from the Jinja2 template.
+- `tools/generators/cdp_catapult.py` — CDP-side payload assembly and delivery helper used by the runtime injection flow.
+- `tools/tools_runtime/handle_cors_addon.py` — mitmproxy runtime addon for CORS/preflight handling, service-domain filtering, and request/response-side header coordination.
+- `tools/tools_runtime/headers_adapter.py` — realistic Accept/header shaping by browser brand/version.
+- `tools/tools_runtime/helpers.py` — shared runtime/profile helpers used by `main.py` and the injection pipeline.
+- `tools/tools_infra/vpn_utils.py` — VPN lifecycle and region-aligned setup using `.ovpn` files from `cfg_vpn/`.
+- `tools/tools_infra/overseer.py` — Python-side logging/diagnostic helper.
+- `tools/tools_native_check/` — normative validation helpers for proxy/native-surface mechanics, including registry checks and bridge-firewall tooling.
 
-### JavaScript (`assets/scripts`)
+### JavaScript (`assets/scripts/window/core`)
 
-- `set_log.js` — JS logging helper.
-- `env_params.js` — initializes PRNG based on `__GLOBAL_SEED`.
-- `hide_webdriver.js` — webdriver masking.
-- `nav_total_set.js`, `screen.js`, `audiocontext.js` — navigator/screen/AudioContext adjustments aligned with the seeding/noise policy.
-- `font_module.js` — consumes `window.fontPatchConfigs`; registers `@font-face`, injects CSS for fonts.
-- `context.js` — hook registration and application chains for patch points.
-- `canvas.js` — Canvas 2D/Offscreen hooks with DPR-aware, edge-respecting noise.
-- `webgl.js` / `webgpu.js` — WebGL/WebGPU hooks; parameter/extension interception; complemented by static whitelists (see above).
-- `headers_interceptor.js` — Accept generator by brand/version; safelisted cross-origin patch for fetch/XHR; synchronized with the CDP Fetch bridge.
-- `RTCPeerConnection.js` — non-relay ICE filtering; ICE servers normalization.
-- `GeoOverride_source.js` / `TimezoneOverride_source.js` — geo/timezone overrides.
-- `wrk.js` / `WORKER_PATCH_SRC.js` — EnvBus / EnvHub: environment snapshots, Dedicated/Shared/Service Worker sync (UA/UA-CH, inline bootstrap).
+- `core_window.js` — main window-side bootstrap/orchestrator that composes the staged patch pipeline and controls when modules are applied.
+- `context.js` — hook registration, chaining, and shared patch mechanics for window-side modules.
+- `prng_seed.js` — installs seed-driven PRNG state and exposes the deterministic seed context used downstream by graphics/media patches.
+- `bootstrap_hide.js` — early bootstrap/hiding helpers that must run before the broader window patch set.
+- `probe.js` — runtime probe/diagnostic surface for verifying whether critical stages were installed.
+- `set_log.js` — JS-side logging/diagnostic emitter.
+
+### JavaScript (`assets/scripts/window/patches/*`)
+
+- `graphics/canvas.js` — Canvas 2D/Offscreen hooks with seeded noise and invariant-preserving wrapping.
+- `graphics/webgl.js`, `graphics/WEBGL_DICKts.js` — WebGL interception plus static whitelist/parameter support.
+- `graphics/webgpu.js`, `graphics/WebgpuWL.js` — WebGPU interception plus whitelist/limits data.
+- `graphics/screen.js` — `screen` and `visualViewport` surface patching.
+- `media/audiocontext.js` — AudioContext-aligned seeded/media surface adjustments.
+- `media/font_module.js` — consumes generated font configs, registers `@font-face`, and injects CSS/font-loading glue.
+- `media/RTCPeerConnection.js` — ICE-server normalization and non-relay/network-shaping logic.
+- `navigator/nav_total_set.js`, `navigator/override_ua_data.js`, `navigator/lang_win_scope.js` — navigator, UA-CH, language, and client-hint surface alignment on the window side.
+- `stealth/hide_webdriver.js` — webdriver masking and related native-surface hardening.
+- `stealth/headers_interceptor.js`, `stealth/headers_bridge.js` — request/header shaping on the JS side, synchronized with the CDP/mitmproxy path.
+- `stealth/GeoOverride_source.js`, `stealth/TimezoneOverride_source.js` — geo/timezone overrides.
+
+### JavaScript (`assets/scripts/workerscope`)
+
+- `wrk.js` — worker-scope coordinator for environment propagation and patch installation across Dedicated/Shared/Service Workers.
+- `WORKER_PATCH_SRC.js` — worker-side patch source bundle consumed by bootstrap/prelude stages.
+- `worker_bootstrap.js` — early worker bootstrap glue that connects worker creation with the injected patch payload.
+- `sw_prelude.js` — Service Worker prelude used to establish the environment before worker patch application.
+- `set_reflect.js` — worker-side reflection/native-surface helper.
 
 ### Generated files & templates
 
