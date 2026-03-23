@@ -75,23 +75,35 @@ const CoreWindowModule = function CoreWindowModule(window) {
   const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
   const existingToString = fpToStringDesc && fpToStringDesc.value;
 
-  const existingCoreToStringState = window && window.__CORE_TOSTRING_STATE__;
-  const existingCoreToStringStateOk = !!(existingCoreToStringState
-    && existingCoreToStringState.__CORE_TOSTRING_STATE__ === true
-    && typeof existingCoreToStringState.nativeToString === 'function'
-    && (existingCoreToStringState.overrideMap instanceof WeakMap)
-    && (existingCoreToStringState.proxyTargetMap instanceof WeakMap));
+  function __isCoreToStringStateOk(state) {
+    return !!(state
+      && state.__CORE_TOSTRING_STATE__ === true
+      && typeof state.nativeToString === 'function'
+      && (state.overrideMap instanceof WeakMap)
+      && (state.proxyTargetMap instanceof WeakMap));
+  }
+
+  const existingOwnedCoreToStringState = (window.Core
+      && window.Core.__internal
+      && typeof window.Core.__internal === 'object')
+    ? window.Core.__internal.coreToStringState
+    : null;
+  const existingCoreToStringState = __isCoreToStringStateOk(existingOwnedCoreToStringState)
+    ? existingOwnedCoreToStringState
+    : (window && window.__CORE_TOSTRING_STATE__);
+  const existingCoreToStringStateOk = __isCoreToStringStateOk(existingCoreToStringState);
 
   let sharedCoreToStringState = existingCoreToStringStateOk ? existingCoreToStringState : null;
   if (!sharedCoreToStringState) {
     try {
       const parentWin = window && window.parent;
-      const parentState = (parentWin && parentWin !== window) ? parentWin.__CORE_TOSTRING_STATE__ : null;
-      const parentOk = !!(parentState
-        && parentState.__CORE_TOSTRING_STATE__ === true
-        && typeof parentState.nativeToString === 'function'
-        && (parentState.overrideMap instanceof WeakMap)
-        && (parentState.proxyTargetMap instanceof WeakMap));
+      const parentOwnedState = (parentWin && parentWin !== window && parentWin.Core && parentWin.Core.__internal && typeof parentWin.Core.__internal === 'object')
+        ? parentWin.Core.__internal.coreToStringState
+        : null;
+      const parentState = __isCoreToStringStateOk(parentOwnedState)
+        ? parentOwnedState
+        : ((parentWin && parentWin !== window) ? parentWin.__CORE_TOSTRING_STATE__ : null);
+      const parentOk = __isCoreToStringStateOk(parentState);
       if (parentOk) {
         sharedCoreToStringState = parentState;
       }
@@ -193,21 +205,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
   }
 
   function publishCoreToStringState() {
-    safeDefine(window, '__CORE_TOSTRING_STATE__', {
-      value: {
-        __CORE_TOSTRING_STATE__: true,
-        nativeToString: nativeToString,
-        overrideMap: toStringOverrideMap,
-        proxyTargetMap: toStringProxyTargetMap
-      },
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
-  }
-
-  if (!existingCoreToStringStateOk) {
-    publishCoreToStringState();
+    return {
+      __CORE_TOSTRING_STATE__: true,
+      nativeToString: nativeToString,
+      overrideMap: toStringOverrideMap,
+      proxyTargetMap: toStringProxyTargetMap
+    };
   }
 
   // --- centralized native-shaped wrappers (Proxy/apply) ---
@@ -707,6 +710,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
       __internal.__patchGuardSeq = __patchGuardSeq;
       __internal.guards = __guardRegistry;
       __internal.prng = __prngRoot;
+      if (!__isCoreToStringStateOk(__internal.coreToStringState)) {
+        const nextCoreToStringState = sharedCoreToStringState || publishCoreToStringState();
+        safeDefine(__internal, 'coreToStringState', {
+          value: nextCoreToStringState,
+          writable: false,
+          configurable: true,
+          enumerable: false
+        });
+        sharedCoreToStringState = nextCoreToStringState;
+      }
 
       function normStr(s) {
         return (s == null ? '' : String(s)).normalize('NFKC');

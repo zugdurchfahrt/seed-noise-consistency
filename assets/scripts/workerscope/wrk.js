@@ -147,6 +147,39 @@ const WrkModule = function WrkModule(window) {
     return undefined;
   }
 
+  function __ensureScopeWrkRuntimeRoot__(scope) {
+    if (!scope || (typeof scope !== 'object' && typeof scope !== 'function')) return null;
+    const C = (scope.CanvasPatchContext && typeof scope.CanvasPatchContext === 'object')
+      ? scope.CanvasPatchContext
+      : __setHiddenValue__(scope, 'CanvasPatchContext', Object.create(null));
+    if (!C) return null;
+    const runtimeRoot = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+      ? C.__wrkRuntime__
+      : __setHiddenValue__(C, '__wrkRuntime__', Object.create(null));
+    return runtimeRoot;
+  }
+
+  function __captureEnvHub__(hub) {
+    if (hub && typeof hub === 'object') __wrkRuntimeSet__('envHub', hub);
+    return hub;
+  }
+
+  function __resolveEnvHub__() {
+    const hub = __wrkRuntimeGet__('envHub');
+    if (hub && typeof hub.publish === 'function' && typeof hub.subscribe === 'function') return hub;
+    return null;
+  }
+
+  function __captureBlobUrlStore__(store) {
+    if (store instanceof Map) __wrkRuntimeSet__('blobUrlStore', store);
+    return store;
+  }
+
+  function __resolveBlobUrlStore__() {
+    const store = __wrkRuntimeGet__('blobUrlStore');
+    return (store instanceof Map) ? store : null;
+  }
+
   function __resolveWorkerReflectSource__() {
     const reflectSrc = (typeof __wrkRuntimeGet__('inlineReflect') === 'string' && __wrkRuntimeGet__('inlineReflect'))
       ? __wrkRuntimeGet__('inlineReflect')
@@ -327,7 +360,6 @@ const WrkModule = function WrkModule(window) {
 
     const __hiddenSurfaceState = {
       preapply: [
-        '__ENV_HUB__',
         '__lastSnap__',
         '__LAST_UACH_HE__',
         '__UACH_HE_READY__',
@@ -335,7 +367,6 @@ const WrkModule = function WrkModule(window) {
         '__PATCHED_SAFE_WORKER__',
         '__PATCHED_SHARED_WORKER__',
         '__PATCHED_SERVICE_WORKER__',
-        '__BLOB_URL_STORE__',
         '__LAST_WORKER_BOOTSTRAP_ERROR__',
         '__LAST_WORKER_USER_URL_LOADED__',
         '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
@@ -349,6 +380,7 @@ const WrkModule = function WrkModule(window) {
       ],
       deleteFinal: [
         '__ENV_BRIDGE__',
+        '__ENV_HUB__',
         '__lastSnap__',
         '__LAST_UACH_HE__',
         '__UACH_HE_READY__',
@@ -356,11 +388,13 @@ const WrkModule = function WrkModule(window) {
         '__PATCHED_SAFE_WORKER__',
         '__PATCHED_SHARED_WORKER__',
         '__PATCHED_SERVICE_WORKER__',
+        '__BLOB_URL_STORE__',
         '__LAST_WORKER_BOOTSTRAP_ERROR__',
         '__LAST_WORKER_USER_URL_LOADED__',
         '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
         '__LAST_SHARED_WORKER_USER_URL_LOADED__',
         '__LAST_SHARED_WORKER_PATCH_OK__',
+        '__CORE_TOSTRING_STATE__',
         'WrkModule',
         'SafeWorkerOverride',
         'SafeSharedWorkerOverride',
@@ -368,10 +402,7 @@ const WrkModule = function WrkModule(window) {
         'WorkerPatchHooks'
       ],
       final: [
-        '__ENV_HUB__',
-        '__BLOB_URL_STORE__',
-        'CanvasPatchContext',
-        '__CORE_TOSTRING_STATE__'
+        'CanvasPatchContext'
       ],
       applied: Object.create(null)
     };
@@ -612,7 +643,9 @@ function EnvHub_init(G){
     },
     installWorkerNavMirror(scope){
       if (!scope) throw new Error('EnvHub: installWorkerNavMirror missing scope');
-      scope.__ENV_HUB__ = hub;
+      const runtimeRoot = __ensureScopeWrkRuntimeRoot__(scope);
+      if (!runtimeRoot) throw new Error('EnvHub: installWorkerNavMirror runtime root missing');
+      __setHiddenValue__(runtimeRoot, 'envHub', hub);
     }
   };
   return hub;
@@ -621,8 +654,10 @@ function EnvHub_init(G){
 
 // 2a) Обёртка для вызова из бандла
 function EnvHubPatchModule(G){
+  const existingHub = __resolveEnvHub__();
+  if (existingHub) return existingHub;
   const hub = EnvHub_init(G);
-  G.__ENV_HUB__ = hub;   // здесь фикс: записываем в глобал один раз
+  return __captureEnvHub__(hub);
 }
 
 // 3) Установка оверрайдов (Worker/Shared/SW).Используем SafeWorkerOverride.
@@ -1480,18 +1515,9 @@ function requireWorkerSnapshot(snap, label) {
 
 function installBlobURLStore(G) {
   if (!G || !G.URL || typeof G.URL.createObjectURL !== 'function') return;
-  if (G.__BLOB_URL_STORE__) return;
-  const storeDesc = Object.getOwnPropertyDescriptor(G, '__BLOB_URL_STORE__');
-  if (!storeDesc) {
-    throw new Error('[WorkerOverride] __BLOB_URL_STORE__ slot missing');
-  }
-  const store = new Map();
-  Object.defineProperty(G, '__BLOB_URL_STORE__', {
-    value: store,
-    configurable: false,
-    writable: false,
-    enumerable: false
-  });
+  const existingStore = __resolveBlobUrlStore__();
+  if (existingStore) return;
+  const store = __captureBlobUrlStore__(new Map());
   if (typeof mark !== 'function') {
     throw new Error('[WorkerOverride] markAsNative missing');
   }
@@ -1521,7 +1547,7 @@ function installBlobURLStore(G) {
 function resolveUserScriptURL(G, absUrl, label) {
   if (typeof absUrl !== 'string' || !absUrl) return absUrl;
   if (absUrl.slice(0, 5) !== 'blob:') return absUrl;
-  const store = G && G.__BLOB_URL_STORE__;
+  const store = __resolveBlobUrlStore__();
   if (!store || !store.has(absUrl)) {
     const l = label ? ` (${label})` : '';
     throw new Error(`[WorkerOverride] blob URL missing from store${l}`);
@@ -2416,7 +2442,7 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
   // 1) Hub (идемпотентно, без сайд-эффектов)
   function initHub(){
-    const hub = G.__ENV_HUB__ || EnvHubPatchModule(G) || G.__ENV_HUB__;
+    const hub = __resolveEnvHub__() || EnvHubPatchModule(G) || __resolveEnvHub__();
     if (!hub) throw new Error('[WorkerInit] EnvHub missing');
     return hub;
   }
@@ -2435,10 +2461,11 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
       ? workerPatchApi.envSnapshot
       : EnvBus(G).envSnapshot;
     const snap = envSnapshot();
-    if (!G.__ENV_HUB__ || typeof G.__ENV_HUB__.publish !== 'function') {
+    const hub = __resolveEnvHub__();
+    if (!hub || typeof hub.publish !== 'function') {
       throw new Error('[WorkerInit] hub missing');
     }
-    G.__ENV_HUB__.publish(snap);
+    hub.publish(snap);
     __updateWorkerSnapshotStatus__(true, 'snapshot_ready');
     __retryBootstrapEnvCleanup__();
     return snap;
@@ -2488,7 +2515,7 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
     if (!G.__DEBUG__) return {};
     const workerPatchApi = __requireWorkerPatchApi__('worker patch hooks diag runtime api not ready', 'runtime');
     return {
-      hasHub:        !!G.__ENV_HUB__,
+      hasHub:        !!__resolveEnvHub__(),
       workerWrapped: !!(G.Worker && (G.Worker.__ENV_WRAPPED__ || /WrappedWorker/.test(String(G.Worker)))),
       sharedWrapped: !!(G.SharedWorker && G.SharedWorker.__ENV_WRAPPED__),
       swWrapped:     !!__wrkRuntimeGet__('patchedServiceWorker'),
