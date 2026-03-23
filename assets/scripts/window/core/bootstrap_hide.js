@@ -310,6 +310,15 @@ __envProfileState__.fullVersionList = __cloneProfileValue__(W.__FULL_VERSION_LIS
 __envProfileState__.storageQuotaMb = W.__STORAGE_QUOTA_MB;
 __envProfileState__.storageUsedPct = W.__STORAGE_USED_PCT;
 __envProfileState__.pluginProfiles = __cloneProfileValue__(Array.isArray(W.__PLUGIN_PROFILES__) ? W.__PLUGIN_PROFILES__ : []);
+if (Object.prototype.hasOwnProperty.call(W, '__MAX_TOUCH_POINTS__')) {
+  __envProfileState__.maxTouchPoints = Number(W.__MAX_TOUCH_POINTS__);
+}
+if (Object.prototype.hasOwnProperty.call(W, '__VENDOR_SUB__')) {
+  __envProfileState__.vendorSub = W.__VENDOR_SUB__;
+}
+if (Object.prototype.hasOwnProperty.call(W, '__PRODUCT_SUB__')) {
+  __envProfileState__.productSub = W.__PRODUCT_SUB__;
+}
 
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
   return __bootstrapHideEmit__(level, code, {
@@ -341,10 +350,28 @@ function __langTransitOwnerReady__() {
     state.normalizedLanguages[0] === state.primaryLanguage;
 }
 
-function __workerTransitSnapshotReady__() {
-  const ready = !!(C && C.__workerEnvSnapshotReady__ === true);
+function __navigatorTransitSnapshotReady__() {
+  const navState = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
+    ? stateRoot.__NAV_TOTAL_SET__
+    : null;
+  const scalarState = (navState && navState.__SCALAR_STATE__ && typeof navState.__SCALAR_STATE__ === 'object')
+    ? navState.__SCALAR_STATE__
+    : null;
+  const objectState = (navState && navState.__OBJECT_STATE__ && typeof navState.__OBJECT_STATE__ === 'object')
+    ? navState.__OBJECT_STATE__
+    : null;
+  const profileState = (navState && navState.__PROFILE_STATE__ && typeof navState.__PROFILE_STATE__ === 'object')
+    ? navState.__PROFILE_STATE__
+    : null;
+  const workerSnapshot = (profileState && profileState.__WORKER_ENV_SNAPSHOT__ && typeof profileState.__WORKER_ENV_SNAPSHOT__ === 'object')
+    ? profileState.__WORKER_ENV_SNAPSHOT__
+    : null;
+  const ready = !!scalarState && !!objectState && !!workerSnapshot;
   __bootstrapTransitStatus__.retention.workerEnvSnapshotReady = ready;
   __bootstrapTransitStatus__.retention.workerEnvSnapshotStage = ready ? 'ready' : 'pending';
+  __bootstrapTransitStatus__.retention.navScalarStateReady = !!scalarState;
+  __bootstrapTransitStatus__.retention.navObjectStateReady = !!objectState;
+  __bootstrapTransitStatus__.retention.navWorkerSnapshotReady = !!workerSnapshot;
   return ready;
 }
 
@@ -387,15 +414,30 @@ function __getBootstrapSanitizeGate__(key) {
   }
   if (
     key === '__EXPECTED_CLIENT_HINTS' ||
+    key === '__NAV_PLATFORM__' ||
+    key === '__GENERATED_PLATFORM' ||
+    key === '__GENERATED_PLATFORM_VERSION' ||
     key === '__USER_AGENT' ||
     key === '__VENDOR' ||
+    key === '__WIDTH' ||
+    key === '__HEIGHT' ||
+    key === '__COLOR_DEPTH' ||
     key === '__DPR' ||
     key === '__cpu' ||
-    key === '__memory'
+    key === '__memory' ||
+    key === '__DEVICES_LABELS' ||
+    key === '__PLUGIN_PROFILES__' ||
+    key === '__WEBGL_RENDERER__' ||
+    key === '__WEBGL_VENDOR__' ||
+    key === '__WEBGL_UNMASKED_VENDOR__' ||
+    key === '__WEBGL_UNMASKED_RENDERER__' ||
+    key === '__GPU_TYPE__' ||
+    key === '__GPU_ARCHITECTURE__' ||
+    key === '__GPU_VENDOR__'
   ) {
     return {
-      ready: __workerTransitSnapshotReady__(),
-      reason: 'worker_snapshot_not_ready'
+      ready: __navigatorTransitSnapshotReady__(),
+      reason: 'nav_snapshot_not_ready'
     };
   }
   return {
@@ -440,10 +482,10 @@ function __sanitizeBootstrapEnvSurface__(win) {
   for (const key of keys) {
     const gate = __getBootstrapSanitizeGate__(key);
     if (!gate.ready) {
-      const code = gate.reason === 'worker_snapshot_not_ready'
+      const code = gate.reason === 'nav_snapshot_not_ready'
         ? 'bootstrap_hide:cleanup_env_retention_not_ready'
         : 'bootstrap_hide:cleanup_env_owner_not_ready';
-      const message = gate.reason === 'worker_snapshot_not_ready'
+      const message = gate.reason === 'nav_snapshot_not_ready'
         ? 'env surface cleanup skipped: retention not ready'
         : 'env surface cleanup skipped: owner not ready';
       __emitCleanupDiag__('warn', code, key, message, gate.reason, null);
@@ -474,12 +516,12 @@ function __runBootstrapEnvCleanup__(win, trigger) {
     cleanupState.reason = 'already_completed';
     return { outcome: 'skip', reason: 'already_completed' };
   }
-  if (!__workerTransitSnapshotReady__()) {
+  if (!__navigatorTransitSnapshotReady__()) {
     cleanupState.deferred = true;
-    cleanupState.reason = 'worker_snapshot_not_ready';
+    cleanupState.reason = 'nav_snapshot_not_ready';
     __bootstrapTransitStatus__.retention.cleanupDeferred = true;
-    __bootstrapTransitStatus__.retention.cleanupDeferredReason = 'worker_snapshot_not_ready';
-    return { outcome: 'defer', reason: 'worker_snapshot_not_ready' };
+    __bootstrapTransitStatus__.retention.cleanupDeferredReason = 'nav_snapshot_not_ready';
+    return { outcome: 'defer', reason: 'nav_snapshot_not_ready' };
   }
   cleanupState.deferred = false;
   cleanupState.reason = 'ready';

@@ -200,6 +200,30 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         enumerable: false
       });
     }
+    let __navScalarState = (__navModuleState.__SCALAR_STATE__ && typeof __navModuleState.__SCALAR_STATE__ === 'object')
+      ? __navModuleState.__SCALAR_STATE__
+      : null;
+    if (!__navScalarState) {
+      __navScalarState = Object.create(null);
+      Object.defineProperty(__navModuleState, '__SCALAR_STATE__', {
+        value: __navScalarState,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    let __navObjectState = (__navModuleState.__OBJECT_STATE__ && typeof __navModuleState.__OBJECT_STATE__ === 'object')
+      ? __navModuleState.__OBJECT_STATE__
+      : null;
+    if (!__navObjectState) {
+      __navObjectState = Object.create(null);
+      Object.defineProperty(__navModuleState, '__OBJECT_STATE__', {
+        value: __navObjectState,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
 
     // basic random from the existing seed initialization
     const __navCoreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
@@ -338,8 +362,30 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     __navProfileState.storageQuotaMb = __envProfileState.storageQuotaMb;
     __navProfileState.storageUsedPct = __envProfileState.storageUsedPct;
     __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(__envProfileState.pluginProfiles) ? __envProfileState.pluginProfiles : []);
-    __navProfileState.primaryLanguage = __navPrimaryLanguage;
-    __navProfileState.normalizedLanguages = __navCloneStateValue(__navNormalizedLanguages);
+    __navScalarState.vendor = __envProfileState.vendor;
+    __navScalarState.appVersion = (typeof __envProfileState.userAgent === 'string' && __envProfileState.userAgent.indexOf('Mozilla/') === 0)
+      ? __envProfileState.userAgent.slice('Mozilla/'.length)
+      : __envProfileState.userAgent;
+    __navScalarState.productSub = (typeof __envProfileState.productSub === 'string' && __envProfileState.productSub)
+      ? __envProfileState.productSub
+      : '20030107';
+    __navScalarState.vendorSub = (typeof __envProfileState.vendorSub === 'string')
+      ? __envProfileState.vendorSub
+      : '';
+    __navScalarState.maxTouchPoints = Number.isFinite(Number(__envProfileState.maxTouchPoints)) && Number(__envProfileState.maxTouchPoints) >= 0
+      ? Number(__envProfileState.maxTouchPoints)
+      : 0;
+    __navScalarState.deviceMemory = Number(__envProfileState.mem);
+    __navScalarState.hardwareConcurrency = Number(__envProfileState.cpu);
+    __navScalarState.language = __navPrimaryLanguage;
+    __navScalarState.languages = __navCloneStateValue(__navNormalizedLanguages);
+    if (Array.isArray(__navScalarState.languages)) {
+      try {
+        Object.freeze(__navScalarState.languages);
+      } catch (_) {}
+    }
+    __navProfileState.primaryLanguage = __navScalarState.language;
+    __navProfileState.normalizedLanguages = __navCloneStateValue(__navScalarState.languages);
     // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
     const meta          = __navProfileState.meta || {};
@@ -511,6 +557,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
     }
     const navPlatformOut = STRICT ? navPlat : expectedNavPlat;
+    __navScalarState.platform = navPlatformOut;
+    __navObjectState.uaData = __navCloneStateValue({
+      brands: __navCloneStateValue(meta.brands),
+      mobile: meta.mobile,
+      platform: meta.platform || __navProfileState.generatedPlatform,
+      he: {
+        architecture: meta.architecture,
+        bitness: meta.bitness,
+        model: meta.model,
+        platformVersion: meta.platformVersion || __navProfileState.generatedPlatformVersion,
+        fullVersionList: __navCloneStateValue(meta.fullVersionList != null ? meta.fullVersionList : __navProfileState.fullVersionList),
+        wow64: meta.wow64,
+        formFactors: __navCloneStateValue(meta.formFactors)
+      }
+    });
     if (!Number.isFinite(colorDepth) || colorDepth <= 0) {
       __navDiag('warn', 'nav_total_set:color_depth_missing', {
         stage: 'preflight',
@@ -545,30 +606,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         return true;
       }
       try {
-        const packetMeta = (__navProfileState.meta && typeof __navProfileState.meta === 'object')
-          ? __navProfileState.meta
+        const scalarState = (__navScalarState && typeof __navScalarState === 'object')
+          ? __navScalarState
           : null;
-        assert(packetMeta, 'worker_env_snapshot.meta missing');
+        const objectState = (__navObjectState && typeof __navObjectState === 'object')
+          ? __navObjectState
+          : null;
+        const packetUaData = (objectState && objectState.uaData && typeof objectState.uaData === 'object')
+          ? objectState.uaData
+          : null;
+        assert(scalarState, 'worker_env_snapshot.scalar_state missing');
+        assert(packetUaData, 'worker_env_snapshot.uaData missing');
         const packet = {
           ua: __navProfileState.userAgent,
-          language: __navProfileState.primaryLanguage || packetMeta.language,
-          languages: __navCloneStateValue(__navProfileState.normalizedLanguages || packetMeta.languages),
-          deviceMemory: __navProfileState.mem,
-          hardwareConcurrency: __navProfileState.cpu,
-          uaData: {
-            brands: __navCloneStateValue(packetMeta.brands),
-            mobile: packetMeta.mobile,
-            platform: packetMeta.platform || __navProfileState.generatedPlatform,
-            he: {
-              architecture: packetMeta.architecture,
-              bitness: packetMeta.bitness,
-              model: packetMeta.model,
-              platformVersion: packetMeta.platformVersion || __navProfileState.generatedPlatformVersion,
-              fullVersionList: __navCloneStateValue(packetMeta.fullVersionList != null ? packetMeta.fullVersionList : __navProfileState.fullVersionList),
-              wow64: packetMeta.wow64,
-              formFactors: __navCloneStateValue(packetMeta.formFactors)
-            }
-          }
+          language: scalarState.language,
+          languages: __navCloneStateValue(scalarState.languages),
+          deviceMemory: scalarState.deviceMemory,
+          hardwareConcurrency: scalarState.hardwareConcurrency,
+          uaData: __navCloneStateValue(packetUaData)
         };
         assert(typeof packet.ua === 'string' && packet.ua, 'worker_env_snapshot.ua missing');
         assert(typeof packet.language === 'string' && packet.language, 'worker_env_snapshot.language missing');
@@ -1242,17 +1297,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages']);
     const objectReturnKeys = new Set(['plugins','mimeTypes','userAgentData']);
     (function patchStrictScalarAccessorsOnProto(){
-      patchStrictScalarAccessor('platform', 'platform' in navProto ? () => navPlatformOut : null, 'nav_total_set:platform');
-      patchStrictScalarAccessor('vendor', 'vendor' in navProto ? () => vendor : null, 'nav_total_set:vendor');
+      patchStrictScalarAccessor('platform', 'platform' in navProto ? () => __navScalarState.platform : null, 'nav_total_set:platform');
+      patchStrictScalarAccessor('vendor', 'vendor' in navProto ? () => __navScalarState.vendor : null, 'nav_total_set:vendor');
       patchStrictScalarAccessor('appVersion', 'appVersion' in navProto ? () => {
-        const pfx = "Mozilla/";
-        return (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
-          ? userAgent.slice(pfx.length)
-          : userAgent;
+        return __navScalarState.appVersion;
       } : null, 'nav_total_set:appVersion');
-      patchStrictScalarAccessor('productSub', 'productSub' in navProto ? () => "20030107" : null, 'nav_total_set:productSub');
-      patchStrictScalarAccessor('vendorSub', 'vendorSub' in navProto ? () => "" : null, 'nav_total_set:vendorSub');
-      patchStrictScalarAccessor('maxTouchPoints', 'maxTouchPoints' in navProto ? () => 0 : null, 'nav_total_set:maxTouchPoints');
+      patchStrictScalarAccessor('productSub', 'productSub' in navProto ? () => __navScalarState.productSub : null, 'nav_total_set:productSub');
+      patchStrictScalarAccessor('vendorSub', 'vendorSub' in navProto ? () => __navScalarState.vendorSub : null, 'nav_total_set:vendorSub');
+      patchStrictScalarAccessor('maxTouchPoints', 'maxTouchPoints' in navProto ? () => __navScalarState.maxTouchPoints : null, 'nav_total_set:maxTouchPoints');
     })();
 
     // rest
@@ -1779,28 +1831,30 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const nativeLanguagesDesc = __navResolveNativeAccessorDesc('languages');
 
     patchStrictScalarAccessor('deviceMemory', 'deviceMemory' in navProto ? function navDeviceMemoryValue() {
-      if (__navIsValidDeviceMemoryValue(mem)) return mem;
+      const deviceMemoryValue = __navScalarState.deviceMemory;
+      if (__navIsValidDeviceMemoryValue(deviceMemoryValue)) return deviceMemoryValue;
       __navDiagPipeline('warn', 'nav_total_set:deviceMemory_invalid_profile', {
         stage: 'runtime',
         key: 'deviceMemory',
         message: 'invalid deviceMemory profile value',
-        data: { outcome: 'return', reason: 'invalid_profile_value', value: mem }
+        data: { outcome: 'return', reason: 'invalid_profile_value', value: deviceMemoryValue }
       });
       return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
     } : null, 'nav_total_set:deviceMemory');
     patchStrictScalarAccessor('hardwareConcurrency', 'hardwareConcurrency' in navProto ? function navHardwareConcurrencyValue() {
-      if (__navIsValidHardwareConcurrencyValue(cpu)) return cpu;
+      const hardwareConcurrencyValue = __navScalarState.hardwareConcurrency;
+      if (__navIsValidHardwareConcurrencyValue(hardwareConcurrencyValue)) return hardwareConcurrencyValue;
       __navDiagPipeline('warn', 'nav_total_set:hardwareConcurrency_invalid_profile', {
         stage: 'runtime',
         key: 'hardwareConcurrency',
         message: 'invalid hardwareConcurrency profile value',
-        data: { outcome: 'return', reason: 'invalid_profile_value', value: cpu }
+        data: { outcome: 'return', reason: 'invalid_profile_value', value: hardwareConcurrencyValue }
       });
       return __navReadNativeScalarFallback(nativeHardwareConcurrencyDesc, this, 'hardwareConcurrency', 'nav_total_set:hardwareConcurrency');
     } : null, 'nav_total_set:hardwareConcurrency');
     patchStrictScalarAccessor('language', 'language' in navProto ? function navLanguageValue() {
-      const primaryLanguage = __navPrimaryLanguage;
-      const normalizedLanguages = __navNormalizedLanguages;
+      const primaryLanguage = __navScalarState.language;
+      const normalizedLanguages = __navScalarState.languages;
       if (__navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0]) {
         return primaryLanguage;
       }
@@ -1818,8 +1872,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return __navReadNativeScalarFallback(nativeLanguageDesc, this, 'language', 'nav_total_set:language');
     } : null, 'nav_total_set:language');
     patchStrictScalarAccessor('languages', 'languages' in navProto ? function navLanguagesValue() {
-      const primaryLanguage = __navPrimaryLanguage;
-      const normalizedLanguages = __navNormalizedLanguages;
+      const primaryLanguage = __navScalarState.language;
+      const normalizedLanguages = __navScalarState.languages;
       if (__navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0]) {
         return normalizedLanguages;
       }
@@ -2572,6 +2626,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         description: safeString(pl.description),
         mimeTypes:   fakeMimeTypes.filter(m => m.pluginIndex === i)
       }));
+      __navObjectState.plugins = __navCloneStateValue(fakePlugins);
+      __navObjectState.mimeTypes = __navCloneStateValue(fakeMimeTypes);
 
       // --- Caching (one instance per page) ---
       let __PLUGIN_ARRAY_SINGLETON__ = null;
@@ -2679,12 +2735,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       // Getters - like in ORIG: enumerable: true
       if ('plugins' in navigator) {
         patchObjectReturnAccessor('plugins', function pluginsAccessorValue() {
-          return createPluginArray(fakePlugins);
+          return createPluginArray(Array.isArray(__navObjectState.plugins) ? __navObjectState.plugins : []);
         }, 'nav_total_set:plugins');
       }
       if ('mimeTypes' in navigator) {
         patchObjectReturnAccessor('mimeTypes', function mimeTypesAccessorValue() {
-          return createMimeTypeArray(fakePlugins);
+          return createMimeTypeArray(Array.isArray(__navObjectState.plugins) ? __navObjectState.plugins : []);
         }, 'nav_total_set:mimeTypes');
       }
 
