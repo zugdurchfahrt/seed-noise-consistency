@@ -374,6 +374,47 @@ def init_driver(
             # --- logger after bootstrap owner-space ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
+            f"""
+            (function initWorkerscopeOwnerSpace(win) {{
+                const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
+                    ? win.CanvasPatchContext
+                    : null;
+                if (!C) throw new Error('WorkerscopeInit: CanvasPatchContext missing');
+                const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+                if (!stateRoot) throw new Error('WorkerscopeInit: CanvasPatchContext.state missing');
+                function defineHidden(obj, key, value) {{
+                    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+                    const desc = Object.getOwnPropertyDescriptor(obj, key);
+                    if (desc && desc.configurable === false) {{
+                        return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
+                    }}
+                    Object.defineProperty(obj, key, {{
+                        value: value,
+                        writable: true,
+                        configurable: true,
+                        enumerable: false
+                    }});
+                    return value;
+                }}
+                const wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+                    ? stateRoot.__WRK__
+                    : defineHidden(stateRoot, '__WRK__', Object.create(null));
+                defineHidden(wrkState, 'bootstrap', Object.create(null));
+                const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+                    ? C.__wrkRuntime__
+                    : defineHidden(C, '__wrkRuntime__', Object.create(null));
+                const wrkHooks = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
+                    ? C.__wrkHooks__
+                    : defineHidden(C, '__wrkHooks__', Object.create(null));
+                if (!wrkHooks || typeof wrkHooks !== 'object') throw new Error('WorkerscopeInit: __wrkHooks__ missing');
+                const inlinePatch = {json.dumps(worker_patch_src)};
+                const inlineReflect = {json.dumps(worker_reflect_src)};
+                if (typeof inlinePatch !== 'string' || !inlinePatch) throw new Error('WorkerscopeInit: inlinePatch missing');
+                if (typeof inlineReflect !== 'string' || !inlineReflect) throw new Error('WorkerscopeInit: inlineReflect missing');
+                defineHidden(wrkRuntime, 'inlinePatch', inlinePatch);
+                defineHidden(wrkRuntime, 'inlineReflect', inlineReflect);
+            }})(window);
+            """,
             Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
             # --- core window ---
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
@@ -408,11 +449,10 @@ def init_driver(
             # --- webgl ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "webgl.js").read_text("utf-8"),
             "WebglPatchModule(window);",
-            #  --- workers (bootstrap/hooks). No direct module call here unless you have one.
-            f"const __WORKER_PATCH_INLINE_SRC__ = {json.dumps(worker_patch_src)};",
-            f"const __WORKER_REFLECT_INLINE_SRC__ = {json.dumps(worker_reflect_src)};",
+            # --- workerscope closure section ---
             Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
             "WrkModule(window);",
+            Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8"),
             # --- webgpu WL ---
             Path(SCRIPTS_PATCHES_GRAPHICS / "WebgpuWL.js").read_text("utf-8"),
             "WebgpuWLBootstrap(window);",
@@ -436,18 +476,6 @@ def init_driver(
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
-            // ——— Worker env diagnostics (pre-bootstrap) ———//
-            //  console.info('[DIAG.preBoot]', window.WorkerPatchHooks.diag && window.WorkerPatchHooks.diag());
-            const L = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
-            if (L && L.__PROBE_LIVE_READER__ && typeof L.__PROBE_LIVE_READER__.start === 'function') {
-                L.__PROBE_LIVE_READER__.start();
-            }
-            if (L && typeof L.DIAG_SCREEN_ON === 'function') {
-                L.DIAG_SCREEN_ON({ criticalOnly: false, includeData: true, lastN: 180 });
-            }
-            if (L && typeof L.__DIAG_ALERTS__ === 'function') {
-                L.__DIAG_ALERTS__({ limit: 150, sinceIndex: 0, criticalOnly: false, includeData: true, includeRaw: true });
-            }
             })(window);
             (function runBootstrapEnvCleanup(win) {
                 const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
@@ -641,79 +669,6 @@ def init_driver(
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
     inject_uach_strip_window(driver, user_agent)
-
-    # --- Workers Initial patch reading ---
-    core = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
-    logger.info("WORKER_PATCH_SRC.initated")
-    set_reflect = Path(SCRIPTS_WORKERSCOPE / "set_reflect.js").read_text("utf-8")
-
-    worker_bootstrap_env_js = f"""
-    (() => {{
-        const bridgeDesc = Object.getOwnPropertyDescriptor(window, '__ENV_BRIDGE__');
-        let BR = bridgeDesc ? (('value' in bridgeDesc) ? bridgeDesc.value : window.__ENV_BRIDGE__) : window.__ENV_BRIDGE__;
-        if (BR == null) {{
-            BR = {{}};
-            Object.defineProperty(window, '__ENV_BRIDGE__', {{
-                value: BR,
-                writable: true,
-                configurable: true,
-                enumerable: false
-            }});
-        }} else if (typeof BR !== 'object') {{
-            throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-        }} else if (bridgeDesc && bridgeDesc.enumerable !== false) {{
-            if (bridgeDesc.configurable === false) throw new Error('WorkerBootstrap: __ENV_BRIDGE__ non-configurable enumerable');
-            if ('value' in bridgeDesc) {{
-                Object.defineProperty(window, '__ENV_BRIDGE__', {{
-                    value: BR,
-                    writable: !!bridgeDesc.writable,
-                    configurable: true,
-                    enumerable: false
-                }});
-            }} else {{
-                Object.defineProperty(window, '__ENV_BRIDGE__', {{
-                    get: bridgeDesc.get,
-                    set: bridgeDesc.set,
-                    configurable: true,
-                    enumerable: false
-                }});
-            }}
-        }}
-        if (!BR || typeof BR !== 'object') throw new Error('WorkerBootstrap: __ENV_BRIDGE__ missing');
-        const core = {json.dumps(core)};
-        const set_reflect = {json.dumps(set_reflect)};
-        if (!BR.inlinePatch) {{
-            BR.inlinePatch = core;
-        }} else if (BR.inlinePatch !== core) {{
-            throw new Error('WorkerBootstrap: inlinePatch already set');
-        }}
-        if (!BR.inlineReflect) {{
-            BR.inlineReflect = set_reflect;
-        }} else if (BR.inlineReflect !== set_reflect) {{
-            throw new Error('WorkerBootstrap: inlineReflect already set');
-        }}
-    }})();
-    //# sourceURL=worker_bootstrap_env.js
-    """
-
-    worker_bootstrap_js = f"""
-    (() => {{
-        const __WORKER_PATCH_INLINE_SRC__ = {json.dumps(core)};
-        const __WORKER_REFLECT_INLINE_SRC__ = {json.dumps(set_reflect)};
-        {Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8")}
-    }})();
-    //# sourceURL=worker_bootstrap_bundle.js
-    """
-
-    # Publish worker patch carrier first:
-    # - worker_bootstrap_env_js sets __ENV_BRIDGE__.inlinePatch/__ENV_BRIDGE__.inlineReflect
-    # This restores a stable shared carrier across script boundaries.
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_env_js})
-
-    # Publish worker patch bootstrap next:
-    # - worker_bootstrap.js reads stable carrier and still has inline fallback
-    # This preserves existing bootstrap URL preparation while restoring old transport semantics.
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": worker_bootstrap_js})
 
     # Connect page_js (core + targets + wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})

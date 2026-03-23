@@ -148,8 +148,8 @@ const WrkModule = function WrkModule(window) {
   }
 
   function __resolveWorkerReflectSource__() {
-    const reflectSrc = (typeof __WORKER_REFLECT_INLINE_SRC__ === 'string' && __WORKER_REFLECT_INLINE_SRC__)
-      ? __WORKER_REFLECT_INLINE_SRC__
+    const reflectSrc = (typeof __wrkRuntimeGet__('inlineReflect') === 'string' && __wrkRuntimeGet__('inlineReflect'))
+      ? __wrkRuntimeGet__('inlineReflect')
       : null;
     return reflectSrc;
   }
@@ -204,14 +204,6 @@ const WrkModule = function WrkModule(window) {
     const hooksRoot = __ensureWrkHooksRoot__();
     if (!hooksRoot) return hooks;
     __setHiddenValue__(hooksRoot, 'WorkerPatchHooks', hooks);
-    if (G && (!Object.prototype.hasOwnProperty.call(G, 'WorkerPatchHooks') || G.WorkerPatchHooks !== hooks)) {
-      const globalHooksDesc = Object.getOwnPropertyDescriptor(G, 'WorkerPatchHooks');
-      if (globalHooksDesc && !Object.prototype.hasOwnProperty.call(globalHooksDesc, 'value') && typeof globalHooksDesc.set === 'function') {
-        G.WorkerPatchHooks = hooks;
-      } else {
-        __setHiddenValue__(G, 'WorkerPatchHooks', hooks);
-      }
-    }
     __wrkRuntimeSet__('workerPatchHooksReady', true);
     return hooks;
   }

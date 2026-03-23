@@ -121,18 +121,16 @@
       ? hooksRoot.WorkerPatchHooks
       : null;
     if (ownedHooks) return ownedHooks;
-    const globalHooks = (W && W.WorkerPatchHooks && typeof W.WorkerPatchHooks === 'object' && typeof W.WorkerPatchHooks.initAll === 'function')
-      ? W.WorkerPatchHooks
-      : null;
-    return globalHooks ? __captureWorkerPatchHooks(globalHooks) : null;
+    return null;
   }
 
   function __resolveInlineWorkerSources() {
-    const inlinePatch = (typeof __WORKER_PATCH_INLINE_SRC__ === 'string' && __WORKER_PATCH_INLINE_SRC__)
-      ? __WORKER_PATCH_INLINE_SRC__
+    const runtimeRoot = __ensureWrkRuntimeRoot();
+    const inlinePatch = (runtimeRoot && typeof runtimeRoot.inlinePatch === 'string' && runtimeRoot.inlinePatch)
+      ? runtimeRoot.inlinePatch
       : null;
-    const inlineReflect = (typeof __WORKER_REFLECT_INLINE_SRC__ === 'string' && __WORKER_REFLECT_INLINE_SRC__)
-      ? __WORKER_REFLECT_INLINE_SRC__
+    const inlineReflect = (runtimeRoot && typeof runtimeRoot.inlineReflect === 'string' && runtimeRoot.inlineReflect)
+      ? runtimeRoot.inlineReflect
       : null;
     return { inlinePatch, inlineReflect };
   }
@@ -424,50 +422,19 @@
       }
     }
 
-    if (__resolveWorkerPatchHooks()) {
-      boot();
-    } else {
-      let _h;
-      Object.defineProperty(W, 'WorkerPatchHooks', {
-        configurable: true,
-        get() { return _h; },
-        set(v) {
-          _h = v;
-
-          // one-shot: accept the first valid hooks object, run boot(), then replace accessor
-          // with a plain value property to prevent re-entry in the same document.
-          if (v && typeof v === 'object' && typeof v.initAll === 'function') {
-            try {
-              __captureWorkerPatchHooks(v);
-              Object.defineProperty(W, 'WorkerPatchHooks', {
-                value: v,
-                writable: true,
-                configurable: true,
-                enumerable: false
-              });
-            } catch (e) {
-              __moduleDiag('warn', __MODULE + ':hooks_lock_failed', {
-                stage: 'guard',
-                key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
-                message: 'failed to lock WorkerPatchHooks to plain property',
-                type: 'browser structure missing data',
-                data: { outcome: 'skip', reason: 'hooks_lock_failed' }
-              }, e);
-            }
-            boot();
-            return;
-          }
-
-          __moduleDiag('warn', __MODULE + ':hooks_invalid', {
-            stage: 'preflight',
-            key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
-            message: 'WorkerPatchHooks set to invalid value; waiting for valid initAll',
-            type: 'pipeline missing data',
-            data: { outcome: 'skip', reason: 'hooks_invalid' }
-          }, null);
-        }
-      });
+    const hooks = __resolveWorkerPatchHooks();
+    if (!hooks) {
+      const err = new Error('WorkerBootstrap: WorkerPatchHooks missing');
+      __moduleDiag('error', __MODULE + ':hooks_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
+        message: 'WorkerPatchHooks missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'hooks_missing' }
+      }, err);
+      throw err;
     }
+    boot();
   } catch (e) {
     __moduleDiag('error', __MODULE + ':fatal', {
       stage: 'apply',
