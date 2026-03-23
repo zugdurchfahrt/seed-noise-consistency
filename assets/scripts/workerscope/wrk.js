@@ -347,8 +347,8 @@ const WrkModule = function WrkModule(window) {
         'SafeSharedWorkerOverride',
         'ServiceWorkerOverride'
       ],
-      final: [
-        '__ENV_HUB__',
+      deleteFinal: [
+        '__ENV_BRIDGE__',
         '__lastSnap__',
         '__LAST_UACH_HE__',
         '__UACH_HE_READY__',
@@ -356,7 +356,6 @@ const WrkModule = function WrkModule(window) {
         '__PATCHED_SAFE_WORKER__',
         '__PATCHED_SHARED_WORKER__',
         '__PATCHED_SERVICE_WORKER__',
-        '__BLOB_URL_STORE__',
         '__LAST_WORKER_BOOTSTRAP_ERROR__',
         '__LAST_WORKER_USER_URL_LOADED__',
         '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
@@ -366,7 +365,11 @@ const WrkModule = function WrkModule(window) {
         'SafeWorkerOverride',
         'SafeSharedWorkerOverride',
         'ServiceWorkerOverride',
-        'WorkerPatchHooks',
+        'WorkerPatchHooks'
+      ],
+      final: [
+        '__ENV_HUB__',
+        '__BLOB_URL_STORE__',
         'CanvasPatchContext',
         '__CORE_TOSTRING_STATE__'
       ],
@@ -1734,7 +1737,7 @@ function SafeWorkerOverride(G){
           message: 'worker bootstrap error store failed',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'worker_bootstrap_error_store_failed' }
-        }, () => { G.__LAST_WORKER_BOOTSTRAP_ERROR__ = bootErr; });
+        }, () => { __wrkRuntimeSet__('lastWorkerBootstrapError', bootErr); });
         emitWorkerBootstrapDegrade(G, 'Worker', bootErr);
         __wrkBestEffort('wrk:worker_bootstrap_stop_propagation_failed', {
           stage: 'runtime',
@@ -1766,7 +1769,7 @@ function SafeWorkerOverride(G){
           message: 'worker loaded url store failed',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'worker_loaded_store_failed' }
-        }, () => { G.__LAST_WORKER_USER_URL_LOADED__ = loaded; });
+        }, () => { __wrkRuntimeSet__('lastWorkerUserUrlLoaded', loaded); });
         // скрываем внутренний сигнал от внешних слушателей
         __wrkBestEffort('wrk:worker_loaded_stop_propagation_failed', {
           stage: 'runtime',
@@ -1808,7 +1811,7 @@ function SafeWorkerOverride(G){
       message: 'worker debug mark failed',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'worker_debug_mark_failed' }
-    }, () => { G.__PATCHED_SAFE_WORKER__ = true; });
+    }, () => { __wrkRuntimeSet__('patchedSafeWorker', true); });
     __wrkDiag('info', 'wrk:worker_installed', {
       stage: 'apply',
       key: 'Worker',
@@ -1938,7 +1941,7 @@ function SafeSharedWorkerOverride(G){
               message: 'shared worker bootstrap error store failed',
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'shared_worker_bootstrap_error_store_failed' }
-            }, () => { G.__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__ = bootErr; });
+            }, () => { __wrkRuntimeSet__('lastSharedWorkerBootstrapError', bootErr); });
             emitWorkerBootstrapDegrade(G, 'SharedWorker', bootErr);
           }
           const loaded = data.__ENV_USER_URL_LOADED__;
@@ -1950,7 +1953,7 @@ function SafeSharedWorkerOverride(G){
               message: 'shared worker loaded url store failed',
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'shared_worker_loaded_store_failed' }
-            }, () => { G.__LAST_SHARED_WORKER_USER_URL_LOADED__ = loaded; });
+            }, () => { __wrkRuntimeSet__('lastSharedWorkerUserUrlLoaded', loaded); });
           }
           const ok = data.__ENV_PATCH_OK__;
           if (ok === true) {
@@ -1974,7 +1977,7 @@ function SafeSharedWorkerOverride(G){
               message: 'shared worker patch-ok store failed',
               type: 'pipeline missing data',
               data: { outcome: 'skip', reason: 'shared_worker_patch_ok_store_failed' }
-            }, () => { G.__LAST_SHARED_WORKER_PATCH_OK__ = true; });
+            }, () => { __wrkRuntimeSet__('lastSharedWorkerPatchOk', true); });
           }
           if (internal) {
             __wrkBestEffort('wrk:shared_worker_stop_propagation_failed', {
@@ -2018,7 +2021,7 @@ function SafeSharedWorkerOverride(G){
       message: 'shared worker debug mark failed',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'shared_worker_debug_mark_failed' }
-    }, () => { G.__PATCHED_SHARED_WORKER__ = true; });
+    }, () => { __wrkRuntimeSet__('patchedSharedWorker', true); });
     __wrkDiag('info', 'wrk:shared_worker_installed', {
       stage: 'apply',
       key: 'SharedWorker',
@@ -2113,7 +2116,7 @@ function ServiceWorkerOverride(G){
           message: 'service worker already-installed mark failed',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'service_worker_already_mark_failed' }
-        }, () => { G.__PATCHED_SERVICE_WORKER__ = true; });
+        }, () => { __wrkRuntimeSet__('patchedServiceWorker', true); });
       }
       __wrkDiag('info', 'wrk:service_worker_already_installed', {
         stage: 'guard',
@@ -2371,7 +2374,7 @@ function ServiceWorkerOverride(G){
       message: 'service worker debug mark failed',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'service_worker_debug_mark_failed' }
-    }, () => { G.__PATCHED_SERVICE_WORKER__ = true; });
+    }, () => { __wrkRuntimeSet__('patchedServiceWorker', true); });
   }
   __wrkDiag('info', 'wrk:service_worker_installed', {
     stage: 'apply',
@@ -2443,7 +2446,8 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
 
   // 4) HE-догонка (не блокирует загрузку, без «N»/«Nav»)
   function snapshotHE(keys){
-    if (G.__UACH_HE_PROMISE__) return G.__UACH_HE_PROMISE__;
+    const existingPromise = __wrkRuntimeGet__('uachHePromise');
+    if (existingPromise && typeof existingPromise.then === 'function') return existingPromise;
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','fullVersionList','formFactors','wow64'];
@@ -2461,11 +2465,11 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
       he[k] = __wrkCloneEnvValue__(v);
     }
     const p = Promise.resolve(he).then(result => {
-      G.__LAST_UACH_HE__ = result;
-      G.__UACH_HE_READY__ = true;
+      __wrkRuntimeSet__('lastUachHe', result);
+      __wrkRuntimeSet__('uachHeReady', true);
       return result;
     });
-    G.__UACH_HE_PROMISE__ = p;
+    __wrkRuntimeSet__('uachHePromise', p);
     return p;
   }
 
@@ -2487,7 +2491,7 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
       hasHub:        !!G.__ENV_HUB__,
       workerWrapped: !!(G.Worker && (G.Worker.__ENV_WRAPPED__ || /WrappedWorker/.test(String(G.Worker)))),
       sharedWrapped: !!(G.SharedWorker && G.SharedWorker.__ENV_WRAPPED__),
-      swWrapped:     !!G.__PATCHED_SERVICE_WORKER__,
+      swWrapped:     !!__wrkRuntimeGet__('patchedServiceWorker'),
       bridge: {
         mkClassic: typeof workerPatchApi.mkClassicWorkerSource === 'function',
         mkModule:  typeof workerPatchApi.mkModuleWorkerSource  === 'function',
@@ -2513,6 +2517,36 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
   try {
     const win = G;
     if (win && (typeof win === 'object' || typeof win === 'function')) {
+      for (const k of __hiddenSurfaceState.deleteFinal) {
+        if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
+        const d = Object.getOwnPropertyDescriptor(win, k);
+        if (!d) continue;
+        if (d.configurable === false) {
+          __hiddenSurfaceState.applied[k] = 'skip_nonconfigurable';
+          const e = new Error('[WrkModule] deletePipelineSurface non-configurable: ' + k);
+          __wrkDiag('warn', 'wrk:delete_pipeline_surface_nonconfigurable', {
+            stage: 'apply',
+            key: k,
+            message: 'delete pipeline surface skipped: non-configurable',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'delete_pipeline_surface_nonconfigurable' }
+          }, e);
+          continue;
+        }
+        try {
+          delete win[k];
+          __hiddenSurfaceState.applied[k] = 'deleted';
+        } catch (e) {
+          __hiddenSurfaceState.applied[k] = 'delete_failed';
+          __wrkDiag('warn', 'wrk:delete_pipeline_surface_failed', {
+            stage: 'apply',
+            key: k,
+            message: 'delete pipeline surface failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'delete_pipeline_surface_failed' }
+          }, e);
+        }
+      }
       for (const k of __hiddenSurfaceState.final) {
         if (!Object.prototype.hasOwnProperty.call(win, k)) continue;
         const d = Object.getOwnPropertyDescriptor(win, k);
