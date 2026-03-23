@@ -135,7 +135,7 @@ const AudioContextModule = function AudioContextModule(window) {
   }
 
   const markAsNative = (function() {
-    const ensure = (typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
+    const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function') ? __core.__ensureMarkAsNative : null;
     const m = ensure ? ensure() : null;
     if (typeof m !== 'function') {
       degrade('audiocontext:mark_native_missing', new Error('[AudioContextPatch] markAsNative missing'), {
@@ -150,7 +150,7 @@ const AudioContextModule = function AudioContextModule(window) {
     return m;
   })();
   if (!markAsNative) return;
-  const safeDefine = (typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
+  const safeDefine = (__core && typeof __core.__safeDefine === 'function') ? __core.__safeDefine : null;
   const __wrapNativeApply = (__core && typeof __core.__wrapNativeApply === 'function') ? __core.__wrapNativeApply : null;
   const __wrapNativeAccessor = (__core && typeof __core.__wrapNativeAccessor === 'function') ? __core.__wrapNativeAccessor : null;
   const __corePreflightTarget = (__core && typeof __core.preflightTarget === 'function')
@@ -160,11 +160,11 @@ const AudioContextModule = function AudioContextModule(window) {
     ? __core.applyTargets
     : null;
   if (typeof safeDefine !== 'function') {
-    degrade('audiocontext:safe_define_missing', new Error('[AudioContextPatch] __safeDefine missing'), {
+    degrade('audiocontext:safe_define_missing', new Error('[AudioContextPatch] Core.__safeDefine missing'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: '__safeDefine',
+      key: 'Core.__safeDefine',
       data: { outcome: 'skip', reason: 'safe_define_missing' }
     });
     return;

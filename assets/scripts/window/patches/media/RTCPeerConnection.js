@@ -158,15 +158,15 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   const safeDefine = (function() {
-    const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
+    const sd = (__core && typeof __core.__safeDefine === 'function') ? __core.__safeDefine : null;
     if (typeof sd !== 'function') return null;
     return sd;
   })();
   if (typeof safeDefine !== 'function') {
     __rtcDiag('fatal', 'rtc:safe_define_missing', {
       stage: 'preflight',
-      key: '__safeDefine',
-      message: 'safeDefine missing',
+      key: 'Core.__safeDefine',
+      message: 'Core.__safeDefine missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_safe_define' }
     }, new Error('[RTC] safeDefine missing'));
@@ -245,7 +245,7 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   const markAsNative = (function() {
-    const ensure = (window && typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
+    const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function') ? __core.__ensureMarkAsNative : null;
     const m = ensure ? ensure() : null;
     if (typeof m !== 'function') return null;
     return m;
@@ -253,8 +253,8 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   if (typeof markAsNative !== 'function') {
     __rtcDiag('fatal', 'rtc:mark_native_missing', {
       stage: 'preflight',
-      key: '__ensureMarkAsNative',
-      message: '__ensureMarkAsNative/markAsNative missing',
+      key: 'Core.__ensureMarkAsNative',
+      message: 'Core.__ensureMarkAsNative/markAsNative missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_mark_native' }
     }, new Error('[RTC] markAsNative missing'));

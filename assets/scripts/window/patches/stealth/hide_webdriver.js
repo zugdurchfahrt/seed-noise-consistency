@@ -99,15 +99,15 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   }
 
   const safeDefine = (function() {
-    const sd = (window && typeof window.__safeDefine === 'function') ? window.__safeDefine : null;
+    const sd = (Core && typeof Core.__safeDefine === 'function') ? Core.__safeDefine : null;
     if (typeof sd !== 'function') {
       degrade('hide_webdriver:safe_define_missing', new Error('[HideWebdriverPatchModule] safeDefine missing'), {
         level: 'fatal',
-        key: '__safeDefine',
+        key: 'Core.__safeDefine',
         stage: 'preflight',
-        message: 'safeDefine missing',
+        message: 'Core.__safeDefine missing',
         type: __typePipeline,
-        data: { outcome: 'skip', reason: 'safe_define_missing', missing: '__safeDefine' }
+        data: { outcome: 'skip', reason: 'safe_define_missing', missing: 'Core.__safeDefine' }
       });
       return null;
     }

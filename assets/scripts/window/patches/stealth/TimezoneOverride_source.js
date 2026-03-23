@@ -140,8 +140,8 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     const spoofedLocale = spoofedLocales ? spoofedLocales[0] : null;
 
     const safeDefine =
-      (window && typeof window.__safeDefine === "function")
-        ? window.__safeDefine
+      (__core && typeof __core.__safeDefine === "function")
+        ? __core.__safeDefine
         : function(obj, prop, desc) { Object.defineProperty(obj, prop, desc); };
 
     function applyDefaultTimeZoneOption(options) {
@@ -182,8 +182,8 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       return;
     }
 
-    const __ensureMarkAsNative = (window && typeof window.__ensureMarkAsNative === "function")
-      ? window.__ensureMarkAsNative
+    const __ensureMarkAsNative = (__core && typeof __core.__ensureMarkAsNative === "function")
+      ? __core.__ensureMarkAsNative
       : null;
     const markAsNative = __ensureMarkAsNative ? __ensureMarkAsNative() : null;
     const __wrapNativeCtor = (__core && typeof __core.__wrapNativeCtor === "function")
@@ -191,9 +191,9 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       : null;
     if (typeof markAsNative !== "function") {
       diagPipeline("warn", "tz:missing_markAsNative", {
-        key: "__ensureMarkAsNative",
+        key: "Core.__ensureMarkAsNative",
         stage: "preflight",
-        message: "__ensureMarkAsNative missing",
+        message: "Core.__ensureMarkAsNative missing",
         data: { outcome: "skip", reason: "missing_dep_markAsNative", timezone: timezone }
       }, null);
       releaseGuard(true);

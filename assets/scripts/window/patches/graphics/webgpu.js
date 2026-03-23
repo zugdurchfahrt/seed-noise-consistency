@@ -159,14 +159,14 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     return;
   }
   const markNative = (function resolveMarkNative() {
-    const ensure = typeof window.__ensureMarkAsNative === 'function' ? window.__ensureMarkAsNative : null;
+    const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function') ? __core.__ensureMarkAsNative : null;
     const m = ensure ? ensure() : null;
     if (typeof m !== 'function') {
       degrade('fatal', 'webgpu:mark_native_missing', new Error('[WebGPUPatchModule] markAsNative missing'), {
         stage: 'preflight',
         type: __webgpuTypePipeline,
-        key: 'markAsNative',
-        message: 'markAsNative missing',
+        key: 'Core.__ensureMarkAsNative',
+        message: 'Core.__ensureMarkAsNative/markAsNative missing',
         data: { outcome: 'skip', reason: 'missing_dep_markAsNative' }
       });
       return null;

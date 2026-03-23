@@ -65,15 +65,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   }
 
-  if (typeof window.__safeDefine !== 'function') {
-    safeDefine(window, '__safeDefine', {
-      value: safeDefine,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
-
   // ——— Global mask "native" + general WeakMap ———
   const nativeGetOwnProp = Object.getOwnPropertyDescriptor;
   const fpToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
@@ -214,15 +205,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     publishCoreToStringState();
   }
 
-  if (typeof window.__ensureMarkAsNative !== 'function') {
-    safeDefine(window, '__ensureMarkAsNative', {
-      value: ensureMarkAsNative,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
-
   // --- centralized native-shaped wrappers (Proxy/apply) ---
   function __throwWrapFactoryPreflight(code, key, message, err) {
     __throw(code, {
@@ -238,7 +220,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
   }
 
   function __requireMarkAsNative(key, wrapperName) {
-    const ensure = (window && typeof window.__ensureMarkAsNative === 'function') ? window.__ensureMarkAsNative : null;
+    const ensure = (typeof ensureMarkAsNative === 'function') ? ensureMarkAsNative : null;
     const m = ensure ? ensure() : null;
     if (typeof m !== 'function') {
       const e = new Error('[CoreWindow] markAsNative missing');
@@ -1991,6 +1973,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
+      safeDefine(Core, '__safeDefine', {
+        value: safeDefine,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       safeDefine(Core, '__ensureMarkAsNative', {
         value: ensureMarkAsNative,
         writable: true,
@@ -2059,7 +2047,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   })();
 
-  window.__CORE_WINDOW_LOADED__ = true;
+  safeDefine(window, '__CORE_WINDOW_LOADED__', {
+    value: true,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
   __emit('info', 'core_window:ready', {
     module: 'core_window',
     diagTag: 'core_window',

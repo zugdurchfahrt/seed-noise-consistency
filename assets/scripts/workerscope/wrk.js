@@ -317,7 +317,7 @@ const WrkModule = function WrkModule(window) {
 
   try {
     const mark = (function() {
-      const ensure = (G && typeof G.__ensureMarkAsNative === 'function') ? G.__ensureMarkAsNative : null;
+      const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function') ? __core.__ensureMarkAsNative : null;
       const m = ensure ? ensure() : null;
       if (typeof m !== 'function') {
         throw new Error('[WrkModule] markAsNative missing');

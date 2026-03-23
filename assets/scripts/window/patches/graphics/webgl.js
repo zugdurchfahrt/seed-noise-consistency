@@ -182,12 +182,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
     let markNative = null;
     try {
-      if (typeof window.__ensureMarkAsNative !== 'function') {
-        throw new Error('__ensureMarkAsNative missing');
+      if (!__core || typeof __core.__ensureMarkAsNative !== 'function') {
+        throw new Error('Core.__ensureMarkAsNative missing');
       }
-      const m = window.__ensureMarkAsNative();
+      const m = __core.__ensureMarkAsNative();
       if (typeof m !== 'function') {
-        throw new Error('__ensureMarkAsNative returned non-function');
+        throw new Error('Core.__ensureMarkAsNative returned non-function');
       }
       markNative = m;
     } catch (e) {
