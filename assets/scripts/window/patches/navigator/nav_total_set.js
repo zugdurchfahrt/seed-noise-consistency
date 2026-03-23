@@ -1141,39 +1141,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // Bucket: strict scalar accessors on Navigator.prototype.
     function patchStrictScalarAccessor(key, getter, diagTag) {
-      const resolved = __navResolvePrototypeAccessorTarget(key, diagTag);
-      if (!resolved) return false;
+      const resolved = __navResolvePrototypeAccessorTarget(key, diagTag, {
+        mode: 'proto_chain'
+      });
+      if (!resolved || !resolved.owner || !resolved.desc) return false;
       const owner = resolved.owner;
       const d = resolved.desc;
-      if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
+      if (typeof getter !== 'function') {
+        throw new TypeError('nav_total_set: getter missing for ' + key);
+      }
       __navRegisterKey(key);
-      const applied = applyCoreTargetsGroup(diagTag, [{
-        owner: owner,
-        key: key,
-        kind: 'accessor',
-        wrapLayer: 'strict_accessor_gateway',
-        resolve: 'proto_chain',
-        policy: 'strict',
-        diagTag: diagTag,
-        allowCreate: false,
-        configurable: !!d.configurable,
-        enumerable: !!d.enumerable,
-        allowShapeChange: false,
-        validThis: __isNavigatorThis,
-        invalidThis: 'native',
-        getImpl: function navStrictScalarGetImpl() {
+      try {
+        const wrapped = __wrapGetter(key, function navStrictScalarAccessorValue() {
           __navLogAccess(key, null, { bucket: 'strict_accessor_gateway' });
           return getter.call(this);
-        }
-      }], 'throw');
-      if (applied !== 1) {
-        __navDiag('error', `${diagTag}_define_failed`, {
+        }, d, __isNavigatorThis);
+        safeDefineAcc(owner, key, wrapped);
+      } catch (e) {
+        __navDiag('error', 'nav_total_set:strict_accessor_define_failed', {
           stage: 'apply',
           type: __navTypeBrowser,
           diagTag: diagTag,
           key: key,
-          message: `failed to define ${key}`
-        });
+          message: key + ' strict accessor define failed',
+          data: { outcome: 'throw', reason: 'apply_failed' }
+        }, e);
         return false;
       }
       return true;
@@ -1181,39 +1173,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // Bucket: object-return identity surfaces.
     function patchObjectReturnAccessor(key, getter, diagTag) {
-      const resolved = __navResolvePrototypeAccessorTarget(key, diagTag);
-      if (!resolved) return false;
+      const resolved = __navResolvePrototypeAccessorTarget(key, diagTag, {
+        mode: 'proto_chain'
+      });
+      if (!resolved || !resolved.owner || !resolved.desc) return false;
       const owner = resolved.owner;
       const d = resolved.desc;
-      if (typeof getter !== 'function') throw new TypeError(`${key}: getter missing`);
+      if (typeof getter !== 'function') {
+        throw new TypeError('nav_total_set: object-return getter missing for ' + key);
+      }
       __navRegisterKey(key);
-      const applied = applyCoreTargetsGroup(diagTag, [{
-        owner: owner,
-        key: key,
-        kind: 'accessor',
-        wrapLayer: 'object_return_gateway',
-        resolve: 'proto_chain',
-        policy: 'strict',
-        diagTag: diagTag,
-        allowCreate: false,
-        configurable: !!d.configurable,
-        enumerable: !!d.enumerable,
-        allowShapeChange: false,
-        validThis: __isNavigatorThis,
-        invalidThis: 'native',
-        getImpl: function navObjectReturnGetImpl() {
+      try {
+        const wrapped = __wrapGetter(key, function navObjectReturnAccessorValue() {
           __navLogAccess(key, null, { bucket: 'object_return_gateway' });
           return getter.call(this);
-        }
-      }], 'throw');
-      if (applied !== 1) {
-        __navDiag('error', `${diagTag}_define_failed`, {
+        }, d, __isNavigatorThis);
+        safeDefineAcc(owner, key, wrapped);
+      } catch (e) {
+        __navDiag('error', 'nav_total_set:object_return_define_failed', {
           stage: 'apply',
           type: __navTypeBrowser,
           diagTag: diagTag,
           key: key,
-          message: `failed to define ${key}`
-        });
+          message: key + ' object-return accessor define failed',
+          data: { outcome: 'throw', reason: 'apply_failed' }
+        }, e);
         return false;
       }
       return true;

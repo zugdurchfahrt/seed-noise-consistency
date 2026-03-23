@@ -542,11 +542,6 @@ __defineHiddenValue__(C, '__runBootstrapEnvCleanup__', __runBootstrapEnvCleanup_
     "__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__",
     "__LAST_SHARED_WORKER_USER_URL_LOADED__",
     "__LAST_SHARED_WORKER_PATCH_OK__",
-    "WorkerPatchHooks",
-    "WrkModule",
-    "SafeWorkerOverride",
-    "SafeSharedWorkerOverride",
-    "ServiceWorkerOverride",
     "CanvasPatchContext",
     "CanvasPatchHooks",
     "webglHooks",
@@ -558,13 +553,7 @@ __defineHiddenValue__(C, '__runBootstrapEnvCleanup__', __runBootstrapEnvCleanup_
   for (const key of hiddenSurfaceState.keys) {
     const d = Object.getOwnPropertyDescriptor(window, key);
     if (!d) {
-      Object.defineProperty(window, key, {
-        value: undefined,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      hiddenSurfaceState.applied[key] = "predefined";
+      hiddenSurfaceState.applied[key] = "skip_missing";
       continue;
     }
     if (d.enumerable === false) {

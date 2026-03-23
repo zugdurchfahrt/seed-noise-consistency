@@ -371,12 +371,7 @@ const WrkModule = function WrkModule(window) {
         '__LAST_WORKER_USER_URL_LOADED__',
         '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
         '__LAST_SHARED_WORKER_USER_URL_LOADED__',
-        '__LAST_SHARED_WORKER_PATCH_OK__',
-        'WorkerPatchHooks',
-        'WrkModule',
-        'SafeWorkerOverride',
-        'SafeSharedWorkerOverride',
-        'ServiceWorkerOverride'
+        '__LAST_SHARED_WORKER_PATCH_OK__'
       ],
       deleteFinal: [
         '__ENV_BRIDGE__',
@@ -394,12 +389,7 @@ const WrkModule = function WrkModule(window) {
         '__LAST_SHARED_WORKER_BOOTSTRAP_ERROR__',
         '__LAST_SHARED_WORKER_USER_URL_LOADED__',
         '__LAST_SHARED_WORKER_PATCH_OK__',
-        '__CORE_TOSTRING_STATE__',
-        'WrkModule',
-        'SafeWorkerOverride',
-        'SafeSharedWorkerOverride',
-        'ServiceWorkerOverride',
-        'WorkerPatchHooks'
+        '__CORE_TOSTRING_STATE__'
       ],
       final: [
         'CanvasPatchContext'
@@ -409,7 +399,8 @@ const WrkModule = function WrkModule(window) {
     for (const k of __hiddenSurfaceState.preapply) {
       const d = Object.getOwnPropertyDescriptor(G, k);
       if (!d) {
-        throw new Error('[WrkModule] bootstrap owner slot missing: ' + k);
+        __hiddenSurfaceState.applied[k] = 'absent';
+        continue;
       }
       if (d.enumerable !== false) {
         throw new Error('[WrkModule] bootstrap owner slot visible: ' + k);
@@ -1845,32 +1836,6 @@ function SafeWorkerOverride(G){
     }, null);
   }
 }
-const __safeWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'SafeWorkerOverride');
-const __safeWorkerExportDesc = __safeWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'SafeWorkerOverride') : null;
-const __safeWorkerCanFillPlaceholder = !!(__safeWorkerExportDesc && __safeWorkerExportDesc.configurable !== false && window.SafeWorkerOverride === undefined);
-if (!__safeWorkerExportOwn || __safeWorkerCanFillPlaceholder) {
-  if (!__safeWorkerExportOwn) {
-    throw new Error('[WrkModule] bootstrap owner slot missing: SafeWorkerOverride');
-  }
-  Object.defineProperty(window, 'SafeWorkerOverride', {
-    value: SafeWorkerOverride,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
-} else {
-  const d = Object.getOwnPropertyDescriptor(window, 'SafeWorkerOverride');
-  if (d && d.enumerable !== false && d.configurable !== false && typeof window.SafeWorkerOverride === 'function') {
-    Object.defineProperty(window, 'SafeWorkerOverride', {
-      value: window.SafeWorkerOverride,
-      writable: !!d.writable,
-      configurable: true,
-      enumerable: false
-    });
-  }
-}
-
-
 // === SafeSharedWorkerOverride (Shared) ===
 function SafeSharedWorkerOverride(G){
   if (!G || !G.SharedWorker) throw new Error('[SharedWorkerOverride] SharedWorker missing');
@@ -2055,33 +2020,6 @@ function SafeSharedWorkerOverride(G){
     }, null);
   }
 }
-const __safeSharedWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'SafeSharedWorkerOverride');
-const __safeSharedWorkerExportDesc = __safeSharedWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'SafeSharedWorkerOverride') : null;
-const __safeSharedWorkerCanFillPlaceholder = !!(__safeSharedWorkerExportDesc && __safeSharedWorkerExportDesc.configurable !== false && window.SafeSharedWorkerOverride === undefined);
-if (!__safeSharedWorkerExportOwn || __safeSharedWorkerCanFillPlaceholder) {
-  if (!__safeSharedWorkerExportOwn) {
-    throw new Error('[WrkModule] bootstrap owner slot missing: SafeSharedWorkerOverride');
-  }
-  Object.defineProperty(window, 'SafeSharedWorkerOverride', {
-    value: SafeSharedWorkerOverride,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
-} else {
-  const d = Object.getOwnPropertyDescriptor(window, 'SafeSharedWorkerOverride');
-  if (d && d.enumerable !== false && d.configurable !== false && typeof window.SafeSharedWorkerOverride === 'function') {
-    Object.defineProperty(window, 'SafeSharedWorkerOverride', {
-      value: window.SafeSharedWorkerOverride,
-      writable: !!d.writable,
-      configurable: true,
-      enumerable: false
-    });
-  }
-}
-
-
-
 // ===== ServiceWorker override (allow self/infra; block others; hub-friendly) =====
 function ServiceWorkerOverride(G){
   'use strict';
@@ -2408,31 +2346,6 @@ function ServiceWorkerOverride(G){
     data: { outcome: 'return' }
   }, null);
 }
-const __serviceWorkerExportOwn = Object.prototype.hasOwnProperty.call(window, 'ServiceWorkerOverride');
-const __serviceWorkerExportDesc = __serviceWorkerExportOwn ? Object.getOwnPropertyDescriptor(window, 'ServiceWorkerOverride') : null;
-const __serviceWorkerCanFillPlaceholder = !!(__serviceWorkerExportDesc && __serviceWorkerExportDesc.configurable !== false && window.ServiceWorkerOverride === undefined);
-if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
-  if (!__serviceWorkerExportOwn) {
-    throw new Error('[WrkModule] bootstrap owner slot missing: ServiceWorkerOverride');
-  }
-  Object.defineProperty(window, 'ServiceWorkerOverride', {
-    value: ServiceWorkerOverride,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
-} else {
-  const d = Object.getOwnPropertyDescriptor(window, 'ServiceWorkerOverride');
-  if (d && d.enumerable !== false && d.configurable !== false && typeof window.ServiceWorkerOverride === 'function') {
-    Object.defineProperty(window, 'ServiceWorkerOverride', {
-      value: window.ServiceWorkerOverride,
-      writable: !!d.writable,
-      configurable: true,
-      enumerable: false
-    });
-  }
-}
-
 // === WorkerPatchHooks: оркестратор ===
 (function WorkerPatchHooks(G){
   const hooksRoot = __ensureWrkHooksRoot__();
@@ -2647,29 +2560,3 @@ if (!__serviceWorkerExportOwn || __serviceWorkerCanFillPlaceholder) {
     throw e;
   }
 }; // <-- закрыли WrkModule
-
-// --- export WrkModule globally (stable regardless of load order) ---
-const __wrkModuleExportOwn = Object.prototype.hasOwnProperty.call(globalThis, 'WrkModule');
-const __wrkModuleExportDesc = __wrkModuleExportOwn ? Object.getOwnPropertyDescriptor(globalThis, 'WrkModule') : null;
-const __wrkModuleCanFillPlaceholder = !!(__wrkModuleExportDesc && __wrkModuleExportDesc.configurable !== false && globalThis.WrkModule === undefined);
-if (!__wrkModuleExportOwn || __wrkModuleCanFillPlaceholder) {
-  if (!__wrkModuleExportOwn) {
-    throw new Error('[WrkModule] bootstrap owner slot missing: WrkModule');
-  }
-  Object.defineProperty(globalThis, 'WrkModule', {
-    value: WrkModule,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
-} else {
-  const d = Object.getOwnPropertyDescriptor(globalThis, 'WrkModule');
-  if (d && d.enumerable !== false && d.configurable !== false && typeof globalThis.WrkModule === 'function') {
-    Object.defineProperty(globalThis, 'WrkModule', {
-      value: globalThis.WrkModule,
-      writable: !!d.writable,
-      configurable: true,
-      enumerable: false
-    });
-  }
-}
