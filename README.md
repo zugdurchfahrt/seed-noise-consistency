@@ -35,7 +35,6 @@ Research / non-commercial; released “as is”. No stability guarantees.
 Built by a single author — scenario/OS coverage is limited. Forks and contributions are welcome.  
 See Issues/TODO for applicability limitations.  
 Executed only on Windows + ProtonVPN (OpenVPN CLI). Other OS/VPNs not tested.  
-Freeze: 2025-09-11 (docs & fixes will be considered).  
 In sum, the pipeline is being initialised and the script is being executed. The designated tasks are being carried out, just several surfaces have been patched.
 
 ## License
