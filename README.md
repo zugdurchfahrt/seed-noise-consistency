@@ -26,8 +26,8 @@ Understand how fonts, WebGL, Client Hints, plug-ins and other components affect 
 Maintain oversight of fingerprinting and its replication through profiling and network layer management.
 
 ## Configuration & principles
-There is no hardcoding: the values of the profile variables are not hardwired; instead, they are compiled into dictionaries and exported to `window.__*`. Then, they are assigned to the respective profile fields.  
-MDN/Chromium compatibility: hooks stay within native API boundaries; avoid Illegal invocation.  
+There is no hardcoding: profile values are assembled from dictionaries/profile data and exposed through `window.__*` only as bootstrap/bridge inputs. The actual patch logic, helpers, and intermediate state are progressively moved into module-local closure state instead of being kept as long-lived public globals.  
+MDN/Chromium compatibility: hooks stay within native API boundaries, with closure-owned routing/helpers used to preserve receiver/owner contracts and avoid Illegal invocation.  
 `__GLOBAL_SEED` / DPR / device metrics: synchronized through initialization variables.
 
 ## Project status
