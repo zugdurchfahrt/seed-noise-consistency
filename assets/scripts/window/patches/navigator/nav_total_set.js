@@ -3,18 +3,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     let __navGuardToken = null;
     const G = (typeof globalThis !== 'undefined' && globalThis)
       || (typeof self !== 'undefined' && self)
-      || (typeof window !== 'undefined' && window)
       || {};
     const __tag = 'nav_total_set';
     const __surface = 'navigator';
     const __flagKey = '__PATCH_NAVTOTALSET__';
-    const __core = window.Core;
+    const __windowRef = (window && (typeof window === 'object' || typeof window === 'function'))
+      ? window
+      : null;
+    const C = (__windowRef && __windowRef.CanvasPatchContext && (typeof __windowRef.CanvasPatchContext === 'object' || typeof __windowRef.CanvasPatchContext === 'function'))
+      ? __windowRef.CanvasPatchContext
+      : null;
+    const __core = (__windowRef && __windowRef.Core && (typeof __windowRef.Core === 'object' || typeof __windowRef.Core === 'function'))
+      ? __windowRef.Core
+      : null;
     const __navTypePipeline = 'pipeline missing data';
     const __navTypeBrowser = 'browser structure missing data';
 
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
-    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-      ? window.CanvasPatchContext.__logger
+    const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object')
+      ? C.__logger
       : null;
     const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -115,7 +122,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     if (!__navGuardToken) return; // already_patched: Core emits nav_total_set:already_patched
     // Must run in Window realm (not Worker)
-    if (typeof document === 'undefined' || !window || window.document !== document) {
+    if (typeof document === 'undefined' || !__windowRef || __windowRef.document !== document) {
       __navDiagBrowser('warn', 'nav_total_set:not_window_realm', {
         stage: 'preflight',
         message: 'not in Window realm',
@@ -125,7 +132,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return;
     }
 
-    const C = window.CanvasPatchContext;
     if (!C) {
       __navDiagPipeline('warn', 'nav_total_set:canvas_patch_context_missing', {
         stage: 'preflight',
@@ -251,6 +257,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'wrap_strict_accessor_missing');
       return;
     }
+    const __envProfileState = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+      ? __stateRoot.__ENV_PROFILE__
+      : null;
+    if (!__envProfileState) {
+      __navDiagPipeline('error', 'nav_total_set:env_profile_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__ENV_PROFILE__',
+        message: 'CanvasPatchContext.state.__ENV_PROFILE__ missing',
+        data: { outcome: 'skip', reason: 'env_profile_missing' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'env_profile_missing');
+      return;
+    }
     const __navLangState = (__stateRoot && __stateRoot.__LANG_STATE__ && typeof __stateRoot.__LANG_STATE__ === 'object')
       ? __stateRoot.__LANG_STATE__
       : ((C && C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') ? C.__LANG_STATE__ : null);
@@ -259,10 +278,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       : null;
     const __navPrimaryLanguage = (__navLangState && typeof __navLangState.primaryLanguage === 'string' && __navLangState.primaryLanguage)
       ? __navLangState.primaryLanguage
-      : ((typeof window.__primaryLanguage === 'string' && window.__primaryLanguage) ? window.__primaryLanguage : null);
+      : null;
     const __navNormalizedLanguages = (__navLangState && Array.isArray(__navLangState.normalizedLanguages))
       ? __navLangState.normalizedLanguages.slice()
-      : (Array.isArray(window.__normalizedLanguages) ? __navCloneStateValue(window.__normalizedLanguages) : null);
+      : null;
     if (Array.isArray(__navNormalizedLanguages)) {
       try {
         Object.freeze(__navNormalizedLanguages);
@@ -276,8 +295,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
     }
     function registerPatchedTarget(owner, key, tag) {
-      const coreRegisterPatchedTarget = (window.Core && typeof window.Core.registerPatchedTarget === 'function')
-        ? window.Core.registerPatchedTarget
+      const coreRegisterPatchedTarget = (__core && typeof __core.registerPatchedTarget === 'function')
+        ? __core.registerPatchedTarget
         : null;
       if (typeof coreRegisterPatchedTarget !== 'function') return;
       try {
@@ -295,30 +314,30 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     try {
-    __navProfileState.meta = __navCloneStateValue(window.__EXPECTED_CLIENT_HINTS || {});
-    __navProfileState.navPlat = window.__NAV_PLATFORM__;
-    __navProfileState.generatedPlatform = window.__GENERATED_PLATFORM;
-    __navProfileState.generatedPlatformVersion = window.__GENERATED_PLATFORM_VERSION;
-    __navProfileState.userAgent = window.__USER_AGENT;
-    __navProfileState.vendor = window.__VENDOR;
-    __navProfileState.mem = Number(window.__memory);
-    __navProfileState.cpu = Number(window.__cpu);
-    __navProfileState.dpr = Number(window.__DPR);
-    __navProfileState.width = Number(window.__WIDTH ?? (window.screen && window.screen.width));
-    __navProfileState.height = Number(window.__HEIGHT ?? (window.screen && window.screen.height));
-    __navProfileState.devicesLabels = __navCloneStateValue(window.__DEVICES_LABELS);
-    __navProfileState.colorDepth = Number(window.__COLOR_DEPTH);
-    __navProfileState.orientationDom = (typeof window.__ORIENTATION !== 'undefined')
-      ? window.__ORIENTATION
+    __navProfileState.meta = __navCloneStateValue((__envProfileState.meta && typeof __envProfileState.meta === 'object') ? __envProfileState.meta : {});
+    __navProfileState.navPlat = __envProfileState.navPlat;
+    __navProfileState.generatedPlatform = __envProfileState.generatedPlatform;
+    __navProfileState.generatedPlatformVersion = __envProfileState.generatedPlatformVersion;
+    __navProfileState.userAgent = __envProfileState.userAgent;
+    __navProfileState.vendor = __envProfileState.vendor;
+    __navProfileState.mem = Number(__envProfileState.mem);
+    __navProfileState.cpu = Number(__envProfileState.cpu);
+    __navProfileState.dpr = Number(__envProfileState.dpr);
+    __navProfileState.width = Number(__envProfileState.width);
+    __navProfileState.height = Number(__envProfileState.height);
+    __navProfileState.devicesLabels = __navCloneStateValue(__envProfileState.devicesLabels);
+    __navProfileState.colorDepth = Number(__envProfileState.colorDepth);
+    __navProfileState.orientationDom = (typeof __envProfileState.orientationDom !== 'undefined')
+      ? __envProfileState.orientationDom
       : ((__navScreenState && typeof __navScreenState.orientationDom === 'string' && __navScreenState.orientationDom)
         ? __navScreenState.orientationDom
         : (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary'));
-    __navProfileState.strict = (window.__NAV_PATCH_STRICT__ !== undefined) ? !!window.__NAV_PATCH_STRICT__ : true;
-    __navProfileState.debug = !!window.__NAV_PATCH_DEBUG__;
-    __navProfileState.fullVersionList = __navCloneStateValue(window.__FULL_VERSION_LIST);
-    __navProfileState.storageQuotaMb = window.__STORAGE_QUOTA_MB;
-    __navProfileState.storageUsedPct = window.__STORAGE_USED_PCT;
-    __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(window.__PLUGIN_PROFILES__) ? window.__PLUGIN_PROFILES__ : []);
+    __navProfileState.strict = (__envProfileState.strict !== undefined) ? !!__envProfileState.strict : true;
+    __navProfileState.debug = !!__envProfileState.debug;
+    __navProfileState.fullVersionList = __navCloneStateValue(__envProfileState.fullVersionList);
+    __navProfileState.storageQuotaMb = __envProfileState.storageQuotaMb;
+    __navProfileState.storageUsedPct = __envProfileState.storageUsedPct;
+    __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(__envProfileState.pluginProfiles) ? __envProfileState.pluginProfiles : []);
     __navProfileState.primaryLanguage = __navPrimaryLanguage;
     __navProfileState.normalizedLanguages = __navCloneStateValue(__navNormalizedLanguages);
     // ---- Hard consistency for platform ----
@@ -532,7 +551,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         assert(packetMeta, 'worker_env_snapshot.meta missing');
         const packet = {
           ua: __navProfileState.userAgent,
-          vendor: __navProfileState.vendor,
           language: __navProfileState.primaryLanguage || packetMeta.language,
           languages: __navCloneStateValue(__navProfileState.normalizedLanguages || packetMeta.languages),
           deviceMemory: __navProfileState.mem,
@@ -553,7 +571,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           }
         };
         assert(typeof packet.ua === 'string' && packet.ua, 'worker_env_snapshot.ua missing');
-        assert(typeof packet.vendor === 'string', 'worker_env_snapshot.vendor missing');
         assert(typeof packet.language === 'string' && packet.language, 'worker_env_snapshot.language missing');
         assert(isStringArray(packet.languages, false), 'worker_env_snapshot.languages missing');
         assert(__navIsValidDeviceMemoryValue(packet.deviceMemory), 'worker_env_snapshot.deviceMemory missing');
@@ -906,7 +923,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           }
         }
       }
-      const Core = window.Core;
+      const Core = __core;
       if (!Core || typeof Core.applyTargets !== 'function') {
         const err = new Error('Core.applyTargets missing');
         __navDiag('error', groupTag + ':core_missing', {
@@ -1020,7 +1037,46 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return applied.length;
     }
 
+    function __navCheckNavigatorOwnShadow(key, diagTag) {
+      const navInstance = (typeof navigator !== 'undefined' && navigator) ? navigator : null;
+      if (!navInstance) return true;
+      let ownDesc = null;
+      try {
+        ownDesc = Object.getOwnPropertyDescriptor(navInstance, key) || null;
+      } catch (e) {
+        __navDiag('error', 'nav_total_set:own_shadow_check_failed', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: diagTag || 'nav_total_set',
+          key: key,
+          message: key + ' own-shadow check failed'
+        }, e);
+        return false;
+      }
+      if (!ownDesc) return true;
+      __navDiag('error', 'nav_total_set:own_shadow_detected', {
+        stage: 'preflight',
+        type: __navTypeBrowser,
+        diagTag: diagTag || 'nav_total_set',
+        key: key,
+        message: key + ' own-property shadow detected on navigator',
+        data: {
+          outcome: 'skip',
+          reason: 'instance_shadow_detected',
+          configurable: !!ownDesc.configurable,
+          enumerable: !!ownDesc.enumerable,
+          hasGetter: typeof ownDesc.get === 'function',
+          hasSetter: typeof ownDesc.set === 'function',
+          hasValue: Object.prototype.hasOwnProperty.call(ownDesc, 'value')
+        }
+      });
+      return false;
+    }
+
     function __navResolvePrototypeAccessorTarget(key, diagTag, options) {
+      if (!__navCheckNavigatorOwnShadow(key, diagTag)) {
+        return null;
+      }
       const opts = (options && typeof options === 'object') ? options : {};
       const descriptorCode = (typeof opts.descriptorCode === 'string' && opts.descriptorCode)
         ? opts.descriptorCode
@@ -1199,7 +1255,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // [REGISTRY] userAgent is handled in `override_ua_data.js` (opt-in gate).
     // Here we keep only strict scalar accessor surfaces on Navigator.prototype.
     const critical = new Set(['platform','vendor','appVersion']);
-    const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages','webdriver']);
+    const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages']);
     const objectReturnKeys = new Set(['plugins','mimeTypes','userAgentData']);
     (function patchStrictScalarAccessorsOnProto(){
       patchStrictScalarAccessor('platform', 'platform' in navProto ? () => navPlatformOut : null, 'nav_total_set:platform');

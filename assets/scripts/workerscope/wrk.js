@@ -459,7 +459,6 @@ function EnvBus(G){
       return true;
     };
     if (typeof out.ua !== 'string' || !out.ua) throw new Error('EnvBus: worker packet ua missing');
-    if (typeof out.vendor !== 'string') throw new Error('EnvBus: worker packet vendor missing');
     if (typeof out.language !== 'string' || !out.language) throw new Error('EnvBus: worker packet language missing');
     if (!isStringArray(out.languages, false)) throw new Error('EnvBus: worker packet languages missing');
     if (!Number.isFinite(Number(out.deviceMemory))) throw new Error('EnvBus: worker packet deviceMemory missing');
@@ -561,7 +560,6 @@ function EnvBus(G){
     const langs = packet.languages.slice();
     const lang = packet.language;
     const ua = packet.ua;
-    const vendor = packet.vendor;
     const dpr      = __envDpr;
     if (!dpr) throw new Error('EnvBus: __DPR missing');
     const cpu = Number(packet.hardwareConcurrency);
@@ -595,7 +593,7 @@ function EnvBus(G){
     })();
     // Snapshot contract: uaData + highEntropy (no CH transport).
     return {
-      ua, vendor, language: lang, languages: langs, dpr, cpu, mem, timeZone,
+      ua, language: lang, languages: langs, dpr, cpu, mem, timeZone,
       uaData,
       highEntropy: he,
       webgl: {
