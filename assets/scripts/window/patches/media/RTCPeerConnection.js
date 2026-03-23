@@ -55,7 +55,10 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     }
   }
 
-  if (!window.__CORE_WINDOW_LOADED__) {
+  if (!(window.Core
+        && window.Core.__internal
+        && typeof window.Core.__internal === 'object'
+        && window.Core.__internal.coreWindowLoaded === true)) {
     __rtcDiag('fatal', 'rtc:core_window_missing', {
       stage: 'preflight',
       key: 'core_window',

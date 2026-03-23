@@ -13,7 +13,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
   if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
     throw new Error('[CoreWindow] window missing');
   }
-  if (window.__CORE_WINDOW_LOADED__) return;
+  if (window.Core
+      && window.Core.__internal
+      && typeof window.Core.__internal === 'object'
+      && window.Core.__internal.coreWindowLoaded === true) {
+    return;
+  }
 
   // [MANDATORY MODULE PRELUDE] [NORMATIVE] unified adapter to C.__logger.__DEGRADE__ (module_NORMATIVE_align.md)
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
@@ -2047,7 +2052,13 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
   })();
 
-  safeDefine(window, '__CORE_WINDOW_LOADED__', {
+  const __coreInternalReadyTarget = (window.Core && window.Core.__internal && typeof window.Core.__internal === 'object')
+    ? window.Core.__internal
+    : null;
+  if (!__coreInternalReadyTarget) {
+    throw new Error('[CoreWindow] Core.__internal missing after core init');
+  }
+  safeDefine(__coreInternalReadyTarget, 'coreWindowLoaded', {
     value: true,
     writable: true,
     configurable: true,

@@ -529,7 +529,6 @@ __defineHiddenValue__(C, '__runBootstrapEnvCleanup__', __runBootstrapEnvCleanup_
     "__wrapNativeAccessor",
     "__wrapStrictAccessor",
     "__wrapNativeCtor",
-    "__CORE_WINDOW_LOADED__",
     "Core",
     "__ENV_BRIDGE__",
     "__ENV_HUB__",
