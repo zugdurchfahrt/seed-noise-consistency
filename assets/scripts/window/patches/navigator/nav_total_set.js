@@ -1152,11 +1152,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       __navRegisterKey(key);
       try {
-        const wrapped = __wrapGetter(key, function navStrictScalarAccessorValue() {
-          __navLogAccess(key, null, { bucket: 'strict_accessor_gateway' });
-          return getter.call(this);
-        }, d, __isNavigatorThis);
-        safeDefineAcc(owner, key, wrapped);
+        const applied = applyCoreTargetsGroup(diagTag, [{
+          owner: owner,
+          key: key,
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: diagTag,
+          configurable: !!d.configurable,
+          enumerable: !!d.enumerable,
+          validThis: __isNavigatorThis,
+          invalidThis: 'native',
+          getImpl: function navStrictScalarAccessorValue() {
+            __navLogAccess(key, null, { bucket: 'strict_accessor_gateway' });
+            return getter.call(this);
+          }
+        }], 'strict');
+        if (applied !== 1) {
+          throw new TypeError('nav_total_set: strict accessor apply failed for ' + key);
+        }
       } catch (e) {
         __navDiag('error', 'nav_total_set:strict_accessor_define_failed', {
           stage: 'apply',
