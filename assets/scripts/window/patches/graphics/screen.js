@@ -315,7 +315,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
   }
   function applyCoreTargetsGroup(groupTag, targets, policy) {
-    const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
+    const groupPolicy = (policy === 'throw' || policy === 'strict') ? 'throw' : 'skip';
     let plans = [];
     let groupKey = null;
     if (Array.isArray(targets)) {
@@ -378,6 +378,46 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           throw new Error('descriptor post-check mismatch');
         }
         applied.push(p);
+      }
+      const coreRegisterPatchedTarget = (__core && typeof __core.registerPatchedTarget === 'function')
+        ? __core.registerPatchedTarget
+        : null;
+      if (typeof coreRegisterPatchedTarget === 'function') {
+        for (let i = 0; i < applied.length; i++) {
+          const p = applied[i];
+          try {
+            coreRegisterPatchedTarget(p.owner, p.key);
+          } catch (registerErr) {
+            __screenDiag('error', groupTag + ':register_failed', {
+              stage: 'apply',
+              type: __screenTypePipeline,
+              diagTag: groupTag,
+              key: p.key || null,
+              message: 'registerPatchedTarget failed',
+              data: {
+                outcome: groupPolicy === 'throw' ? 'throw' : 'skip',
+                reason: 'register_failed',
+                substage: 'Core.registerPatchedTarget',
+                policy: groupPolicy
+              }
+            }, registerErr);
+            if (groupPolicy === 'throw') throw registerErr;
+          }
+        }
+      } else {
+        __screenDiag('warn', groupTag + ':missing_core_registerPatchedTarget', {
+          stage: 'preflight',
+          type: __screenTypePipeline,
+          diagTag: groupTag,
+          key: null,
+          message: 'Core.registerPatchedTarget missing',
+          data: {
+            outcome: groupPolicy === 'throw' ? 'throw' : 'skip',
+            reason: 'missing_core_registerPatchedTarget',
+            substage: 'Core.registerPatchedTarget',
+            policy: groupPolicy
+          }
+        }, null);
       }
     } catch (e) {
       let rollbackErr = null;
@@ -495,7 +535,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         if (typeof getterOrValue === 'function') return getterOrValue.call(this);
         return getterOrValue;
       }
-    }], 'skip');
+    }], 'strict');
   }
   function chooseTarget(obj, proto, prop) {
     if (obj && Object.getOwnPropertyDescriptor(obj, prop)) return obj;
@@ -536,7 +576,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           if (mqlMatches.has(this)) return mqlMatches.get(this);
           return Reflect.apply(origMatchesGet, this, []);
         }
-      }], 'skip');
+      }], 'strict');
     }
   }
   

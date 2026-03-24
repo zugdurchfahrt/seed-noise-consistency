@@ -185,6 +185,67 @@ const CoreWindowModule = function CoreWindowModule(window) {
     };
   }
 
+  function resolveNativeLabel(func) {
+    if (typeof func !== 'function') return null;
+    if (toStringOverrideMap.has(func)) {
+      const ownLabel = toStringOverrideMap.get(func);
+      if (typeof ownLabel === 'string' && ownLabel) return ownLabel;
+    }
+    let cur = func;
+    const seen = new WeakSet();
+    while (typeof cur === 'function') {
+      if (seen.has(cur)) {
+        __emit('warn', 'core_window:toString_bridge_cycle', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: 'Function.prototype.toString',
+          stage: 'runtime',
+          message: 'toString bridge cycle detected during label resolution',
+          type: 'contract violation',
+          data: { outcome: 'return' }
+        }, new Error('[CoreWindow] toString bridge cycle'));
+        return null;
+      }
+      seen.add(cur);
+      const next = toStringProxyTargetMap.get(cur);
+      if (typeof next !== 'function') break;
+      cur = next;
+      if (toStringOverrideMap.has(cur)) {
+        const nextLabel = toStringOverrideMap.get(cur);
+        if (typeof nextLabel === 'string' && nextLabel) return nextLabel;
+      }
+    }
+    return null;
+  }
+
+  {
+    const wrappedFunctionToString = new Proxy(nativeToString, {
+      apply(target, thisArg, argList) {
+        if (typeof thisArg !== 'function') {
+          return Reflect.apply(target, thisArg, argList || []);
+        }
+        const nativeLabel = resolveNativeLabel(thisArg);
+        if (typeof nativeLabel === 'string' && nativeLabel) {
+          return nativeLabel;
+        }
+        return Reflect.apply(target, thisArg, argList || []);
+      }
+    });
+    const currentProto = Reflect.getPrototypeOf(currentRealmToString);
+    toStringProxyTargetMap.set(wrappedFunctionToString, nativeToString);
+    toStringOverrideMap.set(wrappedFunctionToString, 'function toString() { [native code] }');
+    if (Reflect.setPrototypeOf(wrappedFunctionToString, currentProto) !== true) {
+      throw new Error('[CoreWindow] Function.prototype.toString prototype bridge failed');
+    }
+    safeDefine(Function.prototype, 'toString', {
+      value: wrappedFunctionToString,
+      writable: !!fpToStringDesc.writable,
+      configurable: !!fpToStringDesc.configurable,
+      enumerable: !!fpToStringDesc.enumerable
+    });
+  }
+
   // --- centralized native-shaped wrappers (Proxy/apply) ---
   function __throwWrapFactoryPreflight(code, key, message, err) {
     __throw(code, {
@@ -215,9 +276,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
   }
 
   function __resolveWrappedBridgeTarget(nativeFn, wrapperName) {
-    let bridgeTarget = (nativeFn && typeof nativeFn.__coreBridgeTarget__ === 'function')
-      ? nativeFn.__coreBridgeTarget__
-      : nativeFn;
+    let bridgeTarget = nativeFn;
     const seenBridgeTargets = new WeakSet();
     while (typeof bridgeTarget === 'function') {
       if (seenBridgeTargets.has(bridgeTarget)) {
@@ -262,6 +321,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
     if (typeof nativeFn !== 'function') {
       const e = new TypeError('[CoreWindow] __wrapNativeApply: nativeFn must be function');
       __throwWrapFactoryPreflight('core_window:wrapNativeApply:bad_nativeFn', name, '__wrapNativeApply: nativeFn must be function', e);
+    }
+    if (toStringProxyTargetMap.has(nativeFn) && toStringProxyTargetMap.get(nativeFn) !== nativeFn) {
+      const e = new TypeError('[CoreWindow] __wrapNativeApply: nativeFn already wrapped');
+      __throwWrapFactoryPreflight('core_window:wrapNativeApply:double_wrap', name, '__wrapNativeApply: nativeFn already wrapped', e);
     }
     if (typeof applyImpl !== 'function') {
       const e = new TypeError('[CoreWindow] __wrapNativeApply: applyImpl must be function');
@@ -323,6 +386,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
     if (typeof nativeFn !== 'function') {
       const e = new TypeError('[CoreWindow] __wrapNativeCtor: nativeFn must be function');
       __throwWrapFactoryPreflight('core_window:wrapNativeCtor:bad_nativeFn', name || '__wrapNativeCtor', '__wrapNativeCtor: nativeFn must be function', e);
+    }
+    if (toStringProxyTargetMap.has(nativeFn) && toStringProxyTargetMap.get(nativeFn) !== nativeFn) {
+      const e = new TypeError('[CoreWindow] __wrapNativeCtor: nativeFn already wrapped');
+      __throwWrapFactoryPreflight('core_window:wrapNativeCtor:double_wrap', name || '__wrapNativeCtor', '__wrapNativeCtor: nativeFn already wrapped', e);
     }
     if (typeof argsImpl !== 'function') {
       const e = new TypeError('[CoreWindow] __wrapNativeCtor: argsImpl must be function');
@@ -666,10 +733,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         ? existing
         : {};
 
-      const knownWrapped = new WeakSet();
       const __internal = (Core.__internal && typeof Core.__internal === 'object')
         ? Core.__internal
         : Object.create(null);
+      const knownWrapped = (__internal.knownWrapped instanceof WeakSet)
+        ? __internal.knownWrapped
+        : new WeakSet();
       const globalTargetRegistry = (__internal.targets instanceof WeakMap)
         ? __internal.targets
         : ((Core.__targetRegistry instanceof WeakMap) ? Core.__targetRegistry : new WeakMap());
@@ -681,6 +750,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       __internal.targets = globalTargetRegistry;
       __internal.__patchGuardSeq = __patchGuardSeq;
       __internal.guards = __guardRegistry;
+      __internal.knownWrapped = knownWrapped;
       __internal.prng = __prngRoot;
       if (!__isCoreToStringStateOk(__internal.coreToStringState)) {
         const nextCoreToStringState = sharedCoreToStringState || publishCoreToStringState();
@@ -1003,42 +1073,22 @@ const CoreWindowModule = function CoreWindowModule(window) {
           });
           throw e;
         }
-        if (options.mark === false || !useCoreWrapper) {
-          diagDegrade('core:wrapGetter:synthetic_no_native_getter', null, {
-            module: 'core_window',
-            diagTag: 'core:wrapGetter',
-            surface: 'core',
-            key: key || null,
-            stage: 'runtime',
-            type: 'contract violation',
-            message: 'synthetic getter path used because native getter is missing',
-            data: {
-              outcome: 'return',
-              reason: 'synthetic_no_native_getter',
-              wrapLayer: wrapLayer
-            }
-          });
-          const namedGet = Object.getOwnPropertyDescriptor(({ get [key]() {
-            if (checkThis && !checkThis(this)) {
-              return onInvalidThis(invalidThis, origGet, this, arguments);
-            }
-            return valueFromGetter(this);
-          }}), key).get;
-          const markAsNative = ensureMarkAsNative();
-          const wrapped = markAsNative(namedGet, 'get ' + key);
-          knownWrapped.add(wrapped);
-          return wrapped;
-        }
-
-        const baseGet = Object.getOwnPropertyDescriptor(({ get [key]() { return valueFromGetter(this); } }), key).get;
-        const wrapped = __wrapNativeAccessor(baseGet, 'get ' + key, function (target, thisArg, argList) {
-          if (checkThis && !checkThis(thisArg)) {
-            return onInvalidThis(invalidThis, origGet, thisArg, argList || []);
+        const e = new TypeError('[Core.wrapGetter] native getter missing');
+        diagDegrade('core:wrapGetter:synthetic_no_native_getter', e, {
+          module: 'core_window',
+          diagTag: 'core:wrapGetter',
+          surface: 'core',
+          key: key || null,
+          stage: 'contract',
+          type: 'contract violation',
+          message: 'synthetic getter path forbidden because native getter is missing',
+          data: {
+            outcome: 'throw',
+            reason: 'synthetic_no_native_getter',
+            wrapLayer: wrapLayer
           }
-          return valueFromGetter(thisArg);
         });
-        knownWrapped.add(wrapped);
-        return wrapped;
+        throw e;
       }
 
       function safeDefineAcc(target, key, getter, options) {
@@ -1062,6 +1112,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
             enumerable: d ? !!d.enumerable : enumerable
           });
           return true;
+        }
+        if (!d || typeof d.get !== 'function') {
+          throw new TypeError('[Core.safeDefineAcc] native getter missing for ' + key);
         }
         const wrappedGet = wrapGetter(key, getter, d, validThis, { invalidThis: opts.invalidThis });
         Object.defineProperty(target, key, {
@@ -1088,6 +1141,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
             enumerable: d ? !!d.enumerable : false
           });
           return true;
+        }
+        if (!d || typeof d.get !== 'function') {
+          throw new TypeError('[Core.redefineAcc] native getter missing for ' + key);
         }
         const markAsNative = ensureMarkAsNative();
         const namedGet = (typeof getImpl === 'function' && getImpl.name === '')
