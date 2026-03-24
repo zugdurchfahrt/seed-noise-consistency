@@ -1249,7 +1249,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
         const useCoreWrapper = wrapLayer === 'core_wrapper';
-        const useProxyRuntime = useCoreWrapper || isUnifiedAccessorGatewayWrapLayer(wrapLayer);
+        const useProxyRuntime = useCoreWrapper;
         if (accessorGatewayContract && useCoreWrapper) {
           const e = new TypeError('[Core.applyTargets] accessor gateway cannot use core_wrapper');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
