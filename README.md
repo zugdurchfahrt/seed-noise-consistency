@@ -161,12 +161,14 @@ If you already have a VPN set up in any other way, the script will simply use th
 
 ### JavaScript (`assets/scripts/window/core`)
 
-- `core_window.js` — main window-side bootstrap/orchestrator that composes the staged patch pipeline and controls when modules are applied.
-- `context.js` — hook registration, chaining, and shared patch mechanics for window-side modules.
+- `core_window.js`— provides the foundational layer for all other window-related modules and initializes the shared `Core` infrastructure. It contains the key runtime mechanisms: common wrappers, `Core.applyTargets`, safe descriptor installation, native shaping and `toString` masking, the `invalid-this` contract, and diagnostic utilities. It is also the place where `safeDefine`, the wrapper factory for `method` / `accessor` / `ctor`, and the logic for preserving the API’s native-looking surface are implemented.
+Defines the contract-driven patching engine through `Core.applyTargets`. That is why downstream modules rely on it as their support layer: for descriptor-safe wrapper installation, preservation of native behavior and appearance, and correct handling of `invalid receiver` and other engine-level errors while maintaining the expected native pass-through semantics.
+- `context.js` — acts as an orchestration layer for Canvas/WebGL: it assembles CanvasPatchHooks, validates the presence of exports, and registers them in a unified hook queue. It also acts as a patching gateway: it wraps `getContext`, `toDataURL` `toBlob`, `convertToBlob`, `CanvasRenderingContext2D` methods, and WebGL prototypes so that downstream modules pass through a single point of application, preventing proxy leaks, `this` loss, and broken native descriptor mechanics.
 - `prng_seed.js` — installs seed-driven PRNG state and exposes the deterministic seed context used downstream by graphics/media patches.
-- `bootstrap_hide.js` — early bootstrap/hiding helpers that must run before the broader window patch set.
-- `probe.js` — runtime probe/diagnostic surface for verifying whether critical stages were installed.
-- `set_log.js` — JS-side logging/diagnostic emitter.
+- `bootstrap_hide.js` — initializes the internal bootstrap context and moves startup values out of the public window surface into private pipeline state. It creates and maintains `CanvasPatchContext`, transfers bootstrap data into internal state objects, hides service fields from enumeration, and removes temporary global values once the required owners and retention snapshots are ready. This keeps bootstrap data available to the pipeline without leaving it exposed as public window.* properties.
+- `set_log.js` — JS-side logging/diagnostic emitter. Creates a JS-side logger/diag buffer and a unified __DEGRADE__ channel, through which pipeline incidents are collected and normalized.
+- `probe.js` — acts as the pipeline’s internal observability and self-checking layer. Extending the loop started by `set_log.js`, it inspects critical APIs after patches are loaded and validates runtime invariants, descriptor integrity, call semantics, and timeout behavior. All findings are written into the same diagnostic stream, creating a unified trace for later analysis and debugging.
+
 
 ### JavaScript (`assets/scripts/window/patches/*`)
 
@@ -233,6 +235,7 @@ NO_PROXY_START.bat
 
 - Synchronize window Canvas ↔ SharedWorkerScope Canvas.
 - Synchronize window GPU ↔ ServiceWorkerScope GPU.
+- Finalize nativization system setting.
 - Integrate `getClientRects` / `getBoundingClientRect` proxying.
 - Implement TLS fingerprint rotation via OpenSSL.
 - Treat `success/ready` events from places that only record hook installation only as `applied`: the mechanism is installed, but the result is not yet proven.
