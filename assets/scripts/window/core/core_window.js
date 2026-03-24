@@ -94,32 +94,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
   const existingCoreToStringStateOk = __isCoreToStringStateOk(existingCoreToStringState);
 
   let sharedCoreToStringState = existingCoreToStringStateOk ? existingCoreToStringState : null;
-  if (!sharedCoreToStringState) {
-    try {
-      const parentWin = window && window.parent;
-      const parentOwnedState = (parentWin && parentWin !== window && parentWin.Core && parentWin.Core.__internal && typeof parentWin.Core.__internal === 'object')
-        ? parentWin.Core.__internal.coreToStringState
-        : null;
-      const parentState = __isCoreToStringStateOk(parentOwnedState)
-        ? parentOwnedState
-        : ((parentWin && parentWin !== window) ? parentWin.__CORE_TOSTRING_STATE__ : null);
-      const parentOk = __isCoreToStringStateOk(parentState);
-      if (parentOk) {
-        sharedCoreToStringState = parentState;
-      }
-    } catch (e) {
-      __emit('warn', 'core_window:toString_parent_state_access_failed', {
-        module: 'core',
-        diagTag: 'core_window',
-        surface: 'core',
-        key: '__CORE_TOSTRING_STATE__',
-        stage: 'preflight',
-        message: 'parent state access failed',
-        type: 'browser structure missing data',
-        data: { outcome: 'return', fallback: 'local' }
-      }, e);
-    }
-  }
 
   const toStringOverrideMap = sharedCoreToStringState
     ? sharedCoreToStringState.overrideMap
@@ -170,45 +144,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
     throw new Error('[CoreWindow] Function.prototype.toString missing');
   }
 
-  function resolveNativeLabel(candidate) {
-    if (typeof candidate !== 'function') return null;
-    let current = candidate;
-    const seen = new WeakSet();
-    while (typeof current === 'function') {
-      const ownLabel = toStringOverrideMap.get(current);
-      if (typeof ownLabel === 'string' && ownLabel) return ownLabel;
-      if (seen.has(current)) break;
-      seen.add(current);
-      const next = toStringProxyTargetMap.get(current);
-      if (typeof next !== 'function') break;
-      current = next;
-    }
-    const finalLabel = toStringOverrideMap.get(current);
-    return (typeof finalLabel === 'string' && finalLabel) ? finalLabel : null;
-  }
-
-  const wrappedFunctionToString = function toString() {
-    const nativeLabel = resolveNativeLabel(this);
-    if (typeof nativeLabel === 'string' && nativeLabel) {
-      return nativeLabel;
-    }
-    return Reflect.apply(nativeToString, this, []);
-  };
-  toStringProxyTargetMap.set(wrappedFunctionToString, nativeToString);
-  toStringOverrideMap.set(wrappedFunctionToString, 'function toString() { [native code] }');
-  safeDefine(Function.prototype, 'toString', {
-    value: wrappedFunctionToString,
-    writable: !!fpToStringDesc.writable,
-    configurable: !!fpToStringDesc.configurable,
-    enumerable: !!fpToStringDesc.enumerable
-  });
-
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
     try {
-      const mapped = toStringProxyTargetMap.get(func);
-      if (typeof mapped === 'function') func = mapped;
       const nativeName = name || func.name || "";
       const label = nativeName
         ? `function ${nativeName}() { [native code] }`
@@ -2078,20 +2017,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      try {
-        const coreMark = ensureMarkAsNative();
-        coreMark(applyTargets, 'applyTargets');
-        coreMark(patchDataProp, 'patchDataProp');
-        coreMark(patchAccessor, 'patchAccessor');
-        coreMark(patchMethod, 'patchMethod');
-        coreMark(patchPromiseMethod, 'patchPromiseMethod');
-        coreMark(safeDefineAcc, 'safeDefineAcc');
-        coreMark(redefineAcc, 'redefineAcc');
-        coreMark(wrapGetter, 'wrapGetter');
-      } catch (e) {
-        diagDegrade('core:installCoreApplyTargets:mark_failed', e);
-      }
-
     } catch (e) {
       diagDegrade('core:installCoreApplyTargets:failed', e);
       throw e;
