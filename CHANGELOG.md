@@ -1,4 +1,12 @@
 # Changelog
+24.03.2026
+
+clientCode: [] on .window, DedicatedWorkerScope/SharedWorkerScope
+Aligned Screen.* accessor path
+Aligned navigator strict scalar accessors
+Aligned promise_method
+Aligned plugins/mimeTypes object-return accessor
+
 
 23.03.2026
 ## [2026-01-09 - 2026-03-23]
