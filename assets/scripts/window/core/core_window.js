@@ -1220,7 +1220,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
         const invalidThis = t.invalidThis || 'native';
         const wrapLayerInput = planItem.wrapLayer;
-        const wrapLayer = normalizeWrapLayer(wrapLayerInput);
+        let wrapLayer = normalizeWrapLayer(wrapLayerInput);
         if (wrapLayer === null) {
           const code = classifyWrapLayer(wrapLayerInput);
           const e = wrapLayerContractError(code, 'applyTargets');
@@ -1403,9 +1403,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const invokeClass = planItem.invokeClass || 'normal';
         const requiresStrictThis = invokeClass !== 'normal';
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
-        const invalidThis = requiresStrictThis ? 'throw' : (t.invalidThis || 'native');
+        const invalidThis = t.invalidThis || 'native';
         const wrapLayerInput = planItem.wrapLayer;
-        const wrapLayer = normalizeWrapLayer(wrapLayerInput);
+        let wrapLayer = normalizeWrapLayer(wrapLayerInput);
         if (wrapLayer === null) {
           const code = classifyWrapLayer(wrapLayerInput);
           const e = wrapLayerContractError(code, 'applyTargets');
@@ -1529,9 +1529,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const invokeClass = planItem.invokeClass || 'normal';
         const requiresStrictThis = invokeClass !== 'normal';
         const validThis = typeof t.validThis === 'function' ? t.validThis : null;
-        const invalidThis = requiresStrictThis ? 'throw' : (t.invalidThis || 'native');
+        const invalidThis = t.invalidThis || 'native';
         const wrapLayerInput = planItem.wrapLayer;
-        const wrapLayer = normalizeWrapLayer(wrapLayerInput);
+        let wrapLayer = normalizeWrapLayer(wrapLayerInput);
         if (wrapLayer === null) {
           const code = classifyWrapLayer(wrapLayerInput);
           const e = wrapLayerContractError(code, 'applyTargets');
@@ -1648,7 +1648,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const kind = item.kind;
         const invokeClass = normalizeInvokeClass(item.invokeClass);
         const wrapLayerInput = item.wrapLayer;
-        const wrapLayer = normalizeWrapLayer(wrapLayerInput);
+        let wrapLayer = normalizeWrapLayer(wrapLayerInput);
         const policy = normalizePolicy(item.policy);
         const tag = item.diagTag ? String(item.diagTag) : 'core:applyTargets';
         const targetId = item.targetId ? String(item.targetId) : ('pf:' + sameTargetKey(owner, key));
@@ -1698,6 +1698,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
             tag, policy, targetId, key, kind
           };
         }
+        if (kind === 'promise_method' && wrapLayer === 'core_wrapper') {
+          wrapLayer = 'named_wrapper';
+        }
         if ((kind === 'method' || kind === 'promise_method')
             && invokeClass === 'normal'
             && wrapLayer === 'core_wrapper') {
@@ -1706,7 +1709,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             tag, policy, targetId, key, kind
           };
         }
-        if ((kind === 'method' || kind === 'promise_method')
+        if (kind === 'method'
             && invokeClass === 'brand_strict'
             && wrapLayer !== 'core_wrapper') {
           return { ok: false, reason: 'wrap_layer_unsupported',
@@ -1715,7 +1718,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           };
         }
 
-        if ((kind === 'method' || kind === 'promise_method')
+        if (kind === 'method'
             && (invokeClass === 'constructor' || invokeClass === 'meta_primitive')
             && wrapLayer !== 'core_wrapper') {
           return { ok: false, reason: 'wrap_layer_unsupported',
