@@ -159,6 +159,39 @@
         throw new Error('UACHPatch: Function.prototype.toString missing');
       }
 
+      function resolveNativeLabel(candidate) {
+        if (typeof candidate !== 'function') return null;
+        var current = candidate;
+        var seen = new WeakSet();
+        while (typeof current === 'function') {
+          var ownLabel = toStringOverrideMap.get(current);
+          if (typeof ownLabel === 'string' && ownLabel) return ownLabel;
+          if (seen.has(current)) break;
+          seen.add(current);
+          var next = toStringProxyTargetMap.get(current);
+          if (typeof next !== 'function') break;
+          current = next;
+        }
+        var finalLabel = toStringOverrideMap.get(current);
+        return (typeof finalLabel === 'string' && finalLabel) ? finalLabel : null;
+      }
+
+      const wrappedFunctionToString = function toString() {
+        var nativeLabel = resolveNativeLabel(this);
+        if (typeof nativeLabel === 'string' && nativeLabel) {
+          return nativeLabel;
+        }
+        return Reflect.apply(nativeToString, this, []);
+      };
+      toStringProxyTargetMap.set(wrappedFunctionToString, nativeToString);
+      toStringOverrideMap.set(wrappedFunctionToString, 'function toString() { [native code] }');
+      Object.defineProperty(Function.prototype, 'toString', {
+        value: wrappedFunctionToString,
+        writable: !!fpToStringDesc.writable,
+        configurable: !!fpToStringDesc.configurable,
+        enumerable: !!fpToStringDesc.enumerable
+      });
+
       function publishCoreToStringState() {
         const nextState = {
           __CORE_TOSTRING_STATE__: true,

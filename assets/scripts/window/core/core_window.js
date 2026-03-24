@@ -170,6 +170,39 @@ const CoreWindowModule = function CoreWindowModule(window) {
     throw new Error('[CoreWindow] Function.prototype.toString missing');
   }
 
+  function resolveNativeLabel(candidate) {
+    if (typeof candidate !== 'function') return null;
+    let current = candidate;
+    const seen = new WeakSet();
+    while (typeof current === 'function') {
+      const ownLabel = toStringOverrideMap.get(current);
+      if (typeof ownLabel === 'string' && ownLabel) return ownLabel;
+      if (seen.has(current)) break;
+      seen.add(current);
+      const next = toStringProxyTargetMap.get(current);
+      if (typeof next !== 'function') break;
+      current = next;
+    }
+    const finalLabel = toStringOverrideMap.get(current);
+    return (typeof finalLabel === 'string' && finalLabel) ? finalLabel : null;
+  }
+
+  const wrappedFunctionToString = function toString() {
+    const nativeLabel = resolveNativeLabel(this);
+    if (typeof nativeLabel === 'string' && nativeLabel) {
+      return nativeLabel;
+    }
+    return Reflect.apply(nativeToString, this, []);
+  };
+  toStringProxyTargetMap.set(wrappedFunctionToString, nativeToString);
+  toStringOverrideMap.set(wrappedFunctionToString, 'function toString() { [native code] }');
+  safeDefine(Function.prototype, 'toString', {
+    value: wrappedFunctionToString,
+    writable: !!fpToStringDesc.writable,
+    configurable: !!fpToStringDesc.configurable,
+    enumerable: !!fpToStringDesc.enumerable
+  });
+
   // Unified global function-mask
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
