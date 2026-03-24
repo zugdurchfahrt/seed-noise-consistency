@@ -557,14 +557,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const origGet = desc && desc.get;
 
     if (typeof origGet === 'function') {
-      let wrapped;
-      wrapped = __wrapNativeAccessor(origGet, name, function (target, thisArg, argList) {
-        if (onAccess) onAccess(key, wrapped, thisArg);
-        if (checkThis && !checkThis(thisArg)) {
-          return Reflect.apply(target, thisArg, argList || []);
+      const markAsNative = __requireMarkAsNative(name, 'wrapStrictAccessor');
+      let wrapped = Object.getOwnPropertyDescriptor(({
+        get [key]() {
+          if (onAccess) onAccess(key, wrapped, this);
+          if (checkThis && !checkThis(this)) {
+            return Reflect.apply(origGet, this, []);
+          }
+          return valueFromGetter(this);
         }
-        return valueFromGetter(thisArg);
-      });
+      }), key).get;
+      wrapped = markAsNative(wrapped, name);
       return wrapped;
     }
 

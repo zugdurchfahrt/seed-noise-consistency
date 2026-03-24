@@ -530,7 +530,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       validThis(self) {
         return receiverMatchesTarget(target, self);
       },
-      invalidThis: 'throw',
+      invalidThis: 'native',
       getImpl: function screenAccessorGetImpl() {
         if (typeof getterOrValue === 'function') return getterOrValue.call(this);
         return getterOrValue;
@@ -539,7 +539,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   function chooseTarget(obj, proto, prop) {
     if (obj && Object.getOwnPropertyDescriptor(obj, prop)) return obj;
-    if (proto && Object.getOwnPropertyDescriptor(proto, prop)) return proto;
+    let cur = proto;
+    while (cur && cur !== Object.prototype) {
+      if (Object.getOwnPropertyDescriptor(cur, prop)) return cur;
+      cur = Object.getPrototypeOf(cur);
+    }
     return null;
   }
   function sameDesc(actual, expected) {
@@ -571,7 +575,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         validThis(self) {
           return receiverMatchesTarget(mqlProto, self);
         },
-        invalidThis: 'throw',
+        invalidThis: 'native',
         getImpl() {
           if (mqlMatches.has(this)) return mqlMatches.get(this);
           return Reflect.apply(origMatchesGet, this, []);
@@ -723,7 +727,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const screenProto = screenObj && Object.getPrototypeOf(screenObj);
   if (screenObj && screenProto && screenProto !== Object.prototype) {
     const setScreen = (k, get) => {
-      const target = chooseTarget(screenObj, screenProto, k);
+      const target = chooseTarget(null, screenProto, k);
       if (!target) throw new Error(`${k} descriptor missing`);
       redefineProp(target, k, get);
     };
