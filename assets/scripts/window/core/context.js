@@ -143,6 +143,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
   );
   const issuedSerializationPatchedOwners = (typeof WeakSet === 'function') ? new WeakSet() : null;
   const issuedWebGLPatchedContexts = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  const issuedGetContextPatchedOwners = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  const issuedDocumentFactoryPatchedDocs = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  let issuedOffscreenFactoryPatched = false;
 
   // === 0. Utilities ===
   const NOP = () => {};
@@ -1139,6 +1142,204 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return applied;
   }
 
+  function installIssuedGetContextMethod(owner, htmlHooks, ctx2dHooks, webglHooks) {
+    if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return 0;
+    if (issuedGetContextPatchedOwners && issuedGetContextPatchedOwners.has(owner)) return 0;
+    let proto = null;
+    if (typeof HTMLCanvasElement !== 'undefined' && owner instanceof HTMLCanvasElement) {
+      proto = HTMLCanvasElement.prototype;
+    } else if (typeof OffscreenCanvas !== 'undefined' && owner instanceof OffscreenCanvas) {
+      proto = OffscreenCanvas.prototype;
+    }
+    if (!proto) return 0;
+    if (Object.prototype.hasOwnProperty.call(owner, 'getContext')) return 0;
+    const orig = resolveKeptNative(proto, 'getContext') || proto.getContext;
+    if (typeof orig !== 'function') return 0;
+
+    const dispatch = function(boundOwner, contextId, contextAttributes) {
+      const args = Array.prototype.slice.call(arguments, 1);
+      const type = args[0];
+      const rest = args.length > 1 ? Array.prototype.slice.call(args, 1) : [];
+      const res = Reflect.apply(orig, boundOwner, args);
+      let ctx = res;
+
+      try {
+        if (ctx) {
+          installIssuedSerializationMethods(boundOwner);
+        }
+        if (type === '2d' && ctx) {
+          ctx = createSafeCtxProxy(ctx);
+          for (const hook of (ctx2dHooks || [])) {
+            try { ctx = hook.call(boundOwner, ctx, type, ...rest) || ctx; } catch (e) {
+              emitContextDiag('warn', 'context:getContext:ctx2d_hook_failed', e, {
+                stage: 'hook',
+                key: 'getContext',
+                data: { hook: hook && (hook.name || null), type: type || null }
+              });
+            }
+          }
+        }
+        if (/^webgl/.test(String(type))) {
+          if (ctx) {
+            installIssuedWebGLMethods(ctx);
+          }
+          for (const hook of (webglHooks || [])) {
+            try { hook.call(boundOwner, ctx, type, ...rest); } catch (e) {
+              emitContextDiag('warn', 'context:getContext:webgl_hook_failed', e, {
+                stage: 'hook',
+                key: 'getContext',
+                data: { hook: hook && (hook.name || null), type: type || null }
+              });
+            }
+          }
+        }
+        for (const hook of (htmlHooks || [])) {
+          try { hook.call(boundOwner, ctx, type, ...rest); } catch (e) {
+            emitContextDiag('warn', 'context:getContext:html_hook_failed', e, {
+              stage: 'hook',
+              key: 'getContext',
+              data: { hook: hook && (hook.name || null), type: type || null }
+            });
+          }
+        }
+        registerIssuedContext(ctx, type, boundOwner);
+      } catch (e) {
+        emitContextDiag('error', 'context:getContext:chain_failed', e, {
+          stage: 'hook',
+          key: 'getContext',
+          data: { type: type || null }
+        });
+        registerIssuedContext(ctx, type, boundOwner);
+      }
+
+      return ctx;
+    };
+
+    const wrapped = markAsNative(dispatch.bind(null, owner), 'getContext');
+    if (!defineIssuedMethod(owner, proto, 'getContext', wrapped)) return 0;
+    patchedMethods.add(wrapped);
+    if (issuedGetContextPatchedOwners) issuedGetContextPatchedOwners.add(owner);
+    return 1;
+  }
+
+  function installIssuedCanvasFactory(htmlHooks, ctx2dHooks, webglHooks) {
+    const doc = global && global.document;
+    if (!doc || typeof doc.createElement !== 'function') return 0;
+    if (issuedDocumentFactoryPatchedDocs && issuedDocumentFactoryPatchedDocs.has(doc)) return 0;
+    const proto = Object.getPrototypeOf(doc);
+    if (!proto) return 0;
+    let applied = 0;
+
+    const installCanvasOwner = function(canvas) {
+      if (!canvas) return;
+      installIssuedSerializationMethods(canvas);
+      installIssuedGetContextMethod(canvas, htmlHooks, ctx2dHooks, webglHooks);
+    };
+
+    const createElementOrig = proto.createElement;
+    if (typeof createElementOrig === 'function' && !Object.prototype.hasOwnProperty.call(doc, 'createElement')) {
+      const wrappedCreateElement = markAsNative(function createElement(localName, options) {
+        const el = Reflect.apply(createElementOrig, this, arguments);
+        try {
+          if (el && String(localName).toLowerCase() === 'canvas') installCanvasOwner(el);
+        } catch (e) {
+          emitContextDiag('warn', 'context:factory:createElement:decorate_failed', e, {
+            stage: 'apply',
+            key: 'createElement',
+            data: { localName: localName == null ? null : String(localName) }
+          });
+        }
+        return el;
+      }, 'createElement');
+      if (defineIssuedMethod(doc, proto, 'createElement', wrappedCreateElement)) {
+        patchedMethods.add(wrappedCreateElement);
+        applied++;
+      }
+    }
+
+    const createElementNSOrig = proto.createElementNS;
+    if (typeof createElementNSOrig === 'function' && !Object.prototype.hasOwnProperty.call(doc, 'createElementNS')) {
+      const wrappedCreateElementNS = markAsNative(function createElementNS(namespaceURI, qualifiedName, options) {
+        const el = Reflect.apply(createElementNSOrig, this, arguments);
+        try {
+          if (el && String(qualifiedName).toLowerCase() === 'canvas') installCanvasOwner(el);
+        } catch (e) {
+          emitContextDiag('warn', 'context:factory:createElementNS:decorate_failed', e, {
+            stage: 'apply',
+            key: 'createElementNS',
+            data: { qualifiedName: qualifiedName == null ? null : String(qualifiedName) }
+          });
+        }
+        return el;
+      }, 'createElementNS');
+      if (defineIssuedMethod(doc, proto, 'createElementNS', wrappedCreateElementNS)) {
+        patchedMethods.add(wrappedCreateElementNS);
+        applied++;
+      }
+    }
+
+    if (typeof doc.getElementsByTagName === 'function') {
+      try {
+        const existing = doc.getElementsByTagName('canvas');
+        for (let i = 0; existing && i < existing.length; i++) {
+          installCanvasOwner(existing[i]);
+        }
+      } catch (e) {
+        emitContextDiag('warn', 'context:factory:existing_canvas_scan_failed', e, {
+          stage: 'apply',
+          key: 'canvas',
+          data: { outcome: 'skip', reason: 'exception' }
+        });
+      }
+    }
+
+    if (issuedDocumentFactoryPatchedDocs) issuedDocumentFactoryPatchedDocs.add(doc);
+    return applied;
+  }
+
+  function installIssuedOffscreenFactory(htmlHooks, ctx2dHooks, webglHooks) {
+    if (issuedOffscreenFactoryPatched) return 0;
+    if (typeof global.OffscreenCanvas !== 'function') return 0;
+    const ctorDesc = Object.getOwnPropertyDescriptor(global, 'OffscreenCanvas');
+    const NativeOffscreenCanvas = global.OffscreenCanvas;
+    if (!ctorDesc || ctorDesc.configurable === false) return 0;
+
+    const WrappedOffscreenCanvas = markAsNative(function OffscreenCanvas(width, height) {
+      const nextTarget = (typeof new.target === 'function' && new.target !== WrappedOffscreenCanvas)
+        ? new.target
+        : NativeOffscreenCanvas;
+      const instance = Reflect.construct(NativeOffscreenCanvas, arguments, nextTarget);
+      try {
+        installIssuedSerializationMethods(instance);
+        installIssuedGetContextMethod(instance, htmlHooks, ctx2dHooks, webglHooks);
+      } catch (e) {
+        emitContextDiag('warn', 'context:factory:offscreen:decorate_failed', e, {
+          stage: 'apply',
+          key: 'OffscreenCanvas',
+          data: { outcome: 'skip', reason: 'exception' }
+        });
+      }
+      return instance;
+    }, 'OffscreenCanvas');
+
+    Object.setPrototypeOf(WrappedOffscreenCanvas, NativeOffscreenCanvas);
+    Object.defineProperty(WrappedOffscreenCanvas, 'prototype', {
+      value: NativeOffscreenCanvas.prototype,
+      writable: false,
+      configurable: false,
+      enumerable: false
+    });
+    Object.defineProperty(global, 'OffscreenCanvas', {
+      value: WrappedOffscreenCanvas,
+      writable: !!ctorDesc.writable,
+      enumerable: !!ctorDesc.enumerable,
+      configurable: !!ctorDesc.configurable
+    });
+    patchedMethods.add(WrappedOffscreenCanvas);
+    issuedOffscreenFactoryPatched = true;
+    return 1;
+  }
+
   // === 4. Brand-safe patching for CanvasRenderingContext2D (no Proxy returned) ===
   function createSafeCtxProxy(ctx){
     const proto = getCtx2DProto(ctx);
@@ -1441,16 +1642,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (state.canvas) return 0;
     if (typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype) return 0;
     captureKeepNativeRefs();
-    let applied = 0, total = 0;
-    for (const method of GATEWAY_METHODS.htmlCanvasFactory) {
-      total++;
-      if (chainGetContext(
-        HTMLCanvasElement.prototype,
-        method,
-        this.htmlCanvasGetContextHooks,
-        this.ctx2DGetContextHooks,
-        this.webglGetContextHooks
-      )) applied++;
+    let applied = 0, total = 1;
+    applied += installIssuedCanvasFactory(
+      this.htmlCanvasGetContextHooks,
+      this.ctx2DGetContextHooks,
+      this.webglGetContextHooks
+    );
+    if (C && C.__DOM_CANVAS__) {
+      installIssuedSerializationMethods(C.__DOM_CANVAS__);
+      installIssuedGetContextMethod(C.__DOM_CANVAS__, this.htmlCanvasGetContextHooks, this.ctx2DGetContextHooks, this.webglGetContextHooks);
     }
     state.canvas = true;
     if (__loggerRoot && __loggerRoot.__DEBUG__) {
@@ -1467,18 +1667,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const state = __ensurePatchState__(this);
     if (state.offscreen) return 0;
     const Ctx = this;
-    let applied = 0, total = 0;
+    let applied = 0, total = 1;
     if (typeof OffscreenCanvas !== 'undefined'){
       captureKeepNativeRefs();
-      for (const method of GATEWAY_METHODS.offscreenFactory) {
-        total++;
-        if (chainGetContext(
-          OffscreenCanvas.prototype,
-          method,
-          Ctx.offscreenGetContextHooks,
-          Ctx.ctx2DGetContextHooks,
-          Ctx.webglGetContextHooks
-        )) applied++;
+      applied += installIssuedOffscreenFactory(
+        Ctx.offscreenGetContextHooks,
+        Ctx.ctx2DGetContextHooks,
+        Ctx.webglGetContextHooks
+      );
+      if (C && C.__OFFSCREEN_CANVAS__) {
+        installIssuedSerializationMethods(C.__OFFSCREEN_CANVAS__);
+        installIssuedGetContextMethod(C.__OFFSCREEN_CANVAS__, Ctx.offscreenGetContextHooks, Ctx.ctx2DGetContextHooks, Ctx.webglGetContextHooks);
       }
       state.offscreen = true;
     }
