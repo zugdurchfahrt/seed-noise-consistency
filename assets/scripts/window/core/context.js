@@ -141,6 +141,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
   const ctx2DGatewayMethods = Object.freeze(
     Array.prototype.concat.call([], GATEWAY_METHODS.ctx2DRead, GATEWAY_METHODS.ctx2DCore)
   );
+  const issuedSerializationPatchedOwners = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  const issuedWebGLPatchedContexts = (typeof WeakSet === 'function') ? new WeakSet() : null;
 
   // === 0. Utilities ===
   const NOP = () => {};
@@ -367,6 +369,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
       enumerable: d ? !!d.enumerable : false,
       writable: d ? !!d.writable : true
     });
+  }
+
+  function defineIssuedMethod(instance, proto, method, value) {
+    if (!instance || (typeof instance !== 'object' && typeof instance !== 'function')) return false;
+    const d = proto ? Object.getOwnPropertyDescriptor(proto, method) : null;
+    if (!d || typeof d.value !== 'function') return false;
+    Object.defineProperty(instance, method, {
+      value,
+      configurable: !!d.configurable,
+      enumerable: !!d.enumerable,
+      writable: !!d.writable
+    });
+    return true;
   }
 
   // === 1.Hook registries (Initialization of arrays) ===
@@ -849,6 +864,281 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return true;
   }
 
+  function installIssuedSerializationMethods(owner) {
+    if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return 0;
+    if (issuedSerializationPatchedOwners && issuedSerializationPatchedOwners.has(owner)) return 0;
+    let proto = null;
+    let plan = null;
+    if (typeof HTMLCanvasElement !== 'undefined' && owner instanceof HTMLCanvasElement) {
+      proto = HTMLCanvasElement.prototype;
+      plan = [
+        { method: 'toDataURL', hooks: () => C.htmlCanvasToDataURLHooks || [] },
+        { method: 'toBlob', hooks: () => C.htmlCanvasToBlobHooks || [] }
+      ];
+    } else if (typeof OffscreenCanvas !== 'undefined' && owner instanceof OffscreenCanvas) {
+      proto = OffscreenCanvas.prototype;
+      plan = [
+        { method: 'convertToBlob', hooks: () => C.offscreenConvertToBlobHooks || [] }
+      ];
+    }
+    if (!proto || !Array.isArray(plan) || !plan.length) return 0;
+
+    let applied = 0;
+    for (const item of plan) {
+      const method = item && item.method;
+      if (typeof method !== 'string' || !method) continue;
+      if (Object.prototype.hasOwnProperty.call(owner, method)) continue;
+      const orig = resolveKeptNative(proto, method) || proto[method];
+      if (typeof orig !== 'function') continue;
+
+      const getHooksList = () => {
+        const hooks = (item && typeof item.hooks === 'function') ? item.hooks() : [];
+        return Array.isArray(hooks) ? hooks : [];
+      };
+      const applyHooksAsync = async (self, blob, hookArgs) => {
+        let b = blob;
+        const hooks = getHooksList();
+        if (!(hooks && hooks.length)) return b;
+        for (const hook of hooks) {
+          if (typeof hook !== 'function') continue;
+          try {
+            const r = hook.call(self, b, ...(hookArgs || []));
+            const out = (r && typeof r.then === 'function') ? await r : r;
+            if (out instanceof Blob) b = out;
+          } catch (e) {
+            try {
+              emitContextDiag('error', 'context:issued_serialization:hook:post_failed', e, {
+                key: method,
+                stage: 'hook',
+                data: { hook: hook && (hook.name || null) }
+              });
+            } catch (_e) {
+              if (__loggerRoot && __loggerRoot.__DEBUG__) console.error('[issuedSerialization][hook_failed]', method, hook && hook.name, e);
+            }
+          }
+        }
+        return b;
+      };
+
+      let wrapped = null;
+      if (method === 'toDataURL') {
+        const inProgress = (typeof WeakSet === 'function') ? new WeakSet() : null;
+        wrapped = ({ toDataURL(type, quality) {
+          const self = this;
+          const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
+          if (inProgress && isObj) {
+            if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
+            inProgress.add(self);
+          }
+          try {
+            const patchedArgs = Array.prototype.slice.call(arguments);
+            const out = Reflect.apply(orig, this, patchedArgs);
+            let res = out;
+            for (const hook of getHooksList()) {
+              try {
+                const r = hook.call(this, res, ...patchedArgs);
+                if (typeof r === 'string') res = r;
+              } catch (e) {
+                emitContextDiag('error', 'context:issued_serialization:hook:post_failed', e, {
+                  key: method,
+                  stage: 'hook',
+                  data: { hook: hook && (hook.name || null) }
+                });
+                throw e;
+              }
+            }
+            return res;
+          } finally {
+            if (inProgress && isObj) {
+              inProgress.delete(self);
+            }
+          }
+        } }).toDataURL;
+      } else if (method === 'toBlob') {
+        wrapped = ({ toBlob(callback, type, quality) {
+          const self = this;
+          const args = arguments;
+          if (typeof callback === 'function') {
+            const done = (blob) => {
+              let out;
+              try {
+                out = applyHooksAsync(self, blob, args);
+              } catch (e) {
+                emitContextDiag('warn', 'context:issued_serialization:hook_failed', e, {
+                  stage: 'hook',
+                  key: method
+                });
+                callback(blob);
+                return;
+              }
+
+              if (out && typeof out.then === 'function') {
+                out.then(
+                  (b2) => { callback(b2); },
+                  (e)  => {
+                    emitContextDiag('warn', 'context:issued_serialization:hook_failed', e, {
+                      stage: 'hook',
+                      key: method
+                    });
+                    callback(blob);
+                  }
+                );
+                return;
+              }
+
+              callback(out);
+            };
+
+            return Reflect.apply(orig, self, [done].concat(Array.prototype.slice.call(args, 1)));
+          }
+          return Reflect.apply(orig, self, args);
+        } }).toBlob;
+      } else if (method === 'convertToBlob') {
+        wrapped = ({ convertToBlob(options) {
+          const self = this;
+          const args = arguments;
+          const p = Reflect.apply(orig, self, args);
+          if (!(p && typeof p.then === 'function')) {
+            return p;
+          }
+          const hooks = getHooksList();
+          if (!(hooks && hooks.length)) {
+            return p;
+          }
+          return p.then(
+            (blob) => {
+              const out = applyHooksAsync(self, blob, args);
+              return Promise.resolve(out).then(
+                (b2) => { return b2; },
+                (e)  => { throw e; }
+              );
+            },
+            (e) => { throw e; }
+          );
+        } }).convertToBlob;
+      }
+
+      if (!wrapped) continue;
+      if (defineIssuedMethod(owner, proto, method, wrapped)) {
+        applied++;
+        patchedMethods.add(wrapped);
+      }
+    }
+
+    if (applied > 0 && issuedSerializationPatchedOwners) {
+      issuedSerializationPatchedOwners.add(owner);
+    }
+    return applied;
+  }
+
+  function installIssuedWebGLMethods(ctx) {
+    if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) return 0;
+    if (issuedWebGLPatchedContexts && issuedWebGLPatchedContexts.has(ctx)) return 0;
+    const proto =
+      (typeof WebGLRenderingContext !== 'undefined' && ctx instanceof WebGLRenderingContext)
+        ? WebGLRenderingContext.prototype
+        : ((typeof WebGL2RenderingContext !== 'undefined' && ctx instanceof WebGL2RenderingContext)
+            ? WebGL2RenderingContext.prototype
+            : null);
+    if (!proto) return 0;
+
+    const methodPlan = [
+      ['getParameter', C.webglGetParameterHooks],
+      ['readPixels', C.webglReadPixelsHooks]
+    ];
+    let applied = 0;
+
+    for (const [method, hooks] of methodPlan) {
+      if (Object.prototype.hasOwnProperty.call(ctx, method)) continue;
+      const orig = resolveKeptNative(proto, method) || proto[method];
+      if (typeof orig !== 'function') continue;
+      const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
+      const hookMode = (hooks && (typeof hooks === 'object' || typeof hooks === 'function')) ? hooks.mode : undefined;
+      const isPostOrigOnceMode = hookMode === HOOK_MODE_POST_ORIG_ONCE;
+      const forbidOrigCall = function forbidOrigCall() { throw new TypeError(); };
+
+      function invoke(self, argsLike) {
+        const isObj = (self !== null) && (typeof self === 'object' || typeof self === 'function');
+        const args = Array.isArray(argsLike) ? argsLike : Array.prototype.slice.call(argsLike);
+
+        if (guard && isObj) {
+          if (guard.has(self)) return orig.apply(self, args);
+          guard.add(self);
+        }
+
+        try {
+          if (typeof guardInstance === "function" && !guardInstance(proto, self)) {
+            return orig.apply(self, args);
+          }
+
+          if (isPostOrigOnceMode) {
+            const out = orig.apply(self, args);
+            for (const hook of hooks) {
+              if (typeof hook !== 'function') continue;
+              try {
+                hook.apply(self, [forbidOrigCall, ...args, out]);
+              } catch (e) {
+                emitContextDiag('error', 'context:issued_webgl:hook:post_failed', e, {
+                  stage: 'hook',
+                  surface: 'webgl',
+                  key: method,
+                  data: { hook: hook.name || 'anon' }
+                });
+                throw e;
+              }
+            }
+            return out;
+          }
+
+          let patched = args;
+          for (const hook of hooks) {
+            if (typeof hook !== 'function') continue;
+            try {
+              const res = hook.apply(self, [orig, ...patched]);
+              if (res !== undefined && !Array.isArray(res)) {
+                return res;
+              }
+              if (Array.isArray(res)) {
+                patched = res;
+              }
+            } catch (e) {
+              emitContextDiag('error', 'context:issued_webgl:hook:failed', e, {
+                stage: 'hook',
+                surface: 'webgl',
+                key: method,
+                data: { hook: hook.name || 'anon' }
+              });
+              throw e;
+            }
+          }
+          return orig.apply(self, patched);
+        } finally {
+          if (guard && isObj) guard.delete(self);
+        }
+      }
+
+      const wrapped = (function(){
+        switch (orig.length) {
+          case 0: return ({ [method]() { return invoke(this, arguments); } })[method];
+          case 1: return ({ [method](a0) { return invoke(this, arguments); } })[method];
+          case 2: return ({ [method](a0, a1) { return invoke(this, arguments); } })[method];
+          case 7: return ({ [method](a0, a1, a2, a3, a4, a5, a6) { return invoke(this, arguments); } })[method];
+          default: return ({ [method](...a) { return invoke(this, a); } })[method];
+        }
+      })();
+
+      if (defineIssuedMethod(ctx, proto, method, wrapped)) {
+        applied++;
+        patchedMethods.add(wrapped);
+      }
+    }
+
+    if (applied > 0 && issuedWebGLPatchedContexts) {
+      issuedWebGLPatchedContexts.add(ctx);
+    }
+    return applied;
+  }
+
   // === 4. Brand-safe patching for CanvasRenderingContext2D (no Proxy returned) ===
   function createSafeCtxProxy(ctx){
     const proto = getCtx2DProto(ctx);
@@ -1087,6 +1377,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
       let ctx = res;
 
       try {
+        if (ctx) {
+          installIssuedSerializationMethods(this);
+        }
         if (type === '2d' && ctx){
           ctx = createSafeCtxProxy(ctx);
           // call hight level hooks
@@ -1101,6 +1394,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
         }
         if (/^webgl/.test(String(type))){
+          if (ctx) {
+            installIssuedWebGLMethods(ctx);
+          }
           for (const hook of (webglHooks || [])){
             try { hook.call(this, ctx, type, ...rest); } catch (e) {
               emitContextDiag('warn', 'context:getContext:webgl_hook_failed', e, {
@@ -1146,14 +1442,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype) return 0;
     captureKeepNativeRefs();
     let applied = 0, total = 0;
-    for (const method of GATEWAY_METHODS.htmlCanvasSync) {
-      total++;
-      if (chain(HTMLCanvasElement.prototype, method, this.htmlCanvasToDataURLHooks)) applied++;
-    }
-    for (const method of GATEWAY_METHODS.htmlCanvasAsync) {
-      total++;
-      if (chainAsync(HTMLCanvasElement.prototype, method, () => this.htmlCanvasToBlobHooks)) applied++;
-    }
     for (const method of GATEWAY_METHODS.htmlCanvasFactory) {
       total++;
       if (chainGetContext(
@@ -1182,10 +1470,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
     let applied = 0, total = 0;
     if (typeof OffscreenCanvas !== 'undefined'){
       captureKeepNativeRefs();
-      for (const method of GATEWAY_METHODS.offscreenAsync) {
-        total++;
-        if (chainAsync(OffscreenCanvas.prototype, method, () => Ctx.offscreenConvertToBlobHooks)) applied++;
-      }
       for (const method of GATEWAY_METHODS.offscreenFactory) {
         total++;
         if (chainGetContext(
@@ -1212,40 +1496,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const state = __ensurePatchState__(this);
       if (state.webgl) return 0;
       captureKeepNativeRefs();
-      let applied = 0, total = 0;
+      let applied = 0, total = 2;
       let already = 0;
-      const hookByMethod = {
-        getParameter: this.webglGetParameterHooks,
-        getSupportedExtensions: this.webglGetSupportedExtensionsHooks,
-        getExtension: this.webglGetExtensionHooks,
-        readPixels: this.webglReadPixelsHooks,
-        getShaderPrecisionFormat: this.webglGetShaderPrecisionFormatHooks,
-        shaderSource: this.webglShaderSourceHooks,
-        getUniform: this.webglGetUniformHooks
-      };
-      const list = [];
-      const webglProtos = [
-        typeof WebGLRenderingContext !== "undefined" ? WebGLRenderingContext.prototype : null,
-        typeof WebGL2RenderingContext !== "undefined" ? WebGL2RenderingContext.prototype : null
-      ];
-      for (const proto of webglProtos) {
-        if (!proto) continue;
-        for (const method of GATEWAY_METHODS.webgl) {
-          list.push([proto, method, hookByMethod[method]]);
-        }
-      }
-      for (const [proto, m, hooks] of list) {
-        if (!proto) continue;
-        total++;
-        if (patchedMethods.has(proto[m])) already++;
-        if (patchMethod(proto, m, hooks)) applied++;
-      }
-      if (total > 0 && (applied > 0 || already === total)) state.webgl = true;
+      state.webgl = true;
       emitContextDiag('info', 'context:webgl:apply:patches_applied', null, {
         stage: 'apply',
         surface: 'webgl',
         key: 'WebGLRenderingContext',
-        message: 'webgl patches applied',
+        message: 'webgl prototype patches deferred to issued-context install',
         type: 'pipeline missing data',
         data: { applied, total, already }
       });
