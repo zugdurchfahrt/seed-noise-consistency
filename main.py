@@ -46,11 +46,11 @@ CHROMEDRIVER_PATH        = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\p
 
 # Только папки. Никаких путей к файлам.
 PY_MODULE_DIRS = [
-    PROJECT_ROOT,  # если что-то ещё осталось в корне
+    PROJECT_ROOT,
     PROJECT_ROOT / "tools" / "tools_infra",
     PROJECT_ROOT / "tools" / "tools_runtime",
     PROJECT_ROOT / "tools" / "generators",
-    PROJECT_ROOT / "profile_data_source",  # если ты туда клал данные/модули
+    PROJECT_ROOT / "profile_data_source",
 ]
 
 for d in PY_MODULE_DIRS:
@@ -91,10 +91,8 @@ setup_logger(child_levels={
     "plugins_dict": logging.DEBUG,
     "brandmauer": logging.INFO,
 })
-
 # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
-
 
 def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
     if not isinstance(global_seed, str) or not global_seed.strip():
@@ -212,14 +210,13 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
                 driver.execute_cdp_cmd("Fetch.continueRequest", {"requestId": rid})
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
 
-
 # ----------------------- function init_driver -----------------------
 def init_driver(
     profile, country_data, platform, user_agent, screen_width, screen_height,
     webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
-    devices_conf, generated_platform, generated_platform_version, expected_client_hints, vendor_value, 
-    language, normalized_languages, device_memory_value, hardware_concurrency_value, device_dpr_value,
-    plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type, global_seed,
+    devices_conf, generated_platform, generated_platform_version, expected_client_hints,
+    vendor_value, language, normalized_languages, device_memory_value, hardware_concurrency_value,
+    device_dpr_value, plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type, global_seed,
 ):
     timezone = country_data["timezone"]
     offset_minutes = country_data["offset_minutes"]
@@ -253,7 +250,6 @@ def init_driver(
     chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-features=AsyncDNS")
-    # chrome_options.add_argument("--start-maximized")
     if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
         chrome_options.add_argument("--auto-open-devtools-for-tabs")
     chrome_options.binary_location = CHROME_BINARY
@@ -1047,7 +1043,7 @@ def main():
         devices_conf = {"audioinput": audioinput, "videoinput": videoinput, "audiooutput": audiooutput}
 
 
-        # # ----------------------------Setting up GPU and Screen -----------------------
+        # ----------------------------Setting up GPU and Screen -----------------------
         gpu = profile_rng.choice(data["GPU"])
         gpu_architecture = str(gpu.get("architecture", "")).strip()
         gpu_type = str(gpu.get("type", ""))
@@ -1242,12 +1238,10 @@ def main():
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
-        
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
-        # In some launch modes stdin is non-interactive/EOF, so plain input() is not stable.
         def _hold_until_driver_end():
             logger.warning("stdin is unavailable; keepalive mode is active (Ctrl+C to exit)")
             while True:
@@ -1272,7 +1266,6 @@ def main():
     except Exception as e:
         logger.error(f"Error in main block: {e}", exc_info=True)
         logger.info(f"Error: {e}")
-
 
     # ----------------------- THAT'S ALL, FOLKS!  -----------------------
     # finally:
