@@ -22,7 +22,7 @@ This is not a "silver bullet" or an anonymity toolkit. Modern FP techniques (TLS
 
 ## Project goals
 The primary objective of the project was to conduct a comprehensive examination of the browser from an internal perspective, with the aim of identifying the APIs in use and any data-leak channels that may be present.  
-Understand how fonts, WebGL, Client Hints, plug-ins and other components affect the fingerprint.  
+Understand how fonts, `WebGL`, `Client Hints`, plug-ins and other components affect the fingerprint.  
 Maintain oversight of fingerprinting and its replication through profiling and network layer management.
 
 ## Configuration & principles
@@ -56,7 +56,7 @@ All Python deps are pinned in `requirements.txt`.
 ### With mitmproxy (`main.py`)
 
 ✔ Easier browsing without immediate challenges.  
-✔ Direct visibility into CORS/headers/Client Hints.  
+✔ Direct visibility into CORS/headers/`Client Hints`.  
 ✖ Requires installing/setting up mitmproxy.  
 ✖ Detectors may identify mitmproxy TLS fingerprint as not "native".
 
@@ -162,9 +162,9 @@ If you already have a VPN set up in any other way, the script will simply use th
 ### JavaScript (`assets/scripts/window/core`)
 
 - `core_window.js`— provides the foundational layer for all other window-related modules and initializes the shared `Core` infrastructure. It contains the key runtime mechanisms: common wrappers, `Core.applyTargets`, safe descriptor installation, native shaping and `toString` masking, the `invalid-this` contract, and diagnostic utilities. It is also the place where `safeDefine`, the wrapper factory for `method` / `accessor` / `ctor`, and the logic for preserving the API’s native-looking surface are implemented.
-Defines the contract-driven patching engine through `Core.applyTargets`. That is why downstream modules rely on it as their support layer: for descriptor-safe wrapper installation, preservation of native behavior and appearance, and correct handling of `invalid receiver` and other engine-level errors while maintaining the expected native pass-through semantics.
-- `context.js` — acts as an orchestration layer for Canvas/WebGL: it assembles CanvasPatchHooks, validates the presence of exports, and registers them in a unified hook queue. It also acts as a patching gateway: it wraps `getContext`, `toDataURL` `toBlob`, `convertToBlob`, `CanvasRenderingContext2D` methods, and WebGL prototypes so that downstream modules pass through a single point of application, preventing proxy leaks, `this` loss, and broken native descriptor mechanics.
-- `prng_seed.js` — installs seed-driven PRNG state and exposes the deterministic seed context used downstream by graphics/media patches.
+Defines the contract-driven patching engine through `Core.applyTargets`. Downstream modules rely on it as the support layer preserving native behavior and appearance, correct handling of `invalid receiver` and other engine-level errors while maintaining the expected native pass-through semantics.
+- `context.js` — acts as an orchestration layer for `Canvas`/`WebGL`: it assembles `CanvasPatchHooks`, validates the presence of hooks exported from respective modules, then registers them in a unified hook queue. It also acts as a patching gateway: it wraps `getContext`, `toDataURL` `toBlob`, `convertToBlob`, `CanvasRenderingContext2D` methods, and `WebGL` prototypes so that downstream modules pass through a single point of application, preventing proxy leaks, `this` loss, and broken native descriptor mechanics.
+- `prng_seed.js` — That is "gateway" for `__GLOBAL_SEED` from Python backend to JavaScript environment. Module installs seed-driven PRNG state and exposes the deterministic seed context used downstream by graphics/media patches.
 - `bootstrap_hide.js` — initializes the internal bootstrap context and moves startup values out of the public window surface into private pipeline state. It creates and maintains `CanvasPatchContext`, transfers bootstrap data into internal state objects, hides service fields from enumeration, and removes temporary global values once the required owners and retention snapshots are ready. This keeps bootstrap data available to the pipeline without leaving it exposed as public window.* properties.
 - `set_log.js` — JS-side logging/diagnostic emitter. Creates a JS-side logger/diag buffer and a unified __DEGRADE__ channel, through which pipeline incidents are collected and normalized.
 - `probe.js` — acts as the pipeline’s internal observability and self-checking layer. Extending the loop started by `set_log.js`, it inspects critical APIs after patches are loaded and validates runtime invariants, descriptor integrity, call semantics, and timeout behavior. All findings are written into the same diagnostic stream, creating a unified trace for later analysis and debugging.
@@ -173,8 +173,8 @@ Defines the contract-driven patching engine through `Core.applyTargets`. That is
 ### JavaScript (`assets/scripts/window/patches/*`)
 
 - `graphics/canvas.js` — Canvas 2D/Offscreen hooks with seeded noise and invariant-preserving wrapping.
-- `graphics/webgl.js`, `graphics/WEBGL_DICKts.js` — WebGL interception plus static whitelist/parameter support.
-- `graphics/webgpu.js`, `graphics/WebgpuWL.js` — WebGPU interception plus whitelist/limits data.
+- `graphics/webgl.js`, `graphics/WEBGL_DICKts.js` — `WebGL` interception plus static whitelist/parameter support.
+- `graphics/webgpu.js`, `graphics/WebgpuWL.js` — `WebGPU` interception plus whitelist/limits data.
 - `graphics/screen.js` — `screen` and `visualViewport` surface patching.
 - `media/audiocontext.js` — AudioContext-aligned seeded/media surface adjustments.
 - `media/font_module.js` — consumes generated font configs, registers `@font-face`, and injects CSS/font-loading glue.
