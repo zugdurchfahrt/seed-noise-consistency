@@ -1038,7 +1038,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
         if (useUnifiedAccessorGateway) {
           const wrappedStrictGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
-            name: 'get ' + key
+            name: 'get ' + key,
+            wrapLayer: wrapLayer
           });
           knownWrapped.add(wrappedStrictGet);
           return wrappedStrictGet;

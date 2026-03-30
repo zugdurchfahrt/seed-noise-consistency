@@ -726,19 +726,54 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const screenObj = window.screen;
   const screenProto = screenObj && Object.getPrototypeOf(screenObj);
   if (screenObj && screenProto && screenProto !== Object.prototype) {
-    const setScreen = (k, get) => {
-      const target = chooseTarget(null, screenProto, k);
-      if (!target) throw new Error(`${k} descriptor missing`);
-      redefineProp(target, k, get);
+    const nativeScreenValue = (k) => {
+      const target = chooseTarget(screenObj, screenProto, k);
+      if (!target) throw new Error(`screen.${k} descriptor missing`);
+      const d = Object.getOwnPropertyDescriptor(target, k);
+      if (!d || typeof d.get !== 'function') throw new Error(`screen.${k} getter missing`);
+      return Reflect.apply(d.get, screenObj, []);
     };
-    setScreen('width', () => SCREEN_WIDTH);
-    setScreen('height', () => SCREEN_HEIGHT);
-    setScreen('availWidth', () => SCREEN_WIDTH);
-    setScreen('availHeight', () => SCREEN_HEIGHT);
-    setScreen('colorDepth', () => COLOR_DEPTH);
-    setScreen('pixelDepth', () => COLOR_DEPTH);
-    setScreen('availLeft', () => ZERO);
-    setScreen('availTop', () => ZERO);
+    const screenExpected = {
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+      availWidth: SCREEN_WIDTH,
+      availHeight: SCREEN_HEIGHT,
+      colorDepth: COLOR_DEPTH,
+      pixelDepth: COLOR_DEPTH,
+      availLeft: ZERO,
+      availTop: ZERO
+    };
+    Object.keys(screenExpected).forEach((k) => {
+      let actual;
+      try {
+        actual = nativeScreenValue(k);
+      } catch (e) {
+        __screenDiag('warn', 'screen:screen_metric_native_read_failed', {
+          stage: 'apply',
+          type: __screenTypeBrowser,
+          diagTag: 'screen',
+          key: `screen.${k}`,
+          message: 'native Screen metric read failed',
+          data: { outcome: 'skip', reason: 'native_read_failed', substage: 'nativeScreenValue' }
+        }, e);
+        return;
+      }
+      if (!Object.is(actual, screenExpected[k])) {
+        __screenDiag('warn', 'screen:screen_metric_patch_skipped', {
+          stage: 'apply',
+          type: __screenTypeBrowser,
+          diagTag: 'screen',
+          key: `screen.${k}`,
+          message: 'Screen metric patch skipped: no proved contract-safe accessor path',
+          data: {
+            outcome: 'skip',
+            reason: 'contract_safe_path_unproven',
+            expected: screenExpected[k],
+            actual: actual
+          }
+        });
+      }
+    });
   }
   const orientationObj = screenObj && screenObj.orientation;
   const orientationProto = orientationObj && Object.getPrototypeOf(orientationObj);
@@ -800,12 +835,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   // — make screen serializable
   safeDefine(window.screen, "toJSON", {
     value: () => ({
-      width:        SCREEN_WIDTH,
-      height:       SCREEN_HEIGHT,
-      availWidth:   SCREEN_WIDTH,
-      availHeight:  SCREEN_HEIGHT,
-      colorDepth:   COLOR_DEPTH,
-      pixelDepth:   COLOR_DEPTH,
+      width:        window.screen.width,
+      height:       window.screen.height,
+      availWidth:   window.screen.availWidth,
+      availHeight:  window.screen.availHeight,
+      colorDepth:   window.screen.colorDepth,
+      pixelDepth:   window.screen.pixelDepth,
       devicePixelRatio: DPR
     }),
     writable:    false,
