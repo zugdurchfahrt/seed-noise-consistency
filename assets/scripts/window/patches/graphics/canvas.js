@@ -455,7 +455,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
   function getManagedFontConfig(font) {
     try {
-      const cfgs = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
+      const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+      const fontsConfigState = (stateRoot && stateRoot.__FONTS_CONFIG__ && typeof stateRoot.__FONTS_CONFIG__ === 'object')
+        ? stateRoot.__FONTS_CONFIG__
+        : null;
+      const cfgs = Array.isArray(fontsConfigState && fontsConfigState.configs) ? fontsConfigState.configs : [];
       const fontStr = String(font || '');
       const fontLower = fontStr.toLowerCase();
       for (const c of cfgs) {
@@ -469,7 +473,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     } catch (e) {
       emitCanvasDiag('warn', 'canvas:fonts:managed_config_resolve_failed', e, {
         stage: 'runtime',
-        key: 'fontPatchConfigs'
+        key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs'
       });
     }
     return null;
@@ -497,12 +501,12 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
       const fontsState = (stateRoot && stateRoot.__FONTS_STATE__ && typeof stateRoot.__FONTS_STATE__ === 'object')
         ? stateRoot.__FONTS_STATE__
-        : ((C && C.__FONTS_STATE__ && typeof C.__FONTS_STATE__ === 'object') ? C.__FONTS_STATE__ : null);
+        : null;
       const fontsReadyFlag = !!(fontsState && fontsState.ready === true);
 
       const nativeFontsReady = !!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded');
 
-      // Managed fonts stay on the explicit CanvasPatchContext.__FONTS_STATE__.ready gate.
+      // Managed fonts stay on the explicit CanvasPatchContext.state.__FONTS_STATE__.ready gate.
       // Unmanaged/custom CSS fonts must follow only native FontFaceSet readiness.
       const fontsReady = isManagedFont ? fontsReadyFlag : nativeFontsReady;
       if (!fontsReady) return nativeMetrics;
@@ -576,7 +580,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // === Font size scaling: masters for fillText/strokeText (Layer 1) ===
   //
   // Requirements:
-  // - Reads global configs: `window.fontPatchConfigs` (optional)
+  // - Reads managed font configs from `CanvasPatchContext.state.__FONTS_CONFIG__.configs` (optional)
   // - Writes global idempotency flag: `window.__PATCH_FONT_SCALE_HOOKS__`
   // - Exports masters: `applyFillTextHook` / `applyStrokeTextHook` (via final export section)
   
@@ -633,7 +637,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   //     return parts.join(' ');
   //   }
 
-  //   // Масштаб под текст: сперва fontPatchConfigs, фолбэк — __FONT_SCALE__
+  //   // Масштаб под текст: сперва managed fonts config slot, фолбэк — __FONT_SCALE__
   //   function getScaleForText(ctx, text) {
   //     try {
   //       const font = String(ctx && ctx.font || '');
@@ -646,7 +650,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   //     } catch (e) {
   //       emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
   //         stage: 'runtime',
-  //         key: 'fontPatchConfigs'
+  //         key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs'
   //       });
   //     }
   //     return { sx: 1, sy: 1 };

@@ -119,23 +119,81 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }, null);
     return;
   }
-  const __envProfileState = (C.state && typeof C.state === 'object' && C.state.__ENV_PROFILE__ && typeof C.state.__ENV_PROFILE__ === 'object')
-    ? C.state.__ENV_PROFILE__
+  const __stateRoot = (C.state && typeof C.state === 'object')
+    ? C.state
+    : null;
+  const __envProfileState = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+    ? __stateRoot.__ENV_PROFILE__
     : null;
   const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
     ? __envProfileState.profile
     : null;
+  if (!__stateRoot) {
+    __fontDiagPipeline('warn', 'fonts:canvas_patch_state_missing', {
+      stage: 'preflight',
+      key: 'CanvasPatchContext.state',
+      message: 'CanvasPatchContext.state missing',
+      data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
+    }, null);
+    return;
+  }
+
+  function __ensureFontsConfigSlot() {
+    const existing = (__stateRoot.__FONTS_CONFIG__ && typeof __stateRoot.__FONTS_CONFIG__ === 'object')
+      ? __stateRoot.__FONTS_CONFIG__
+      : null;
+    if (existing) return existing;
+    const state = Object.create(null);
+    try {
+      Object.defineProperty(__stateRoot, '__FONTS_CONFIG__', {
+        value: state,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      return state;
+    } catch (e) {
+      __fontDiagBrowser('warn', 'fonts:fonts_config_define_failed', {
+        stage: 'apply',
+        surface: 'CanvasPatchContext.state',
+        key: 'CanvasPatchContext.state.__FONTS_CONFIG__',
+        message: 'Object.defineProperty(CanvasPatchContext.state,"__FONTS_CONFIG__") failed',
+        data: { outcome: 'skip', reason: 'fonts_config_define_failed' }
+      }, e);
+      return null;
+    }
+  }
+
+  const __fontsConfigState = __ensureFontsConfigSlot();
+  if (!__fontsConfigState) return;
+
+  function __getFontsConfigArray() {
+    return Array.isArray(__fontsConfigState.configs) ? __fontsConfigState.configs : [];
+  }
 
   function __ensureFontsStateSlot() {
-    if (Object.prototype.hasOwnProperty.call(C, '__FONTS_STATE__')) {
-      const existing = C.__FONTS_STATE__;
+    if (Object.prototype.hasOwnProperty.call(__stateRoot, '__FONTS_STATE__')) {
+      const existing = __stateRoot.__FONTS_STATE__;
       if (existing && typeof existing === 'object') return existing;
       __fontDiagPipeline('warn', 'fonts:fonts_state_invalid', {
         stage: 'preflight',
-        surface: 'CanvasPatchContext',
-        key: '__FONTS_STATE__',
-        message: 'CanvasPatchContext.__FONTS_STATE__ invalid',
+        surface: 'CanvasPatchContext.state',
+        key: 'CanvasPatchContext.state.__FONTS_STATE__',
+        message: 'CanvasPatchContext.state.__FONTS_STATE__ invalid',
         data: { outcome: 'skip', reason: 'invalid_fonts_state_slot' }
+      }, null);
+      return null;
+    }
+    const legacy = Object.prototype.hasOwnProperty.call(C, '__FONTS_STATE__')
+      ? C.__FONTS_STATE__
+      : null;
+    if (legacy != null && (typeof legacy !== 'object' || !legacy)) {
+      __fontDiagPipeline('warn', 'fonts:fonts_state_legacy_invalid', {
+        stage: 'preflight',
+        surface: 'CanvasPatchContext',
+        key: 'CanvasPatchContext.__FONTS_STATE__',
+        message: 'legacy CanvasPatchContext.__FONTS_STATE__ invalid',
+        data: { outcome: 'skip', reason: 'invalid_legacy_fonts_state_slot' }
       }, null);
       return null;
     }
@@ -148,20 +206,21 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       awaitReadyReject: null,
       familySnapshot: __makeFontFamilySnapshot()
     };
+    const nextState = (legacy && typeof legacy === 'object') ? legacy : state;
     try {
-      Object.defineProperty(C, '__FONTS_STATE__', {
-        value: state,
+      Object.defineProperty(__stateRoot, '__FONTS_STATE__', {
+        value: nextState,
         writable: true,
         configurable: true,
         enumerable: false
       });
-      return state;
+      return nextState;
     } catch (e) {
       __fontDiagBrowser('warn', 'fonts:fonts_state_define_failed', {
         stage: 'apply',
-        surface: 'CanvasPatchContext',
-        key: '__FONTS_STATE__',
-        message: 'Object.defineProperty(CanvasPatchContext,"__FONTS_STATE__") failed',
+        surface: 'CanvasPatchContext.state',
+        key: 'CanvasPatchContext.state.__FONTS_STATE__',
+        message: 'Object.defineProperty(CanvasPatchContext.state,"__FONTS_STATE__") failed',
         data: { outcome: 'skip', reason: 'fonts_state_define_failed' }
       }, e);
       return null;
@@ -217,8 +276,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   __fontsState.familySnapshot = __fontFamilySnapshot;
 
   const Core = window && window.Core;
-  const __fontNavPlatform = (typeof window.__NAV_PLATFORM__ === 'string' && window.__NAV_PLATFORM__)
-    ? window.__NAV_PLATFORM__
+  const __fontNavPlatform = (__envProfileState && typeof __envProfileState.navPlat === 'string' && __envProfileState.navPlat)
+    ? __envProfileState.navPlat
     : null;
   if (!Core) {
     __fontDiagPipeline('warn', 'fonts:core_missing', {
@@ -456,82 +515,12 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __fontsState.familySnapshot = __fontFamilySnapshot;
   }
 
-  function __hideLegacyFontSurface(key) {
-    const d = Object.getOwnPropertyDescriptor(window, key);
-    if (!d) return true;
-    if (d.enumerable === false) return true;
-    if (d.configurable === false) {
-      __fontDiagBrowser('warn', 'fonts:hide_pass_nonconfigurable', {
-        stage: 'apply',
-        diagTag: 'fonts:hide-pass',
-        key: key,
-        message: 'hide-pass skipped: non-configurable legacy surface',
-        data: { outcome: 'skip', reason: 'hide_pass_nonconfigurable' }
-      }, null);
-      return false;
-    }
-    try {
-      if ('value' in d) {
-        Object.defineProperty(window, key, {
-          value: d.value,
-          writable: !!d.writable,
-          configurable: true,
-          enumerable: false
-        });
-      } else {
-        Object.defineProperty(window, key, {
-          get: d.get,
-          set: d.set,
-          configurable: true,
-          enumerable: false
-        });
-      }
-      return true;
-    } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:hide_pass_failed', {
-        stage: 'apply',
-        diagTag: 'fonts:hide-pass',
-        key: key,
-        message: 'hide-pass failed for legacy font surface',
-        data: { outcome: 'skip', reason: 'hide_pass_failed' }
-      }, e);
-      return false;
-    }
-  }
-
-  function __runFontsHidePass() {
-    __hideLegacyFontSurface('awaitFontsReady');
-    __hideLegacyFontSurface('__FONTS_READY__');
-    __hideLegacyFontSurface('__FONTS_ERROR__');
-  }
-
-  function __syncAwaitFontsMirror() {
-    try {
-      Object.defineProperty(window, 'awaitFontsReady', {
-        value: __fontsState.awaitReady,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      return true;
-    } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:await_ready_mirror_define_failed', {
-        stage: 'apply',
-        diagTag: 'fonts:data:awaitFontsReady',
-        key: 'awaitFontsReady',
-        message: 'awaitFontsReady mirror define failed',
-        data: { outcome: 'throw', reason: 'await_ready_mirror_define_failed' }
-      }, e);
-      return false;
-    }
-  }
-
   function __setFontsAwaitState(promiseValue, status, resolveFn, rejectFn) {
     __fontsState.awaitReady = promiseValue || null;
     __fontsState.awaitReadyStatus = status || null;
     __fontsState.awaitReadyResolve = (typeof resolveFn === 'function') ? resolveFn : null;
     __fontsState.awaitReadyReject = (typeof rejectFn === 'function') ? rejectFn : null;
-    return __syncAwaitFontsMirror();
+    return true;
   }
 
   function __setFontsRuntimeState(readyValue, errorValue) {
@@ -592,23 +581,17 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   if (!__guardToken) return; // already_patched: Core emits fonts:already_patched
 
   const __rollbackSnapshot = {
-    fontsStateValue: __cloneFontsStateValue(__fontsState),
-    awaitFontsReadyOwn: Object.prototype.hasOwnProperty.call(window, 'awaitFontsReady'),
-    awaitFontsReadyDesc: Object.getOwnPropertyDescriptor(window, 'awaitFontsReady') || null,
-    fontsReadyOwn: Object.prototype.hasOwnProperty.call(window, '__FONTS_READY__'),
-    fontsReadyDesc: Object.getOwnPropertyDescriptor(window, '__FONTS_READY__') || null,
-    fontsErrorOwn: Object.prototype.hasOwnProperty.call(window, '__FONTS_ERROR__'),
-    fontsErrorDesc: Object.getOwnPropertyDescriptor(window, '__FONTS_ERROR__') || null
+    fontsStateValue: __cloneFontsStateValue(__fontsState)
   };
   let __applyStarted = false;
   try {
-    if (!Array.isArray(window.fontPatchConfigs)) {
+    if (!Array.isArray(__fontsConfigState.configs)) {
       __fontDiagPipeline('warn', 'fonts:configs_missing_or_invalid', {
         stage: 'preflight',
         diagTag: 'fonts',
-        key: 'fontPatchConfigs',
-        message: 'fontPatchConfigs missing/invalid (skip font patch)',
-        data: { outcome: 'skip', reason: 'configs_missing_or_invalid', typeof: typeof window.fontPatchConfigs }
+        key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
+        message: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs missing/invalid (skip font patch)',
+        data: { outcome: 'skip', reason: 'configs_missing_or_invalid', typeof: typeof __fontsConfigState.configs }
       }, null);
       __releaseGuardOnSkip('releaseGuardFlag threw on preflight skip', __flagKey, 'guard_release_failed');
       return;
@@ -616,36 +599,24 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __applyStarted = true;
 
 
-  // expose awaitFontsReady in window and in the Worker env
+  // expose awaitFontsReady only in internal fonts state
   (function exposeFontsReady(){
     const hasDocFonts = (typeof document === 'object' && document && document.fonts && document.fonts.ready);
 
-    // В window-ветке нам нужна "внешне резолвимая" точка
     if (hasDocFonts) {
       if (!__fontsState.awaitReady || typeof __fontsState.awaitReady.then !== 'function' || __fontsState.awaitReadyStatus !== 'pending') {
         let resolveFn, rejectFn;
         const p = new Promise((res, rej) => { resolveFn = res; rejectFn = rej; });
-        if (!__setFontsAwaitState(p, 'pending', resolveFn, rejectFn)) {
-          throw new Error('awaitFontsReady mirror define failed');
-        }
-      } else if (!__syncAwaitFontsMirror()) {
-        throw new Error('awaitFontsReady mirror define failed');
+        __setFontsAwaitState(p, 'pending', resolveFn, rejectFn);
       }
       return;
     }
-    // В non-window (worker) НЕ подменяем нативный ready на pending-промис, который никто не резолвит
     if (window.fonts && window.fonts.ready && typeof window.fonts.ready.then === 'function') {
-      if (!__setFontsAwaitState(window.fonts.ready, 'native', null, null)) {
-        throw new Error('awaitFontsReady mirror define failed');
-      }
+      __setFontsAwaitState(window.fonts.ready, 'native', null, null);
     } else {
-      if (!__setFontsAwaitState(Promise.resolve(), 'native', null, null)) {
-        throw new Error('awaitFontsReady mirror define failed');
-      }
+      __setFontsAwaitState(Promise.resolve(), 'native', null, null);
     }
   })();
-
-  __runFontsHidePass();
 
   function __settleAwaitFontsReady(state, payload) {
     const p = __fontsState.awaitReady;
@@ -711,11 +682,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }
 
   function getPlatformScopedFontConfigs(winArg) {
-    const win = (winArg && (typeof winArg === 'object' || typeof winArg === 'function')) ? winArg : ((typeof window !== 'undefined') ? window : G);
-    const domPlat = (win && typeof win.__NAV_PLATFORM__ === 'string')
-      ? win.__NAV_PLATFORM__
-      : __fontNavPlatform;
-    const cfgs = Array.isArray(win && win.fontPatchConfigs) ? win.fontPatchConfigs : [];
+    const domPlat = __fontNavPlatform;
+    const cfgs = __getFontsConfigArray();
     const hasPlatformDom = cfgs.some(f => f && typeof f.platform_dom === 'string');
     const filteredCfgs = (domPlat && hasPlatformDom) ? cfgs.filter(f => f && f.platform_dom === domPlat) : cfgs;
     return {
@@ -888,7 +856,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
   function getRuntimeFontConfigs() {
     const snapshot = refreshFamilySnapshot();
-    const scoped = getPlatformScopedFontConfigs((typeof window !== 'undefined') ? window : G);
+    const scoped = getPlatformScopedFontConfigs();
     if (__fontFamilySnapshot.platformDom !== snapshot.platformDom) {
       __fontFamilySnapshot.platformDom = snapshot.platformDom;
     }
@@ -1084,7 +1052,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
               stage: 'runtime',
               diagTag: 'fonts:fontface',
               key: 'FontFace',
-              message: 'FontFace source type is unexpected for runtime fontPatchConfigs policy',
+              message: 'FontFace source type is unexpected for runtime managed-font policy',
               data: {
                 outcome: 'return',
                 reason: 'unexpected_source_type',
@@ -1386,8 +1354,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __fontDiagPipeline('warn', 'fonts:nav_platform_missing', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: '__NAV_PLATFORM__',
-      message: '__NAV_PLATFORM__ missing (skip font patch)',
+      key: 'CanvasPatchContext.state.__ENV_PROFILE__.navPlat',
+      message: 'CanvasPatchContext.state.__ENV_PROFILE__.navPlat missing (skip font patch)',
       data: { outcome: 'skip', reason: 'missing_nav_platform' }
     }, null);
     try {
@@ -1401,14 +1369,14 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     return;
   }
 
-  const allFonts = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
+  const allFonts = __getFontsConfigArray();
   const hasPlatformDom = allFonts.some(f => f && typeof f.platform_dom === 'string');
   const fonts = (hasPlatformDom && domPlat) ? allFonts.filter(f => f.platform_dom === domPlat) : allFonts;
   if (!fonts.length) {
     __fontDiagPipeline('warn', 'fonts:filtered_empty', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: 'fontPatchConfigs',
+      key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
       message: 'filtered fonts list is empty',
       data: { platform: domPlat }
     }, null);
@@ -1416,7 +1384,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __fontDiagPipeline('info', 'fonts:filtered_count', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: 'fontPatchConfigs',
+      key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
       message: 'filtered fonts list prepared',
       data: { platform: domPlat, count: fonts.length }
     }, null);
@@ -1435,8 +1403,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       __fontDiagPipeline('warn', 'fonts:dom_override_nav_platform_missing', {
         stage: 'preflight',
         diagTag: 'fonts',
-        key: '__NAV_PLATFORM__',
-        message: '__NAV_PLATFORM__ missing (skip dom override)',
+        key: 'CanvasPatchContext.state.__ENV_PROFILE__.navPlat',
+        message: 'CanvasPatchContext.state.__ENV_PROFILE__.navPlat missing (skip dom override)',
         data: { outcome: 'skip', reason: 'missing_nav_platform' }
       }, null);
       return;
@@ -1446,14 +1414,14 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     function run() {
       if (domPlat !== 'MacIntel') return;
 
-      const allFonts = Array.isArray(window.fontPatchConfigs) ? window.fontPatchConfigs : [];
+      const allFonts = __getFontsConfigArray();
       const hasPlatformDom = allFonts.some(f => f && typeof f.platform_dom === 'string');
       const fonts = (hasPlatformDom && domPlat) ? allFonts.filter(f => f.platform_dom === domPlat) : allFonts;
       if (!fonts.length) {
         __fontDiagPipeline('warn', 'fonts:dom_override_filtered_empty', {
           stage: 'preflight',
           diagTag: 'fonts',
-          key: 'fontPatchConfigs',
+          key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
           message: 'dom override skipped: no filtered fonts',
           data: { platform: domPlat }
         }, null);
@@ -1550,7 +1518,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           __fontDiagBrowser('warn', 'fonts:load_item_failed', {
             stage: 'runtime',
             diagTag: 'fonts',
-            key: 'fontPatchConfigs',
+            key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
             message: 'font item build failed',
             data: { outcome: 'skip', reason: 'font_item_build_failed' }
           }, e);
@@ -1664,27 +1632,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     if (__applyStarted) {
       try {
         __restoreFontsStateValue(__rollbackSnapshot.fontsStateValue);
-        if (__rollbackSnapshot.awaitFontsReadyOwn) {
-          if (__rollbackSnapshot.awaitFontsReadyDesc) {
-            Object.defineProperty(window, 'awaitFontsReady', __rollbackSnapshot.awaitFontsReadyDesc);
-          }
-        } else {
-          delete window.awaitFontsReady;
-        }
-        if (__rollbackSnapshot.fontsReadyOwn) {
-          if (__rollbackSnapshot.fontsReadyDesc) {
-            Object.defineProperty(window, '__FONTS_READY__', __rollbackSnapshot.fontsReadyDesc);
-          }
-        } else {
-          delete window.__FONTS_READY__;
-        }
-        if (__rollbackSnapshot.fontsErrorOwn) {
-          if (__rollbackSnapshot.fontsErrorDesc) {
-            Object.defineProperty(window, '__FONTS_ERROR__', __rollbackSnapshot.fontsErrorDesc);
-          }
-        } else {
-          delete window.__FONTS_ERROR__;
-        }
       } catch (re) {
         rollbackErr = re;
         __fontDiagBrowser('error', 'fonts:rollback_failed', {

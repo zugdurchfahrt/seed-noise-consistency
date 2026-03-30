@@ -1226,9 +1226,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const doc = global && global.document;
     if (!doc || typeof doc.createElement !== 'function') return 0;
     if (issuedDocumentFactoryPatchedDocs && issuedDocumentFactoryPatchedDocs.has(doc)) return 0;
-    const proto = Object.getPrototypeOf(doc);
-    if (!proto) return 0;
+    const docProto = Object.getPrototypeOf(doc);
+    if (!docProto) return 0;
     let applied = 0;
+
+    const resolveDocumentMethodOwner = function(method) {
+      let owner = docProto;
+      while (owner && !Object.prototype.hasOwnProperty.call(owner, method)) {
+        owner = Object.getPrototypeOf(owner);
+      }
+      if (!owner) return null;
+      const desc = Object.getOwnPropertyDescriptor(owner, method);
+      return (desc && typeof desc.value === 'function') ? owner : null;
+    };
 
     const installCanvasOwner = function(canvas) {
       if (!canvas) return;
@@ -1236,7 +1246,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
       installIssuedGetContextMethod(canvas, htmlHooks, ctx2dHooks, webglHooks);
     };
 
-    const createElementOrig = proto.createElement;
+    const createElementProto = resolveDocumentMethodOwner('createElement');
+    const createElementOrig = createElementProto && createElementProto.createElement;
     if (typeof createElementOrig === 'function' && !Object.prototype.hasOwnProperty.call(doc, 'createElement')) {
       const wrappedCreateElement = markAsNative(function createElement(localName, options) {
         const el = Reflect.apply(createElementOrig, this, arguments);
@@ -1251,13 +1262,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
         }
         return el;
       }, 'createElement');
-      if (defineIssuedMethod(doc, proto, 'createElement', wrappedCreateElement)) {
+      if (defineIssuedMethod(doc, createElementProto, 'createElement', wrappedCreateElement)) {
         patchedMethods.add(wrappedCreateElement);
         applied++;
       }
     }
 
-    const createElementNSOrig = proto.createElementNS;
+    const createElementNSProto = resolveDocumentMethodOwner('createElementNS');
+    const createElementNSOrig = createElementNSProto && createElementNSProto.createElementNS;
     if (typeof createElementNSOrig === 'function' && !Object.prototype.hasOwnProperty.call(doc, 'createElementNS')) {
       const wrappedCreateElementNS = markAsNative(function createElementNS(namespaceURI, qualifiedName, options) {
         const el = Reflect.apply(createElementNSOrig, this, arguments);
@@ -1272,7 +1284,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         }
         return el;
       }, 'createElementNS');
-      if (defineIssuedMethod(doc, proto, 'createElementNS', wrappedCreateElementNS)) {
+      if (defineIssuedMethod(doc, createElementNSProto, 'createElementNS', wrappedCreateElementNS)) {
         patchedMethods.add(wrappedCreateElementNS);
         applied++;
       }
@@ -1293,7 +1305,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       }
     }
 
-    if (issuedDocumentFactoryPatchedDocs) issuedDocumentFactoryPatchedDocs.add(doc);
+    if (applied > 0 && issuedDocumentFactoryPatchedDocs) issuedDocumentFactoryPatchedDocs.add(doc);
     return applied;
   }
 
@@ -1649,10 +1661,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
       this.webglGetContextHooks
     );
     if (C && C.__DOM_CANVAS__) {
-      installIssuedSerializationMethods(C.__DOM_CANVAS__);
-      installIssuedGetContextMethod(C.__DOM_CANVAS__, this.htmlCanvasGetContextHooks, this.ctx2DGetContextHooks, this.webglGetContextHooks);
+      total += 2;
+      applied += installIssuedSerializationMethods(C.__DOM_CANVAS__);
+      applied += installIssuedGetContextMethod(C.__DOM_CANVAS__, this.htmlCanvasGetContextHooks, this.ctx2DGetContextHooks, this.webglGetContextHooks);
     }
-    state.canvas = true;
+    state.canvas = applied > 0;
     if (__loggerRoot && __loggerRoot.__DEBUG__) {
       emitContextDiag('info', 'context:canvas:apply:patches_applied', null, {
         stage: 'apply',

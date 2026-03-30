@@ -1,1 +1,25 @@
-window.fontPatchConfigs = {{ configs_json | safe }};
+(function () {
+  const G = (typeof globalThis !== 'undefined' && globalThis)
+    || (typeof self !== 'undefined' && self)
+    || (typeof window !== 'undefined' && window)
+    || {};
+  const C = (G.CanvasPatchContext && (typeof G.CanvasPatchContext === 'object' || typeof G.CanvasPatchContext === 'function'))
+    ? G.CanvasPatchContext
+    : null;
+  if (!C || !C.state || typeof C.state !== 'object') {
+    throw new Error('[fonts] CanvasPatchContext.state missing');
+  }
+  let slot = (C.state.__FONTS_CONFIG__ && typeof C.state.__FONTS_CONFIG__ === 'object')
+    ? C.state.__FONTS_CONFIG__
+    : null;
+  if (!slot) {
+    slot = Object.create(null);
+    Object.defineProperty(C.state, '__FONTS_CONFIG__', {
+      value: slot,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  slot.configs = {{ configs_json | safe }};
+})();

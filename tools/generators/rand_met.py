@@ -103,7 +103,7 @@ def _seed_namespace() -> str:
 
 def _rng_for_manifest(platform: str, all_names: list) -> random.Random:
     global _MANIFEST_SEED
-    _MANIFEST_SEED = _seed_value()
+    _MANIFEST_SEED = f"{_seed_value()}|{platform}|" + "|".join(sorted(all_names))
     return random.Random(_MANIFEST_SEED)
 
 
