@@ -2554,29 +2554,34 @@ function printToStringCrossRealmChecks() {
     const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
     const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
     const locate = (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
+    const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
+    const rowData = entry ? __probeDataCell(entry) : null;
     return {
       idx: index,
       kind: kind,
-      unit: unit,
       status: status,
       source: slot && typeof slot.source === "string" ? slot.source : null,
-      emitter: slot && typeof slot.emitter === "string" ? slot.emitter : null,
       timestamp: entry && typeof entry.timestamp === "string" ? entry.timestamp : null,
-      code: entry && typeof entry.code === "string" ? entry.code : null,
-      level: extra && typeof extra.level === "string" ? extra.level : null,
+      code: entry && typeof entry.code === "string"
+        ? entry.code
+        : (expected && typeof expected.code === "string"
+          ? expected.code
+          : (locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null)),
+      level: extra && typeof extra.level === "string"
+        ? extra.level
+        : (expected && typeof expected.level === "string" ? expected.level : null),
       diagTag: extra && typeof extra.diagTag === "string"
         ? extra.diagTag
         : (slot && typeof slot.diagTag === "string" ? slot.diagTag : null),
       module: slot && typeof slot.module === "string"
         ? slot.module
         : (extra && typeof extra.module === "string" ? extra.module : null),
-      stage: extra && typeof extra.stage === "string" ? extra.stage : null,
-      key: extra && (typeof extra.key === "string" || extra.key === null) ? extra.key : null,
-      triggerCode: data && typeof data.triggerCode === "string"
-        ? data.triggerCode
-        : (data && typeof data.code === "string"
-          ? data.code
-          : (locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null)),
+      stage: extra && typeof extra.stage === "string"
+        ? extra.stage
+        : (expected && typeof expected.stage === "string" ? expected.stage : null),
+      key: extra && (typeof extra.key === "string" || extra.key === null)
+        ? extra.key
+        : (expected && (typeof expected.key === "string" || expected.key === null) ? expected.key : null),
       file: data && typeof data.file === "string"
         ? data.file
         : (locate && typeof locate.file === "string" ? locate.file : null),
@@ -2584,9 +2589,20 @@ function printToStringCrossRealmChecks() {
         ? extra.message
         : (entry && entry.error && typeof entry.error === "object" && typeof entry.error.message === "string")
           ? entry.error.message
-          : null,
+          : (expected && typeof expected.message === "string" ? expected.message : null),
       err: __probeErrCell(entry),
-      data: __probeDataCell(entry)
+      data: rowData != null
+        ? rowData
+        : (expected && Object.prototype.hasOwnProperty.call(expected, "data")
+          ? (function() {
+              try {
+                const s = JSON.stringify(expected.data);
+                return (typeof s === "string") ? s : null;
+              } catch (_) {
+                return "[unserializable]";
+              }
+            })()
+          : null)
     };
   }
 

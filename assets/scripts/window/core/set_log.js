@@ -180,7 +180,15 @@ const LOGGingModule = function LOGGingModule() {
         requiresResultProof: true,
         locate: {
           file: "sunami/assets/scripts/workerscope/WORKER_PATCH_SRC.js",
-          triggerCode: "worker_patch_src:apply:installed"
+          triggerCode: "worker_patch_src:apply:installed",
+          expected: {
+            level: "info",
+            code: "worker_patch_src:apply:installed",
+            stage: "apply",
+            key: "installWorkerUACHMirror",
+            message: "worker patch installed",
+            data: { outcome: "return" }
+          }
         }
       },
       { module: "worker_bootstrap", diagTag: "worker_bootstrap", codePrefix: "worker_bootstrap", source: "cdp", emitter: "diag", functions: "none", critical: true }
@@ -346,6 +354,9 @@ const LOGGingModule = function LOGGingModule() {
         if (!slot || slot.critical !== true) return;
         if (status !== "apply_only" && status !== "warn" && status !== "error" && status !== "not_emitted" && status !== "missing_emitter") return;
         const locate = (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
+        const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
+        const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+        const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
         const code = (status === "apply_only")
           ? "degrade:module_result_missing"
           : "degrade:module_status";
@@ -354,11 +365,17 @@ const LOGGingModule = function LOGGingModule() {
           : "module status is not ok";
         const entryCode = (entry && typeof entry.code === "string") ? entry.code : null;
         __degradeApi.diag("error", code, {
-          module: "set_log",
+          module: (slot && typeof slot.module === "string" && slot.module) ? slot.module : "set_log",
           diagTag: "degrade:module_check",
-          surface: "logger",
-          key: (slot && typeof slot.module === "string" && slot.module) ? slot.module : null,
-          stage: "runtime",
+          surface: (extra && typeof extra.surface === "string" && extra.surface)
+            ? extra.surface
+            : (slot && typeof slot.diagTag === "string" && slot.diagTag ? slot.diagTag : "logger"),
+          key: (extra && (typeof extra.key === "string" || extra.key === null))
+            ? extra.key
+            : (expected && (typeof expected.key === "string" || expected.key === null))
+              ? expected.key
+              : ((slot && typeof slot.module === "string" && slot.module) ? slot.module : null),
+          stage: "audit",
           message,
           type: "pipeline missing data",
           data: {
@@ -366,6 +383,14 @@ const LOGGingModule = function LOGGingModule() {
             reason: status,
             module: slot && slot.module ? slot.module : null,
             code: entryCode,
+            auditedBy: "set_log",
+            observedStage: extra && typeof extra.stage === "string"
+              ? extra.stage
+              : (expected && typeof expected.stage === "string" ? expected.stage : null),
+            observedKey: extra && (typeof extra.key === "string" || extra.key === null)
+              ? extra.key
+              : (expected && (typeof expected.key === "string" || expected.key === null) ? expected.key : null),
+            observedData: data || (expected && Object.prototype.hasOwnProperty.call(expected, "data") ? expected.data : null),
             source: slot && slot.source ? slot.source : null,
             file: locate && typeof locate.file === "string" ? locate.file : null,
             triggerCode: locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null
