@@ -550,6 +550,7 @@ const LOGGingModule = function LOGGingModule() {
 
     function shapeDegradeBufferEntry(entry, idx) {
       const incident = normalizeDiagIncident(entry, idx);
+      const entryType = (entry && typeof entry.type === "string") ? entry.type : (incident && incident.entryType ? incident.entryType : "degrade");
       const entryExtra = (entry && entry.extra && typeof entry.extra === "object")
         ? normalizeForJSON(entry.extra)
         : {};
@@ -578,21 +579,26 @@ const LOGGingModule = function LOGGingModule() {
       })();
       const moduleName = (typeof extra.module === "string" && extra.module)
         ? extra.module
-        : (incident && typeof incident.module === "string" ? incident.module : null);
+        : (entry && typeof entry.module === "string" && entry.module)
+          ? entry.module
+          : (incident && typeof incident.module === "string" ? incident.module : null);
       const keyValue = (typeof extra.key === "string" || extra.key === null)
         ? extra.key
-        : (incident ? incident.key : null);
+        : (entry && (typeof entry.key === "string" || entry.key === null))
+          ? entry.key
+          : (incident ? incident.key : null);
       const codeValue = (entry && typeof entry.code === "string" && entry.code)
         ? entry.code
         : (incident && typeof incident.code === "string" ? incident.code : ((entry && typeof entry.type === "string") ? entry.type : null));
       return {
+        idx: (typeof idx === "number") ? idx : null,
         module: moduleName,
         key: keyValue,
         code: codeValue,
         error: errorValue,
         extra: extra,
         timestamp: formatCompactTimestamp(safeEntryTimestamp(entry)),
-        type: (entry && typeof entry.type === "string") ? entry.type : (incident && incident.entryType ? incident.entryType : "degrade")
+        type: entryType
       };
     }
 
@@ -663,7 +669,12 @@ const LOGGingModule = function LOGGingModule() {
       info: console.info && console.info.bind(console),
       debug: console.debug && console.debug.bind(console),
       trace: console.trace && console.trace.bind(console),
+      group: console.group && console.group.bind(console),
+      groupEnd: console.groupEnd && console.groupEnd.bind(console),
+      table: console.table && console.table.bind(console),
+      dir: console.dir && console.dir.bind(console),
     };
+    __defineLoggerHiddenValue("__RAW_CONSOLE__", Object.freeze(origConsole), true);
 
     function getLoggerGuard() {
       __ensureLoggerHiddenValue("__LOGGER_GUARD__", function () {
@@ -763,6 +774,21 @@ const LOGGingModule = function LOGGingModule() {
           timestamp: new Date().toISOString()
         });
       } catch (_) {}
+    }
+
+    function extractConsoleBufferMeta(args) {
+      const arr = Array.isArray(args) ? args.slice() : [];
+      if (!arr.length) return { args: arr, meta: null };
+      const first = arr[0];
+      if (!isPlainObject(first) || first.__bufferMeta__ !== true) return { args: arr, meta: null };
+      return {
+        args: arr.slice(1),
+        meta: {
+          module: (typeof first.module === "string" && first.module) ? first.module : null,
+          key: (typeof first.key === "string" || first.key === null) ? first.key : null,
+          code: (typeof first.code === "string" && first.code) ? first.code : null
+        }
+      };
     }
 
     function isExpectedReceiverThrow(code, extra, err) {
@@ -1353,7 +1379,7 @@ const LOGGingModule = function LOGGingModule() {
 
 
     // ===== 2) Core logger: pushLog (console + errors) =====
-    function pushLog(level, args, withStack, module) {
+    function pushLog(level, args, withStack, module, bufferMeta) {
       try {
         if (!levelAllows(__loggerRoot._logLevel, level)) return;
 
@@ -1377,7 +1403,9 @@ const LOGGingModule = function LOGGingModule() {
         const e = {
           type: "console",
           level: level,
-          module: module || "global",
+          module: (bufferMeta && typeof bufferMeta.module === "string" && bufferMeta.module) ? bufferMeta.module : (module || "global"),
+          key: (bufferMeta && (typeof bufferMeta.key === "string" || bufferMeta.key === null)) ? bufferMeta.key : null,
+          code: (bufferMeta && typeof bufferMeta.code === "string" && bufferMeta.code) ? bufferMeta.code : "console",
           message: msgParts.join(" "),
           expanded: normArgs,
           timestamp: new Date().toISOString(),
@@ -1409,10 +1437,13 @@ const LOGGingModule = function LOGGingModule() {
 
       console[level] = function () {
         const args = Array.prototype.slice.call(arguments);
+        const extracted = extractConsoleBufferMeta(args);
+        const consoleArgs = extracted.args;
+        const bufferMeta = extracted.meta;
 
         // keep your existing filter
-        for (let i = 0; i < args.length; i++) {
-          const a = args[i];
+        for (let i = 0; i < consoleArgs.length; i++) {
+          const a = consoleArgs[i];
           if (typeof a === "string" && a.indexOf("undetected chromedriver") !== -1) {
             return;
           }
@@ -1420,13 +1451,14 @@ const LOGGingModule = function LOGGingModule() {
 
         pushLog(
           level,
-          args,
+          consoleArgs,
           level === "error" || level === "warn" || level === "log",
-          "console"
+          "console",
+          bufferMeta
         );
 
         if (__loggerRoot.__DEBUG__) {
-          guardedApply(orig, console, args, "console." + level);
+          guardedApply(orig, console, consoleArgs, "console." + level);
         }
       };
     }

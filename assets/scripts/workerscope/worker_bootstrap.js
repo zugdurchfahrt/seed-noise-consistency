@@ -174,7 +174,7 @@
     } catch (releaseErr) {
       __moduleDiag('warn', __MODULE + ':guard_release_failed', {
         stage: 'guard',
-        key: '__PATCH_WORKER_BOOTSTRAP__',
+        key: 'guard',
         message: 'releaseGuardFlag failed',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed' }
@@ -299,7 +299,7 @@
         if (!__core || typeof __core.guardFlag !== 'function') {
           __moduleDiag('warn', __MODULE + ':guard_missing', {
             stage: 'guard',
-            key: '__PATCH_WORKER_BOOTSTRAP__',
+            key: 'guard',
             message: 'Core.guardFlag missing',
             type: 'pipeline missing data',
             data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
@@ -310,7 +310,7 @@
       } catch (e) {
         __moduleDiag('warn', __MODULE + ':guard_failed', {
           stage: 'guard',
-          key: '__PATCH_WORKER_BOOTSTRAP__',
+          key: 'guard',
           message: 'guardFlag threw',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'guard_failed' }
@@ -383,7 +383,6 @@
                   type: 'pipeline missing data',
                   data: { outcome: 'return' }
                 }, null);
-                __releaseGuard(__guardToken, true);
               })
               .catch((e) => {
                 __syncWorkerBootstrapState({ initStatus: 'error', initReason: 'initAll_failed' });
@@ -407,7 +406,6 @@
           type: 'pipeline missing data',
           data: { outcome: 'return' }
         }, null);
-        __releaseGuard(__guardToken, true);
       } catch (e) {
         __syncWorkerBootstrapState({ initStatus: 'error', initReason: 'initAll_failed' });
         __moduleDiag('error', __MODULE + ':initAll_failed', {

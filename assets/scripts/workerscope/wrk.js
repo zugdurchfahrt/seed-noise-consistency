@@ -328,7 +328,7 @@ const WrkModule = function WrkModule(window) {
     if (!__core || typeof __core.guardFlag !== 'function') {
       __wrkDiag('warn', __MODULE + ':guard_missing', {
         stage: 'guard',
-        key: __flagKey,
+        key: 'guard',
         message: 'Core.guardFlag missing',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
@@ -339,7 +339,7 @@ const WrkModule = function WrkModule(window) {
   } catch (e) {
     __wrkDiag('warn', __MODULE + ':guard_failed', {
       stage: 'guard',
-      key: __flagKey,
+      key: 'guard',
       message: 'guardFlag threw',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'guard_failed' }
@@ -2535,7 +2535,7 @@ function ServiceWorkerOverride(G){
 
     __wrkDiag('info', 'wrk:init:return', {
       stage: 'apply',
-      key: __flagKey,
+      key: 'init',
       message: 'WrkModule initialized',
       type: 'pipeline missing data',
       data: { outcome: 'return' }
@@ -2543,14 +2543,14 @@ function ServiceWorkerOverride(G){
   } catch (e) {
     __wrkDiag('error', 'wrk:fatal', {
       stage: 'apply',
-      key: __flagKey,
+      key: 'init',
       message: 'WrkModule fatal',
       type: 'browser structure missing data',
       data: { outcome: 'throw', reason: 'fatal', rollbackOk: false }
     }, e);
     __wrkBestEffort('wrk:guard_release_failed', {
       stage: 'guard',
-      key: __flagKey,
+      key: 'guard',
       message: 'releaseGuardFlag failed',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'guard_release_failed' }

@@ -838,6 +838,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       function guardFlag(flagKey, codePrefix) {
         const key = String(flagKey || '');
         if (!key) return null;
+        const diagKey = /^__PATCH_[A-Z0-9_]+__$/.test(key) ? 'guard' : key;
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
           if (__guardRegistry.has(key)) {
@@ -845,7 +846,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               module: 'core',
               diagTag: tag,
               surface: 'core',
-              key,
+              key: diagKey,
               stage: 'guard',
               message: 'already patched (guard)',
               type: 'pipeline missing data',
@@ -858,7 +859,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core',
             diagTag: tag,
             surface: 'core',
-            key,
+            key: diagKey,
             stage: 'guard',
             message: 'guard read failed',
             type: 'pipeline missing data',
@@ -874,7 +875,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core',
             diagTag: tag,
             surface: 'core',
-            key,
+            key: diagKey,
             stage: 'guard',
             message: 'guard write failed',
             type: 'pipeline missing data',
@@ -889,6 +890,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const key = String(flagKey || '');
         if (!key) return false;
         if (rollbackOk !== true) return false;
+        const diagKey = /^__PATCH_[A-Z0-9_]+__$/.test(key) ? 'guard' : key;
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
         try {
           if (__guardRegistry.get(key) !== token) return false;
@@ -898,7 +900,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               module: 'core',
               diagTag: tag,
               surface: 'core',
-              key,
+              key: diagKey,
               stage: 'rollback',
               message: 'guard release failed',
               type: 'pipeline missing data',
@@ -910,7 +912,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core',
             diagTag: tag,
             surface: 'core',
-            key,
+            key: diagKey,
             stage: 'rollback',
             message: 'guard released after rollback ok',
             type: 'pipeline missing data',
@@ -922,7 +924,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core',
             diagTag: tag,
             surface: 'core',
-            key,
+            key: diagKey,
             stage: 'rollback',
             message: 'guard release failed',
             type: 'pipeline missing data',

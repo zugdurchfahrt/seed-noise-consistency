@@ -18,6 +18,9 @@ const __probeRun = async function(){
     ? W.CanvasPatchContext.__logger
     : null;
   const __probeDegrade = (__probeLoggerRoot && typeof __probeLoggerRoot.__DEGRADE__ === "function") ? __probeLoggerRoot.__DEGRADE__ : null;
+  const __probeRawConsole = (__probeLoggerRoot && __probeLoggerRoot.__RAW_CONSOLE__ && typeof __probeLoggerRoot.__RAW_CONSOLE__ === "object")
+    ? __probeLoggerRoot.__RAW_CONSOLE__
+    : console;
 
 
   function __probeDiag(level, code, extra, err) {
@@ -40,6 +43,17 @@ const __probeRun = async function(){
       if (typeof __probeDegrade === 'function') {
         __probeDegrade(String(code || 'probe'), err || null, Object.assign({ level: String(level || 'info') }, ctx));
       }
+    } catch (_) {}
+  }
+
+  function __probeConsoleCall(method) {
+    try {
+      const fn = __probeRawConsole && typeof __probeRawConsole[method] === "function"
+        ? __probeRawConsole[method]
+        : (console && typeof console[method] === "function" ? console[method] : null);
+      if (typeof fn !== "function") return;
+      const args = Array.prototype.slice.call(arguments, 1);
+      fn.apply(console, args);
     } catch (_) {}
   }
 
@@ -686,9 +700,9 @@ const __probeRun = async function(){
       };
     });
 
-    console.group("[probe] Field values");
-    console.table(rows);
-    console.groupEnd();
+    __probeConsoleCall("group", "[probe] Field values");
+    __probeConsoleCall("table", rows);
+    __probeConsoleCall("groupEnd");
 
     return rows;
   }
@@ -968,9 +982,9 @@ const __probeRun = async function(){
         actual: shared.second.ok ? shared.second.values : null
       });
 
-      console.group("[probe] worker scope audit");
-      console.table(rows);
-      console.groupEnd();
+      __probeConsoleCall("group", "[probe] worker scope audit");
+      __probeConsoleCall("table", rows);
+      __probeConsoleCall("groupEnd");
 
       return {
         ok: dedicated.ok === true && shared.first.ok === true && shared.second.ok === true && rows.every((row) => row && row.match === true),
@@ -1006,8 +1020,6 @@ const __probeRun = async function(){
   }
 
   function printPrototypeDescriptors() {
-    console.group("[probe] Prototype descriptors");
-
     const out = [];
 
     for (const spec of PROTO_SPECS) {
@@ -1017,13 +1029,13 @@ const __probeRun = async function(){
         proto = spec.getProto();
         target = typeof spec.getTarget === "function" ? spec.getTarget() : null;
       } catch (e) {
-        console.warn(`[probe] ${spec.label} skipped (getProto failed):`, e);
+        __probeConsoleCall("warn", `[probe] ${spec.label} skipped (getProto failed):`, e);
         out.push({ prototype: spec.label, error: String(e) });
         continue;
       }
 
       if (!proto) {
-        console.log(`[probe] ${spec.label}: not available`);
+        __probeConsoleCall("log", `[probe] ${spec.label}: not available`);
         out.push({ prototype: spec.label, error: "not available" });
         continue;
       }
@@ -1109,12 +1121,16 @@ const __probeRun = async function(){
         );
       });
 
-      console.log(`[probe] ${spec.label}`);
-      console.table(rows);
       out.push({ prototype: spec.label, rows });
     }
 
-    console.groupEnd();
+    __probeConsoleCall("group", "[probe] Prototype descriptors");
+    for (const block of out) {
+      if (!block || !Array.isArray(block.rows)) continue;
+      __probeConsoleCall("log", `[probe] ${block.prototype}`);
+      __probeConsoleCall("table", block.rows);
+    }
+    __probeConsoleCall("groupEnd");
     return out;
   }
 
@@ -1263,9 +1279,9 @@ const __probeRun = async function(){
       };
     });
 
-    console.group("[probe] Touched methods");
-    console.table(rows);
-    console.groupEnd();
+    __probeConsoleCall("group", "[probe] Touched methods");
+    __probeConsoleCall("table", rows);
+    __probeConsoleCall("groupEnd");
 
     try {
       if (sandboxOracle && sandboxOracle.iframe) sandboxOracle.iframe.remove();
@@ -1880,8 +1896,8 @@ const __probeRun = async function(){
     }
 
     const ok = rows.every((r) => r.match === true || r.match === null);
-    console.group("[probe] Receiver/Illegal invocation checks");
-    console.table(rows.map((r) => ({
+    __probeConsoleCall("group", "[probe] Receiver/Illegal invocation checks");
+    __probeConsoleCall("table", rows.map((r) => ({
       check: r.check,
       method: r.method,
       available: r.available,
@@ -1895,7 +1911,7 @@ const __probeRun = async function(){
       goodAsyncState: r.goodAsyncState,
       goodElapsedMs: r.goodElapsedMs
     })));
-    console.groupEnd();
+    __probeConsoleCall("groupEnd");
 
     return { ok, rows };
   }
@@ -1984,8 +2000,8 @@ const __probeRun = async function(){
     }
 
     const ok = rows.every((r) => r.match === true || r.match === null);
-    console.group("[probe] Audio own-property invariant checks");
-    console.table(rows.map((r) => ({
+    __probeConsoleCall("group", "[probe] Audio own-property invariant checks");
+    __probeConsoleCall("table", rows.map((r) => ({
       check: r.check,
       method: r.method,
       match: r.match,
@@ -1994,7 +2010,7 @@ const __probeRun = async function(){
       protoHasOwn: r.extra && Object.prototype.hasOwnProperty.call(r.extra, "protoHasOwn") ? r.extra.protoHasOwn : null,
       error: r.error ? r.error.name : null
     })));
-    console.groupEnd();
+    __probeConsoleCall("groupEnd");
 
     return { ok, rows };
   }
@@ -2095,9 +2111,9 @@ const __probeRun = async function(){
     }
 
     const ok = rows.every((r) => r.match === true || r.match === null);
-    console.group("[probe] Prototype/instanceof checks");
-    console.table(rows.map((r) => ({ check: r.check, match: r.match, error: r.error ? r.error.name : null })));
-    console.groupEnd();
+    __probeConsoleCall("group", "[probe] Prototype/instanceof checks");
+    __probeConsoleCall("table", rows.map((r) => ({ check: r.check, match: r.match, error: r.error ? r.error.name : null })));
+    __probeConsoleCall("groupEnd");
 
     return { ok, rows };
   }
@@ -2275,9 +2291,9 @@ function printToStringCrossRealmChecks() {
   try { iframe.remove(); } catch (_) {}
 
   const ok = rows.every((r) => r.match === true || r.match === null);
-  console.group("[probe] toString cross-realm checks (hard invariants + informational)");
-  console.table(rows.map((r) => ({ check: r.check, match: r.match, error: r.error ? r.error.name : null })));
-  console.groupEnd();
+  __probeConsoleCall("group", "[probe] toString cross-realm checks (hard invariants + informational)");
+  __probeConsoleCall("table", rows.map((r) => ({ check: r.check, match: r.match, error: r.error ? r.error.name : null })));
+  __probeConsoleCall("groupEnd");
 
   return { ok, rows };
 }
@@ -2354,11 +2370,11 @@ function printToStringCrossRealmChecks() {
     if (!out || !Array.isArray(out.descriptors)) {
       const error = {
         name: "TypeError",
-        message: "[probe] descriptors missing before descriptor expectations compare"
+        message: "descriptors missing before descriptor expectations compare"
       };
-      console.group("[probe] Descriptor expectations - skipped");
-      console.warn(error.message);
-      console.groupEnd();
+      __probeConsoleCall("group", "[probe] Descriptor expectations - skipped");
+      __probeConsoleCall("warn", `[probe] ${error.message}`);
+      __probeConsoleCall("groupEnd");
       return { total: 0, mismatches: 0, rows: [], skipped: true, error };
     }
 
@@ -2390,10 +2406,10 @@ function printToStringCrossRealmChecks() {
     });
 
     const mismatchesRows = rows.filter((r) => !r.allMatch);
-    console.group("[probe] Descriptor expectations - mismatches");
-    console.log(`[probe] total: ${rows.length}, mismatches: ${mismatchesRows.length}`);
-    console.table(mismatchesRows);
-    console.groupEnd();
+    __probeConsoleCall("group", "[probe] Descriptor expectations - mismatches");
+    __probeConsoleCall("log", `[probe] total: ${rows.length}, mismatches: ${mismatchesRows.length}`);
+    __probeConsoleCall("table", mismatchesRows);
+    __probeConsoleCall("groupEnd");
 
     return { total: rows.length, mismatches: mismatchesRows.length, rows, skipped: false, error: null };
   }
@@ -2484,12 +2500,12 @@ function printToStringCrossRealmChecks() {
 
 
 
-    console.group("[probe] __DEGRADE__ last 50");
-    console.log(`[probe] total degrade events: ${all.length}`);
-    console.table(rows);
-    console.log("[probe] raw last 50 entries:");
-    for (const entry of last50) console.dir(entry, { depth: 5 });
-    console.groupEnd();
+    __probeConsoleCall("group", "[probe] __DEGRADE__ last 50");
+    __probeConsoleCall("log", `[probe] total degrade events: ${all.length}`);
+    __probeConsoleCall("table", rows);
+    __probeConsoleCall("log", "[probe] raw last 50 entries:");
+    for (const entry of last50) __probeConsoleCall("dir", entry, { depth: 5 });
+    __probeConsoleCall("groupEnd");
 
     return { total: all.length, last50Count: last50.length, rows, raw: last50 };
   }
@@ -2629,9 +2645,9 @@ function printToStringCrossRealmChecks() {
       }
     } catch (_) {}
 
-    console.group("[probe] module check");
-    console.table(rows);
-    console.groupEnd();
+    __probeConsoleCall("group", "[probe] module check");
+    __probeConsoleCall("table", rows);
+    __probeConsoleCall("groupEnd");
     return rows;
   }
 
