@@ -40,6 +40,12 @@ const LOGGingModule = function LOGGingModule() {
       });
       return value;
     }
+    try {
+      const globalLoggerAliasDesc = Object.getOwnPropertyDescriptor(global, "L");
+      if (!globalLoggerAliasDesc || globalLoggerAliasDesc.configurable !== false || globalLoggerAliasDesc.value === __loggerRoot) {
+        __defineGlobalCompatValue("L", __loggerRoot, true);
+      }
+    } catch (_) {}
 
     const __loggerWindowShellKeys = ["__DEGRADE__", "__DEBUG__", "_logLevel", "_logConfig", "__LOGGER_GUARD_MODE__", "log"];
     function rebindWindowLoggerShell() {
@@ -129,17 +135,6 @@ const LOGGingModule = function LOGGingModule() {
       logger_guard: "error"
     };
 
-    const DIAG_SCREEN_STATE = {
-      startedAt: new Date().toISOString(),
-      updatedAt: null,
-      totalSeen: 0,
-      totalCritical: 0,
-      byLevel: {},
-      byCode: {},
-      byModule: {},
-      byEntryType: {},
-      lastCritical: []
-    };
     // DIAG dedup/throttle:
     // - keeps the first N identical diag events and suppresses further duplicates;
     // - improves log readability when one failing check emits the same event many times;
@@ -531,135 +526,109 @@ const LOGGingModule = function LOGGingModule() {
       }
     }
 
-    function diagScreenGetConfig() {
-      __ensureLoggerHiddenValue("__DIAG_SCREEN__", function () { return {}; }, function (v) {
-        return !!(v && typeof v === "object");
-      }, true);
-      const cfg = __loggerRoot.__DIAG_SCREEN__;
-      if (!Object.prototype.hasOwnProperty.call(cfg, "enabled")) cfg.enabled = false;
-      if (!Object.prototype.hasOwnProperty.call(cfg, "criticalOnly")) cfg.criticalOnly = true;
-      if (!Object.prototype.hasOwnProperty.call(cfg, "lastN")) cfg.lastN = 30;
-      if (!Object.prototype.hasOwnProperty.call(cfg, "includeData")) cfg.includeData = false;
-      return cfg;
+    function formatCompactTimestamp(value) {
+      const raw = (typeof value === "string" && value) ? value : new Date().toISOString();
+      const isoMatch = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(\.\d+)?Z?$/.exec(raw);
+      if (isoMatch) {
+        const fraction = isoMatch[3] ? isoMatch[3].slice(0, 3) : "";
+        return isoMatch[1] + ":" + isoMatch[2] + fraction;
+      }
+      const parsed = new Date(raw);
+      if (!isFinite(parsed.getTime())) return raw;
+      const pad2 = (n) => String(n).padStart(2, "0");
+      const centis = String(Math.floor(parsed.getUTCMilliseconds() / 10)).padStart(2, "0");
+      return [
+        parsed.getUTCFullYear(),
+        pad2(parsed.getUTCMonth() + 1),
+        pad2(parsed.getUTCDate())
+      ].join("-") + ":" + [
+        pad2(parsed.getUTCHours()),
+        pad2(parsed.getUTCMinutes()),
+        pad2(parsed.getUTCSeconds())
+      ].join(":") + "." + centis;
     }
 
-    function diagScreenSnapshot() {
-      const cfg = diagScreenGetConfig();
+    function shapeDegradeBufferEntry(entry, idx) {
+      const incident = normalizeDiagIncident(entry, idx);
+      const entryExtra = (entry && entry.extra && typeof entry.extra === "object")
+        ? normalizeForJSON(entry.extra)
+        : {};
+      const extra = (entryExtra && typeof entryExtra === "object")
+        ? Object.assign({}, entryExtra)
+        : {};
+      if (incident) {
+        if (typeof incident.level === "string" && !Object.prototype.hasOwnProperty.call(extra, "level")) extra.level = incident.level;
+        if (typeof incident.diagTag === "string" && incident.diagTag && !Object.prototype.hasOwnProperty.call(extra, "diagTag")) extra.diagTag = incident.diagTag;
+        if (typeof incident.stage === "string" && incident.stage && !Object.prototype.hasOwnProperty.call(extra, "stage")) extra.stage = incident.stage;
+        if (typeof incident.diagType === "string" && incident.diagType && !Object.prototype.hasOwnProperty.call(extra, "type")) extra.type = incident.diagType;
+        if (!Object.prototype.hasOwnProperty.call(extra, "data") && incident.data != null) extra.data = incident.data;
+        if (!Object.prototype.hasOwnProperty.call(extra, "entryType")) extra.entryType = incident.entryType;
+        if (!Object.prototype.hasOwnProperty.call(extra, "critical")) extra.critical = !!incident.critical;
+      }
+      const errorValue = (() => {
+        if (entry && Object.prototype.hasOwnProperty.call(entry, "error")) return normalizeForJSON(entry.error);
+        if (incident && (incident.errName || incident.errMessage)) {
+          return {
+            name: incident.errName || null,
+            message: incident.errMessage || null
+          };
+        }
+        if (entry && typeof entry.message === "string" && entry.message) return entry.message;
+        return null;
+      })();
+      const moduleName = (typeof extra.module === "string" && extra.module)
+        ? extra.module
+        : (incident && typeof incident.module === "string" ? incident.module : null);
+      const keyValue = (typeof extra.key === "string" || extra.key === null)
+        ? extra.key
+        : (incident ? incident.key : null);
+      const codeValue = (entry && typeof entry.code === "string" && entry.code)
+        ? entry.code
+        : (incident && typeof incident.code === "string" ? incident.code : ((entry && typeof entry.type === "string") ? entry.type : null));
       return {
-        enabled: !!cfg.enabled,
-        criticalOnly: !!cfg.criticalOnly,
-        lastN: toPosInt(cfg.lastN, 30),
-        includeData: !!cfg.includeData,
-        startedAt: DIAG_SCREEN_STATE.startedAt,
-        updatedAt: DIAG_SCREEN_STATE.updatedAt,
-        totalSeen: DIAG_SCREEN_STATE.totalSeen,
-        totalCritical: DIAG_SCREEN_STATE.totalCritical,
-        byLevel: Object.assign({}, DIAG_SCREEN_STATE.byLevel),
-        byCode: Object.assign({}, DIAG_SCREEN_STATE.byCode),
-        byModule: Object.assign({}, DIAG_SCREEN_STATE.byModule),
-        byEntryType: Object.assign({}, DIAG_SCREEN_STATE.byEntryType),
-        lastCritical: DIAG_SCREEN_STATE.lastCritical.slice()
+        module: moduleName,
+        key: keyValue,
+        code: codeValue,
+        error: errorValue,
+        extra: extra,
+        timestamp: formatCompactTimestamp(safeEntryTimestamp(entry)),
+        type: (entry && typeof entry.type === "string") ? entry.type : (incident && incident.entryType ? incident.entryType : "degrade")
       };
     }
 
-    function pushDiagScreenIncident(incident) {
-      const cfg = diagScreenGetConfig();
-      if (!cfg.enabled) return;
-      if (!incident || typeof incident !== "object") return;
-      if (cfg.criticalOnly && !incident.critical) return;
-
-      DIAG_SCREEN_STATE.totalSeen += 1;
-      if (incident.critical) DIAG_SCREEN_STATE.totalCritical += 1;
-      DIAG_SCREEN_STATE.updatedAt = new Date().toISOString();
-
-      const lv = (typeof incident.level === "string" && incident.level) ? incident.level : "info";
-      const code = (typeof incident.code === "string" && incident.code) ? incident.code : "unknown";
-      const mod = (typeof incident.module === "string" && incident.module) ? incident.module : "unknown";
-      const typ = (typeof incident.entryType === "string" && incident.entryType) ? incident.entryType : "unknown";
-
-      DIAG_SCREEN_STATE.byLevel[lv] = (DIAG_SCREEN_STATE.byLevel[lv] || 0) + 1;
-      DIAG_SCREEN_STATE.byCode[code] = (DIAG_SCREEN_STATE.byCode[code] || 0) + 1;
-      DIAG_SCREEN_STATE.byModule[mod] = (DIAG_SCREEN_STATE.byModule[mod] || 0) + 1;
-      DIAG_SCREEN_STATE.byEntryType[typ] = (DIAG_SCREEN_STATE.byEntryType[typ] || 0) + 1;
-
-      const keepData = !!cfg.includeData;
-      const saved = keepData ? incident : Object.assign({}, incident, { data: undefined });
-      DIAG_SCREEN_STATE.lastCritical.push(saved);
-
-      const maxN = toPosInt(cfg.lastN, 30);
-      if (DIAG_SCREEN_STATE.lastCritical.length > maxN) {
-        DIAG_SCREEN_STATE.lastCritical.splice(0, DIAG_SCREEN_STATE.lastCritical.length - maxN);
+    function buildDegradeBufferMeta(rawEntries) {
+      const arr = Array.isArray(rawEntries) ? rawEntries : [];
+      const meta = {
+        totalBuffer: arr.length,
+        totalCritical: 0,
+        byLevel: {},
+        byCode: {},
+        byModule: {},
+        byEntryType: {},
+        lastCritical: []
+      };
+      for (let i = 0; i < arr.length; i++) {
+        const incident = normalizeDiagIncident(arr[i], i);
+        if (!incident) continue;
+        const level = (typeof incident.level === "string" && incident.level) ? incident.level : "info";
+        const code = (typeof incident.code === "string" && incident.code) ? incident.code : "unknown";
+        const moduleName = (typeof incident.module === "string" && incident.module) ? incident.module : "unknown";
+        const entryType = (typeof incident.entryType === "string" && incident.entryType) ? incident.entryType : "unknown";
+        meta.byLevel[level] = (meta.byLevel[level] || 0) + 1;
+        meta.byCode[code] = (meta.byCode[code] || 0) + 1;
+        meta.byModule[moduleName] = (meta.byModule[moduleName] || 0) + 1;
+        meta.byEntryType[entryType] = (meta.byEntryType[entryType] || 0) + 1;
+        if (!incident.critical) continue;
+        meta.totalCritical += 1;
+        meta.lastCritical.push(shapeDegradeBufferEntry(arr[i], i));
       }
-
-      const sink = (typeof global.__DIAG_SCREEN_RENDER__ === "function") ? global.__DIAG_SCREEN_RENDER__ : null;
-      if (sink) {
-        try {
-          sink(diagScreenSnapshot(), saved);
-        } catch (_) {}
-      }
-    }
-
-    function pullDiagAlerts(opts) {
-      try {
-        const o = isPlainObject(opts) ? opts : {};
-        const limit = toPosInt(o.limit, 50);
-        const sinceIndex = toNonNegInt(o.sinceIndex, 0);
-        const criticalOnly = !Object.prototype.hasOwnProperty.call(o, "criticalOnly") ? true : !!o.criticalOnly;
-        const includeData = !!o.includeData;
-        const includeRaw = !!o.includeRaw;
-
-        const buf = _buf().slice();
-        const start = Math.min(sinceIndex, buf.length);
-        const out = [];
-        let scanned = 0;
-
-        for (let i = start; i < buf.length; i++) {
-          const incident = normalizeDiagIncident(buf[i], i);
-          if (!incident) continue;
-          scanned += 1;
-          if (criticalOnly && !incident.critical) continue;
-          const shaped = includeData ? incident : Object.assign({}, incident, { data: undefined });
-          if (includeRaw) shaped.raw = buf[i];
-          out.push(shaped);
-        }
-
-        const incidents = out.length > limit ? out.slice(out.length - limit) : out;
-        const lastEntry = (buf.length > 0) ? buf[buf.length - 1] : null;
-
-        return {
-          ok: true,
-          totalBuffer: buf.length,
-          scanned: scanned,
-          returned: incidents.length,
-          incidents: incidents,
-          cursor: {
-            nextSinceIndex: buf.length,
-            lastTimestamp: safeEntryTimestamp(lastEntry)
-          }
-        };
-      } catch (e) {
-        return {
-          ok: false,
-          error: {
-            name: (e && e.name) ? String(e.name) : "Error",
-            message: (e && e.message) ? String(e.message) : String(e)
-          },
-          incidents: [],
-          cursor: { nextSinceIndex: 0, lastTimestamp: null }
-        };
-      }
-    }
-
-    function resetDiagScreenState() {
-      DIAG_SCREEN_STATE.startedAt = new Date().toISOString();
-      DIAG_SCREEN_STATE.updatedAt = null;
-      DIAG_SCREEN_STATE.totalSeen = 0;
-      DIAG_SCREEN_STATE.totalCritical = 0;
-      DIAG_SCREEN_STATE.byLevel = {};
-      DIAG_SCREEN_STATE.byCode = {};
-      DIAG_SCREEN_STATE.byModule = {};
-      DIAG_SCREEN_STATE.byEntryType = {};
-      DIAG_SCREEN_STATE.lastCritical = [];
+      if (meta.lastCritical.length > 30) meta.lastCritical = meta.lastCritical.slice(-30);
+      meta.lastTimestamp = arr.length ? formatCompactTimestamp(safeEntryTimestamp(arr[arr.length - 1])) : null;
+      meta.cursor = {
+        nextSinceIndex: arr.length,
+        lastTimestamp: meta.lastTimestamp
+      };
+      return meta;
     }
 
 
@@ -1026,10 +995,6 @@ const LOGGingModule = function LOGGingModule() {
     function pushEntry(entry) {
       try {
         _buf().push(entry);
-        try {
-          const incident = normalizeDiagIncident(entry, null);
-          if (incident) pushDiagScreenIncident(incident);
-        } catch (_) {}
       } catch (e) {
         // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
         // иначе рекурсия по пути ошибок (само-логирование логгера).
@@ -1087,7 +1052,15 @@ const LOGGingModule = function LOGGingModule() {
 
     Object.defineProperty(__degradeApi, "getBuffer", {
       value() {
-        return _buf().slice();
+        const raw = _buf().slice();
+        const shaped = raw.map((entry, idx) => shapeDegradeBufferEntry(entry, idx));
+        Object.defineProperty(shaped, "meta", {
+          value: buildDegradeBufferMeta(raw),
+          enumerable: false,
+          writable: false,
+          configurable: false
+        });
+        return shaped;
       },
       enumerable: false,
       writable: false,
@@ -1376,57 +1349,7 @@ const LOGGingModule = function LOGGingModule() {
       return true;
     }
 
-    __defineLoggerHiddenValue("__PROBE_LIVE_READER__", {
-      start: __probeLiveStart,
-      stop: __probeLiveStop,
-      poll: __probeLivePoll,
-      snapshot() {
-        return {
-          enabled: __probeLiveState.enabled,
-          intervalMs: __probeLiveState.intervalMs,
-          maxRows: __probeLiveState.maxRows,
-          lastIndex: __probeLiveState.lastIndex,
-          rows: __probeLiveState.rows.slice(),
-          startedAt: __probeLiveState.startedAt
-        };
-      }
-    }, false);
-
-    __probeLiveStart();
   }
-
-  // ===== Stage 0/1: runtime-evaluate alerts + optional live-summary state =====
-  __defineLoggerHiddenValue("__DIAG_ALERTS__", function (opts) { return pullDiagAlerts(opts); }, false);
-
-  __defineLoggerHiddenValue("DIAG_SCREEN_ON", function (opts) {
-    try {
-      const cfg = diagScreenGetConfig();
-      if (isPlainObject(opts)) {
-        if (Object.prototype.hasOwnProperty.call(opts, "criticalOnly")) cfg.criticalOnly = !!opts.criticalOnly;
-        if (Object.prototype.hasOwnProperty.call(opts, "includeData")) cfg.includeData = !!opts.includeData;
-        if (Object.prototype.hasOwnProperty.call(opts, "lastN")) cfg.lastN = toPosInt(opts.lastN, 30);
-      }
-      cfg.enabled = true;
-    } catch (_) {}
-    return diagScreenSnapshot();
-  }, false);
-
-  __defineLoggerHiddenValue("DIAG_SCREEN_OFF", function () {
-    try {
-      const cfg = diagScreenGetConfig();
-      cfg.enabled = false;
-    } catch (_) {}
-    return diagScreenSnapshot();
-  }, false);
-
-  __defineLoggerHiddenValue("DIAG_SCREEN_RESET", function () {
-    resetDiagScreenState();
-    return diagScreenSnapshot();
-  }, false);
-
-  __defineLoggerHiddenValue("DIAG_SCREEN_SNAPSHOT", function () {
-    return diagScreenSnapshot();
-  }, false);
 
 
     // ===== 2) Core logger: pushLog (console + errors) =====
