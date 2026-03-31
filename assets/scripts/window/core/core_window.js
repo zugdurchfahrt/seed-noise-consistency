@@ -148,6 +148,13 @@ const CoreWindowModule = function CoreWindowModule(window) {
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
     try {
+      let currentLabel = null;
+      try {
+        currentLabel = Reflect.apply(nativeToString, func, []);
+      } catch (_) {}
+      if (typeof currentLabel === 'string' && currentLabel && currentLabel.indexOf('[native code]') === -1) {
+        return func;
+      }
       const nativeName = name || func.name || "";
       const label = nativeName
         ? `function ${nativeName}() { [native code] }`
@@ -566,37 +573,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return valueFromGetter(this);
         }
       }), key).get;
-      let nativeLabel = null;
-      try {
-        nativeLabel = Reflect.apply(nativeToString, origGet, []);
-      } catch (e) {
-        __emit('error', 'core_window:wrapStrictAccessor:native_label_read_failed', {
-          module: 'core',
-          diagTag: 'core_window',
-          surface: 'core',
-          key: key,
-          stage: 'apply',
-          message: '__wrapStrictAccessor native getter label read failed',
-          type: 'contract violation',
-          data: { outcome: 'throw', reason: 'native_label_read_failed' }
-        }, e);
-        throw e;
-      }
-      if (typeof nativeLabel !== 'string' || !nativeLabel) {
-        const e = new Error('[CoreWindow] __wrapStrictAccessor: native getter label missing');
-        __emit('error', 'core_window:wrapStrictAccessor:native_label_missing', {
-          module: 'core',
-          diagTag: 'core_window',
-          surface: 'core',
-          key: key,
-          stage: 'apply',
-          message: '__wrapStrictAccessor native getter label missing',
-          type: 'contract violation',
-          data: { outcome: 'throw', reason: 'native_label_missing' }
-        }, e);
-        throw e;
-      }
-      toStringOverrideMap.set(wrapped, nativeLabel);
       return wrapped;
     }
 
@@ -719,8 +695,21 @@ const CoreWindowModule = function CoreWindowModule(window) {
     function isObjectReturnGatewayWrapLayer(v) {
       return v === 'object_return_gateway';
     }
+    function isMaterializedAccessorGatewayWrapLayer(v) {
+      return v === 'materialized_accessor_gateway';
+    }
+    function isProtoChainRequiredAccessorGatewayWrapLayer(v) {
+      return (
+        isStrictScalarAccessorGatewayWrapLayer(v) ||
+        isObjectReturnGatewayWrapLayer(v)
+      );
+    }
     function isAccessorGatewayWrapLayer(v) {
-      return isStrictScalarAccessorGatewayWrapLayer(v) || isObjectReturnGatewayWrapLayer(v);
+      return (
+        isStrictScalarAccessorGatewayWrapLayer(v) ||
+        isObjectReturnGatewayWrapLayer(v) ||
+        isMaterializedAccessorGatewayWrapLayer(v)
+      );
     }
     function normalizeWrapLayer(v) {
       if (isWrapLayerMissing(v)) return null;
@@ -729,6 +718,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         || v === 'named_wrapper'
         || v === 'strict_accessor_gateway'
         || v === 'object_return_gateway'
+        || v === 'materialized_accessor_gateway'
         || v === 'core_wrapper'
       ) return v;
       return null;
@@ -781,6 +771,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
       __internal.guards = __guardRegistry;
       __internal.knownWrapped = knownWrapped;
       __internal.prng = __prngRoot;
+      safeDefine(__internal, '__ACCESSOR_OWNER_FIRST_CAPABLE__', {
+        value: true,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       if (!__isCoreToStringStateOk(__internal.coreToStringState)) {
         const nextCoreToStringState = sharedCoreToStringState || publishCoreToStringState();
         safeDefine(__internal, 'coreToStringState', {
@@ -1064,6 +1060,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         };
         const useStrictScalarAccessorGateway = isStrictScalarAccessorGatewayWrapLayer(wrapLayer);
         const useObjectReturnGateway = isObjectReturnGatewayWrapLayer(wrapLayer);
+        const useMaterializedAccessorGateway = isMaterializedAccessorGatewayWrapLayer(wrapLayer);
 
         if (useStrictScalarAccessorGateway) {
           const wrappedStrictGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
@@ -1085,6 +1082,25 @@ const CoreWindowModule = function CoreWindowModule(window) {
           }), key).get;
           knownWrapped.add(wrappedObjectGet);
           return wrappedObjectGet;
+        }
+
+        if (useMaterializedAccessorGateway) {
+          if (typeof origGet === 'function') {
+            const wrappedMaterializedNativeGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
+              name: 'get ' + key,
+              wrapLayer: wrapLayer
+            });
+            knownWrapped.add(wrappedMaterializedNativeGet);
+            return wrappedMaterializedNativeGet;
+          }
+          const wrappedMaterializedGet = buildNamedAccessor(key, 'get', function coreMaterializedAccessorGet() {
+            if (checkThis && !checkThis(this)) {
+              return onInvalidThis(invalidThis, null, this, []);
+            }
+            return valueFromGetter(this);
+          });
+          knownWrapped.add(wrappedMaterializedGet);
+          return wrappedMaterializedGet;
         }
 
         if (isData) return getter;
@@ -1191,14 +1207,13 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (!d || typeof d.get !== 'function') {
           throw new TypeError('[Core.redefineAcc] native getter missing for ' + key);
         }
-        const markAsNative = ensureMarkAsNative();
         const namedGet = (typeof getImpl === 'function' && getImpl.name === '')
           ? Object.getOwnPropertyDescriptor(({ get [key]() { return getImpl.call(this); } }), key).get
           : getImpl;
         if (typeof namedGet !== 'function') {
           throw new TypeError('[Core.redefineAcc] getter missing for ' + key);
         }
-        const wrappedGet = markAsNative(namedGet, 'get ' + key);
+        const wrappedGet = namedGet;
         knownWrapped.add(wrappedGet);
         Object.defineProperty(target, key, {
           get: wrappedGet,
@@ -1271,9 +1286,11 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         const strictScalarContract = planItem.policy === 'strict' && isStrictScalarAccessorGatewayWrapLayer(wrapLayer);
         const objectReturnContract = planItem.policy === 'strict' && isObjectReturnGatewayWrapLayer(wrapLayer);
-        const accessorGatewayContract = strictScalarContract || objectReturnContract;
+        const materializedAccessorContract = planItem.policy === 'strict' && isMaterializedAccessorGatewayWrapLayer(wrapLayer);
+        const accessorGatewayContract = strictScalarContract || objectReturnContract || materializedAccessorContract;
+        const requiresExistingDescriptor = strictScalarContract || objectReturnContract;
         const allowShapeChange = !!planItem.allowShapeChange;
-        if (accessorGatewayContract && !desc) {
+        if (requiresExistingDescriptor && !desc) {
           const e = new Error('[Core.applyTargets] accessor strict requires descriptor');
           return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
@@ -1297,7 +1314,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] accessor gateway cannot use core_wrapper');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        planItem.wrapperClass = useProxyRuntime ? 'core_proxy' : 'synthetic_named';
+        planItem.wrapperClass = useProxyRuntime
+          ? 'core_proxy'
+          : (materializedAccessorContract ? 'materialized_named' : 'synthetic_named');
         let getWrapped = origGet;
         let setWrapped = origSet;
 
@@ -1342,6 +1361,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
               wrapLayer: wrapLayer
             });
           }
+          if (materializedAccessorContract && typeof getWrapped === 'function' && typeof markAsNative === 'function') {
+            markAsNative(getWrapped, 'get ' + key);
+          }
           if (accessorGatewayContract) {
             if (desc && Object.prototype.hasOwnProperty.call(desc, 'set')) {
               setWrapped = desc.set;
@@ -1367,7 +1389,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
                 if (setImpl) return setImpl.call(this, origSet, v);
                 return Reflect.apply(origSet, this, [v]);
               });
-              setWrapped = markAsNative(setRaw, 'set ' + key);
+              setWrapped = setRaw;
             }
             knownWrapped.add(setWrapped);
           } else if (setImpl) {
@@ -1386,7 +1408,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               }
               return setImpl.call(this, undefined, v);
             });
-            setWrapped = markAsNative(setRaw, 'set ' + key);
+            setWrapped = setRaw;
             knownWrapped.add(setWrapped);
           }
         } catch (e) {
@@ -1534,7 +1556,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             });
           } else {
             const wrappedRaw = buildMethodWrapperByArity(orig, key, invokeMethodPath);
-            wrapped = markAsNative(wrappedRaw, key);
+            wrapped = wrappedRaw;
           }
           knownWrapped.add(wrapped);
         } catch (e) {
@@ -1735,9 +1757,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if ((kind === 'accessor' || kind === 'method' || kind === 'promise_method') && wrapLayer === 'descriptor_only') {
           return { ok: false, reason: 'wrap_layer_kind_mismatch', error: new TypeError('[Core.applyTargets] descriptor_only unsupported for non-data kind'), tag, policy, targetId, key, kind };
         }
-        if (isAccessorGatewayWrapLayer(wrapLayer) && resolveMode !== 'proto_chain') {
+        if (isProtoChainRequiredAccessorGatewayWrapLayer(wrapLayer) && resolveMode !== 'proto_chain') {
           return { ok: false, reason: 'resolve_mode_required',
-            error: new TypeError('[Core.applyTargets] accessor gateway requires resolve=proto_chain'),
+            error: new TypeError('[Core.applyTargets] native accessor gateway requires resolve=proto_chain'),
             tag, policy, targetId, key, kind
           };
         }
@@ -1796,7 +1818,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (!desc && !allowCreate) {
           return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] descriptor missing'), tag, policy, targetId, key, kind };
         }
-        if (!desc && kind === 'accessor' && isAccessorGatewayWrapLayer(wrapLayer)) {
+        if (
+          !desc &&
+          kind === 'accessor' &&
+          isAccessorGatewayWrapLayer(wrapLayer) &&
+          !(allowCreate && isMaterializedAccessorGatewayWrapLayer(wrapLayer))
+        ) {
           return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] accessor gateway requires descriptor'), tag, policy, targetId, key, kind };
         }
         if (desc && kind === 'data') {

@@ -263,6 +263,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navLangState = (__stateRoot && __stateRoot.__LANG_STATE__ && typeof __stateRoot.__LANG_STATE__ === 'object')
       ? __stateRoot.__LANG_STATE__
       : ((C && C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') ? C.__LANG_STATE__ : null);
+    const __coreOwnerFirstAccessorCapable = !!(
+      __core &&
+      __core.__internal &&
+      typeof __core.__internal === 'object' &&
+      __core.__internal.__ACCESSOR_OWNER_FIRST_CAPABLE__ === true
+    );
     const __navScreenState = (__stateRoot && __stateRoot.__SCREEN__ && typeof __stateRoot.__SCREEN__ === 'object')
       ? __stateRoot.__SCREEN__
       : null;
@@ -1140,32 +1146,32 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
         return;
       }
-      const dprResolved = __navResolveDescriptor(windowProto, 'devicePixelRatio', { mode: 'proto_chain' });
-      const dprOwner = dprResolved && dprResolved.owner;
-      const dprDesc = dprResolved && dprResolved.desc;
-      if (!dprOwner || !dprDesc) {
-        __navDiag('warn', 'nav_total_set:devicePixelRatio_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set:devicePixelRatio',
-          key: 'devicePixelRatio',
-          message: 'devicePixelRatio descriptor missing',
-          data: { outcome: 'skip', reason: 'descriptor_missing', policy: 'skip', action: 'native' }
-        });
-        return;
+      const dprOwnDesc = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+      const dprResolved = dprOwnDesc
+        ? null
+        : __navResolveDescriptor(windowProto, 'devicePixelRatio', { mode: 'proto_chain' });
+
+      let dprOwner = null;
+      let dprDesc = null;
+      let dprNeedsMaterialize = false;
+      let dprOwnerFact = null;
+
+      if (dprOwnDesc) {
+        dprOwner = window;
+        dprDesc = dprOwnDesc;
+        dprOwnerFact = 'window_own';
+      } else if (dprResolved && dprResolved.desc) {
+        dprOwner = dprResolved.owner;
+        dprDesc = dprResolved.desc;
+        dprOwnerFact = 'proto_chain';
+      } else {
+        dprOwner = windowProto;
+        dprDesc = null;
+        dprNeedsMaterialize = true;
+        dprOwnerFact = 'materialize_on_window_proto';
       }
-      if (dprOwner === window) {
-        __navDiag('error', 'nav_total_set:devicePixelRatio_instance_owner', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set:devicePixelRatio',
-          key: 'devicePixelRatio',
-          message: 'devicePixelRatio resolved to instance owner',
-          data: { outcome: 'skip', reason: 'instance_owner_resolved', policy: 'skip', action: 'native' }
-        });
-        return;
-      }
-      if (dprDesc.configurable === false) {
+
+      if (dprDesc && dprDesc.configurable === false) {
         __navDiag('warn', 'nav_total_set:devicePixelRatio_non_configurable', {
           stage: 'preflight',
           type: __navTypeBrowser,
@@ -1176,7 +1182,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
         return;
       }
-      if (typeof dprDesc.get !== 'function') {
+
+      const dprIsData = !!dprDesc
+        && Object.prototype.hasOwnProperty.call(dprDesc, 'value')
+        && !dprDesc.get
+        && !dprDesc.set;
+
+      if (dprDesc && !dprIsData && typeof dprDesc.get !== 'function') {
         __navDiag('warn', 'nav_total_set:devicePixelRatio_descriptor_kind_mismatch', {
           stage: 'preflight',
           type: __navTypeBrowser,
@@ -1206,22 +1218,85 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           return false;
         }
       };
-      const applied = applyCoreTargetsGroup('nav_total_set:devicePixelRatio', [{
-        owner: dprOwner,
-        key: 'devicePixelRatio',
-        kind: 'accessor',
-        wrapLayer: 'strict_accessor_gateway',
-        resolve: 'proto_chain',
-        policy: 'strict',
-        diagTag: 'nav_total_set:devicePixelRatio',
-        configurable: !!dprDesc.configurable,
-        enumerable: !!dprDesc.enumerable,
-        validThis: validWindowThis,
-        invalidThis: 'native',
-        getImpl: function navDevicePixelRatioValue() {
-          return dpr;
+
+      let applied = 0;
+
+      if (dprIsData) {
+        applied = applyCoreTargetsGroup('nav_total_set:devicePixelRatio', [{
+          owner: dprOwner,
+          key: 'devicePixelRatio',
+          kind: 'data',
+          wrapLayer: 'descriptor_only',
+          policy: 'throw',
+          diagTag: 'nav_total_set:devicePixelRatio',
+          value: dpr,
+          writable: !!dprDesc.writable,
+          configurable: !!dprDesc.configurable,
+          enumerable: !!dprDesc.enumerable
+        }], 'throw');
+      } else {
+        const dprUseOwnerFirstGateway = (dprNeedsMaterialize || dprOwner === window);
+        const dprWrapLayer = dprUseOwnerFirstGateway
+          ? 'materialized_accessor_gateway'
+          : 'strict_accessor_gateway';
+        const dprResolveMode = dprUseOwnerFirstGateway
+          ? ((dprOwner === window) ? 'own' : 'proto_chain')
+          : 'proto_chain';
+        const dprInvalidThis = dprUseOwnerFirstGateway
+          ? ((dprDesc && typeof dprDesc.get === 'function') ? 'native' : 'throw')
+          : 'native';
+
+        if (dprUseOwnerFirstGateway && !__coreOwnerFirstAccessorCapable) {
+          __navDiag('error', 'nav_total_set:devicePixelRatio_stale_core_bundle', {
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:devicePixelRatio',
+            key: 'devicePixelRatio',
+            message: 'Core does not advertise owner-first accessor capability',
+            data: {
+              outcome: 'skip',
+              reason: 'stale_core_bundle',
+              ownerFact: dprOwnerFact,
+              wrapLayer: dprWrapLayer,
+              resolve: dprResolveMode
+            }
+          });
+          return;
         }
-      }], 'strict');
+
+        __navDiag('info', 'nav_total_set:devicePixelRatio_apply_plan', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          key: 'devicePixelRatio',
+          message: 'devicePixelRatio apply plan prepared',
+          data: {
+            outcome: 'return',
+            ownerFact: dprOwnerFact,
+            wrapLayer: dprWrapLayer,
+            resolve: dprResolveMode,
+            needsMaterialize: dprNeedsMaterialize
+          }
+        });
+
+        applied = applyCoreTargetsGroup('nav_total_set:devicePixelRatio', [{
+          owner: dprOwner,
+          key: 'devicePixelRatio',
+          kind: 'accessor',
+          wrapLayer: dprWrapLayer,
+          resolve: dprResolveMode,
+          policy: 'strict',
+          allowCreate: dprNeedsMaterialize,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          configurable: dprDesc ? !!dprDesc.configurable : true,
+          enumerable: dprDesc ? !!dprDesc.enumerable : false,
+          validThis: validWindowThis,
+          invalidThis: dprInvalidThis,
+          getImpl: function navDevicePixelRatioValue() {
+            return dpr;
+          }
+        }], 'strict');
+      }
       if (applied !== 1) {
         __navDiag('warn', 'nav_total_set:devicePixelRatio_define_failed', {
           stage: 'apply',
@@ -1229,7 +1304,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           diagTag: 'nav_total_set:devicePixelRatio',
           key: 'devicePixelRatio',
           message: 'failed to define devicePixelRatio',
-          data: { outcome: 'skip', reason: 'apply_failed', policy: 'skip', action: 'native' }
+          data: {
+            outcome: 'skip',
+            reason: 'apply_failed',
+            policy: 'skip',
+            action: 'native',
+            ownerFact: dprOwnerFact
+          }
         });
         return;
       }
@@ -2362,100 +2443,159 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }, 'get memory');
 
         try {
-          if (perfMemoryOwner === performance) {
-            __navDiag('warn', 'nav_total_set:performance_memory_owner_mismatch', {
+          const perfMemoryOwnDesc = Object.getOwnPropertyDescriptor(performance, 'memory');
+          const perfMemoryResolvedOwnerFirst = perfMemoryOwnDesc
+            ? null
+            : perfMemoryResolved;
+
+          let perfMemoryOwner = null;
+          let perfMemoryDesc = null;
+          let perfMemoryNeedsMaterialize = false;
+          let perfMemoryOwnerFact = null;
+
+          if (perfMemoryOwnDesc) {
+            perfMemoryOwner = performance;
+            perfMemoryDesc = perfMemoryOwnDesc;
+            perfMemoryOwnerFact = 'performance_own';
+          } else if (perfMemoryResolvedOwnerFirst && perfMemoryResolvedOwnerFirst.desc) {
+            perfMemoryOwner = perfMemoryResolvedOwnerFirst.owner;
+            perfMemoryDesc = perfMemoryResolvedOwnerFirst.desc;
+            perfMemoryOwnerFact = 'proto_chain';
+          } else {
+            perfMemoryOwner = perfProto;
+            perfMemoryDesc = null;
+            perfMemoryNeedsMaterialize = true;
+            perfMemoryOwnerFact = 'materialize_on_performance_proto';
+          }
+
+          if (perfMemoryDesc && perfMemoryDesc.configurable === false) {
+            __navDiag('warn', 'nav_total_set:performance_memory_non_configurable', {
               surface: 'navigator',
               stage: 'preflight',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:performance.memory',
               key: 'performance.memory',
-              message: 'performance.memory resolved to instance owner',
-              data: { outcome: 'skip', reason: 'instance_owner_resolved', policy: 'skip', action: 'native' }
+              message: 'performance.memory is non-configurable',
+              data: { outcome: 'skip', reason: 'non_configurable', policy: 'skip', action: 'native' }
             });
-          } else {
-            const perfMemoryDesc = perfMemoryResolved && perfMemoryResolved.desc;
-            if (!perfMemoryDesc) {
-              __navDiag('warn', 'nav_total_set:performance_memory_descriptor_missing', {
-                surface: 'navigator',
-                stage: 'preflight',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:performance.memory',
-                key: 'performance.memory',
-                message: 'performance.memory descriptor missing',
-                data: { outcome: 'skip', reason: 'descriptor_missing', policy: 'skip', action: 'native' }
-              });
-              return;
-            }
-            if (perfMemoryDesc.configurable === false) {
-              __navDiag('warn', 'nav_total_set:performance_memory_non_configurable', {
-                surface: 'navigator',
-                stage: 'preflight',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:performance.memory',
-                key: 'performance.memory',
-                message: 'performance.memory is non-configurable',
-                data: { outcome: 'skip', reason: 'non_configurable', policy: 'skip', action: 'native' }
-              });
-              return;
-            }
-            if (typeof perfMemoryDesc.get !== 'function') {
-              __navDiag('warn', 'nav_total_set:performance_memory_descriptor_kind_mismatch', {
-                surface: 'navigator',
-                stage: 'preflight',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:performance.memory',
-                key: 'performance.memory',
-                message: 'performance.memory is not accessor-shaped on prototype',
-                data: { outcome: 'skip', reason: 'descriptor_kind_mismatch', policy: 'skip', action: 'native' }
-              });
-              return;
-            }
-            let __navPerformanceThisCheckDiagSent = false;
-            const validPerformanceThis = function validPerformanceThis(self) {
-              try {
-                return self === performance || (typeof Performance === 'function' && self instanceof Performance);
-              } catch (e) {
-                if (!__navPerformanceThisCheckDiagSent) {
-                  __navPerformanceThisCheckDiagSent = true;
-                  __navDiag('warn', 'nav_total_set:performance_memory_this_check_failed', {
-                    stage: 'runtime',
-                    type: __navTypeBrowser,
-                    diagTag: 'nav_total_set:performance.memory',
-                    key: 'performance.memory',
-                    message: 'Performance receiver check failed',
-                    data: { outcome: 'return', reason: 'performance_this_check_failed', policy: 'skip', action: 'native' }
-                  }, e);
-                }
-                return false;
-              }
-            };
-            const applied = applyCoreTargetsGroup('nav_total_set:performance.memory', [{
-              owner: perfMemoryOwner,
-              key: 'memory',
-              kind: 'accessor',
-              wrapLayer: 'object_return_gateway',
-              resolve: 'proto_chain',
-              policy: 'strict',
+            return;
+          }
+          if (perfMemoryDesc && typeof perfMemoryDesc.get !== 'function') {
+            __navDiag('warn', 'nav_total_set:performance_memory_descriptor_kind_mismatch', {
+              surface: 'navigator',
+              stage: 'preflight',
+              type: __navTypeBrowser,
               diagTag: 'nav_total_set:performance.memory',
-              configurable: !!perfMemoryDesc.configurable,
-              enumerable: !!perfMemoryDesc.enumerable,
-              validThis: validPerformanceThis,
-              invalidThis: 'native',
-              getImpl: function navPerformanceMemoryValue() {
-                return getMemory.call(this);
+              key: 'performance.memory',
+              message: 'performance.memory is not accessor-shaped on owner',
+              data: {
+                outcome: 'skip',
+                reason: 'descriptor_kind_mismatch',
+                policy: 'skip',
+                action: 'native',
+                ownerFact: perfMemoryOwnerFact
               }
-            }], 'strict');
-            if (applied !== 1) {
-              __navDiag('warn', 'nav_total_set:performance_memory_define_failed', {
-                surface: 'navigator',
-                stage: 'apply',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:performance.memory',
-                key: 'performance.memory',
-                message: 'failed to define performance.memory',
-                data: { outcome: 'skip', reason: 'apply_failed', policy: 'skip', action: 'native' }
-              });
+            });
+            return;
+          }
+          let __navPerformanceThisCheckDiagSent = false;
+          const validPerformanceThis = function validPerformanceThis(self) {
+            try {
+              return self === performance || (typeof Performance === 'function' && self instanceof Performance);
+            } catch (e) {
+              if (!__navPerformanceThisCheckDiagSent) {
+                __navPerformanceThisCheckDiagSent = true;
+                __navDiag('warn', 'nav_total_set:performance_memory_this_check_failed', {
+                  stage: 'runtime',
+                  type: __navTypeBrowser,
+                  diagTag: 'nav_total_set:performance.memory',
+                  key: 'performance.memory',
+                  message: 'Performance receiver check failed',
+                  data: { outcome: 'return', reason: 'performance_this_check_failed', policy: 'skip', action: 'native' }
+                }, e);
+              }
+              return false;
             }
+          };
+          const perfUseOwnerFirstGateway = (perfMemoryNeedsMaterialize || perfMemoryOwner === performance);
+          const perfWrapLayer = perfUseOwnerFirstGateway
+            ? 'materialized_accessor_gateway'
+            : 'object_return_gateway';
+          const perfResolveMode = perfUseOwnerFirstGateway
+            ? ((perfMemoryOwner === performance) ? 'own' : 'proto_chain')
+            : 'proto_chain';
+          const perfInvalidThis = perfUseOwnerFirstGateway
+            ? ((perfMemoryDesc && typeof perfMemoryDesc.get === 'function') ? 'native' : 'throw')
+            : 'native';
+
+          if (perfUseOwnerFirstGateway && !__coreOwnerFirstAccessorCapable) {
+            __navDiag('error', 'nav_total_set:performance_memory_stale_core_bundle', {
+              surface: 'navigator',
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:performance.memory',
+              key: 'performance.memory',
+              message: 'Core does not advertise owner-first accessor capability',
+              data: {
+                outcome: 'skip',
+                reason: 'stale_core_bundle',
+                ownerFact: perfMemoryOwnerFact,
+                wrapLayer: perfWrapLayer,
+                resolve: perfResolveMode
+              }
+            });
+            return;
+          }
+
+          __navDiag('info', 'nav_total_set:performance_memory_apply_plan', {
+            surface: 'navigator',
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:performance.memory',
+            key: 'performance.memory',
+            message: 'performance.memory apply plan prepared',
+            data: {
+              outcome: 'return',
+              ownerFact: perfMemoryOwnerFact,
+              wrapLayer: perfWrapLayer,
+              resolve: perfResolveMode,
+              needsMaterialize: perfMemoryNeedsMaterialize
+            }
+          });
+
+          const applied = applyCoreTargetsGroup('nav_total_set:performance.memory', [{
+            owner: perfMemoryOwner,
+            key: 'memory',
+            kind: 'accessor',
+            wrapLayer: perfWrapLayer,
+            resolve: perfResolveMode,
+            policy: 'strict',
+            allowCreate: perfMemoryNeedsMaterialize,
+            diagTag: 'nav_total_set:performance.memory',
+            configurable: perfMemoryDesc ? !!perfMemoryDesc.configurable : true,
+            enumerable: perfMemoryDesc ? !!perfMemoryDesc.enumerable : false,
+            validThis: validPerformanceThis,
+            invalidThis: perfInvalidThis,
+            getImpl: function navPerformanceMemoryValue() {
+              return getMemory.call(this);
+            }
+          }], 'strict');
+          if (applied !== 1) {
+            __navDiag('warn', 'nav_total_set:performance_memory_define_failed', {
+              surface: 'navigator',
+              stage: 'apply',
+              type: __navTypeBrowser,
+              diagTag: 'nav_total_set:performance.memory',
+              key: 'performance.memory',
+              message: 'failed to define performance.memory',
+              data: {
+                outcome: 'skip',
+                reason: 'apply_failed',
+                policy: 'skip',
+                action: 'native',
+                ownerFact: perfMemoryOwnerFact
+              }
+            });
           }
         } catch (e) {
           __navDiag('warn', 'nav_total_set:performance_memory_proto', {
