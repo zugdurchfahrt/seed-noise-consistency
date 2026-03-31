@@ -151,28 +151,28 @@ const LOGGingModule = function LOGGingModule() {
     const DIAG_DUP_MAP_MAX = toPosInt(global.__DIAG_DUP_MAP_MAX, 2048);
     const DIAG_DUP_COUNTS = new Map();
     const LOGGER_MODULE_AUDIT_SLOTS = [
-      { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "diag", functions: "none" },
-      { module: "bootstrap_hide", diagTag: "bootstrap_hide", codePrefix: "bootstrap_hide", source: "bundle", emitter: "diag", functions: "none" },
-      { module: "core_window", diagTag: "core_window", codePrefix: "core_window", source: "bundle", emitter: "diag", functions: "none" },
-      { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none" },
-      { module: "rtc", diagTag: "rtc", codePrefix: "rtc", source: "bundle", emitter: "diag", functions: "auto" },
-      { module: "hide_webdriver", diagTag: "hide_webdriver", codePrefix: "hide_webdriver", source: "bundle", emitter: "diag", functions: "auto" },
-      { module: "wrk", diagTag: "wrk", codePrefix: "wrk", source: "bundle", emitter: "diag", functions: "none" },
-      { module: "rng_set", diagTag: "rng_set", codePrefix: "rng_set", source: "bundle", emitter: "diag", functions: "none" },
-      { module: "nav_total_set", diagTag: "nav_total_set", codePrefix: "nav_total_set", source: "bundle", emitter: "diag", functions: "auto" },
-      { module: "screen", diagTag: "screen", codePrefix: "screen", source: "bundle", emitter: "diag", functions: "auto" },
-      { module: "fonts", diagTag: "fonts", codePrefix: "fonts", source: "bundle", emitter: "diag", functions: "auto" },
-      { module: "canvas", diagTag: "canvas", codePrefix: "canvas", source: "bundle", emitter: "diag", functions: "auto" },
-      { module: "webgl", diagTag: "webgl", codePrefix: "webgl", source: "bundle", emitter: "diag", functions: "auto", aliases: ["webglstorage"] },
-      { module: "webgpu_wl", diagTag: "webgpu_wl", codePrefix: "webgpu_wl", source: "bundle", emitter: "diag", functions: "auto" },
-      { module: "webgpu", diagTag: "webgpu", codePrefix: "webgpu", source: "bundle", emitter: "diag", functions: "auto" },
-      { module: "audiocontext", diagTag: "audiocontext", codePrefix: "audiocontext", source: "bundle", emitter: "diag", functions: "auto", aliases: ["audio"] },
-      { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none" },
-      { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto" },
-      { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto" },
-      { module: "uad_override", diagTag: "uad_override", codePrefix: "uad_override", source: "cdp", emitter: "diag", functions: "auto" },
-      { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto" },
-      { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto" },
+      { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "bootstrap_hide", diagTag: "bootstrap_hide", codePrefix: "bootstrap_hide", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "core_window", diagTag: "core_window", codePrefix: "core_window", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "rtc", diagTag: "rtc", codePrefix: "rtc", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "hide_webdriver", diagTag: "hide_webdriver", codePrefix: "hide_webdriver", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "wrk", diagTag: "wrk", codePrefix: "wrk", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "rng_set", diagTag: "rng_set", codePrefix: "rng_set", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "nav_total_set", diagTag: "nav_total_set", codePrefix: "nav_total_set", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "screen", diagTag: "screen", codePrefix: "screen", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "fonts", diagTag: "fonts", codePrefix: "fonts", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "canvas", diagTag: "canvas", codePrefix: "canvas", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "webgl", diagTag: "webgl", codePrefix: "webgl", source: "bundle", emitter: "diag", functions: "auto", aliases: ["webglstorage"], critical: true },
+      { module: "webgpu_wl", diagTag: "webgpu_wl", codePrefix: "webgpu_wl", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "webgpu", diagTag: "webgpu", codePrefix: "webgpu", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "audiocontext", diagTag: "audiocontext", codePrefix: "audiocontext", source: "bundle", emitter: "diag", functions: "auto", aliases: ["audio"], critical: true },
+      { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto", critical: true },
+      { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto", critical: true },
+      { module: "uad_override", diagTag: "uad_override", codePrefix: "uad_override", source: "cdp", emitter: "diag", functions: "auto", critical: true },
+      { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto", critical: false },
+      { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto", critical: false },
       {
         module: "WORKER_PATCH_SRC",
         diagTag: "worker_patch",
@@ -181,19 +181,21 @@ const LOGGingModule = function LOGGingModule() {
         emitter: "diag",
         functions: "none",
         aliases: ["WORKER_PATCH_SRC"],
+        critical: true,
         requiresResultProof: true,
         locate: {
           file: "sunami/assets/scripts/workerscope/WORKER_PATCH_SRC.js",
           triggerCode: "worker_patch_src:apply:installed"
         }
       },
-      { module: "worker_bootstrap", diagTag: "worker_bootstrap", codePrefix: "worker_bootstrap", source: "cdp", emitter: "diag", functions: "none" }
+      { module: "worker_bootstrap", diagTag: "worker_bootstrap", codePrefix: "worker_bootstrap", source: "cdp", emitter: "diag", functions: "none", critical: true }
     ];
     __defineLoggerHiddenValue("__MODULE_DIAG_SLOTS__", LOGGER_MODULE_AUDIT_SLOTS, true);
     const __moduleAuditState = {
       timerId: null,
       lastSignalByModule: Object.create(null),
-      armed: false
+      armed: false,
+      completed: false
     };
 
     // Signature defines what "same event" means for dedup.
@@ -240,56 +242,6 @@ const LOGGingModule = function LOGGingModule() {
         code.endsWith(":whitelist_loaded") ||
         code.endsWith(":group_applied")
       );
-    }
-
-
-    function scheduleCriticalWorkerPatchSignal(entry, status) {
-      try {
-        const state = __criticalModuleProducerState.workerPatch;
-        if (!state || !entry || typeof entry !== "object") return;
-        const entryCode = (typeof entry.code === "string") ? entry.code : "";
-        const entryTs = (typeof entry.timestamp === "string") ? entry.timestamp : "";
-        if (status === "warn" || status === "error") {
-          const statusSig = [status, entryCode, entryTs].join("|");
-          if (state.lastStatusSig === statusSig) return;
-          state.lastStatusSig = statusSig;
-          emitCriticalWorkerPatchSignal(status, entry);
-          return;
-        }
-        if (status !== "apply_only") return;
-        state.pendingEntry = entry;
-        if (state.timerId != null) {
-          try { global.clearTimeout(state.timerId); } catch (_) {}
-          state.timerId = null;
-        }
-        state.timerId = global.setTimeout(function() {
-          state.timerId = null;
-          if (state.pendingEntry !== entry) return;
-          const resultSig = [entryCode, entryTs].join("|");
-          if (state.lastResultSig === resultSig) return;
-          state.lastResultSig = resultSig;
-          emitCriticalWorkerPatchSignal("apply_only", entry);
-        }, 0);
-      } catch (_) {}
-    }
-
-    function runCriticalModuleProducer(entry) {
-      try {
-        if (!entry || entry.type !== "degrade") return;
-        const code = (typeof entry.code === "string") ? entry.code : "";
-        if (code === "probe:critical_module_status" || code === "probe:critical_module_result_missing") return;
-        const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
-        const moduleName = (extra && typeof extra.module === "string") ? extra.module : null;
-        const diagTag = (extra && typeof extra.diagTag === "string") ? extra.diagTag : null;
-        if (moduleName !== "WORKER_PATCH_SRC" && diagTag !== "worker_patch" && code.indexOf("worker_patch_src:") !== 0) return;
-        const level = (extra && typeof extra.level === "string") ? extra.level : null;
-        const status = (level === "fatal" || level === "error")
-          ? "error"
-          : (level === "warn")
-            ? "warn"
-            : (isSummaryCode(code) ? "apply_only" : "seen");
-        scheduleCriticalWorkerPatchSignal(entry, status);
-      } catch (_) {}
     }
 
     function modulePrefixes(slot) {
@@ -387,9 +339,16 @@ const LOGGingModule = function LOGGingModule() {
       if (slot && slot.requiresResultProof === true && isSummaryCode(code)) return "apply_only";
       return isSummaryCode(code) ? "ok" : "seen";
     }
+    __defineLoggerHiddenValue("__MODULE_DIAG_AUDIT__", Object.freeze({
+      isSummaryCode,
+      matchEntry: moduleEventMatchesSlot,
+      pickEntry: modulePickEvent,
+      entryStatus: moduleEntryStatus
+    }), true);
 
     function emitModuleAuditSignal(slot, entry, status) {
       try {
+        if (!slot || slot.critical !== true) return;
         if (status !== "apply_only" && status !== "warn" && status !== "error" && status !== "not_emitted" && status !== "missing_emitter") return;
         const locate = (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
         const code = (status === "apply_only")
@@ -455,14 +414,34 @@ const LOGGingModule = function LOGGingModule() {
 
     function scheduleModuleAuditProducer() {
       try {
+        if (__moduleAuditState.armed) return;
         __moduleAuditState.armed = true;
-        if (__moduleAuditState.timerId != null) return;
-        __moduleAuditState.timerId = global.setTimeout(function() {
-          __moduleAuditState.timerId = null;
-          runModuleAuditProducer();
-        }, 0);
+        const queueRun = function() {
+          if (__moduleAuditState.completed === true) return;
+          if (__moduleAuditState.timerId != null) return;
+          __moduleAuditState.timerId = global.setTimeout(function() {
+            __moduleAuditState.timerId = null;
+            __moduleAuditState.completed = true;
+            runModuleAuditProducer();
+          }, 0);
+        };
+        const doc = (global.document && typeof global.document === "object") ? global.document : null;
+        if (!doc || doc.readyState === "complete") {
+          queueRun();
+          return;
+        }
+        if (typeof global.addEventListener === "function") {
+          global.addEventListener("load", queueRun, { once: true });
+          return;
+        }
+        if (typeof doc.addEventListener === "function") {
+          doc.addEventListener("DOMContentLoaded", queueRun, { once: true });
+          return;
+        }
+        queueRun();
       } catch (_) {}
     }
+    scheduleModuleAuditProducer();
 
     function toPosInt(v, defVal) {
       const n = Number(v);
@@ -1051,7 +1030,6 @@ const LOGGingModule = function LOGGingModule() {
           const incident = normalizeDiagIncident(entry, null);
           if (incident) pushDiagScreenIncident(incident);
         } catch (_) {}
-        try { scheduleModuleAuditProducer(); } catch (_) {}
       } catch (e) {
         // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
         // иначе рекурсия по пути ошибок (само-логирование логгера).
@@ -1110,16 +1088,6 @@ const LOGGingModule = function LOGGingModule() {
     Object.defineProperty(__degradeApi, "getBuffer", {
       value() {
         return _buf().slice();
-      },
-      enumerable: false,
-      writable: false,
-      configurable: false
-    });
-
-    Object.defineProperty(__degradeApi, "runModuleAudit", {
-      value() {
-        runModuleAuditProducer();
-        return true;
       },
       enumerable: false,
       writable: false,

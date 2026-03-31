@@ -838,26 +838,6 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
                 logger.info(f"Youtube Cookies set: {cookie['name']} для {youtube_url}")
             except Exception as e:
                 logger.error(f"Error setting Youtube cookies {cookie['name']}: {e}")
-        try:
-            driver.execute_script(
-                """
-                (function() {
-                    const C = (window && window.CanvasPatchContext && typeof window.CanvasPatchContext === 'object')
-                        ? window.CanvasPatchContext
-                        : null;
-                    const L = (C && C.__logger && typeof C.__logger === 'object')
-                        ? C.__logger
-                        : null;
-                    const D = (L && typeof L.__DEGRADE__ === 'function')
-                        ? L.__DEGRADE__
-                        : null;
-                    if (!D || typeof D.runModuleAudit !== 'function') return false;
-                    return D.runModuleAudit() === true;
-                })();
-                """
-            )
-        except Exception as e:
-            logger.warning(f"Module audit trigger skipped: {e}")
         logger.info(f"Regional alignment done: {country_data}")
     except Exception as e:
         logger.error(f"configure_profile error: {e}", exc_info=True)
