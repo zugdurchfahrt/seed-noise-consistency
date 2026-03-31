@@ -557,7 +557,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const origGet = desc && desc.get;
 
     if (typeof origGet === 'function') {
-      const markAsNative = __requireMarkAsNative(name, 'wrapStrictAccessor');
       let wrapped = Object.getOwnPropertyDescriptor(({
         get [key]() {
           if (onAccess) onAccess(key, wrapped, this);
@@ -567,7 +566,37 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return valueFromGetter(this);
         }
       }), key).get;
-      wrapped = markAsNative(wrapped, name);
+      let nativeLabel = null;
+      try {
+        nativeLabel = Reflect.apply(nativeToString, origGet, []);
+      } catch (e) {
+        __emit('error', 'core_window:wrapStrictAccessor:native_label_read_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: key,
+          stage: 'apply',
+          message: '__wrapStrictAccessor native getter label read failed',
+          type: 'contract violation',
+          data: { outcome: 'throw', reason: 'native_label_read_failed' }
+        }, e);
+        throw e;
+      }
+      if (typeof nativeLabel !== 'string' || !nativeLabel) {
+        const e = new Error('[CoreWindow] __wrapStrictAccessor: native getter label missing');
+        __emit('error', 'core_window:wrapStrictAccessor:native_label_missing', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: key,
+          stage: 'apply',
+          message: '__wrapStrictAccessor native getter label missing',
+          type: 'contract violation',
+          data: { outcome: 'throw', reason: 'native_label_missing' }
+        }, e);
+        throw e;
+      }
+      toStringOverrideMap.set(wrapped, nativeLabel);
       return wrapped;
     }
 
@@ -692,9 +721,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
     function isAccessorGatewayWrapLayer(v) {
       return isStrictScalarAccessorGatewayWrapLayer(v) || isObjectReturnGatewayWrapLayer(v);
-    }
-    function isUnifiedAccessorGatewayWrapLayer(v) {
-      return v === 'strict_accessor_gateway' || v === 'object_return_gateway';
     }
     function normalizeWrapLayer(v) {
       if (isWrapLayerMissing(v)) return null;
@@ -1036,15 +1062,29 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const valueFromGetter = function (thisArg) {
           return (typeof getter === 'function') ? getter.call(thisArg) : getter;
         };
-        const useUnifiedAccessorGateway = isUnifiedAccessorGatewayWrapLayer(wrapLayer);
+        const useStrictScalarAccessorGateway = isStrictScalarAccessorGatewayWrapLayer(wrapLayer);
+        const useObjectReturnGateway = isObjectReturnGatewayWrapLayer(wrapLayer);
 
-        if (useUnifiedAccessorGateway) {
+        if (useStrictScalarAccessorGateway) {
           const wrappedStrictGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
             name: 'get ' + key,
             wrapLayer: wrapLayer
           });
           knownWrapped.add(wrappedStrictGet);
           return wrappedStrictGet;
+        }
+
+        if (useObjectReturnGateway && typeof origGet === 'function') {
+          const wrappedObjectGet = Object.getOwnPropertyDescriptor(({
+            get [key]() {
+              if (checkThis && !checkThis(this)) {
+                return onInvalidThis(invalidThis, origGet, this, []);
+              }
+              return valueFromGetter(this);
+            }
+          }), key).get;
+          knownWrapped.add(wrappedObjectGet);
+          return wrappedObjectGet;
         }
 
         if (isData) return getter;
