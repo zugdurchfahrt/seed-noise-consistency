@@ -1672,7 +1672,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             });
           } else {
             const wrappedRaw = buildPromiseMethodWrapperByArity(orig, key, invokePromisePath);
-            wrapped = markAsNative(wrappedRaw, key);
+            wrapped = wrappedRaw;
           }
           knownWrapped.add(wrapped);
         } catch (e) {

@@ -1475,12 +1475,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
       const ghevResolved = __navResolveDescriptor
         ? __navResolveDescriptor(uadProto, 'getHighEntropyValues', { mode: 'proto_chain' })
-        : {
-            owner: Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues') ? uadProto : nativeUAD,
-            desc: Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues')
-              || Object.getOwnPropertyDescriptor(nativeUAD, 'getHighEntropyValues')
-              || null
-          };
+        : null;
       const ghevDesc = ghevResolved ? ghevResolved.desc : null;
       const ghevOwner = (ghevResolved && ghevResolved.owner) ? ghevResolved.owner : uadProto;
       const origGHEV = ghevDesc ? ghevDesc.value : null;
@@ -1517,9 +1512,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'getHighEntropyValues',
           kind: 'promise_method',
           resolve: 'proto_chain',
-          wrapLayer: 'core_wrapper',
+          wrapLayer: 'named_wrapper',
           invokeClass: 'brand_strict',
-          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
           validThis: isUadThis,
@@ -1834,12 +1828,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const permProto = Object.getPrototypeOf(navigator.permissions) || navigator.permissions;
       const permResolved = __navResolveDescriptor
         ? __navResolveDescriptor(permProto, 'query', { mode: 'proto_chain' })
-        : {
-            owner: Object.getOwnPropertyDescriptor(permProto, 'query') ? permProto : navigator.permissions,
-            desc: Object.getOwnPropertyDescriptor(permProto, 'query')
-              || Object.getOwnPropertyDescriptor(navigator.permissions, 'query')
-              || null
-          };
+        : null;
       const permDesc = permResolved ? permResolved.desc : null;
       const permOwner = (permResolved && permResolved.owner) ? permResolved.owner : permProto;
       if (!permDesc) {
@@ -1884,9 +1873,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             key: 'query',
             resolve: 'proto_chain',
             kind: 'promise_method',
-            wrapLayer: 'core_wrapper',
+            wrapLayer: 'named_wrapper',
             invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
             policy: 'throw',
             diagTag: 'nav_total_set:permissions.query',
             validThis(self) {
@@ -1916,7 +1904,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   mediaMicGranted = state === 'granted';
                   syncMediaLabelsUnlocked();
                   __navLogAccess('permissions.query', null, {
-                    bucket: 'core_wrapper',
+                    bucket: 'named_wrapper',
                     permission: permName,
                     source: sourceName,
                     state,
@@ -1932,7 +1920,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   mediaCameraGranted = state === 'granted';
                   syncMediaLabelsUnlocked();
                   __navLogAccess('permissions.query', null, {
-                    bucket: 'core_wrapper',
+                    bucket: 'named_wrapper',
                     permission: permName,
                     state,
                     mediaDevicesLabelsUnlocked
@@ -1940,7 +1928,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   return status;
                 });
               }
-              __navLogAccess('permissions.query', null, { bucket: 'core_wrapper' });
+              __navLogAccess('permissions.query', null, { bucket: 'named_wrapper' });
               return Reflect.apply(orig, this, args || []);
             }
           }], 'throw');
@@ -1953,12 +1941,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const mediaProto = Object.getPrototypeOf(navigator.mediaDevices) || navigator.mediaDevices;
       const mediaResolved = __navResolveDescriptor
         ? __navResolveDescriptor(mediaProto, 'enumerateDevices', { mode: 'proto_chain' })
-        : {
-            owner: Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices') ? mediaProto : navigator.mediaDevices,
-            desc: Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
-              || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices')
-              || null
-          };
+        : null;
       const mediaDesc = mediaResolved ? mediaResolved.desc : null;
       const mediaOwner = (mediaResolved && mediaResolved.owner) ? mediaResolved.owner : mediaProto;
       if (!mediaDesc) {
@@ -2003,9 +1986,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             key: 'enumerateDevices',
             resolve: 'proto_chain',
             kind: 'promise_method',
-            wrapLayer: 'core_wrapper',
+            wrapLayer: 'named_wrapper',
             invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
             policy: 'throw',
             diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
             validThis(self) {
@@ -2046,7 +2028,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               const audioUnlocked = !!mediaMicGranted;
               const videoUnlocked = !!mediaCameraGranted;
               __navLogAccess('mediaDevices.enumerateDevices', null, {
-                bucket: 'core_wrapper',
+                bucket: 'named_wrapper',
                 multimediaDevices: { speakers: 1, micros: 1, webcams: 1 },
                 labelsHidden: !(audioUnlocked || videoUnlocked),
                 audioUnlocked,
@@ -2085,12 +2067,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const storageProto = Object.getPrototypeOf(navigator.storage) || navigator.storage;
       const storageResolved = __navResolveDescriptor
         ? __navResolveDescriptor(storageProto, 'estimate', { mode: 'proto_chain' })
-        : {
-            owner: Object.getOwnPropertyDescriptor(storageProto, 'estimate') ? storageProto : navigator.storage,
-            desc: Object.getOwnPropertyDescriptor(storageProto, 'estimate')
-              || Object.getOwnPropertyDescriptor(navigator.storage, 'estimate')
-              || null
-          };
+        : null;
       const storageDesc = storageResolved ? storageResolved.desc : null;
       const storageOwner = (storageResolved && storageResolved.owner) ? storageResolved.owner : storageProto;
          if (!storageDesc) {
@@ -2151,9 +2128,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'estimate',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'core_wrapper',
+          wrapLayer: 'named_wrapper',
           invokeClass: 'brand_strict',
-          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.estimate',
           validThis(self) {
@@ -2161,7 +2137,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           },
           invalidThis: 'native',
           invoke(orig, args) {
-            __navLogAccess('storage.estimate', null, { bucket: 'core_wrapper' });
+            __navLogAccess('storage.estimate', null, { bucket: 'named_wrapper' });
             tickUsage();
             return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
           }
@@ -2244,12 +2220,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (typeof navigator.storage.persist   === 'function') {
         const persistResolved = __navResolveDescriptor
           ? __navResolveDescriptor(storageProto, 'persist', { mode: 'proto_chain' })
-          : {
-              owner: Object.getOwnPropertyDescriptor(storageProto, 'persist') ? storageProto : navigator.storage,
-              desc: Object.getOwnPropertyDescriptor(storageProto, 'persist')
-                || Object.getOwnPropertyDescriptor(navigator.storage, 'persist')
-                || null
-            };
+          : null;
         const persistDesc = persistResolved ? persistResolved.desc : null;
         const persistOwner = (persistResolved && persistResolved.owner) ? persistResolved.owner : storageProto;
         if (!persistDesc) {
@@ -2278,9 +2249,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'persist',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'core_wrapper',
+          wrapLayer: 'named_wrapper',
           invokeClass: 'brand_strict',
-          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persist',
           validThis(self) {
@@ -2298,12 +2268,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (typeof navigator.storage.persisted === 'function') {
         const persistedResolved = __navResolveDescriptor
           ? __navResolveDescriptor(storageProto, 'persisted', { mode: 'proto_chain' })
-          : {
-              owner: Object.getOwnPropertyDescriptor(storageProto, 'persisted') ? storageProto : navigator.storage,
-              desc: Object.getOwnPropertyDescriptor(storageProto, 'persisted')
-                || Object.getOwnPropertyDescriptor(navigator.storage, 'persisted')
-                || null
-            };
+          : null;
         const persistedDesc = persistedResolved ? persistedResolved.desc : null;
         const persistedOwner = (persistedResolved && persistedResolved.owner) ? persistedResolved.owner : storageProto;
         if (!persistedDesc) {
@@ -2332,9 +2297,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'persisted',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'core_wrapper',
+          wrapLayer: 'named_wrapper',
           invokeClass: 'brand_strict',
-          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persisted',
           validThis(self) {
@@ -2524,20 +2488,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const credProto = Object.getPrototypeOf(navigator.credentials) || navigator.credentials;
       const createResolved = __navResolveDescriptor
         ? __navResolveDescriptor(credProto, 'create', { mode: 'proto_chain' })
-        : {
-            owner: Object.getOwnPropertyDescriptor(credProto, 'create') ? credProto : navigator.credentials,
-            desc: Object.getOwnPropertyDescriptor(credProto, 'create')
-              || Object.getOwnPropertyDescriptor(navigator.credentials, 'create')
-              || null
-          };
+        : null;
       const getResolved = __navResolveDescriptor
         ? __navResolveDescriptor(credProto, 'get', { mode: 'proto_chain' })
-        : {
-            owner: Object.getOwnPropertyDescriptor(credProto, 'get') ? credProto : navigator.credentials,
-            desc: Object.getOwnPropertyDescriptor(credProto, 'get')
-              || Object.getOwnPropertyDescriptor(navigator.credentials, 'get')
-              || null
-          };
+        : null;
       const createDesc = createResolved ? createResolved.desc : null;
       const getDesc = getResolved ? getResolved.desc : null;
       const createOwner = (createResolved && createResolved.owner) ? createResolved.owner : credProto;
@@ -2570,9 +2524,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'create',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'core_wrapper',
+          wrapLayer: 'named_wrapper',
           invokeClass: 'brand_strict',
-          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:credentials.create',
           validThis(self) {
@@ -2595,9 +2548,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'get',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'core_wrapper',
+          wrapLayer: 'named_wrapper',
           invokeClass: 'brand_strict',
-          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:credentials.get',
           validThis(self) {
