@@ -45,9 +45,26 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 
 const C  = G.CanvasPatchContext;
 const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+const __canvasStateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+const __canvasEnvProfile = (__canvasStateRoot && __canvasStateRoot.__ENV_PROFILE__ && typeof __canvasStateRoot.__ENV_PROFILE__ === 'object')
+  ? __canvasStateRoot.__ENV_PROFILE__
+  : null;
+const __canvasProfile = (__canvasEnvProfile && __canvasEnvProfile.profile && typeof __canvasEnvProfile.profile === 'object')
+  ? __canvasEnvProfile.profile
+  : null;
 const __canvasScreenWidth = Number(G.__WIDTH);
 const __canvasScreenHeight = Number(G.__HEIGHT);
 const __canvasDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : NaN;
+const __canvasPhysicalScreenWidth = Number(
+  (__canvasProfile && __canvasProfile.physical_screen_width != null)
+    ? __canvasProfile.physical_screen_width
+    : NaN
+);
+const __canvasPhysicalScreenHeight = Number(
+  (__canvasProfile && __canvasProfile.physical_screen_height != null)
+    ? __canvasProfile.physical_screen_height
+    : NaN
+);
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
     const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
@@ -69,6 +86,34 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       return;
     }
     d(eventCode, e, ctx);
+  }
+  if (
+    Number.isFinite(__canvasScreenWidth) &&
+    Number.isFinite(__canvasScreenHeight) &&
+    Number.isFinite(__canvasDpr) &&
+    (Number.isFinite(__canvasPhysicalScreenWidth) || Number.isFinite(__canvasPhysicalScreenHeight))
+  ) {
+    if (
+      !Number.isFinite(__canvasPhysicalScreenWidth) ||
+      !Number.isFinite(__canvasPhysicalScreenHeight) ||
+      Math.round(__canvasScreenWidth * __canvasDpr) !== __canvasPhysicalScreenWidth ||
+      Math.round(__canvasScreenHeight * __canvasDpr) !== __canvasPhysicalScreenHeight
+    ) {
+      emitCanvasDiag('warn', 'canvas:init:preflight:physical_screen_metrics_mismatch', null, {
+        stage: 'preflight',
+        key: '__ENV_PROFILE__.profile.physical_screen_*',
+        message: 'physical screen metrics mismatch',
+        data: {
+          outcome: 'skip',
+          reason: 'physical_screen_metrics_mismatch',
+          width: __canvasScreenWidth,
+          height: __canvasScreenHeight,
+          dpr: __canvasDpr,
+          physicalWidth: __canvasPhysicalScreenWidth,
+          physicalHeight: __canvasPhysicalScreenHeight
+        }
+      });
+    }
   }
   function __resolvePrngState() {
     const __core = G && G.Core;

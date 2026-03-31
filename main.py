@@ -1053,7 +1053,7 @@ def main():
         screen_res = profile_rng.choice(gpu["resolution"])
         if not isinstance(screen_res, str) or not re.fullmatch(r"[1-9]\d{2,4}x[1-9]\d{2,4}", screen_res):
             raise ValueError(f"invalid screen resolution from GPU dictionary: {screen_res!r}")
-        screen_width, screen_height = map(int, screen_res.split("x", 1))
+        physical_screen_width, physical_screen_height = map(int, screen_res.split("x", 1))
 
         # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
         dpr_map = {
@@ -1064,6 +1064,19 @@ def main():
         device_dpr_value = dpr_map.get(screen_res)
         if device_dpr_value is None:
             raise ValueError(f"unknown screen resolution: {screen_res!r}")
+        screen_width = round(physical_screen_width / device_dpr_value)
+        screen_height = round(physical_screen_height / device_dpr_value)
+        if screen_width <= 0 or screen_height <= 0:
+            raise ValueError(
+                f"invalid CSS screen dimensions derived from resolution={screen_res!r}, "
+                f"dpr={device_dpr_value!r}: {screen_width}x{screen_height}"
+            )
+        if round(screen_width * device_dpr_value) != physical_screen_width or round(screen_height * device_dpr_value) != physical_screen_height:
+            raise ValueError(
+                f"inconsistent screen metrics derived from resolution={screen_res!r}, "
+                f"dpr={device_dpr_value!r}: css={screen_width}x{screen_height}, "
+                f"physical={physical_screen_width}x{physical_screen_height}"
+            )
 
         # ----------------------- WebGL VENDOR, RENDERER -----------------------
         def get_webgl_vendor_renderer(gpu_name, gpu_code, user_agent, platform, debug_info=False):
@@ -1100,6 +1113,8 @@ def main():
             "browser_version": version,
             "screen_width": screen_width,
             "screen_height": screen_height,
+            "physical_screen_width": physical_screen_width,
+            "physical_screen_height": physical_screen_height,
             "device_dpr_value": device_dpr_value,
             "webgl_vendor": webgl_vendor,
             "webgl_renderer": webgl_renderer,

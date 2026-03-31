@@ -230,6 +230,16 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const SCREEN_HEIGHT = Number(window.__HEIGHT);
   const COLOR_DEPTH   = Number(window.__COLOR_DEPTH);
   const DPR           = Number(window.__DPR);
+  const PHYSICAL_SCREEN_WIDTH = Number(
+    (__screenProfile && __screenProfile.physical_screen_width != null)
+      ? __screenProfile.physical_screen_width
+      : NaN
+  );
+  const PHYSICAL_SCREEN_HEIGHT = Number(
+    (__screenProfile && __screenProfile.physical_screen_height != null)
+      ? __screenProfile.physical_screen_height
+      : NaN
+  );
 
   try {
   if (!Number.isFinite(SCREEN_WIDTH) || !Number.isFinite(SCREEN_HEIGHT)) {
@@ -241,11 +251,29 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!Number.isFinite(DPR) || DPR <= 0) {
     throw new Error('bad dpr');
   }
+  if (Number.isFinite(PHYSICAL_SCREEN_WIDTH) || Number.isFinite(PHYSICAL_SCREEN_HEIGHT)) {
+    if (
+      !Number.isFinite(PHYSICAL_SCREEN_WIDTH) || PHYSICAL_SCREEN_WIDTH <= 0 ||
+      !Number.isFinite(PHYSICAL_SCREEN_HEIGHT) || PHYSICAL_SCREEN_HEIGHT <= 0
+    ) {
+      throw new Error('bad physical width/height');
+    }
+    if (
+      Math.round(SCREEN_WIDTH * DPR) !== PHYSICAL_SCREEN_WIDTH ||
+      Math.round(SCREEN_HEIGHT * DPR) !== PHYSICAL_SCREEN_HEIGHT
+    ) {
+      throw new Error('inconsistent physical width/height');
+    }
+  }
 
   // Avoid hardcoded numeric literals for the constant zeros/ones used by layout offsets.
   // These values are derived from existing profile-driven values.
   const ZERO = SCREEN_WIDTH - SCREEN_WIDTH;
   const ONE = DPR / DPR;
+  if (Number.isFinite(PHYSICAL_SCREEN_WIDTH) && Number.isFinite(PHYSICAL_SCREEN_HEIGHT)) {
+    __screenState.physicalWidth = PHYSICAL_SCREEN_WIDTH;
+    __screenState.physicalHeight = PHYSICAL_SCREEN_HEIGHT;
+  }
 
   const __coreApplyTargets = (__core && typeof __core.applyTargets === 'function')
     ? __core.applyTargets
@@ -906,7 +934,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         substage: 'DOMContentLoaded',
         html:   { width:  document.documentElement.clientWidth,  height: document.documentElement.clientHeight },
         window: { width:  window.innerWidth,  height: window.innerHeight },
-        screen: { width:  window.screen.width,  height: window.screen.height }
+        screen: {
+          width:  window.screen.width,
+          height: window.screen.height,
+          physicalWidth: (__screenState && Number.isFinite(__screenState.physicalWidth)) ? __screenState.physicalWidth : null,
+          physicalHeight: (__screenState && Number.isFinite(__screenState.physicalHeight)) ? __screenState.physicalHeight : null
+        }
       }
     });
   };

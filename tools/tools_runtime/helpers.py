@@ -14,6 +14,19 @@ def build_device_metrics(profile: dict) -> dict:
     w   = int(profile["screen_width"])
     h   = int(profile["screen_height"])
     dpr = float(profile.get("device_dpr_value", 1))
+    physical_w = profile.get("physical_screen_width")
+    physical_h = profile.get("physical_screen_height")
+
+    if physical_w is not None and round(w * dpr) != int(physical_w):
+        raise ValueError(
+            f"inconsistent width metrics: screen_width={w}, dpr={dpr}, "
+            f"physical_screen_width={physical_w}"
+        )
+    if physical_h is not None and round(h * dpr) != int(physical_h):
+        raise ValueError(
+            f"inconsistent height metrics: screen_height={h}, dpr={dpr}, "
+            f"physical_screen_height={physical_h}"
+        )
 
     # OS/CDP (camelCase)
     otype = "portraitPrimary" if h >= w else "landscapePrimary"
