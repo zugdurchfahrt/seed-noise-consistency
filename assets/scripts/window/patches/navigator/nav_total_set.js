@@ -247,16 +247,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return;
     }
     const __navMark = mark;
-    const wrapStrictAccessor = (__core && typeof __core.__wrapStrictAccessor === 'function') ? __core.__wrapStrictAccessor : null;
-    if (typeof wrapStrictAccessor !== 'function') {
-      __navDiagPipeline('warn', 'nav_total_set:wrap_strict_accessor_missing', {
-        stage: 'preflight',
-        message: 'Core.__wrapStrictAccessor missing',
-        data: { outcome: 'skip', reason: 'missing_dep_wrap_strict_accessor', policy: 'skip', action: 'native' }
-      });
-      __navReleaseEntryGuard(true, 'preflight', 'wrap_strict_accessor_missing');
-      return;
-    }
     const __envProfileState = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
       ? __stateRoot.__ENV_PROFILE__
       : null;
@@ -451,19 +441,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         return false;
       }
     };
-    function __wrapGetter(key, getter, desc, validThis) {
-      __navRegisterKey(key);
-      if (typeof wrapStrictAccessor !== 'function') {
-        if (desc && typeof desc.get === 'function') return desc.get;
-        return getter;
-      }
-      const wrapped = wrapStrictAccessor(key, getter, desc, validThis, {
-        onAccess: function (_, fn) { __navLogAccess(key, fn); }
-      });
-      if (typeof wrapped === 'function' && wrapped !== getter) __navRegisterFn(wrapped);
-      return wrapped;
-    }
-
     // mapping helpers (OS <-> DOM)
     const asDom = (os) => os === 'Windows' ? 'Win32' : (os === 'macOS' ? 'MacIntel' : os);
     const asOS  = (dom) => dom === 'Win32' ? 'Windows' : (dom === 'MacIntel' ? 'macOS' : dom);
@@ -642,240 +619,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // ——— B. Safe helpers ———
     const navProto = Object.getPrototypeOf(navigator);
-    function safeDefineAcc(target, key, getter, { enumerable = false } = {}) {
-      if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
-        const err = new TypeError(`${key}: invalid target`);
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_invalid_target', {
-          stage: 'preflight',
-          diagTag: 'nav_total_set:safeDefineAcc',
-          key: key || null,
-          message: err.message,
-          data: { outcome: 'throw', reason: 'invalid_target' }
-        }, err);
-        throw err;
-      }
-      const d = Object.getOwnPropertyDescriptor(target, key);
-      if (d && d.configurable === false) {
-        const err = new TypeError(`${key}: non-configurable`);
-        let resolved = null;
-        let resolveErr = null;
-        try {
-          resolved = __navResolveDescriptor ? __navResolveDescriptor(target, key, { mode: 'proto_chain' }) : null;
-        } catch (e) {
-          resolveErr = e;
-        }
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_non_configurable', {
-          stage: 'preflight',
-          diagTag: 'nav_total_set:safeDefineAcc',
-          key: key || null,
-          message: err.message,
-          data: {
-            outcome: 'throw',
-            reason: 'non_configurable',
-            targetTag: Object.prototype.toString.call(target),
-            targetIsNavProto: target === navProto,
-            ownDesc: {
-              configurable: !!d.configurable,
-              enumerable: !!d.enumerable,
-              writable: Object.prototype.hasOwnProperty.call(d, 'writable') ? !!d.writable : undefined,
-              hasGet: typeof d.get === 'function',
-              hasSet: typeof d.set === 'function',
-              hasValue: Object.prototype.hasOwnProperty.call(d, 'value')
-            },
-            protoChainFound: !!(resolved && resolved.desc),
-            protoChainOwnerIsTarget: !!(resolved && resolved.owner === target),
-            protoChainOwnerTag: (resolved && resolved.owner) ? Object.prototype.toString.call(resolved.owner) : undefined,
-            protoChainDescConfigurable: (resolved && resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'configurable')) ? !!resolved.desc.configurable : undefined,
-            resolveDescriptorError: resolveErr ? String(resolveErr && (resolveErr.message || resolveErr)) : undefined
-          }
-        }, err);
-        throw err;
-      }
-      const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
-      if (isData) {
-        const value = (typeof getter === 'function') ? getter.call(target) : getter;
-        const applied = applyCoreTargetsGroup('nav_total_set:safeDefineAcc', [{
-          owner: target,
-          key,
-          kind: 'data',
-          wrapLayer: 'descriptor_only',
-          policy: 'throw',
-          diagTag: 'nav_total_set:safeDefineAcc',
-          allowCreate: !d,
-          value,
-          writable: d ? !!d.writable : true,
-          configurable: d ? !!d.configurable : true,
-          enumerable: d ? !!d.enumerable : !!enumerable
-        }], 'throw');
-        if (applied !== 1) {
-          const err = new TypeError(`failed to define ${key}`);
-          __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_define_failed', {
-            stage: 'apply',
-            diagTag: 'nav_total_set:safeDefineAcc',
-            key: key || null,
-            message: err.message,
-            data: { outcome: 'throw', reason: 'define_failed' }
-          }, err);
-          throw err;
-        }
-        return true;
-      }
-      let getFn = getter;
-      if (typeof getter === 'function' && getter.name === '') {
-        const acc = ({ get [key]() { return getter.call(this); } });
-        getFn = Object.getOwnPropertyDescriptor(acc, key).get;
-      }
-      if (typeof getFn !== 'function') {
-        const err = new TypeError(`${key}: getter missing`);
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_getter_missing', {
-          stage: 'preflight',
-          diagTag: 'nav_total_set:safeDefineAcc',
-          key: key || null,
-          message: err.message,
-          data: { outcome: 'throw', reason: 'getter_missing' }
-        }, err);
-        throw err;
-      }
-      const applied = applyCoreTargetsGroup('nav_total_set:safeDefineAcc', [{
-        owner: target,
-        key,
-        kind: 'accessor',
-        wrapLayer: 'named_wrapper',
-        policy: 'throw',
-        diagTag: 'nav_total_set:safeDefineAcc',
-        allowCreate: !d,
-        configurable: d ? !!d.configurable : true,
-        enumerable: d ? !!d.enumerable : !!enumerable,
-        invalidThis: 'throw',
-        getImpl: function safeDefineAccGetImpl() {
-          return Reflect.apply(getFn, this, []);
-        }
-        }], 'throw');
-      if (applied !== 1) {
-        const err = new TypeError(`failed to define ${key}`);
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_define_failed', {
-          stage: 'apply',
-          diagTag: 'nav_total_set:safeDefineAcc',
-          key: key || null,
-          message: err.message,
-          data: { outcome: 'throw', reason: 'define_failed' }
-        }, err);
-        throw err;
-      }
-      return true;
-    }
-
-    function redefineAcc(proto, key, getImpl) {
-      const d = Object.getOwnPropertyDescriptor(proto, key);
-      if (d && d.configurable === false) {
-        const err = new TypeError(`${key}: non-configurable`);
-        let resolved = null;
-        let resolveErr = null;
-        try {
-          resolved = __navResolveDescriptor ? __navResolveDescriptor(proto, key, { mode: 'proto_chain' }) : null;
-        } catch (e) {
-          resolveErr = e;
-        }
-        __navDiagBrowser('error', 'nav_total_set:redefineAcc_non_configurable', {
-          stage: 'preflight',
-          diagTag: 'nav_total_set:redefineAcc',
-          key: key || null,
-          message: err.message,
-          data: {
-            outcome: 'throw',
-            reason: 'non_configurable',
-            targetTag: Object.prototype.toString.call(proto),
-            targetIsNavProto: proto === navProto,
-            ownDesc: {
-              configurable: !!d.configurable,
-              enumerable: !!d.enumerable,
-              writable: Object.prototype.hasOwnProperty.call(d, 'writable') ? !!d.writable : undefined,
-              hasGet: typeof d.get === 'function',
-              hasSet: typeof d.set === 'function',
-              hasValue: Object.prototype.hasOwnProperty.call(d, 'value')
-            },
-            protoChainFound: !!(resolved && resolved.desc),
-            protoChainOwnerIsTarget: !!(resolved && resolved.owner === proto),
-            protoChainOwnerTag: (resolved && resolved.owner) ? Object.prototype.toString.call(resolved.owner) : undefined,
-            protoChainDescConfigurable: (resolved && resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'configurable')) ? !!resolved.desc.configurable : undefined,
-            resolveDescriptorError: resolveErr ? String(resolveErr && (resolveErr.message || resolveErr)) : undefined
-          }
-        }, err);
-        throw err;
-      }
-      const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
-      if (isData) {
-        const value = (typeof getImpl === 'function') ? getImpl.call(proto) : getImpl;
-        const applied = applyCoreTargetsGroup('nav_total_set:redefineAcc', [{
-          owner: proto,
-          key,
-          kind: 'data',
-          wrapLayer: 'descriptor_only',
-          policy: 'throw',
-          diagTag: 'nav_total_set:redefineAcc',
-          allowCreate: !d,
-          value,
-          writable: d ? !!d.writable : true,
-          configurable: d ? !!d.configurable : true,
-          enumerable: d ? !!d.enumerable : false
-        }], 'throw');
-        if (applied !== 1) {
-          const err = new TypeError(`failed to define ${key}`);
-          __navDiagBrowser('error', 'nav_total_set:redefineAcc_define_failed', {
-            stage: 'apply',
-            diagTag: 'nav_total_set:redefineAcc',
-            key: key || null,
-            message: err.message,
-            data: { outcome: 'throw', reason: 'define_failed' }
-          }, err);
-          throw err;
-        }
-        return;
-      }
-      let getFn = getImpl;
-      if (typeof getImpl === 'function' && getImpl.name === '') {
-        const acc = ({ get [key]() { return getImpl.call(this); } });
-        getFn = Object.getOwnPropertyDescriptor(acc, key).get;
-      }
-      if (typeof getFn !== 'function') {
-        const err = new TypeError(`${key}: getter missing`);
-        __navDiagBrowser('error', 'nav_total_set:redefineAcc_getter_missing', {
-          stage: 'preflight',
-          diagTag: 'nav_total_set:redefineAcc',
-          key: key || null,
-          message: err.message,
-          data: { outcome: 'throw', reason: 'getter_missing' }
-        }, err);
-        throw err;
-      }
-      const applied = applyCoreTargetsGroup('nav_total_set:redefineAcc', [{
-        owner: proto,
-        key,
-        kind: 'accessor',
-        wrapLayer: 'named_wrapper',
-        policy: 'throw',
-        diagTag: 'nav_total_set:redefineAcc',
-        allowCreate: !d,
-        configurable: d ? !!d.configurable : true,
-        enumerable: d ? !!d.enumerable : false,
-        invalidThis: 'throw',
-        getImpl: function redefineAccGetImpl() {
-          return Reflect.apply(getFn, this, []);
-        }
-        }], 'throw');
-      if (applied !== 1) {
-        const err = new TypeError(`failed to define ${key}`);
-        __navDiagBrowser('error', 'nav_total_set:redefineAcc_define_failed', {
-          stage: 'apply',
-          diagTag: 'nav_total_set:redefineAcc',
-          key: key || null,
-          message: err.message,
-          data: { outcome: 'throw', reason: 'define_failed' }
-        }, err);
-        throw err;
-      }
-    }
-
     function isSameDescriptor(actual, expected) {
       if (!actual || !expected) return false;
       const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
@@ -1331,20 +1074,164 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (critical.has(prop) || strictScalarKeys.has(prop) || objectReturnKeys.has(prop)) return; 
         if (!(prop in navProto)) return;
         const d = Object.getOwnPropertyDescriptor(navProto, prop);
-        const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
-        safeDefineAcc(navProto, prop, wrapped);
+        if (!d || d.configurable === false) return;
+        __navRegisterKey(prop);
+        const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+        if (isData) {
+          const applied = applyCoreTargetsGroup('nav_total_set:' + prop, [{
+            owner: navProto,
+            key: prop,
+            kind: 'data',
+            wrapLayer: 'descriptor_only',
+            policy: 'throw',
+            diagTag: 'nav_total_set:' + prop,
+            value: getter.call(navProto),
+            writable: !!d.writable,
+            configurable: !!d.configurable,
+            enumerable: !!d.enumerable
+          }], 'throw');
+          if (applied !== 1) throw new TypeError('nav_total_set: failed to define ' + prop);
+          return;
+        }
+        if (typeof d.get === 'function') {
+          const applied = applyCoreTargetsGroup('nav_total_set:' + prop, [{
+            owner: navProto,
+            key: prop,
+            kind: 'accessor',
+            wrapLayer: 'strict_accessor_gateway',
+            resolve: 'proto_chain',
+            policy: 'strict',
+            diagTag: 'nav_total_set:' + prop,
+            configurable: !!d.configurable,
+            enumerable: !!d.enumerable,
+            validThis: __isNavigatorThis,
+            invalidThis: 'native',
+            getImpl: function navAdditionalScalarAccessorValue() {
+              __navLogAccess(prop, null, { bucket: 'strict_accessor_gateway' });
+              return getter.call(this);
+            }
+          }], 'strict');
+          if (applied !== 1) throw new TypeError('nav_total_set: failed to define ' + prop);
+        }
       });
 
     // ——— D. devicePixelRatio & screen.* ———
-    // dpr: first we try to redefine own in window (often own), then — prototype
     (function () {
-      const desc = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
-      if (desc && desc.configurable !== false) {
-        safeDefineAcc(window, 'devicePixelRatio', function(){ return dpr; });
-      } else {
-        const acc = ({ get devicePixelRatio() { return dpr; } });
-        const getDpr = Object.getOwnPropertyDescriptor(acc, 'devicePixelRatio').get;
-        redefineAcc(Window.prototype, 'devicePixelRatio', getDpr);
+      const windowProto = (window.Window && Window.prototype) ? Window.prototype : null;
+      if (!windowProto) {
+        __navDiag('warn', 'nav_total_set:devicePixelRatio_window_proto_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          key: 'devicePixelRatio',
+          message: 'Window.prototype missing',
+          data: { outcome: 'skip', reason: 'window_proto_missing', policy: 'skip', action: 'native' }
+        });
+        return;
+      }
+      if (!__navResolveDescriptor) {
+        __navDiag('warn', 'nav_total_set:devicePixelRatio_resolve_descriptor_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          key: 'devicePixelRatio',
+          message: 'Core.resolveDescriptor missing',
+          data: { outcome: 'skip', reason: 'missing_dep_core_resolve_descriptor', policy: 'skip', action: 'native' }
+        });
+        return;
+      }
+      const dprResolved = __navResolveDescriptor(windowProto, 'devicePixelRatio', { mode: 'proto_chain' });
+      const dprOwner = dprResolved && dprResolved.owner;
+      const dprDesc = dprResolved && dprResolved.desc;
+      if (!dprOwner || !dprDesc) {
+        __navDiag('warn', 'nav_total_set:devicePixelRatio_descriptor_missing', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          key: 'devicePixelRatio',
+          message: 'devicePixelRatio descriptor missing',
+          data: { outcome: 'skip', reason: 'descriptor_missing', policy: 'skip', action: 'native' }
+        });
+        return;
+      }
+      if (dprOwner === window) {
+        __navDiag('error', 'nav_total_set:devicePixelRatio_instance_owner', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          key: 'devicePixelRatio',
+          message: 'devicePixelRatio resolved to instance owner',
+          data: { outcome: 'skip', reason: 'instance_owner_resolved', policy: 'skip', action: 'native' }
+        });
+        return;
+      }
+      if (dprDesc.configurable === false) {
+        __navDiag('warn', 'nav_total_set:devicePixelRatio_non_configurable', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          key: 'devicePixelRatio',
+          message: 'devicePixelRatio is non-configurable',
+          data: { outcome: 'skip', reason: 'non_configurable', policy: 'skip', action: 'native' }
+        });
+        return;
+      }
+      if (typeof dprDesc.get !== 'function') {
+        __navDiag('warn', 'nav_total_set:devicePixelRatio_descriptor_kind_mismatch', {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          key: 'devicePixelRatio',
+          message: 'devicePixelRatio is not accessor-shaped on prototype',
+          data: { outcome: 'skip', reason: 'descriptor_kind_mismatch', policy: 'skip', action: 'native' }
+        });
+        return;
+      }
+      let __navDprThisCheckDiagSent = false;
+      const validWindowThis = function validWindowThis(self) {
+        try {
+          return self === window || (typeof Window === 'function' && self instanceof Window);
+        } catch (e) {
+          if (!__navDprThisCheckDiagSent) {
+            __navDprThisCheckDiagSent = true;
+            __navDiag('warn', 'nav_total_set:devicePixelRatio_this_check_failed', {
+              stage: 'runtime',
+              type: __navTypeBrowser,
+              diagTag: 'nav_total_set:devicePixelRatio',
+              key: 'devicePixelRatio',
+              message: 'Window receiver check failed',
+              data: { outcome: 'return', reason: 'window_this_check_failed', policy: 'skip', action: 'native' }
+            }, e);
+          }
+          return false;
+        }
+      };
+      const applied = applyCoreTargetsGroup('nav_total_set:devicePixelRatio', [{
+        owner: dprOwner,
+        key: 'devicePixelRatio',
+        kind: 'accessor',
+        wrapLayer: 'strict_accessor_gateway',
+        resolve: 'proto_chain',
+        policy: 'strict',
+        diagTag: 'nav_total_set:devicePixelRatio',
+        configurable: !!dprDesc.configurable,
+        enumerable: !!dprDesc.enumerable,
+        validThis: validWindowThis,
+        invalidThis: 'native',
+        getImpl: function navDevicePixelRatioValue() {
+          return dpr;
+        }
+      }], 'strict');
+      if (applied !== 1) {
+        __navDiag('warn', 'nav_total_set:devicePixelRatio_define_failed', {
+          stage: 'apply',
+          type: __navTypeBrowser,
+          diagTag: 'nav_total_set:devicePixelRatio',
+          key: 'devicePixelRatio',
+          message: 'failed to define devicePixelRatio',
+          data: { outcome: 'skip', reason: 'apply_failed', policy: 'skip', action: 'native' }
+        });
+        return;
       }
       // Post-apply invariant: devicePixelRatio must match profile DPR
       try {
@@ -1387,8 +1274,44 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // oscpu (только если есть в прототипе)
     if ('oscpu' in navProto) {
       const dOscpu = Object.getOwnPropertyDescriptor(navProto, 'oscpu');
-      const wrappedOscpu = __wrapGetter('oscpu', () => undefined, dOscpu, __isNavigatorThis);
-      safeDefineAcc(navProto, 'oscpu', wrappedOscpu);
+      if (dOscpu && dOscpu.configurable !== false) {
+        __navRegisterKey('oscpu');
+        const isData = Object.prototype.hasOwnProperty.call(dOscpu, 'value') && !dOscpu.get && !dOscpu.set;
+        if (isData) {
+          const applied = applyCoreTargetsGroup('nav_total_set:oscpu', [{
+            owner: navProto,
+            key: 'oscpu',
+            kind: 'data',
+            wrapLayer: 'descriptor_only',
+            policy: 'throw',
+            diagTag: 'nav_total_set:oscpu',
+            value: undefined,
+            writable: !!dOscpu.writable,
+            configurable: !!dOscpu.configurable,
+            enumerable: !!dOscpu.enumerable
+          }], 'throw');
+          if (applied !== 1) throw new TypeError('nav_total_set: failed to define oscpu');
+        } else if (typeof dOscpu.get === 'function') {
+          const applied = applyCoreTargetsGroup('nav_total_set:oscpu', [{
+            owner: navProto,
+            key: 'oscpu',
+            kind: 'accessor',
+            wrapLayer: 'strict_accessor_gateway',
+            resolve: 'proto_chain',
+            policy: 'strict',
+            diagTag: 'nav_total_set:oscpu',
+            configurable: !!dOscpu.configurable,
+            enumerable: !!dOscpu.enumerable,
+            validThis: __isNavigatorThis,
+            invalidThis: 'native',
+            getImpl: function navOscpuAccessorValue() {
+              __navLogAccess('oscpu', null, { bucket: 'strict_accessor_gateway' });
+              return undefined;
+            }
+          }], 'strict');
+          if (applied !== 1) throw new TypeError('nav_total_set: failed to define oscpu');
+        }
+      }
     }
     // ——— E. userAgentData (low + high entropy) ———
     if ('userAgentData' in navigator) {
@@ -2434,18 +2357,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       // dm: 0.25, 0.5, 1, 2, 4, 8, …
       // читаем dm каждый раз — «жёсткая» привязка к текущему realm
       // dm нелегален → не вмешиваемся (оставляем натив/предыдущее)
-    const perfProto = (window.Performance && Performance.prototype) || Object.getPrototypeOf(performance);
+    const perfProto = (window.Performance && Performance.prototype) ? Performance.prototype : null;
     if (perfProto) {
       const dm0 = Number(navigator.deviceMemory);
       if (typeof dm0 === 'number' && isFinite(dm0)) {
-        const perfMemoryResolved = __navResolveDescriptor
-          ? __navResolveDescriptor(perfProto, 'memory', { mode: 'proto_chain' })
-          : {
-              owner: Object.getOwnPropertyDescriptor(perfProto, 'memory') ? perfProto : performance,
-              desc: Object.getOwnPropertyDescriptor(perfProto, 'memory')
-                || Object.getOwnPropertyDescriptor(performance, 'memory')
-                || null
-            };
+        if (!__navResolveDescriptor) {
+          __navDiag('warn', 'nav_total_set:performance_memory_resolve_descriptor_missing', {
+            surface: 'navigator',
+            stage: 'preflight',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:performance.memory',
+            key: 'performance.memory',
+            message: 'Core.resolveDescriptor missing',
+            data: { outcome: 'skip', reason: 'missing_dep_core_resolve_descriptor', policy: 'skip', action: 'native' }
+          });
+          return;
+        }
+        const perfMemoryResolved = __navResolveDescriptor(perfProto, 'memory', { mode: 'proto_chain' });
         const perfMemoryOwner = (perfMemoryResolved && perfMemoryResolved.owner) ? perfMemoryResolved.owner : perfProto;
 
         const heapFromDM = __navMark(function heapFromDM(dm) {
@@ -2481,7 +2409,89 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               data: { outcome: 'skip', reason: 'instance_owner_resolved', policy: 'skip', action: 'native' }
             });
           } else {
-            redefineAcc(perfMemoryOwner, 'memory', getMemory);
+            const perfMemoryDesc = perfMemoryResolved && perfMemoryResolved.desc;
+            if (!perfMemoryDesc) {
+              __navDiag('warn', 'nav_total_set:performance_memory_descriptor_missing', {
+                surface: 'navigator',
+                stage: 'preflight',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:performance.memory',
+                key: 'performance.memory',
+                message: 'performance.memory descriptor missing',
+                data: { outcome: 'skip', reason: 'descriptor_missing', policy: 'skip', action: 'native' }
+              });
+              return;
+            }
+            if (perfMemoryDesc.configurable === false) {
+              __navDiag('warn', 'nav_total_set:performance_memory_non_configurable', {
+                surface: 'navigator',
+                stage: 'preflight',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:performance.memory',
+                key: 'performance.memory',
+                message: 'performance.memory is non-configurable',
+                data: { outcome: 'skip', reason: 'non_configurable', policy: 'skip', action: 'native' }
+              });
+              return;
+            }
+            if (typeof perfMemoryDesc.get !== 'function') {
+              __navDiag('warn', 'nav_total_set:performance_memory_descriptor_kind_mismatch', {
+                surface: 'navigator',
+                stage: 'preflight',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:performance.memory',
+                key: 'performance.memory',
+                message: 'performance.memory is not accessor-shaped on prototype',
+                data: { outcome: 'skip', reason: 'descriptor_kind_mismatch', policy: 'skip', action: 'native' }
+              });
+              return;
+            }
+            let __navPerformanceThisCheckDiagSent = false;
+            const validPerformanceThis = function validPerformanceThis(self) {
+              try {
+                return self === performance || (typeof Performance === 'function' && self instanceof Performance);
+              } catch (e) {
+                if (!__navPerformanceThisCheckDiagSent) {
+                  __navPerformanceThisCheckDiagSent = true;
+                  __navDiag('warn', 'nav_total_set:performance_memory_this_check_failed', {
+                    stage: 'runtime',
+                    type: __navTypeBrowser,
+                    diagTag: 'nav_total_set:performance.memory',
+                    key: 'performance.memory',
+                    message: 'Performance receiver check failed',
+                    data: { outcome: 'return', reason: 'performance_this_check_failed', policy: 'skip', action: 'native' }
+                  }, e);
+                }
+                return false;
+              }
+            };
+            const applied = applyCoreTargetsGroup('nav_total_set:performance.memory', [{
+              owner: perfMemoryOwner,
+              key: 'memory',
+              kind: 'accessor',
+              wrapLayer: 'object_return_gateway',
+              resolve: 'proto_chain',
+              policy: 'strict',
+              diagTag: 'nav_total_set:performance.memory',
+              configurable: !!perfMemoryDesc.configurable,
+              enumerable: !!perfMemoryDesc.enumerable,
+              validThis: validPerformanceThis,
+              invalidThis: 'native',
+              getImpl: function navPerformanceMemoryValue() {
+                return getMemory.call(this);
+              }
+            }], 'strict');
+            if (applied !== 1) {
+              __navDiag('warn', 'nav_total_set:performance_memory_define_failed', {
+                surface: 'navigator',
+                stage: 'apply',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:performance.memory',
+                key: 'performance.memory',
+                message: 'failed to define performance.memory',
+                data: { outcome: 'skip', reason: 'apply_failed', policy: 'skip', action: 'native' }
+              });
+            }
           }
         } catch (e) {
           __navDiag('warn', 'nav_total_set:performance_memory_proto', {
