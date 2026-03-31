@@ -1654,14 +1654,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (state.canvas) return 0;
     if (typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype) return 0;
     captureKeepNativeRefs();
-    let applied = 0, total = 1;
+    let applied = 0, total = 2;
     applied += installIssuedCanvasFactory(
       this.htmlCanvasGetContextHooks,
       this.ctx2DGetContextHooks,
       this.webglGetContextHooks
     );
     if (C && C.__DOM_CANVAS__) {
-      total += 2;
+      total += 3;
       applied += installIssuedSerializationMethods(C.__DOM_CANVAS__);
       applied += installIssuedGetContextMethod(C.__DOM_CANVAS__, this.htmlCanvasGetContextHooks, this.ctx2DGetContextHooks, this.webglGetContextHooks);
     }
@@ -1670,6 +1670,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       emitContextDiag('info', 'context:canvas:apply:patches_applied', null, {
         stage: 'apply',
         key: 'HTMLCanvasElement.getContext',
+        message: 'canvas issued patches applied',
         data: { applied: applied, total: total }
       });
     }
@@ -1689,8 +1690,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
         Ctx.webglGetContextHooks
       );
       if (C && C.__OFFSCREEN_CANVAS__) {
-        installIssuedSerializationMethods(C.__OFFSCREEN_CANVAS__);
-        installIssuedGetContextMethod(C.__OFFSCREEN_CANVAS__, Ctx.offscreenGetContextHooks, Ctx.ctx2DGetContextHooks, Ctx.webglGetContextHooks);
+        total += 2;
+        applied += installIssuedSerializationMethods(C.__OFFSCREEN_CANVAS__);
+        applied += installIssuedGetContextMethod(C.__OFFSCREEN_CANVAS__, Ctx.offscreenGetContextHooks, Ctx.ctx2DGetContextHooks, Ctx.webglGetContextHooks);
       }
       state.offscreen = true;
     }
@@ -1698,6 +1700,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       emitContextDiag('info', 'context:offscreen:apply:patches_applied', null, {
         stage: 'apply',
         key: 'OffscreenCanvas.getContext',
+        message: 'offscreen issued patches applied',
         data: { applied: applied, total: total }
       });
     }
