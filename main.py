@@ -416,12 +416,12 @@ def init_driver(
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             "CoreWindowModule(window);",
             Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
-            # --- RTC ---
-            Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
-            "RtcpeerconnectionPatchModule(window);",
             # --- hide_webdriver  ---
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             "HideWebdriverPatchModule(window);",
+            # --- RTC ---
+            Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
+            "RtcpeerconnectionPatchModule(window);",
             # --- rng params ---
             Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
             "RNGsetModule(window);",
@@ -1254,7 +1254,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://pixelscan.net/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

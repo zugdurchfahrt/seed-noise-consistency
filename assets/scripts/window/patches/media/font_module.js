@@ -184,19 +184,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       }, null);
       return null;
     }
-    const legacy = Object.prototype.hasOwnProperty.call(C, '__FONTS_STATE__')
-      ? C.__FONTS_STATE__
-      : null;
-    if (legacy != null && (typeof legacy !== 'object' || !legacy)) {
-      __fontDiagPipeline('warn', 'fonts:fonts_state_legacy_invalid', {
-        stage: 'preflight',
-        surface: 'CanvasPatchContext',
-        key: 'CanvasPatchContext.__FONTS_STATE__',
-        message: 'legacy CanvasPatchContext.__FONTS_STATE__ invalid',
-        data: { outcome: 'skip', reason: 'invalid_legacy_fonts_state_slot' }
-      }, null);
-      return null;
-    }
     const state = {
       ready: false,
       error: null,
@@ -206,15 +193,14 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       awaitReadyReject: null,
       familySnapshot: __makeFontFamilySnapshot()
     };
-    const nextState = (legacy && typeof legacy === 'object') ? legacy : state;
     try {
       Object.defineProperty(__stateRoot, '__FONTS_STATE__', {
-        value: nextState,
+        value: state,
         writable: true,
         configurable: true,
         enumerable: false
       });
-      return nextState;
+      return state;
     } catch (e) {
       __fontDiagBrowser('warn', 'fonts:fonts_state_define_failed', {
         stage: 'apply',
@@ -237,39 +223,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   if (!Object.prototype.hasOwnProperty.call(__fontsState, 'awaitReadyResolve')) __fontsState.awaitReadyResolve = null;
   if (!Object.prototype.hasOwnProperty.call(__fontsState, 'awaitReadyReject')) __fontsState.awaitReadyReject = null;
 
-  const __legacyFontFamilySnapshot = (C.__fontFamilySnapshot && typeof C.__fontFamilySnapshot === 'object')
-    ? C.__fontFamilySnapshot
-    : null;
   const __fontFamilySnapshot = (__fontsState.familySnapshot && typeof __fontsState.familySnapshot === 'object')
     ? __fontsState.familySnapshot
     : __makeFontFamilySnapshot();
-  if (__legacyFontFamilySnapshot && __fontFamilySnapshot !== __legacyFontFamilySnapshot) {
-    if (
-      (
-        !(__fontFamilySnapshot.allowedFamilies instanceof Set) ||
-        __fontFamilySnapshot.allowedFamilies.size === 0
-      ) &&
-      (__legacyFontFamilySnapshot.allowedFamilies instanceof Set)
-    ) {
-      __fontFamilySnapshot.allowedFamilies = new Set(__legacyFontFamilySnapshot.allowedFamilies);
-    }
-    if (__legacyFontFamilySnapshot.runtimeFamilies instanceof Set) {
-      if (!(__fontFamilySnapshot.runtimeFamilies instanceof Set)) {
-        __fontFamilySnapshot.runtimeFamilies = new Set();
-      }
-      if (__fontFamilySnapshot.runtimeFamilies.size === 0) {
-        __legacyFontFamilySnapshot.runtimeFamilies.forEach(function migrateRuntimeFamily(fam) {
-          __fontFamilySnapshot.runtimeFamilies.add(fam);
-        });
-      }
-    }
-    if (__fontFamilySnapshot.platformDom == null && Object.prototype.hasOwnProperty.call(__legacyFontFamilySnapshot, 'platformDom')) {
-      __fontFamilySnapshot.platformDom = __legacyFontFamilySnapshot.platformDom;
-    }
-    if (__fontFamilySnapshot.versionToken == null && Object.prototype.hasOwnProperty.call(__legacyFontFamilySnapshot, 'versionToken')) {
-      __fontFamilySnapshot.versionToken = __legacyFontFamilySnapshot.versionToken;
-    }
-  }
   if (!(__fontFamilySnapshot.runtimeFamilies instanceof Set)) {
     __fontFamilySnapshot.runtimeFamilies = new Set();
   }
@@ -303,15 +259,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       key: 'Core.registerPatchedTarget',
       message: 'Core.registerPatchedTarget missing',
       data: { outcome: 'skip', reason: 'missing_core_register_patched_target' }
-    }, null);
-    return;
-  }
-  if (typeof Core.guardFlag !== 'function') {
-    __fontDiagPipeline('warn', 'fonts:core_guard_flag_missing', {
-      stage: 'preflight',
-      key: 'Core.guardFlag',
-      message: 'Core.guardFlag missing',
-      data: { outcome: 'skip', reason: 'missing_core_guard_flag' }
     }, null);
     return;
   }
@@ -528,23 +475,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __fontsState.error = (errorValue == null) ? null : errorValue;
   }
 
-  function __releaseGuardOnSkip(message, key, reason) {
-    try {
-      if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
-      }
-    } catch (eRelease) {
-      __fontDiagPipeline('warn', 'fonts:guard_release_failed', {
-        stage: 'rollback',
-        diagTag: __tag,
-        surface: __surface,
-        key: key || __flagKey,
-        message: message,
-        data: { outcome: 'skip', reason: reason || 'guard_release_failed' }
-      }, eRelease);
-    }
-  }
-
   const FONTFACE_RUNTIME_FAMILIES = __fontFamilySnapshot.runtimeFamilies;
   let FONTFACE_RUNTIME_SYNC_FAILED = false;
 
@@ -580,6 +510,23 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }
   if (!__guardToken) return; // already_patched: Core emits fonts:already_patched
 
+  function __releaseGuardOnSkip(stage, message, reason) {
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
+      }
+    } catch (eRelease) {
+      __fontDiagPipeline('warn', 'fonts:guard_release_failed', {
+        stage: stage || 'preflight',
+        diagTag: __tag,
+        surface: __surface,
+        key: __flagKey,
+        message: message,
+        data: { outcome: 'skip', reason: reason || 'guard_release_failed' }
+      }, eRelease);
+    }
+  }
+
   const __rollbackSnapshot = {
     fontsStateValue: __cloneFontsStateValue(__fontsState)
   };
@@ -593,7 +540,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         message: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs missing/invalid (skip font patch)',
         data: { outcome: 'skip', reason: 'configs_missing_or_invalid', typeof: typeof __fontsConfigState.configs }
       }, null);
-      __releaseGuardOnSkip('releaseGuardFlag threw on preflight skip', __flagKey, 'guard_release_failed');
+      __releaseGuardOnSkip('preflight', 'guard release failed after preflight skip', 'guard_release_failed');
       return;
     }
     __applyStarted = true;
@@ -1365,7 +1312,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     } catch (eRestore) {
       degrade('fonts:await_ready_restore_failed', eRestore);
     }
-    __releaseGuardOnSkip('releaseGuardFlag threw on nav_platform skip', __flagKey, 'guard_release_failed');
+    __releaseGuardOnSkip('preflight', 'guard release failed after nav_platform skip', 'guard_release_failed');
     return;
   }
 

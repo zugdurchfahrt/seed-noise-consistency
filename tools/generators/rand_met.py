@@ -32,7 +32,9 @@ SYS_FONTS_WIN = [
         'Arial', 'Aptos','Verdana','Tahoma','Times New Roman','Courier New','Georgia',
         'Palatino','Garamond','Comic Sans MS','Trebuchet MS','Impact',
         'Lucida Sans','Segoe UI','Segoe UI Symbol','Calibri','Consolas','Candara',
-        'Franklin Gothic Medium','Constantia','Corbel','Century Gothic']
+        'Franklin Gothic Medium','Constantia','Corbel','Century Gothic',
+        'Segoe Print','Segoe Script','DejaVu Sans', 'DejaVu Sans Mono','DejaVu Serif','Gentium','Inter',
+        'Liberation Mono', 'Liberation Sans','Liberation Serif','Montserrat','Roboto','Tinos']
     
 SYS_FONTS_MAC = [
         'Helvetica','Geneva','Lucida Grande','Palatino','Menlo','Monaco',
