@@ -1058,8 +1058,8 @@ def main():
         # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
         dpr_map = {
             "1920x1080": 1.0,
-            "2560x1440": 1.25,
-            "3840x2160": 2.0,
+            "2560x1440": 1.0,
+            "3840x2160": 1.5,
         }
         device_dpr_value = dpr_map.get(screen_res)
         if device_dpr_value is None:
