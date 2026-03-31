@@ -150,6 +150,51 @@ const LOGGingModule = function LOGGingModule() {
     const DIAG_DUP_LIMIT = toPosInt(global.__DIAG_DUP_LIMIT, 2);
     const DIAG_DUP_MAP_MAX = toPosInt(global.__DIAG_DUP_MAP_MAX, 2048);
     const DIAG_DUP_COUNTS = new Map();
+    const LOGGER_MODULE_AUDIT_SLOTS = [
+      { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "diag", functions: "none" },
+      { module: "bootstrap_hide", diagTag: "bootstrap_hide", codePrefix: "bootstrap_hide", source: "bundle", emitter: "diag", functions: "none" },
+      { module: "core_window", diagTag: "core_window", codePrefix: "core_window", source: "bundle", emitter: "diag", functions: "none" },
+      { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none" },
+      { module: "rtc", diagTag: "rtc", codePrefix: "rtc", source: "bundle", emitter: "diag", functions: "auto" },
+      { module: "hide_webdriver", diagTag: "hide_webdriver", codePrefix: "hide_webdriver", source: "bundle", emitter: "diag", functions: "auto" },
+      { module: "wrk", diagTag: "wrk", codePrefix: "wrk", source: "bundle", emitter: "diag", functions: "none" },
+      { module: "rng_set", diagTag: "rng_set", codePrefix: "rng_set", source: "bundle", emitter: "diag", functions: "none" },
+      { module: "nav_total_set", diagTag: "nav_total_set", codePrefix: "nav_total_set", source: "bundle", emitter: "diag", functions: "auto" },
+      { module: "screen", diagTag: "screen", codePrefix: "screen", source: "bundle", emitter: "diag", functions: "auto" },
+      { module: "fonts", diagTag: "fonts", codePrefix: "fonts", source: "bundle", emitter: "diag", functions: "auto" },
+      { module: "canvas", diagTag: "canvas", codePrefix: "canvas", source: "bundle", emitter: "diag", functions: "auto" },
+      { module: "webgl", diagTag: "webgl", codePrefix: "webgl", source: "bundle", emitter: "diag", functions: "auto", aliases: ["webglstorage"] },
+      { module: "webgpu_wl", diagTag: "webgpu_wl", codePrefix: "webgpu_wl", source: "bundle", emitter: "diag", functions: "auto" },
+      { module: "webgpu", diagTag: "webgpu", codePrefix: "webgpu", source: "bundle", emitter: "diag", functions: "auto" },
+      { module: "audiocontext", diagTag: "audiocontext", codePrefix: "audiocontext", source: "bundle", emitter: "diag", functions: "auto", aliases: ["audio"] },
+      { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none" },
+      { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto" },
+      { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto" },
+      { module: "uad_override", diagTag: "uad_override", codePrefix: "uad_override", source: "cdp", emitter: "diag", functions: "auto" },
+      { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto" },
+      { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto" },
+      {
+        module: "WORKER_PATCH_SRC",
+        diagTag: "worker_patch",
+        codePrefix: "worker_patch_src",
+        source: "cdp",
+        emitter: "diag",
+        functions: "none",
+        aliases: ["WORKER_PATCH_SRC"],
+        requiresResultProof: true,
+        locate: {
+          file: "sunami/assets/scripts/workerscope/WORKER_PATCH_SRC.js",
+          triggerCode: "worker_patch_src:apply:installed"
+        }
+      },
+      { module: "worker_bootstrap", diagTag: "worker_bootstrap", codePrefix: "worker_bootstrap", source: "cdp", emitter: "diag", functions: "none" }
+    ];
+    __defineLoggerHiddenValue("__MODULE_DIAG_SLOTS__", LOGGER_MODULE_AUDIT_SLOTS, true);
+    const __moduleAuditState = {
+      timerId: null,
+      lastSignalByModule: Object.create(null),
+      armed: false
+    };
 
     // Signature defines what "same event" means for dedup.
     // If these fields match, event copies after DIAG_DUP_LIMIT are suppressed.
@@ -182,6 +227,241 @@ const LOGGingModule = function LOGGingModule() {
         DIAG_DUP_COUNTS.clear();
       }
       return next <= DIAG_DUP_LIMIT;
+    }
+
+    function isSummaryCode(code) {
+      if (typeof code !== "string" || !code) return false;
+      return (
+        code.endsWith(":ready") ||
+        code.endsWith(":installed") ||
+        code.endsWith(":applied") ||
+        code.endsWith(":patched") ||
+        code.endsWith(":patches_applied") ||
+        code.endsWith(":whitelist_loaded") ||
+        code.endsWith(":group_applied")
+      );
+    }
+
+
+    function scheduleCriticalWorkerPatchSignal(entry, status) {
+      try {
+        const state = __criticalModuleProducerState.workerPatch;
+        if (!state || !entry || typeof entry !== "object") return;
+        const entryCode = (typeof entry.code === "string") ? entry.code : "";
+        const entryTs = (typeof entry.timestamp === "string") ? entry.timestamp : "";
+        if (status === "warn" || status === "error") {
+          const statusSig = [status, entryCode, entryTs].join("|");
+          if (state.lastStatusSig === statusSig) return;
+          state.lastStatusSig = statusSig;
+          emitCriticalWorkerPatchSignal(status, entry);
+          return;
+        }
+        if (status !== "apply_only") return;
+        state.pendingEntry = entry;
+        if (state.timerId != null) {
+          try { global.clearTimeout(state.timerId); } catch (_) {}
+          state.timerId = null;
+        }
+        state.timerId = global.setTimeout(function() {
+          state.timerId = null;
+          if (state.pendingEntry !== entry) return;
+          const resultSig = [entryCode, entryTs].join("|");
+          if (state.lastResultSig === resultSig) return;
+          state.lastResultSig = resultSig;
+          emitCriticalWorkerPatchSignal("apply_only", entry);
+        }, 0);
+      } catch (_) {}
+    }
+
+    function runCriticalModuleProducer(entry) {
+      try {
+        if (!entry || entry.type !== "degrade") return;
+        const code = (typeof entry.code === "string") ? entry.code : "";
+        if (code === "probe:critical_module_status" || code === "probe:critical_module_result_missing") return;
+        const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+        const moduleName = (extra && typeof extra.module === "string") ? extra.module : null;
+        const diagTag = (extra && typeof extra.diagTag === "string") ? extra.diagTag : null;
+        if (moduleName !== "WORKER_PATCH_SRC" && diagTag !== "worker_patch" && code.indexOf("worker_patch_src:") !== 0) return;
+        const level = (extra && typeof extra.level === "string") ? extra.level : null;
+        const status = (level === "fatal" || level === "error")
+          ? "error"
+          : (level === "warn")
+            ? "warn"
+            : (isSummaryCode(code) ? "apply_only" : "seen");
+        scheduleCriticalWorkerPatchSignal(entry, status);
+      } catch (_) {}
+    }
+
+    function modulePrefixes(slot) {
+      const out = [];
+      if (slot && typeof slot.diagTag === "string" && slot.diagTag) out.push(slot.diagTag);
+      if (slot && typeof slot.codePrefix === "string" && slot.codePrefix) out.push(slot.codePrefix);
+      if (slot && Array.isArray(slot.aliases)) {
+        for (let i = 0; i < slot.aliases.length; i++) {
+          const v = slot.aliases[i];
+          if (typeof v === "string" && v) out.push(v);
+        }
+      }
+      return out;
+    }
+
+    function modulePrefixMatch(value, prefix) {
+      if (typeof value !== "string" || !value || typeof prefix !== "string" || !prefix) return false;
+      return value === prefix || value.indexOf(prefix + ":") === 0;
+    }
+
+    function moduleEventMatchesSlot(slot, entry) {
+      if (!slot || !entry || typeof entry !== "object" || entry.type !== "degrade") return false;
+      const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+      const moduleName = (extra && typeof extra.module === "string" && extra.module) ? extra.module : null;
+      const diagTag = (extra && typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
+      const code = (typeof entry.code === "string" && entry.code) ? entry.code : null;
+      if (slot.module && moduleName === slot.module) return true;
+      const prefixes = modulePrefixes(slot);
+      for (let i = 0; i < prefixes.length; i++) {
+        const prefix = prefixes[i];
+        if (modulePrefixMatch(diagTag, prefix) || modulePrefixMatch(code, prefix)) return true;
+      }
+      return false;
+    }
+
+    function modulePickEvent(slot, events) {
+      if (!Array.isArray(events) || !events.length) return null;
+      let fallback = null;
+      for (let i = events.length - 1; i >= 0; i--) {
+        const entry = events[i];
+        const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+        const diagTag = (extra && typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
+        const moduleName = (extra && typeof extra.module === "string" && extra.module) ? extra.module : null;
+        if (!fallback) fallback = entry;
+        if ((diagTag && diagTag === slot.diagTag) || (moduleName && moduleName === slot.module)) {
+          if (isSummaryCode(entry.code)) return entry;
+          return entry;
+        }
+      }
+      return fallback;
+    }
+
+    function moduleEntryStatus(slot, entry) {
+      if (slot && slot.emitter === "missing") return "missing_emitter";
+      if (!entry) return (slot && slot.source === "disabled") ? "disabled" : "not_emitted";
+      const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+      const level = (extra && typeof extra.level === "string") ? extra.level : null;
+      const stage = (extra && typeof extra.stage === "string") ? extra.stage : null;
+      const code = (entry && typeof entry.code === "string") ? entry.code : "";
+      const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+      const reason = (data && typeof data.reason === "string") ? data.reason : null;
+      const outcome = (data && typeof data.outcome === "string") ? data.outcome : null;
+      const err = entry ? entry.error : null;
+      const errName = (err && typeof err === "object" && typeof err.name === "string")
+        ? err.name
+        : ((typeof err === "string" && err.indexOf("TypeError") >= 0) ? "TypeError" : null);
+      const errMessage = (err && typeof err === "object" && typeof err.message === "string")
+        ? err.message
+        : ((typeof err === "string") ? err : null);
+      const expectedReason = (
+        reason === "native_illegal_invocation"
+        || reason === "illegal_invocation"
+        || reason === "native_throw"
+      );
+      const expectedCode = (
+        code.endsWith("_illegal_invocation")
+        || code.endsWith(":native_throw")
+      );
+      const hasTypeErrorSignal = (
+        errName === "TypeError"
+        || (typeof errMessage === "string" && errMessage.indexOf("TypeError") >= 0)
+        || (typeof errMessage === "string" && errMessage.indexOf("Illegal invocation") >= 0)
+        || (typeof errMessage === "string" && errMessage.indexOf("incompatible receiver") >= 0)
+      );
+      if (
+        (stage === "runtime" || stage === "hook")
+        && hasTypeErrorSignal
+        && (expectedReason || expectedCode)
+        && (outcome === "throw" || outcome == null)
+      ) {
+        return "expected_throw";
+      }
+      if (level === "fatal" || level === "error") return "error";
+      if (level === "warn") return "warn";
+      if (slot && slot.requiresResultProof === true && isSummaryCode(code)) return "apply_only";
+      return isSummaryCode(code) ? "ok" : "seen";
+    }
+
+    function emitModuleAuditSignal(slot, entry, status) {
+      try {
+        if (status !== "apply_only" && status !== "warn" && status !== "error" && status !== "not_emitted" && status !== "missing_emitter") return;
+        const locate = (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
+        const code = (status === "apply_only")
+          ? "degrade:module_result_missing"
+          : "degrade:module_status";
+        const message = (status === "apply_only")
+          ? "module emitted only apply/install signal; result proof missing"
+          : "module status is not ok";
+        const entryCode = (entry && typeof entry.code === "string") ? entry.code : null;
+        __degradeApi.diag("error", code, {
+          module: "set_log",
+          diagTag: "degrade:module_check",
+          surface: "logger",
+          key: (slot && typeof slot.module === "string" && slot.module) ? slot.module : null,
+          stage: "runtime",
+          message,
+          type: "pipeline missing data",
+          data: {
+            outcome: "return",
+            reason: status,
+            module: slot && slot.module ? slot.module : null,
+            code: entryCode,
+            source: slot && slot.source ? slot.source : null,
+            file: locate && typeof locate.file === "string" ? locate.file : null,
+            triggerCode: locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null
+          }
+        }, null);
+      } catch (_) {}
+    }
+
+    function runModuleAuditProducer() {
+      try {
+        const buf = _buf();
+        const arr = Array.isArray(buf)
+          ? buf.filter((entry) => {
+              if (!entry || entry.type !== "degrade") return false;
+              const code = (typeof entry.code === "string") ? entry.code : "";
+              return code !== "degrade:module_status" && code !== "degrade:module_result_missing";
+            })
+          : [];
+        for (let i = 0; i < LOGGER_MODULE_AUDIT_SLOTS.length; i++) {
+          const slot = LOGGER_MODULE_AUDIT_SLOTS[i];
+          const events = [];
+          for (let j = 0; j < arr.length; j++) {
+            const entry = arr[j];
+            if (moduleEventMatchesSlot(slot, entry)) events.push(entry);
+          }
+          const moduleEvent = modulePickEvent(slot, events);
+          const status = moduleEntryStatus(slot, moduleEvent);
+          const signalKey = [
+            status,
+            moduleEvent && typeof moduleEvent.code === "string" ? moduleEvent.code : "",
+            moduleEvent && typeof moduleEvent.timestamp === "string" ? moduleEvent.timestamp : ""
+          ].join("|");
+          if (__moduleAuditState.lastSignalByModule[slot.module] === signalKey) continue;
+          __moduleAuditState.lastSignalByModule[slot.module] = signalKey;
+          if (status === "apply_only" || status === "warn" || status === "error" || status === "not_emitted" || status === "missing_emitter") {
+            emitModuleAuditSignal(slot, moduleEvent, status);
+          }
+        }
+      } catch (_) {}
+    }
+
+    function scheduleModuleAuditProducer() {
+      try {
+        __moduleAuditState.armed = true;
+        if (__moduleAuditState.timerId != null) return;
+        __moduleAuditState.timerId = global.setTimeout(function() {
+          __moduleAuditState.timerId = null;
+          runModuleAuditProducer();
+        }, 0);
+      } catch (_) {}
     }
 
     function toPosInt(v, defVal) {
@@ -771,6 +1051,7 @@ const LOGGingModule = function LOGGingModule() {
           const incident = normalizeDiagIncident(entry, null);
           if (incident) pushDiagScreenIncident(incident);
         } catch (_) {}
+        try { scheduleModuleAuditProducer(); } catch (_) {}
       } catch (e) {
         // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
         // иначе рекурсия по пути ошибок (само-логирование логгера).
@@ -829,6 +1110,16 @@ const LOGGingModule = function LOGGingModule() {
     Object.defineProperty(__degradeApi, "getBuffer", {
       value() {
         return _buf().slice();
+      },
+      enumerable: false,
+      writable: false,
+      configurable: false
+    });
+
+    Object.defineProperty(__degradeApi, "runModuleAudit", {
+      value() {
+        runModuleAuditProducer();
+        return true;
       },
       enumerable: false,
       writable: false,

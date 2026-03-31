@@ -64,6 +64,7 @@ const __probeRun = async function(){
       : {};
   const __PROBE_ENABLE_RECEIVER_CHECKS__ = __probeFlagsCfg.receiverChecks === true;
   const __PROBE_ENABLE_BRAND_CHECK__ = __probeFlagsCfg.brandCheck === true;
+  const __PROBE_ENABLE_WORKER_SCOPE_AUDIT__ = __probeFlagsCfg.workerScopeAudit === true;
   const __probeRunStartedAt = Date.now();
 
   function __probeBuildTimeoutError(meta, timeoutMs, elapsedMs) {
@@ -100,6 +101,23 @@ const __probeRun = async function(){
       return { ok: false, error, timedOut, elapsedMs: Date.now() - startedAt, timeoutMs: ms };
     } finally {
       if (timer) clearTimeout(timer);
+    }
+  }
+
+  async function __probeObserveAsync(promiseLike) {
+    const startedAt = Date.now();
+    try {
+      const value = await Promise.resolve(promiseLike);
+      return { ok: true, value, timedOut: false, elapsedMs: Date.now() - startedAt, timeoutMs: 0 };
+    } catch (error) {
+      const timedOut = !!(error && (error.probeTimedOut === true || error.name === "TimeoutError"));
+      return {
+        ok: false,
+        error,
+        timedOut,
+        elapsedMs: Date.now() - startedAt,
+        timeoutMs: __probeNum(error && error.timeoutMs, 0)
+      };
     }
   }
 
@@ -2494,7 +2512,13 @@ function printToStringCrossRealmChecks() {
   // - inventory stays static and follows main.py / assignmnets/array.md;
   // - runtime rows are built only from __DEGRADE__ buffer;
   // - patch rows are shown only for modules that already emit grouped patch diagnostics.
-  const PROBE_MODULE_CHECK_SLOTS = [
+  const PROBE_MODULE_CHECK_SLOTS = (
+    __probeLoggerRoot
+    && Array.isArray(__probeLoggerRoot.__MODULE_DIAG_SLOTS__)
+    && __probeLoggerRoot.__MODULE_DIAG_SLOTS__.length
+  )
+    ? __probeLoggerRoot.__MODULE_DIAG_SLOTS__
+    : [
     { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "diag", functions: "none" },
     { module: "bootstrap_hide", diagTag: "bootstrap_hide", codePrefix: "bootstrap_hide", source: "bundle", emitter: "diag", functions: "none" },
     { module: "core_window", diagTag: "core_window", codePrefix: "core_window", source: "bundle", emitter: "diag", functions: "none" },
@@ -2646,14 +2670,28 @@ function printToStringCrossRealmChecks() {
       const locate = (slot.locate && typeof slot.locate === "object") ? slot.locate : null;
       const code =
         status === "apply_only"
-          ? "probe:critical_module_result_missing"
-          : "probe:critical_module_status";
+          ? "degrade:module_result_missing"
+          : "degrade:module_status";
       const message =
         status === "apply_only"
           ? "critical module emitted only apply/install signal; result proof missing"
           : "critical module status is not ok";
+      const existing = getDegradeEvents().some((row) => {
+        if (!row || row.type !== "degrade") return false;
+        if (row.code !== code) return false;
+        const extra = (row.extra && typeof row.extra === "object") ? row.extra : null;
+        const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+        return !!(
+          extra
+          && extra.diagTag === "degrade:module_check"
+          && data
+          && data.reason === status
+          && data.module === (slot.module || null)
+        );
+      });
+      if (existing) return;
       __probeDiag("error", code, {
-        diagTag: "probe:module_check",
+        diagTag: "degrade:module_check",
         key: (typeof slot.module === "string" && slot.module) ? slot.module : null,
         stage: "runtime",
         message,
@@ -2801,13 +2839,13 @@ function printToStringCrossRealmChecks() {
   }
 
   const fieldsMeta = { check: "__PROBE__", phase: "build", method: "printFieldValues" };
-  const fieldsWait = await __probeAwaitWithinBudget(printFieldValues(), fieldsMeta);
+  const fieldsWait = await __probeObserveAsync(printFieldValues());
   if (!fieldsWait.ok && fieldsWait.timedOut) {
     __probeLogAsyncTimeout(fieldsMeta, fieldsWait.elapsedMs, fieldsWait.timeoutMs, fieldsWait.error);
   }
   const receiverMeta = { check: "__PROBE__", phase: "build", method: "printReceiverChecks" };
   const receiverWait = __PROBE_ENABLE_RECEIVER_CHECKS__
-    ? await __probeAwaitWithinBudget(printReceiverChecks(), receiverMeta)
+    ? await __probeObserveAsync(printReceiverChecks())
     : {
         ok: true,
         value: {
@@ -2824,8 +2862,21 @@ function printToStringCrossRealmChecks() {
     __probeLogAsyncTimeout(receiverMeta, receiverWait.elapsedMs, receiverWait.timeoutMs, receiverWait.error);
   }
   const workerScopeMeta = { check: "__PROBE__", phase: "build", method: "__probeRunWorkerScopeAudit" };
-  const workerScopeWait = await __probeAwaitWithinBudget(__probeRunWorkerScopeAudit(), workerScopeMeta);
-  if (!workerScopeWait.ok && workerScopeWait.timedOut) {
+  const workerScopeWait = __PROBE_ENABLE_WORKER_SCOPE_AUDIT__
+    ? await __probeAwaitWithinBudget(__probeRunWorkerScopeAudit(), workerScopeMeta)
+    : {
+        ok: true,
+        value: {
+          ok: true,
+          rows: [],
+          skipped: true,
+          reason: "disabled_by_probe_flags"
+        },
+        timedOut: false,
+        elapsedMs: 0,
+        timeoutMs: 0
+      };
+  if (__PROBE_ENABLE_WORKER_SCOPE_AUDIT__ && !workerScopeWait.ok && workerScopeWait.timedOut) {
     __probeLogAsyncTimeout(workerScopeMeta, workerScopeWait.elapsedMs, workerScopeWait.timeoutMs, workerScopeWait.error);
   }
 
@@ -2837,7 +2888,7 @@ function printToStringCrossRealmChecks() {
       ok: false,
       value: null,
       error: errorToString(fieldsWait.error),
-      source: "watchdog",
+      source: "probe_async",
       asyncState: fieldsWait.timedOut ? "timed_out" : "rejected",
       elapsedMs: fieldsWait.elapsedMs
     }],
@@ -2846,7 +2897,7 @@ function printToStringCrossRealmChecks() {
     receiverChecks: receiverWait.ok ? receiverWait.value : {
       ok: false,
       rows: [{
-        check: "receiver: watchdog",
+        check: "receiver: probe_async",
         method: "printReceiverChecks",
         available: false,
         goodThis: null,
@@ -2881,9 +2932,10 @@ function printToStringCrossRealmChecks() {
     degrade: printLastDegradeEvents(),
     moduleCheck: printModuleCheck(),
     watchdog: {
-      totalBudgetMs: __PROBE_TIMEOUTS.totalMs,
+      enabled: __PROBE_ENABLE_WORKER_SCOPE_AUDIT__,
+      totalBudgetMs: __PROBE_ENABLE_WORKER_SCOPE_AUDIT__ ? __PROBE_TIMEOUTS.totalMs : 0,
       spentMs: Date.now() - __probeRunStartedAt,
-      remainingMs: __probeRemainingBudgetMs(),
+      remainingMs: __PROBE_ENABLE_WORKER_SCOPE_AUDIT__ ? __probeRemainingBudgetMs() : 0,
       fields: {
         state: fieldsWait.ok ? "resolved" : (fieldsWait.timedOut ? "timed_out" : "rejected"),
         elapsedMs: fieldsWait.elapsedMs,
@@ -2895,7 +2947,9 @@ function printToStringCrossRealmChecks() {
         timeoutMs: receiverWait.timeoutMs
       },
       workerScopeAudit: {
-        state: workerScopeWait.ok ? "resolved" : (workerScopeWait.timedOut ? "timed_out" : "rejected"),
+        state: __PROBE_ENABLE_WORKER_SCOPE_AUDIT__
+          ? (workerScopeWait.ok ? "resolved" : (workerScopeWait.timedOut ? "timed_out" : "rejected"))
+          : "disabled",
         elapsedMs: workerScopeWait.elapsedMs,
         timeoutMs: workerScopeWait.timeoutMs
       }
