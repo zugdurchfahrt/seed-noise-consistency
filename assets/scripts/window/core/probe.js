@@ -120,6 +120,7 @@ const __probeRun = async function(){
     callMs: __probeNum(__probeTimeoutCfg.callMs, 2500),
     highEntropyMs: __probeNum(__probeTimeoutCfg.highEntropyMs, 3000),
     stepMs: __probeNum(__probeTimeoutCfg.stepMs, 8000),
+    sharedWorkerMs: __probeNum(__probeTimeoutCfg.sharedWorkerMs, 12000),
     totalMs: __probeNum(__probeTimeoutCfg.totalMs, 30000)
   };
   const __probeFlagsCfg =
@@ -201,7 +202,8 @@ const __probeRun = async function(){
         timeoutMs: 0
       };
     }
-    const budgetMs = Math.min(__PROBE_TIMEOUTS.stepMs, left);
+    const requestedMs = __probeNum(meta && meta.timeoutMs, __PROBE_TIMEOUTS.stepMs);
+    const budgetMs = Math.min(requestedMs, left);
     return __probeAwaitWithTimeout(promiseLike, budgetMs, meta);
   }
 
@@ -922,6 +924,41 @@ const __probeRun = async function(){
     const sharedName = `probe-shared-${Date.now()}`;
     const rows = [];
     const cleanup = [];
+    const readScopeFromDegrade = (scopeKind, missingMessage) => {
+      try {
+        const events = getDegradeEvents();
+        for (let i = events.length - 1; i >= 0; i--) {
+          const entry = events[i];
+          if (!entry || typeof entry !== "object") continue;
+          const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+          if (!extra) continue;
+          const data = (extra.data && typeof extra.data === "object") ? extra.data : null;
+          const observed = (data && data.observedData && typeof data.observedData === "object")
+            ? data.observedData
+            : null;
+          const source = observed && typeof observed === "object" ? observed : data;
+          if (!source || typeof source !== "object") continue;
+          const rawScopeKind = (typeof source.scopeKind === "string" && source.scopeKind)
+            ? source.scopeKind
+            : ((typeof source.scope === "string" && source.scope) ? source.scope : null);
+          const normalizedScopeKind = rawScopeKind === "Worker" ? "DedicatedWorker" : rawScopeKind;
+          if (normalizedScopeKind !== scopeKind) continue;
+          return {
+            ok: true,
+            values: {
+              language: source.language,
+              languages: Array.isArray(source.languages) ? JSON.parse(JSON.stringify(source.languages)) : source.languages,
+              deviceMemory: source.deviceMemory,
+              hardwareConcurrency: source.hardwareConcurrency,
+              uaData: source.uaData && typeof source.uaData === "object" ? JSON.parse(JSON.stringify(source.uaData)) : null
+            }
+          };
+        }
+      } catch (e) {
+        return { ok: false, error: errorShape(e), comparisons: [] };
+      }
+      return { ok: false, error: errorShape(new Error(missingMessage)), comparisons: [] };
+    };
     try {
       const dedicatedWait = await __probeAwaitWithinBudget((async () => {
         const worker = new Worker(dedicatedURL);
@@ -948,17 +985,6 @@ const __probeRun = async function(){
       const dedicated = dedicatedWait.ok
         ? { ok: true, values: dedicatedWait.value, comparisons: __probeCompareScopeValues(windowValues, dedicatedWait.value, "DedicatedWorker", "single") }
         : { ok: false, error: errorShape(dedicatedWait.error), comparisons: [] };
-      if (!dedicated.ok) {
-        rows.push({
-          scope: "DedicatedWorker",
-          variant: "single",
-          field: "__worker__",
-          match: false,
-          expected: "values",
-          actual: dedicated.error
-        });
-      }
-      Array.prototype.push.apply(rows, dedicated.comparisons);
 
       const sharedCollect = async () => {
         const shared = new SharedWorker(sharedURL, { name: sharedName, type: "module" });
@@ -987,8 +1013,18 @@ const __probeRun = async function(){
         });
       };
 
-      const sharedFirstWait = await __probeAwaitWithinBudget(sharedCollect(), { check: "worker_scope_audit", phase: "SharedWorker:first", method: "SharedWorker" });
-      const sharedSecondWait = await __probeAwaitWithinBudget(sharedCollect(), { check: "worker_scope_audit", phase: "SharedWorker:reuse", method: "SharedWorker" });
+      const sharedFirstWait = await __probeAwaitWithinBudget(sharedCollect(), {
+        check: "worker_scope_audit",
+        phase: "SharedWorker:first",
+        method: "SharedWorker",
+        timeoutMs: __PROBE_TIMEOUTS.sharedWorkerMs
+      });
+      const sharedSecondWait = await __probeAwaitWithinBudget(sharedCollect(), {
+        check: "worker_scope_audit",
+        phase: "SharedWorker:reuse",
+        method: "SharedWorker",
+        timeoutMs: __PROBE_TIMEOUTS.sharedWorkerMs
+      });
 
       const shared = {
         first: sharedFirstWait.ok
@@ -998,8 +1034,29 @@ const __probeRun = async function(){
           ? { ok: true, values: sharedSecondWait.value, comparisons: __probeCompareScopeValues(windowValues, sharedSecondWait.value, "SharedWorker", "reuse") }
           : { ok: false, error: errorShape(sharedSecondWait.error), comparisons: [] }
       };
+      const sharedView = shared.first.ok
+        ? { ok: true, values: shared.first.values }
+        : { ok: false, error: shared.first.error };
+
+      const serviceWorkerSlot = readScopeFromDegrade("ServiceWorker", "service worker values missing in __DEGRADE__");
+      const serviceWorker = serviceWorkerSlot.ok
+        ? { ok: true, values: serviceWorkerSlot.values, comparisons: __probeCompareScopeValues(windowValues, serviceWorkerSlot.values, "ServiceWorker", "active") }
+        : { ok: false, error: serviceWorkerSlot.error, comparisons: [] };
+
+      const comparisonRows = [];
+      if (!dedicated.ok) {
+        comparisonRows.push({
+          scope: "DedicatedWorker",
+          variant: "single",
+          field: "__worker__",
+          match: false,
+          expected: "values",
+          actual: dedicated.error
+        });
+      }
+      Array.prototype.push.apply(comparisonRows, dedicated.comparisons);
       if (!shared.first.ok) {
-        rows.push({
+        comparisonRows.push({
           scope: "SharedWorker",
           variant: "first",
           field: "__worker__",
@@ -1009,7 +1066,7 @@ const __probeRun = async function(){
         });
       }
       if (!shared.second.ok) {
-        rows.push({
+        comparisonRows.push({
           scope: "SharedWorker",
           variant: "reuse",
           field: "__worker__",
@@ -1018,12 +1075,12 @@ const __probeRun = async function(){
           actual: shared.second.error
         });
       }
-      Array.prototype.push.apply(rows, shared.first.comparisons);
-      Array.prototype.push.apply(rows, shared.second.comparisons);
+      Array.prototype.push.apply(comparisonRows, shared.first.comparisons);
+      Array.prototype.push.apply(comparisonRows, shared.second.comparisons);
       const reuseMatch = (shared.first.ok && shared.second.ok)
         ? (__probeStableStringify(shared.first.values) === __probeStableStringify(shared.second.values))
         : false;
-      rows.push({
+      comparisonRows.push({
         scope: "SharedWorker",
         variant: "reuse",
         field: "reuse.same_values",
@@ -1031,16 +1088,65 @@ const __probeRun = async function(){
         expected: shared.first.ok ? shared.first.values : null,
         actual: shared.second.ok ? shared.second.values : null
       });
+      if (!serviceWorker.ok) {
+        comparisonRows.push({
+          scope: "ServiceWorker",
+          variant: "active",
+          field: "__degrade__",
+          match: false,
+          expected: "diag values",
+          actual: serviceWorker.error
+        });
+      } else {
+        Array.prototype.push.apply(comparisonRows, serviceWorker.comparisons);
+      }
+
+      const rowFields = [
+        ["language", (x) => x ? x.language : null],
+        ["languages", (x) => x ? x.languages : null],
+        ["deviceMemory", (x) => x ? x.deviceMemory : null],
+        ["hardwareConcurrency", (x) => x ? x.hardwareConcurrency : null],
+        ["userAgentData.brands", (x) => x && x.uaData ? x.uaData.brands : null],
+        ["userAgentData.mobile", (x) => x && x.uaData ? x.uaData.mobile : null],
+        ["userAgentData.platform", (x) => x && x.uaData ? x.uaData.platform : null],
+        ["userAgentData.fullVersionList", (x) => x && x.uaData ? x.uaData.fullVersionList : null],
+        ["userAgentData.getHighEntropyValues.architecture", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.architecture : null],
+        ["userAgentData.getHighEntropyValues.bitness", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.bitness : null],
+        ["userAgentData.getHighEntropyValues.model", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.model : null],
+        ["userAgentData.getHighEntropyValues.platformVersion", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.platformVersion : null],
+        ["userAgentData.getHighEntropyValues.fullVersionList", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.fullVersionList : null],
+        ["userAgentData.getHighEntropyValues.wow64", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.wow64 : null],
+        ["userAgentData.getHighEntropyValues.formFactors", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.formFactors : null]
+      ];
+      const printable = (value) => {
+        if (value && typeof value === "object" && value.name && value.message) {
+          return `${String(value.name)}: ${String(value.message)}`;
+        }
+        return toPrintable(value);
+      };
+      for (const entry of rowFields) {
+        const label = entry[0];
+        const getter = entry[1];
+        rows.push({
+          parameter: label,
+          Window: printable(getter(windowValues)),
+          DedicatedWorker: dedicated.ok ? printable(getter(dedicated.values)) : printable(dedicated.error),
+          SharedWorker: sharedView.ok ? printable(getter(sharedView.values)) : printable(sharedView.error),
+          ServiceWorker: serviceWorker.ok ? printable(getter(serviceWorker.values)) : printable(serviceWorker.error)
+        });
+      }
 
       __probeConsoleCall("group", "[probe] worker scope audit");
       __probeConsoleCall("table", rows);
       __probeConsoleCall("groupEnd");
 
       return {
-        ok: dedicated.ok === true && shared.first.ok === true && shared.second.ok === true && rows.every((row) => row && row.match === true),
+        ok: dedicated.ok === true && shared.first.ok === true && shared.second.ok === true && serviceWorker.ok === true && comparisonRows.every((row) => row && row.match === true),
         window: windowValues,
         dedicated,
         shared,
+        serviceWorker,
+        comparisons: comparisonRows,
         rows
       };
     } finally {
@@ -2742,7 +2848,7 @@ function printToStringCrossRealmChecks() {
   }
   const workerScopeMeta = { check: "__PROBE__", phase: "build", method: "__probeRunWorkerScopeAudit" };
   const workerScopeWait = __PROBE_ENABLE_WORKER_SCOPE_AUDIT__
-    ? await __probeAwaitWithinBudget(__probeRunWorkerScopeAudit(), workerScopeMeta)
+    ? await __probeObserveAsync(__probeRunWorkerScopeAudit())
     : {
         ok: true,
         value: {
@@ -2970,6 +3076,7 @@ function __probeDownloadHtmlReport(result) {
   const title = `probe report ${ts}`;
 
   const fields = result && result.fields;
+  // const workerScopeRows = result && result.workerScopeAudit && result.workerScopeAudit.rows;
   const methodsRows = result && result.methods && result.methods.rows;
   const degradeRows = result && result.degrade && result.degrade.rows;
   const toStringCrossRows = result && result.toStringCrossRealm && result.toStringCrossRealm.rows;

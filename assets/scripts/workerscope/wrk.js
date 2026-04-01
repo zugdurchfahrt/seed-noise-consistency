@@ -686,6 +686,8 @@ function mkModuleWorkerSource(snapshot, absUrl){
       var __ENV_EMIT_Q__ = [];
       var __ENV_DIAG_RELAY_ACTIVE__ = false;
       var __ENV_SHARED_PORTS__ = [];
+      var __ENV_CONNECT_Q__ = [];
+      var __ENV_CONNECT_BUF__ = true;
       var __LAST_SNAP__ = null;
       var __ENV_SNAP_APPLIED__ = null;
       var __serializeDiagErr = function(err){
@@ -807,11 +809,17 @@ function mkModuleWorkerSource(snapshot, absUrl){
         self.addEventListener('connect', function(ev){
           try {
             var ports = ev && ev.ports;
+            var connectPorts = null;
             if (ports && ports.length) {
+              connectPorts = [];
               for (var j = 0; j < ports.length; j++) {
                 try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
                 __ENV_SHARED_PORTS__.push(ports[j]);
+                connectPorts.push(ports[j]);
               }
+            }
+            if (__ENV_CONNECT_BUF__ && connectPorts && connectPorts.length) {
+              __ENV_CONNECT_Q__.push(connectPorts);
             }
           } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_connect_event' }); }
           try {
@@ -1020,6 +1028,14 @@ function mkModuleWorkerSource(snapshot, absUrl){
       const USER = ${USER};
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user module URL');
       await import(USER);
+      __ENV_CONNECT_BUF__ = false;
+      try {
+        if (typeof self.onconnect === 'function' && __ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
+          for (const ports of __ENV_CONNECT_Q__) {
+            self.onconnect({ ports: ports });
+          }
+        }
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
       // Replay any early messages after user code is loaded.
       __MSG_BUF__ = false;
       try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
@@ -1061,6 +1077,8 @@ function mkClassicWorkerSource(snapshot, absUrl){
       var __ENV_EMIT_Q__ = [];
       var __ENV_DIAG_RELAY_ACTIVE__ = false;
       var __ENV_SHARED_PORTS__ = [];
+      var __ENV_CONNECT_Q__ = [];
+      var __ENV_CONNECT_BUF__ = true;
       var __LAST_SNAP__ = null;
       var __ENV_SNAP_APPLIED__ = null;
       var __serializeDiagErr = function(err){
@@ -1182,11 +1200,17 @@ function mkClassicWorkerSource(snapshot, absUrl){
         self.addEventListener('connect', function(ev){
           try {
             var ports = ev && ev.ports;
+            var connectPorts = null;
             if (ports && ports.length) {
+              connectPorts = [];
               for (var j = 0; j < ports.length; j++) {
                 try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
                 __ENV_SHARED_PORTS__.push(ports[j]);
+                connectPorts.push(ports[j]);
               }
+            }
+            if (__ENV_CONNECT_BUF__ && connectPorts && connectPorts.length) {
+              __ENV_CONNECT_Q__.push(connectPorts);
             }
           } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_connect_event' }); }
           try {
@@ -1421,9 +1445,15 @@ function mkClassicWorkerSource(snapshot, absUrl){
       try {
         importScripts(USER);
       } catch (e) {
-        import(USER).then(function(){
-           // Replay any early messages after user code is loaded.
-           __MSG_BUF__ = false;
+         import(USER).then(function(){
+            __ENV_CONNECT_BUF__ = false;
+            try {
+              if (typeof self.onconnect === 'function' && __ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
+                for (var j = 0; j < __ENV_CONNECT_Q__.length; j++) self.onconnect({ ports: __ENV_CONNECT_Q__[j] });
+              }
+            } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
+            // Replay any early messages after user code is loaded.
+            __MSG_BUF__ = false;
            try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
            try {
              if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
@@ -1443,6 +1473,12 @@ function mkClassicWorkerSource(snapshot, absUrl){
         });
         return;
       }
+      __ENV_CONNECT_BUF__ = false;
+      try {
+        if (typeof self.onconnect === 'function' && __ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
+          for (var i = 0; i < __ENV_CONNECT_Q__.length; i++) self.onconnect({ ports: __ENV_CONNECT_Q__[i] });
+        }
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
       // Replay any early messages after user code is loaded.
       __MSG_BUF__ = false;
       try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }

@@ -23,7 +23,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const x = (extra && typeof extra === 'object') ? extra : null;
     const ctx = {
       module: __screenModule,
-      diagTag: x ? x.diagTag : undefined,
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __screenModule,
       surface: __screenSurface,
       key: (x && Object.prototype.hasOwnProperty.call(x, 'key')) ? x.key : null,
       stage: x ? x.stage : undefined,

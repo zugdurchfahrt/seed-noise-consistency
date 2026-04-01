@@ -581,6 +581,26 @@ const LOGGingModule = function LOGGingModule() {
       ].join(":") + "." + centis;
     }
 
+    function resolveModuleAuditObservedData(triggerCode) {
+      try {
+        if (typeof triggerCode !== "string" || !triggerCode) return null;
+        const arr = _buf();
+        if (!Array.isArray(arr)) return null;
+        for (let i = arr.length - 1; i >= 0; i--) {
+          const entry = arr[i];
+          if (!entry || entry.type !== "degrade") continue;
+          const code = (typeof entry.code === "string") ? entry.code : "";
+          if (!code || code === "degrade:module_status" || code === "degrade:module_result_missing") continue;
+          if (code !== triggerCode) continue;
+          const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+          const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+          if (!data) continue;
+          return normalizeForJSON(data);
+        }
+      } catch (_) {}
+      return null;
+    }
+
     function shapeDegradeBufferEntry(entry, idx) {
       const incident = normalizeDiagIncident(entry, idx);
       const entryType = (entry && typeof entry.type === "string") ? entry.type : (incident && incident.entryType ? incident.entryType : "degrade");
@@ -623,6 +643,37 @@ const LOGGingModule = function LOGGingModule() {
       const codeValue = (entry && typeof entry.code === "string" && entry.code)
         ? entry.code
         : (incident && typeof incident.code === "string" ? incident.code : ((entry && typeof entry.type === "string") ? entry.type : null));
+      if (
+        extra
+        && typeof extra === "object"
+        && (codeValue === "degrade:module_status" || codeValue === "degrade:module_result_missing")
+        && extra.data
+        && typeof extra.data === "object"
+      ) {
+        const data = Object.assign({}, extra.data);
+        const observed = (data.observedData && typeof data.observedData === "object") ? data.observedData : null;
+        const looksThinObserved = !observed || (
+          Object.keys(observed).length <= 1
+          && Object.prototype.hasOwnProperty.call(observed, "outcome")
+        );
+        if (looksThinObserved) {
+          const hydratedObserved = resolveModuleAuditObservedData(data.triggerCode);
+          if (hydratedObserved && typeof hydratedObserved === "object") {
+            data.observedData = hydratedObserved;
+          }
+        }
+        const nextObserved = (data.observedData && typeof data.observedData === "object") ? data.observedData : null;
+        if (nextObserved) {
+          const workerKeys = ["scopeKind", "language", "languages", "deviceMemory", "hardwareConcurrency", "uaData"];
+          for (let i = 0; i < workerKeys.length; i++) {
+            const k = workerKeys[i];
+            if (!Object.prototype.hasOwnProperty.call(data, k) && Object.prototype.hasOwnProperty.call(nextObserved, k)) {
+              data[k] = nextObserved[k];
+            }
+          }
+        }
+        extra.data = data;
+      }
       return {
         idx: (typeof idx === "number") ? idx : null,
         module: moduleName,
