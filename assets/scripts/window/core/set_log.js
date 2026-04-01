@@ -205,6 +205,13 @@ const LOGGingModule = function LOGGingModule() {
     // If these fields match, event copies after DIAG_DUP_LIMIT are suppressed.
     function diagDupSignature(level, code, ctx, err) {
       const c = (ctx && typeof ctx === "object") ? ctx : {};
+      const data = (c.data && typeof c.data === "object") ? c.data : null;
+      const consoleGroup = (
+        (String(code || "unknown") === "set_log:console_capture")
+        && data
+        && typeof data.consoleGroup === "string"
+        && data.consoleGroup
+      ) ? data.consoleGroup : "";
       const eName = (err && typeof err.name === "string") ? err.name : "";
       const eMsg = (err && typeof err.message === "string") ? err.message : (err == null ? "" : String(err));
       return [
@@ -217,6 +224,7 @@ const LOGGingModule = function LOGGingModule() {
         (typeof c.stage === "string") ? c.stage : "",
         (typeof c.message === "string") ? c.message : "",
         (typeof c.type === "string") ? c.type : "",
+        consoleGroup,
         eName,
         eMsg
       ].join("|");
@@ -695,11 +703,13 @@ const LOGGingModule = function LOGGingModule() {
       debug: console.debug && console.debug.bind(console),
       trace: console.trace && console.trace.bind(console),
       group: console.group && console.group.bind(console),
+      groupCollapsed: console.groupCollapsed && console.groupCollapsed.bind(console),
       groupEnd: console.groupEnd && console.groupEnd.bind(console),
       table: console.table && console.table.bind(console),
       dir: console.dir && console.dir.bind(console),
     };
     __defineLoggerHiddenValue("__RAW_CONSOLE__", Object.freeze(origConsole), true);
+    const consoleGroupStack = [];
 
     function getLoggerGuard() {
       __ensureLoggerHiddenValue("__LOGGER_GUARD__", function () {
@@ -1425,27 +1435,43 @@ const LOGGingModule = function LOGGingModule() {
           }
         }
 
-        const e = {
-          type: "console",
-          level: level,
-          module: (bufferMeta && typeof bufferMeta.module === "string" && bufferMeta.module) ? bufferMeta.module : (module || "global"),
-          key: (bufferMeta && (typeof bufferMeta.key === "string" || bufferMeta.key === null)) ? bufferMeta.key : null,
-          code: (bufferMeta && typeof bufferMeta.code === "string" && bufferMeta.code) ? bufferMeta.code : "console",
-          message: msgParts.join(" "),
-          expanded: normArgs,
-          timestamp: new Date().toISOString(),
+        const resolvedModule = (bufferMeta && typeof bufferMeta.module === "string" && bufferMeta.module) ? bufferMeta.module : (module || "global");
+        const resolvedKey = (bufferMeta && (typeof bufferMeta.key === "string" || bufferMeta.key === null)) ? bufferMeta.key : null;
+        const resolvedCode = (bufferMeta && typeof bufferMeta.code === "string" && bufferMeta.code)
+          ? bufferMeta.code
+          : ((module === "console") ? "set_log:console_capture" : "set_log:logger_capture");
+        const resolvedDiagTag = (module === "console") ? "set_log:console_capture" : "set_log:logger_capture";
+        const resolvedMessage = msgParts.join(" ");
+        const diagLevel = (level === "error") ? "error" : ((level === "warn") ? "warn" : "info");
+        const activeConsoleGroup = (module === "console" && consoleGroupStack.length)
+          ? consoleGroupStack[consoleGroupStack.length - 1]
+          : null;
+        const diagData = {
+          source: (module === "console") ? "console_capture" : "module_logger",
+          consoleLevel: level,
+          args: normArgs
         };
-
+        if (typeof activeConsoleGroup === "string" && activeConsoleGroup) diagData.consoleGroup = activeConsoleGroup;
+        if (module !== "console") diagData.loggerModule = module;
         if (withStack) {
           try {
             const st = new Error().stack;
-            e.stack = st ? String(st) : null;
-          } catch (_) {
-            e.stack = null;
-          }
+            if (typeof st === "string" && st) diagData.stack = st;
+          } catch (_) {}
         }
-
-        pushEntry(e); // <-- обязательно вернуть
+        if (withStack) {
+          diagData.captureMode = "stacked";
+        }
+        __degradeApi.diag(diagLevel, resolvedCode, {
+          module: resolvedModule,
+          diagTag: resolvedDiagTag,
+          surface: "logger",
+          key: resolvedKey,
+          stage: "runtime",
+          message: resolvedMessage || ((module === "console") ? ("console." + level) : (String(module || "logger") + "." + level)),
+          type: "pipeline telemetry",
+          data: diagData
+        }, null);
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
@@ -1482,9 +1508,41 @@ const LOGGingModule = function LOGGingModule() {
           bufferMeta
         );
 
-        if (__loggerRoot.__DEBUG__) {
-          guardedApply(orig, console, consoleArgs, "console." + level);
-        }
+        guardedApply(orig, console, consoleArgs, "console." + level);
+      };
+    }
+    if (origConsole.group) {
+      console.group = function () {
+        const args = Array.prototype.slice.call(arguments);
+        const label = args.length ? args.map((a) => {
+          try {
+            return (typeof a === "string") ? a : safeTag(a);
+          } catch (_) {
+            return "[Unserializable]";
+          }
+        }).join(" ") : "group";
+        consoleGroupStack.push(label);
+        guardedApply(origConsole.group, console, args, "console.group");
+      };
+    }
+    if (origConsole.groupCollapsed) {
+      console.groupCollapsed = function () {
+        const args = Array.prototype.slice.call(arguments);
+        const label = args.length ? args.map((a) => {
+          try {
+            return (typeof a === "string") ? a : safeTag(a);
+          } catch (_) {
+            return "[Unserializable]";
+          }
+        }).join(" ") : "groupCollapsed";
+        consoleGroupStack.push(label);
+        guardedApply(origConsole.groupCollapsed, console, args, "console.groupCollapsed");
+      };
+    }
+    if (origConsole.groupEnd) {
+      console.groupEnd = function () {
+        if (consoleGroupStack.length) consoleGroupStack.pop();
+        guardedApply(origConsole.groupEnd, console, [], "console.groupEnd");
       };
     }
 
@@ -1506,17 +1564,7 @@ const LOGGingModule = function LOGGingModule() {
       if (!config || !config.enabled) return;
       if (!levelAllows(config.level, level)) return;
 
-      // Output to DevTools without recursion through patched console
-      const prefix = "%c[" + module + "]%c";
-      const style1 =
-        "color:#fff;background:#0070f3;border-radius:2px;padding:2px 4px;";
-      const style2 = "color:inherit;";
-      const callArgs = [prefix, style1, style2].concat(args);
-
-      const orig = origConsole[level] || origConsole.log;
-      if (orig) guardedApply(orig, console, callArgs, "log." + level);
-
-      // Store entry
+      // Store entry in __DEGRADE__ only; do not mirror to DevTools console.
       pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
     }, false);
 

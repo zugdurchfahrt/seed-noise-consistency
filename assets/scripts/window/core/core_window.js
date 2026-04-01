@@ -148,13 +148,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
     try {
-      let currentLabel = null;
-      try {
-        currentLabel = Reflect.apply(nativeToString, func, []);
-      } catch (_) {}
-      if (typeof currentLabel === 'string' && currentLabel && currentLabel.indexOf('[native code]') === -1) {
-        return func;
-      }
       const nativeName = name || func.name || "";
       const label = nativeName
         ? `function ${nativeName}() { [native code] }`
@@ -564,6 +557,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const origGet = desc && desc.get;
 
     if (typeof origGet === 'function') {
+      const markAsNative = __requireMarkAsNative(name, 'wrapStrictAccessor');
       let wrapped = Object.getOwnPropertyDescriptor(({
         get [key]() {
           if (onAccess) onAccess(key, wrapped, this);
@@ -573,6 +567,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return valueFromGetter(this);
         }
       }), key).get;
+      wrapped = markAsNative(wrapped, name);
       return wrapped;
     }
 
@@ -1071,15 +1066,11 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return wrappedStrictGet;
         }
 
-        if (useObjectReturnGateway && typeof origGet === 'function') {
-          const wrappedObjectGet = Object.getOwnPropertyDescriptor(({
-            get [key]() {
-              if (checkThis && !checkThis(this)) {
-                return onInvalidThis(invalidThis, origGet, this, []);
-              }
-              return valueFromGetter(this);
-            }
-          }), key).get;
+        if (useObjectReturnGateway) {
+          const wrappedObjectGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
+            name: 'get ' + key,
+            wrapLayer: wrapLayer
+          });
           knownWrapped.add(wrappedObjectGet);
           return wrappedObjectGet;
         }
@@ -1207,13 +1198,14 @@ const CoreWindowModule = function CoreWindowModule(window) {
         if (!d || typeof d.get !== 'function') {
           throw new TypeError('[Core.redefineAcc] native getter missing for ' + key);
         }
+        const markAsNative = ensureMarkAsNative();
         const namedGet = (typeof getImpl === 'function' && getImpl.name === '')
           ? Object.getOwnPropertyDescriptor(({ get [key]() { return getImpl.call(this); } }), key).get
           : getImpl;
         if (typeof namedGet !== 'function') {
           throw new TypeError('[Core.redefineAcc] getter missing for ' + key);
         }
-        const wrappedGet = namedGet;
+        const wrappedGet = markAsNative(namedGet, 'get ' + key);
         knownWrapped.add(wrappedGet);
         Object.defineProperty(target, key, {
           get: wrappedGet,
@@ -1389,7 +1381,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
                 if (setImpl) return setImpl.call(this, origSet, v);
                 return Reflect.apply(origSet, this, [v]);
               });
-              setWrapped = setRaw;
+              setWrapped = markAsNative(setRaw, 'set ' + key);
             }
             knownWrapped.add(setWrapped);
           } else if (setImpl) {
@@ -1408,7 +1400,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               }
               return setImpl.call(this, undefined, v);
             });
-            setWrapped = setRaw;
+            setWrapped = markAsNative(setRaw, 'set ' + key);
             knownWrapped.add(setWrapped);
           }
         } catch (e) {
@@ -1556,7 +1548,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             });
           } else {
             const wrappedRaw = buildMethodWrapperByArity(orig, key, invokeMethodPath);
-            wrapped = wrappedRaw;
+            wrapped = markAsNative(wrappedRaw, key);
           }
           knownWrapped.add(wrapped);
         } catch (e) {
@@ -1694,7 +1686,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             });
           } else {
             const wrappedRaw = buildPromiseMethodWrapperByArity(orig, key, invokePromisePath);
-            wrapped = wrappedRaw;
+            wrapped = markAsNative(wrappedRaw, key);
           }
           knownWrapped.add(wrapped);
         } catch (e) {
@@ -1759,7 +1751,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         if (isProtoChainRequiredAccessorGatewayWrapLayer(wrapLayer) && resolveMode !== 'proto_chain') {
           return { ok: false, reason: 'resolve_mode_required',
-            error: new TypeError('[Core.applyTargets] native accessor gateway requires resolve=proto_chain'),
+            error: new TypeError('[Core.applyTargets] accessor gateway requires resolve=proto_chain'),
             tag, policy, targetId, key, kind
           };
         }

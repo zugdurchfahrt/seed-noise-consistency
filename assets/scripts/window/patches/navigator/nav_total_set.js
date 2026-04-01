@@ -247,6 +247,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return;
     }
     const __navMark = mark;
+    const wrapStrictAccessor = (__core && typeof __core.__wrapStrictAccessor === 'function') ? __core.__wrapStrictAccessor : null;
+    if (typeof wrapStrictAccessor !== 'function') {
+      __navDiagPipeline('warn', 'nav_total_set:wrap_strict_accessor_missing', {
+        stage: 'preflight',
+        message: 'Core.__wrapStrictAccessor missing',
+        data: { outcome: 'skip', reason: 'missing_dep_wrap_strict_accessor', policy: 'skip', action: 'native' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'wrap_strict_accessor_missing');
+      return;
+    }
     const __envProfileState = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
       ? __stateRoot.__ENV_PROFILE__
       : null;
@@ -447,6 +457,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         return false;
       }
     };
+    function __wrapGetter(key, getter, desc, validThis) {
+      __navRegisterKey(key);
+      if (typeof wrapStrictAccessor !== 'function') {
+        if (desc && typeof desc.get === 'function') return desc.get;
+        return getter;
+      }
+      const wrapped = wrapStrictAccessor(key, getter, desc, validThis, {
+        onAccess: function (_, fn) { __navLogAccess(key, fn); }
+      });
+      if (typeof wrapped === 'function' && wrapped !== getter) __navRegisterFn(wrapped);
+      return wrapped;
+    }
+
     // mapping helpers (OS <-> DOM)
     const asDom = (os) => os === 'Windows' ? 'Win32' : (os === 'macOS' ? 'MacIntel' : os);
     const asOS  = (dom) => dom === 'Win32' ? 'Windows' : (dom === 'MacIntel' ? 'macOS' : dom);
@@ -625,6 +648,240 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // ——— B. Safe helpers ———
     const navProto = Object.getPrototypeOf(navigator);
+    function safeDefineAcc(target, key, getter, { enumerable = false } = {}) {
+      if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+        const err = new TypeError(`${key}: invalid target`);
+        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_invalid_target', {
+          stage: 'preflight',
+          diagTag: 'nav_total_set:safeDefineAcc',
+          key: key || null,
+          message: err.message,
+          data: { outcome: 'throw', reason: 'invalid_target' }
+        }, err);
+        throw err;
+      }
+      const d = Object.getOwnPropertyDescriptor(target, key);
+      if (d && d.configurable === false) {
+        const err = new TypeError(`${key}: non-configurable`);
+        let resolved = null;
+        let resolveErr = null;
+        try {
+          resolved = __navResolveDescriptor ? __navResolveDescriptor(target, key, { mode: 'proto_chain' }) : null;
+        } catch (e) {
+          resolveErr = e;
+        }
+        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_non_configurable', {
+          stage: 'preflight',
+          diagTag: 'nav_total_set:safeDefineAcc',
+          key: key || null,
+          message: err.message,
+          data: {
+            outcome: 'throw',
+            reason: 'non_configurable',
+            targetTag: Object.prototype.toString.call(target),
+            targetIsNavProto: target === navProto,
+            ownDesc: {
+              configurable: !!d.configurable,
+              enumerable: !!d.enumerable,
+              writable: Object.prototype.hasOwnProperty.call(d, 'writable') ? !!d.writable : undefined,
+              hasGet: typeof d.get === 'function',
+              hasSet: typeof d.set === 'function',
+              hasValue: Object.prototype.hasOwnProperty.call(d, 'value')
+            },
+            protoChainFound: !!(resolved && resolved.desc),
+            protoChainOwnerIsTarget: !!(resolved && resolved.owner === target),
+            protoChainOwnerTag: (resolved && resolved.owner) ? Object.prototype.toString.call(resolved.owner) : undefined,
+            protoChainDescConfigurable: (resolved && resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'configurable')) ? !!resolved.desc.configurable : undefined,
+            resolveDescriptorError: resolveErr ? String(resolveErr && (resolveErr.message || resolveErr)) : undefined
+          }
+        }, err);
+        throw err;
+      }
+      const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      if (isData) {
+        const value = (typeof getter === 'function') ? getter.call(target) : getter;
+        const applied = applyCoreTargetsGroup('nav_total_set:safeDefineAcc', [{
+          owner: target,
+          key,
+          kind: 'data',
+          wrapLayer: 'descriptor_only',
+          policy: 'throw',
+          diagTag: 'nav_total_set:safeDefineAcc',
+          allowCreate: !d,
+          value,
+          writable: d ? !!d.writable : true,
+          configurable: d ? !!d.configurable : true,
+          enumerable: d ? !!d.enumerable : !!enumerable
+        }], 'throw');
+        if (applied !== 1) {
+          const err = new TypeError(`failed to define ${key}`);
+          __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_define_failed', {
+            stage: 'apply',
+            diagTag: 'nav_total_set:safeDefineAcc',
+            key: key || null,
+            message: err.message,
+            data: { outcome: 'throw', reason: 'define_failed' }
+          }, err);
+          throw err;
+        }
+        return true;
+      }
+      let getFn = getter;
+      if (typeof getter === 'function' && getter.name === '') {
+        const acc = ({ get [key]() { return getter.call(this); } });
+        getFn = Object.getOwnPropertyDescriptor(acc, key).get;
+      }
+      if (typeof getFn !== 'function') {
+        const err = new TypeError(`${key}: getter missing`);
+        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_getter_missing', {
+          stage: 'preflight',
+          diagTag: 'nav_total_set:safeDefineAcc',
+          key: key || null,
+          message: err.message,
+          data: { outcome: 'throw', reason: 'getter_missing' }
+        }, err);
+        throw err;
+      }
+      const applied = applyCoreTargetsGroup('nav_total_set:safeDefineAcc', [{
+        owner: target,
+        key,
+        kind: 'accessor',
+        wrapLayer: 'named_wrapper',
+        policy: 'throw',
+        diagTag: 'nav_total_set:safeDefineAcc',
+        allowCreate: !d,
+        configurable: d ? !!d.configurable : true,
+        enumerable: d ? !!d.enumerable : !!enumerable,
+        invalidThis: 'throw',
+        getImpl: function safeDefineAccGetImpl() {
+          return Reflect.apply(getFn, this, []);
+        }
+        }], 'throw');
+      if (applied !== 1) {
+        const err = new TypeError(`failed to define ${key}`);
+        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_define_failed', {
+          stage: 'apply',
+          diagTag: 'nav_total_set:safeDefineAcc',
+          key: key || null,
+          message: err.message,
+          data: { outcome: 'throw', reason: 'define_failed' }
+        }, err);
+        throw err;
+      }
+      return true;
+    }
+
+    function redefineAcc(proto, key, getImpl) {
+      const d = Object.getOwnPropertyDescriptor(proto, key);
+      if (d && d.configurable === false) {
+        const err = new TypeError(`${key}: non-configurable`);
+        let resolved = null;
+        let resolveErr = null;
+        try {
+          resolved = __navResolveDescriptor ? __navResolveDescriptor(proto, key, { mode: 'proto_chain' }) : null;
+        } catch (e) {
+          resolveErr = e;
+        }
+        __navDiagBrowser('error', 'nav_total_set:redefineAcc_non_configurable', {
+          stage: 'preflight',
+          diagTag: 'nav_total_set:redefineAcc',
+          key: key || null,
+          message: err.message,
+          data: {
+            outcome: 'throw',
+            reason: 'non_configurable',
+            targetTag: Object.prototype.toString.call(proto),
+            targetIsNavProto: proto === navProto,
+            ownDesc: {
+              configurable: !!d.configurable,
+              enumerable: !!d.enumerable,
+              writable: Object.prototype.hasOwnProperty.call(d, 'writable') ? !!d.writable : undefined,
+              hasGet: typeof d.get === 'function',
+              hasSet: typeof d.set === 'function',
+              hasValue: Object.prototype.hasOwnProperty.call(d, 'value')
+            },
+            protoChainFound: !!(resolved && resolved.desc),
+            protoChainOwnerIsTarget: !!(resolved && resolved.owner === proto),
+            protoChainOwnerTag: (resolved && resolved.owner) ? Object.prototype.toString.call(resolved.owner) : undefined,
+            protoChainDescConfigurable: (resolved && resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'configurable')) ? !!resolved.desc.configurable : undefined,
+            resolveDescriptorError: resolveErr ? String(resolveErr && (resolveErr.message || resolveErr)) : undefined
+          }
+        }, err);
+        throw err;
+      }
+      const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
+      if (isData) {
+        const value = (typeof getImpl === 'function') ? getImpl.call(proto) : getImpl;
+        const applied = applyCoreTargetsGroup('nav_total_set:redefineAcc', [{
+          owner: proto,
+          key,
+          kind: 'data',
+          wrapLayer: 'descriptor_only',
+          policy: 'throw',
+          diagTag: 'nav_total_set:redefineAcc',
+          allowCreate: !d,
+          value,
+          writable: d ? !!d.writable : true,
+          configurable: d ? !!d.configurable : true,
+          enumerable: d ? !!d.enumerable : false
+        }], 'throw');
+        if (applied !== 1) {
+          const err = new TypeError(`failed to define ${key}`);
+          __navDiagBrowser('error', 'nav_total_set:redefineAcc_define_failed', {
+            stage: 'apply',
+            diagTag: 'nav_total_set:redefineAcc',
+            key: key || null,
+            message: err.message,
+            data: { outcome: 'throw', reason: 'define_failed' }
+          }, err);
+          throw err;
+        }
+        return;
+      }
+      let getFn = getImpl;
+      if (typeof getImpl === 'function' && getImpl.name === '') {
+        const acc = ({ get [key]() { return getImpl.call(this); } });
+        getFn = Object.getOwnPropertyDescriptor(acc, key).get;
+      }
+      if (typeof getFn !== 'function') {
+        const err = new TypeError(`${key}: getter missing`);
+        __navDiagBrowser('error', 'nav_total_set:redefineAcc_getter_missing', {
+          stage: 'preflight',
+          diagTag: 'nav_total_set:redefineAcc',
+          key: key || null,
+          message: err.message,
+          data: { outcome: 'throw', reason: 'getter_missing' }
+        }, err);
+        throw err;
+      }
+      const applied = applyCoreTargetsGroup('nav_total_set:redefineAcc', [{
+        owner: proto,
+        key,
+        kind: 'accessor',
+        wrapLayer: 'named_wrapper',
+        policy: 'throw',
+        diagTag: 'nav_total_set:redefineAcc',
+        allowCreate: !d,
+        configurable: d ? !!d.configurable : true,
+        enumerable: d ? !!d.enumerable : false,
+        invalidThis: 'throw',
+        getImpl: function redefineAccGetImpl() {
+          return Reflect.apply(getFn, this, []);
+        }
+        }], 'throw');
+      if (applied !== 1) {
+        const err = new TypeError(`failed to define ${key}`);
+        __navDiagBrowser('error', 'nav_total_set:redefineAcc_define_failed', {
+          stage: 'apply',
+          diagTag: 'nav_total_set:redefineAcc',
+          key: key || null,
+          message: err.message,
+          data: { outcome: 'throw', reason: 'define_failed' }
+        }, err);
+        throw err;
+      }
+    }
+
     function isSameDescriptor(actual, expected) {
       if (!actual || !expected) return false;
       const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
@@ -1080,45 +1337,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (critical.has(prop) || strictScalarKeys.has(prop) || objectReturnKeys.has(prop)) return; 
         if (!(prop in navProto)) return;
         const d = Object.getOwnPropertyDescriptor(navProto, prop);
-        if (!d || d.configurable === false) return;
-        __navRegisterKey(prop);
-        const isData = Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
-        if (isData) {
-          const applied = applyCoreTargetsGroup('nav_total_set:' + prop, [{
-            owner: navProto,
-            key: prop,
-            kind: 'data',
-            wrapLayer: 'descriptor_only',
-            policy: 'throw',
-            diagTag: 'nav_total_set:' + prop,
-            value: getter.call(navProto),
-            writable: !!d.writable,
-            configurable: !!d.configurable,
-            enumerable: !!d.enumerable
-          }], 'throw');
-          if (applied !== 1) throw new TypeError('nav_total_set: failed to define ' + prop);
-          return;
-        }
-        if (typeof d.get === 'function') {
-          const applied = applyCoreTargetsGroup('nav_total_set:' + prop, [{
-            owner: navProto,
-            key: prop,
-            kind: 'accessor',
-            wrapLayer: 'strict_accessor_gateway',
-            resolve: 'proto_chain',
-            policy: 'strict',
-            diagTag: 'nav_total_set:' + prop,
-            configurable: !!d.configurable,
-            enumerable: !!d.enumerable,
-            validThis: __isNavigatorThis,
-            invalidThis: 'native',
-            getImpl: function navAdditionalScalarAccessorValue() {
-              __navLogAccess(prop, null, { bucket: 'strict_accessor_gateway' });
-              return getter.call(this);
-            }
-          }], 'strict');
-          if (applied !== 1) throw new TypeError('nav_total_set: failed to define ' + prop);
-        }
+        const wrapped = __wrapGetter(prop, getter, d, __isNavigatorThis);
+        safeDefineAcc(navProto, prop, wrapped);
       });
 
     // ——— D. devicePixelRatio & screen.* ———
@@ -1355,44 +1575,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // oscpu (только если есть в прототипе)
     if ('oscpu' in navProto) {
       const dOscpu = Object.getOwnPropertyDescriptor(navProto, 'oscpu');
-      if (dOscpu && dOscpu.configurable !== false) {
-        __navRegisterKey('oscpu');
-        const isData = Object.prototype.hasOwnProperty.call(dOscpu, 'value') && !dOscpu.get && !dOscpu.set;
-        if (isData) {
-          const applied = applyCoreTargetsGroup('nav_total_set:oscpu', [{
-            owner: navProto,
-            key: 'oscpu',
-            kind: 'data',
-            wrapLayer: 'descriptor_only',
-            policy: 'throw',
-            diagTag: 'nav_total_set:oscpu',
-            value: undefined,
-            writable: !!dOscpu.writable,
-            configurable: !!dOscpu.configurable,
-            enumerable: !!dOscpu.enumerable
-          }], 'throw');
-          if (applied !== 1) throw new TypeError('nav_total_set: failed to define oscpu');
-        } else if (typeof dOscpu.get === 'function') {
-          const applied = applyCoreTargetsGroup('nav_total_set:oscpu', [{
-            owner: navProto,
-            key: 'oscpu',
-            kind: 'accessor',
-            wrapLayer: 'strict_accessor_gateway',
-            resolve: 'proto_chain',
-            policy: 'strict',
-            diagTag: 'nav_total_set:oscpu',
-            configurable: !!dOscpu.configurable,
-            enumerable: !!dOscpu.enumerable,
-            validThis: __isNavigatorThis,
-            invalidThis: 'native',
-            getImpl: function navOscpuAccessorValue() {
-              __navLogAccess('oscpu', null, { bucket: 'strict_accessor_gateway' });
-              return undefined;
-            }
-          }], 'strict');
-          if (applied !== 1) throw new TypeError('nav_total_set: failed to define oscpu');
-        }
-      }
+      const wrappedOscpu = __wrapGetter('oscpu', () => undefined, dOscpu, __isNavigatorThis);
+      safeDefineAcc(navProto, 'oscpu', wrappedOscpu);
     }
     // ——— E. userAgentData (low + high entropy) ———
     if ('userAgentData' in navigator) {
@@ -1556,7 +1740,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
       const ghevResolved = __navResolveDescriptor
         ? __navResolveDescriptor(uadProto, 'getHighEntropyValues', { mode: 'proto_chain' })
-        : null;
+        : {
+            owner: Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues') ? uadProto : nativeUAD,
+            desc: Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues')
+              || Object.getOwnPropertyDescriptor(nativeUAD, 'getHighEntropyValues')
+              || null
+          };
       const ghevDesc = ghevResolved ? ghevResolved.desc : null;
       const ghevOwner = (ghevResolved && ghevResolved.owner) ? ghevResolved.owner : uadProto;
       const origGHEV = ghevDesc ? ghevDesc.value : null;
@@ -1593,8 +1782,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'getHighEntropyValues',
           kind: 'promise_method',
           resolve: 'proto_chain',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
           validThis: isUadThis,
@@ -1909,7 +2099,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const permProto = Object.getPrototypeOf(navigator.permissions) || navigator.permissions;
       const permResolved = __navResolveDescriptor
         ? __navResolveDescriptor(permProto, 'query', { mode: 'proto_chain' })
-        : null;
+        : {
+            owner: Object.getOwnPropertyDescriptor(permProto, 'query') ? permProto : navigator.permissions,
+            desc: Object.getOwnPropertyDescriptor(permProto, 'query')
+              || Object.getOwnPropertyDescriptor(navigator.permissions, 'query')
+              || null
+          };
       const permDesc = permResolved ? permResolved.desc : null;
       const permOwner = (permResolved && permResolved.owner) ? permResolved.owner : permProto;
       if (!permDesc) {
@@ -1954,8 +2149,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             key: 'query',
             resolve: 'proto_chain',
             kind: 'promise_method',
-            wrapLayer: 'named_wrapper',
+            wrapLayer: 'core_wrapper',
             invokeClass: 'brand_strict',
+            wrapperClass: 'core_proxy',
             policy: 'throw',
             diagTag: 'nav_total_set:permissions.query',
             validThis(self) {
@@ -1985,7 +2181,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   mediaMicGranted = state === 'granted';
                   syncMediaLabelsUnlocked();
                   __navLogAccess('permissions.query', null, {
-                    bucket: 'named_wrapper',
+                    bucket: 'core_wrapper',
                     permission: permName,
                     source: sourceName,
                     state,
@@ -2001,7 +2197,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   mediaCameraGranted = state === 'granted';
                   syncMediaLabelsUnlocked();
                   __navLogAccess('permissions.query', null, {
-                    bucket: 'named_wrapper',
+                    bucket: 'core_wrapper',
                     permission: permName,
                     state,
                     mediaDevicesLabelsUnlocked
@@ -2009,7 +2205,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   return status;
                 });
               }
-              __navLogAccess('permissions.query', null, { bucket: 'named_wrapper' });
+              __navLogAccess('permissions.query', null, { bucket: 'core_wrapper' });
               return Reflect.apply(orig, this, args || []);
             }
           }], 'throw');
@@ -2022,7 +2218,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const mediaProto = Object.getPrototypeOf(navigator.mediaDevices) || navigator.mediaDevices;
       const mediaResolved = __navResolveDescriptor
         ? __navResolveDescriptor(mediaProto, 'enumerateDevices', { mode: 'proto_chain' })
-        : null;
+        : {
+            owner: Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices') ? mediaProto : navigator.mediaDevices,
+            desc: Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
+              || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices')
+              || null
+          };
       const mediaDesc = mediaResolved ? mediaResolved.desc : null;
       const mediaOwner = (mediaResolved && mediaResolved.owner) ? mediaResolved.owner : mediaProto;
       if (!mediaDesc) {
@@ -2067,8 +2268,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             key: 'enumerateDevices',
             resolve: 'proto_chain',
             kind: 'promise_method',
-            wrapLayer: 'named_wrapper',
+            wrapLayer: 'core_wrapper',
             invokeClass: 'brand_strict',
+            wrapperClass: 'core_proxy',
             policy: 'throw',
             diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
             validThis(self) {
@@ -2109,7 +2311,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               const audioUnlocked = !!mediaMicGranted;
               const videoUnlocked = !!mediaCameraGranted;
               __navLogAccess('mediaDevices.enumerateDevices', null, {
-                bucket: 'named_wrapper',
+                bucket: 'core_wrapper',
                 multimediaDevices: { speakers: 1, micros: 1, webcams: 1 },
                 labelsHidden: !(audioUnlocked || videoUnlocked),
                 audioUnlocked,
@@ -2148,7 +2350,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const storageProto = Object.getPrototypeOf(navigator.storage) || navigator.storage;
       const storageResolved = __navResolveDescriptor
         ? __navResolveDescriptor(storageProto, 'estimate', { mode: 'proto_chain' })
-        : null;
+        : {
+            owner: Object.getOwnPropertyDescriptor(storageProto, 'estimate') ? storageProto : navigator.storage,
+            desc: Object.getOwnPropertyDescriptor(storageProto, 'estimate')
+              || Object.getOwnPropertyDescriptor(navigator.storage, 'estimate')
+              || null
+          };
       const storageDesc = storageResolved ? storageResolved.desc : null;
       const storageOwner = (storageResolved && storageResolved.owner) ? storageResolved.owner : storageProto;
          if (!storageDesc) {
@@ -2209,8 +2416,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'estimate',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.estimate',
           validThis(self) {
@@ -2218,7 +2426,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           },
           invalidThis: 'native',
           invoke(orig, args) {
-            __navLogAccess('storage.estimate', null, { bucket: 'named_wrapper' });
+            __navLogAccess('storage.estimate', null, { bucket: 'core_wrapper' });
             tickUsage();
             return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
           }
@@ -2301,7 +2509,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (typeof navigator.storage.persist   === 'function') {
         const persistResolved = __navResolveDescriptor
           ? __navResolveDescriptor(storageProto, 'persist', { mode: 'proto_chain' })
-          : null;
+          : {
+              owner: Object.getOwnPropertyDescriptor(storageProto, 'persist') ? storageProto : navigator.storage,
+              desc: Object.getOwnPropertyDescriptor(storageProto, 'persist')
+                || Object.getOwnPropertyDescriptor(navigator.storage, 'persist')
+                || null
+            };
         const persistDesc = persistResolved ? persistResolved.desc : null;
         const persistOwner = (persistResolved && persistResolved.owner) ? persistResolved.owner : storageProto;
         if (!persistDesc) {
@@ -2330,8 +2543,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'persist',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persist',
           validThis(self) {
@@ -2349,7 +2563,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (typeof navigator.storage.persisted === 'function') {
         const persistedResolved = __navResolveDescriptor
           ? __navResolveDescriptor(storageProto, 'persisted', { mode: 'proto_chain' })
-          : null;
+          : {
+              owner: Object.getOwnPropertyDescriptor(storageProto, 'persisted') ? storageProto : navigator.storage,
+              desc: Object.getOwnPropertyDescriptor(storageProto, 'persisted')
+                || Object.getOwnPropertyDescriptor(navigator.storage, 'persisted')
+                || null
+            };
         const persistedDesc = persistedResolved ? persistedResolved.desc : null;
         const persistedOwner = (persistedResolved && persistedResolved.owner) ? persistedResolved.owner : storageProto;
         if (!persistedDesc) {
@@ -2378,8 +2597,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'persisted',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:storage.persisted',
           validThis(self) {
@@ -2628,10 +2848,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const credProto = Object.getPrototypeOf(navigator.credentials) || navigator.credentials;
       const createResolved = __navResolveDescriptor
         ? __navResolveDescriptor(credProto, 'create', { mode: 'proto_chain' })
-        : null;
+        : {
+            owner: Object.getOwnPropertyDescriptor(credProto, 'create') ? credProto : navigator.credentials,
+            desc: Object.getOwnPropertyDescriptor(credProto, 'create')
+              || Object.getOwnPropertyDescriptor(navigator.credentials, 'create')
+              || null
+          };
       const getResolved = __navResolveDescriptor
         ? __navResolveDescriptor(credProto, 'get', { mode: 'proto_chain' })
-        : null;
+        : {
+            owner: Object.getOwnPropertyDescriptor(credProto, 'get') ? credProto : navigator.credentials,
+            desc: Object.getOwnPropertyDescriptor(credProto, 'get')
+              || Object.getOwnPropertyDescriptor(navigator.credentials, 'get')
+              || null
+          };
       const createDesc = createResolved ? createResolved.desc : null;
       const getDesc = getResolved ? getResolved.desc : null;
       const createOwner = (createResolved && createResolved.owner) ? createResolved.owner : credProto;
@@ -2664,8 +2894,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'create',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:credentials.create',
           validThis(self) {
@@ -2688,8 +2919,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: 'get',
           resolve: 'proto_chain',
           kind: 'promise_method',
-          wrapLayer: 'named_wrapper',
+          wrapLayer: 'core_wrapper',
           invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
           policy: 'throw',
           diagTag: 'nav_total_set:credentials.get',
           validThis(self) {
