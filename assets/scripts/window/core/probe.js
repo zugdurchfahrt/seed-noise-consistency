@@ -20,7 +20,7 @@ const __probeRun = async function(){
   const __probeDegrade = (__probeLoggerRoot && typeof __probeLoggerRoot.__DEGRADE__ === "function") ? __probeLoggerRoot.__DEGRADE__ : null;
   const __probeRawConsole = (__probeLoggerRoot && __probeLoggerRoot.__RAW_CONSOLE__ && typeof __probeLoggerRoot.__RAW_CONSOLE__ === "object")
     ? __probeLoggerRoot.__RAW_CONSOLE__
-    : console;
+    : null;
 
 
   function __probeDiag(level, code, extra, err) {
@@ -50,13 +50,63 @@ const __probeRun = async function(){
     try {
       const fn = __probeRawConsole && typeof __probeRawConsole[method] === "function"
         ? __probeRawConsole[method]
-        : (console && typeof console[method] === "function" ? console[method] : null);
+        : null;
       if (typeof fn !== "function") return;
       const args = Array.prototype.slice.call(arguments, 1);
-      fn.apply(console, args);
+      fn.apply(__probeRawConsole, args);
     } catch (_) {}
   }
 
+  function __probeCountWhere(list, predicate) {
+    const arr = Array.isArray(list) ? list : [];
+    let count = 0;
+    for (let i = 0; i < arr.length; i++) {
+      let matched = false;
+      try {
+        matched = !!predicate(arr[i], i);
+      } catch (_) {
+        matched = false;
+      }
+      if (matched) count += 1;
+    }
+    return count;
+  }
+
+  function __probeReport(section, payload, err) {
+    try {
+      const sectionName = (typeof section === "string" && section) ? section : "unknown";
+      const x = (payload && typeof payload === "object") ? payload : {};
+      const status = (typeof x.status === "string" && x.status) ? x.status : "ok";
+      const level = (typeof x.level === "string" && x.level)
+        ? x.level
+        : ((status === "error") ? "error" : ((status === "mismatch" || status === "skipped") ? "warn" : "info"));
+      const data = {
+        section: sectionName,
+        status: status,
+        probeRunId: String(__probeRunStartedAt)
+      };
+      if (Object.prototype.hasOwnProperty.call(x, "rows")) data.rows = x.rows;
+      if (Object.prototype.hasOwnProperty.call(x, "summary")) data.summary = x.summary;
+      if (Object.prototype.hasOwnProperty.call(x, "reason")) data.reason = x.reason;
+      if (Object.prototype.hasOwnProperty.call(x, "error")) data.error = x.error;
+      if (Object.prototype.hasOwnProperty.call(x, "rawEntries")) data.rawEntries = x.rawEntries;
+      if (Object.prototype.hasOwnProperty.call(x, "meta")) data.meta = x.meta;
+      __probeDiag(level, `probe:section:${sectionName}`, {
+        diagTag: "probe:report",
+        stage: "report",
+        key: sectionName,
+        message: `[probe] section report ${sectionName} #${__probeRunStartedAt}`,
+        type: "probe telemetry",
+        data: data
+      }, err || null);
+    } catch (_) {}
+  }
+
+  globalThis.__PROBE_FLAGS__ = {
+    workerScopeAudit: true,
+    brandCheck: false,
+    receiverChecks: false
+  };
   function __probeNum(v, fallback) {
     const n = Number(v);
     return (Number.isFinite(n) && n > 0) ? Math.floor(n) : fallback;
@@ -2834,6 +2884,23 @@ function printToStringCrossRealmChecks() {
       (result.moduleCheckOk !== false)
     );
   } catch (_) {}
+
+  try {
+    const moduleRows = Array.isArray(result.moduleCheck) ? result.moduleCheck : [];
+    const moduleBad = __probeCountWhere(moduleRows, (row) => {
+      const status = (row && typeof row.status === "string") ? row.status : "";
+      return status === "error" || status === "warn" || status === "missing_emitter" || status === "not_emitted";
+    });
+    __probeReport("module_check", {
+      status: moduleBad ? "mismatch" : "ok",
+      rows: moduleRows,
+      summary: {
+        total: moduleRows.length,
+        bad: moduleBad
+      }
+    });
+  } catch (_) {}
+
   Object.defineProperty(globalThis, "__PROBE_OUTPUT__", {
     value: result,
     writable: true,
