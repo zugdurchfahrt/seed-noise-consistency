@@ -127,19 +127,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
       seenBridgeTargets.add(bridgeTarget);
       const nextTarget = toStringProxyTargetMap.get(bridgeTarget);
       if (typeof nextTarget !== 'function') break;
-      if (nextTarget === bridgeTarget || seenBridgeTargets.has(nextTarget)) {
-        __emit('warn', 'core_window:toString_native_candidate_cycle', {
-          module: 'core',
-          diagTag: 'core_window',
-          surface: 'core',
-          key: 'Function.prototype.toString',
-          stage: 'preflight',
-          message: 'nativeToString candidate self-loop/cycle detected; fallback to current realm toString',
-          type: 'contract violation',
-          data: { outcome: 'return', fallback: 'current_realm_toString' }
-        }, new Error('[CoreWindow] nativeToString candidate self-loop/cycle'));
-        return null;
-      }
       bridgeTarget = nextTarget;
     }
     return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
@@ -200,8 +187,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
 
   function resolveNativeLabel(func) {
     if (typeof func !== 'function') return null;
-    const ownLabel = toStringOverrideMap.get(func);
-    if (typeof ownLabel === 'string' && ownLabel) return ownLabel;
+    if (toStringOverrideMap.has(func)) {
+      const ownLabel = toStringOverrideMap.get(func);
+      if (typeof ownLabel === 'string' && ownLabel) return ownLabel;
+    }
     let cur = func;
     const seen = new WeakSet();
     while (typeof cur === 'function') {
@@ -221,40 +210,34 @@ const CoreWindowModule = function CoreWindowModule(window) {
       seen.add(cur);
       const next = toStringProxyTargetMap.get(cur);
       if (typeof next !== 'function') break;
-      if (next === cur || seen.has(next)) {
-        __emit('warn', 'core_window:toString_bridge_cycle', {
-          module: 'core',
-          diagTag: 'core_window',
-          surface: 'core',
-          key: 'Function.prototype.toString',
-          stage: 'runtime',
-          message: 'toString bridge self-loop/cycle detected during label resolution',
-          type: 'contract violation',
-          data: { outcome: 'return' }
-        }, new Error('[CoreWindow] toString bridge self-loop/cycle'));
-        return null;
-      }
-      const nextLabel = toStringOverrideMap.get(next);
-      if (typeof nextLabel === 'string' && nextLabel) return nextLabel;
       cur = next;
+      if (toStringOverrideMap.has(cur)) {
+        const nextLabel = toStringOverrideMap.get(cur);
+        if (typeof nextLabel === 'string' && nextLabel) return nextLabel;
+      }
     }
     return null;
   }
 
   {
-    const wrappedFunctionToString = ({
-      toString() {
-        if (typeof this === 'function') {
-          const nativeLabel = resolveNativeLabel(this);
-          if (typeof nativeLabel === 'string' && nativeLabel) {
-            return nativeLabel;
-          }
+    const wrappedFunctionToString = new Proxy(nativeToString, {
+      apply(target, thisArg, argList) {
+        if (typeof thisArg !== 'function') {
+          return Reflect.apply(target, thisArg, argList || []);
         }
-        return Reflect.apply(nativeToString, this, arguments);
+        const nativeLabel = resolveNativeLabel(thisArg);
+        if (typeof nativeLabel === 'string' && nativeLabel) {
+          return nativeLabel;
+        }
+        return Reflect.apply(target, thisArg, argList || []);
       }
-    }).toString;
+    });
+    const currentProto = Reflect.getPrototypeOf(currentRealmToString);
     toStringProxyTargetMap.set(wrappedFunctionToString, nativeToString);
     toStringOverrideMap.set(wrappedFunctionToString, 'function toString() { [native code] }');
+    if (Reflect.setPrototypeOf(wrappedFunctionToString, currentProto) !== true) {
+      throw new Error('[CoreWindow] Function.prototype.toString prototype bridge failed');
+    }
     safeDefine(Function.prototype, 'toString', {
       value: wrappedFunctionToString,
       writable: !!fpToStringDesc.writable,
@@ -371,10 +354,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const bridgeTarget = __resolveWrappedBridgeTarget(nativeFn, '__wrapNativeApply');
       toStringProxyTargetMap.set(wrapped, bridgeTarget);
       const wrappedName = name || nativeFn.name || "";
-      markAsNative(wrapped, wrappedName);
+      const nativeName = bridgeTarget.name || "";
+      markAsNative(bridgeTarget, nativeName);
       const wrappedLabel = wrappedName
         ? `function ${wrappedName}() { [native code] }`
         : 'function () { [native code] }';
+      toStringOverrideMap.set(wrapped, wrappedLabel);
       if (Object.getPrototypeOf(wrapped) !== Object.getPrototypeOf(nativeFn)) {
         throw new Error('[CoreWindow] __wrapNativeApply: function prototype chain mismatch');
       }
@@ -569,16 +554,21 @@ const CoreWindowModule = function CoreWindowModule(window) {
       return (typeof getter === 'function') ? getter.call(thisArg) : getter;
     };
     const checkThis = (typeof validThis === 'function') ? validThis : null;
-    const origGet = (desc && typeof desc.get === 'function') ? desc.get : null;
+    const origGet = desc && desc.get;
 
-    if (origGet) {
-      return __wrapNativeAccessor(origGet, name, function (target, thisArg, argList) {
-        if (onAccess) onAccess(key, origGet, thisArg);
-        if (checkThis && !checkThis(thisArg)) {
-          return Reflect.apply(origGet, thisArg, argList || []);
+    if (typeof origGet === 'function') {
+      const markAsNative = __requireMarkAsNative(name, 'wrapStrictAccessor');
+      let wrapped = Object.getOwnPropertyDescriptor(({
+        get [key]() {
+          if (onAccess) onAccess(key, wrapped, this);
+          if (checkThis && !checkThis(this)) {
+            return Reflect.apply(origGet, this, []);
+          }
+          return valueFromGetter(this);
         }
-        return valueFromGetter(thisArg);
-      });
+      }), key).get;
+      wrapped = markAsNative(wrapped, name);
+      return wrapped;
     }
 
     const e = new Error('[CoreWindow] __wrapStrictAccessor: synthetic strict accessor path forbidden without native getter');
@@ -1310,20 +1300,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const e = new TypeError('[Core.applyTargets] accessor gateway forbids setImpl');
           return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
-        if (strictScalarContract) {
-          if (typeof origGet !== 'function') {
-            const e = new TypeError('[Core.applyTargets] strict scalar accessor requires native getter');
-            return fail(planItem.policy, planItem.tag, 'native_getter_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
-          }
-          if (typeof getImpl !== 'function') {
-            const e = new TypeError('[Core.applyTargets] strict scalar accessor requires getImpl');
-            return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
-          }
-          if (planItem.allowCreate || allowShapeChange) {
-            const e = new TypeError('[Core.applyTargets] strict scalar accessor forbids create/shape-change');
-            return fail(planItem.policy, planItem.tag, 'strict_contract_violation', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
-          }
-        }
         const useCoreWrapper = wrapLayer === 'core_wrapper';
         const useProxyRuntime = useCoreWrapper;
         if (accessorGatewayContract && useCoreWrapper) {
@@ -1807,9 +1783,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
             tag, policy, targetId, key, kind
           };
         }
-        const strictScalarContract = (kind === 'accessor' && wrapLayer === 'strict_accessor_gateway');
-        const objectReturnContract = (kind === 'accessor' && wrapLayer === 'object_return_gateway');
-        const materializedAccessorContract = (kind === 'accessor' && wrapLayer === 'materialized_accessor_gateway');
+
+
+
+
+
+
         const resolved = resolveDescriptor(owner, key, { mode: resolveMode });
         const descriptorOwner = resolved && resolved.owner ? resolved.owner : owner;
         const desc = resolved ? resolved.desc : null;
@@ -1833,11 +1812,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         if (
           !desc &&
-          (
-            strictScalarContract ||
-            objectReturnContract ||
-            (materializedAccessorContract && !allowCreate)
-          )
+          kind === 'accessor' &&
+          isAccessorGatewayWrapLayer(wrapLayer) &&
+          !(allowCreate && isMaterializedAccessorGatewayWrapLayer(wrapLayer))
         ) {
           return { ok: false, reason: 'descriptor_missing', error: new Error('[Core.applyTargets] accessor gateway requires descriptor'), tag, policy, targetId, key, kind };
         }
@@ -1857,40 +1834,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
           }
           if (!desc.configurable) {
             return { ok: false, reason: 'non_configurable', error: new TypeError('[Core.applyTargets] non-configurable accessor'), tag, policy, targetId, key, kind };
-          }
-        }
-        if (strictScalarContract) {
-          if (!desc) {
-            return {
-              ok: false,
-              reason: 'descriptor_missing',
-              error: new Error('[Core.applyTargets] strict scalar accessor requires descriptor'),
-              tag, policy, targetId, key, kind
-            };
-          }
-          if (!hasAccessorShape(desc)) {
-            return {
-              ok: false,
-              reason: 'kind_mismatch',
-              error: new TypeError('[Core.applyTargets] strict scalar accessor requires accessor descriptor'),
-              tag, policy, targetId, key, kind
-            };
-          }
-          if (typeof desc.get !== 'function') {
-            return {
-              ok: false,
-              reason: 'native_getter_missing',
-              error: new TypeError('[Core.applyTargets] strict scalar accessor requires native getter'),
-              tag, policy, targetId, key, kind
-            };
-          }
-          if (allowCreate || allowShapeChange) {
-            return {
-              ok: false,
-              reason: 'strict_contract_violation',
-              error: new TypeError('[Core.applyTargets] strict scalar accessor forbids create/shape-change'),
-              tag, policy, targetId, key, kind
-            };
           }
         }
         if (desc && (kind === 'method' || kind === 'promise_method')) {
