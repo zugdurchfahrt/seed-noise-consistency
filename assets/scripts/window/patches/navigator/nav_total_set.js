@@ -428,6 +428,77 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     function __navPermissionIsGranted(name) {
       return __navGetPermissionState(name) === 'granted';
     }
+    function __navBuildEnumerateDevicesPayload() {
+      if (!devicesLabels || typeof devicesLabels !== 'object') {
+        __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_missing', {
+          stage: 'runtime',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+          key: 'mediaDevices.enumerateDevices',
+          message: 'devices labels missing'
+        });
+        return null;
+      }
+      if (typeof devicesLabels.audioinput !== 'string'
+        || typeof devicesLabels.videoinput !== 'string'
+        || typeof devicesLabels.audiooutput !== 'string') {
+        __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_invalid', {
+          stage: 'runtime',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+          key: 'mediaDevices.enumerateDevices',
+          message: 'devices labels invalid'
+        });
+        return null;
+      }
+      if (typeof R !== 'function') {
+        return null;
+      }
+      const generateHexId = (len = 64) => {
+        let s = '';
+        for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
+        return s;
+      };
+      __navApplyPermissionGateState();
+      const audioUnlocked = __navPermissionIsGranted('microphone');
+      const videoUnlocked = __navPermissionIsGranted('camera');
+      __navQueryNativePermissionState('microphone', function (nativeState) {
+        __navCheckPermissionSemanticMismatch('microphone', nativeState);
+      });
+      __navQueryNativePermissionState('camera', function (nativeState) {
+        __navCheckPermissionSemanticMismatch('camera', nativeState);
+      });
+      const groupId = generateHexId(64);
+      return {
+        logExtra: {
+          bucket: 'hidden_implementation',
+          multimediaDevices: { speakers: 1, micros: 1, webcams: 1 },
+          labelsHidden: !(audioUnlocked || videoUnlocked),
+          audioUnlocked,
+          videoUnlocked
+        },
+        devices: [
+          {
+            kind: 'audioinput',
+            label: audioUnlocked ? devicesLabels.audioinput : '',
+            deviceId: audioUnlocked ? generateHexId(64) : '',
+            groupId: audioUnlocked ? groupId : ''
+          },
+          {
+            kind: 'videoinput',
+            label: videoUnlocked ? devicesLabels.videoinput : '',
+            deviceId: videoUnlocked ? generateHexId(64) : '',
+            groupId: videoUnlocked ? groupId : ''
+          },
+          {
+            kind: 'audiooutput',
+            label: audioUnlocked ? devicesLabels.audiooutput : '',
+            deviceId: audioUnlocked ? generateHexId(64) : '',
+            groupId: audioUnlocked ? generateHexId(64) : ''
+          }
+        ]
+      };
+    }
     function __navQueryNativePermissionState(name, onResolved) {
       if (typeof __navNativePermissionsQuery !== 'function' || !__navNativePermissionsThis) return;
       let out;
@@ -487,6 +558,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     __navSetHiddenStateValue(__navModuleState, '__GET_PERMISSION_STATE__', __navGetPermissionState);
     __navSetHiddenStateValue(__navModuleState, '__SET_PERMISSION_STATE__', __navSetPermissionState);
+    __navSetHiddenStateValue(__navModuleState, '__ENUMERATE_DEVICES_IMPL__', __navBuildEnumerateDevicesPayload);
     __navApplyPermissionGateState();
 
     if (!Number.isFinite(dpr) || dpr <= 0) {
@@ -2327,83 +2399,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             invokeClass: 'brand_strict',
             wrapperClass: 'core_proxy',
             policy: 'throw',
-            diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-            validThis(self) {
-              return self === navigator.mediaDevices;
-            },
-            invalidThis: 'native',
-            invoke(orig, args) {
-              if (!devicesLabels || typeof devicesLabels !== 'object') {
-                __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_missing', {
-                  stage: 'runtime',
-                  type: __navTypePipeline,
-                  diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-                  key: 'mediaDevices.enumerateDevices',
-                  message: 'devices labels missing'
-                });
+          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+          validThis(self) {
+            return self === navigator.mediaDevices;
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
+              const buildImpl = (__navModuleState && typeof __navModuleState.__ENUMERATE_DEVICES_IMPL__ === 'function')
+                ? __navModuleState.__ENUMERATE_DEVICES_IMPL__
+                : __navBuildEnumerateDevicesPayload;
+              const payload = buildImpl();
+              if (!payload || !Array.isArray(payload.devices)) {
                 return Reflect.apply(orig, this, args || []);
               }
-              if (typeof devicesLabels.audioinput !== 'string'
-                || typeof devicesLabels.videoinput !== 'string'
-                || typeof devicesLabels.audiooutput !== 'string') {
-                __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_invalid', {
-                  stage: 'runtime',
-                  type: __navTypePipeline,
-                  diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-                  key: 'mediaDevices.enumerateDevices',
-                  message: 'devices labels invalid'
-                });
-                return Reflect.apply(orig, this, args || []);
-              }
-              if (typeof R !== 'function') {
-                return Reflect.apply(orig, this, args || []);
-              }
-              const generateHexId = (len = 64) => {
-                let s = '';
-                for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
-                return s;
-              };
-              __navApplyPermissionGateState();
-              const audioUnlocked = __navPermissionIsGranted('microphone');
-              const videoUnlocked = __navPermissionIsGranted('camera');
-              __navQueryNativePermissionState('microphone', function (nativeState) {
-                __navCheckPermissionSemanticMismatch('microphone', nativeState);
-              });
-              __navQueryNativePermissionState('camera', function (nativeState) {
-                __navCheckPermissionSemanticMismatch('camera', nativeState);
-              });
-              __navLogAccess('mediaDevices.enumerateDevices', null, {
-                bucket: 'core_wrapper',
-                multimediaDevices: { speakers: 1, micros: 1, webcams: 1 },
-                labelsHidden: !(audioUnlocked || videoUnlocked),
-                audioUnlocked,
-                videoUnlocked
-              });
-              const groupId = generateHexId(64);
-              return Promise.resolve([
-                {
-                  kind: 'audioinput',
-                  label: audioUnlocked ? devicesLabels.audioinput : '',
-                  deviceId: audioUnlocked ? generateHexId(64) : '',
-                  groupId: audioUnlocked ? groupId : ''
-                },
-                {
-                  kind: 'videoinput',
-                  label: videoUnlocked ? devicesLabels.videoinput : '',
-                  deviceId: videoUnlocked ? generateHexId(64) : '',
-                  groupId: videoUnlocked ? groupId : ''
-                },
-                {
-                  kind: 'audiooutput',
-                  label: audioUnlocked ? devicesLabels.audiooutput : '',
-                  deviceId: audioUnlocked ? generateHexId(64) : '',
-                  groupId: audioUnlocked ? generateHexId(64) : ''
-                }
-              ]);
-            }
-          }], 'throw');
-        }
+              __navLogAccess('mediaDevices.enumerateDevices', null, payload.logExtra || { bucket: 'core_wrapper' });
+              return Promise.resolve(payload.devices);
+          }
+        }], 'throw');
       }
+    }
     }
 
     // ——— J. storage.estimate & webkitTemporaryStorage ———
