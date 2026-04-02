@@ -1033,6 +1033,81 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       __adapterProtoPatched__.add(adapterProto);
     }
 
+    let __requestAdapterWarmupPromise__ = null;
+    function warmupRequestAdapterPrototype(options, sourceTag) {
+      if (__requestAdapterWarmupPromise__) return __requestAdapterWarmupPromise__;
+
+      const args = (typeof options === 'undefined') ? [] : [options];
+      let pending;
+      try {
+        pending = Reflect.apply(origRequestAdapter, gpu, args);
+      } catch (e) {
+        degrade('warn', 'webgpu:navigator:requestAdapter_warmup_throw', e, {
+          stage: 'runtime',
+          type: __webgpuTypeBrowser,
+          diagTag: 'webgpu',
+          key: 'navigator.gpu.requestAdapter',
+          message: 'native requestAdapter warmup threw',
+          data: {
+            outcome: 'skip',
+            reason: 'warmup_native_throw',
+            source: sourceTag || 'warmup'
+          }
+        });
+        __requestAdapterWarmupPromise__ = Promise.resolve(null);
+        return __requestAdapterWarmupPromise__;
+      }
+
+      __requestAdapterWarmupPromise__ = Promise.resolve(pending).then(function onWarmupAdapter(adapter) {
+        if (!adapter) {
+          degrade('warn', 'webgpu:navigator:requestAdapter_warmup_null_adapter', null, {
+            stage: 'runtime',
+            type: __webgpuTypeBrowser,
+            diagTag: 'webgpu',
+            key: 'navigator.gpu.requestAdapter',
+            message: 'native requestAdapter returned null adapter (environment may not expose WebGPU adapter)',
+            data: {
+              outcome: 'skip',
+              reason: 'warmup_adapter_missing',
+              source: sourceTag || 'warmup'
+            }
+          });
+          return null;
+        }
+
+        patchAdapterPrototype(adapter);
+        degrade('info', 'webgpu:navigator:requestAdapter_warmup_ok', null, {
+          stage: 'runtime',
+          type: __webgpuTypePipeline,
+          diagTag: 'webgpu',
+          key: 'navigator.gpu.requestAdapter',
+          message: 'native requestAdapter warmup patched adapter prototype',
+          data: {
+            outcome: 'return',
+            reason: 'warmup_ok',
+            source: sourceTag || 'warmup'
+          }
+        });
+        return adapter;
+      }, function onWarmupReject(err) {
+        degrade('warn', 'webgpu:navigator:requestAdapter_warmup_rejected', err, {
+          stage: 'runtime',
+          type: 'runtime rejection',
+          diagTag: 'webgpu',
+          key: 'navigator.gpu.requestAdapter',
+          message: 'native requestAdapter warmup rejected (environment may not expose WebGPU adapter)',
+          data: {
+            outcome: 'skip',
+            reason: 'warmup_runtime_rejection',
+            source: sourceTag || 'warmup'
+          }
+        });
+        return null;
+      });
+
+      return __requestAdapterWarmupPromise__;
+    }
+
     const nav = window.navigator;
     const gpu = nav && nav.gpu;
     if (!gpu || typeof gpu.requestAdapter !== 'function') {
@@ -1088,94 +1163,29 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       return;
     }
 
-    const requestAdapterTargets = [{
-      owner: requestAdapterOwner,
-      key: 'requestAdapter',
-      kind: 'promise_method',
-      wrapLayer: 'core_wrapper',
-      resolve: 'proto_chain',
-      invokeClass: 'brand_strict',
-      policy: 'throw',
-      diagTag: 'webgpu:navigator:requestAdapter',
-      validThis: function validGPUThis(self) {
-        return self === gpu;
-      },
-      invalidThis: 'native',
-      invoke: function webgpuRequestAdapterInvoke(orig, args) {
-        const input = Array.isArray(args) ? args : [];
-        let out;
-        try {
-          out = Reflect.apply(orig, this, input);
-        } catch (e) {
-          degrade('warn', 'webgpu:navigator:requestAdapter:native_throw', e, {
-            stage: 'runtime',
-            type: __webgpuTypeBrowser,
-            diagTag: 'webgpu',
-            key: 'navigator.gpu.requestAdapter',
-            message: 'navigator.gpu.requestAdapter threw',
-            data: { outcome: 'throw', reason: 'native_throw' }
-          });
-          throw e;
-        }
-        return out.then(function onAdapter(adapter) {
-          if (!adapter) return null;
-          patchAdapterPrototype(adapter);
-          return adapter;
-        }, function onAdapterReject(err) {
-          degrade('warn', 'webgpu:navigator:requestAdapter:rejected', err, {
-            stage: 'runtime',
-            type: 'runtime rejection',
-            diagTag: 'webgpu',
-            key: 'navigator.gpu.requestAdapter',
-            message: 'navigator.gpu.requestAdapter rejected',
-            data: { outcome: 'throw', reason: 'runtime_rejection' }
-          });
-          throw err;
-        });
-      }
-    }];
-
-    let applied = 0;
-    try {
-      applied = applyCoreTargetsGroup('webgpu:navigator_gpu', requestAdapterTargets, 'throw');
-    } catch (e) {
-      const rollbackOk = !(e && e.__rollbackOk === false);
-      degrade('error', 'webgpu:navigator:requestAdapter_apply_failed', e, {
-        stage: 'apply',
-        type: __webgpuTypePipeline,
-        diagTag: 'webgpu',
-        key: 'navigator.gpu.requestAdapter',
-        message: 'navigator.gpu.requestAdapter patch failed',
-        data: { outcome: 'skip', reason: 'apply_failed', rollbackOk: rollbackOk }
-      });
-      releaseEntryGuard(rollbackOk);
-      return;
-    }
-    if (applied !== requestAdapterTargets.length) {
-      degrade('error', 'webgpu:navigator:requestAdapter_apply_failed', new Error('[WebGPU] navigator.gpu.requestAdapter patch failed'), {
-        stage: 'apply',
-        type: __webgpuTypePipeline,
-        diagTag: 'webgpu',
-        key: 'navigator.gpu.requestAdapter',
-        message: 'navigator.gpu.requestAdapter patch apply count mismatch',
-        data: { outcome: 'skip', reason: 'apply_count_mismatch' }
-      });
-      releaseEntryGuard(true);
-      return;
-    }
-
     Object.defineProperty(__webgpuState, '__requestAdapterSnapshotGate__', {
       value: async function webgpuRequestAdapterSnapshotGate(options) {
-        const args = (typeof options === 'undefined') ? [] : [options];
-        const adapter = await Reflect.apply(origRequestAdapter, gpu, args);
-        if (!adapter) return null;
-        patchAdapterPrototype(adapter);
-        return adapter;
+        return warmupRequestAdapterPrototype(options, 'snapshot_gate');
       },
       writable: true,
       configurable: true,
       enumerable: false
     });
+
+    degrade('info', 'webgpu:navigator:requestAdapter_native_passthrough', null, {
+      stage: 'apply',
+      type: __webgpuTypePipeline,
+      diagTag: 'webgpu',
+      key: 'navigator.gpu.requestAdapter',
+      message: 'navigator.gpu.requestAdapter left native; adapter prototype warmup moved to hidden gate',
+      data: {
+        outcome: 'return',
+        reason: 'native_passthrough',
+        ownerIsPrototype: requestAdapterOwner !== gpu
+      }
+    });
+
+    warmupRequestAdapterPrototype(undefined, 'module_init');
 
     degrade('info', 'webgpu:ready', null, {
       stage: 'apply',
