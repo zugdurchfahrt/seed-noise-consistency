@@ -984,10 +984,84 @@ const LOGGingModule = function LOGGingModule() {
       metaKeys: 8
     };
 
-    function clampString(value) {
+    const COMPACT_CONSOLE_CAPTURE_CONFIG = {
+      depth: Math.min(SERIAL_LIMITS.depth, 1),
+      keys: Math.min(SERIAL_LIMITS.keys, 8),
+      array: Math.min(SERIAL_LIMITS.array, 8),
+      string: Math.min(SERIAL_LIMITS.string, 256),
+      metaKeys: Math.min(SERIAL_LIMITS.metaKeys, 4),
+      stackLevels: {
+        error: true,
+        warn: true,
+        log: false,
+        info: false,
+        debug: false,
+        trace: false
+      }
+    };
+
+    const FULL_CONSOLE_CAPTURE_CONFIG = {
+      depth: SERIAL_LIMITS.depth,
+      keys: SERIAL_LIMITS.keys,
+      array: SERIAL_LIMITS.array,
+      string: SERIAL_LIMITS.string,
+      metaKeys: SERIAL_LIMITS.metaKeys,
+      stackLevels: {
+        error: true,
+        warn: true,
+        log: true,
+        info: false,
+        debug: false,
+        trace: false
+      }
+    };
+
+    function normalizeConsoleCaptureConfig(raw, fallback) {
+      const base = (fallback && typeof fallback === "object") ? fallback : COMPACT_CONSOLE_CAPTURE_CONFIG;
+      const src = (raw && typeof raw === "object") ? raw : {};
+      const stackLevels = (src.stackLevels && typeof src.stackLevels === "object") ? src.stackLevels : {};
+      return {
+        depth: toNonNegInt(src.depth, base.depth),
+        keys: toPosInt(src.keys, base.keys),
+        array: toPosInt(src.array, base.array),
+        string: toPosInt(src.string, base.string),
+        metaKeys: toPosInt(src.metaKeys, base.metaKeys),
+        stackLevels: {
+          error: typeof stackLevels.error === "boolean" ? stackLevels.error : base.stackLevels.error,
+          warn: typeof stackLevels.warn === "boolean" ? stackLevels.warn : base.stackLevels.warn,
+          log: typeof stackLevels.log === "boolean" ? stackLevels.log : base.stackLevels.log,
+          info: typeof stackLevels.info === "boolean" ? stackLevels.info : base.stackLevels.info,
+          debug: typeof stackLevels.debug === "boolean" ? stackLevels.debug : base.stackLevels.debug,
+          trace: typeof stackLevels.trace === "boolean" ? stackLevels.trace : base.stackLevels.trace
+        }
+      };
+    }
+
+    __ensureLoggerHiddenValue("__CONSOLE_CAPTURE_COMPACT__", function () {
+      return global.__CONSOLE_CAPTURE_COMPACT__ !== false;
+    }, function (v) {
+      return typeof v === "boolean";
+    }, true);
+
+    function getConsoleCaptureConfig() {
+      const compact = __loggerRoot.__CONSOLE_CAPTURE_COMPACT__ !== false;
+      const base = compact ? COMPACT_CONSOLE_CAPTURE_CONFIG : FULL_CONSOLE_CAPTURE_CONFIG;
+      return normalizeConsoleCaptureConfig(null, base);
+    }
+
+    function setConsoleCaptureCompactMode(enabled) {
+      __defineLoggerHiddenValue("__CONSOLE_CAPTURE_COMPACT__", !!enabled, true);
+      return getConsoleCaptureConfig();
+    }
+
+    function clampStringWithLimit(value, maxLen) {
       const s = String(value);
-      if (s.length <= SERIAL_LIMITS.string) return s;
-      return s.slice(0, SERIAL_LIMITS.string) + `...[len=${s.length}]`;
+      if (s.length <= maxLen) return s;
+      return s.slice(0, maxLen) + `...[len=${s.length}]`;
+    }
+
+    function clampString(value) {
+      return clampStringWithLimit(value, SERIAL_LIMITS.string);
     }
 
     function isPlainObject(value) {
@@ -1001,7 +1075,7 @@ const LOGGingModule = function LOGGingModule() {
       return proto === Object.prototype || proto === null;
     }
 
-    function metadataSnapshot(value, tag) {
+    function metadataSnapshotWithLimits(value, tag, limits) {
       const out = { __type: "snapshot", tag: tag || safeTag(value) };
       try {
         const ctor = value && value.constructor && value.constructor.name;
@@ -1014,14 +1088,18 @@ const LOGGingModule = function LOGGingModule() {
         if (value && typeof value === "object") {
           if (typeof value.length === "number" && isFinite(value.length)) out.length = value.length;
           const keys = Object.keys(value);
-          out.keys = keys.slice(0, SERIAL_LIMITS.metaKeys);
-          if (keys.length > SERIAL_LIMITS.metaKeys) out.keys_truncated = keys.length - SERIAL_LIMITS.metaKeys;
+          out.keys = keys.slice(0, limits.metaKeys);
+          if (keys.length > limits.metaKeys) out.keys_truncated = keys.length - limits.metaKeys;
         }
       } catch (_) {}
       return out;
     }
 
-    function normalizeForJSON(value, seen, depth) {
+    function metadataSnapshot(value, tag) {
+      return metadataSnapshotWithLimits(value, tag, SERIAL_LIMITS);
+    }
+
+    function normalizeForJSONWithLimits(value, limits, seen, depth) {
       try {
         const lvl = typeof depth === "number" ? depth : 0;
         if (value === null || typeof value === "undefined") return value;
@@ -1030,57 +1108,57 @@ const LOGGingModule = function LOGGingModule() {
         if (t === "string") {
           if (value.indexOf("data:") === 0) return "[DataURL len=" + value.length + "]";
           if (value.indexOf("blob:") === 0) return "[BlobURL]";
-          return clampString(value);
+          return clampStringWithLimit(value, limits.string);
         }
         if (t === "number" || t === "boolean") return value;
         if (t === "bigint") return String(value) + "n";
         if (t === "symbol") return String(value);
 
         if (t === "function") {
-          return metadataSnapshot(value, safeTag(value));
+          return metadataSnapshotWithLimits(value, safeTag(value), limits);
         }
 
         if (value instanceof Error) {
           return {
             __type: "Error",
-            name: clampString(value.name || "Error"),
-            message: clampString(value.message || ""),
-            stack: value.stack ? clampString(value.stack) : null,
+            name: clampStringWithLimit(value.name || "Error", limits.string),
+            message: clampStringWithLimit(value.message || "", limits.string),
+            stack: value.stack ? clampStringWithLimit(value.stack, limits.string) : null,
           };
         }
 
         const tag = safeTag(value);
-        if (isHostLikeTag(tag)) return metadataSnapshot(value, tag);
+        if (isHostLikeTag(tag)) return metadataSnapshotWithLimits(value, tag, limits);
 
-        if (t !== "object") return clampString(value);
+        if (t !== "object") return clampStringWithLimit(value, limits.string);
 
         // Cycles
         if (!seen) seen = new WeakSet();
         if (seen.has(value)) return "[Circular]";
         seen.add(value);
 
-        if (lvl >= SERIAL_LIMITS.depth) return metadataSnapshot(value, tag);
+        if (lvl >= limits.depth) return metadataSnapshotWithLimits(value, tag, limits);
 
         // Arrays
         if (Array.isArray(value)) {
-          const lim = Math.min(value.length, SERIAL_LIMITS.array);
+          const lim = Math.min(value.length, limits.array);
           const outArr = new Array(lim);
           for (let i = 0; i < lim; i++) {
-            outArr[i] = normalizeForJSON(value[i], seen, lvl + 1);
+            outArr[i] = normalizeForJSONWithLimits(value[i], limits, seen, lvl + 1);
           }
           if (value.length > lim) outArr.push(`[... ${value.length - lim} more items]`);
           return outArr;
         }
 
-        if (!isPlainObject(value)) return metadataSnapshot(value, tag);
+        if (!isPlainObject(value)) return metadataSnapshotWithLimits(value, tag, limits);
 
         const out = {};
         const keys = Object.keys(value);
-        const lim = Math.min(keys.length, SERIAL_LIMITS.keys);
+        const lim = Math.min(keys.length, limits.keys);
         for (let i = 0; i < lim; i++) {
           const k = keys[i];
           try {
-            out[k] = normalizeForJSON(value[k], seen, lvl + 1);
+            out[k] = normalizeForJSONWithLimits(value[k], limits, seen, lvl + 1);
           } catch (_) {
             out[k] = "[Unserializable]";
           }
@@ -1088,8 +1166,12 @@ const LOGGingModule = function LOGGingModule() {
         if (keys.length > lim) out.__truncated_keys__ = keys.length - lim;
         return out;
       } catch (_) {
-        return metadataSnapshot(value, safeTag(value));
+        return metadataSnapshotWithLimits(value, safeTag(value), limits);
       }
+    }
+
+    function normalizeForJSON(value, seen, depth) {
+      return normalizeForJSONWithLimits(value, SERIAL_LIMITS, seen, depth);
     }
 
     function normalizeProbeScalar(value) {
@@ -1599,7 +1681,10 @@ const LOGGingModule = function LOGGingModule() {
       try {
         if (!levelAllows(__loggerRoot._logLevel, level)) return;
 
-        const normArgs = normalizeForJSON(args);
+        const consoleCaptureConfig = (module === "console") ? getConsoleCaptureConfig() : null;
+        const normArgs = consoleCaptureConfig
+          ? normalizeForJSONWithLimits(args, consoleCaptureConfig)
+          : normalizeForJSON(args);
         const msgParts = [];
         if (args && args.length) {
           for (let i = 0; i < args.length; i++) {
@@ -1634,13 +1719,16 @@ const LOGGingModule = function LOGGingModule() {
         };
         if (typeof activeConsoleGroup === "string" && activeConsoleGroup) diagData.consoleGroup = activeConsoleGroup;
         if (module !== "console") diagData.loggerModule = module;
-        if (withStack) {
+        const captureStack = consoleCaptureConfig
+          ? !!(consoleCaptureConfig.stackLevels && consoleCaptureConfig.stackLevels[level])
+          : !!withStack;
+        if (captureStack) {
           try {
             const st = new Error().stack;
             if (typeof st === "string" && st) diagData.stack = st;
           } catch (_) {}
         }
-        if (withStack) {
+        if (captureStack) {
           diagData.captureMode = "stacked";
         }
         __degradeApi.diag(diagLevel, resolvedCode, {
@@ -2020,6 +2108,52 @@ const LOGGingModule = function LOGGingModule() {
       } catch (e) {
         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
         try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
+      }
+    }, false);
+
+    __defineLoggerHiddenValue("CONSOLE_CAPTURE_COMPACT_ON", function () {
+      try {
+        const cfg = setConsoleCaptureCompactMode(true);
+        if (typeof __loggerRoot.__DEGRADE__ === "function") {
+          __loggerRoot.__DEGRADE__("CONSOLE_CAPTURE_COMPACT_ON", null, {
+            enabled: true,
+            depth: cfg.depth,
+            keys: cfg.keys,
+            array: cfg.array,
+            string: cfg.string
+          });
+        }
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "CONSOLE_CAPTURE_COMPACT_ON"); } catch (_) {}
+      }
+    }, false);
+
+    __defineLoggerHiddenValue("CONSOLE_CAPTURE_COMPACT_OFF", function () {
+      try {
+        const cfg = setConsoleCaptureCompactMode(false);
+        if (typeof __loggerRoot.__DEGRADE__ === "function") {
+          __loggerRoot.__DEGRADE__("CONSOLE_CAPTURE_COMPACT_OFF", null, {
+            enabled: false,
+            depth: cfg.depth,
+            keys: cfg.keys,
+            array: cfg.array,
+            string: cfg.string
+          });
+        }
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "CONSOLE_CAPTURE_COMPACT_OFF"); } catch (_) {}
+      }
+    }, false);
+
+    __defineLoggerHiddenValue("CONSOLE_CAPTURE_COMPACT_TOGGLE", function () {
+      try {
+        if (__loggerRoot.__CONSOLE_CAPTURE_COMPACT__ === false) __loggerRoot.CONSOLE_CAPTURE_COMPACT_ON();
+        else __loggerRoot.CONSOLE_CAPTURE_COMPACT_OFF();
+      } catch (e) {
+        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        try { recordLoggerError(e, "CONSOLE_CAPTURE_COMPACT_TOGGLE"); } catch (_) {}
       }
     }, false);
 
