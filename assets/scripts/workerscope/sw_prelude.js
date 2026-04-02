@@ -269,26 +269,9 @@
       }, new Error('SW navigator proto missing'));
     }
 
-    const uad = nav.userAgentData;
-    if (!uad) {
-      __fail('sw_prelude:uadata_missing', {
-        stage: 'preflight',
-        key: 'userAgentData',
-        message: 'service worker navigator.userAgentData missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'uadata_missing' }
-      }, new Error('SW navigator.userAgentData missing'));
-    }
-    const uadProto = Object.getPrototypeOf(uad);
-    if (!uadProto) {
-      __fail('sw_prelude:uadata_proto_missing', {
-        stage: 'preflight',
-        key: 'userAgentData',
-        message: 'service worker uaData proto missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'uadata_proto_missing' }
-      }, new Error('SW uaData proto missing'));
-    }
+    const liveUad = nav.userAgentData;
+    const uad = (liveUad && typeof liveUad === 'object') ? liveUad : null;
+    const uadProto = uad ? Object.getPrototypeOf(uad) : null;
 
     const chPlatform = meta.platform;
     if (typeof chPlatform !== 'string' || !chPlatform) {
@@ -326,6 +309,119 @@
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'uadata_full_version_list_missing' }
       }, new Error('SW uaData.fullVersionList missing'));
+    }
+
+    const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
+    const brandsValue = deep(meta.brands);
+    const mobileValue = meta.mobile;
+    const platformValue = chPlatform;
+    const preparedUad = {
+      brands: brandsValue,
+      mobile: mobileValue,
+      platform: platformValue,
+      fullVersionList: deep(meta.fullVersionList),
+      highEntropy: {
+        architecture: meta.architecture,
+        bitness: meta.bitness,
+        model: meta.model,
+        platformVersion: meta.platformVersion,
+        fullVersionList: deep(meta.fullVersionList),
+        wow64: meta.wow64,
+        formFactors: deep(meta.formFactors)
+      }
+    };
+    if (!uad) {
+      __fail('sw_prelude:uadata_missing', {
+        stage: 'preflight',
+        key: 'userAgentData',
+        message: 'service worker navigator.userAgentData missing',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'uadata_missing' }
+      }, new Error('SW navigator.userAgentData missing'));
+    }
+    if (!uadProto) {
+      __fail('sw_prelude:uadata_proto_missing', {
+        stage: 'preflight',
+        key: 'userAgentData',
+        message: 'service worker uaData proto missing',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'uadata_proto_missing' }
+      }, new Error('SW uaData proto missing'));
+    }
+
+    function defAcc(key, getter) {
+      const resolved = __resolveDescriptor(nav, key);
+      if (resolved.desc && resolved.desc.configurable === false) {
+        __fail('sw_prelude:descriptor_nonconfigurable', {
+          stage: 'preflight',
+          key,
+          message: 'service worker descriptor non-configurable',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'descriptor_nonconfigurable' }
+        }, new Error('SW ' + key + ' non-configurable'));
+      }
+      const owner = resolved.owner || proto;
+      const isDataDesc = !!resolved.desc
+        && Object.prototype.hasOwnProperty.call(resolved.desc, 'value')
+        && !resolved.desc.get
+        && !resolved.desc.set;
+      if (isDataDesc) {
+        let nextValue = null;
+        try {
+          nextValue = getter.call(nav);
+        } catch (e) {
+          __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
+            stage: 'runtime',
+            key,
+            message: 'service worker getter runtime failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'getter_runtime_failed' }
+          }, e);
+          throw e;
+        }
+        __trackDefineProperty(owner, key, {
+          value: nextValue,
+          configurable: !!resolved.desc.configurable,
+          enumerable: !!resolved.desc.enumerable,
+          writable: Object.prototype.hasOwnProperty.call(resolved.desc, 'writable') ? resolved.desc.writable : true
+        });
+        return;
+      }
+      let origGet = resolved.desc && (typeof resolved.desc.get === 'function') ? resolved.desc.get : null;
+      const guardedGet = function() {
+        const recv = this;
+        if (recv === nav) {
+          try {
+            return getter.call(recv);
+          } catch (e) {
+            __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
+              stage: 'runtime',
+              key,
+              message: 'service worker getter runtime failed',
+              type: 'browser structure missing data',
+              data: { outcome: 'skip', reason: 'getter_runtime_failed' }
+            }, e);
+            // Disabled temporarily: valid SW profile reads must come only from __SW_ENV__.
+            // if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
+            throw e;
+          }
+        }
+        if (typeof origGet === 'function') {
+          try {
+            return Reflect.apply(origGet, recv, []);
+          } catch (e) {
+            __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker getter illegal invocation', e);
+            throw e;
+          }
+        }
+        return undefined;
+      };
+      __trackDefineProperty(owner, key, {
+        get: guardedGet,
+        configurable: resolved.desc ? !!resolved.desc.configurable : true,
+        enumerable: resolved.desc ? !!resolved.desc.enumerable : false,
+        set: resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'set') ? resolved.desc.set : undefined
+      });
     }
 
     const uadGetterInfo = __resolveDescriptor(nav, 'userAgentData');
@@ -375,16 +471,8 @@
 
     const fullInfo = __resolveDescriptor(uad, 'fullVersionList');
     const dFull = fullInfo.desc;
-    if (!dFull) {
-      __fail('sw_prelude:full_version_list_missing', {
-        stage: 'preflight',
-        key: 'fullVersionList',
-        message: 'service worker fullVersionList descriptor missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'full_version_list_missing' }
-      }, new Error('SW uaData fullVersionList missing'));
-    }
-    if (dFull.configurable === false) {
+    const hasFullVersionListSurface = !!dFull;
+    if (dFull && dFull.configurable === false) {
       __fail('sw_prelude:full_version_list_nonconfigurable', {
         stage: 'preflight',
         key: 'fullVersionList',
@@ -478,87 +566,7 @@
       }, new TypeError('SW uaData.toJSON resolved non-function'));
     }
 
-    const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
-    const brandsValue = deep(meta.brands);
-    const mobileValue = meta.mobile;
-    const platformValue = chPlatform;
     const isUadThis = recv => (recv === uad);
-
-    function defAcc(key, getter) {
-      const resolved = __resolveDescriptor(nav, key);
-      if (resolved.desc && resolved.desc.configurable === false) {
-        __fail('sw_prelude:descriptor_nonconfigurable', {
-          stage: 'preflight',
-          key,
-          message: 'service worker descriptor non-configurable',
-          type: 'browser structure missing data',
-          data: { outcome: 'throw', reason: 'descriptor_nonconfigurable' }
-        }, new Error('SW ' + key + ' non-configurable'));
-      }
-      const owner = resolved.owner || proto;
-      const isDataDesc = !!resolved.desc
-        && Object.prototype.hasOwnProperty.call(resolved.desc, 'value')
-        && !resolved.desc.get
-        && !resolved.desc.set;
-      if (isDataDesc) {
-        let nextValue = null;
-        try {
-          nextValue = getter.call(nav);
-        } catch (e) {
-          __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
-            stage: 'runtime',
-            key,
-            message: 'service worker getter runtime failed',
-            type: 'browser structure missing data',
-            data: { outcome: 'skip', reason: 'getter_runtime_failed' }
-          }, e);
-          throw e;
-        }
-        __trackDefineProperty(owner, key, {
-          value: nextValue,
-          configurable: !!resolved.desc.configurable,
-          enumerable: !!resolved.desc.enumerable,
-          writable: Object.prototype.hasOwnProperty.call(resolved.desc, 'writable') ? resolved.desc.writable : true
-        });
-        return;
-      }
-      let origGet = resolved.desc && (typeof resolved.desc.get === 'function') ? resolved.desc.get : null;
-      const guardedGet = function() {
-        const recv = this;
-        if (recv === nav) {
-          try {
-            return getter.call(recv);
-          } catch (e) {
-            __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
-              stage: 'runtime',
-              key,
-              message: 'service worker getter runtime failed',
-              type: 'browser structure missing data',
-              data: { outcome: 'skip', reason: 'getter_runtime_failed' }
-            }, e);
-            // Disabled temporarily: valid SW profile reads must come only from __SW_ENV__.
-            // if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
-            throw e;
-          }
-        }
-        if (typeof origGet === 'function') {
-          try {
-            return Reflect.apply(origGet, recv, []);
-          } catch (e) {
-            __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker getter illegal invocation', e);
-            throw e;
-          }
-        }
-        return undefined;
-      };
-      __trackDefineProperty(owner, key, {
-        get: guardedGet,
-        configurable: resolved.desc ? !!resolved.desc.configurable : true,
-        enumerable: resolved.desc ? !!resolved.desc.enumerable : false,
-        set: resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'set') ? resolved.desc.set : undefined
-      });
-    }
-
     function guardedUadGetter(value, origGet, origValue) {
       return function() {
         const recv = this;
@@ -622,20 +630,22 @@
       });
     }
 
-    if (Object.prototype.hasOwnProperty.call(dFull, 'value') && !dFull.get && !dFull.set) {
-      __trackDefineProperty(fullInfo.owner || uadProto, 'fullVersionList', {
-        value: deep(meta.fullVersionList),
-        writable: !!dFull.writable,
-        enumerable: !!dFull.enumerable,
-        configurable: !!dFull.configurable
-      });
-    } else {
-      __trackDefineProperty(fullInfo.owner || uadProto, 'fullVersionList', {
-        get: guardedUadGetter(deep(meta.fullVersionList), dFull.get, dFull.value),
-        set: dFull.set,
-        enumerable: !!dFull.enumerable,
-        configurable: !!dFull.configurable
-      });
+    if (hasFullVersionListSurface) {
+      if (Object.prototype.hasOwnProperty.call(dFull, 'value') && !dFull.get && !dFull.set) {
+        __trackDefineProperty(fullInfo.owner || uadProto, 'fullVersionList', {
+          value: deep(meta.fullVersionList),
+          writable: !!dFull.writable,
+          enumerable: !!dFull.enumerable,
+          configurable: !!dFull.configurable
+        });
+      } else {
+        __trackDefineProperty(fullInfo.owner || uadProto, 'fullVersionList', {
+          get: guardedUadGetter(deep(meta.fullVersionList), dFull.get, dFull.value),
+          set: dFull.set,
+          enumerable: !!dFull.enumerable,
+          configurable: !!dFull.configurable
+        });
+      }
     }
 
     const getHighEntropyValues = function(keys) {
@@ -681,8 +691,6 @@
             type: 'pipeline missing data',
             data: { outcome: 'throw', reason: 'get_high_entropy_values_contract_missing' }
           }, null);
-          // Disabled temporarily: valid SW profile reads must not fall back to native HE data.
-          // return Reflect.apply(origGHEV, this, [keys]);
           throw new Error('SW getHighEntropyValues contract missing ' + hint);
         }
         result[hint] = val;
@@ -763,21 +771,7 @@
         languages: deep(nav.languages),
         deviceMemory: nav.deviceMemory,
         hardwareConcurrency: nav.hardwareConcurrency,
-        uaData: {
-          brands: deep(uad.brands),
-          mobile: uad.mobile,
-          platform: uad.platform,
-          fullVersionList: ('fullVersionList' in uad) ? deep(uad.fullVersionList) : deep(meta.fullVersionList),
-          highEntropy: {
-            architecture: meta.architecture,
-            bitness: meta.bitness,
-            model: meta.model,
-            platformVersion: meta.platformVersion,
-            fullVersionList: deep(meta.fullVersionList),
-            wow64: meta.wow64,
-            formFactors: deep(meta.formFactors)
-          }
-        }
+        uaData: preparedUad
       }
     }, null);
   } catch (e) {
