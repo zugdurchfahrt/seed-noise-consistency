@@ -258,6 +258,7 @@
         data: { outcome: 'throw', reason: 'navigator_missing' }
       }, new Error('SW navigator missing'));
     }
+    const protoInfo = __resolveDescriptor(Object.getPrototypeOf(nav), 'language');
     const proto = Object.getPrototypeOf(nav);
     if (!proto) {
       __fail('sw_prelude:navigator_proto_missing', {
@@ -269,9 +270,26 @@
       }, new Error('SW navigator proto missing'));
     }
 
-    const liveUad = nav.userAgentData;
-    const uad = (liveUad && typeof liveUad === 'object') ? liveUad : null;
-    const uadProto = uad ? Object.getPrototypeOf(uad) : null;
+    const uad = nav.userAgentData;
+    if (!uad) {
+      __fail('sw_prelude:uadata_missing', {
+        stage: 'preflight',
+        key: 'userAgentData',
+        message: 'service worker navigator.userAgentData missing',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'uadata_missing' }
+      }, new Error('SW navigator.userAgentData missing'));
+    }
+    const uadProto = Object.getPrototypeOf(uad);
+    if (!uadProto) {
+      __fail('sw_prelude:uadata_proto_missing', {
+        stage: 'preflight',
+        key: 'userAgentData',
+        message: 'service worker uaData proto missing',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'uadata_proto_missing' }
+      }, new Error('SW uaData proto missing'));
+    }
 
     const chPlatform = meta.platform;
     if (typeof chPlatform !== 'string' || !chPlatform) {
@@ -311,46 +329,93 @@
       }, new Error('SW uaData.fullVersionList missing'));
     }
 
+    const uadGetterInfo = __resolveDescriptor(proto, 'userAgentData');
+    if (!uadGetterInfo.desc) {
+      __fail('sw_prelude:uadata_descriptor_missing', {
+        stage: 'preflight',
+        key: 'userAgentData',
+        message: 'service worker userAgentData descriptor missing',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'uadata_descriptor_missing' }
+      }, new Error('SW userAgentData descriptor missing'));
+    }
+    if (uadGetterInfo.desc.configurable === false) {
+      __fail('sw_prelude:uadata_descriptor_nonconfigurable', {
+        stage: 'preflight',
+        key: 'userAgentData',
+        message: 'service worker userAgentData descriptor non-configurable',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'uadata_descriptor_nonconfigurable' }
+      }, new Error('SW userAgentData non-configurable'));
+    }
+
+    const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands') || Object.getOwnPropertyDescriptor(uad, 'brands');
+    const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile') || Object.getOwnPropertyDescriptor(uad, 'mobile');
+    const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform') || Object.getOwnPropertyDescriptor(uad, 'platform');
+    if (!dBrands || !dMobile || !dPlatform) {
+      __fail('sw_prelude:uadata_leaf_descriptor_missing', {
+        stage: 'preflight',
+        key: 'brands',
+        message: 'service worker uaData descriptor missing',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'uadata_leaf_descriptor_missing' }
+      }, new Error('SW uaData descriptor missing'));
+    }
+    if (dBrands.configurable === false || dMobile.configurable === false || dPlatform.configurable === false) {
+      __fail('sw_prelude:uadata_leaf_descriptor_nonconfigurable', {
+        stage: 'preflight',
+        key: 'brands',
+        message: 'service worker uaData descriptor non-configurable',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'uadata_leaf_descriptor_nonconfigurable' }
+      }, new Error('SW uaData non-configurable'));
+    }
+
+    const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
+      || Object.getOwnPropertyDescriptor(uad, 'fullVersionList')
+      || { configurable: true, enumerable: false };
+    if (dFull.configurable === false) {
+      __fail('sw_prelude:full_version_list_nonconfigurable', {
+        stage: 'preflight',
+        key: 'fullVersionList',
+        message: 'service worker fullVersionList non-configurable',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'full_version_list_nonconfigurable' }
+      }, new Error('SW uaData fullVersionList non-configurable'));
+    }
+
+    const ghevDesc = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
+    if (!ghevDesc || ghevDesc.configurable === false || typeof ghevDesc.value !== 'function') {
+      __fail('sw_prelude:get_high_entropy_values_missing', {
+        stage: 'preflight',
+        key: 'getHighEntropyValues',
+        message: 'service worker getHighEntropyValues descriptor missing',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'get_high_entropy_values_missing' }
+      }, new Error('SW uaData.getHighEntropyValues original missing'));
+    }
+    const origGHEV = ghevDesc.value;
+
+    const toJsonDesc = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
+    if (!toJsonDesc || toJsonDesc.configurable === false || typeof toJsonDesc.value !== 'function') {
+      __fail('sw_prelude:tojson_missing', {
+        stage: 'preflight',
+        key: 'toJSON',
+        message: 'service worker toJSON descriptor missing',
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'tojson_missing' }
+      }, new Error('SW uaData.toJSON original missing'));
+    }
+    const origToJSON = toJsonDesc.value;
+
     const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
     const brandsValue = deep(meta.brands);
     const mobileValue = meta.mobile;
     const platformValue = chPlatform;
-    const preparedUad = {
-      brands: brandsValue,
-      mobile: mobileValue,
-      platform: platformValue,
-      fullVersionList: deep(meta.fullVersionList),
-      highEntropy: {
-        architecture: meta.architecture,
-        bitness: meta.bitness,
-        model: meta.model,
-        platformVersion: meta.platformVersion,
-        fullVersionList: deep(meta.fullVersionList),
-        wow64: meta.wow64,
-        formFactors: deep(meta.formFactors)
-      }
-    };
-    if (!uad) {
-      __fail('sw_prelude:uadata_missing', {
-        stage: 'preflight',
-        key: 'userAgentData',
-        message: 'service worker navigator.userAgentData missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'uadata_missing' }
-      }, new Error('SW navigator.userAgentData missing'));
-    }
-    if (!uadProto) {
-      __fail('sw_prelude:uadata_proto_missing', {
-        stage: 'preflight',
-        key: 'userAgentData',
-        message: 'service worker uaData proto missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'uadata_proto_missing' }
-      }, new Error('SW uaData proto missing'));
-    }
+    const isUadThis = recv => (recv === uad);
 
     function defAcc(key, getter) {
-      const resolved = __resolveDescriptor(nav, key);
+      const resolved = __resolveDescriptor(proto, key);
       if (resolved.desc && resolved.desc.configurable === false) {
         __fail('sw_prelude:descriptor_nonconfigurable', {
           stage: 'preflight',
@@ -361,33 +426,14 @@
         }, new Error('SW ' + key + ' non-configurable'));
       }
       const owner = resolved.owner || proto;
-      const isDataDesc = !!resolved.desc
+      let origGet = resolved.desc && (typeof resolved.desc.get === 'function') ? resolved.desc.get : null;
+      if (!origGet && resolved.desc
         && Object.prototype.hasOwnProperty.call(resolved.desc, 'value')
         && !resolved.desc.get
-        && !resolved.desc.set;
-      if (isDataDesc) {
-        let nextValue = null;
-        try {
-          nextValue = getter.call(nav);
-        } catch (e) {
-          __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
-            stage: 'runtime',
-            key,
-            message: 'service worker getter runtime failed',
-            type: 'browser structure missing data',
-            data: { outcome: 'skip', reason: 'getter_runtime_failed' }
-          }, e);
-          throw e;
-        }
-        __trackDefineProperty(owner, key, {
-          value: nextValue,
-          configurable: !!resolved.desc.configurable,
-          enumerable: !!resolved.desc.enumerable,
-          writable: Object.prototype.hasOwnProperty.call(resolved.desc, 'writable') ? resolved.desc.writable : true
-        });
-        return;
+        && !resolved.desc.set) {
+        const nativeValue = resolved.desc.value;
+        origGet = function nativeDataGetterFallback() { return nativeValue; };
       }
-      let origGet = resolved.desc && (typeof resolved.desc.get === 'function') ? resolved.desc.get : null;
       const guardedGet = function() {
         const recv = this;
         if (recv === nav) {
@@ -424,149 +470,6 @@
       });
     }
 
-    const uadGetterInfo = __resolveDescriptor(nav, 'userAgentData');
-    if (!uadGetterInfo.desc) {
-      __fail('sw_prelude:uadata_descriptor_missing', {
-        stage: 'preflight',
-        key: 'userAgentData',
-        message: 'service worker userAgentData descriptor missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'uadata_descriptor_missing' }
-      }, new Error('SW userAgentData descriptor missing'));
-    }
-    if (uadGetterInfo.desc.configurable === false) {
-      __fail('sw_prelude:uadata_descriptor_nonconfigurable', {
-        stage: 'preflight',
-        key: 'userAgentData',
-        message: 'service worker userAgentData descriptor non-configurable',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'uadata_descriptor_nonconfigurable' }
-      }, new Error('SW userAgentData non-configurable'));
-    }
-
-    const brandsInfo = __resolveDescriptor(uad, 'brands');
-    const mobileInfo = __resolveDescriptor(uad, 'mobile');
-    const platformInfo = __resolveDescriptor(uad, 'platform');
-    const dBrands = brandsInfo.desc;
-    const dMobile = mobileInfo.desc;
-    const dPlatform = platformInfo.desc;
-    if (!dBrands || !dMobile || !dPlatform) {
-      __fail('sw_prelude:uadata_leaf_descriptor_missing', {
-        stage: 'preflight',
-        key: 'brands',
-        message: 'service worker uaData descriptor missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'uadata_leaf_descriptor_missing' }
-      }, new Error('SW uaData descriptor missing'));
-    }
-    if (dBrands.configurable === false || dMobile.configurable === false || dPlatform.configurable === false) {
-      __fail('sw_prelude:uadata_leaf_descriptor_nonconfigurable', {
-        stage: 'preflight',
-        key: 'brands',
-        message: 'service worker uaData descriptor non-configurable',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'uadata_leaf_descriptor_nonconfigurable' }
-      }, new Error('SW uaData non-configurable'));
-    }
-
-    const fullInfo = __resolveDescriptor(uad, 'fullVersionList');
-    const dFull = fullInfo.desc;
-    const hasFullVersionListSurface = !!dFull;
-    if (dFull && dFull.configurable === false) {
-      __fail('sw_prelude:full_version_list_nonconfigurable', {
-        stage: 'preflight',
-        key: 'fullVersionList',
-        message: 'service worker fullVersionList non-configurable',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'full_version_list_nonconfigurable' }
-      }, new Error('SW uaData fullVersionList non-configurable'));
-    }
-
-    const ghevInfo = __resolveDescriptor(uad, 'getHighEntropyValues');
-    const ghevDesc = ghevInfo.desc;
-    const ghevIsData = !!ghevDesc
-      && Object.prototype.hasOwnProperty.call(ghevDesc, 'value')
-      && !ghevDesc.get
-      && !ghevDesc.set;
-    const ghevIsAccessor = !!ghevDesc && typeof ghevDesc.get === 'function';
-    if (!ghevDesc || ghevDesc.configurable === false || (!ghevIsData && !ghevIsAccessor)) {
-      __fail('sw_prelude:get_high_entropy_values_missing', {
-        stage: 'preflight',
-        key: 'getHighEntropyValues',
-        message: 'service worker getHighEntropyValues descriptor missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'get_high_entropy_values_missing' }
-      }, new Error('SW uaData.getHighEntropyValues original missing'));
-    }
-    let origGHEV = null;
-    if (ghevIsData) {
-      origGHEV = ghevDesc.value;
-    } else {
-      try {
-        origGHEV = Reflect.apply(ghevDesc.get, uad, []);
-      } catch (e) {
-        __fail('sw_prelude:get_high_entropy_values_native_getter_failed', {
-          stage: 'preflight',
-          key: 'getHighEntropyValues',
-          message: 'service worker getHighEntropyValues native getter failed',
-          type: 'browser structure missing data',
-          data: { outcome: 'throw', reason: 'get_high_entropy_values_native_getter_failed' }
-        }, e);
-      }
-    }
-    if (typeof origGHEV !== 'function') {
-      __fail('sw_prelude:get_high_entropy_values_non_function', {
-        stage: 'preflight',
-        key: 'getHighEntropyValues',
-        message: 'service worker getHighEntropyValues resolved non-function',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'get_high_entropy_values_non_function' }
-      }, new TypeError('SW uaData.getHighEntropyValues resolved non-function'));
-    }
-
-    const toJsonInfo = __resolveDescriptor(uad, 'toJSON');
-    const toJsonDesc = toJsonInfo.desc;
-    const toJsonIsData = !!toJsonDesc
-      && Object.prototype.hasOwnProperty.call(toJsonDesc, 'value')
-      && !toJsonDesc.get
-      && !toJsonDesc.set;
-    const toJsonIsAccessor = !!toJsonDesc && typeof toJsonDesc.get === 'function';
-    if (!toJsonDesc || toJsonDesc.configurable === false || (!toJsonIsData && !toJsonIsAccessor)) {
-      __fail('sw_prelude:tojson_missing', {
-        stage: 'preflight',
-        key: 'toJSON',
-        message: 'service worker toJSON descriptor missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'tojson_missing' }
-      }, new Error('SW uaData.toJSON original missing'));
-    }
-    let origToJSON = null;
-    if (toJsonIsData) {
-      origToJSON = toJsonDesc.value;
-    } else {
-      try {
-        origToJSON = Reflect.apply(toJsonDesc.get, uad, []);
-      } catch (e) {
-        __fail('sw_prelude:tojson_native_getter_failed', {
-          stage: 'preflight',
-          key: 'toJSON',
-          message: 'service worker toJSON native getter failed',
-          type: 'browser structure missing data',
-          data: { outcome: 'throw', reason: 'tojson_native_getter_failed' }
-        }, e);
-      }
-    }
-    if (typeof origToJSON !== 'function') {
-      __fail('sw_prelude:tojson_non_function', {
-        stage: 'preflight',
-        key: 'toJSON',
-        message: 'service worker toJSON resolved non-function',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw', reason: 'tojson_non_function' }
-      }, new TypeError('SW uaData.toJSON resolved non-function'));
-    }
-
-    const isUadThis = recv => (recv === uad);
     function guardedUadGetter(value, origGet, origValue) {
       return function() {
         const recv = this;
@@ -585,14 +488,14 @@
     }
 
     if (Object.prototype.hasOwnProperty.call(dBrands, 'value') && !dBrands.get && !dBrands.set) {
-      __trackDefineProperty(brandsInfo.owner || uadProto, 'brands', {
+      __trackDefineProperty(uadProto, 'brands', {
         value: brandsValue,
         writable: !!dBrands.writable,
         configurable: !!dBrands.configurable,
         enumerable: !!dBrands.enumerable
       });
     } else {
-      __trackDefineProperty(brandsInfo.owner || uadProto, 'brands', {
+      __trackDefineProperty(uadProto, 'brands', {
         get: guardedUadGetter(brandsValue, dBrands.get, dBrands.value),
         set: dBrands.set,
         configurable: !!dBrands.configurable,
@@ -600,14 +503,14 @@
       });
     }
     if (Object.prototype.hasOwnProperty.call(dMobile, 'value') && !dMobile.get && !dMobile.set) {
-      __trackDefineProperty(mobileInfo.owner || uadProto, 'mobile', {
+      __trackDefineProperty(uadProto, 'mobile', {
         value: mobileValue,
         writable: !!dMobile.writable,
         configurable: !!dMobile.configurable,
         enumerable: !!dMobile.enumerable
       });
     } else {
-      __trackDefineProperty(mobileInfo.owner || uadProto, 'mobile', {
+      __trackDefineProperty(uadProto, 'mobile', {
         get: guardedUadGetter(mobileValue, dMobile.get, dMobile.value),
         set: dMobile.set,
         configurable: !!dMobile.configurable,
@@ -615,14 +518,14 @@
       });
     }
     if (Object.prototype.hasOwnProperty.call(dPlatform, 'value') && !dPlatform.get && !dPlatform.set) {
-      __trackDefineProperty(platformInfo.owner || uadProto, 'platform', {
+      __trackDefineProperty(uadProto, 'platform', {
         value: platformValue,
         writable: !!dPlatform.writable,
         configurable: !!dPlatform.configurable,
         enumerable: !!dPlatform.enumerable
       });
     } else {
-      __trackDefineProperty(platformInfo.owner || uadProto, 'platform', {
+      __trackDefineProperty(uadProto, 'platform', {
         get: guardedUadGetter(platformValue, dPlatform.get, dPlatform.value),
         set: dPlatform.set,
         configurable: !!dPlatform.configurable,
@@ -630,23 +533,11 @@
       });
     }
 
-    if (hasFullVersionListSurface) {
-      if (Object.prototype.hasOwnProperty.call(dFull, 'value') && !dFull.get && !dFull.set) {
-        __trackDefineProperty(fullInfo.owner || uadProto, 'fullVersionList', {
-          value: deep(meta.fullVersionList),
-          writable: !!dFull.writable,
-          enumerable: !!dFull.enumerable,
-          configurable: !!dFull.configurable
-        });
-      } else {
-        __trackDefineProperty(fullInfo.owner || uadProto, 'fullVersionList', {
-          get: guardedUadGetter(deep(meta.fullVersionList), dFull.get, dFull.value),
-          set: dFull.set,
-          enumerable: !!dFull.enumerable,
-          configurable: !!dFull.configurable
-        });
-      }
-    }
+    __trackDefineProperty(uadProto, 'fullVersionList', {
+      get: guardedUadGetter(deep(meta.fullVersionList), dFull.get, dFull.value),
+      enumerable: !!dFull.enumerable,
+      configurable: !!dFull.configurable
+    });
 
     const getHighEntropyValues = function(keys) {
       if (!isUadThis(this)) {
@@ -691,6 +582,8 @@
             type: 'pipeline missing data',
             data: { outcome: 'throw', reason: 'get_high_entropy_values_contract_missing' }
           }, null);
+          // Disabled temporarily: valid SW profile reads must not fall back to native HE data.
+          // return Reflect.apply(origGHEV, this, [keys]);
           throw new Error('SW getHighEntropyValues contract missing ' + hint);
         }
         result[hint] = val;
@@ -698,21 +591,12 @@
       return Promise.resolve(result);
     };
     __trackDeleteOwnIfConfigurable(uad, 'getHighEntropyValues');
-    if (ghevIsData) {
-      __trackDefineProperty(ghevInfo.owner || uadProto, 'getHighEntropyValues', {
-        value: getHighEntropyValues,
-        configurable: !!ghevDesc.configurable,
-        enumerable: !!ghevDesc.enumerable,
-        writable: Object.prototype.hasOwnProperty.call(ghevDesc, 'writable') ? ghevDesc.writable : true
-      });
-    } else {
-      __trackDefineProperty(ghevInfo.owner || uadProto, 'getHighEntropyValues', {
-        get: guardedUadGetter(getHighEntropyValues, ghevDesc.get, origGHEV),
-        set: ghevDesc.set,
-        configurable: !!ghevDesc.configurable,
-        enumerable: !!ghevDesc.enumerable
-      });
-    }
+    __trackDefineProperty(uadProto, 'getHighEntropyValues', {
+      value: getHighEntropyValues,
+      configurable: !!ghevDesc.configurable,
+      enumerable: !!ghevDesc.enumerable,
+      writable: Object.prototype.hasOwnProperty.call(ghevDesc, 'writable') ? ghevDesc.writable : true
+    });
 
     const toJSON = function() {
       if (!isUadThis(this)) {
@@ -726,21 +610,12 @@
       return { platform: this.platform, brands: this.brands, mobile: this.mobile };
     };
     __trackDeleteOwnIfConfigurable(uad, 'toJSON');
-    if (toJsonIsData) {
-      __trackDefineProperty(toJsonInfo.owner || uadProto, 'toJSON', {
-        value: toJSON,
-        configurable: !!toJsonDesc.configurable,
-        enumerable: !!toJsonDesc.enumerable,
-        writable: Object.prototype.hasOwnProperty.call(toJsonDesc, 'writable') ? toJsonDesc.writable : true
-      });
-    } else {
-      __trackDefineProperty(toJsonInfo.owner || uadProto, 'toJSON', {
-        get: guardedUadGetter(toJSON, toJsonDesc.get, origToJSON),
-        set: toJsonDesc.set,
-        configurable: !!toJsonDesc.configurable,
-        enumerable: !!toJsonDesc.enumerable
-      });
-    }
+    __trackDefineProperty(uadProto, 'toJSON', {
+      value: toJSON,
+      configurable: !!toJsonDesc.configurable,
+      enumerable: !!toJsonDesc.enumerable,
+      writable: Object.prototype.hasOwnProperty.call(toJsonDesc, 'writable') ? toJsonDesc.writable : true
+    });
 
     defAcc('userAgentData', function() { return uad; });
     defAcc('language', function() { return primary; });
@@ -763,16 +638,7 @@
       key: 'navigator',
       message: 'service worker mirror installed',
       type: 'pipeline missing data',
-      data: {
-        outcome: 'return',
-        scopeKind: 'ServiceWorker',
-        scope: 'ServiceWorker',
-        language: nav.language,
-        languages: deep(nav.languages),
-        deviceMemory: nav.deviceMemory,
-        hardwareConcurrency: nav.hardwareConcurrency,
-        uaData: preparedUad
-      }
+      data: { outcome: 'return' }
     }, null);
   } catch (e) {
     let rollbackErr = null;

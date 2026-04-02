@@ -408,19 +408,17 @@ def run():
         sanity_expr = (
             "(() => {"
             " const nav = globalThis.navigator;"
-            " const env = globalThis.__SW_ENV__;"
-            " const meta = (env && typeof env === 'object' && env.meta && typeof env.meta === 'object') ? env.meta : null;"
             " if (!nav) return null;"
             " return {"
             "  language: nav.language,"
             "  languages: nav.languages,"
             "  hardwareConcurrency: nav.hardwareConcurrency,"
             "  deviceMemory: nav.deviceMemory,"
-             "  uad: meta ? {"
-             "    platform: meta.platform,"
-             "    mobile: meta.mobile,"
-             "    brands: meta.brands,"
-             "    fullVersionList: Array.isArray(meta.fullVersionList) ? meta.fullVersionList : null"
+             "  uad: nav.userAgentData ? {"
+             "    platform: nav.userAgentData.platform,"
+             "    mobile: nav.userAgentData.mobile,"
+             "    brands: nav.userAgentData.brands,"
+             "    fullVersionList: nav.userAgentData.fullVersionList"
              "  } : null"
              " };"
              "})()"
@@ -566,8 +564,7 @@ def run():
                         if list(uad.get("brands") or []) != list(exp["uad"].get("brands") or []):
                             _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
                             return
-                        got_full_version_list = uad.get("fullVersionList")
-                        if got_full_version_list is not None and list(got_full_version_list or []) != list(exp["uad"].get("fullVersionList") or []):
+                        if list(uad.get("fullVersionList") or []) != list(exp["uad"].get("fullVersionList") or []):
                             _fatal(ws, "sw sanity: uad fullVersionList mismatch", {"expected": exp, "got": out})
                             return
                         logger.info("SW inject: sanity OK target values match profile")

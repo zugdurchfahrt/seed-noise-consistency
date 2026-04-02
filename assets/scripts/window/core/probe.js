@@ -632,11 +632,624 @@ const __probeRun = async function(){
     return value;
   }
 
+  const API_CONTROL_TARGET_SPECS = [
+    {
+      target: "Date.toLocaleDateString",
+      scope: "window",
+      key: "toLocaleDateString",
+      getRoot: () => (typeof Date !== "undefined" && Date && Date.prototype ? Date.prototype : null),
+      hasOwnOnNavigator: () => null
+    },
+    {
+      target: "Date.toLocaleString",
+      scope: "window",
+      key: "toLocaleString",
+      getRoot: () => (typeof Date !== "undefined" && Date && Date.prototype ? Date.prototype : null),
+      hasOwnOnNavigator: () => null
+    },
+    {
+      target: "Date.toLocaleTimeString",
+      scope: "window",
+      key: "toLocaleTimeString",
+      getRoot: () => (typeof Date !== "undefined" && Date && Date.prototype ? Date.prototype : null),
+      hasOwnOnNavigator: () => null
+    },
+    {
+      target: "DateTimeFormat.resolvedOptions",
+      scope: "window",
+      key: "resolvedOptions",
+      getRoot: () => (
+        typeof Intl !== "undefined" &&
+        Intl &&
+        Intl.DateTimeFormat &&
+        Intl.DateTimeFormat.prototype
+          ? Intl.DateTimeFormat.prototype
+          : null
+      ),
+      hasOwnOnNavigator: () => null
+    },
+    {
+      target: "Function.toString",
+      scope: "window",
+      key: "toString",
+      getRoot: () => (typeof Function !== "undefined" && Function && Function.prototype ? Function.prototype : null),
+      hasOwnOnNavigator: () => null
+    },
+    {
+      target: "GPU.requestAdapter",
+      scope: "window",
+      key: "requestAdapter",
+      getRoot: () => {
+        if (typeof GPU !== "undefined" && GPU && GPU.prototype) return GPU.prototype;
+        const gpu = safeGet(nav, "gpu");
+        if (!gpu.ok || !gpu.value) return null;
+        return Object.getPrototypeOf(gpu.value);
+      },
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "gpu")
+    },
+    {
+      target: "MediaDevices.enumerateDevices",
+      scope: "window",
+      key: "enumerateDevices",
+      getRoot: () => {
+        if (typeof MediaDevices !== "undefined" && MediaDevices && MediaDevices.prototype) return MediaDevices.prototype;
+        if (!nav || !nav.mediaDevices) return null;
+        return Object.getPrototypeOf(nav.mediaDevices);
+      },
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "mediaDevices")
+    },
+    {
+      target: "Navigator.appVersion",
+      scope: "window",
+      key: "appVersion",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "appVersion")
+    },
+    {
+      target: "Navigator.deviceMemory",
+      scope: "window",
+      key: "deviceMemory",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "deviceMemory")
+    },
+    {
+      target: "Navigator.hardwareConcurrency",
+      scope: "window",
+      key: "hardwareConcurrency",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "hardwareConcurrency")
+    },
+    {
+      target: "Navigator.language",
+      scope: "window",
+      key: "language",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "language")
+    },
+    {
+      target: "Navigator.languages",
+      scope: "window",
+      key: "languages",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "languages")
+    },
+    {
+      target: "Navigator.maxTouchPoints",
+      scope: "window",
+      key: "maxTouchPoints",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "maxTouchPoints")
+    },
+    {
+      target: "Navigator.mimeTypes",
+      scope: "window",
+      key: "mimeTypes",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "mimeTypes")
+    },
+    {
+      target: "Navigator.platform",
+      scope: "window",
+      key: "platform",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "platform")
+    },
+    {
+      target: "Navigator.plugins",
+      scope: "window",
+      key: "plugins",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "plugins")
+    },
+    {
+      target: "Navigator.productSub",
+      scope: "window",
+      key: "productSub",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "productSub")
+    },
+    {
+      target: "Navigator.vendor",
+      scope: "window",
+      key: "vendor",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "vendor")
+    },
+    {
+      target: "Navigator.vendorSub",
+      scope: "window",
+      key: "vendorSub",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "vendorSub")
+    },
+    {
+      target: "Navigator.webdriver",
+      scope: "window",
+      key: "webdriver",
+      getRoot: () => Object.getPrototypeOf(nav),
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "webdriver")
+    },
+    {
+      target: "Permissions.query",
+      scope: "window",
+      key: "query",
+      getRoot: () => {
+        if (typeof Permissions !== "undefined" && Permissions && Permissions.prototype) return Permissions.prototype;
+        if (!nav || !nav.permissions) return null;
+        return Object.getPrototypeOf(nav.permissions);
+      },
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "permissions")
+    },
+    {
+      target: "RelativeTimeFormat.resolvedOptions",
+      scope: "window",
+      key: "resolvedOptions",
+      getRoot: () => (
+        typeof Intl !== "undefined" &&
+        Intl &&
+        Intl.RelativeTimeFormat &&
+        Intl.RelativeTimeFormat.prototype
+          ? Intl.RelativeTimeFormat.prototype
+          : null
+      ),
+      hasOwnOnNavigator: () => null
+    },
+    {
+      target: "StorageManager.estimate",
+      scope: "window",
+      key: "estimate",
+      getRoot: () => {
+        if (typeof StorageManager !== "undefined" && StorageManager && StorageManager.prototype) return StorageManager.prototype;
+        if (!nav || !nav.storage) return null;
+        return Object.getPrototypeOf(nav.storage);
+      },
+      hasOwnOnNavigator: () => Object.prototype.hasOwnProperty.call(nav, "storage")
+    }
+  ];
+
+  const API_CONTROL_WORKER_TARGET_KEYS = [
+    "deviceMemory",
+    "hardwareConcurrency",
+    "language",
+    "languages"
+  ];
+
   function errorToString(error) {
     if (!error) return null;
     const name = error && error.name ? String(error.name) : "Error";
     const message = error && error.message ? String(error.message) : String(error);
     return `${name}: ${message}`;
+  }
+
+  function __probeDescribeProtoNode(node) {
+    if (node == null) return "null";
+    try {
+      const ctor = node && node.constructor;
+      const ctorName = (typeof ctor === "function" && ctor.name) ? String(ctor.name) : "";
+      if (ctorName) return `${ctorName}.prototype`;
+    } catch (_) {}
+    try {
+      return Object.prototype.toString.call(node);
+    } catch (_) {
+      return "[prototype unreadable]";
+    }
+  }
+
+  function __probeBuildProtoChain(root) {
+    const rows = [];
+    const seen = [];
+    let current = root;
+    let depth = 0;
+    while (current != null && depth < 24) {
+      if (seen.indexOf(current) !== -1) {
+        rows.push("[cycle]");
+        return rows;
+      }
+      seen.push(current);
+      rows.push(__probeDescribeProtoNode(current));
+      try {
+        current = Object.getPrototypeOf(current);
+      } catch (e) {
+        rows.push(`[Object.getPrototypeOf threw: ${errorToString(e)}]`);
+        return rows;
+      }
+      depth += 1;
+    }
+    rows.push("null");
+    return rows;
+  }
+
+  function __probeAccessorVsData(desc) {
+    if (!desc) return null;
+    if (typeof desc.get === "function" || typeof desc.set === "function") return "accessor";
+    if (Object.prototype.hasOwnProperty.call(desc, "value")) return "data";
+    return "unknown";
+  }
+
+  function __probeInspectApiControlTarget(spec, overrides) {
+    const extra = (overrides && typeof overrides === "object") ? overrides : {};
+    const row = {
+      target: spec && spec.target ? String(spec.target) : "unknown",
+      scope: extra.scope || (spec && spec.scope ? String(spec.scope) : "window"),
+      variant: Object.prototype.hasOwnProperty.call(extra, "variant") ? extra.variant : null,
+      descriptorOwner: null,
+      descriptorShape: null,
+      accessorVsData: null,
+      hasOwnOnNavigator: null,
+      descriptorMissing: null,
+      ownerMissing: null,
+      readOnlyInspection: "Object.getOwnPropertyDescriptor",
+      protoChain: [],
+      error: null
+    };
+    let root = null;
+    let key = null;
+    try {
+      key = spec && spec.key ? String(spec.key) : null;
+      if (!key) throw new Error("probe control key missing");
+      root = Object.prototype.hasOwnProperty.call(extra, "root")
+        ? extra.root
+        : (spec && typeof spec.getRoot === "function" ? spec.getRoot() : null);
+      if (Object.prototype.hasOwnProperty.call(extra, "hasOwnOnNavigator")) {
+        row.hasOwnOnNavigator = extra.hasOwnOnNavigator;
+      } else if (spec && typeof spec.hasOwnOnNavigator === "function") {
+        row.hasOwnOnNavigator = spec.hasOwnOnNavigator();
+      }
+      if (!root) {
+        row.protoChain = [];
+        row.descriptorMissing = true;
+        row.ownerMissing = true;
+        return row;
+      }
+      row.protoChain = __probeBuildProtoChain(root);
+      let current = root;
+      while (current != null) {
+        let desc = null;
+        try {
+          desc = Object.getOwnPropertyDescriptor(current, key) || null;
+        } catch (e) {
+          row.error = errorShape(e);
+          row.descriptorMissing = true;
+          row.ownerMissing = true;
+          return row;
+        }
+        if (desc) {
+          row.descriptorOwner = __probeDescribeProtoNode(current);
+          row.descriptorShape = descriptorShape(desc);
+          row.accessorVsData = __probeAccessorVsData(desc);
+          row.descriptorMissing = false;
+          row.ownerMissing = false;
+          return row;
+        }
+        current = Object.getPrototypeOf(current);
+      }
+      row.descriptorMissing = true;
+      row.ownerMissing = true;
+      return row;
+    } catch (e) {
+      row.error = errorShape(e);
+      row.descriptorMissing = true;
+      row.ownerMissing = true;
+      return row;
+    }
+  }
+
+  async function __probeCollectWorkerControlRows() {
+    const keysJson = JSON.stringify(API_CONTROL_WORKER_TARGET_KEYS);
+    const workerScript = `
+      function __probeWorkerDescribeProtoNode__(node) {
+        if (node == null) return "null";
+        try {
+          const ctor = node && node.constructor;
+          const ctorName = (typeof ctor === "function" && ctor.name) ? String(ctor.name) : "";
+          if (ctorName) return ctorName + ".prototype";
+        } catch (_) {}
+        try {
+          return Object.prototype.toString.call(node);
+        } catch (_) {
+          return "[prototype unreadable]";
+        }
+      }
+      function __probeWorkerBuildProtoChain__(root) {
+        const rows = [];
+        const seen = [];
+        let current = root;
+        let depth = 0;
+        while (current != null && depth < 24) {
+          if (seen.indexOf(current) !== -1) {
+            rows.push("[cycle]");
+            return rows;
+          }
+          seen.push(current);
+          rows.push(__probeWorkerDescribeProtoNode__(current));
+          try {
+            current = Object.getPrototypeOf(current);
+          } catch (e) {
+            rows.push("[Object.getPrototypeOf threw]");
+            return rows;
+          }
+          depth += 1;
+        }
+        rows.push("null");
+        return rows;
+      }
+      function __probeWorkerDescriptorShape__(desc) {
+        if (!desc) return null;
+        return {
+          configurable: !!desc.configurable,
+          enumerable: !!desc.enumerable,
+          writable: Object.prototype.hasOwnProperty.call(desc, "writable") ? !!desc.writable : null,
+          hasGetter: typeof desc.get === "function",
+          hasSetter: typeof desc.set === "function",
+          hasValue: Object.prototype.hasOwnProperty.call(desc, "value"),
+          valueType: Object.prototype.hasOwnProperty.call(desc, "value") ? typeof desc.value : null
+        };
+      }
+      function __probeWorkerInspectRow__(key) {
+        const nav = self.navigator;
+        const root = nav ? Object.getPrototypeOf(nav) : null;
+        const row = {
+          target: "WorkerGlobalScope.WorkerNavigator." + key,
+          key: key,
+          descriptorOwner: null,
+          descriptorShape: null,
+          accessorVsData: null,
+          hasOwnOnNavigator: nav ? Object.prototype.hasOwnProperty.call(nav, key) : null,
+          descriptorMissing: null,
+          ownerMissing: null,
+          readOnlyInspection: "Object.getOwnPropertyDescriptor",
+          protoChain: root ? __probeWorkerBuildProtoChain__(root) : [],
+          error: null
+        };
+        if (!root) {
+          row.descriptorMissing = true;
+          row.ownerMissing = true;
+          return row;
+        }
+        let current = root;
+        while (current != null) {
+          let desc = null;
+          try {
+            desc = Object.getOwnPropertyDescriptor(current, key) || null;
+          } catch (e) {
+            row.error = {
+              name: e && e.name ? String(e.name) : "Error",
+              message: e && e.message ? String(e.message) : String(e),
+              stack: e && e.stack ? String(e.stack) : null
+            };
+            row.descriptorMissing = true;
+            row.ownerMissing = true;
+            return row;
+          }
+          if (desc) {
+            row.descriptorOwner = __probeWorkerDescribeProtoNode__(current);
+            row.descriptorShape = __probeWorkerDescriptorShape__(desc);
+            row.accessorVsData =
+              (typeof desc.get === "function" || typeof desc.set === "function")
+                ? "accessor"
+                : (Object.prototype.hasOwnProperty.call(desc, "value") ? "data" : "unknown");
+            row.descriptorMissing = false;
+            row.ownerMissing = false;
+            return row;
+          }
+          current = Object.getPrototypeOf(current);
+        }
+        row.descriptorMissing = true;
+        row.ownerMissing = true;
+        return row;
+      }
+      async function __probeWorkerCollectControlRows__() {
+        const keys = ${keysJson};
+        return keys.map(__probeWorkerInspectRow__);
+      }
+    `;
+
+    const dedicatedSource = `
+      "use strict";
+      ${workerScript}
+      (async function() {
+        try {
+          const rows = await __probeWorkerCollectControlRows__();
+          self.postMessage({ ok: true, rows: rows });
+        } catch (error) {
+          self.postMessage({
+            ok: false,
+            error: {
+              name: error && error.name ? String(error.name) : "Error",
+              message: error && error.message ? String(error.message) : String(error),
+              stack: error && error.stack ? String(error.stack) : null
+            }
+          });
+        }
+      })();
+    `;
+
+    const sharedSource = `
+      "use strict";
+      ${workerScript}
+      self.onconnect = function(ev) {
+        const port = ev && ev.ports && ev.ports[0];
+        if (!port) return;
+        Promise.resolve()
+          .then(__probeWorkerCollectControlRows__)
+          .then(function(rows) {
+            port.postMessage({ ok: true, rows: rows });
+          })
+          .catch(function(error) {
+            port.postMessage({
+              ok: false,
+              error: {
+                name: error && error.name ? String(error.name) : "Error",
+                message: error && error.message ? String(error.message) : String(error),
+                stack: error && error.stack ? String(error.stack) : null
+              }
+            });
+          });
+      };
+    `;
+
+    const rows = [];
+    const cleanup = [];
+    const dedicatedURL = URL.createObjectURL(new Blob([dedicatedSource], { type: "text/javascript" }));
+    const sharedURL = URL.createObjectURL(new Blob([sharedSource], { type: "text/javascript" }));
+    const sharedName = `probe-control-shared-${Date.now()}`;
+    try {
+      const dedicatedWait = await __probeAwaitWithinBudget((async () => {
+        const worker = new Worker(dedicatedURL);
+        cleanup.push(() => { try { worker.terminate(); } catch (_) {} });
+        return await new Promise((resolve, reject) => {
+          const onMessage = (ev) => {
+            cleanupListeners();
+            const data = ev && ev.data;
+            if (data && data.ok) return resolve(data.rows);
+            reject(data && data.error ? new Error(String(data.error.message || data.error.name || "worker error")) : new Error("worker error"));
+          };
+          const onError = (ev) => {
+            cleanupListeners();
+            reject(new Error(ev && ev.message ? String(ev.message) : "worker message error"));
+          };
+          const cleanupListeners = () => {
+            worker.removeEventListener("message", onMessage);
+            worker.removeEventListener("error", onError);
+          };
+          worker.addEventListener("message", onMessage);
+          worker.addEventListener("error", onError);
+        });
+      })(), {
+        check: "api_control_list",
+        phase: "DedicatedWorker",
+        method: "Worker"
+      });
+
+      if (dedicatedWait.ok) {
+        const dedicatedRows = Array.isArray(dedicatedWait.value) ? dedicatedWait.value : [];
+        for (const row of dedicatedRows) {
+          rows.push(Object.assign({ scope: "worker", variant: "DedicatedWorker" }, row));
+        }
+      } else {
+        for (const key of API_CONTROL_WORKER_TARGET_KEYS) {
+          rows.push({
+            target: `WorkerGlobalScope.WorkerNavigator.${key}`,
+            scope: "worker",
+            variant: "DedicatedWorker",
+            descriptorOwner: null,
+            descriptorShape: null,
+            accessorVsData: null,
+            hasOwnOnNavigator: null,
+            descriptorMissing: true,
+            ownerMissing: true,
+            readOnlyInspection: "Object.getOwnPropertyDescriptor",
+            protoChain: [],
+            error: errorShape(dedicatedWait.error)
+          });
+        }
+      }
+
+      const sharedWait = await __probeAwaitWithinBudget((async () => {
+        const shared = new SharedWorker(sharedURL, { name: sharedName, type: "module" });
+        const port = shared.port;
+        cleanup.push(() => {
+          try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
+        });
+        return await new Promise((resolve, reject) => {
+          const onMessage = (ev) => {
+            cleanupListeners();
+            const data = ev && ev.data;
+            if (data && data.ok) return resolve(data.rows);
+            reject(data && data.error ? new Error(String(data.error.message || data.error.name || "shared worker error")) : new Error("shared worker error"));
+          };
+          const onError = (ev) => {
+            cleanupListeners();
+            reject(new Error(ev && ev.message ? String(ev.message) : "shared worker message error"));
+          };
+          const cleanupListeners = () => {
+            port.removeEventListener("message", onMessage);
+            port.removeEventListener("messageerror", onError);
+          };
+          port.addEventListener("message", onMessage);
+          port.addEventListener("messageerror", onError);
+          if (typeof port.start === "function") port.start();
+        });
+      })(), {
+        check: "api_control_list",
+        phase: "SharedWorker",
+        method: "SharedWorker",
+        timeoutMs: __PROBE_TIMEOUTS.sharedWorkerMs
+      });
+
+      if (sharedWait.ok) {
+        const sharedRows = Array.isArray(sharedWait.value) ? sharedWait.value : [];
+        for (const row of sharedRows) {
+          rows.push(Object.assign({ scope: "worker", variant: "SharedWorker" }, row));
+        }
+      } else {
+        for (const key of API_CONTROL_WORKER_TARGET_KEYS) {
+          rows.push({
+            target: `WorkerGlobalScope.WorkerNavigator.${key}`,
+            scope: "worker",
+            variant: "SharedWorker",
+            descriptorOwner: null,
+            descriptorShape: null,
+            accessorVsData: null,
+            hasOwnOnNavigator: null,
+            descriptorMissing: true,
+            ownerMissing: true,
+            readOnlyInspection: "Object.getOwnPropertyDescriptor",
+            protoChain: [],
+            error: errorShape(sharedWait.error)
+          });
+        }
+      }
+    } finally {
+      while (cleanup.length) {
+        const fn = cleanup.pop();
+        try { fn(); } catch (_) {}
+      }
+      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {}
+      try { URL.revokeObjectURL(sharedURL); } catch (_) {}
+    }
+    return rows;
+  }
+
+  async function printApiControlList() {
+    const rows = [];
+    for (const spec of API_CONTROL_TARGET_SPECS) {
+      rows.push(__probeInspectApiControlTarget(spec));
+    }
+    if (__PROBE_ENABLE_WORKER_SCOPE_AUDIT__) {
+      const workerRows = await __probeCollectWorkerControlRows();
+      Array.prototype.push.apply(rows, workerRows);
+    }
+    __probeConsoleCall("group", "[probe] API control list");
+    __probeConsoleCall("table", rows);
+    __probeConsoleCall("groupEnd");
+    return {
+      rows,
+      meta: {
+        targets: API_CONTROL_TARGET_SPECS.length,
+        workerTargets: API_CONTROL_WORKER_TARGET_KEYS.length
+      }
+    };
   }
 
   async function printFieldValues() {
@@ -2864,6 +3477,11 @@ function printToStringCrossRealmChecks() {
   if (__PROBE_ENABLE_WORKER_SCOPE_AUDIT__ && !workerScopeWait.ok && workerScopeWait.timedOut) {
     __probeLogAsyncTimeout(workerScopeMeta, workerScopeWait.elapsedMs, workerScopeWait.timeoutMs, workerScopeWait.error);
   }
+  const apiControlMeta = { check: "__PROBE__", phase: "build", method: "printApiControlList" };
+  const apiControlWait = await __probeObserveAsync(printApiControlList());
+  if (!apiControlWait.ok && apiControlWait.timedOut) {
+    __probeLogAsyncTimeout(apiControlMeta, apiControlWait.elapsedMs, apiControlWait.timeoutMs, apiControlWait.error);
+  }
 
   const result = {
     ok: true,
@@ -2877,6 +3495,27 @@ function printToStringCrossRealmChecks() {
       asyncState: fieldsWait.timedOut ? "timed_out" : "rejected",
       elapsedMs: fieldsWait.elapsedMs
     }],
+    apiControlList: apiControlWait.ok ? apiControlWait.value : {
+      rows: [{
+        target: "__probe__.printApiControlList",
+        scope: "window",
+        variant: null,
+        descriptorOwner: null,
+        descriptorShape: null,
+        accessorVsData: null,
+        hasOwnOnNavigator: null,
+        descriptorMissing: true,
+        ownerMissing: true,
+        readOnlyInspection: "Object.getOwnPropertyDescriptor",
+        protoChain: [],
+        error: errorShape(apiControlWait.error)
+      }],
+      meta: {
+        error: errorShape(apiControlWait.error),
+        asyncState: apiControlWait.timedOut ? "timed_out" : "rejected",
+        elapsedMs: apiControlWait.elapsedMs
+      }
+    },
     descriptors: printPrototypeDescriptors(),
     methods: printTouchedMethods(),
     receiverChecks: receiverWait.ok ? receiverWait.value : {
@@ -2925,6 +3564,11 @@ function printToStringCrossRealmChecks() {
         state: fieldsWait.ok ? "resolved" : (fieldsWait.timedOut ? "timed_out" : "rejected"),
         elapsedMs: fieldsWait.elapsedMs,
         timeoutMs: fieldsWait.timeoutMs
+      },
+      apiControlList: {
+        state: apiControlWait.ok ? "resolved" : (apiControlWait.timedOut ? "timed_out" : "rejected"),
+        elapsedMs: apiControlWait.elapsedMs,
+        timeoutMs: apiControlWait.timeoutMs
       },
       receiverChecks: {
         state: __PROBE_ENABLE_RECEIVER_CHECKS__ ? (receiverWait.ok ? "resolved" : (receiverWait.timedOut ? "timed_out" : "rejected")) : "disabled",
@@ -3076,6 +3720,12 @@ function __probeDownloadHtmlReport(result) {
   const title = `probe report ${ts}`;
 
   const fields = result && result.fields;
+  const apiControlRows = result && result.apiControlList && Array.isArray(result.apiControlList.rows)
+    ? result.apiControlList.rows
+    : [];
+  const apiControlMeta = result && result.apiControlList && result.apiControlList.meta
+    ? __probeEscapeHtml(JSON.stringify(result.apiControlList.meta))
+    : "not available";
   // const workerScopeRows = result && result.workerScopeAudit && result.workerScopeAudit.rows;
   const methodsRows = result && result.methods && result.methods.rows;
   const degradeRows = result && result.degrade && result.degrade.rows;
@@ -3127,6 +3777,12 @@ function __probeDownloadHtmlReport(result) {
   <section>
     <h2>Field values</h2>
     ${__probeTableHtml(fields)}
+  </section>
+
+  <section>
+    <h2>API-only control list</h2>
+    <div class="meta">${apiControlMeta}</div>
+    ${__probeTableHtml(apiControlRows)}
   </section>
 
   <section>

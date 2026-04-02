@@ -143,12 +143,6 @@
     verifyRollbackRepeatApply();
     const __workerNavigatorPatchedOwners__ = Object.create(null);
     const __workerNavigatorDescriptorModes__ = Object.create(null);
-    const __resolveWorkerScopeKind__ = () => {
-      if (typeof ServiceWorkerGlobalScope === 'function' && self instanceof ServiceWorkerGlobalScope) return 'ServiceWorker';
-      if (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) return 'SharedWorker';
-      return 'DedicatedWorker';
-    };
-    const __cloneWorkerDiagValue__ = (value) => value == null ? value : JSON.parse(JSON.stringify(value));
     const validDpr = v => Number.isFinite(v) && v > 0;
     const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
     const LE_KEYS = ['brands','mobile','platform'];
@@ -869,7 +863,7 @@
         configurable: d ? !!d.configurable : true,
         enumerable: d ? !!d.enumerable : !!enumerable,
         get: protoGuardedGet,
-        set: d && Object.prototype.hasOwnProperty.call(d, 'set') ? d.set : undefined
+        set: undefined
       });
       __workerNavigatorPatchedOwners__[k] = patchOwner;
       __workerNavigatorDescriptorModes__[k] = 'patched';
@@ -945,41 +939,6 @@
       } catch (_) {
         return false;
       }
-    };
-    const sameArrayShallow = (a, b) => {
-      return Array.isArray(a)
-        && Array.isArray(b)
-        && a.length === b.length
-        && a.every((v, i) => v === b[i]);
-    };
-    const safeReadWorkerNavigatorValue = (k) => {
-      try {
-        if (!nav) throw new Error(`UACHPatch: navigator missing while reading ${k}`);
-        return { ok: true, value: nav[k] };
-      } catch (e) {
-        emitDegrade('warn', 'worker_patch_src:workernavigator_direct_read:failed', {
-          type: 'browser structure missing data',
-          stage: 'runtime',
-          module: 'WORKER_PATCH_SRC',
-          surface: 'WorkerNavigator',
-          key: String(k || ''),
-          policy: 'skip',
-          action: 'native',
-          data: { outcome: 'skip', reason: 'direct_read_failed' }
-        }, e);
-        return { ok: false, value: undefined };
-      }
-    };
-    const preferNativeWorkerNavigatorValue = (k, expected, compare) => {
-      const direct = safeReadWorkerNavigatorValue(k);
-      if (!direct.ok) return false;
-      if (!(typeof compare === 'function' ? compare(direct.value, expected) : Object.is(direct.value, expected))) {
-        return false;
-      }
-      const resolved = resolveWorkerNavigatorNativeDescriptor(k);
-      __workerNavigatorPatchedOwners__[k] = resolved.owner;
-      __workerNavigatorDescriptorModes__[k] = 'native_skip';
-      return true;
     };
     const assertWorkerNavigatorDescriptor = (k) => {
       const mode = __workerNavigatorDescriptorModes__[k] || null;
@@ -1060,9 +1019,7 @@
 
     const getLanguage = markAsNative(function getLanguage(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
-      if (typeof cache.snap.language !== 'string' || cache.snap.language.trim() === '') {
-        throw new Error('UACHPatch: bad language');
-      }
+      if (typeof cache.snap.language !== 'string' || cache.snap.language.trim() === '') throw new Error('UACHPatch: bad language');
       return cache.snap.language;
     }, 'get language');
     {
@@ -1070,12 +1027,28 @@
       __workerNavigatorPatchedOwners__['userAgentData'] = resolvedUserAgentData.owner;
       __workerNavigatorDescriptorModes__['userAgentData'] = 'native_skip';
     }
-    if (!preferNativeWorkerNavigatorValue(
-      'language',
-      cache.snap.language,
-      (actual, expected) => actual === expected
-    )) {
-      def(proto, 'language', getLanguage, true);
+    let __patchLanguage = true;
+    try {
+      const nativeLanguageResolved = readWorkerNavigatorNativeValue('language');
+      if (nativeLanguageResolved.value === cache.snap.language) {
+        __workerNavigatorPatchedOwners__['language'] = nativeLanguageResolved.owner;
+        __workerNavigatorDescriptorModes__['language'] = 'native_skip';
+        __patchLanguage = false;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'language',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
+      }, e);
+    }
+    if (__patchLanguage) {
+      def(proto,'language', getLanguage, true);
     }
 
     const getLanguages = markAsNative(function getLanguages(){
@@ -1105,12 +1078,33 @@
       languagesCache.frozen = out;
       return out;
     }, 'get languages');
-    if (!preferNativeWorkerNavigatorValue(
-      'languages',
-      cache.snap.languages,
-      (actual, expected) => sameArrayShallow(actual, expected)
-    )) {
-      def(proto, 'languages', getLanguages, true);
+    let __patchLanguages = true;
+    try {
+      const nativeLanguagesResolved = readWorkerNavigatorNativeValue('languages');
+      const nativeLanguages = nativeLanguagesResolved.value;
+      const snapLanguages = cache.snap.languages;
+      if (Array.isArray(nativeLanguages)
+          && Array.isArray(snapLanguages)
+          && nativeLanguages.length === snapLanguages.length
+          && nativeLanguages.every(function(value, index) { return value === snapLanguages[index]; })) {
+        __workerNavigatorPatchedOwners__['languages'] = nativeLanguagesResolved.owner;
+        __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
+        __patchLanguages = false;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'languages',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
+      }, e);
+    }
+    if (__patchLanguages) {
+      def(proto,'languages', getLanguages, true);
     }
 
 
@@ -1120,11 +1114,29 @@
       if (!Number.isFinite(v)) throw new Error('UACHPatch: bad deviceMemory');
       return v;
     }, 'get deviceMemory');
-    if (!preferNativeWorkerNavigatorValue(
-      'deviceMemory',
-      Number(cache.snap.deviceMemory),
-      (actual, expected) => Number.isFinite(Number(actual)) && Object.is(Number(actual), Number(expected))
-    )) {
+    let __patchDeviceMemory = true;
+    try {
+      const nativeDeviceMemoryResolved = readWorkerNavigatorNativeValue('deviceMemory');
+      const nativeDeviceMemory = Number(nativeDeviceMemoryResolved.value);
+      const snapDeviceMemory = Number(cache.snap.deviceMemory);
+      if (Number.isFinite(nativeDeviceMemory) && Number.isFinite(snapDeviceMemory) && Object.is(nativeDeviceMemory, snapDeviceMemory)) {
+        __workerNavigatorPatchedOwners__['deviceMemory'] = nativeDeviceMemoryResolved.owner;
+        __workerNavigatorDescriptorModes__['deviceMemory'] = 'native_skip';
+        __patchDeviceMemory = false;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'deviceMemory',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
+      }, e);
+    }
+    if (__patchDeviceMemory) {
       def(proto, 'deviceMemory', getDeviceMemory, true);
     }
 
@@ -1134,11 +1146,29 @@
       if (!Number.isFinite(v)) throw new Error('UACHPatch: bad hardwareConcurrency');
       return v;
     }, 'get hardwareConcurrency');
-    if (!preferNativeWorkerNavigatorValue(
-      'hardwareConcurrency',
-      Number(cache.snap.hardwareConcurrency),
-      (actual, expected) => Number.isFinite(Number(actual)) && Object.is(Number(actual), Number(expected))
-    )) {
+    let __patchHardwareConcurrency = true;
+    try {
+      const nativeHardwareConcurrencyResolved = readWorkerNavigatorNativeValue('hardwareConcurrency');
+      const nativeHardwareConcurrency = Number(nativeHardwareConcurrencyResolved.value);
+      const snapHardwareConcurrency = Number(cache.snap.hardwareConcurrency);
+      if (Number.isFinite(nativeHardwareConcurrency) && Number.isFinite(snapHardwareConcurrency) && Object.is(nativeHardwareConcurrency, snapHardwareConcurrency)) {
+        __workerNavigatorPatchedOwners__['hardwareConcurrency'] = nativeHardwareConcurrencyResolved.owner;
+        __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
+        __patchHardwareConcurrency = false;
+      }
+    } catch (e) {
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'hardwareConcurrency',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
+      }, e);
+    }
+    if (__patchHardwareConcurrency) {
       def(proto, 'hardwareConcurrency', getHardwareConcurrency, true);
     }
     assertWorkerNavigatorDescriptor('userAgentData');
@@ -1146,45 +1176,6 @@
     assertWorkerNavigatorDescriptor('languages');
     assertWorkerNavigatorDescriptor('deviceMemory');
     assertWorkerNavigatorDescriptor('hardwareConcurrency');
-    const __workerScopeKind = __resolveWorkerScopeKind__();
-    const __workerValuesProof = {
-      outcome: 'return',
-      scopeKind: __workerScopeKind,
-      scope: __workerScopeKind,
-      language: self.navigator && self.navigator.language,
-      languages: __cloneWorkerDiagValue__(self.navigator && self.navigator.languages),
-      deviceMemory: self.navigator && self.navigator.deviceMemory,
-      hardwareConcurrency: self.navigator && self.navigator.hardwareConcurrency,
-      uaData: (function() {
-        const currentUAD = self.navigator && self.navigator.userAgentData;
-        if (!currentUAD || typeof currentUAD !== 'object') return null;
-        let highEntropy = null;
-        try {
-          highEntropy = cache.snap && cache.snap.uaData && cache.snap.uaData.he
-            ? __cloneWorkerDiagValue__(cache.snap.uaData.he)
-            : null;
-        } catch (e) {
-          highEntropy = null;
-        }
-        return {
-          brands: __cloneWorkerDiagValue__(currentUAD.brands),
-          mobile: currentUAD.mobile,
-          platform: currentUAD.platform,
-          fullVersionList: ('fullVersionList' in currentUAD)
-            ? __cloneWorkerDiagValue__(currentUAD.fullVersionList)
-            : (highEntropy ? __cloneWorkerDiagValue__(highEntropy.fullVersionList) : null),
-          highEntropy: highEntropy
-        };
-      })()
-    };
-    emitDegrade('info', 'worker_patch_src:contract:observed_values', {
-      stage: 'contract',
-      surface: 'worker',
-      key: 'installWorkerUACHMirror',
-      message: 'worker patch values observed',
-      type: 'pipeline missing data',
-      data: __workerValuesProof
-    }, null);
 
     const requireWebGLSnapshot = (s, where) => {
       const snap = requireSnap(s, where);
@@ -1591,15 +1582,7 @@
       data: {
         core: true,
         mirror: __uachMirrorInstalled__ === true,
-        scopeKind: __workerScopeKind,
-        scope: __workerScopeKind,
-        scopeConsistencyPatched: !!self.__SCOPE_CONSISTENCY_PATCHED__,
-        language: __workerValuesProof.language,
-        languages: __cloneWorkerDiagValue__(__workerValuesProof.languages),
-        deviceMemory: __workerValuesProof.deviceMemory,
-        hardwareConcurrency: __workerValuesProof.hardwareConcurrency,
-        uaData: __cloneWorkerDiagValue__(__workerValuesProof.uaData),
-        outcome: 'return'
+        scope: !!self.__SCOPE_CONSISTENCY_PATCHED__
       },
       type: "pipeline missing data"
     };
