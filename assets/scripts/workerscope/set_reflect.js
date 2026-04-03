@@ -360,13 +360,18 @@
         ? ('function ' + wrappedName + '() { [native code] }')
         : 'function () { [native code] }';
       const nativeName = bridgeTarget.name || '';
-      baseMarkAsNative(bridgeTarget, nativeName);
+      const bridgeLabel = nativeName
+        ? ('function ' + nativeName + '() { [native code] }')
+        : 'function () { [native code] }';
+      toStringOverrideMap.set(bridgeTarget, bridgeLabel);
       toStringProxyTargetMap.set(wrapped, bridgeTarget);
       toStringOverrideMap.set(wrapped, wrappedLabel);
       if (Object.getPrototypeOf(wrapped) !== Object.getPrototypeOf(nativeFn)) {
         throw new Error('[WrkBridge] ' + wrapperName + ': function prototype chain mismatch');
       }
-      if (toStringProxyTargetMap.get(wrapped) !== bridgeTarget || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
+      if (toStringOverrideMap.get(bridgeTarget) !== bridgeLabel
+          || toStringProxyTargetMap.get(wrapped) !== bridgeTarget
+          || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
         throw new Error('[WrkBridge] ' + wrapperName + ': bridge registration failed');
       }
       return wrapped;

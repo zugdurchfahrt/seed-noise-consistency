@@ -280,6 +280,9 @@
     {
       const st = __resolveCoreToStringState__();
       const probe = function probe(){};
+      const expectedBridge = (st && typeof st.nativeToString === 'function')
+        ? st.nativeToString
+        : nativeToString;
       Object.defineProperty(probe, '__coreBridgeTarget__', {
         value: nativeToString,
         writable: true,
@@ -294,7 +297,14 @@
       const actualBridge = st && st.proxyTargetMap && typeof st.proxyTargetMap.get === 'function'
         ? st.proxyTargetMap.get(probe)
         : undefined;
-      if (typeof actual !== 'string' || actual === nativeProbe || actualBridge !== nativeToString) {
+      const actualBridgeLabel = (st && st.overrideMap && typeof st.overrideMap.get === 'function' && typeof actualBridge === 'function')
+        ? st.overrideMap.get(actualBridge)
+        : undefined;
+      if (typeof actual !== 'string'
+          || actual === nativeProbe
+          || actualBridge !== expectedBridge
+          || typeof actualBridgeLabel !== 'string'
+          || !actualBridgeLabel) {
         const e = new Error('UACHPatch: toString override map missing bridge label');
         emitDegrade('error', 'worker_patch_src:tostring_state:contract:label_missing', {
           type: 'pipeline missing data',
@@ -350,7 +360,9 @@
         enumerable: false
       });
     }
-    const getDevicePixelRatio = markAsNative(getDevicePixelRatioRaw, 'get devicePixelRatio');
+    const getDevicePixelRatio = (dprDesc && typeof dprDesc.get === 'function')
+      ? markAsNative(getDevicePixelRatioRaw, 'get devicePixelRatio')
+      : getDevicePixelRatioRaw;
     if (dprTarget && !(dprDesc && dprDesc.configurable === false)) {
       const isData = dprDesc && Object.prototype.hasOwnProperty.call(dprDesc, 'value') && !dprDesc.get && !dprDesc.set;
       if (isData) {
@@ -491,7 +503,9 @@
         enumerable: false
       });
     }
-    const getBrands = markAsNative(getBrandsRaw, 'get brands');
+    const getBrands = (typeof origBrandsGet === 'function')
+      ? markAsNative(getBrandsRaw, 'get brands')
+      : getBrandsRaw;
     const getMobileRaw = function getMobile(){
                         if (!isUadThis(this)) {
                           if (typeof origMobileGet === 'function') {
@@ -539,7 +553,9 @@
         enumerable: false
       });
     }
-    const getMobile = markAsNative(getMobileRaw, 'get mobile');
+    const getMobile = (typeof origMobileGet === 'function')
+      ? markAsNative(getMobileRaw, 'get mobile')
+      : getMobileRaw;
     const getPlatformRaw = function getPlatform(){
                         if (!isUadThis(this)) {
                           if (typeof origPlatformGet === 'function') {
@@ -589,7 +605,9 @@
         enumerable: false
       });
     }
-    const getPlatform = markAsNative(getPlatformRaw, 'get platform');
+    const getPlatform = (typeof origPlatformGet === 'function')
+      ? markAsNative(getPlatformRaw, 'get platform')
+      : getPlatformRaw;
     trackedDefineProperties(uadProto, {
       brands:   { get: getBrands, enumerable: !!dBrands.enumerable, configurable: !!dBrands.configurable, set: dBrands.set },
       mobile:   { get: getMobile, enumerable: !!dMobile.enumerable, configurable: !!dMobile.configurable, set: dMobile.set },
@@ -648,7 +666,9 @@
         enumerable: false
       });
     }
-    const getFullVersionList = markAsNative(getFullVersionListRaw, 'get fullVersionList');
+    const getFullVersionList = (typeof origFullGet === 'function')
+      ? markAsNative(getFullVersionListRaw, 'get fullVersionList')
+      : getFullVersionListRaw;
     if (dFull) {
       trackedDefineProperty(uadProto, 'fullVersionList', {
         configurable: !!dFull.configurable,
@@ -688,7 +708,9 @@
         enumerable: false
       });
     }
-    const toJSON = markAsNative(toJSONRaw, 'toJSON');
+    const toJSON = (typeof origToJSON === 'function')
+      ? markAsNative(toJSONRaw, 'toJSON')
+      : toJSONRaw;
     trackedDefineProperty(uadProto, 'toJSON', {
       configurable: dToJSON ? !!dToJSON.configurable : true,
       enumerable: dToJSON ? !!dToJSON.enumerable : false,
@@ -825,7 +847,9 @@
         enumerable: false
       });
     }
-    const getHighEntropyValues = markAsNative(getHighEntropyValuesRaw, 'getHighEntropyValues');
+    const getHighEntropyValues = (typeof origGHEV === 'function')
+      ? markAsNative(getHighEntropyValuesRaw, 'getHighEntropyValues')
+      : getHighEntropyValuesRaw;
     trackedDefineProperty(uadProto, 'getHighEntropyValues', {
       configurable: dGHEV ? !!dGHEV.configurable : true,
       enumerable: dGHEV ? !!dGHEV.enumerable : false,

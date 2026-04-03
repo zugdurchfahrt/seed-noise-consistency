@@ -182,19 +182,18 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       return;
     }
 
-    const __ensureMarkAsNative = (__core && typeof __core.__ensureMarkAsNative === "function")
-      ? __core.__ensureMarkAsNative
+    const __applyTargets = (__core && typeof __core.applyTargets === "function")
+      ? __core.applyTargets
       : null;
-    const markAsNative = __ensureMarkAsNative ? __ensureMarkAsNative() : null;
     const __wrapNativeCtor = (__core && typeof __core.__wrapNativeCtor === "function")
       ? __core.__wrapNativeCtor
       : null;
-    if (typeof markAsNative !== "function") {
-      diagPipeline("warn", "tz:missing_markAsNative", {
-        key: "Core.__ensureMarkAsNative",
+    if (typeof __applyTargets !== "function") {
+      diagPipeline("warn", "tz:applyTargets_missing", {
+        key: "Core.applyTargets",
         stage: "preflight",
-        message: "Core.__ensureMarkAsNative missing",
-        data: { outcome: "skip", reason: "missing_dep_markAsNative", timezone: timezone }
+        message: "Core.applyTargets missing",
+        data: { outcome: "skip", reason: "missing_apply_targets", timezone: timezone }
       }, null);
       releaseGuard(true);
       return;
@@ -203,19 +202,14 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       ? __core.registerPatchedTarget
       : null;
 
-    function createNativeShapedMethod(name, impl) {
-      const method = ({ [name](...args) {
-        return Reflect.apply(impl, this, args);
-      } })[name];
-      if (typeof impl === "function") {
-        Object.defineProperty(method, "__coreBridgeTarget__", {
-          value: impl,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
+    function createNativeShapedMethod(name, nativeFn, impl) {
+      if (typeof nativeFn !== "function") {
+        throw new TypeError("[patchTimeZone] native method missing for " + String(name));
       }
-      return markAsNative(method, name);
+      if (typeof impl !== "function") {
+        throw new TypeError("[patchTimeZone] impl missing for " + String(name));
+      }
+      return impl;
     }
 
     function sameDesc(actual, expected) {
@@ -276,7 +270,87 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         }, e);
         throw e;
       }
-      redefineValue(owner, key, patchedValue, diagTag);
+      let plans = [];
+      try {
+        plans = __applyTargets([{
+          owner,
+          key,
+          resolve: "own",
+          kind: "method",
+          wrapLayer: "named_wrapper",
+          policy: "throw",
+          diagTag,
+          invoke(orig, args) {
+            return Reflect.apply(patchedValue, this, Array.isArray(args) ? args : []);
+          }
+        }], null, []);
+      } catch (e) {
+        diagBrowser("error", diagTag + ":preflight_failed", {
+          key: String(key),
+          stage: "preflight",
+          message: "Core.applyTargets threw",
+          data: { outcome: "throw", reason: "preflight_failed" }
+        }, e);
+        throw e;
+      }
+      if (!Array.isArray(plans) || plans.ok === false || plans.length !== 1) {
+        const e = new Error("[patchTimeZone] method plan missing: " + String(key));
+        diagBrowser("error", diagTag + ":plan_missing", {
+          key: String(key),
+          stage: "preflight",
+          message: "Core.applyTargets returned invalid plan set",
+          data: { outcome: "throw", reason: (plans && plans.reason) ? plans.reason : "plan_missing" }
+        }, e);
+        throw e;
+      }
+      const plan = plans[0];
+      if (!plan || plan.skipApply || !plan.owner || typeof plan.key !== "string" || !plan.nextDesc) {
+        const e = new Error("[patchTimeZone] invalid plan item: " + String(key));
+        diagBrowser("error", diagTag + ":invalid_plan_item", {
+          key: String(key),
+          stage: "contract",
+          message: "Core.applyTargets returned invalid plan item",
+          data: { outcome: "throw", reason: "invalid_plan_item" }
+        }, e);
+        throw e;
+      }
+      safeDefine(plan.owner, plan.key, plan.nextDesc);
+      const after = Object.getOwnPropertyDescriptor(plan.owner, plan.key);
+      if (!sameDesc(after, plan.nextDesc)) {
+        try {
+          if (plan.origDesc) safeDefine(plan.owner, plan.key, plan.origDesc);
+        } catch (restoreErr) {
+          diagBrowser("error", diagTag + ":rollback_failed", {
+            key: String(key),
+            stage: "rollback",
+            message: "restore failed after descriptor mismatch",
+            data: { outcome: "rollback", reason: "restore_failed" }
+          }, restoreErr);
+        }
+        const e = new Error("[patchTimeZone] redefineMethod descriptor mismatch: " + String(key));
+        diagBrowser("error", diagTag + ":descriptor_mismatch", {
+          key: String(key),
+          stage: "contract",
+          message: "redefineMethod descriptor mismatch",
+          data: { outcome: "throw", reason: "descriptor_mismatch" }
+        }, e);
+        throw e;
+      }
+      pushRestore(() => {
+        if (plan.origDesc) safeDefine(plan.owner, plan.key, plan.origDesc);
+      });
+      if (__registerPatchedTarget) {
+        try {
+          __registerPatchedTarget(plan.owner, plan.key);
+        } catch (e) {
+          diagBrowser("warn", diagTag + ":register_failed", {
+            key: String(key),
+            stage: "apply",
+            message: "registerPatchedTarget failed",
+            data: { outcome: "return", reason: "register_failed" }
+          }, e);
+        }
+      }
     }
 
     if (typeof Date.prototype.getTimezoneOffset === "function") {
@@ -373,7 +447,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         rememberProtoValue(proto, "resolvedOptions");
         const origResolvedOptions = proto.resolvedOptions;
         // Keep this path unchanged until constructor-time caller intent can be tracked per instance.
-        const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", function resolvedOptionsImpl() {
+        const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", origResolvedOptions, function resolvedOptionsImpl() {
           let ro;
           try {
             ro = Reflect.apply(origResolvedOptions, this, []);
@@ -443,7 +517,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         if (typeof origResolvedOptions !== "function") return;
         rememberProtoValue(proto, "resolvedOptions");
         // Keep this path unchanged until constructor-time caller intent can be tracked per instance.
-        const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", function resolvedOptionsImpl() {
+        const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", origResolvedOptions, function resolvedOptionsImpl() {
           let options;
           try {
             options = Reflect.apply(origResolvedOptions, this, []);
@@ -506,7 +580,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         }, e);
         throw e;
       }
-      const patchedToLocaleString = createNativeShapedMethod("toLocaleString", function toLocaleStringImpl(locales, options) {
+      const patchedToLocaleString = createNativeShapedMethod("toLocaleString", origToLocaleString, function toLocaleStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
         options = applyDefaultTimeZoneOption(options);
         try {
@@ -520,7 +594,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           throw e;
         }
       });
-      const patchedToLocaleDateString = createNativeShapedMethod("toLocaleDateString", function toLocaleDateStringImpl(locales, options) {
+      const patchedToLocaleDateString = createNativeShapedMethod("toLocaleDateString", origToLocaleDateString, function toLocaleDateStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
         options = applyDefaultTimeZoneOption(options);
         try {
@@ -534,7 +608,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
           throw e;
         }
       });
-      const patchedToLocaleTimeString = createNativeShapedMethod("toLocaleTimeString", function toLocaleTimeStringImpl(locales, options) {
+      const patchedToLocaleTimeString = createNativeShapedMethod("toLocaleTimeString", origToLocaleTimeString, function toLocaleTimeStringImpl(locales, options) {
         if (locales == null) locales = spoofedLocales;
         options = applyDefaultTimeZoneOption(options);
         try {
