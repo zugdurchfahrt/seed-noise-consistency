@@ -247,36 +247,6 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return;
   }
 
-  const markAsNative = (function() {
-    const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function') ? __core.__ensureMarkAsNative : null;
-    const m = ensure ? ensure() : null;
-    if (typeof m !== 'function') return null;
-    return m;
-  })();
-  if (typeof markAsNative !== 'function') {
-    __rtcDiag('fatal', 'rtc:mark_native_missing', {
-      stage: 'preflight',
-      key: 'Core.__ensureMarkAsNative',
-      message: 'Core.__ensureMarkAsNative/markAsNative missing',
-      type: 'pipeline missing data',
-      data: { outcome: 'skip', reason: 'missing_dep_mark_native' }
-    }, new Error('[RTC] markAsNative missing'));
-    try {
-      if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
-      }
-    } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
-        stage: 'guard',
-        key: __FLAG_KEY,
-        message: 'releaseGuardFlag threw on markAsNative preflight skip',
-        type: 'pipeline missing data',
-        data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
-    }
-    return;
-  }
-
   const Orig = window.RTCPeerConnection;
   if (!Orig) {
     __rtcDiag('info', 'rtc:skip_no_api', {
@@ -349,17 +319,6 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   const origOnIceDesc = Object.getOwnPropertyDescriptor(Orig.prototype, 'onicecandidate') || null;
   function __rtcMarkNative(fn, nativeName, key) {
     if (typeof fn !== 'function') return fn;
-    try {
-      markAsNative(fn, nativeName || fn.name || '');
-    } catch (e) {
-      __rtcDiag('warn', 'rtc:mark_native_failed', {
-        stage: 'apply',
-        key: (typeof key === 'string' && key) ? key : null,
-        message: 'markAsNative failed for wrapper',
-        type: 'browser structure missing data',
-        data: { outcome: 'return', reason: 'mark_native_failed' }
-      }, e);
-    }
     return fn;
   }
 

@@ -207,6 +207,14 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       const method = ({ [name](...args) {
         return Reflect.apply(impl, this, args);
       } })[name];
+      if (typeof impl === "function") {
+        Object.defineProperty(method, "__coreBridgeTarget__", {
+          value: impl,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
       return markAsNative(method, name);
     }
 

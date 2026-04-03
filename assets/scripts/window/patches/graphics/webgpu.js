@@ -501,7 +501,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
                 });
                 return nativeHas;
               }
-              methodCache.has = markNative(function has(feature) {
+              const hasRaw = function has(feature) {
                 try {
                   if (this !== proxy && this !== target) return Reflect.apply(nativeHas, this, [feature]);
                   return __WL_FEATURES__.has(feature) && Reflect.apply(nativeHas, target, [feature]);
@@ -516,14 +516,21 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
                   });
                   throw e;
                 }
-              }, 'has');
+              };
+              Object.defineProperty(hasRaw, '__coreBridgeTarget__', {
+                value: nativeHas,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
+              methodCache.has = markNative(hasRaw, 'has');
             }
             return methodCache.has;
           }
           if (prop === 'forEach') {
             if (!methodCache.forEach) {
               const nativeForEach = Reflect.get(target, 'forEach', target);
-              methodCache.forEach = markNative(function forEach(cb, thisArg) {
+              const forEachRaw = function forEach(cb, thisArg) {
                 if (this !== proxy && this !== target) {
                   if (typeof nativeForEach === 'function') {
                     try {
@@ -543,7 +550,14 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) cb.call(thisArg, v, v, proxy);
-              }, 'forEach');
+              };
+              Object.defineProperty(forEachRaw, '__coreBridgeTarget__', {
+                value: nativeForEach,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
+              methodCache.forEach = markNative(forEachRaw, 'forEach');
             }
             return methodCache.forEach;
           }
@@ -552,7 +566,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             if (!methodCache[key]) {
               const name = prop === 'keys' ? 'keys' : 'values';
               const nativeIter = Reflect.get(target, prop, target);
-              methodCache[key] = markNative(function* iterator() {
+              const iteratorRaw = function* iterator() {
                 if (this !== proxy && this !== target) {
                   if (typeof nativeIter === 'function') {
                     try {
@@ -572,14 +586,21 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) yield v;
-              }, name);
+              };
+              Object.defineProperty(iteratorRaw, '__coreBridgeTarget__', {
+                value: nativeIter,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
+              methodCache[key] = markNative(iteratorRaw, name);
             }
             return methodCache[key];
           }
           if (prop === 'entries') {
             if (!methodCache.entries) {
               const nativeEntries = Reflect.get(target, 'entries', target);
-              methodCache.entries = markNative(function* entries() {
+              const entriesRaw = function* entries() {
                 if (this !== proxy && this !== target) {
                   if (typeof nativeEntries === 'function') {
                     try {
@@ -599,7 +620,14 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) yield [v, v];
-              }, 'entries');
+              };
+              Object.defineProperty(entriesRaw, '__coreBridgeTarget__', {
+                value: nativeEntries,
+                writable: true,
+                configurable: true,
+                enumerable: false
+              });
+              methodCache.entries = markNative(entriesRaw, 'entries');
             }
             return methodCache.entries;
           }

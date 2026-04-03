@@ -527,6 +527,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
         } })[method];
 
+    Object.defineProperty(wrapped, '__coreBridgeTarget__', {
+      value: orig,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
     const patched = markAsNative(wrapped, method);
     definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
     patchedMethods.add(patched);
@@ -702,6 +708,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
       })();
 
+      Object.defineProperty(wrappedRaw, '__coreBridgeTarget__', {
+        value: orig,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       const wrapped = markAsNative(wrappedRaw, method);
       if ((__loggerRoot && __loggerRoot.__DEBUG__) && (method === 'getParameter' || method === 'readPixels')) {
         emitContextDiag('info', 'context:webgl:wrapLayer:selected', null, {
@@ -797,6 +809,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
          // 2026-02-11: keep native contract - toBlob without callback returns undefined.
          return Reflect.apply(orig, self, args);
        } }).toBlob;
+       Object.defineProperty(wrapped, '__coreBridgeTarget__', {
+         value: orig,
+         writable: true,
+         configurable: true,
+         enumerable: false
+       });
        const patched = markAsNative(wrapped, method);
        definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
        patchedMethods.add(patched);
@@ -834,6 +852,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           (e) => { throw e; }
         );
       } }).convertToBlob;
+       Object.defineProperty(wrapped, '__coreBridgeTarget__', {
+         value: orig,
+         writable: true,
+         configurable: true,
+         enumerable: false
+       });
        const patched = markAsNative(wrapped, method);
        definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
        patchedMethods.add(patched);
@@ -861,6 +885,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           });
       });
     } })[method];
+    Object.defineProperty(wrapped, '__coreBridgeTarget__', {
+      value: orig,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
     const patched = markAsNative(wrapped, method);
     definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
     patchedMethods.add(patched);
@@ -1215,7 +1245,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
       return ctx;
     };
 
-    const wrapped = markAsNative(dispatch.bind(null, owner), 'getContext');
+    const wrappedGetContext = dispatch.bind(null, owner);
+    Object.defineProperty(wrappedGetContext, '__coreBridgeTarget__', {
+      value: orig,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    const wrapped = markAsNative(wrappedGetContext, 'getContext');
     if (!defineIssuedMethod(owner, proto, 'getContext', wrapped)) return 0;
     patchedMethods.add(wrapped);
     if (issuedGetContextPatchedOwners) issuedGetContextPatchedOwners.add(owner);
@@ -1249,7 +1286,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const createElementProto = resolveDocumentMethodOwner('createElement');
     const createElementOrig = createElementProto && createElementProto.createElement;
     if (typeof createElementOrig === 'function' && !Object.prototype.hasOwnProperty.call(doc, 'createElement')) {
-      const wrappedCreateElement = markAsNative(function createElement(localName, options) {
+      const wrappedCreateElementRaw = function createElement(localName, options) {
         const el = Reflect.apply(createElementOrig, this, arguments);
         try {
           if (el && String(localName).toLowerCase() === 'canvas') installCanvasOwner(el);
@@ -1261,7 +1298,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
           });
         }
         return el;
-      }, 'createElement');
+      };
+      Object.defineProperty(wrappedCreateElementRaw, '__coreBridgeTarget__', {
+        value: createElementOrig,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      const wrappedCreateElement = markAsNative(wrappedCreateElementRaw, 'createElement');
       if (defineIssuedMethod(doc, createElementProto, 'createElement', wrappedCreateElement)) {
         patchedMethods.add(wrappedCreateElement);
         applied++;
@@ -1271,7 +1315,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const createElementNSProto = resolveDocumentMethodOwner('createElementNS');
     const createElementNSOrig = createElementNSProto && createElementNSProto.createElementNS;
     if (typeof createElementNSOrig === 'function' && !Object.prototype.hasOwnProperty.call(doc, 'createElementNS')) {
-      const wrappedCreateElementNS = markAsNative(function createElementNS(namespaceURI, qualifiedName, options) {
+      const wrappedCreateElementNSRaw = function createElementNS(namespaceURI, qualifiedName, options) {
         const el = Reflect.apply(createElementNSOrig, this, arguments);
         try {
           if (el && String(qualifiedName).toLowerCase() === 'canvas') installCanvasOwner(el);
@@ -1283,7 +1327,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
           });
         }
         return el;
-      }, 'createElementNS');
+      };
+      Object.defineProperty(wrappedCreateElementNSRaw, '__coreBridgeTarget__', {
+        value: createElementNSOrig,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      const wrappedCreateElementNS = markAsNative(wrappedCreateElementNSRaw, 'createElementNS');
       if (defineIssuedMethod(doc, createElementNSProto, 'createElementNS', wrappedCreateElementNS)) {
         patchedMethods.add(wrappedCreateElementNS);
         applied++;
@@ -1316,7 +1367,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const NativeOffscreenCanvas = global.OffscreenCanvas;
     if (!ctorDesc || ctorDesc.configurable === false) return 0;
 
-    const WrappedOffscreenCanvas = markAsNative(function OffscreenCanvas(width, height) {
+    const WrappedOffscreenCanvasRaw = function OffscreenCanvas(width, height) {
       const nextTarget = (typeof new.target === 'function' && new.target !== WrappedOffscreenCanvas)
         ? new.target
         : NativeOffscreenCanvas;
@@ -1332,7 +1383,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
         });
       }
       return instance;
-    }, 'OffscreenCanvas');
+    };
+    Object.defineProperty(WrappedOffscreenCanvasRaw, '__coreBridgeTarget__', {
+      value: NativeOffscreenCanvas,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    const WrappedOffscreenCanvas = markAsNative(WrappedOffscreenCanvasRaw, 'OffscreenCanvas');
 
     Object.setPrototypeOf(WrappedOffscreenCanvas, NativeOffscreenCanvas);
     Object.defineProperty(WrappedOffscreenCanvas, 'prototype', {
@@ -1642,6 +1700,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
       return ctx;
     } }).getContext;
 
+    Object.defineProperty(wrapped, '__coreBridgeTarget__', {
+      value: orig,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
     const patched = markAsNative(wrapped, method);
     definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
     patchedMethods.add(patched);

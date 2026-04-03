@@ -134,22 +134,6 @@ const AudioContextModule = function AudioContextModule(window) {
     return;
   }
 
-  const markAsNative = (function() {
-    const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function') ? __core.__ensureMarkAsNative : null;
-    const m = ensure ? ensure() : null;
-    if (typeof m !== 'function') {
-      degrade('audiocontext:mark_native_missing', new Error('[AudioContextPatch] markAsNative missing'), {
-        stage: 'preflight',
-        level: 'fatal',
-        type: __audioTypePipeline,
-        key: 'markAsNative',
-        data: { outcome: 'skip', reason: 'mark_native_missing' }
-      });
-      return null;
-    }
-    return m;
-  })();
-  if (!markAsNative) return;
   const safeDefine = (__core && typeof __core.__safeDefine === 'function') ? __core.__safeDefine : null;
   const __wrapNativeApply = (__core && typeof __core.__wrapNativeApply === 'function') ? __core.__wrapNativeApply : null;
   const __wrapNativeAccessor = (__core && typeof __core.__wrapNativeAccessor === 'function') ? __core.__wrapNativeAccessor : null;

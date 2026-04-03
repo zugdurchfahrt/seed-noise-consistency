@@ -2469,11 +2469,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       let usageBytes   = Math.max(0, Math.floor(quotaBytes * USED_PCT / 100));
 
       // Monotonous “jitter” of usage within a few KB, on R(), so as not to break the module’s entropy
-       const tickUsage = __navMark(function tickUsage() {
+       const tickUsage = function tickUsage() {
          if (typeof R === 'function') {
            usageBytes = Math.min(quotaBytes - 4096, usageBytes + Math.floor(R() * 4096));
          }
-       }, 'tickUsage');
+       };
 
         const origEstimate = storageDesc.value;
         if (typeof origEstimate !== 'function') {
@@ -2717,15 +2717,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const perfMemoryResolved = __navResolveDescriptor(perfProto, 'memory', { mode: 'proto_chain' });
         const perfMemoryOwner = (perfMemoryResolved && perfMemoryResolved.owner) ? perfMemoryResolved.owner : perfProto;
 
-        const heapFromDM = __navMark(function heapFromDM(dm) {
+        const heapFromDM = function heapFromDM(dm) {
           if (!(typeof dm === 'number' && isFinite(dm))) return null;
           if (dm <= 0.5) return 512  * 1024 * 1024;   
           if (dm <= 1)   return 768  * 1024 * 1024;   
           if (dm <= 2)   return 1536 * 1024 * 1024;   
           if (dm <= 4)   return 3072 * 1024 * 1024;   
           return 4096 * 1024 * 1024;                  
-        }, 'heapFromDM');
-        const getMemory = __navMark(function () {
+        };
+        const getMemory = function () {
           const dm = Number(navigator.deviceMemory);
           const limit = heapFromDM(dm);
           if (limit == null) {
@@ -2736,7 +2736,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           const randMix = (typeof R === 'function') ? (0.40 + 0.15 * R()) : 0.40;
           const used  = Math.min(total - 1, Math.floor(total * randMix));
           return { jsHeapSizeLimit: limit, totalJSHeapSize: total, usedJSHeapSize: used };
-        }, 'get memory');
+        };
 
         try {
           const perfMemoryOwnDesc = Object.getOwnPropertyDescriptor(performance, 'memory');
@@ -2909,13 +2909,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // ——— K. WebAuthn (stub) ———
     if (!window.PublicKeyCredential) {
-      window.PublicKeyCredential = __navMark(function PublicKeyCredential() {}, 'PublicKeyCredential');
+      window.PublicKeyCredential = function PublicKeyCredential() {};
       Object.defineProperty(PublicKeyCredential, 'isUserVerifyingPlatformAuthenticatorAvailable', {
         configurable: true,
         enumerable: false,
         writable: true,
-        value: __navMark(function isUserVerifyingPlatformAuthenticatorAvailable() { return Promise.resolve(true); },
-             'isUserVerifyingPlatformAuthenticatorAvailable')
+        value: function isUserVerifyingPlatformAuthenticatorAvailable() { return Promise.resolve(true); }
       });
     }
     if (navigator.credentials) {
@@ -3055,6 +3054,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       let __MIMETYPE_ARRAY_SINGLETON__ = null;
       let __MIME_OBJECTS_SINGLETON__ = null;
 
+      const __navNativePluginItem = (typeof Plugin === 'function' && Plugin.prototype && typeof Plugin.prototype.item === 'function')
+        ? Plugin.prototype.item
+        : null;
+      const __navNativePluginNamedItem = (typeof Plugin === 'function' && Plugin.prototype && typeof Plugin.prototype.namedItem === 'function')
+        ? Plugin.prototype.namedItem
+        : null;
+      const __navNativePluginArrayItem = (typeof PluginArray === 'function' && PluginArray.prototype && typeof PluginArray.prototype.item === 'function')
+        ? PluginArray.prototype.item
+        : null;
+      const __navNativePluginArrayNamedItem = (typeof PluginArray === 'function' && PluginArray.prototype && typeof PluginArray.prototype.namedItem === 'function')
+        ? PluginArray.prototype.namedItem
+        : null;
+      const __navNativeMimeTypeArrayItem = (typeof MimeTypeArray === 'function' && MimeTypeArray.prototype && typeof MimeTypeArray.prototype.item === 'function')
+        ? MimeTypeArray.prototype.item
+        : null;
+      const __navNativeMimeTypeArrayNamedItem = (typeof MimeTypeArray === 'function' && MimeTypeArray.prototype && typeof MimeTypeArray.prototype.namedItem === 'function')
+        ? MimeTypeArray.prototype.namedItem
+        : null;
+
       // 4.3. PluginArray (enumerable fields, compatible with JSON/assign)
       function createPluginArray(plugins) {
         if (__PLUGIN_ARRAY_SINGLETON__) return __PLUGIN_ARRAY_SINGLETON__;
@@ -3068,6 +3086,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             for (let j = 0; j < this.length; j++) if (this[j]?.type === type) return this[j];
             return null;
           } }).namedItem;
+          let pluginItemValue = itemMethod;
+          if (typeof __navNativePluginItem === 'function') {
+            Object.defineProperty(itemMethod, '__coreBridgeTarget__', {
+              value: __navNativePluginItem,
+              writable: true,
+              configurable: true,
+              enumerable: false
+            });
+            pluginItemValue = __navMark(itemMethod, 'item');
+          }
+          let pluginNamedItemValue = namedItemMethod;
+          if (typeof __navNativePluginNamedItem === 'function') {
+            Object.defineProperty(namedItemMethod, '__coreBridgeTarget__', {
+              value: __navNativePluginNamedItem,
+              writable: true,
+              configurable: true,
+              enumerable: false
+            });
+            pluginNamedItemValue = __navMark(namedItemMethod, 'namedItem');
+          }
 
           // Create plugin object: metadata non-enumerable, mime indexes enumerable
           const pluginObj = Object.create(Plugin.prototype, {
@@ -3076,11 +3114,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             description: { value: String(p.description), enumerable: false, configurable: true },
             length:      { value: p.mimeTypes.length,    enumerable: false, configurable: true },
             item: {
-              value: __navMark(itemMethod, 'item'),
+              value: pluginItemValue,
               enumerable: false, configurable: true
             },
             namedItem: {
-              value: __navMark(namedItemMethod, 'namedItem'),
+              value: pluginNamedItemValue,
               enumerable: false, configurable: true
             }
           });
@@ -3107,10 +3145,32 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
 
         // array of plugins
+        const pluginArrayItemRaw = ({ item(index) { return pluginArray[String(index)] || null; } }).item;
+        let pluginArrayItemValue = pluginArrayItemRaw;
+        if (typeof __navNativePluginArrayItem === 'function') {
+          Object.defineProperty(pluginArrayItemRaw, '__coreBridgeTarget__', {
+            value: __navNativePluginArrayItem,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          pluginArrayItemValue = __navMark(pluginArrayItemRaw, 'item');
+        }
+        const pluginArrayNamedItemRaw = ({ namedItem(name) { for (let i = 0; i < arr.length; i++) if (pluginArray[String(i)]?.name === name) return pluginArray[String(i)]; return null; } }).namedItem;
+        let pluginArrayNamedItemValue = pluginArrayNamedItemRaw;
+        if (typeof __navNativePluginArrayNamedItem === 'function') {
+          Object.defineProperty(pluginArrayNamedItemRaw, '__coreBridgeTarget__', {
+            value: __navNativePluginArrayNamedItem,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          pluginArrayNamedItemValue = __navMark(pluginArrayNamedItemRaw, 'namedItem');
+        }
         const pluginArray = Object.create(PluginArray.prototype, {
           length:    { value: arr.length, enumerable: true, configurable: true },
-          item:      { value: __navMark(({ item(index) { return pluginArray[String(index)] || null; } }).item, 'item'), enumerable: false, configurable: true },
-          namedItem: { value: __navMark(({ namedItem(name) { for (let i = 0; i < arr.length; i++) if (pluginArray[String(i)]?.name === name) return pluginArray[String(i)]; return null; } }).namedItem, 'namedItem'), enumerable: false, configurable: true }
+          item:      { value: pluginArrayItemValue, enumerable: false, configurable: true },
+          namedItem: { value: pluginArrayNamedItemValue, enumerable: false, configurable: true }
         });
 
         // Indexes ? enumerable + named props (non-enumerable)
@@ -3134,10 +3194,32 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
         createPluginArray(plugins);
         const mimes = Array.isArray(__MIME_OBJECTS_SINGLETON__) ? __MIME_OBJECTS_SINGLETON__ : [];
+        const mimeArrayItemRaw = ({ item(index) { return mimeArray[String(index)] || null; } }).item;
+        let mimeArrayItemValue = mimeArrayItemRaw;
+        if (typeof __navNativeMimeTypeArrayItem === 'function') {
+          Object.defineProperty(mimeArrayItemRaw, '__coreBridgeTarget__', {
+            value: __navNativeMimeTypeArrayItem,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          mimeArrayItemValue = __navMark(mimeArrayItemRaw, 'item');
+        }
+        const mimeArrayNamedItemRaw = ({ namedItem(type) { return mimeArray[type] || null; } }).namedItem;
+        let mimeArrayNamedItemValue = mimeArrayNamedItemRaw;
+        if (typeof __navNativeMimeTypeArrayNamedItem === 'function') {
+          Object.defineProperty(mimeArrayNamedItemRaw, '__coreBridgeTarget__', {
+            value: __navNativeMimeTypeArrayNamedItem,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          mimeArrayNamedItemValue = __navMark(mimeArrayNamedItemRaw, 'namedItem');
+        }
         const mimeArray = Object.create(MimeTypeArray.prototype, {
           length:    { value: mimes.length, enumerable: true, configurable: true },
-          item:      { value: __navMark(({ item(index) { return mimeArray[String(index)] || null; } }).item, 'item'), enumerable: false, configurable: true },
-          namedItem: { value: __navMark(({ namedItem(type) { return mimeArray[type] || null; } }).namedItem, 'namedItem'), enumerable: false, configurable: true }
+          item:      { value: mimeArrayItemValue, enumerable: false, configurable: true },
+          namedItem: { value: mimeArrayNamedItemValue, enumerable: false, configurable: true }
         });
 
         for (let i = 0; i < mimes.length; i++) {

@@ -280,13 +280,22 @@
     {
       const st = __resolveCoreToStringState__();
       const probe = function probe(){};
+      Object.defineProperty(probe, '__coreBridgeTarget__', {
+        value: nativeToString,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       const nativeProbe = Reflect.apply(nativeToString, probe, []);
-      markAsNative(probe);
+      markAsNative(probe, 'toString');
       const actual = st && st.overrideMap && typeof st.overrideMap.get === 'function'
         ? st.overrideMap.get(probe)
         : undefined;
-      if (typeof actual !== 'string' || actual === nativeProbe) {
-        const e = new Error('UACHPatch: toString override map missing label');
+      const actualBridge = st && st.proxyTargetMap && typeof st.proxyTargetMap.get === 'function'
+        ? st.proxyTargetMap.get(probe)
+        : undefined;
+      if (typeof actual !== 'string' || actual === nativeProbe || actualBridge !== nativeToString) {
+        const e = new Error('UACHPatch: toString override map missing bridge label');
         emitDegrade('error', 'worker_patch_src:tostring_state:contract:label_missing', {
           type: 'pipeline missing data',
           stage: 'contract',
@@ -298,6 +307,8 @@
         }, e);
         throw e;
       }
+      if (st && st.overrideMap && typeof st.overrideMap.delete === 'function') st.overrideMap.delete(probe);
+      if (st && st.proxyTargetMap && typeof st.proxyTargetMap.delete === 'function') st.proxyTargetMap.delete(probe);
       const directProbe = function workerPatchDirectProbe(){};
       const expectedNative = Reflect.apply(nativeToString, directProbe, []);
       const actualNative = Reflect.apply(Function.prototype.toString, directProbe, []);
@@ -316,23 +327,30 @@
       }
     }
 
-    markAsNative(seedEnsure, '__ensureMarkAsNative');
-
 
     try {
-    const getDevicePixelRatio = markAsNative(function getDevicePixelRatio(){
+    const getDevicePixelRatioRaw = function getDevicePixelRatio(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!('dpr' in cache.snap)) throw new Error('UACHPatch: no dpr');
       const snapVal = Number(cache.snap.dpr);
       if (validDpr(snapVal)) return snapVal;
       throw new Error('UACHPatch: bad dpr');
-    }, 'get devicePixelRatio');
+    };
     const dprOwn = Object.getOwnPropertyDescriptor(self, 'devicePixelRatio');
     const dprProto = (!dprOwn && Object.getPrototypeOf(self))
       ? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(self), 'devicePixelRatio')
       : null;
     const dprTarget = dprOwn ? self : (dprProto ? Object.getPrototypeOf(self) : null);
     const dprDesc = dprOwn || dprProto;
+    if (dprDesc && typeof dprDesc.get === 'function') {
+      Object.defineProperty(getDevicePixelRatioRaw, '__coreBridgeTarget__', {
+        value: dprDesc.get,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    const getDevicePixelRatio = markAsNative(getDevicePixelRatioRaw, 'get devicePixelRatio');
     if (dprTarget && !(dprDesc && dprDesc.configurable === false)) {
       const isData = dprDesc && Object.prototype.hasOwnProperty.call(dprDesc, 'value') && !dprDesc.get && !dprDesc.set;
       if (isData) {
@@ -427,8 +445,7 @@
       && Object.prototype.hasOwnProperty.call(dPlatform, 'value')
       && !dPlatform.get
       && !dPlatform.set) ? dPlatform.value : undefined;
-    trackedDefineProperties(uadProto, {
-      brands:   { get: markAsNative(function getBrands(){
+    const getBrandsRaw = function getBrands(){
                         if (!isUadThis(this)) {
                           if (typeof origBrandsGet === 'function') {
                             try {
@@ -465,8 +482,17 @@
                           if (typeof origBrandsGet === 'function') return origBrandsGet.call(this);
                           throw e;
                         }
-                      }, 'get brands'), enumerable: !!dBrands.enumerable, configurable: !!dBrands.configurable, set: dBrands.set },
-      mobile:   { get: markAsNative(function getMobile(){
+                      };
+    if (typeof origBrandsGet === 'function') {
+      Object.defineProperty(getBrandsRaw, '__coreBridgeTarget__', {
+        value: origBrandsGet,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    const getBrands = markAsNative(getBrandsRaw, 'get brands');
+    const getMobileRaw = function getMobile(){
                         if (!isUadThis(this)) {
                           if (typeof origMobileGet === 'function') {
                             try {
@@ -504,8 +530,17 @@
                           if (typeof origMobileGet === 'function') return origMobileGet.call(this);
                           throw e;
                         }
-                      }, 'get mobile'),       enumerable: !!dMobile.enumerable, configurable: !!dMobile.configurable, set: dMobile.set },
-      platform: { get: markAsNative(function getPlatform(){
+                      };
+    if (typeof origMobileGet === 'function') {
+      Object.defineProperty(getMobileRaw, '__coreBridgeTarget__', {
+        value: origMobileGet,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    const getMobile = markAsNative(getMobileRaw, 'get mobile');
+    const getPlatformRaw = function getPlatform(){
                         if (!isUadThis(this)) {
                           if (typeof origPlatformGet === 'function') {
                             try {
@@ -545,7 +580,20 @@
                           if (typeof origPlatformGet === 'function') return origPlatformGet.call(this);
                           throw e;
                         }
-                      }, 'get platform'), enumerable: !!dPlatform.enumerable, configurable: !!dPlatform.configurable, set: dPlatform.set },
+                      };
+    if (typeof origPlatformGet === 'function') {
+      Object.defineProperty(getPlatformRaw, '__coreBridgeTarget__', {
+        value: origPlatformGet,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    const getPlatform = markAsNative(getPlatformRaw, 'get platform');
+    trackedDefineProperties(uadProto, {
+      brands:   { get: getBrands, enumerable: !!dBrands.enumerable, configurable: !!dBrands.configurable, set: dBrands.set },
+      mobile:   { get: getMobile, enumerable: !!dMobile.enumerable, configurable: !!dMobile.configurable, set: dMobile.set },
+      platform: { get: getPlatform, enumerable: !!dPlatform.enumerable, configurable: !!dPlatform.configurable, set: dPlatform.set },
     });
     const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList');
     const origFullGet = dFull && dFull.get;
@@ -553,7 +601,7 @@
       && Object.prototype.hasOwnProperty.call(dFull, 'value')
       && !dFull.get
       && !dFull.set) ? dFull.value : undefined;
-    const getFullVersionList = markAsNative(function getFullVersionList(){
+    const getFullVersionListRaw = function getFullVersionList(){
       if (!isUadThis(this)) {
         if (typeof origFullGet === 'function') {
           try {
@@ -591,7 +639,16 @@
         if (typeof origFullGet === 'function') return origFullGet.call(this);
         throw e;
       }
-    }, 'get fullVersionList');
+    };
+    if (typeof origFullGet === 'function') {
+      Object.defineProperty(getFullVersionListRaw, '__coreBridgeTarget__', {
+        value: origFullGet,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    const getFullVersionList = markAsNative(getFullVersionListRaw, 'get fullVersionList');
     if (dFull) {
       trackedDefineProperty(uadProto, 'fullVersionList', {
         configurable: !!dFull.configurable,
@@ -602,7 +659,7 @@
     }
     const dToJSON = Object.getOwnPropertyDescriptor(uadProto, 'toJSON');
     const origToJSON = dToJSON && dToJSON.value;
-    const toJSON = markAsNative(function toJSON(){
+    const toJSONRaw = function toJSON(){
       if (!isUadThis(this)) {
         if (typeof origToJSON === 'function') {
           try {
@@ -622,7 +679,16 @@
         throw new TypeError('Illegal invocation');
       }
       return {brands:this.brands, mobile:this.mobile, platform:this.platform};
-    }, 'toJSON');
+    };
+    if (typeof origToJSON === 'function') {
+      Object.defineProperty(toJSONRaw, '__coreBridgeTarget__', {
+        value: origToJSON,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    const toJSON = markAsNative(toJSONRaw, 'toJSON');
     trackedDefineProperty(uadProto, 'toJSON', {
       configurable: dToJSON ? !!dToJSON.configurable : true,
       enumerable: dToJSON ? !!dToJSON.enumerable : false,
@@ -631,7 +697,7 @@
     });
     const dGHEV = Object.getOwnPropertyDescriptor(uadProto, 'getHighEntropyValues');
     const origGHEV = dGHEV && dGHEV.value;
-    const getHighEntropyValues = markAsNative(function getHighEntropyValues(keys){
+    const getHighEntropyValuesRaw = function getHighEntropyValues(keys){
         if (!isUadThis(this)) {
           if (typeof origGHEV === 'function') {
             try {
@@ -750,7 +816,16 @@
           }, e);
           throw e;
         }
-      }, 'getHighEntropyValues');
+      };
+    if (typeof origGHEV === 'function') {
+      Object.defineProperty(getHighEntropyValuesRaw, '__coreBridgeTarget__', {
+        value: origGHEV,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    const getHighEntropyValues = markAsNative(getHighEntropyValuesRaw, 'getHighEntropyValues');
     trackedDefineProperty(uadProto, 'getHighEntropyValues', {
       configurable: dGHEV ? !!dGHEV.configurable : true,
       enumerable: dGHEV ? !!dGHEV.enumerable : false,
@@ -1017,11 +1092,11 @@
     };
 
 
-    const getLanguage = markAsNative(function getLanguage(){
+    const getLanguage = function getLanguage(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (typeof cache.snap.language !== 'string' || cache.snap.language.trim() === '') throw new Error('UACHPatch: bad language');
       return cache.snap.language;
-    }, 'get language');
+    };
     {
       const resolvedUserAgentData = resolveWorkerNavigatorNativeDescriptor('userAgentData');
       __workerNavigatorPatchedOwners__['userAgentData'] = resolvedUserAgentData.owner;
@@ -1051,7 +1126,7 @@
       def(proto,'language', getLanguage, true);
     }
 
-    const getLanguages = markAsNative(function getLanguages(){
+    const getLanguages = function getLanguages(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       if (!Array.isArray(cache.snap.languages)) throw new Error('UACHPatch: bad languages');
       const currentValues = cache.snap.languages;
@@ -1077,7 +1152,7 @@
       languagesCache.values = out.slice();
       languagesCache.frozen = out;
       return out;
-    }, 'get languages');
+    };
     let __patchLanguages = true;
     try {
       const nativeLanguagesResolved = readWorkerNavigatorNativeValue('languages');
@@ -1108,12 +1183,12 @@
     }
 
 
-    const getDeviceMemory = markAsNative(function getDeviceMemory(){
+    const getDeviceMemory = function getDeviceMemory(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       const v = Number(cache.snap.deviceMemory);
       if (!Number.isFinite(v)) throw new Error('UACHPatch: bad deviceMemory');
       return v;
-    }, 'get deviceMemory');
+    };
     let __patchDeviceMemory = true;
     try {
       const nativeDeviceMemoryResolved = readWorkerNavigatorNativeValue('deviceMemory');
@@ -1140,12 +1215,12 @@
       def(proto, 'deviceMemory', getDeviceMemory, true);
     }
 
-    const getHardwareConcurrency = markAsNative(function getHardwareConcurrency(){
+    const getHardwareConcurrency = function getHardwareConcurrency(){
       if (!cache.snap) throw new Error('UACHPatch: no snap');
       const v = Number(cache.snap.hardwareConcurrency);
       if (!Number.isFinite(v)) throw new Error('UACHPatch: bad hardwareConcurrency');
       return v;
-    }, 'get hardwareConcurrency');
+    };
     let __patchHardwareConcurrency = true;
     try {
       const nativeHardwareConcurrencyResolved = readWorkerNavigatorNativeValue('hardwareConcurrency');
@@ -1229,13 +1304,20 @@
           : (typeof ctx.getExtension === 'function' ? ctx.getExtension : null);
 
         if (typeof origGetExtension === 'function') {
-          const wrappedGetExtension = markAsNative(function getExtension(name) {
+          const wrappedGetExtensionRaw = function getExtension(name) {
             const ext = Reflect.apply(origGetExtension, this, arguments);
             if (name === 'WEBGL_debug_renderer_info') {
               debugInfoCache.set(this, ext || null);
             }
             return ext;
-          }, 'getExtension');
+          };
+          Object.defineProperty(wrappedGetExtensionRaw, '__coreBridgeTarget__', {
+            value: origGetExtension,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          const wrappedGetExtension = markAsNative(wrappedGetExtensionRaw, 'getExtension');
           trackedDefineProperty(ctx, 'getExtension', {
             configurable: dGetExtension ? !!dGetExtension.configurable : true,
             enumerable: dGetExtension ? !!dGetExtension.enumerable : false,
@@ -1244,7 +1326,7 @@
           });
         }
 
-        const wrappedGetParameter = markAsNative(function getParameter(pname) {
+        const wrappedGetParameterRaw = function getParameter(pname) {
           const live = requireWebGLSnapshot(cache.snap, 'webgl_runtime');
           let dbg = debugInfoCache.has(this) ? debugInfoCache.get(this) : undefined;
           if (dbg === undefined) {
@@ -1265,7 +1347,14 @@
           if (pname === this.VENDOR || pname === 0x1F00) return live.vendor;
           if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
           return Reflect.apply(origGetParameter, this, arguments);
-        }, 'getParameter');
+        };
+        Object.defineProperty(wrappedGetParameterRaw, '__coreBridgeTarget__', {
+          value: origGetParameter,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        const wrappedGetParameter = markAsNative(wrappedGetParameterRaw, 'getParameter');
         trackedDefineProperty(ctx, 'getParameter', {
           configurable: dGetParameter ? !!dGetParameter.configurable : true,
           enumerable: dGetParameter ? !!dGetParameter.enumerable : false,
@@ -1275,14 +1364,21 @@
         return ctx;
       };
 
-      const wrappedGetContext = markAsNative(function getContext(kind) {
+      const wrappedGetContextRaw = function getContext(kind) {
         const res = Reflect.apply(nativeGetContext, this, arguments);
         if (!res) return res;
         if (kind === 'webgl' || kind === 'webgl2' || kind === 'experimental-webgl') {
           return patchContextInstance(res);
         }
         return res;
-      }, 'getContext');
+      };
+      Object.defineProperty(wrappedGetContextRaw, '__coreBridgeTarget__', {
+        value: nativeGetContext,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      const wrappedGetContext = markAsNative(wrappedGetContextRaw, 'getContext');
       trackedDefineProperty(oscProto, 'getContext', {
         configurable: !!dGetContext.configurable,
         enumerable: !!dGetContext.enumerable,
@@ -1379,7 +1475,7 @@
       const NativeWorker = self.Worker;
       const dWorker = Object.getOwnPropertyDescriptor(self, 'Worker');
       if (!dWorker) throw new Error('UACHPatch: Worker descriptor missing');
-      const WrappedWorker = markAsNative(function Worker(url, opts){
+      const WrappedWorkerRaw = function Worker(url, opts){
         const abs = new URL(url, self.location && self.location.href || undefined).href;
         const workerType = resolveWorkerType(abs, opts);
         const snap = requireSnap(cache.snap, 'nested');
@@ -1392,7 +1488,14 @@
         // Do not revoke immediately: the worker may still be fetching the bootstrap script.
         // Early revoke can surface as `importScripts(blob:...) failed to load` in real sites.
         return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
-      }, 'Worker');
+      };
+      Object.defineProperty(WrappedWorkerRaw, '__coreBridgeTarget__', {
+        value: NativeWorker,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      const WrappedWorker = markAsNative(WrappedWorkerRaw, 'Worker');
       trackedDefineProperty(self, 'Worker', {
         configurable: dWorker.configurable,
         enumerable: dWorker.enumerable,

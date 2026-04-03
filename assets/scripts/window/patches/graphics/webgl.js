@@ -319,6 +319,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
           return Reflect.apply(origGetParameter, this, [pname]);
         }}).getParameter;
 
+        Object.defineProperty(wrappedGetParameter, '__coreBridgeTarget__', {
+          value: origGetParameter,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
         const wrappedGetParameterNative = markNative(wrappedGetParameter, 'getParameter');
         res.getParameter = wrappedGetParameterNative;
       }

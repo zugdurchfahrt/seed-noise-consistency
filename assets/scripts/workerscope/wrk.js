@@ -1548,15 +1548,29 @@ function installBlobURLStore(G) {
   }
   const nativeCreate = G.URL.createObjectURL;
   const nativeRevoke = G.URL.revokeObjectURL;
-  const createWrapped = mark(function createObjectURL(obj){
+  const createWrappedRaw = function createObjectURL(obj){
     const url = nativeCreate.call(G.URL, obj);
     if (obj && typeof obj === 'object') store.set(url, obj);
     return url;
-  }, 'createObjectURL');
-  const revokeWrapped = mark(function revokeObjectURL(url){
+  };
+  Object.defineProperty(createWrappedRaw, '__coreBridgeTarget__', {
+    value: nativeCreate,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+  const createWrapped = mark(createWrappedRaw, 'createObjectURL');
+  const revokeWrappedRaw = function revokeObjectURL(url){
     if (store.has(url)) store.delete(url);
     return nativeRevoke.call(G.URL, url);
-  }, 'revokeObjectURL');
+  };
+  Object.defineProperty(revokeWrappedRaw, '__coreBridgeTarget__', {
+    value: nativeRevoke,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+  const revokeWrapped = mark(revokeWrappedRaw, 'revokeObjectURL');
   const dCreate = Object.getOwnPropertyDescriptor(G.URL, 'createObjectURL');
   const dRevoke = Object.getOwnPropertyDescriptor(G.URL, 'revokeObjectURL');
   if (dCreate && dCreate.configurable === false && dCreate.writable === false) {
@@ -1672,7 +1686,7 @@ function SafeWorkerOverride(G){
     throw new Error('[WorkerOverride] markAsNative missing');
   }
 
-  const WrappedWorker = mark(function Worker(url, opts) {
+  const WrappedWorkerRaw = function Worker(url, opts) {
   const abs = new URL(url, location.href).href;
   const workerType = resolveWorkerType(abs, opts, 'Worker');
   const workerPatchApi = __requireWorkerPatchApi__('worker override runtime api not ready', 'preflight');
@@ -1850,7 +1864,14 @@ function SafeWorkerOverride(G){
 
   return w;
 
-}, 'Worker');
+};
+  Object.defineProperty(WrappedWorkerRaw, '__coreBridgeTarget__', {
+    value: NativeWorker,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+  const WrappedWorker = mark(WrappedWorkerRaw, 'Worker');
 
   definePatchedValue(G, 'Worker', WrappedWorker, 'Worker');
 
@@ -1885,7 +1906,7 @@ function SafeSharedWorkerOverride(G){
 
   // === SharedWorker override wrapper (complete, self-contained) ===
    // Normalize 2nd arg to an options object (always), so `type` is never lost
-  const WrappedSharedWorker = mark(function SharedWorker(url, nameOrOpts) {
+  const WrappedSharedWorkerRaw = function SharedWorker(url, nameOrOpts) {
     const abs = new URL(url, location.href).href;
     const hasOptsObj =
       !!(nameOrOpts && (typeof nameOrOpts === 'object' || typeof nameOrOpts === 'function')) &&
@@ -2033,7 +2054,14 @@ function SafeSharedWorkerOverride(G){
       }, e);
     }
     return sw;
-  }, 'SharedWorker');
+  };
+  Object.defineProperty(WrappedSharedWorkerRaw, '__coreBridgeTarget__', {
+    value: NativeShared,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+  const WrappedSharedWorker = mark(WrappedSharedWorkerRaw, 'SharedWorker');
   
   
   
@@ -2242,7 +2270,7 @@ function ServiceWorkerOverride(G){
     if (!desc || desc.configurable === false || desc.writable === false) {
       throw new Error(`[ServiceWorkerOverride] register not configurable: ${JSON.stringify(desc)}`);
     }
-    const WrappedServiceWorkerRegister = mark(function register(url, opts){
+    const WrappedServiceWorkerRegisterRaw = function register(url, opts){
       if (!isAllowed(url, (opts && opts.scope))) {
         if (wantFake()) return Promise.resolve(makeFakeRegistration(opts, String(url)));
         const Err = (typeof DOMException === 'function')
@@ -2255,7 +2283,14 @@ function ServiceWorkerOverride(G){
       if (arguments.length >= 2) return Native.register.call(this, url, opts);
       return Native.register.call(this, url);
 
-    }, 'register');
+    };
+    Object.defineProperty(WrappedServiceWorkerRegisterRaw, '__coreBridgeTarget__', {
+      value: Native.register,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    const WrappedServiceWorkerRegister = mark(WrappedServiceWorkerRegisterRaw, 'register');
     __wrkBestEffort('wrk:service_worker_register_name_failed', {
       stage: 'apply',
       key: 'register.name',
@@ -2278,7 +2313,7 @@ function ServiceWorkerOverride(G){
     if (!desc || desc.configurable === false || desc.writable === false) {
       throw new Error(`[ServiceWorkerOverride] getRegistrations not configurable: ${JSON.stringify(desc)}`);
     }
-    const WrappedSWGetRegistrations = mark(async function getRegistrations(){
+    const WrappedSWGetRegistrationsRaw = async function getRegistrations(){
       const regs = await Native.getRegistrations.apply(this, arguments);
       if (!wantFilter()) return regs;
       const out = [];
@@ -2306,7 +2341,14 @@ function ServiceWorkerOverride(G){
         }
       }
       return out;
-    }, 'getRegistrations');
+    };
+    Object.defineProperty(WrappedSWGetRegistrationsRaw, '__coreBridgeTarget__', {
+      value: Native.getRegistrations,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    const WrappedSWGetRegistrations = mark(WrappedSWGetRegistrationsRaw, 'getRegistrations');
     __wrkBestEffort('wrk:service_worker_getregistrations_name_failed', {
       stage: 'apply',
       key: 'getRegistrations.name',
@@ -2326,7 +2368,7 @@ function ServiceWorkerOverride(G){
     if (!desc || desc.configurable === false || desc.writable === false) {
       throw new Error(`[ServiceWorkerOverride] getRegistration not configurable: ${JSON.stringify(desc)}`);
     }
-    const WrappedSWGetRegistration = mark(async function getRegistration(scope){
+    const WrappedSWGetRegistrationRaw = async function getRegistration(scope){
       const r = await Native.getRegistration.apply(this, arguments);
       if (!r) return wantFake() && wantFilter() ? makeFakeRegistration({ scope }) : r;
       if (!wantFilter()) return r;
@@ -2350,7 +2392,14 @@ function ServiceWorkerOverride(G){
         CLEANED.add(sc);
       }
       return wantFake() ? makeFakeRegistration({ scope: sc }, url) : undefined;
-    }, 'getRegistration');
+    };
+    Object.defineProperty(WrappedSWGetRegistrationRaw, '__coreBridgeTarget__', {
+      value: Native.getRegistration,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    const WrappedSWGetRegistration = mark(WrappedSWGetRegistrationRaw, 'getRegistration');
     __wrkBestEffort('wrk:service_worker_getregistration_name_failed', {
       stage: 'apply',
       key: 'getRegistration.name',
