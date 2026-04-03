@@ -198,6 +198,28 @@ Defines the contract-driven patching engine through `Core.applyTargets`. Downstr
 - `assets/JS_fonts_patch/font_patch.generated.js` — auto-generated fonts patch, consumed by `font_module.js`.
 - `assets/templates/font_patch.template.j2` — Jinja2 template used by `rand_met.py` to generate the JS patch.
 
+
+### Logging
+
+- type in console to get:
+- L.__PROBE__();  `probe.js` log console output, json and html files saving;
+
+- L.__DEGRADE__.getBuffer(); - `set_log.js` console output;
+
+- `set_log.js` json log file saving:
+
+  ```js
+  (() => {
+    const json = JSON.stringify(L.__DEGRADE__?.getBuffer?.() || [], null, 2);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: `degrade-buffer-${stamp}.json` });
+    a.click();
+    URL.revokeObjectURL(url);
+  })();
+  ```
+
+
 ### Launchers
 
 - `NO_PROXY_START.bat` — venv → `python main_no_proxy.py`.

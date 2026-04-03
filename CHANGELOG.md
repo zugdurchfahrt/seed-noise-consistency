@@ -1,15 +1,21 @@
 # Changelog
 
+03.04.2026
+
+- `clientCode`: [] on `ServiceWorkerGlobalScope`
+- `Function.prototype.toString` improvements
+
 26.03.2026
 ### `context.js`  
-The hook logic hasn't been altered; it's still the same as before.
+
 
 - Added instance-level routing for serialization and `WebGL` methods.
 - `toDataURL`, `toBlob`, `convertToBlob`, `getParameter`, and `readPixels` are now attached only to real canvas/context objects instead of being patched on public prototypes.
 - `chainGetContext()` is now used only to install those handlers after a real context is created.
 - Public prototype patch loops were removed for `HTMLCanvasElement.prototype.toDataURL`, `HTMLCanvasElement.prototype.toBlob`, `OffscreenCanvas.prototype.convertToBlob`, `WebGLRenderingContext.prototype.*`, and `WebGL2RenderingContext.prototype.*`.
-
 - `getContext` patch was removed from the `HTMLCanvasElement` and `OffscreenCanvas` prototypes. It is now applied only to actual canvas objects when they are created, so the public prototypes keep native shape.
+- `getContext` patch was removed from the `HTMLCanvasElement` and `OffscreenCanvas` prototypes. It is now applied only to actual canvas objects when they are created, so the public prototypes keep native shape.
+- The hook logic hasn't been affected.
 
 ### `screen.js` 
 
