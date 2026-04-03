@@ -884,6 +884,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
       __internal.guards = __guardRegistry;
       __internal.knownWrapped = knownWrapped;
       __internal.prng = __prngRoot;
+      safeDefine(__internal, 'markAsNative', {
+        value: baseMarkAsNative,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
       safeDefine(__internal, '__ACCESSOR_OWNER_FIRST_CAPABLE__', {
         value: true,
         writable: true,
