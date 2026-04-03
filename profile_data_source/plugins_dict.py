@@ -15,50 +15,179 @@ logger = logger.getChild("plugins_dict")
 
 PLUGIN_DICT: Dict[str, List]  = {
     "chromium-viewer": [
-        # [],  # V1 — empty
-        [    # V2 — Classic Chrome: only one PDF Viewer
+        [    # V1 — Medium Chromium-like bundle
             {
-                "name": "Chrome PDF Viewer",
+                "name": "PDF Viewer",
                 "filename": "internal-pdf-viewer",
-                "description": "",
+                "description": "Portable Document Format",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": ""}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
+            {
+                "name": "Chromium PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
                 ],
             }
+            ,
+            {
+                "name": "Microsoft Edge PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
+            {
+                "name": "WebKit built-in PDF",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
         ],
-        [   # V3 — The same essence, another description
+        [    # V2 — Full Chromium-like bundle (clean local baseline)
+            {
+                "name": "PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
             {
                 "name": "Chrome PDF Viewer",
                 "filename": "internal-pdf-viewer",
                 "description": "Portable Document Format",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
                 ],
-            }
+            },
+            {
+                "name": "Chromium PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
+            {
+                "name": "Microsoft Edge PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
+            {
+                "name": "WebKit built-in PDF",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
         ],
     ],
 
     "edge-viewer": [
-        # [],  # V1 — empty
-        [    # V2 — Classic Edge: only one PDF Viewer
+        [    # V1 — Medium Edge-like bundle
+            {
+                "name": "PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
+            {
+                "name": "Chromium PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
             {
                 "name": "Microsoft Edge PDF Viewer",
                 "filename": "internal-pdf-viewer",
                 "description": "Portable Document Format",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
                 ],
-            }
+            },
+            {
+                "name": "WebKit built-in PDF",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
         ],
-        [   # V3 — description variation
+        [    # V2 — Full Edge-like bundle (clean local baseline)
+            {
+                "name": "PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
+            {
+                "name": "Chrome PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
+            {
+                "name": "Chromium PDF Viewer",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
             {
                 "name": "Microsoft Edge PDF Viewer",
                 "filename": "internal-pdf-viewer",
-                "description": "",
+                "description": "Portable Document Format",
                 "mimeTypes": [
-                    {"type": "application/pdf", "suffixes": "pdf", "description": ""}
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
                 ],
-            }
+            },
+            {
+                "name": "WebKit built-in PDF",
+                "filename": "internal-pdf-viewer",
+                "description": "Portable Document Format",
+                "mimeTypes": [
+                    {"type": "application/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                    {"type": "text/pdf", "suffixes": "pdf", "description": "Portable Document Format"},
+                ],
+            },
         ],
     ],
 
@@ -110,8 +239,8 @@ PLUGIN_DICT: Dict[str, List]  = {
 
 # Engine restrictions (lo, hi)
 ENGINE_LIMITS: dict[str, Tuple[int, int]] = {
-    "chromium-viewer": (0, 1),
-    "edge-viewer":     (0, 1),
+    "chromium-viewer": (4, 5),
+    "edge-viewer":     (4, 5),
     "webkit-viewer":   (0, 1),
     "gecko-standard":  (2, 2),
 }
@@ -200,24 +329,29 @@ def build_plugins_profile(browser_choice: str, *, rng: Optional[random.Random] =
     cleaned = _dedup_norm(filtered)
 
     lo, hi = ENGINE_LIMITS.get(key, (0, 1))
-    if len(cleaned) < lo:
-        # "Pour" from the "canonical" version
-        canon: List[Dict] = []
-        if variants and isinstance(variants[0], dict):
-            canon = [dict(p) for p in variants if isinstance(p, dict)]
-        else:
-            for v in variants or []:
-                if isinstance(v, list) and v:
-                    canon = [dict(p) for p in v if isinstance(p, dict)]
-                    break
-        cleaned = _dedup_norm(cleaned + canon)[:lo]
     if len(cleaned) > hi:
         cleaned = cleaned[:hi]
 
     if strict:
         assert lo <= len(cleaned) <= hi, f"plugins count {len(cleaned)} outside limits {lo}..{hi} for {key}"
 
-    mime_final = [mt for p in cleaned for mt in (p.get("mimeTypes") or [])]
+    mime_final: List[Dict] = []
+    seen_mime: set[Tuple[str, str, str]] = set()
+    for p in cleaned:
+        for mt in (p.get("mimeTypes") or []):
+            k = (
+                str(mt.get("type", "")),
+                str(mt.get("suffixes", "")),
+                str(mt.get("description", "")),
+            )
+            if k in seen_mime:
+                continue
+            seen_mime.add(k)
+            mime_final.append({
+                "type": k[0],
+                "suffixes": k[1],
+                "description": k[2],
+            })
     logger.debug("[plugins.unify] browser=%s key=%s → %d: %s", browser_choice, key, len(cleaned), [p.get("name") for p in cleaned])
     return cleaned, mime_final
 

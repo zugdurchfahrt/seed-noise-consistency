@@ -3436,6 +3436,157 @@ function printToStringCrossRealmChecks() {
     return rows;
   }
 
+  function printNavigatorCollectionChecks() {
+    const rows = [];
+    function push(check, pass, details, err) {
+      rows.push({
+        check: String(check || "navigator_collection"),
+        pass: !!pass,
+        details: Object.prototype.hasOwnProperty.call(arguments, 2) ? details : null,
+        error: err ? errorShape(err) : null
+      });
+    }
+    function compareWrongThis(wrapperFn, nativeFn, args) {
+      const invokeArgs = Array.isArray(args) ? args.slice() : [];
+      const invoke = (fn) => {
+        try {
+          return { threw: false, value: toPrintable(Reflect.apply(fn, {}, invokeArgs)), error: null };
+        } catch (e) {
+          return { threw: true, value: null, error: errorShape(e) };
+        }
+      };
+      const actual = invoke(wrapperFn);
+      const expected = (typeof nativeFn === "function") ? invoke(nativeFn) : null;
+      let match = false;
+      if (expected) {
+        if (actual.threw === expected.threw) {
+          if (actual.threw) {
+            match = !!(
+              actual.error &&
+              expected.error &&
+              actual.error.name === expected.error.name &&
+              actual.error.message === expected.error.message
+            );
+          } else {
+            match = JSON.stringify(actual.value) === JSON.stringify(expected.value);
+          }
+        }
+      }
+      return { actual, expected, match };
+    }
+    try {
+      const plugins = nav.plugins;
+      const pluginsAgain = nav.plugins;
+      const mimeTypes = nav.mimeTypes;
+      const mimeTypesAgain = nav.mimeTypes;
+      const plugin0 = plugins && plugins.length ? plugins[0] : null;
+      const mime0 = mimeTypes && mimeTypes.length ? mimeTypes[0] : null;
+      const pluginArrayProto = (typeof PluginArray !== "undefined" && PluginArray && PluginArray.prototype)
+        ? PluginArray.prototype
+        : (plugins ? Object.getPrototypeOf(plugins) : null);
+      const pluginProto = (typeof Plugin !== "undefined" && Plugin && Plugin.prototype)
+        ? Plugin.prototype
+        : (plugin0 ? Object.getPrototypeOf(plugin0) : null);
+      const mimeTypeArrayProto = (typeof MimeTypeArray !== "undefined" && MimeTypeArray && MimeTypeArray.prototype)
+        ? MimeTypeArray.prototype
+        : (mimeTypes ? Object.getPrototypeOf(mimeTypes) : null);
+
+      push("Navigator.plugins identity stable", plugins === pluginsAgain, {
+        sameIdentity: plugins === pluginsAgain
+      });
+      push("Navigator.mimeTypes identity stable", mimeTypes === mimeTypesAgain, {
+        sameIdentity: mimeTypes === mimeTypesAgain
+      });
+      push("Navigator.plugins tag", Object.prototype.toString.call(plugins) === "[object PluginArray]", {
+        tag: Object.prototype.toString.call(plugins)
+      });
+      push("Navigator.mimeTypes tag", Object.prototype.toString.call(mimeTypes) === "[object MimeTypeArray]", {
+        tag: Object.prototype.toString.call(mimeTypes)
+      });
+      push("Navigator.plugins item native-shaped", !!(plugins && typeof plugins.item === "function" && plugins.item.name === "item" && Function.prototype.toString.call(plugins.item).indexOf("[native code]") !== -1), {
+        type: plugins ? typeof plugins.item : null,
+        name: plugins && plugins.item ? plugins.item.name : null,
+        toString: plugins && plugins.item ? Function.prototype.toString.call(plugins.item) : null
+      });
+      push("Navigator.plugins namedItem native-shaped", !!(plugins && typeof plugins.namedItem === "function" && plugins.namedItem.name === "namedItem" && Function.prototype.toString.call(plugins.namedItem).indexOf("[native code]") !== -1), {
+        type: plugins ? typeof plugins.namedItem : null,
+        name: plugins && plugins.namedItem ? plugins.namedItem.name : null,
+        toString: plugins && plugins.namedItem ? Function.prototype.toString.call(plugins.namedItem) : null
+      });
+      push("Navigator.mimeTypes item native-shaped", !!(mimeTypes && typeof mimeTypes.item === "function" && mimeTypes.item.name === "item" && Function.prototype.toString.call(mimeTypes.item).indexOf("[native code]") !== -1), {
+        type: mimeTypes ? typeof mimeTypes.item : null,
+        name: mimeTypes && mimeTypes.item ? mimeTypes.item.name : null,
+        toString: mimeTypes && mimeTypes.item ? Function.prototype.toString.call(mimeTypes.item) : null
+      });
+      push("Navigator.mimeTypes namedItem native-shaped", !!(mimeTypes && typeof mimeTypes.namedItem === "function" && mimeTypes.namedItem.name === "namedItem" && Function.prototype.toString.call(mimeTypes.namedItem).indexOf("[native code]") !== -1), {
+        type: mimeTypes ? typeof mimeTypes.namedItem : null,
+        name: mimeTypes && mimeTypes.namedItem ? mimeTypes.namedItem.name : null,
+        toString: mimeTypes && mimeTypes.namedItem ? Function.prototype.toString.call(mimeTypes.namedItem) : null
+      });
+      push("Plugin object tag", !!plugin0 && Object.prototype.toString.call(plugin0) === "[object Plugin]", {
+        tag: plugin0 ? Object.prototype.toString.call(plugin0) : null
+      });
+      push("MimeType object tag", !!mime0 && Object.prototype.toString.call(mime0) === "[object MimeType]", {
+        tag: mime0 ? Object.prototype.toString.call(mime0) : null
+      });
+      push("Navigator.plugins numeric lookup linked", !!(plugins && plugin0 && plugins.item(0) === plugin0), {
+        item0Matches: !!(plugins && plugin0 && plugins.item(0) === plugin0)
+      });
+      push("Navigator.plugins named lookup linked", !!(plugins && plugin0 && plugin0.name && plugins.namedItem(plugin0.name) === plugin0), {
+        pluginName: plugin0 ? plugin0.name : null,
+        namedItemMatches: !!(plugins && plugin0 && plugin0.name && plugins.namedItem(plugin0.name) === plugin0)
+      });
+      push("Navigator.mimeTypes numeric lookup linked", !!(mimeTypes && mime0 && mimeTypes.item(0) === mime0), {
+        item0Matches: !!(mimeTypes && mime0 && mimeTypes.item(0) === mime0)
+      });
+      push("Navigator.mimeTypes named lookup linked", !!(mimeTypes && mime0 && mime0.type && mimeTypes.namedItem(mime0.type) === mime0), {
+        mimeType: mime0 ? mime0.type : null,
+        namedItemMatches: !!(mimeTypes && mime0 && mime0.type && mimeTypes.namedItem(mime0.type) === mime0)
+      });
+      push("Plugin numeric lookup linked", !!(plugin0 && mime0 && plugin0.item(0) === mime0), {
+        item0Matches: !!(plugin0 && mime0 && plugin0.item(0) === mime0)
+      });
+      push("Plugin named lookup linked", !!(plugin0 && mime0 && mime0.type && plugin0.namedItem(mime0.type) === mime0), {
+        mimeType: mime0 ? mime0.type : null,
+        namedItemMatches: !!(plugin0 && mime0 && mime0.type && plugin0.namedItem(mime0.type) === mime0)
+      });
+      push("MimeType enabledPlugin linked", !!(mime0 && plugin0 && mime0.enabledPlugin === plugin0), {
+        linked: !!(mime0 && plugin0 && mime0.enabledPlugin === plugin0)
+      });
+      if (plugins && typeof plugins.item === "function") {
+        const wrongThis = compareWrongThis(plugins.item, pluginArrayProto && pluginArrayProto.item, [0]);
+        push("PluginArray.item wrong-this matches native", wrongThis.match, wrongThis);
+      }
+      if (plugins && typeof plugins.namedItem === "function") {
+        const wrongThis = compareWrongThis(plugins.namedItem, pluginArrayProto && pluginArrayProto.namedItem, [plugin0 && plugin0.name ? plugin0.name : "missing"]);
+        push("PluginArray.namedItem wrong-this matches native", wrongThis.match, wrongThis);
+      }
+      if (plugin0 && typeof plugin0.item === "function") {
+        const wrongThis = compareWrongThis(plugin0.item, pluginProto && pluginProto.item, [0]);
+        push("Plugin.item wrong-this matches native", wrongThis.match, wrongThis);
+      }
+      if (plugin0 && typeof plugin0.namedItem === "function") {
+        const wrongThis = compareWrongThis(plugin0.namedItem, pluginProto && pluginProto.namedItem, [mime0 && mime0.type ? mime0.type : "missing"]);
+        push("Plugin.namedItem wrong-this matches native", wrongThis.match, wrongThis);
+      }
+      if (mimeTypes && typeof mimeTypes.item === "function") {
+        const wrongThis = compareWrongThis(mimeTypes.item, mimeTypeArrayProto && mimeTypeArrayProto.item, [0]);
+        push("MimeTypeArray.item wrong-this matches native", wrongThis.match, wrongThis);
+      }
+      if (mimeTypes && typeof mimeTypes.namedItem === "function") {
+        const wrongThis = compareWrongThis(mimeTypes.namedItem, mimeTypeArrayProto && mimeTypeArrayProto.namedItem, [mime0 && mime0.type ? mime0.type : "missing"]);
+        push("MimeTypeArray.namedItem wrong-this matches native", wrongThis.match, wrongThis);
+      }
+    } catch (e) {
+      push("navigator collections probe", false, null, e);
+    }
+
+    __probeConsoleCall("group", "[probe] navigator collections");
+    __probeConsoleCall("table", rows);
+    __probeConsoleCall("groupEnd");
+    return { ok: rows.every((row) => row && row.pass !== false), rows };
+  }
+
   const fieldsMeta = { check: "__PROBE__", phase: "build", method: "printFieldValues" };
   const fieldsWait = await __probeObserveAsync(printFieldValues());
   if (!fieldsWait.ok && fieldsWait.timedOut) {
@@ -3540,6 +3691,7 @@ function printToStringCrossRealmChecks() {
     audioOwnProperty: printAudioOwnPropertyInvariantChecks(),
     prototypeInvariants: printPrototypeInvariantChecks(),
     toStringCrossRealm: printToStringCrossRealmChecks(),
+    navigatorCollections: printNavigatorCollectionChecks(),
     workerScopeAudit: workerScopeWait.ok ? workerScopeWait.value : {
       ok: false,
       rows: [{
@@ -3630,9 +3782,25 @@ function printToStringCrossRealmChecks() {
       (result.audioOwnProperty ? result.audioOwnProperty.ok !== false : true) &&
       (result.prototypeInvariants ? result.prototypeInvariants.ok !== false : true) &&
       (result.toStringCrossRealm ? result.toStringCrossRealm.ok !== false : true) &&
+      (result.navigatorCollections ? result.navigatorCollections.ok !== false : true) &&
       (result.degradeOk !== false) &&
       (result.moduleCheckOk !== false)
     );
+  } catch (_) {}
+
+  try {
+    const collectionRows = (result.navigatorCollections && Array.isArray(result.navigatorCollections.rows))
+      ? result.navigatorCollections.rows
+      : [];
+    const collectionBad = __probeCountWhere(collectionRows, (row) => row && row.pass === false);
+    __probeReport("navigator_collections", {
+      status: collectionBad ? "mismatch" : "ok",
+      rows: collectionRows,
+      summary: {
+        total: collectionRows.length,
+        bad: collectionBad
+      }
+    });
   } catch (_) {}
 
   try {
