@@ -159,6 +159,24 @@
     }
   }
 
+  const __swWrapStrictAccessor = (typeof G.__wrapStrictAccessor === 'function')
+    ? G.__wrapStrictAccessor
+    : null;
+
+  function __dropBridgeExport(key) {
+    try {
+      const desc = G ? Object.getOwnPropertyDescriptor(G, key) : null;
+      if (desc && desc.configurable === true) delete G[key];
+    } catch (e) {}
+  }
+
+  __dropBridgeExport('__ensureMarkAsNative');
+  __dropBridgeExport('__wrapNativeApply');
+  __dropBridgeExport('__wrapNativeAccessor');
+  __dropBridgeExport('__wrapStrictAccessor');
+  __dropBridgeExport('__wrapNativeCtor');
+  __dropBridgeExport('__CORE_TOSTRING_STATE__');
+
   function __resolveDescriptor(startObj, key) {
     for (let cur = startObj; cur; cur = Object.getPrototypeOf(cur)) {
       let desc = null;
@@ -172,12 +190,31 @@
     return { owner: null, desc: null };
   }
 
+  function __resolveSwEnv() {
+    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+      ? G.CanvasPatchContext
+      : null;
+    const stateRoot = (C && C.state && typeof C.state === 'object')
+      ? C.state
+      : null;
+    const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+      ? stateRoot.__WRK__
+      : null;
+    const bootstrapRoot = (wrkState && wrkState.bootstrap && typeof wrkState.bootstrap === 'object')
+      ? wrkState.bootstrap
+      : null;
+    if (!bootstrapRoot) return null;
+    const envDesc = Object.getOwnPropertyDescriptor(bootstrapRoot, '__SW_ENV__');
+    if (!envDesc) return null;
+    return ('value' in envDesc) ? envDesc.value : bootstrapRoot.__SW_ENV__;
+  }
+
   try {
-    const env = G.__SW_ENV__;
+    const env = __resolveSwEnv();
     if (!env || typeof env !== 'object') {
       __fail('sw_prelude:env_missing', {
         stage: 'preflight',
-        key: '__SW_ENV__',
+        key: 'CanvasPatchContext.state.__WRK__.bootstrap.__SW_ENV__',
         message: 'service worker env missing',
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'env_missing' }
@@ -234,6 +271,15 @@
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'meta_invalid' }
       }, new Error('SW uaData meta invalid'));
+    }
+    if (typeof __swWrapStrictAccessor !== 'function') {
+      __fail('sw_prelude:wrap_strict_accessor_missing', {
+        stage: 'preflight',
+        key: '__wrapStrictAccessor',
+        message: 'service worker strict accessor bridge missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'wrap_strict_accessor_missing' }
+      }, new Error('SW strict accessor bridge missing'));
     }
 
     try {
@@ -434,57 +480,92 @@
         const nativeValue = resolved.desc.value;
         origGet = function nativeDataGetterFallback() { return nativeValue; };
       }
-      const guardedGet = function() {
-        const recv = this;
-        if (recv === nav) {
-          try {
-            return getter.call(recv);
-          } catch (e) {
-            __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
-              stage: 'runtime',
-              key,
-              message: 'service worker getter runtime failed',
-              type: 'browser structure missing data',
-              data: { outcome: 'skip', reason: 'getter_runtime_failed' }
-            }, e);
-            // Disabled temporarily: valid SW profile reads must come only from __SW_ENV__.
-            // if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
-            throw e;
+      const guardedGet = Object.getOwnPropertyDescriptor(({
+        get [key]() {
+          const recv = this;
+          if (recv === nav) {
+            try {
+              return getter.call(recv);
+            } catch (e) {
+              __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
+                stage: 'runtime',
+                key,
+                message: 'service worker getter runtime failed',
+                type: 'browser structure missing data',
+                data: { outcome: 'skip', reason: 'getter_runtime_failed' }
+              }, e);
+              // Disabled temporarily: valid SW profile reads must come only from hidden bootstrap SW env.
+              // if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
+              throw e;
+            }
           }
-        }
-        if (typeof origGet === 'function') {
-          try {
-            return Reflect.apply(origGet, recv, []);
-          } catch (e) {
-            __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker getter illegal invocation', e);
-            throw e;
+          if (typeof origGet === 'function') {
+            try {
+              return Reflect.apply(origGet, recv, []);
+            } catch (e) {
+              __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker getter illegal invocation', e);
+              throw e;
+            }
           }
+          return undefined;
         }
-        return undefined;
-      };
+      }), key).get;
+      const sourceDesc = resolved.desc && typeof resolved.desc === 'object'
+        ? {
+            configurable: !!resolved.desc.configurable,
+            enumerable: !!resolved.desc.enumerable,
+            get: origGet,
+            set: resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'set') ? resolved.desc.set : undefined
+          }
+        : {
+            configurable: true,
+            enumerable: false,
+            get: origGet,
+            set: undefined
+          };
+      const bridgedGet = (typeof origGet === 'function')
+        ? __swWrapStrictAccessor(key, guardedGet, sourceDesc, function(recv) {
+            return recv === nav;
+          }, {
+            name: 'get ' + key
+          })
+        : guardedGet;
       __trackDefineProperty(owner, key, {
-        get: guardedGet,
+        get: bridgedGet,
         configurable: resolved.desc ? !!resolved.desc.configurable : true,
         enumerable: resolved.desc ? !!resolved.desc.enumerable : false,
         set: resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'set') ? resolved.desc.set : undefined
       });
     }
 
-    function guardedUadGetter(value, origGet, origValue) {
-      return function() {
-        const recv = this;
-        if (isUadThis(recv)) return value;
-        if (typeof origGet === 'function') {
-          try {
-            return Reflect.apply(origGet, recv, []);
-          } catch (e) {
-            __reportNativeThrow('sw_prelude:illegal_invocation', null, 'service worker uaData illegal invocation', e);
-            throw e;
+    function guardedUadGetter(key, value, origGet, origValue) {
+      const guardedGet = Object.getOwnPropertyDescriptor(({
+        get [key]() {
+          const recv = this;
+          if (isUadThis(recv)) return value;
+          if (typeof origGet === 'function') {
+            try {
+              return Reflect.apply(origGet, recv, []);
+            } catch (e) {
+              __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker uaData illegal invocation', e);
+              throw e;
+            }
           }
+          if (origValue !== undefined) return origValue;
+          return undefined;
         }
-        if (origValue !== undefined) return origValue;
-        return undefined;
-      };
+      }), key).get;
+      if (typeof origGet !== 'function') return guardedGet;
+      return __swWrapStrictAccessor(key, guardedGet, {
+        configurable: true,
+        enumerable: false,
+        get: origGet,
+        set: undefined
+      }, function(recv) {
+        return isUadThis(recv);
+      }, {
+        name: 'get ' + key
+      });
     }
 
     if (Object.prototype.hasOwnProperty.call(dBrands, 'value') && !dBrands.get && !dBrands.set) {
@@ -496,7 +577,7 @@
       });
     } else {
       __trackDefineProperty(uadProto, 'brands', {
-        get: guardedUadGetter(brandsValue, dBrands.get, dBrands.value),
+        get: guardedUadGetter('brands', brandsValue, dBrands.get, dBrands.value),
         set: dBrands.set,
         configurable: !!dBrands.configurable,
         enumerable: !!dBrands.enumerable
@@ -511,7 +592,7 @@
       });
     } else {
       __trackDefineProperty(uadProto, 'mobile', {
-        get: guardedUadGetter(mobileValue, dMobile.get, dMobile.value),
+        get: guardedUadGetter('mobile', mobileValue, dMobile.get, dMobile.value),
         set: dMobile.set,
         configurable: !!dMobile.configurable,
         enumerable: !!dMobile.enumerable
@@ -526,7 +607,7 @@
       });
     } else {
       __trackDefineProperty(uadProto, 'platform', {
-        get: guardedUadGetter(platformValue, dPlatform.get, dPlatform.value),
+        get: guardedUadGetter('platform', platformValue, dPlatform.get, dPlatform.value),
         set: dPlatform.set,
         configurable: !!dPlatform.configurable,
         enumerable: !!dPlatform.enumerable
@@ -534,7 +615,7 @@
     }
 
     __trackDefineProperty(uadProto, 'fullVersionList', {
-      get: guardedUadGetter(deep(meta.fullVersionList), dFull.get, dFull.value),
+      get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull.get, dFull.value),
       enumerable: !!dFull.enumerable,
       configurable: !!dFull.configurable
     });

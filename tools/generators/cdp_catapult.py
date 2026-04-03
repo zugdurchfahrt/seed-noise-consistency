@@ -230,14 +230,19 @@ def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_c
         raise ValueError("SW inject: expected_client_hints missing")
 
     prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
+    reflect_path = SCRIPTS_WORKERSCOPE / "set_reflect.js"
     if not prelude_path.exists():
         raise FileNotFoundError(prelude_path)
+    if not reflect_path.exists():
+        raise FileNotFoundError(reflect_path)
 
     sw_prelude_js = prelude_path.read_text("utf-8")
+    sw_reflect_js = reflect_path.read_text("utf-8")
     sw_env_js = f"""
 (() => {{
   'use strict';
   const G = globalThis;
+  const hasOwn = Object.prototype.hasOwnProperty;
   const nextEnv = {{
     primary: {json.dumps(language, ensure_ascii=False)},
     langs: {json.dumps(normalized_languages, ensure_ascii=False)},
@@ -245,26 +250,50 @@ def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_c
     dm: {json.dumps(device_memory)},
     meta: {json.dumps(SW_META, ensure_ascii=False)}
   }};
-  const prev = Object.getOwnPropertyDescriptor(G, '__SW_ENV__');
+  function defineHidden(obj, key, value) {{
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) {{
+      throw new Error('SW inject: hidden owner missing for ' + String(key));
+    }}
+    const desc = Object.getOwnPropertyDescriptor(obj, key);
+    if (desc && desc.configurable === false) {{
+      return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
+    }}
+    Object.defineProperty(obj, key, {{
+      value: value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    }});
+    return value;
+  }}
+  function ensureHiddenObject(owner, key) {{
+    if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {{
+      throw new Error('SW inject: hidden owner missing for ' + String(key));
+    }}
+    if (hasOwn.call(owner, key) && owner[key] && typeof owner[key] === 'object') {{
+      return owner[key];
+    }}
+    return defineHidden(owner, key, Object.create(null));
+  }}
+  const C = ensureHiddenObject(G, 'CanvasPatchContext');
+  const stateRoot = ensureHiddenObject(C, 'state');
+  const wrkState = ensureHiddenObject(stateRoot, '__WRK__');
+  const bootstrapRoot = ensureHiddenObject(wrkState, 'bootstrap');
+  const prev = Object.getOwnPropertyDescriptor(bootstrapRoot, '__SW_ENV__');
   if (prev && prev.configurable === false) {{
-    const cur = ('value' in prev) ? prev.value : G.__SW_ENV__;
+    const cur = ('value' in prev) ? prev.value : bootstrapRoot.__SW_ENV__;
     const curJson = JSON.stringify(cur);
     const nextJson = JSON.stringify(nextEnv);
     if (curJson !== nextJson) {{
-      throw new Error('SW inject: __SW_ENV__ non-configurable mismatch');
+      throw new Error('SW inject: CanvasPatchContext.state.__WRK__.bootstrap.__SW_ENV__ non-configurable mismatch');
     }}
     return;
   }}
-  Object.defineProperty(G, '__SW_ENV__', {{
-    value: nextEnv,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  }});
+  defineHidden(bootstrapRoot, '__SW_ENV__', nextEnv);
 }})();
 //# sourceURL=sw_prelude_env.js
 """
-    return (sw_env_js + "\n" + sw_prelude_js).strip()
+    return (sw_env_js + "\n" + sw_reflect_js + "\n" + sw_prelude_js).strip()
 
 
 def _build_worker_seed_prelude(global_seed: str) -> str:
@@ -367,7 +396,7 @@ def run():
     """
     Lightweight SW injector loop:
     - connects to CDP
-    - auto-attaches to targets with waitForDebuggerOnStart=false (do NOT pause SW on start)
+    - auto-attaches to service_worker targets with waitForDebuggerOnStart=true
     - uses "flatten" protocol (required for browser-level auto-attach)
     - resumes non-service_worker targets immediately
     - for service_worker targets: Runtime.enable + Runtime.evaluate(prelude) + sanity + (optional) resume
@@ -427,6 +456,7 @@ def run():
     pending = {}
     pending_sess = {}  # (sessionId, innerId) -> str tag
     session_targets = {}
+    pending_sw_resume = {}
 
     fatal = {"err": None, "disconnect": False}
 
@@ -444,6 +474,20 @@ def run():
             ws.close()
         except Exception:
             pass
+
+    def _resume_sw_session(ws, sessionId, why):
+        meta = pending_sw_resume.pop(sessionId, None)
+        if not meta or not do_resume:
+            return
+        try:
+            send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+            logger.info(
+                "SW inject: resumed service_worker targetId=%s reason=%s",
+                meta.get("targetId"),
+                why,
+            )
+        except Exception as e:
+            _fatal(ws, "sw resume failed", e)
 
     def send(ws, method, params=None, tag=None):
         msg_id["v"] += 1
@@ -478,9 +522,8 @@ def run():
 
         params = {
             "autoAttach": True,
-            # IMPORTANT: do NOT pause SW on start. If the CDP websocket drops, a paused SW can
-            # manifest as downstream "NetworkError" / dead worker symptoms.
-            "waitForDebuggerOnStart": False,
+            # Pause SW before client code so prelude lands before navigator reads.
+            "waitForDebuggerOnStart": True,
             # Required for browser-level auto-attach.
             "flatten": True,
             "filter": [{"type": "service_worker", "exclude": False}],
@@ -510,6 +553,8 @@ def run():
                 return
             # Session-level response error handling (flatten protocol).
             if sid and msg.get("error"):
+                if tag in ("Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
+                    _resume_sw_session(ws, sid, "prelude_error")
                 if tag == "Runtime.addBinding:sw_diag":
                     logger.warning(
                         "SW inject: diag relay binding unavailable sessionId=%s target=%r err=%r",
@@ -525,10 +570,14 @@ def run():
                 res = msg.get("result") or {}
                 exc = res.get("exceptionDetails")
                 if exc:
+                    if tag in ("Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
+                        _resume_sw_session(ws, sid, "prelude_exception")
                     _fatal(ws, "sw prelude Runtime.evaluate exceptionDetails", exc)
                     return
                 if tag == "Runtime.evaluate:sw_prelude":
                     logger.info("SW inject: prelude applied (UAD branch)")
+                    if not sanity_expr:
+                        _resume_sw_session(ws, sid, "prelude_applied")
                 if tag == "Runtime.evaluate:sw_sanity":
                     try:
                         out = (res.get("result") or {}).get("value")
@@ -540,35 +589,46 @@ def run():
                             "uad": SW_META,
                         }
                         if not isinstance(out, dict):
+                            _resume_sw_session(ws, sid, "sanity_bad_result")
                             _fatal(ws, "sw sanity: bad result type", out)
                             return
                         if out.get("language") != exp["language"] or list(out.get("languages") or []) != list(exp["languages"]):
+                            _resume_sw_session(ws, sid, "sanity_language_mismatch")
                             _fatal(ws, "sw sanity: language mismatch", {"expected": exp, "got": out})
                             return
                         if int(out.get("hardwareConcurrency") or 0) != int(exp["hardwareConcurrency"]):
+                            _resume_sw_session(ws, sid, "sanity_hardware_mismatch")
                             _fatal(ws, "sw sanity: hardwareConcurrency mismatch", {"expected": exp, "got": out})
                             return
                         if float(out.get("deviceMemory") or 0.0) != float(exp["deviceMemory"]):
+                            _resume_sw_session(ws, sid, "sanity_device_memory_mismatch")
                             _fatal(ws, "sw sanity: deviceMemory mismatch", {"expected": exp, "got": out})
                             return
                         uad = out.get("uad") or {}
                         if not isinstance(uad, dict):
+                            _resume_sw_session(ws, sid, "sanity_uad_bad_result")
                             _fatal(ws, "sw sanity: uad bad result type", {"expected": exp, "got": out})
                             return
                         if uad.get("platform") != exp["uad"].get("platform"):
+                            _resume_sw_session(ws, sid, "sanity_uad_platform_mismatch")
                             _fatal(ws, "sw sanity: uad platform mismatch", {"expected": exp, "got": out})
                             return
                         if uad.get("mobile") != exp["uad"].get("mobile"):
+                            _resume_sw_session(ws, sid, "sanity_uad_mobile_mismatch")
                             _fatal(ws, "sw sanity: uad mobile mismatch", {"expected": exp, "got": out})
                             return
                         if list(uad.get("brands") or []) != list(exp["uad"].get("brands") or []):
+                            _resume_sw_session(ws, sid, "sanity_uad_brands_mismatch")
                             _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
                             return
                         if list(uad.get("fullVersionList") or []) != list(exp["uad"].get("fullVersionList") or []):
+                            _resume_sw_session(ws, sid, "sanity_uad_full_version_mismatch")
                             _fatal(ws, "sw sanity: uad fullVersionList mismatch", {"expected": exp, "got": out})
                             return
                         logger.info("SW inject: sanity OK target values match profile")
+                        _resume_sw_session(ws, sid, "sanity_ok")
                     except Exception as e:
+                        _resume_sw_session(ws, sid, "sanity_parse_failed")
                         _fatal(ws, "sw sanity: parse/compare failed", e)
             return
 
@@ -597,6 +657,7 @@ def run():
             sid = params.get("sessionId") or msg.get("sessionId")
             if sid:
                 session_targets.pop(sid, None)
+                pending_sw_resume.pop(sid, None)
             return
 
         if msg.get("method") != "Target.attachedToTarget":
@@ -628,6 +689,8 @@ def run():
 
         injected.add(tid)
         session_targets[sessionId] = {"targetId": tid, "url": turl}
+        if do_prelude and do_resume:
+            pending_sw_resume[sessionId] = {"targetId": tid, "url": turl}
         logger.info("SW inject: attached service_worker targetId=%s sessionId=%s url=%r", tid, sessionId, turl)
 
         if do_prelude:
@@ -647,14 +710,8 @@ def run():
                     "awaitPromise": False
                 })
             except Exception as e:
+                _resume_sw_session(ws, sessionId, "prelude_send_failed")
                 _fatal(ws, "sw prelude inject failed", e)
-            finally:
-                if do_resume:
-                    try:
-                        send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-                        logger.info("SW inject: resumed service_worker targetId=%s", tid)
-                    except Exception as e:
-                        _fatal(ws, "sw resume failed", e)
         else:
             if do_resume:
                 try:
