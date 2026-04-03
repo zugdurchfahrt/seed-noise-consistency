@@ -893,31 +893,26 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
 
 
-  // clientWidth / clientHeight for <html> ──
-  const installViewportClientAccessor = (owner, key, value) => {
-    if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return false;
-    const protoDesc = Object.getOwnPropertyDescriptor(Element.prototype, key);
-    if (!protoDesc || typeof protoDesc.get !== 'function') return false;
-    const getter = function viewportClientAccessor() {
-      return value;
-    }.bind(null);
-    Object.defineProperty(owner, key, {
-      get: getter,
-      configurable: !!protoDesc.configurable,
-      enumerable: !!protoDesc.enumerable
-    });
-    return true;
-  };
-  installViewportClientAccessor(document.documentElement, 'clientWidth', SCREEN_WIDTH);
-  installViewportClientAccessor(document.documentElement, 'clientHeight', SCREEN_HEIGHT);
-  const installBodyViewportAccessors = () => {
-    installViewportClientAccessor(document.body, 'clientWidth', SCREEN_WIDTH);
-    installViewportClientAccessor(document.body, 'clientHeight', SCREEN_HEIGHT);
-  };
-  installBodyViewportAccessors();
-  if (!document.body && typeof document.addEventListener === 'function') {
-    document.addEventListener('DOMContentLoaded', installBodyViewportAccessors, { once: true });
+  // clientWidth / clientHeight
+  const elementProto = (typeof Element !== 'undefined' && Element && Element.prototype) ? Element.prototype : null;
+  const clientWidthDesc = elementProto && Object.getOwnPropertyDescriptor(elementProto, 'clientWidth');
+  const clientHeightDesc = elementProto && Object.getOwnPropertyDescriptor(elementProto, 'clientHeight');
+  if (!clientWidthDesc || typeof clientWidthDesc.get !== 'function') {
+    throw new Error('Element.prototype.clientWidth getter missing');
   }
+  if (!clientHeightDesc || typeof clientHeightDesc.get !== 'function') {
+    throw new Error('Element.prototype.clientHeight getter missing');
+  }
+  const origClientWidth = clientWidthDesc.get;
+  const origClientHeight = clientHeightDesc.get;
+  redefineProp(elementProto, 'clientWidth', function clientWidth() {
+    if (this === document.documentElement || this === document.body) return SCREEN_WIDTH;
+    return Reflect.apply(origClientWidth, this, []);
+  });
+  redefineProp(elementProto, 'clientHeight', function clientHeight() {
+    if (this === document.documentElement || this === document.body) return SCREEN_HEIGHT;
+    return Reflect.apply(origClientHeight, this, []);
+  });
 
 
 
