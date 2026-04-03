@@ -224,15 +224,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     let mark = null;
     try {
-      const ensureMarkAsNative = (__core && typeof __core.__ensureMarkAsNative === 'function')
-        ? __core.__ensureMarkAsNative
+      mark = (__navCoreInternal && typeof __navCoreInternal.markAsNative === 'function')
+        ? __navCoreInternal.markAsNative
         : null;
-      mark = ensureMarkAsNative ? ensureMarkAsNative() : null;
     } catch (e) {
       __navDiagPipeline('error', 'nav_total_set:mark_as_native_failed', {
         stage: 'preflight',
-        message: 'Core.__ensureMarkAsNative failed',
-        data: { outcome: 'skip', reason: 'ensure_mark_as_native_failed', policy: 'skip', action: 'native' }
+        message: 'Core.__internal.markAsNative failed',
+        data: { outcome: 'skip', reason: 'core_internal_mark_as_native_failed', policy: 'skip', action: 'native' }
       }, e);
       __navReleaseEntryGuard(true, 'preflight', 'mark_as_native_failed');
       return;
@@ -240,8 +239,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (typeof mark !== 'function') {
       __navDiagPipeline('warn', 'nav_total_set:mark_as_native_missing', {
         stage: 'preflight',
-        message: 'Core.__ensureMarkAsNative missing',
-        data: { outcome: 'skip', reason: 'missing_dep_core_mark_as_native', policy: 'skip', action: 'native' }
+        message: 'Core.__internal.markAsNative missing',
+        data: { outcome: 'skip', reason: 'missing_dep_core_internal_mark_as_native', policy: 'skip', action: 'native' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'mark_as_native_missing');
       return;
