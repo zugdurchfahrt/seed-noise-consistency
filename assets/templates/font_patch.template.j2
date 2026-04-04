@@ -13,13 +13,7 @@
     ? C.state.__FONTS_CONFIG__
     : null;
   if (!slot) {
-    slot = Object.create(null);
-    Object.defineProperty(C.state, '__FONTS_CONFIG__', {
-      value: slot,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
+    throw new Error('[fonts] CanvasPatchContext.state.__FONTS_CONFIG__ missing');
   }
   slot.configs = {{ configs_json | safe }};
 })();

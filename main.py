@@ -374,15 +374,31 @@ def init_driver(
             # --- logger after bootstrap owner-space ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
-            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_NAV / "nav_total_set.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "screen.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA / "font_module.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "canvas.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "WEBGL_DICKts.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "webgl.js").read_text("utf-8"),
+            Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "WebgpuWL.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "webgpu.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_MEDIA / "audiocontext.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "context.js").read_text("utf-8"),
+            # --- execute phase ---
             f"""
-            (function initWorkerscopeOwnerSpace(win) {{
+            CoreWindowModule(window);
+            """,
+            f"""
+            (function initWorkerscopeRuntime(win) {{
                 const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
                     ? win.CanvasPatchContext
                     : null;
                 if (!C) throw new Error('WorkerscopeInit: CanvasPatchContext missing');
-                const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-                if (!stateRoot) throw new Error('WorkerscopeInit: CanvasPatchContext.state missing');
                 function defineHidden(obj, key, value) {{
                     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
                     const desc = Object.getOwnPropertyDescriptor(obj, key);
@@ -397,105 +413,54 @@ def init_driver(
                     }});
                     return value;
                 }}
-                const wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
-                    ? stateRoot.__WRK__
-                    : defineHidden(stateRoot, '__WRK__', Object.create(null));
-                defineHidden(wrkState, 'bootstrap', Object.create(null));
                 const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
                     ? C.__wrkRuntime__
                     : defineHidden(C, '__wrkRuntime__', Object.create(null));
-                const wrkHooks = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
-                    ? C.__wrkHooks__
-                    : defineHidden(C, '__wrkHooks__', Object.create(null));
-                if (!wrkHooks || typeof wrkHooks !== 'object') throw new Error('WorkerscopeInit: __wrkHooks__ missing');
-                const inlinePatch = {json.dumps(worker_patch_src)};
-                const inlineReflect = {json.dumps(worker_reflect_src)};
-                const inlineCoreWindow = {json.dumps(worker_core_window_src)};
-                const inlinePrng = {json.dumps(worker_prng_src)};
-                const inlineCanvasPatch = {json.dumps(worker_canvas_src)};
-                const inlineContextPatch = {json.dumps(worker_context_src)};
-                if (typeof inlinePatch !== 'string' || !inlinePatch) throw new Error('WorkerscopeInit: inlinePatch missing');
-                if (typeof inlineReflect !== 'string' || !inlineReflect) throw new Error('WorkerscopeInit: inlineReflect missing');
-                if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('WorkerscopeInit: inlineCoreWindow missing');
-                if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('WorkerscopeInit: inlinePrng missing');
-                if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('WorkerscopeInit: inlineCanvasPatch missing');
-                if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('WorkerscopeInit: inlineContextPatch missing');
-                defineHidden(wrkRuntime, 'inlinePatch', inlinePatch);
-                defineHidden(wrkRuntime, 'inlineReflect', inlineReflect);
-                defineHidden(wrkRuntime, 'inlineCoreWindow', inlineCoreWindow);
-                defineHidden(wrkRuntime, 'inlinePrng', inlinePrng);
-                defineHidden(wrkRuntime, 'inlineCanvasPatch', inlineCanvasPatch);
-                defineHidden(wrkRuntime, 'inlineContextPatch', inlineContextPatch);
+                defineHidden(wrkRuntime, 'inlinePatch', {json.dumps(worker_patch_src)});
+                defineHidden(wrkRuntime, 'inlineReflect', {json.dumps(worker_reflect_src)});
+                defineHidden(wrkRuntime, 'inlineCoreWindow', {json.dumps(worker_core_window_src)});
+                defineHidden(wrkRuntime, 'inlinePrng', {json.dumps(worker_prng_src)});
+                defineHidden(wrkRuntime, 'inlineCanvasPatch', {json.dumps(worker_canvas_src)});
+                defineHidden(wrkRuntime, 'inlineContextPatch', {json.dumps(worker_context_src)});
             }})(window);
             """,
-            # --- core window ---
-            Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
-            "CoreWindowModule(window);",
-            # --- hide_webdriver  ---
-            Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
-            "HideWebdriverPatchModule(window);",
-            # --- RTC ---
-            Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
-            "RtcpeerconnectionPatchModule(window);",
-            # --- rng params ---
-            Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
-            "RNGsetModule(window);",
-            # --- nav total set ---
-            Path(SCRIPTS_PATCHES_NAV / "nav_total_set.js").read_text("utf-8"),
-            "NavTotalSetPatchModule(window);",
-            # --- screen ---
-            Path(SCRIPTS_PATCHES_GRAPHICS / "screen.js").read_text("utf-8"),
-            "ScreenPatchModule(window);",
-            # --- generated patch output ---
             Path(PATCH_OUT).read_text("utf-8"),
-            # --- fonts ---
-            Path(SCRIPTS_PATCHES_MEDIA / "font_module.js").read_text("utf-8"),
-            "FontPatchModule(window);",
-            # --- canvas ---
-            Path(SCRIPTS_PATCHES_GRAPHICS / "canvas.js").read_text("utf-8"),
-            "CanvasPatchModule(window);",
-            # --- webgl extra ---
-            Path(SCRIPTS_PATCHES_GRAPHICS / "WEBGL_DICKts.js").read_text("utf-8"),
-            "WEBglDICKts(window);",
-            # --- webgl ---
-            Path(SCRIPTS_PATCHES_GRAPHICS / "webgl.js").read_text("utf-8"),
-            "WebglPatchModule(window);",
-            # --- workerscope closure section ---
-            Path(SCRIPTS_WORKERSCOPE / "wrk.js").read_text("utf-8"),
-            "WrkModule(window);",
-            Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8"),
-            # --- webgpu WL ---
-            Path(SCRIPTS_PATCHES_GRAPHICS / "WebgpuWL.js").read_text("utf-8"),
-            "WebgpuWLBootstrap(window);",
-            # --- webgpu ---
-            Path(SCRIPTS_PATCHES_GRAPHICS / "webgpu.js").read_text("utf-8"),
-            "WebGPUPatchModule(window);",
-            # --- audiocontext ---
-            Path(SCRIPTS_PATCHES_MEDIA / "audiocontext.js").read_text("utf-8"),
-            "AudioContextModule(window);",
-            # --- context ---
-            Path(SCRIPTS_CORE / "context.js").read_text("utf-8"),
-            "ContextPatchModule(window);",
-            """
-            // —————— Register all hooks here ——————//
-            if (window.CanvasPatchContext && typeof window.CanvasPatchContext.registerAllHooks === 'function') {
+            f"""
+            HideWebdriverPatchModule(window);
+            RtcpeerconnectionPatchModule(window);
+            RNGsetModule(window);
+            NavTotalSetPatchModule(window);
+            ScreenPatchModule(window);
+            FontPatchModule(window);
+            CanvasPatchModule(window);
+            WEBglDICKts(window);
+            WebglPatchModule(window);
+            WrkModule(window);
+            WebgpuWLBootstrap(window);
+            WebGPUPatchModule(window);
+            AudioContextModule(window);
+            ContextPatchModule(window);
+            if (window.CanvasPatchContext && typeof window.CanvasPatchContext.registerAllHooks === 'function') {{
                 window.CanvasPatchContext.registerAllHooks();
-            }
-            (function applyAllPatchesCustomOrder(win) {
+            }}
+            (function applyAllPatchesCustomOrder(win) {{
                 const C = window.CanvasPatchContext; if (!C) return;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
-            })(window);
-            (function runBootstrapEnvCleanup(win) {
+            }})(window);
+            (function runBootstrapEnvCleanup(win) {{
                 const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
                     ? win.CanvasPatchContext
                     : null;
                 if (!C || typeof C.__runBootstrapEnvCleanup__ !== 'function') return;
                 C.__runBootstrapEnvCleanup__(win, 'bundle_finalize');
-            })(window);
-            """
+            }})(window);
+            """,
+            # --- self-executing sources after dependencies ---
+            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8"),
         ]
         return "\n;\n".join(parts)
     
@@ -1272,7 +1237,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://browserleaks.com/fonts")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

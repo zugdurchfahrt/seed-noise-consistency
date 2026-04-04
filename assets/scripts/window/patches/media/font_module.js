@@ -143,25 +143,13 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       ? __stateRoot.__FONTS_CONFIG__
       : null;
     if (existing) return existing;
-    const state = Object.create(null);
-    try {
-      Object.defineProperty(__stateRoot, '__FONTS_CONFIG__', {
-        value: state,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      return state;
-    } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:fonts_config_define_failed', {
-        stage: 'apply',
-        surface: 'CanvasPatchContext.state',
-        key: 'CanvasPatchContext.state.__FONTS_CONFIG__',
-        message: 'Object.defineProperty(CanvasPatchContext.state,"__FONTS_CONFIG__") failed',
-        data: { outcome: 'skip', reason: 'fonts_config_define_failed' }
-      }, e);
-      return null;
-    }
+    __fontDiagPipeline('warn', 'fonts:fonts_config_missing', {
+      stage: 'preflight',
+      key: 'CanvasPatchContext.state.__FONTS_CONFIG__',
+      message: 'CanvasPatchContext.state.__FONTS_CONFIG__ missing',
+      data: { outcome: 'skip', reason: 'fonts_config_missing' }
+    }, null);
+    return null;
   }
 
   const __fontsConfigState = __ensureFontsConfigSlot();

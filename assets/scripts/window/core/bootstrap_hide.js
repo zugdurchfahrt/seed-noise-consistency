@@ -46,6 +46,16 @@ if (!stateRoot) {
   __defineHiddenValue__(C, 'state', stateRoot);
 }
 
+let fontsConfigState = (stateRoot.__FONTS_CONFIG__ && typeof stateRoot.__FONTS_CONFIG__ === 'object')
+  ? stateRoot.__FONTS_CONFIG__
+  : null;
+if (!fontsConfigState) {
+  fontsConfigState = __defineHiddenValue__(stateRoot, '__FONTS_CONFIG__', Object.create(null));
+  if (!fontsConfigState) throw new Error('[module] CanvasPatchContext.state.__FONTS_CONFIG__ bootstrap failed');
+} else {
+  __defineHiddenValue__(stateRoot, '__FONTS_CONFIG__', fontsConfigState);
+}
+
 let loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 if (!loggerRoot) {
   loggerRoot = __defineHiddenValue__(C, '__logger', Object.create(null));
