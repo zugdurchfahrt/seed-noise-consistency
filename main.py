@@ -362,6 +362,10 @@ def init_driver(
     def build_page_bundle(init_params: str) -> str:
         worker_patch_src = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
         worker_reflect_src = Path(SCRIPTS_WORKERSCOPE / "set_reflect.js").read_text("utf-8")
+        worker_core_window_src = Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8")
+        worker_prng_src = Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8")
+        worker_canvas_src = Path(SCRIPTS_PATCHES_GRAPHICS / "canvas.js").read_text("utf-8")
+        worker_context_src = Path(SCRIPTS_CORE / "context.js").read_text("utf-8")
         parts = [
             init_params,
             # --- closure bootstrap ---
@@ -405,10 +409,22 @@ def init_driver(
                 if (!wrkHooks || typeof wrkHooks !== 'object') throw new Error('WorkerscopeInit: __wrkHooks__ missing');
                 const inlinePatch = {json.dumps(worker_patch_src)};
                 const inlineReflect = {json.dumps(worker_reflect_src)};
+                const inlineCoreWindow = {json.dumps(worker_core_window_src)};
+                const inlinePrng = {json.dumps(worker_prng_src)};
+                const inlineCanvasPatch = {json.dumps(worker_canvas_src)};
+                const inlineContextPatch = {json.dumps(worker_context_src)};
                 if (typeof inlinePatch !== 'string' || !inlinePatch) throw new Error('WorkerscopeInit: inlinePatch missing');
                 if (typeof inlineReflect !== 'string' || !inlineReflect) throw new Error('WorkerscopeInit: inlineReflect missing');
+                if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('WorkerscopeInit: inlineCoreWindow missing');
+                if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('WorkerscopeInit: inlinePrng missing');
+                if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('WorkerscopeInit: inlineCanvasPatch missing');
+                if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('WorkerscopeInit: inlineContextPatch missing');
                 defineHidden(wrkRuntime, 'inlinePatch', inlinePatch);
                 defineHidden(wrkRuntime, 'inlineReflect', inlineReflect);
+                defineHidden(wrkRuntime, 'inlineCoreWindow', inlineCoreWindow);
+                defineHidden(wrkRuntime, 'inlinePrng', inlinePrng);
+                defineHidden(wrkRuntime, 'inlineCanvasPatch', inlineCanvasPatch);
+                defineHidden(wrkRuntime, 'inlineContextPatch', inlineContextPatch);
             }})(window);
             """,
             Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
@@ -1257,7 +1273,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/prototype.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

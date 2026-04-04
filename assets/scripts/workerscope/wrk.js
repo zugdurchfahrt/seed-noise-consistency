@@ -191,13 +191,25 @@ const WrkModule = function WrkModule(window) {
     const workerPatchClassic = __wrkRuntimeGet__('workerPatchClassic');
     const workerPatchModule = __wrkRuntimeGet__('workerPatchModule');
     const inlineReflect = __wrkRuntimeGet__('inlineReflect') || __resolveWorkerReflectSource__();
+    const inlineCoreWindow = __wrkRuntimeGet__('inlineCoreWindow');
+    const inlinePrng = __wrkRuntimeGet__('inlinePrng');
+    const inlineCanvasPatch = __wrkRuntimeGet__('inlineCanvasPatch');
+    const inlineContextPatch = __wrkRuntimeGet__('inlineContextPatch');
     if (typeof workerPatchClassic === 'string' && workerPatchClassic
         && typeof workerPatchModule === 'string' && workerPatchModule
-        && typeof inlineReflect === 'string' && inlineReflect) {
+        && typeof inlineReflect === 'string' && inlineReflect
+        && typeof inlineCoreWindow === 'string' && inlineCoreWindow
+        && typeof inlinePrng === 'string' && inlinePrng
+        && typeof inlineCanvasPatch === 'string' && inlineCanvasPatch
+        && typeof inlineContextPatch === 'string' && inlineContextPatch) {
       return {
         workerPatchClassic,
         workerPatchModule,
-        inlineReflect
+        inlineReflect,
+        inlineCoreWindow,
+        inlinePrng,
+        inlineCanvasPatch,
+        inlineContextPatch
       };
     }
     const err = new Error('[WrkModule] FAIL_FAST: worker patch runtime not ready');
@@ -413,13 +425,17 @@ function EnvBus(G){
   function __cloneEnvValue(v) {
     return __wrkCloneEnvValue__(v);
   }
-  function __requireWorkerEnvPacket() {
+  function __resolveCanvasPatchStateRoot() {
     const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
       ? G.CanvasPatchContext
       : null;
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
       : null;
+    return stateRoot;
+  }
+  function __requireWorkerEnvPacket() {
+    const stateRoot = __resolveCanvasPatchStateRoot();
     const navModuleState = (stateRoot && stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
       ? stateRoot.__NAV_TOTAL_SET__
       : null;
@@ -467,6 +483,64 @@ function EnvBus(G){
     if (typeof out.uaData.he.wow64 !== 'boolean') throw new Error('EnvBus: worker packet uaData.he.wow64 missing');
     if (!isStringArray(out.uaData.he.formFactors, false)) throw new Error('EnvBus: worker packet uaData.he.formFactors missing');
     return out;
+  }
+  function __cloneFontsFamilySnapshotForWorker__(familySnapshot) {
+    const out = {
+      allowedFamilies: null,
+      runtimeFamilies: [],
+      platformDom: null,
+      versionToken: null
+    };
+    if (!familySnapshot || typeof familySnapshot !== 'object') return out;
+    if (familySnapshot.allowedFamilies instanceof Set) {
+      out.allowedFamilies = Array.from(familySnapshot.allowedFamilies);
+    } else if (Array.isArray(familySnapshot.allowedFamilies)) {
+      out.allowedFamilies = familySnapshot.allowedFamilies.slice();
+    }
+    if (familySnapshot.runtimeFamilies instanceof Set) {
+      out.runtimeFamilies = Array.from(familySnapshot.runtimeFamilies);
+    } else if (Array.isArray(familySnapshot.runtimeFamilies)) {
+      out.runtimeFamilies = familySnapshot.runtimeFamilies.slice();
+    }
+    if (Object.prototype.hasOwnProperty.call(familySnapshot, 'platformDom')) {
+      out.platformDom = __cloneEnvValue(familySnapshot.platformDom);
+    }
+    if (Object.prototype.hasOwnProperty.call(familySnapshot, 'versionToken')) {
+      out.versionToken = __cloneEnvValue(familySnapshot.versionToken);
+    }
+    return out;
+  }
+  function __cloneFontsStateForWorker__() {
+    const stateRoot = __resolveCanvasPatchStateRoot();
+    const fontsState = (stateRoot && stateRoot.__FONTS_STATE__ && typeof stateRoot.__FONTS_STATE__ === 'object')
+      ? stateRoot.__FONTS_STATE__
+      : null;
+    if (!fontsState) return null;
+    return {
+      ready: fontsState.ready === true,
+      error: Object.prototype.hasOwnProperty.call(fontsState, 'error')
+        ? __cloneEnvValue(fontsState.error)
+        : null,
+      awaitReady: null,
+      awaitReadyStatus: (typeof fontsState.awaitReadyStatus === 'string' && fontsState.awaitReadyStatus)
+        ? fontsState.awaitReadyStatus
+        : null,
+      awaitReadyPending: !!(fontsState.awaitReady && typeof fontsState.awaitReady.then === 'function'),
+      familySnapshot: __cloneFontsFamilySnapshotForWorker__(fontsState.familySnapshot)
+    };
+  }
+  function __cloneFontsConfigForWorker__() {
+    const stateRoot = __resolveCanvasPatchStateRoot();
+    const fontsConfigState = (stateRoot && stateRoot.__FONTS_CONFIG__ && typeof stateRoot.__FONTS_CONFIG__ === 'object')
+      ? stateRoot.__FONTS_CONFIG__
+      : null;
+    const configs = Array.isArray(fontsConfigState && fontsConfigState.configs)
+      ? fontsConfigState.configs
+      : null;
+    if (!configs) return null;
+    return {
+      configs: __cloneEnvValue(configs)
+    };
   }
   const __geoStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__GEO_STATE__ && typeof G.CanvasPatchContext.state.__GEO_STATE__ === 'object')
     ? G.CanvasPatchContext.state.__GEO_STATE__
@@ -587,6 +661,8 @@ function EnvBus(G){
       ua, language: lang, languages: langs, dpr, cpu, mem, timeZone,
       uaData,
       highEntropy: he,
+      fontsState: __cloneFontsStateForWorker__(),
+      fontsConfig: __cloneFontsConfigForWorker__(),
       webgl: {
         vendor: webglVendor,
         renderer: webglRenderer,
@@ -675,10 +751,22 @@ function mkModuleWorkerSource(snapshot, absUrl){
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkModuleWorkerSource bad absUrl');
   const runtime = __requireWorkerPatchRuntime__('workerPatchModule runtime not ready', 'preflight');
   const patchUrl = runtime && runtime.workerPatchModule;
+  const inlineCoreWindow = runtime && runtime.inlineCoreWindow;
+  const inlinePrng = runtime && runtime.inlinePrng;
+  const inlineCanvasPatch = runtime && runtime.inlineCanvasPatch;
+  const inlineContextPatch = runtime && runtime.inlineContextPatch;
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkModuleWorkerSource bad workerPatchModule url');
+  if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkModuleWorkerSource bad inlineCoreWindow');
+  if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkModuleWorkerSource bad inlinePrng');
+  if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkModuleWorkerSource bad inlineCanvasPatch');
+  if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkModuleWorkerSource bad inlineContextPatch');
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
   const PATCH_URL = JSON.stringify(patchUrl);
+  const INLINE_CORE_WINDOW = JSON.stringify(inlineCoreWindow);
+  const INLINE_PRNG = JSON.stringify(inlinePrng);
+  const INLINE_CANVAS_PATCH = JSON.stringify(inlineCanvasPatch);
+  const INLINE_CONTEXT_PATCH = JSON.stringify(inlineContextPatch);
   return `
     (async function(){
       'use strict';
@@ -978,6 +1066,32 @@ function mkModuleWorkerSource(snapshot, absUrl){
       };
       __installEarlyWorkerWebGLMirror__();
       ${ENV_WRK_SRC}
+      (function __installWorkerCanvasSources__(){
+        var __ensureHiddenValue = function(obj, key, value){
+          if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+          var desc = Object.getOwnPropertyDescriptor(obj, key);
+          if (desc && desc.configurable === false) {
+            return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
+          }
+          Object.defineProperty(obj, key, {
+            value: value,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          return value;
+        };
+        var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+          ? self.CanvasPatchContext
+          : __ensureHiddenValue(self, 'CanvasPatchContext', Object.create(null));
+        var wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+          ? C.__wrkRuntime__
+          : __ensureHiddenValue(C, '__wrkRuntime__', Object.create(null));
+        __ensureHiddenValue(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
+        __ensureHiddenValue(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
+        __ensureHiddenValue(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
+        __ensureHiddenValue(wrkRuntime, 'inlineContextPatch', ${INLINE_CONTEXT_PATCH});
+      })();
       let __patchOK = false;
       try {
         // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
@@ -1066,10 +1180,22 @@ function mkClassicWorkerSource(snapshot, absUrl){
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkClassicWorkerSource bad absUrl');
   const runtime = __requireWorkerPatchRuntime__('workerPatchClassic runtime not ready', 'preflight');
   const patchUrl = runtime && runtime.workerPatchClassic;
+  const inlineCoreWindow = runtime && runtime.inlineCoreWindow;
+  const inlinePrng = runtime && runtime.inlinePrng;
+  const inlineCanvasPatch = runtime && runtime.inlineCanvasPatch;
+  const inlineContextPatch = runtime && runtime.inlineContextPatch;
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkClassicWorkerSource bad workerPatchClassic url');
+  if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkClassicWorkerSource bad inlineCoreWindow');
+  if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkClassicWorkerSource bad inlinePrng');
+  if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkClassicWorkerSource bad inlineCanvasPatch');
+  if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkClassicWorkerSource bad inlineContextPatch');
   const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
   const PATCH_URL = JSON.stringify(patchUrl);
+  const INLINE_CORE_WINDOW = JSON.stringify(inlineCoreWindow);
+  const INLINE_PRNG = JSON.stringify(inlinePrng);
+  const INLINE_CANVAS_PATCH = JSON.stringify(inlineCanvasPatch);
+  const INLINE_CONTEXT_PATCH = JSON.stringify(inlineContextPatch);
   return `
     (async function(){
       'use strict';
@@ -1368,6 +1494,32 @@ function mkClassicWorkerSource(snapshot, absUrl){
       };
       __installEarlyWorkerWebGLMirror__();
       ${ENV_WRK_SRC}
+      (function __installWorkerCanvasSources__(){
+        var __ensureHiddenValue = function(obj, key, value){
+          if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+          var desc = Object.getOwnPropertyDescriptor(obj, key);
+          if (desc && desc.configurable === false) {
+            return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
+          }
+          Object.defineProperty(obj, key, {
+            value: value,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          return value;
+        };
+        var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+          ? self.CanvasPatchContext
+          : __ensureHiddenValue(self, 'CanvasPatchContext', Object.create(null));
+        var wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+          ? C.__wrkRuntime__
+          : __ensureHiddenValue(C, '__wrkRuntime__', Object.create(null));
+        __ensureHiddenValue(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
+        __ensureHiddenValue(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
+        __ensureHiddenValue(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
+        __ensureHiddenValue(wrkRuntime, 'inlineContextPatch', ${INLINE_CONTEXT_PATCH});
+      })();
       let __patchOK = false;
       try {
         // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>

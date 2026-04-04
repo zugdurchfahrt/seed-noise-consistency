@@ -818,18 +818,17 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     const familyMatches = cfgs.filter(cfg => normalizeFamilyName(cfg && (cfg.cssFamily || cfg.family)) === fam);
     if (!familyMatches.length) return null;
     const desc = (descriptors && typeof descriptors === 'object') ? descriptors : null;
-    const style = desc && typeof desc.style === 'string' ? desc.style.toLowerCase() : '';
-    const weight = desc && typeof desc.weight === 'string' ? desc.weight.toLowerCase() : '';
-    if (!style && !weight) return familyMatches[0];
+    const style = desc && typeof desc.style === 'string' ? desc.style.toLowerCase() : 'normal';
+    const weight = desc && typeof desc.weight === 'string' ? desc.weight.toLowerCase() : 'normal';
     for (let i = 0; i < familyMatches.length; i++) {
       const cfg = familyMatches[i];
       const cfgStyle = typeof cfg.style === 'string' ? cfg.style.toLowerCase() : 'normal';
       const cfgWeight = typeof cfg.weight === 'string' ? cfg.weight.toLowerCase() : 'normal';
-      if ((!style || cfgStyle === style) && (!weight || cfgWeight === weight)) {
+      if (cfgStyle === style && cfgWeight === weight) {
         return cfg;
       }
     }
-    return familyMatches[0];
+    return null;
   }
 
 
@@ -838,7 +837,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       source: source,
       hadLocal: false,
       hadOnlyLocal: false,
-      localOnlyBlocked: false,
+      localOnlyManaged: false,
+      localOnlyNativeError: false,
       localOnlyPassthrough: false,
       unexpectedSourceType: false,
       runtimeConfigMatched: false,
@@ -889,17 +889,12 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
 
     let matchedCfg = null;
-    let invalidManagedSource = null;
+    let managedSource = null;
     try {
-      const familyDictionary = getSharedFamilyDictionary();
-      const normalizedFamily = normalizeFamilyName(family);
-      matchedCfg = (normalizedFamily && familyDictionary.has(normalizedFamily))
-        ? matchRuntimeFontConfig(family, descriptors)
-        : null;
+      matchedCfg = matchRuntimeFontConfig(family, descriptors);
       const matchedUrl = matchedCfg && typeof matchedCfg.url === 'string' ? matchedCfg.url : '';
-      const commaIndex = matchedUrl.indexOf(',');
-      if (/^data:font\/woff2;base64,/i.test(matchedUrl) && commaIndex !== -1) {
-        invalidManagedSource = `url(${JSON.stringify(matchedUrl.slice(0, commaIndex + 1))}) format("woff2")`;
+      if (/^data:font\/woff2;base64,/i.test(matchedUrl)) {
+        managedSource = `url(${JSON.stringify(matchedUrl)}) format("woff2")`;
       }
     } catch (e) {
       return Object.assign({}, resultBase, {
@@ -913,11 +908,12 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
     if (!filtered.length) {
       return Object.assign({}, resultBase, {
-        source: invalidManagedSource || source,
+        source: managedSource || source,
         hadLocal: true,
         hadOnlyLocal: true,
-        localOnlyBlocked: !!invalidManagedSource,
-        localOnlyPassthrough: !invalidManagedSource,
+        localOnlyManaged: !!managedSource,
+        localOnlyNativeError: !managedSource,
+        localOnlyPassthrough: false,
         unexpectedSourceType: unexpectedSourceType,
         runtimeConfigMatched: !!matchedCfg
       });
@@ -980,6 +976,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         try {
           const sanitized = sanitizeFontFaceSource(nextArgs[1], nextArgs[0], nextArgs[2]);
           nextArgs[1] = sanitized.source;
+          if (sanitized.localOnlyNativeError) {
+            nextArgs.length = Math.min(nextArgs.length, 1);
+          }
           if (sanitized.sanitizeFailed) {
             __fontDiagBrowser('warn', 'fonts:fontface:sanitize_parser_failed', {
               stage: 'runtime',
@@ -1008,15 +1007,29 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
               }
             }, null);
           }
-          if (sanitized.localOnlyBlocked) {
-            __fontDiagPipeline('info', 'fonts:fontface:local_only_replaced_with_managed_invalid_src', {
+          if (sanitized.localOnlyManaged) {
+            __fontDiagPipeline('info', 'fonts:fontface:local_only_replaced_with_managed_src', {
               stage: 'runtime',
               diagTag: 'fonts:fontface',
               key: 'FontFace',
-              message: 'FontFace local-only source replaced with managed invalid data src',
+              message: 'FontFace local-only source replaced with managed data src',
               data: {
                 outcome: 'return',
-                reason: 'local_only_replaced_with_managed_invalid_src',
+                reason: 'local_only_replaced_with_managed_src',
+                family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
+                runtimeConfigMatched: !!sanitized.runtimeConfigMatched
+              }
+            }, null);
+          }
+          if (sanitized.localOnlyNativeError) {
+            __fontDiagPipeline('warn', 'fonts:fontface:local_only_native_typeerror_path', {
+              stage: 'runtime',
+              diagTag: 'fonts:fontface',
+              key: 'FontFace',
+              message: 'FontFace local-only source has no exact managed match (native TypeError path)',
+              data: {
+                outcome: 'return',
+                reason: 'local_only_native_typeerror_path',
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
                 runtimeConfigMatched: !!sanitized.runtimeConfigMatched
               }

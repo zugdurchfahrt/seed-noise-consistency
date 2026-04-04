@@ -1404,6 +1404,286 @@
     };
     installWorkerWebGLMirror();
 
+    const resolveWorkerCanvasPatchSources = () => {
+      const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
+      const inlineCoreWindow = runtimeRoot && runtimeRoot.inlineCoreWindow;
+      const inlinePrng = runtimeRoot && runtimeRoot.inlinePrng;
+      const inlineCanvasPatch = runtimeRoot && runtimeRoot.inlineCanvasPatch;
+      const inlineContextPatch = runtimeRoot && runtimeRoot.inlineContextPatch;
+      if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) {
+        throw new Error('UACHPatch: inlineCoreWindow missing');
+      }
+      if (typeof inlinePrng !== 'string' || !inlinePrng) {
+        throw new Error('UACHPatch: inlinePrng missing');
+      }
+      if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) {
+        throw new Error('UACHPatch: inlineCanvasPatch missing');
+      }
+      if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) {
+        throw new Error('UACHPatch: inlineContextPatch missing');
+      }
+      return {
+        runtimeRoot,
+        inlineCoreWindow,
+        inlinePrng,
+        inlineCanvasPatch,
+        inlineContextPatch
+      };
+    };
+
+    const executeWorkerInlineModule = (source, exportName, label) => {
+      if (typeof source !== 'string' || !source) {
+        throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
+      }
+      const runner = new Function('window', source + '\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
+      return runner(self);
+    };
+    const restoreWorkerFontsState = stateRoot => {
+      if (!stateRoot || typeof stateRoot !== 'object') {
+        throw new Error('UACHPatch: CanvasPatchContext.state missing for fonts restore');
+      }
+      const snap = (cache.snap && cache.snap.fontsState && typeof cache.snap.fontsState === 'object')
+        ? cache.snap.fontsState
+        : null;
+      const cfgSnap = (cache.snap && cache.snap.fontsConfig && typeof cache.snap.fontsConfig === 'object')
+        ? cache.snap.fontsConfig
+        : null;
+      if (!snap && !cfgSnap) return false;
+      const ensureStateSlot = key => {
+        const existing = (stateRoot[key] && typeof stateRoot[key] === 'object')
+          ? stateRoot[key]
+          : null;
+        if (existing) return existing;
+        trackedDefineProperty(stateRoot, key, {
+          value: Object.create(null),
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        return stateRoot[key];
+      };
+      if (snap) {
+        const fontsState = ensureStateSlot('__FONTS_STATE__');
+        const familySnapshot = (snap.familySnapshot && typeof snap.familySnapshot === 'object')
+          ? snap.familySnapshot
+          : null;
+        trackedDefineProperty(fontsState, 'ready', {
+          value: snap.ready === true,
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+        trackedDefineProperty(fontsState, 'error', {
+          value: Object.prototype.hasOwnProperty.call(snap, 'error') ? snap.error : null,
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+        trackedDefineProperty(fontsState, 'awaitReady', {
+          value: null,
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+        trackedDefineProperty(fontsState, 'awaitReadyStatus', {
+          value: (typeof snap.awaitReadyStatus === 'string' && snap.awaitReadyStatus)
+            ? snap.awaitReadyStatus
+            : (snap.awaitReadyPending ? 'pending' : null),
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+        trackedDefineProperty(fontsState, 'awaitReadyResolve', {
+          value: null,
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+        trackedDefineProperty(fontsState, 'awaitReadyReject', {
+          value: null,
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+        trackedDefineProperty(fontsState, 'familySnapshot', {
+          value: {
+            allowedFamilies: Array.isArray(familySnapshot && familySnapshot.allowedFamilies)
+              ? new Set(familySnapshot.allowedFamilies)
+              : null,
+            runtimeFamilies: Array.isArray(familySnapshot && familySnapshot.runtimeFamilies)
+              ? new Set(familySnapshot.runtimeFamilies)
+              : new Set(),
+            platformDom: familySnapshot && Object.prototype.hasOwnProperty.call(familySnapshot, 'platformDom')
+              ? familySnapshot.platformDom
+              : null,
+            versionToken: familySnapshot && Object.prototype.hasOwnProperty.call(familySnapshot, 'versionToken')
+              ? familySnapshot.versionToken
+              : null
+          },
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+      }
+      if (cfgSnap) {
+        const fontsConfig = ensureStateSlot('__FONTS_CONFIG__');
+        trackedDefineProperty(fontsConfig, 'configs', {
+          value: Array.isArray(cfgSnap.configs) ? cfgSnap.configs.slice() : [],
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+      }
+      return true;
+    };
+
+    const installWorkerCanvasPipeline = () => {
+      if (self.__WORKER_CANVAS_PATCH_INSTALLED__ === true) return true;
+
+      const sources = resolveWorkerCanvasPatchSources();
+      const runtimeRoot = sources.runtimeRoot;
+      const C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+        ? self.CanvasPatchContext
+        : (trackedDefineProperty(self, 'CanvasPatchContext', {
+            value: Object.create(null),
+            writable: true,
+            configurable: true,
+            enumerable: false
+          }), self.CanvasPatchContext);
+      const stateRoot = (C.state && typeof C.state === 'object')
+        ? C.state
+        : (trackedDefineProperty(C, 'state', {
+            value: Object.create(null),
+            writable: true,
+            configurable: true,
+            enumerable: false
+          }), C.state);
+
+      let Core = (self.Core && typeof self.Core === 'object')
+        ? self.Core
+        : null;
+      if (!Core) {
+        trackedDefineProperty(self, 'Core', {
+          value: Object.create(null),
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        Core = self.Core;
+      }
+      let coreInternal = (Core.__internal && typeof Core.__internal === 'object')
+        ? Core.__internal
+        : null;
+      if (!coreInternal) {
+        trackedDefineProperty(Core, '__internal', {
+          value: Object.create(null),
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        coreInternal = Core.__internal;
+      }
+      if (runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__ && coreInternal.coreToStringState !== runtimeRoot.__CORE_TOSTRING_STATE__) {
+        trackedDefineProperty(coreInternal, 'coreToStringState', {
+          value: runtimeRoot.__CORE_TOSTRING_STATE__,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+
+      const seed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '';
+      if (!seed) {
+        throw new Error('UACHPatch: worker canvas seed missing');
+      }
+      if (self.__GLOBAL_SEED !== seed) {
+        trackedDefineProperty(self, '__GLOBAL_SEED', {
+          value: seed,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      const snapDpr = Number(cache.snap && cache.snap.dpr);
+      if (Number.isFinite(snapDpr) && snapDpr > 0) {
+        trackedDefineProperty(self, '__DPR', {
+          value: snapDpr,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+
+      if (!(stateRoot && typeof stateRoot === 'object')) {
+        throw new Error('UACHPatch: CanvasPatchContext.state missing');
+      }
+      restoreWorkerFontsState(stateRoot);
+
+      executeWorkerInlineModule(sources.inlineCoreWindow, 'CoreWindowModule', 'inlineCoreWindow');
+      executeWorkerInlineModule(sources.inlinePrng, 'RNGsetModule', 'inlinePrng');
+      executeWorkerInlineModule(sources.inlineCanvasPatch, 'CanvasPatchModule', 'inlineCanvasPatch');
+      executeWorkerInlineModule(sources.inlineContextPatch, 'ContextPatchModule', 'inlineContextPatch');
+
+      const hooks = (self.CanvasPatchHooks && typeof self.CanvasPatchHooks === 'object')
+        ? self.CanvasPatchHooks
+        : null;
+      const patchCtx = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+        ? self.CanvasPatchContext
+        : null;
+      if (!patchCtx) {
+        throw new Error('UACHPatch: worker CanvasPatchContext missing after install');
+      }
+      if (!hooks) {
+        throw new Error('UACHPatch: worker CanvasPatchHooks missing after install');
+      }
+
+      if (typeof patchCtx.registerOffscreenConvertToBlobHook === 'function' && typeof hooks.patchConvertToBlobInjectNoise === 'function') {
+        patchCtx.registerOffscreenConvertToBlobHook(hooks.patchConvertToBlobInjectNoise);
+      }
+      if (typeof patchCtx.registerCtx2DMeasureTextHook === 'function' && typeof hooks.measureTextNoiseHook === 'function') {
+        patchCtx.registerCtx2DMeasureTextHook(hooks.measureTextNoiseHook);
+      }
+      if (typeof patchCtx.registerCtx2DFillTextHook === 'function' && typeof hooks.fillTextNoiseHook === 'function') {
+        patchCtx.registerCtx2DFillTextHook(hooks.fillTextNoiseHook);
+      }
+      if (typeof patchCtx.registerCtx2DStrokeTextHook === 'function' && typeof hooks.strokeTextNoiseHook === 'function') {
+        patchCtx.registerCtx2DStrokeTextHook(hooks.strokeTextNoiseHook);
+      }
+      if (typeof patchCtx.registerCtx2DFillRectHook === 'function' && typeof hooks.fillRectNoiseHook === 'function') {
+        patchCtx.registerCtx2DFillRectHook(hooks.fillRectNoiseHook);
+      }
+      if (typeof patchCtx.registerCtx2DDrawImageHook === 'function' && typeof hooks.applyDrawImageHook === 'function') {
+        patchCtx.registerCtx2DDrawImageHook(hooks.applyDrawImageHook);
+      }
+
+      if (typeof patchCtx.applyOffscreenPatches === 'function') {
+        patchCtx.applyOffscreenPatches();
+      }
+      if (typeof patchCtx.applyCtx2DContextPatches === 'function') {
+        patchCtx.applyCtx2DContextPatches();
+      }
+      if (typeof patchCtx.applyWebGLContextPatches === 'function') {
+        patchCtx.applyWebGLContextPatches();
+      }
+
+      trackedDefineProperty(self, '__WORKER_CANVAS_PATCH_INSTALLED__', {
+        value: true,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      if (runtimeRoot) {
+        trackedDefineProperty(runtimeRoot, 'workerCanvasPatchInstalled', {
+          value: true,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      return true;
+    };
+    installWorkerCanvasPipeline();
+
 
 
 
