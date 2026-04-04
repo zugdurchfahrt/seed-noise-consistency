@@ -831,12 +831,24 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     return null;
   }
 
+  function getManagedBlockedSource() {
+    const cfgs = getRuntimeFontConfigs();
+    for (let i = 0; i < cfgs.length; i++) {
+      const cfg = cfgs[i];
+      const url = cfg && typeof cfg.url === 'string' ? cfg.url : '';
+      if (!/^data:font\/woff2;base64,/i.test(url)) continue;
+      return `url(${JSON.stringify(url)}) format("woff2")`;
+    }
+    return null;
+  }
+
 
   function sanitizeFontFaceSource(source, family, descriptors) {
     const resultBase = {
       source: source,
       hadLocal: false,
       hadOnlyLocal: false,
+      localOnlyBlocked: false,
       localOnlyManaged: false,
       localOnlyNativeError: false,
       localOnlyPassthrough: false,
@@ -890,11 +902,15 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
     let matchedCfg = null;
     let managedSource = null;
+    let blockedSource = null;
     try {
       matchedCfg = matchRuntimeFontConfig(family, descriptors);
       const matchedUrl = matchedCfg && typeof matchedCfg.url === 'string' ? matchedCfg.url : '';
       if (/^data:font\/woff2;base64,/i.test(matchedUrl)) {
         managedSource = `url(${JSON.stringify(matchedUrl)}) format("woff2")`;
+      }
+      if (!managedSource) {
+        blockedSource = getManagedBlockedSource();
       }
     } catch (e) {
       return Object.assign({}, resultBase, {
@@ -908,12 +924,13 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
     if (!filtered.length) {
       return Object.assign({}, resultBase, {
-        source: managedSource || source,
+        source: managedSource || blockedSource || '',
         hadLocal: true,
         hadOnlyLocal: true,
+        localOnlyBlocked: !managedSource && !!blockedSource,
         localOnlyManaged: !!managedSource,
-        localOnlyNativeError: !managedSource,
-        localOnlyPassthrough: false,
+        localOnlyNativeError: !managedSource && !blockedSource,
+        localOnlyPassthrough: !managedSource && !blockedSource,
         unexpectedSourceType: unexpectedSourceType,
         runtimeConfigMatched: !!matchedCfg
       });
@@ -976,9 +993,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         try {
           const sanitized = sanitizeFontFaceSource(nextArgs[1], nextArgs[0], nextArgs[2]);
           nextArgs[1] = sanitized.source;
-          if (sanitized.localOnlyNativeError) {
-            nextArgs.length = Math.min(nextArgs.length, 1);
-          }
           if (sanitized.sanitizeFailed) {
             __fontDiagBrowser('warn', 'fonts:fontface:sanitize_parser_failed', {
               stage: 'runtime',
@@ -1021,15 +1035,29 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
               }
             }, null);
           }
-          if (sanitized.localOnlyNativeError) {
-            __fontDiagPipeline('warn', 'fonts:fontface:local_only_native_typeerror_path', {
+          if (sanitized.localOnlyBlocked) {
+            __fontDiagPipeline('warn', 'fonts:fontface:local_only_blocked_with_managed_fallback_src', {
               stage: 'runtime',
               diagTag: 'fonts:fontface',
               key: 'FontFace',
-              message: 'FontFace local-only source has no exact managed match (native TypeError path)',
+              message: 'FontFace local-only source blocked with managed fallback src',
               data: {
                 outcome: 'return',
-                reason: 'local_only_native_typeerror_path',
+                reason: 'local_only_blocked_with_managed_fallback_src',
+                family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
+                runtimeConfigMatched: !!sanitized.runtimeConfigMatched
+              }
+            }, null);
+          }
+          if (sanitized.localOnlyNativeError) {
+            __fontDiagPipeline('warn', 'fonts:fontface:local_only_native_invalid_source_path', {
+              stage: 'runtime',
+              diagTag: 'fonts:fontface',
+              key: 'FontFace',
+              message: 'FontFace local-only source has no exact managed match (native invalid-source path)',
+              data: {
+                outcome: 'return',
+                reason: 'local_only_native_invalid_source_path',
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
                 runtimeConfigMatched: !!sanitized.runtimeConfigMatched
               }

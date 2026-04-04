@@ -140,10 +140,14 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       if (cached && cached.trim()) return cached.trim();
 
       const doc = G && G.document;
-      if (!doc || typeof doc.createElement !== 'function') {
+      let canvas = null;
+      if (doc && typeof doc.createElement === 'function') {
+        canvas = doc.createElement('canvas');
+      } else if (typeof G.OffscreenCanvas === 'function') {
+        canvas = new G.OffscreenCanvas(1, 1);
+      } else {
         throw new Error('[CanvasPatch] document.createElement missing');
       }
-      const canvas = doc.createElement('canvas');
       const ctx = (canvas && typeof canvas.getContext === 'function') ? canvas.getContext('2d') : null;
       const font = (ctx && typeof ctx.font === 'string' && ctx.font.trim()) ? ctx.font.trim() : '';
       if (!font) throw new Error('[CanvasPatch] default ctx2d.font missing/invalid');

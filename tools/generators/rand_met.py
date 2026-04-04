@@ -34,7 +34,7 @@ SYS_FONTS_WIN = [
         'Lucida Sans','Segoe UI','Segoe UI Symbol','Calibri','Consolas','Candara',
         'Franklin Gothic Medium','Constantia','Corbel','Century Gothic',
         'Segoe Print','Segoe Script','DejaVu Sans', 'DejaVu Sans Mono','DejaVu Serif','Gentium','Inter',
-        'Liberation Mono', 'Liberation Sans','Liberation Serif','Montserrat','Roboto','Tinos']
+        'Liberation Mono', 'Helvetica', 'Liberation Sans','Liberation Serif','Montserrat','Roboto','Tinos']
     
 SYS_FONTS_MAC = [
         'Helvetica','Geneva','Lucida Grande','Palatino','Menlo','Monaco',
@@ -641,6 +641,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
             file_path = target_dir / fname
             name_no_ext = pathlib.Path(fname).stem
+            orig_family, orig_subfamily = get_font_compare(file_path)
 
             # deterministic generation of metadata (seed is already fixed above)
             meta_values = generate_font_metadata(platform, subfamilies_src)
@@ -648,17 +649,23 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             subfamily  = meta_values.get(2, "")
             full_name  = meta_values.get(4, "")
             postscript = meta_values.get(6, "")
+            platform_name_bank = SYS_FONTS_MAC if platform == "MacIntel" else SYS_FONTS_WIN
+            resolved_family = (
+                orig_family
+                if isinstance(orig_family, str) and orig_family in platform_name_bank
+                else family
+            )
             
             #limits families dups and removes duplicates
         # Dedup: drop duplicates; do not mutate/tag font fields.
-            uniq_triple = (family, full_name, postscript)
+            uniq_triple = (resolved_family, full_name, postscript)
             if uniq_triple in used_families:
                 skip_stats["duplicate_uniq_triple"] += 1
                 logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
                 continue
-            if family_counter[family] >= max_family_repeats:
+            if family_counter[resolved_family] >= max_family_repeats:
                 skip_stats["family_repeat_limit"] += 1
-                logger.debug(f"[fonts] Step4 skip {fname}: family_repeat_limit family={family} limit={max_family_repeats}")
+                logger.debug(f"[fonts] Step4 skip {fname}: family_repeat_limit family={resolved_family} limit={max_family_repeats}")
                 continue
 
             _sf = (subfamily or "").lower()
@@ -669,8 +676,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 "name": name_no_ext,
                 "url": data_url,
                 "fontFamily": meta_values.get(6, name_no_ext),
-                "family": family,
-                "cssFamily": _derive_css_family(meta_values.get(1, family), name_no_ext),
+                "family": resolved_family,
+                "cssFamily": _derive_css_family(resolved_family, name_no_ext),
                 "subfamily": subfamily,
                 "weight": weight,
                 "style": style,
@@ -686,12 +693,11 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             }
             temp_configs.append(cfg)
             used_families.add(uniq_triple)
-            family_counter[family] += 1
+            family_counter[resolved_family] += 1
 
-            orig_family, orig_subfamily = get_font_compare(file_path)
             logger.debug(
                 f"[CFG Font] {fname}: src=({orig_family or '-'}/{orig_subfamily or '-'}) → "
-                f"dst=({family}/{subfamily})"
+                f"dst=({resolved_family}/{subfamily})"
             )
     finally:
         _META_RNG = _prev_meta_rng

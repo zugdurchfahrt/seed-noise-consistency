@@ -740,7 +740,7 @@ const LOGGingModule = function LOGGingModule() {
       if (!Object.prototype.hasOwnProperty.call(existingEnv, "DEBUG_DEGRADES")) existingEnv.DEBUG_DEGRADES = true;
       // existingEnv.DEBUG_DEGRADES = false; // выключить
       // existingEnv.EXPECTED_RECEIVER_THROW_GUARD = true;   // включить special logger_guard for expected Illegal invocation / incompatible receiver
-      if (!Object.prototype.hasOwnProperty.call(existingEnv, "EXPECTED_RECEIVER_THROW_GUARD")) existingEnv.EXPECTED_RECEIVER_THROW_GUARD = false;
+      if (!Object.prototype.hasOwnProperty.call(existingEnv, "EXPECTED_RECEIVER_THROW_GUARD")) existingEnv.EXPECTED_RECEIVER_THROW_GUARD = true;
       return existingEnv;
     })();
 
