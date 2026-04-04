@@ -1056,14 +1056,17 @@ def main():
         physical_screen_width, physical_screen_height = map(int, screen_res.split("x", 1))
 
         # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
-        dpr_map = {
-            "1920x1080": 1.0,
-            "2560x1440": 1.0,
-            "3840x2160": 1.5,
+        dpr_variants = {
+            "1920x1080": (1.0, 1.25),
+            "2560x1440": (1.0,),
+            "3840x2160": (1.5,),
         }
-        device_dpr_value = dpr_map.get(screen_res)
-        if device_dpr_value is None:
-            raise ValueError(f"unknown screen resolution: {screen_res!r}")
+        dpr_choices = dpr_variants.get(screen_res)
+        if not dpr_choices:
+            raise ValueError(f"unknown screen resolution preset: {screen_res!r}")
+        device_dpr_value = float(profile_rng.choice(dpr_choices))
+        if not isinstance(device_dpr_value, float) or device_dpr_value <= 0:
+            raise ValueError(f"invalid DPR in screen preset for resolution={screen_res!r}: {device_dpr_value!r}")
         screen_width = round(physical_screen_width / device_dpr_value)
         screen_height = round(physical_screen_height / device_dpr_value)
         if screen_width <= 0 or screen_height <= 0:
@@ -1254,7 +1257,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/prototype.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

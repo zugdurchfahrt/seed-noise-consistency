@@ -1181,33 +1181,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const useObjectReturnGateway = isObjectReturnGatewayWrapLayer(wrapLayer);
         const useMaterializedAccessorGateway = isMaterializedAccessorGatewayWrapLayer(wrapLayer);
 
-        if (useStrictScalarAccessorGateway) {
-          const wrappedStrictGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
+        if (useStrictScalarAccessorGateway || useObjectReturnGateway || (useMaterializedAccessorGateway && typeof origGet === 'function')) {
+          const wrappedStrictLikeGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
             name: 'get ' + key,
             wrapLayer: wrapLayer
           });
-          knownWrapped.add(wrappedStrictGet);
-          return wrappedStrictGet;
-        }
-
-        if (useObjectReturnGateway) {
-          const wrappedObjectGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
-            name: 'get ' + key,
-            wrapLayer: wrapLayer
-          });
-          knownWrapped.add(wrappedObjectGet);
-          return wrappedObjectGet;
+          knownWrapped.add(wrappedStrictLikeGet);
+          return wrappedStrictLikeGet;
         }
 
         if (useMaterializedAccessorGateway) {
-          if (typeof origGet === 'function') {
-            const wrappedMaterializedNativeGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
-              name: 'get ' + key,
-              wrapLayer: wrapLayer
-            });
-            knownWrapped.add(wrappedMaterializedNativeGet);
-            return wrappedMaterializedNativeGet;
-          }
           const wrappedMaterializedGet = buildNamedAccessor(key, 'get', function coreMaterializedAccessorGet() {
             if (checkThis && !checkThis(this)) {
               return onInvalidThis(invalidThis, null, this, []);
@@ -1266,78 +1249,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
           }
         });
         throw e;
-      }
-
-      function safeDefineAcc(target, key, getter, options) {
-        const opts = options || {};
-        const enumerable = !!opts.enumerable;
-        const validThis = typeof opts.validThis === 'function' ? opts.validThis : null;
-        if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
-          throw new TypeError('[Core.safeDefineAcc] invalid target for ' + key);
-        }
-        const d = Object.getOwnPropertyDescriptor(target, key);
-        if (d && d.configurable === false) {
-          throw new TypeError('[Core.safeDefineAcc] non-configurable ' + key);
-        }
-        const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
-        if (isData) {
-          const value = (typeof getter === 'function') ? getter.call(target) : getter;
-          Object.defineProperty(target, key, {
-            value: value,
-            writable: d ? !!d.writable : true,
-            configurable: d ? !!d.configurable : true,
-            enumerable: d ? !!d.enumerable : enumerable
-          });
-          return true;
-        }
-        if (!d || typeof d.get !== 'function') {
-          throw new TypeError('[Core.safeDefineAcc] native getter missing for ' + key);
-        }
-        const wrappedGet = wrapGetter(key, getter, d, validThis, { invalidThis: opts.invalidThis });
-        Object.defineProperty(target, key, {
-          get: wrappedGet,
-          set: d && d.set,
-          configurable: d ? !!d.configurable : true,
-          enumerable: d ? !!d.enumerable : enumerable
-        });
-        return true;
-      }
-
-      function redefineAcc(target, key, getImpl) {
-        const d = Object.getOwnPropertyDescriptor(target, key);
-        if (d && d.configurable === false) {
-          throw new TypeError('[Core.redefineAcc] non-configurable ' + key);
-        }
-        const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
-        if (isData) {
-          const value = (typeof getImpl === 'function') ? getImpl.call(target) : getImpl;
-          Object.defineProperty(target, key, {
-            value: value,
-            writable: d ? !!d.writable : true,
-            configurable: d ? !!d.configurable : true,
-            enumerable: d ? !!d.enumerable : false
-          });
-          return true;
-        }
-        if (!d || typeof d.get !== 'function') {
-          throw new TypeError('[Core.redefineAcc] native getter missing for ' + key);
-        }
-        const markAsNative = ensureMarkAsNative();
-        const namedGet = (typeof getImpl === 'function' && getImpl.name === '')
-          ? Object.getOwnPropertyDescriptor(({ get [key]() { return getImpl.call(this); } }), key).get
-          : getImpl;
-        if (typeof namedGet !== 'function') {
-          throw new TypeError('[Core.redefineAcc] getter missing for ' + key);
-        }
-        const wrappedGet = __registerToStringWrapper(namedGet, d.get, 'get ' + key, 'Core.redefineAcc');
-        knownWrapped.add(wrappedGet);
-        Object.defineProperty(target, key, {
-          get: wrappedGet,
-          set: d && d.set,
-          configurable: d ? !!d.configurable : true,
-          enumerable: d ? !!d.enumerable : false
-        });
-        return true;
       }
 
       function patchDataProp(planItem, t, desc, fail) {
@@ -1432,7 +1343,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         planItem.wrapperClass = useProxyRuntime
           ? 'core_proxy'
-          : (materializedAccessorContract ? 'materialized_named' : 'synthetic_named');
+          : (materializedAccessorContract
+              ? 'materialized_named'
+              : 'synthetic_named');
         let getWrapped = origGet;
         let setWrapped = origSet;
 
@@ -2246,18 +2159,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
       });
       safeDefine(Core, 'wrapGetter', {
         value: wrapGetter,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, 'safeDefineAcc', {
-        value: safeDefineAcc,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, 'redefineAcc', {
-        value: redefineAcc,
         writable: true,
         configurable: true,
         enumerable: false

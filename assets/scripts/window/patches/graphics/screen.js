@@ -903,16 +903,92 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!clientHeightDesc || typeof clientHeightDesc.get !== 'function') {
     throw new Error('Element.prototype.clientHeight getter missing');
   }
-  const origClientWidth = clientWidthDesc.get;
-  const origClientHeight = clientHeightDesc.get;
-  redefineProp(elementProto, 'clientWidth', function clientWidth() {
-    if (this === document.documentElement || this === document.body) return SCREEN_WIDTH;
-    return Reflect.apply(origClientWidth, this, []);
-  });
-  redefineProp(elementProto, 'clientHeight', function clientHeight() {
-    if (this === document.documentElement || this === document.body) return SCREEN_HEIGHT;
-    return Reflect.apply(origClientHeight, this, []);
-  });
+  const htmlEl = document.documentElement || null;
+  const bodyEl = document.body || null;
+  const viewportClientTargets = [];
+  if (htmlEl) {
+    viewportClientTargets.push({
+      owner: htmlEl,
+      key: 'clientWidth',
+      kind: 'accessor',
+      wrapLayer: 'materialized_accessor_gateway',
+      resolve: 'own',
+      policy: 'strict',
+      allowCreate: true,
+      configurable: !!clientWidthDesc.configurable,
+      enumerable: !!clientWidthDesc.enumerable,
+      diagTag: 'screen:viewport_clientWidth:html',
+      validThis(self) {
+        return self === htmlEl;
+      },
+      invalidThis: 'throw',
+      getImpl: function viewportHtmlClientWidthValue() {
+        return SCREEN_WIDTH;
+      }
+    });
+    viewportClientTargets.push({
+      owner: htmlEl,
+      key: 'clientHeight',
+      kind: 'accessor',
+      wrapLayer: 'materialized_accessor_gateway',
+      resolve: 'own',
+      policy: 'strict',
+      allowCreate: true,
+      configurable: !!clientHeightDesc.configurable,
+      enumerable: !!clientHeightDesc.enumerable,
+      diagTag: 'screen:viewport_clientHeight:html',
+      validThis(self) {
+        return self === htmlEl;
+      },
+      invalidThis: 'throw',
+      getImpl: function viewportHtmlClientHeightValue() {
+        return SCREEN_HEIGHT;
+      }
+    });
+  }
+  if (bodyEl) {
+    viewportClientTargets.push({
+      owner: bodyEl,
+      key: 'clientWidth',
+      kind: 'accessor',
+      wrapLayer: 'materialized_accessor_gateway',
+      resolve: 'own',
+      policy: 'strict',
+      allowCreate: true,
+      configurable: !!clientWidthDesc.configurable,
+      enumerable: !!clientWidthDesc.enumerable,
+      diagTag: 'screen:viewport_clientWidth:body',
+      validThis(self) {
+        return self === bodyEl;
+      },
+      invalidThis: 'throw',
+      getImpl: function viewportBodyClientWidthValue() {
+        return SCREEN_WIDTH;
+      }
+    });
+    viewportClientTargets.push({
+      owner: bodyEl,
+      key: 'clientHeight',
+      kind: 'accessor',
+      wrapLayer: 'materialized_accessor_gateway',
+      resolve: 'own',
+      policy: 'strict',
+      allowCreate: true,
+      configurable: !!clientHeightDesc.configurable,
+      enumerable: !!clientHeightDesc.enumerable,
+      diagTag: 'screen:viewport_clientHeight:body',
+      validThis(self) {
+        return self === bodyEl;
+      },
+      invalidThis: 'throw',
+      getImpl: function viewportBodyClientHeightValue() {
+        return SCREEN_HEIGHT;
+      }
+    });
+  }
+  if (viewportClientTargets.length) {
+    applyCoreTargetsGroup('screen:viewport_client_metrics', viewportClientTargets, 'strict');
+  }
 
 
 
