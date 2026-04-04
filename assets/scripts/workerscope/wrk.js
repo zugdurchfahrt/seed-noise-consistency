@@ -1144,10 +1144,15 @@ function mkModuleWorkerSource(snapshot, absUrl){
       await import(USER);
       __ENV_CONNECT_BUF__ = false;
       try {
-        if (typeof self.onconnect === 'function' && __ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
+        if (__ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
           for (const ports of __ENV_CONNECT_Q__) {
-            self.onconnect({ ports: ports });
+            if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
+              self.dispatchEvent(new MessageEvent('connect', { ports: ports }));
+            } else if (typeof self.onconnect === 'function') {
+              self.onconnect({ ports: ports });
+            }
           }
+          __ENV_CONNECT_Q__.length = 0;
         }
       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
       // Replay any early messages after user code is loaded.
@@ -1600,8 +1605,16 @@ function mkClassicWorkerSource(snapshot, absUrl){
          import(USER).then(function(){
             __ENV_CONNECT_BUF__ = false;
             try {
-              if (typeof self.onconnect === 'function' && __ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
-                for (var j = 0; j < __ENV_CONNECT_Q__.length; j++) self.onconnect({ ports: __ENV_CONNECT_Q__[j] });
+              if (__ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
+                for (var j = 0; j < __ENV_CONNECT_Q__.length; j++) {
+                  var __portsImport = __ENV_CONNECT_Q__[j];
+                  if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
+                    self.dispatchEvent(new MessageEvent('connect', { ports: __portsImport }));
+                  } else if (typeof self.onconnect === 'function') {
+                    self.onconnect({ ports: __portsImport });
+                  }
+                }
+                __ENV_CONNECT_Q__.length = 0;
               }
             } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
             // Replay any early messages after user code is loaded.
@@ -1627,8 +1640,16 @@ function mkClassicWorkerSource(snapshot, absUrl){
       }
       __ENV_CONNECT_BUF__ = false;
       try {
-        if (typeof self.onconnect === 'function' && __ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
-          for (var i = 0; i < __ENV_CONNECT_Q__.length; i++) self.onconnect({ ports: __ENV_CONNECT_Q__[i] });
+        if (__ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
+          for (var i = 0; i < __ENV_CONNECT_Q__.length; i++) {
+            var __portsClassic = __ENV_CONNECT_Q__[i];
+            if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
+              self.dispatchEvent(new MessageEvent('connect', { ports: __portsClassic }));
+            } else if (typeof self.onconnect === 'function') {
+              self.onconnect({ ports: __portsClassic });
+            }
+          }
+          __ENV_CONNECT_Q__.length = 0;
         }
       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
       // Replay any early messages after user code is loaded.
