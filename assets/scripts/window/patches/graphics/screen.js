@@ -586,29 +586,18 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     return true;
   }
 
-  const mqlMatches = new WeakMap();
   const mqlProto = (typeof MediaQueryList !== 'undefined' && MediaQueryList.prototype) ? MediaQueryList.prototype : null;
   if (mqlProto) {
     const matchesDesc = Object.getOwnPropertyDescriptor(mqlProto, 'matches');
-    if (matchesDesc && typeof matchesDesc.get === 'function' && matchesDesc.configurable) {
-      const origMatchesGet = matchesDesc.get;
-      applyCoreTargetsGroup('screen:mql_matches', [{
-        owner: mqlProto,
-        key: 'matches',
-        kind: 'accessor',
-        wrapLayer: 'strict_accessor_gateway',
-        resolve: 'proto_chain',
-        policy: 'strict',
+    if (!(matchesDesc && typeof matchesDesc.get === 'function')) {
+      __screenDiag('warn', 'screen:mql_matches_descriptor_missing', {
+        stage: 'preflight',
+        type: __screenTypeBrowser,
         diagTag: 'screen:mql_matches',
-        validThis(self) {
-          return receiverMatchesTarget(mqlProto, self);
-        },
-        invalidThis: 'native',
-        getImpl() {
-          if (mqlMatches.has(this)) return mqlMatches.get(this);
-          return Reflect.apply(origMatchesGet, this, []);
-        }
-      }], 'strict');
+        key: 'matches',
+        message: 'MediaQueryList.matches descriptor missing',
+        data: { outcome: 'skip', reason: 'descriptor_missing' }
+      });
     }
   }
   
@@ -716,20 +705,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
 
     const mql = Reflect.apply(target, effectiveThis, [query]);
-    if (mql && (typeof mql === 'object' || typeof mql === 'function')) {
-      try {
-        if (touched || isTrashQuery) mqlMatches.set(mql, matches);
-      } catch (e) {
-        __screenDiag('warn', 'screen:mql_matches_cache_set_failed', {
-          stage: 'runtime',
-          type: __screenTypeBrowser,
-          diagTag: 'screen:mql_matches',
-          key: 'matches',
-          message: 'MediaQueryList cache set failed',
-          data: { outcome: 'skip', reason: 'exception', substage: 'mqlMatches.set' }
-        }, e);
-      }
-    }
     return mql;
   };
   const matchMediaInvokeCore = function matchMediaInvokeCore(orig, args) {

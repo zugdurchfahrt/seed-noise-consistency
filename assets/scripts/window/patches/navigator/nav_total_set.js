@@ -200,6 +200,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         enumerable: false
       });
     }
+    let __navObjectState = (__navModuleState.__OBJECT_STATE__ && typeof __navModuleState.__OBJECT_STATE__ === 'object')
+      ? __navModuleState.__OBJECT_STATE__
+      : null;
+    if (!__navObjectState) {
+      __navObjectState = Object.create(null);
+      Object.defineProperty(__navModuleState, '__OBJECT_STATE__', {
+        value: __navObjectState,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
 
     // basic random from the existing seed initialization
     const __navCoreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
@@ -730,6 +742,65 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
     }
     const navPlatformOut = STRICT ? navPlat : expectedNavPlat;
+    function __navBuildUserAgentDataHighEntropySource() {
+      const safeDeviceMemory = __navIsValidDeviceMemoryValue(mem) ? mem : undefined;
+      const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(cpu) ? cpu : undefined;
+      const fullVersionList = (meta && meta.fullVersionList != null)
+        ? meta.fullVersionList
+        : __navProfileState.fullVersionList;
+      return {
+        architecture: meta.architecture,
+        bitness: meta.bitness,
+        model: meta.model,
+        brands: meta.brands,
+        mobile: meta.mobile,
+        platform: chPlatform,
+        platformVersion: meta.platformVersion,
+        fullVersionList: fullVersionList,
+        deviceMemory: safeDeviceMemory,
+        hardwareConcurrency: safeHardwareConcurrency,
+        wow64: meta.wow64,
+        formFactors: meta.formFactors
+      };
+    }
+    function __navBuildUserAgentDataHighEntropyPatch(keys) {
+      const producer = (__navObjectState && typeof __navObjectState.__GET_HIGH_ENTROPY_VALUES_PRODUCER__ === 'function')
+        ? __navObjectState.__GET_HIGH_ENTROPY_VALUES_PRODUCER__
+        : null;
+      if (typeof producer !== 'function') {
+        return { ok: false, reason: 'producer_missing', value: null };
+      }
+      const map = producer();
+      const result = {};
+      for (const hint of keys) {
+        if (typeof hint !== 'string' || !hint) {
+          return { ok: false, reason: 'bad_hint', value: null };
+        }
+        const val = map[hint];
+        if (val === undefined || val === null || (typeof val === 'string' && !val && hint !== 'model') || (Array.isArray(val) && !val.length)) {
+          continue;
+        }
+        result[hint] = val;
+      }
+      return { ok: true, reason: null, value: result };
+    }
+    function __navPostProcessUserAgentDataHighEntropyResult(nativeResolved, result) {
+      const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : null;
+      if (!base) {
+        return Object.keys(result).length ? Object.assign({}, result) : nativeResolved;
+      }
+      const out = Object.assign({}, base);
+      for (const hint of Object.keys(result)) {
+        const current = out[hint];
+        if (current === undefined || current === null || (typeof current === 'string' && !current && hint !== 'model') || (Array.isArray(current) && !current.length)) {
+          out[hint] = result[hint];
+        }
+      }
+      return out;
+    }
+    __navSetHiddenStateValue(__navObjectState, '__GET_HIGH_ENTROPY_VALUES_PRODUCER__', __navBuildUserAgentDataHighEntropySource);
+    __navSetHiddenStateValue(__navObjectState, '__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__', __navBuildUserAgentDataHighEntropyPatch);
+    __navSetHiddenStateValue(__navObjectState, '__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__', __navPostProcessUserAgentDataHighEntropyResult);
     if (!Number.isFinite(colorDepth) || colorDepth <= 0) {
       __navDiag('warn', 'nav_total_set:color_depth_missing', {
         stage: 'preflight',
@@ -1993,58 +2064,61 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                // Public API path must not leak service errors; pass-through native behavior.
                return Reflect.apply(orig, this, args || []);
              }
-              const safeDeviceMemory = __navIsValidDeviceMemoryValue(mem) ? mem : undefined;
-              const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(cpu) ? cpu : undefined;
-              const fullVersionList = (meta && meta.fullVersionList != null)
-                ? meta.fullVersionList
-                : __navProfileState.fullVersionList;
-               const map = {
-                 architecture: meta.architecture,
-                 bitness: meta.bitness,
-                model: meta.model,
-                brands: meta.brands,
-                 mobile: meta.mobile,
-                 platform: chPlatform,
-                 platformVersion: meta.platformVersion,
-                 fullVersionList: fullVersionList,
-                 deviceMemory: safeDeviceMemory,
-                 hardwareConcurrency: safeHardwareConcurrency,
-                 wow64: meta.wow64,
-                 formFactors: meta.formFactors
-               };
-             const result = {};
-             for (const hint of keys) {
-               if (typeof hint !== 'string' || !hint) {
-                 __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_hint', {
-                   stage: 'runtime',
-                   type: __navTypePipeline,
-                   diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
-                   key: 'userAgentData.getHighEntropyValues',
-                   message: 'bad highEntropy key item',
-                   data: { outcome: 'return', reason: 'bad_hint' }
-                 });
-                 return nativeOut;
-               }
-               const val = map[hint];
-               if (val === undefined || val === null || (typeof val === 'string' && !val && hint !== 'model') || (Array.isArray(val) && !val.length)) {
-                 continue;
-               }
-               result[hint] = val;
-             }
+              const patchBuilder = (__navObjectState && typeof __navObjectState.__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__ === 'function')
+                ? __navObjectState.__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__
+                : null;
+              if (typeof patchBuilder !== 'function') {
+                __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_patch_builder_missing', {
+                  stage: 'runtime',
+                  type: __navTypePipeline,
+                  diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+                  key: 'userAgentData.getHighEntropyValues',
+                  message: 'highEntropy patch builder missing',
+                  data: { outcome: 'return', reason: 'patch_builder_missing' }
+                });
+                return nativeOut;
+              }
+              const patchBuild = patchBuilder(keys);
+              if (!patchBuild || patchBuild.ok !== true) {
+                if (patchBuild && patchBuild.reason === 'bad_hint') {
+                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_hint', {
+                    stage: 'runtime',
+                    type: __navTypePipeline,
+                    diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+                    key: 'userAgentData.getHighEntropyValues',
+                    message: 'bad highEntropy key item',
+                    data: { outcome: 'return', reason: 'bad_hint' }
+                  });
+                } else {
+                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_producer_missing', {
+                    stage: 'runtime',
+                    type: __navTypePipeline,
+                    diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+                    key: 'userAgentData.getHighEntropyValues',
+                    message: 'highEntropy producer missing',
+                    data: { outcome: 'return', reason: 'producer_missing' }
+                  });
+                }
+                return nativeOut;
+              }
+              const result = patchBuild.value || {};
+              const postProcessor = (__navObjectState && typeof __navObjectState.__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__ === 'function')
+                ? __navObjectState.__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__
+                : null;
+              if (typeof postProcessor !== 'function') {
+                __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_postprocessor_missing', {
+                  stage: 'runtime',
+                  type: __navTypePipeline,
+                  diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+                  key: 'userAgentData.getHighEntropyValues',
+                  message: 'highEntropy postprocessor missing',
+                  data: { outcome: 'return', reason: 'postprocessor_missing' }
+                });
+                return nativeOut;
+              }
               return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
                 try {
-                  const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : null;
-                  if (!base) {
-                    return Object.keys(result).length ? Object.assign({}, result) : nativeResolved;
-                  }
-                  const out = Object.assign({}, base);
-                  for (const hint of Object.keys(result)) {
-                    const current = out[hint];
-                    if (current === undefined || current === null || (typeof current === 'string' && !current && hint !== 'model') || (Array.isArray(current) && !current.length)) {
-                      out[hint] = result[hint];
-                    }
-                  }
-                  return out;
+                  return postProcessor(nativeResolved, result);
                 } catch (e) {
                   __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
                    stage: 'runtime',
