@@ -157,12 +157,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       && typeof window.Core.__internal === 'object')
     ? validateCoreToStringStateCandidate(window.Core.__internal.coreToStringState, 'Core.__internal.coreToStringState')
     : null;
-  const fallbackWindowCoreToStringState = validateCoreToStringStateCandidate(
-    window && window.__CORE_TOSTRING_STATE__,
-    'window.__CORE_TOSTRING_STATE__'
-  );
-
-  let sharedCoreToStringState = existingOwnedCoreToStringState || fallbackWindowCoreToStringState || null;
+  let sharedCoreToStringState = existingOwnedCoreToStringState || null;
 
   toStringOverrideMap = sharedCoreToStringState
     ? sharedCoreToStringState.overrideMap
@@ -188,28 +183,21 @@ const CoreWindowModule = function CoreWindowModule(window) {
     if (typeof func !== 'function') return func;
     try {
       const hasOwnBridgeTarget = (typeof func.__coreBridgeTarget__ === 'function');
-      const hasMappedBridgeTarget = (typeof toStringProxyTargetMap.get(func) === 'function');
-      if (!hasOwnBridgeTarget && !hasMappedBridgeTarget) {
-        const bridgeErr = new Error('[CoreWindow] markAsNative requires __coreBridgeTarget__ or existing bridge');
+      if (!hasOwnBridgeTarget) {
+        const bridgeErr = new Error('[CoreWindow] markAsNative requires __coreBridgeTarget__');
         __emit('error', 'core_window:mark_as_native_bridge_missing', {
           module: 'core',
           diagTag: 'core_window',
           surface: 'core',
           key: 'Function.prototype.toString',
           stage: 'preflight',
-          message: 'markAsNative requires __coreBridgeTarget__ or existing bridge',
+          message: 'markAsNative requires __coreBridgeTarget__',
           type: 'contract_violation',
           data: { outcome: 'throw' }
         }, bridgeErr);
         throw bridgeErr;
       }
-      const ownBridgeTarget = hasOwnBridgeTarget
-        ? __resolveWrappedBridgeTarget(func.__coreBridgeTarget__, 'baseMarkAsNative')
-        : null;
-      const mappedBridgeTarget = hasMappedBridgeTarget
-        ? __resolveWrappedBridgeTarget(toStringProxyTargetMap.get(func), 'baseMarkAsNative')
-        : null;
-      const bridgeTarget = ownBridgeTarget || mappedBridgeTarget;
+      const bridgeTarget = __resolveWrappedBridgeTarget(func.__coreBridgeTarget__, 'baseMarkAsNative');
       const nativeName = name || bridgeTarget.name || func.name || "";
       const label = nativeName
         ? `function ${nativeName}() { [native code] }`
@@ -218,7 +206,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const bridgeLabel = bridgeTarget.name
           ? `function ${bridgeTarget.name}() { [native code] }`
           : 'function () { [native code] }';
-        toStringProxyTargetMap.set(func, bridgeTarget);
         toStringOverrideMap.set(bridgeTarget, bridgeLabel);
       }
       toStringOverrideMap.set(func, label);

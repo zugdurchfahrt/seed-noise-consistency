@@ -172,11 +172,7 @@
       (__wrkRuntimeRoot && __wrkRuntimeRoot.__CORE_TOSTRING_STATE__) ? __wrkRuntimeRoot.__CORE_TOSTRING_STATE__ : null,
       'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__'
     );
-    const fallbackCoreToStringState = validateCoreToStringStateCandidate(
-      self && self.__CORE_TOSTRING_STATE__,
-      'self.__CORE_TOSTRING_STATE__'
-    );
-    let sharedCoreToStringState = ownedCoreToStringState || fallbackCoreToStringState || null;
+    let sharedCoreToStringState = ownedCoreToStringState || null;
 
     const toStringOverrideMap = sharedCoreToStringState
       ? sharedCoreToStringState.overrideMap
@@ -217,23 +213,6 @@
         }, eState);
         throw eState;
       }
-      try {
-        Object.defineProperty(self, '__CORE_TOSTRING_STATE__', {
-          value: nextState,
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
-      } catch (eState) {
-        __wrkDiag('error', 'wrk:core_tostring_state_define_failed', {
-          stage: 'apply',
-          key: '__CORE_TOSTRING_STATE__',
-          message: 'failed to define __CORE_TOSTRING_STATE__',
-          type: 'pipeline missing data',
-          data: { outcome: 'throw' }
-        }, eState);
-        throw eState;
-      }
       return nextState;
     }
 
@@ -241,25 +220,18 @@
       if (typeof func !== 'function') return func;
       try {
         const hasOwnBridgeTarget = (typeof func.__coreBridgeTarget__ === 'function');
-        const hasMappedBridgeTarget = (typeof toStringProxyTargetMap.get(func) === 'function');
-        if (!hasOwnBridgeTarget && !hasMappedBridgeTarget) {
-          const bridgeErr = new Error('[set_reflect] markAsNative requires __coreBridgeTarget__ or existing bridge');
+        if (!hasOwnBridgeTarget) {
+          const bridgeErr = new Error('[set_reflect] markAsNative requires __coreBridgeTarget__');
           __wrkDiag('error', 'wrk:mark_as_native_bridge_missing', {
             stage: 'preflight',
             key: 'Function.prototype.toString',
-            message: 'markAsNative requires __coreBridgeTarget__ or existing bridge',
+            message: 'markAsNative requires __coreBridgeTarget__',
             type: 'contract_violation',
             data: { outcome: 'throw' }
           }, bridgeErr);
           throw bridgeErr;
         }
-        const ownBridgeTarget = hasOwnBridgeTarget
-          ? __resolveWrappedBridgeTarget(func.__coreBridgeTarget__, 'baseMarkAsNative')
-          : null;
-        const mappedBridgeTarget = hasMappedBridgeTarget
-          ? __resolveWrappedBridgeTarget(toStringProxyTargetMap.get(func), 'baseMarkAsNative')
-          : null;
-        const bridgeTarget = ownBridgeTarget || mappedBridgeTarget;
+        const bridgeTarget = __resolveWrappedBridgeTarget(func.__coreBridgeTarget__, 'baseMarkAsNative');
         const nativeName = name || bridgeTarget.name || func.name || "";
         const label = nativeName
           ? ('function ' + nativeName + '() { [native code] }')
@@ -268,7 +240,6 @@
           const bridgeLabel = bridgeTarget.name
             ? ('function ' + bridgeTarget.name + '() { [native code] }')
             : 'function () { [native code] }';
-          toStringProxyTargetMap.set(func, bridgeTarget);
           toStringOverrideMap.set(bridgeTarget, bridgeLabel);
         }
         toStringOverrideMap.set(func, label);
@@ -704,8 +675,8 @@
         enumerable: false
       });
       markAsNative(seedProbe, 'toString');
-      if (toStringProxyTargetMap.get(seedProbe) !== nativeToString || typeof toStringOverrideMap.get(seedProbe) !== 'string') {
-        throw new Error('UACHPatch: toString probe missing bridge registration');
+      if (typeof toStringOverrideMap.get(seedProbe) !== 'string') {
+        throw new Error('UACHPatch: toString probe missing native label');
       }
       toStringProxyTargetMap.delete(seedProbe);
       toStringOverrideMap.delete(seedProbe);

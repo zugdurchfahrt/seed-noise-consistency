@@ -85,8 +85,6 @@
       const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
       const ownedState = runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__;
       if (__isCoreToStringStateOk__(ownedState)) return ownedState;
-      const fallbackState = self.__CORE_TOSTRING_STATE__;
-      if (__isCoreToStringStateOk__(fallbackState)) return fallbackState;
       return null;
     };
     const trackedDefineProperty = (obj, key, desc) => {
@@ -280,9 +278,6 @@
     {
       const st = __resolveCoreToStringState__();
       const probe = function probe(){};
-      const expectedBridge = (st && typeof st.nativeToString === 'function')
-        ? st.nativeToString
-        : nativeToString;
       Object.defineProperty(probe, '__coreBridgeTarget__', {
         value: nativeToString,
         writable: true,
@@ -294,19 +289,10 @@
       const actual = st && st.overrideMap && typeof st.overrideMap.get === 'function'
         ? st.overrideMap.get(probe)
         : undefined;
-      const actualBridge = st && st.proxyTargetMap && typeof st.proxyTargetMap.get === 'function'
-        ? st.proxyTargetMap.get(probe)
-        : undefined;
-      const actualBridgeLabel = (st && st.overrideMap && typeof st.overrideMap.get === 'function' && typeof actualBridge === 'function')
-        ? st.overrideMap.get(actualBridge)
-        : undefined;
       if (typeof actual !== 'string'
-          || actual === nativeProbe
-          || actualBridge !== expectedBridge
-          || typeof actualBridgeLabel !== 'string'
-          || !actualBridgeLabel) {
-        const e = new Error('UACHPatch: toString override map missing bridge label');
-        emitDegrade('error', 'worker_patch_src:tostring_state:contract:label_missing', {
+          || actual === nativeProbe) {
+        const e = new Error('UACHPatch: toString override map missing native label');
+        emitDegrade('error', 'worker_patch_src:tostring_state:contract:native_label_missing', {
           type: 'pipeline missing data',
           stage: 'contract',
           module: 'WORKER_PATCH_SRC',
