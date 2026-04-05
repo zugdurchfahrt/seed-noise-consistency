@@ -1462,8 +1462,22 @@
         });
         return stateRoot[key];
       };
+      const ensureFontsSubSlot = key => {
+        const fontsRoot = ensureStateSlot('__FONTS__');
+        const existing = (fontsRoot[key] && typeof fontsRoot[key] === 'object')
+          ? fontsRoot[key]
+          : null;
+        if (existing) return existing;
+        trackedDefineProperty(fontsRoot, key, {
+          value: Object.create(null),
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        return fontsRoot[key];
+      };
       if (snap) {
-        const fontsState = ensureStateSlot('__FONTS_STATE__');
+        const fontsState = ensureFontsSubSlot('__STATE__');
         const familySnapshot = (snap.familySnapshot && typeof snap.familySnapshot === 'object')
           ? snap.familySnapshot
           : null;
@@ -1526,7 +1540,7 @@
         });
       }
       if (cfgSnap) {
-        const fontsConfig = ensureStateSlot('__FONTS_CONFIG__');
+        const fontsConfig = ensureFontsSubSlot('__CONFIG__');
         trackedDefineProperty(fontsConfig, 'configs', {
           value: Array.isArray(cfgSnap.configs) ? cfgSnap.configs.slice() : [],
           writable: true,

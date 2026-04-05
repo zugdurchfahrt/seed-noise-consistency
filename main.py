@@ -430,8 +430,8 @@ def init_driver(
             RtcpeerconnectionPatchModule(window);
             RNGsetModule(window);
             NavTotalSetPatchModule(window);
-            ScreenPatchModule(window);
             FontPatchModule(window);
+            ScreenPatchModule(window);
             CanvasPatchModule(window);
             WEBglDICKts(window);
             WebglPatchModule(window);
@@ -1237,7 +1237,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/fonts")
+        driver.get("https://pixelscan.net/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

@@ -46,15 +46,51 @@ if (!stateRoot) {
   __defineHiddenValue__(C, 'state', stateRoot);
 }
 
-let fontsConfigState = (stateRoot.__FONTS_CONFIG__ && typeof stateRoot.__FONTS_CONFIG__ === 'object')
-  ? stateRoot.__FONTS_CONFIG__
+let fontsRoot = (stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
+  ? stateRoot.__FONTS__
+  : null;
+if (!fontsRoot) {
+  fontsRoot = __defineHiddenValue__(stateRoot, '__FONTS__', Object.create(null));
+  if (!fontsRoot) throw new Error('[module] CanvasPatchContext.state.__FONTS__ bootstrap failed');
+} else {
+  __defineHiddenValue__(stateRoot, '__FONTS__', fontsRoot);
+}
+
+let fontsState = (fontsRoot.__STATE__ && typeof fontsRoot.__STATE__ === 'object')
+  ? fontsRoot.__STATE__
+  : null;
+if (!fontsState) {
+  fontsState = __defineHiddenValue__(fontsRoot, '__STATE__', {
+    ready: false,
+    error: null,
+    awaitReady: null,
+    awaitReadyStatus: null,
+    awaitReadyResolve: null,
+    awaitReadyReject: null,
+    familySnapshot: {
+      allowedFamilies: null,
+      runtimeFamilies: new Set(),
+      platformDom: null,
+      versionToken: null
+    }
+  });
+  if (!fontsState) throw new Error('[module] CanvasPatchContext.state.__FONTS__.__STATE__ bootstrap failed');
+} else {
+  __defineHiddenValue__(fontsRoot, '__STATE__', fontsState);
+}
+
+let fontsConfigState = (fontsRoot.__CONFIG__ && typeof fontsRoot.__CONFIG__ === 'object')
+  ? fontsRoot.__CONFIG__
   : null;
 if (!fontsConfigState) {
-  fontsConfigState = __defineHiddenValue__(stateRoot, '__FONTS_CONFIG__', Object.create(null));
-  if (!fontsConfigState) throw new Error('[module] CanvasPatchContext.state.__FONTS_CONFIG__ bootstrap failed');
+  fontsConfigState = Object.create(null);
+  fontsConfigState.configs = [];
+  fontsConfigState = __defineHiddenValue__(fontsRoot, '__CONFIG__', fontsConfigState);
+  if (!fontsConfigState) throw new Error('[module] CanvasPatchContext.state.__FONTS__.__CONFIG__ bootstrap failed');
 } else {
-  __defineHiddenValue__(stateRoot, '__FONTS_CONFIG__', fontsConfigState);
+  __defineHiddenValue__(fontsRoot, '__CONFIG__', fontsConfigState);
 }
+if (!Array.isArray(fontsConfigState.configs)) fontsConfigState.configs = [];
 
 let loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 if (!loggerRoot) {

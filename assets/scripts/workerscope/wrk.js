@@ -512,8 +512,11 @@ function EnvBus(G){
   }
   function __cloneFontsStateForWorker__() {
     const stateRoot = __resolveCanvasPatchStateRoot();
-    const fontsState = (stateRoot && stateRoot.__FONTS_STATE__ && typeof stateRoot.__FONTS_STATE__ === 'object')
-      ? stateRoot.__FONTS_STATE__
+    const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
+      ? stateRoot.__FONTS__
+      : null;
+    const fontsState = (fontsRoot && fontsRoot.__STATE__ && typeof fontsRoot.__STATE__ === 'object')
+      ? fontsRoot.__STATE__
       : null;
     if (!fontsState) return null;
     return {
@@ -531,8 +534,11 @@ function EnvBus(G){
   }
   function __cloneFontsConfigForWorker__() {
     const stateRoot = __resolveCanvasPatchStateRoot();
-    const fontsConfigState = (stateRoot && stateRoot.__FONTS_CONFIG__ && typeof stateRoot.__FONTS_CONFIG__ === 'object')
-      ? stateRoot.__FONTS_CONFIG__
+    const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
+      ? stateRoot.__FONTS__
+      : null;
+    const fontsConfigState = (fontsRoot && fontsRoot.__CONFIG__ && typeof fontsRoot.__CONFIG__ === 'object')
+      ? fontsRoot.__CONFIG__
       : null;
     const configs = Array.isArray(fontsConfigState && fontsConfigState.configs)
       ? fontsConfigState.configs

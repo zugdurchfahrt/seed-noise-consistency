@@ -505,8 +505,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   function getManagedFontConfig(font) {
     try {
       const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-      const fontsConfigState = (stateRoot && stateRoot.__FONTS_CONFIG__ && typeof stateRoot.__FONTS_CONFIG__ === 'object')
-        ? stateRoot.__FONTS_CONFIG__
+      const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
+        ? stateRoot.__FONTS__
+        : null;
+      const fontsConfigState = (fontsRoot && fontsRoot.__CONFIG__ && typeof fontsRoot.__CONFIG__ === 'object')
+        ? fontsRoot.__CONFIG__
         : null;
       const cfgs = Array.isArray(fontsConfigState && fontsConfigState.configs) ? fontsConfigState.configs : [];
       const fontStr = String(font || '');
@@ -522,7 +525,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     } catch (e) {
       emitCanvasDiag('warn', 'canvas:fonts:managed_config_resolve_failed', e, {
         stage: 'runtime',
-        key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs'
+        key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs'
       });
     }
     return null;
@@ -543,8 +546,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         ? font
         : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : DEFAULT_CTX2D_FONT;
       const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-      const fontsState = (stateRoot && stateRoot.__FONTS_STATE__ && typeof stateRoot.__FONTS_STATE__ === 'object')
-        ? stateRoot.__FONTS_STATE__
+      const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
+        ? stateRoot.__FONTS__
+        : null;
+      const fontsState = (fontsRoot && fontsRoot.__STATE__ && typeof fontsRoot.__STATE__ === 'object')
+        ? fontsRoot.__STATE__
         : null;
       const familySnapshot = (fontsState && fontsState.familySnapshot && typeof fontsState.familySnapshot === 'object')
         ? fontsState.familySnapshot
@@ -624,7 +630,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // === Font size scaling: masters for fillText/strokeText (Layer 1) ===
   //
   // Requirements:
-  // - Reads managed font configs from `CanvasPatchContext.state.__FONTS_CONFIG__.configs` (optional)
+  // - Reads managed font configs from `CanvasPatchContext.state.__FONTS__.__CONFIG__.configs` (optional)
   // - Writes global idempotency flag: `window.__PATCH_FONT_SCALE_HOOKS__`
   // - Exports masters: `applyFillTextHook` / `applyStrokeTextHook` (via final export section)
   
@@ -694,7 +700,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   //     } catch (e) {
   //       emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
   //         stage: 'runtime',
-  //         key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs'
+  //         key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs'
   //       });
   //     }
   //     return { sx: 1, sy: 1 };

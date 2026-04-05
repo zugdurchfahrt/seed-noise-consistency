@@ -138,15 +138,32 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     return;
   }
 
-  function __ensureFontsConfigSlot() {
-    const existing = (__stateRoot.__FONTS_CONFIG__ && typeof __stateRoot.__FONTS_CONFIG__ === 'object')
-      ? __stateRoot.__FONTS_CONFIG__
+  function __ensureFontsModuleSlot() {
+    const existing = (__stateRoot.__FONTS__ && typeof __stateRoot.__FONTS__ === 'object')
+      ? __stateRoot.__FONTS__
       : null;
     if (existing) return existing;
     __fontDiagPipeline('warn', 'fonts:fonts_config_missing', {
       stage: 'preflight',
-      key: 'CanvasPatchContext.state.__FONTS_CONFIG__',
-      message: 'CanvasPatchContext.state.__FONTS_CONFIG__ missing',
+      key: 'CanvasPatchContext.state.__FONTS__',
+      message: 'CanvasPatchContext.state.__FONTS__ missing',
+      data: { outcome: 'skip', reason: 'fonts_module_slot_missing' }
+    }, null);
+    return null;
+  }
+
+  const __fontsModuleState = __ensureFontsModuleSlot();
+  if (!__fontsModuleState) return;
+
+  function __ensureFontsConfigSlot() {
+    const existing = (__fontsModuleState.__CONFIG__ && typeof __fontsModuleState.__CONFIG__ === 'object')
+      ? __fontsModuleState.__CONFIG__
+      : null;
+    if (existing) return existing;
+    __fontDiagPipeline('warn', 'fonts:fonts_config_missing', {
+      stage: 'preflight',
+      key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__',
+      message: 'CanvasPatchContext.state.__FONTS__.__CONFIG__ missing',
       data: { outcome: 'skip', reason: 'fonts_config_missing' }
     }, null);
     return null;
@@ -160,45 +177,18 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }
 
   function __ensureFontsStateSlot() {
-    if (Object.prototype.hasOwnProperty.call(__stateRoot, '__FONTS_STATE__')) {
-      const existing = __stateRoot.__FONTS_STATE__;
-      if (existing && typeof existing === 'object') return existing;
-      __fontDiagPipeline('warn', 'fonts:fonts_state_invalid', {
-        stage: 'preflight',
-        surface: 'CanvasPatchContext.state',
-        key: 'CanvasPatchContext.state.__FONTS_STATE__',
-        message: 'CanvasPatchContext.state.__FONTS_STATE__ invalid',
-        data: { outcome: 'skip', reason: 'invalid_fonts_state_slot' }
-      }, null);
-      return null;
-    }
-    const state = {
-      ready: false,
-      error: null,
-      awaitReady: null,
-      awaitReadyStatus: null,
-      awaitReadyResolve: null,
-      awaitReadyReject: null,
-      familySnapshot: __makeFontFamilySnapshot()
-    };
-    try {
-      Object.defineProperty(__stateRoot, '__FONTS_STATE__', {
-        value: state,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      return state;
-    } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:fonts_state_define_failed', {
-        stage: 'apply',
-        surface: 'CanvasPatchContext.state',
-        key: 'CanvasPatchContext.state.__FONTS_STATE__',
-        message: 'Object.defineProperty(CanvasPatchContext.state,"__FONTS_STATE__") failed',
-        data: { outcome: 'skip', reason: 'fonts_state_define_failed' }
-      }, e);
-      return null;
-    }
+    const existing = (__fontsModuleState.__STATE__ && typeof __fontsModuleState.__STATE__ === 'object')
+      ? __fontsModuleState.__STATE__
+      : null;
+    if (existing) return existing;
+    __fontDiagPipeline('warn', 'fonts:fonts_state_missing', {
+      stage: 'preflight',
+      surface: 'CanvasPatchContext.state.__FONTS__',
+      key: 'CanvasPatchContext.state.__FONTS__.__STATE__',
+      message: 'CanvasPatchContext.state.__FONTS__.__STATE__ missing',
+      data: { outcome: 'skip', reason: 'missing_fonts_state_slot' }
+    }, null);
+    return null;
   }
 
   const __fontsState = __ensureFontsStateSlot();
@@ -533,8 +523,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       __fontDiagPipeline('warn', 'fonts:configs_missing_or_invalid', {
         stage: 'preflight',
         diagTag: 'fonts',
-        key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
-        message: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs missing/invalid (skip font patch)',
+        key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
+        message: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs missing/invalid (skip font patch)',
         data: { outcome: 'skip', reason: 'configs_missing_or_invalid', typeof: typeof __fontsConfigState.configs }
       }, null);
       __releaseGuardOnSkip('preflight', 'guard release failed after preflight skip', 'guard_release_failed');
@@ -1379,7 +1369,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __fontDiagPipeline('warn', 'fonts:filtered_empty', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
+      key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
       message: 'filtered fonts list is empty',
       data: { platform: domPlat }
     }, null);
@@ -1387,7 +1377,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __fontDiagPipeline('info', 'fonts:filtered_count', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
+      key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
       message: 'filtered fonts list prepared',
       data: { platform: domPlat, count: fonts.length }
     }, null);
@@ -1424,7 +1414,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         __fontDiagPipeline('warn', 'fonts:dom_override_filtered_empty', {
           stage: 'preflight',
           diagTag: 'fonts',
-          key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
+          key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
           message: 'dom override skipped: no filtered fonts',
           data: { platform: domPlat }
         }, null);
@@ -1521,7 +1511,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           __fontDiagBrowser('warn', 'fonts:load_item_failed', {
             stage: 'runtime',
             diagTag: 'fonts',
-            key: 'CanvasPatchContext.state.__FONTS_CONFIG__.configs',
+            key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
             message: 'font item build failed',
             data: { outcome: 'skip', reason: 'font_item_build_failed' }
           }, e);
