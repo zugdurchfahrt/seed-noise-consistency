@@ -835,18 +835,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     return null;
   }
 
-  function getManagedBlockedSource() {
-    const cfgs = getRuntimeFontConfigs();
-    for (let i = 0; i < cfgs.length; i++) {
-      const cfg = cfgs[i];
-      const url = cfg && typeof cfg.url === 'string' ? cfg.url : '';
-      if (!/^data:font\/woff2;base64,/i.test(url)) continue;
-      return `url(${JSON.stringify(url)}) format("woff2")`;
-    }
-    return null;
-  }
-
-
   function sanitizeFontFaceSource(source, family, descriptors) {
     const resultBase = {
       source: source,
@@ -906,15 +894,11 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
     let matchedCfg = null;
     let managedSource = null;
-    let blockedSource = null;
     try {
       matchedCfg = matchRuntimeFontConfig(family, descriptors);
       const matchedUrl = matchedCfg && typeof matchedCfg.url === 'string' ? matchedCfg.url : '';
       if (/^data:font\/woff2;base64,/i.test(matchedUrl)) {
         managedSource = `url(${JSON.stringify(matchedUrl)}) format("woff2")`;
-      }
-      if (!managedSource) {
-        blockedSource = getManagedBlockedSource();
       }
     } catch (e) {
       return Object.assign({}, resultBase, {
@@ -928,13 +912,13 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
     if (!filtered.length) {
       return Object.assign({}, resultBase, {
-        source: managedSource || blockedSource || '',
+        source: managedSource || source,
         hadLocal: true,
         hadOnlyLocal: true,
-        localOnlyBlocked: !managedSource && !!blockedSource,
+        localOnlyBlocked: false,
         localOnlyManaged: !!managedSource,
-        localOnlyNativeError: !managedSource && !blockedSource,
-        localOnlyPassthrough: !managedSource && !blockedSource,
+        localOnlyNativeError: false,
+        localOnlyPassthrough: !managedSource,
         unexpectedSourceType: unexpectedSourceType,
         runtimeConfigMatched: !!matchedCfg
       });
@@ -1034,20 +1018,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
               data: {
                 outcome: 'return',
                 reason: 'local_only_replaced_with_managed_src',
-                family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
-                runtimeConfigMatched: !!sanitized.runtimeConfigMatched
-              }
-            }, null);
-          }
-          if (sanitized.localOnlyBlocked) {
-            __fontDiagPipeline('warn', 'fonts:fontface:local_only_blocked_with_managed_fallback_src', {
-              stage: 'runtime',
-              diagTag: 'fonts:fontface',
-              key: 'FontFace',
-              message: 'FontFace local-only source blocked with managed fallback src',
-              data: {
-                outcome: 'return',
-                reason: 'local_only_blocked_with_managed_fallback_src',
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
                 runtimeConfigMatched: !!sanitized.runtimeConfigMatched
               }
