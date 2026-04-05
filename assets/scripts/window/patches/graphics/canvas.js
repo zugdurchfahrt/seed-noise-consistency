@@ -539,32 +539,27 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       // - Do not create/use TextMetrics cache until fonts are ready.
       // - Keep API-shape compatibility: do not synthesize values for properties absent on native TextMetrics.
 
-      const doc = (window && window.document);
-      const ffs = doc && doc.fonts;
       const fontStr = (typeof font === 'string' && font.trim())
         ? font
         : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : DEFAULT_CTX2D_FONT;
-      const managedFontCfg = getManagedFontConfig(fontStr);
-      const isManagedFont = !!managedFontCfg;
-
       const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
       const fontsState = (stateRoot && stateRoot.__FONTS_STATE__ && typeof stateRoot.__FONTS_STATE__ === 'object')
         ? stateRoot.__FONTS_STATE__
         : null;
-      const fontsReadyFlag = !!(fontsState && fontsState.ready === true);
-
-      const nativeFontsReady = !!(ffs && typeof ffs.status === 'string' && ffs.status === 'loaded');
-
-      // Managed fonts stay on the explicit CanvasPatchContext.state.__FONTS_STATE__.ready gate.
-      // Unmanaged/custom CSS fonts must follow only native FontFaceSet readiness.
-      const fontsReady = isManagedFont ? fontsReadyFlag : nativeFontsReady;
+      const familySnapshot = (fontsState && fontsState.familySnapshot && typeof fontsState.familySnapshot === 'object')
+        ? fontsState.familySnapshot
+        : null;
+      const fontsReady = !!(fontsState && fontsState.ready === true);
       if (!fontsReady) return nativeMetrics;
       // NOTE: widthNoise is intentionally applied ONLY here (post-read),
       // measureTextNoiseHook itself must not change returned metrics for consistency.
       const info = measureTextNoiseHook.call(this, nativeMetrics, text, fontStr);
       if (!info || typeof info !== 'object') return nativeMetrics;
       const TM = C.__TextMetrics__ || (C.__TextMetrics__ = { cache: new Map() });
-      const key = (typeof info.key === 'string' && info.key.length) ? info.key : null;
+      const epochToken = (familySnapshot && Object.prototype.hasOwnProperty.call(familySnapshot, 'versionToken'))
+        ? String(familySnapshot.versionToken || '')
+        : '';
+      const key = (typeof info.key === 'string' && info.key.length) ? `${info.key}\u241F${epochToken}` : null;
       return new Proxy(nativeMetrics, {
         get(t, p) {
           const hasProp = (p in t);

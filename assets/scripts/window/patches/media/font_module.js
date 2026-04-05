@@ -450,17 +450,26 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     __fontsState.familySnapshot = __fontFamilySnapshot;
   }
 
+  function __refreshFontsEpochState() {
+    if (typeof refreshFamilySnapshot === 'function') {
+      return refreshFamilySnapshot();
+    }
+    return __fontFamilySnapshot;
+  }
+
   function __setFontsAwaitState(promiseValue, status, resolveFn, rejectFn) {
     __fontsState.awaitReady = promiseValue || null;
     __fontsState.awaitReadyStatus = status || null;
     __fontsState.awaitReadyResolve = (typeof resolveFn === 'function') ? resolveFn : null;
     __fontsState.awaitReadyReject = (typeof rejectFn === 'function') ? rejectFn : null;
+    __refreshFontsEpochState();
     return true;
   }
 
   function __setFontsRuntimeState(readyValue, errorValue) {
     __fontsState.ready = readyValue === true;
     __fontsState.error = (errorValue == null) ? null : errorValue;
+    __refreshFontsEpochState();
   }
 
   const FONTFACE_RUNTIME_FAMILIES = __fontFamilySnapshot.runtimeFamilies;
@@ -558,6 +567,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     if (!p || typeof p.then !== 'function') return false;
     if (__fontsState.awaitReadyStatus && __fontsState.awaitReadyStatus !== 'pending') return false;
     __fontsState.awaitReadyStatus = state;
+    __refreshFontsEpochState();
     if (state === 'resolved') {
       if (typeof __fontsState.awaitReadyResolve === 'function') __fontsState.awaitReadyResolve(payload);
       return true;
@@ -627,7 +637,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     };
   }
 
-  function buildFamilyVersionToken(domPlat, cfgs) {
+  function buildFamilyVersionToken(domPlat, cfgs, runtimeFamilies, readyValue, awaitStatus, errorValue) {
     const parts = [domPlat || '', String(Array.isArray(cfgs) ? cfgs.length : 0)];
     const list = Array.isArray(cfgs) ? cfgs : [];
     for (let i = 0; i < list.length; i++) {
@@ -641,18 +651,21 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         (typeof cfg.weight === 'string') ? cfg.weight.toLowerCase() : ''
       ].join('|'));
     }
+    const runtimeList = (runtimeFamilies instanceof Set)
+      ? Array.from(runtimeFamilies).map(normalizeFamilyName).filter(Boolean).sort()
+      : [];
+    parts.push('runtime:' + String(runtimeList.length));
+    if (runtimeList.length) {
+      parts.push(runtimeList.join('|'));
+    }
+    parts.push('ready:' + String(readyValue === true ? 1 : 0));
+    parts.push('await:' + String(awaitStatus || ''));
+    parts.push('error:' + String(errorValue == null ? '' : 1));
     return parts.join('||');
   }
 
   function refreshFamilySnapshot() {
     const scoped = getPlatformScopedFontConfigs();
-    const token = buildFamilyVersionToken(scoped.domPlat, scoped.cfgs);
-    if (__fontFamilySnapshot.allowedFamilies instanceof Set && __fontFamilySnapshot.versionToken === token) {
-      if (__fontFamilySnapshot.platformDom !== scoped.domPlat) {
-        __fontFamilySnapshot.platformDom = scoped.domPlat;
-      }
-      return __fontFamilySnapshot;
-    }
     __fontFamilySnapshot.allowedFamilies = new Set(
       scoped.cfgs
         .flatMap(f => [f && f.cssFamily, f && f.family].filter(Boolean))
@@ -660,8 +673,15 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         .filter(Boolean)
     );
     __fontFamilySnapshot.platformDom = scoped.domPlat;
-    __fontFamilySnapshot.versionToken = token;
     __fontFamilySnapshot.runtimeFamilies = FONTFACE_RUNTIME_FAMILIES;
+    __fontFamilySnapshot.versionToken = buildFamilyVersionToken(
+      scoped.domPlat,
+      scoped.cfgs,
+      FONTFACE_RUNTIME_FAMILIES,
+      __fontsState && __fontsState.ready === true,
+      __fontsState ? __fontsState.awaitReadyStatus : null,
+      __fontsState ? __fontsState.error : null
+    );
     return __fontFamilySnapshot;
   }
 
@@ -677,7 +697,13 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
   function rememberRuntimeFamily(family) {
     const normalized = normalizeFamilyName(family);
-    if (normalized) FONTFACE_RUNTIME_FAMILIES.add(normalized);
+    if (normalized) {
+      const before = FONTFACE_RUNTIME_FAMILIES.size;
+      FONTFACE_RUNTIME_FAMILIES.add(normalized);
+      if (FONTFACE_RUNTIME_FAMILIES.size !== before) {
+        refreshFamilySnapshot();
+      }
+    }
     __fontFamilySnapshot.runtimeFamilies = FONTFACE_RUNTIME_FAMILIES;
     return normalized;
   }
@@ -1348,6 +1374,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   const allFonts = __getFontsConfigArray();
   const hasPlatformDom = allFonts.some(f => f && typeof f.platform_dom === 'string');
   const fonts = (hasPlatformDom && domPlat) ? allFonts.filter(f => f.platform_dom === domPlat) : allFonts;
+  __refreshFontsEpochState();
   if (!fonts.length) {
     __fontDiagPipeline('warn', 'fonts:filtered_empty', {
       stage: 'preflight',
@@ -1517,6 +1544,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
             __setFontsRuntimeState(false, null);
             try {
               __fontsState.error = String((err && (err.stack || err.message)) || err);
+              __refreshFontsEpochState();
             } catch (eSet) {
               degrade('fonts:data:set_error_failed', eSet);
             }
@@ -1552,6 +1580,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       __setFontsRuntimeState(false, null);
       try {
         __fontsState.error = String((e && (e.stack || e.message)) || e);
+        __refreshFontsEpochState();
       } catch (eSet) {
         degrade('fonts:data:set_error_failed', eSet);
       }
