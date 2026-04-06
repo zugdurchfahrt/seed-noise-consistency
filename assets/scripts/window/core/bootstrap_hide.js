@@ -100,6 +100,43 @@ if (!loggerRoot) {
   __defineHiddenValue__(C, '__logger', loggerRoot);
 }
 
+let coreRoot = (W.Core && (typeof W.Core === 'object' || typeof W.Core === 'function'))
+  ? W.Core
+  : null;
+if (!coreRoot) {
+  coreRoot = __defineHiddenValue__(W, 'Core', Object.create(null));
+  if (!coreRoot) throw new Error('[module] Core bootstrap failed');
+} else {
+  __defineHiddenValue__(W, 'Core', coreRoot);
+}
+
+let coreInternal = (coreRoot.__internal && typeof coreRoot.__internal === 'object')
+  ? coreRoot.__internal
+  : null;
+if (!coreInternal) {
+  coreInternal = __defineHiddenValue__(coreRoot, '__internal', Object.create(null));
+  if (!coreInternal) throw new Error('[module] Core.__internal bootstrap failed');
+} else {
+  __defineHiddenValue__(coreRoot, '__internal', coreInternal);
+}
+
+let prngRoot = (coreInternal.prng && typeof coreInternal.prng === 'object')
+  ? coreInternal.prng
+  : null;
+if (!prngRoot) {
+  prngRoot = __defineHiddenValue__(coreInternal, 'prng', Object.create(null));
+  if (!prngRoot) throw new Error('[module] Core.__internal.prng bootstrap failed');
+} else {
+  __defineHiddenValue__(coreInternal, 'prng', prngRoot);
+}
+if (typeof prngRoot.seed !== 'string') prngRoot.seed = '';
+if (typeof prngRoot.strToSeed !== 'function') prngRoot.strToSeed = null;
+if (typeof prngRoot.mulberry32 !== 'function') prngRoot.mulberry32 = null;
+if (!prngRoot.rand || typeof prngRoot.rand !== 'object') prngRoot.rand = null;
+if (!prngRoot.pools || typeof prngRoot.pools !== 'object') prngRoot.pools = Object.create(null);
+if (typeof prngRoot.marker !== 'string' || !prngRoot.marker) prngRoot.marker = 'envrand';
+if (typeof prngRoot.version !== 'string' || !prngRoot.version) prngRoot.version = '1.1.1';
+
 const __MODULE = 'bootstrap_hide';
 const __SURFACE = 'bootstrap_hide';
 const __D = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;

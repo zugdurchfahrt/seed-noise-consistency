@@ -94,9 +94,7 @@ const AudioContextModule = function AudioContextModule(window) {
     : null;
   const __prngState = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
     ? __coreInternal.prng
-    : ((__stateRoot.__PRNG_STATE__ && typeof __stateRoot.__PRNG_STATE__ === 'object')
-    ? __stateRoot.__PRNG_STATE__
-    : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null));
+    : null;
   const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
     ? __prngState.rand
     : null;

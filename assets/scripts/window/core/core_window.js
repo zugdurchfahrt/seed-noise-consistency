@@ -847,14 +847,31 @@ const CoreWindowModule = function CoreWindowModule(window) {
       return String(key) + '::' + Object.prototype.toString.call(owner);
     }
     try {
-      const existing = window.Core;
-      const Core = (existing && (typeof existing === 'object' || typeof existing === 'function'))
-        ? existing
-        : {};
+      const Core = (window.Core && (typeof window.Core === 'object' || typeof window.Core === 'function'))
+        ? window.Core
+        : __throw('core_window:core_root_missing', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: 'Core',
+            stage: 'preflight',
+            message: 'Core missing; bootstrap owner-space was not created',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw' }
+          }, new Error('[CoreWindow] Core missing'));
 
       const __internal = (Core.__internal && typeof Core.__internal === 'object')
         ? Core.__internal
-        : Object.create(null);
+        : __throw('core_window:core_internal_missing', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: 'Core.__internal',
+            stage: 'preflight',
+            message: 'Core.__internal missing; bootstrap owner-space was not created',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw' }
+          }, new Error('[CoreWindow] Core.__internal missing'));
       const knownWrapped = (__internal.knownWrapped instanceof WeakSet)
         ? __internal.knownWrapped
         : new WeakSet();
@@ -865,7 +882,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
         ? __internal.__patchGuardSeq
         : ((Core.__patchGuardSeq instanceof WeakMap) ? Core.__patchGuardSeq : new WeakMap());
       const __guardRegistry = (__internal.guards instanceof Map) ? __internal.guards : new Map();
-      const __prngRoot = (__internal.prng && typeof __internal.prng === 'object') ? __internal.prng : Object.create(null);
+      const __prngRoot = (__internal.prng && typeof __internal.prng === 'object')
+        ? __internal.prng
+        : __throw('core_window:core_prng_missing', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: 'Core.__internal.prng',
+            stage: 'preflight',
+            message: 'Core.__internal.prng missing; bootstrap owner-space was not created',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw' }
+          }, new Error('[CoreWindow] Core.__internal.prng missing'));
       __internal.targets = globalTargetRegistry;
       __internal.__patchGuardSeq = __patchGuardSeq;
       __internal.guards = __guardRegistry;
@@ -904,14 +932,14 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         const prngState = (__prngRoot && typeof __prngRoot === 'object')
           ? __prngRoot
-          : ((C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null);
-        const raw = normStr((prngState && typeof prngState.seed === 'string' && prngState.seed) ? prngState.seed : ((G && G.__GLOBAL_SEED) || ''));
+          : null;
+        const raw = normStr((prngState && typeof prngState.seed === 'string' && prngState.seed) ? prngState.seed : '');
         const mixed = 'ok|' + raw;
 
         try {
           const seedHasher = (prngState && typeof prngState.strToSeed === 'function')
             ? prngState.strToSeed
-            : ((G && typeof G.strToSeed === 'function') ? G.strToSeed : null);
+            : null;
           if (typeof seedHasher === 'function') {
             const tag = String(seedHasher(mixed) >>> 0).toString(36).slice(0, 8);
             if (__prngRoot && typeof __prngRoot === 'object') __prngRoot.__guardSeedTag = tag;
@@ -922,7 +950,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core',
             diagTag: 'core_window',
             surface: 'core',
-            key: '__GLOBAL_SEED',
+            key: 'Core.__internal.prng.strToSeed',
             stage: 'guard',
             message: 'guard seed hash provider failed; using local hash fallback',
             type: 'pipeline missing data',

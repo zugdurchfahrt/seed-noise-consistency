@@ -76,110 +76,77 @@
     const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
       ? __core.__internal
       : null;
+    function isWorkerRealm() {
+      return !!(
+        typeof WorkerGlobalScope !== 'undefined'
+        && window
+        && window instanceof WorkerGlobalScope
+      );
+    }
+    function resolveBootstrapSeedMeta() {
+      if (isWorkerRealm()) {
+        if (window && window.CDP_GLOBAL_SEED != null) {
+          return { seed: String(window.CDP_GLOBAL_SEED), key: 'CDP_GLOBAL_SEED', source: 'CDP_GLOBAL_SEED' };
+        }
+        if (G && G.CDP_GLOBAL_SEED != null) {
+          return { seed: String(G.CDP_GLOBAL_SEED), key: 'CDP_GLOBAL_SEED', source: 'CDP_GLOBAL_SEED' };
+        }
+        return { seed: '', key: 'CDP_GLOBAL_SEED', source: 'CDP_GLOBAL_SEED' };
+      }
+      if (window && typeof window.__GLOBAL_SEED === 'string' && window.__GLOBAL_SEED) {
+        return { seed: String(window.__GLOBAL_SEED), key: '__GLOBAL_SEED', source: '__GLOBAL_SEED' };
+      }
+      if (G && typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) {
+        return { seed: String(G.__GLOBAL_SEED), key: '__GLOBAL_SEED', source: '__GLOBAL_SEED' };
+      }
+      return { seed: '', key: '__GLOBAL_SEED', source: '__GLOBAL_SEED' };
+    }
+    function resolveBootstrapSeed() {
+      return resolveBootstrapSeedMeta().seed;
+    }
     function ensurePrngState() {
-      let state = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+      const state = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
         ? __coreInternal.prng
         : null;
-      if (!state && (!C || (typeof C !== 'object' && typeof C !== 'function'))) return null;
-      const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
       if (!state) {
-        state = (stateRoot && stateRoot.__PRNG_STATE__ && typeof stateRoot.__PRNG_STATE__ === 'object')
-          ? stateRoot.__PRNG_STATE__
-          : null;
-      }
-      if (!state) {
-        state = (C && C.__PRNG_STATE__ && typeof C.__PRNG_STATE__ === 'object') ? C.__PRNG_STATE__ : null;
-      }
-      if (!state) {
-        state = {
-          seed: '',
-          strToSeed: null,
-          mulberry32: null,
-          rand: null,
-          pools: Object.create(null),
-          marker: 'envrand',
-          version: '1.1.1'
-        };
-      }
-      if (stateRoot) {
-        try {
-          const shared = stateRoot.__PRNG_STATE__;
-          if (shared !== state) {
-            Object.defineProperty(stateRoot, '__PRNG_STATE__', {
-              value: state,
-              writable: true,
-              configurable: true,
-              enumerable: false
-            });
-          }
-        } catch (e) {
-          __emit('warn', 'rng_set:define_state_root_prng_failed', {
-            module: 'rng_set',
-            diagTag: 'rng_set',
-            surface: 'CanvasPatchContext.state',
-            key: '__PRNG_STATE__',
-            stage: 'apply',
-            message: 'Object.defineProperty(CanvasPatchContext.state,"__PRNG_STATE__") failed',
-            type: 'browser structure missing data',
-            data: { outcome: 'continue', action: 'keep_root_slot' }
-          }, e);
-        }
-      }
-      try {
-        if (C && C.__PRNG_STATE__ !== state) {
-          Object.defineProperty(C, '__PRNG_STATE__', {
-            value: state,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-        }
-      } catch (e) {
-        __emit('warn', 'rng_set:define_prng_state_failed', {
+        __emit('fatal', 'rng_set:core_prng_owner_missing', {
           module: 'rng_set',
           diagTag: 'rng_set',
-          surface: 'CanvasPatchContext',
-          key: '__PRNG_STATE__',
-          stage: 'apply',
-          message: 'Object.defineProperty(CanvasPatchContext,"__PRNG_STATE__") failed; fallback to assignment',
-          type: 'browser structure missing data',
-          data: { outcome: 'rollback', action: 'fallback_assign' }
-        }, e);
-        if (C) C.__PRNG_STATE__ = state;
+          surface: 'Core.__internal.prng',
+          key: 'Core.__internal.prng',
+          stage: 'preflight',
+          message: 'Core.__internal.prng missing; bootstrap owner-space was not created',
+          type: 'pipeline missing data',
+          data: { outcome: 'rollback', action: 'native' }
+        }, new Error('[RNGsetModule] Core.__internal.prng missing'));
+        return null;
       }
-      if (__coreInternal && __coreInternal.prng !== state) {
-        __coreInternal.prng = state;
-      }
+      if (typeof state.seed !== 'string') state.seed = '';
+      if (typeof state.strToSeed !== 'function') state.strToSeed = null;
+      if (typeof state.mulberry32 !== 'function') state.mulberry32 = null;
+      if (!state.rand || typeof state.rand !== 'object') state.rand = null;
       if (!state.pools || typeof state.pools !== 'object') state.pools = Object.create(null);
+      if (typeof state.marker !== 'string' || !state.marker) state.marker = 'envrand';
+      if (typeof state.version !== 'string' || !state.version) state.version = '1.1.1';
       return state;
     }
     const __prngState = ensurePrngState();
 
     function installRand() {
+      if (!__prngState) return false;
+      const bootstrapSeedMeta = resolveBootstrapSeedMeta();
+      const bootstrapSeed = bootstrapSeedMeta.seed;
       if (__prngState && __prngState.rand && __prngState.rand.__marker === 'envrand' && typeof __prngState.rand.use === 'function') {
-        if (!__prngState.seed && typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) __prngState.seed = String(G.__GLOBAL_SEED);
-        if (!__prngState.strToSeed && typeof G.strToSeed === 'function') __prngState.strToSeed = G.strToSeed;
-        if (!__prngState.mulberry32 && typeof G.mulberry32 === 'function') __prngState.mulberry32 = G.mulberry32;
+        if (!__prngState.seed && bootstrapSeed) __prngState.seed = bootstrapSeed;
         return true;
       }
-      if (G.rand && G.rand.__marker === 'envrand' && typeof G.rand.use === 'function') {
-        if (__prngState) {
-          __prngState.seed = (typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED) ? String(G.__GLOBAL_SEED) : (__prngState.seed || '');
-          __prngState.strToSeed = (typeof G.strToSeed === 'function') ? G.strToSeed : __prngState.strToSeed;
-          __prngState.mulberry32 = (typeof G.mulberry32 === 'function') ? G.mulberry32 : __prngState.mulberry32;
-          __prngState.rand = G.rand;
-        }
-        return true;
-      }
-      const seed = (typeof G.__GLOBAL_SEED === 'string' && G.__GLOBAL_SEED)
-        ? String(G.__GLOBAL_SEED)
-        : ((__prngState && typeof __prngState.seed === 'string' && __prngState.seed) ? __prngState.seed : '');
+      const seed = bootstrapSeed || ((__prngState && typeof __prngState.seed === 'string' && __prngState.seed) ? __prngState.seed : '');
       if (!seed) return false; // why: waiting for the seed
       if (__prngState) __prngState.seed = seed;
 
       let mulberry32Fn = (__prngState && typeof __prngState.mulberry32 === 'function')
         ? __prngState.mulberry32
-        : ((typeof G.mulberry32 === 'function') ? G.mulberry32 : null);
+        : null;
       if (typeof mulberry32Fn !== 'function') {
         const __mulberry32 = function (seed) {
           return function () {
@@ -195,7 +162,7 @@
 
       let strToSeedFn = (__prngState && typeof __prngState.strToSeed === 'function')
         ? __prngState.strToSeed
-        : ((typeof G.strToSeed === 'function') ? G.strToSeed : null);
+        : null;
       if (typeof strToSeedFn !== 'function') {
         const __strToSeed = function (str) {
           let h = 5381; str = String(str);
@@ -213,9 +180,9 @@
           module: 'rng_set',
           diagTag: 'rng_set',
           surface: 'rng_set',
-          key: '__GLOBAL_SEED',
+          key: bootstrapSeedMeta.key,
           stage: 'preflight',
-          message: '__GLOBAL_SEED detected',
+          message: bootstrapSeedMeta.source + ' detected',
           type: 'ok',
           data: { outcome: 'return', seed: maskSeed(seed) }
         }, null);
@@ -299,12 +266,12 @@
           module: __tag,
           diagTag: __tag,
           surface: __surface,
-          key: '__GLOBAL_SEED',
+          key: bootstrapSeedMeta.key,
           stage: 'preflight',
-          message: '__GLOBAL_SEED missing; rand not installed',
+          message: bootstrapSeedMeta.source + ' missing; rand not installed',
           type: 'pipeline missing data',
           // Policy exception: for seed we keep the guard (do NOT release) to prevent late seed replacement.
-          data: { outcome: 'return', reason: 'global_seed_missing', action: 'native', guard: 'locked' }
+          data: { outcome: 'return', reason: 'bootstrap_seed_missing', action: 'native', guard: 'locked' }
         }, null);
       } catch (e) {
         __emit('fatal', 'rng_set:boot_failed', {
@@ -343,7 +310,18 @@
       if (exportDesc && exportDesc.configurable !== false) {
         delete G.RNGsetModule;
       }
-    } catch (_) {}
+    } catch (e) {
+      __emit('warn', 'rng_set:runtime_export_sync_failed', {
+        module: 'rng_set',
+        diagTag: 'rng_set',
+        surface: 'rng_set',
+        key: 'RNGsetModule',
+        stage: 'apply',
+        message: 'runtime export sync failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'return', action: 'keep_runtime_shell' }
+      }, e);
+    }
   }
 
   // Function export*
@@ -356,6 +334,20 @@
   const __rngHasOwnExport = Object.prototype.hasOwnProperty.call(G, 'RNGsetModule');
   const __rngExportDesc = __rngHasOwnExport ? Object.getOwnPropertyDescriptor(G, 'RNGsetModule') : null;
   const __rngCanFillPlaceholder = !!(__rngExportDesc && __rngExportDesc.configurable !== false && G.RNGsetModule === undefined);
+  const __outerLoggerRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.__logger && typeof G.CanvasPatchContext.__logger === 'object')
+    ? G.CanvasPatchContext.__logger
+    : null;
+  const __outerDegrade = (__outerLoggerRoot && typeof __outerLoggerRoot.__DEGRADE__ === 'function') ? __outerLoggerRoot.__DEGRADE__ : null;
+  const __outerDiag = (__outerDegrade && typeof __outerDegrade.diag === 'function') ? __outerDegrade.diag.bind(__outerDegrade) : null;
+  function __emitOuter(level, code, ctx, err) {
+    try {
+      if (__outerDiag) return __outerDiag(level, code, ctx || null, err || null);
+      if (typeof __outerDegrade === 'function') {
+        return __outerDegrade(code, err || null, Object.assign({ level: level || 'warn' }, ctx || null));
+      }
+    } catch (_emitErr) {}
+    return undefined;
+  }
   if (!__rngHasOwnExport || __rngCanFillPlaceholder) {
     try {
       Object.defineProperty(G, 'RNGsetModule', {
@@ -367,8 +359,6 @@
     } catch (e) {
       // [NORMATIVE] no console.*, report through __DEGRADE__.diag with fallback
       try {
-        const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-        const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
         const ctx = {
           module: 'rng_set',
           diagTag: 'rng_set',
@@ -379,9 +369,8 @@
           type: 'browser structure missing data',
           data: { outcome: 'rollback', action: 'fallback_assign' }
         };
-        if (__diag) __diag('warn', 'rng_set:export_define_failed', ctx, e);
-        else if (typeof __D === 'function') __D('rng_set:export_define_failed', e, Object.assign({ level: 'warn' }, ctx));
-      } catch (_) {}
+        __emitOuter('warn', 'rng_set:export_define_failed', ctx, e);
+      } catch (_reportErr) {}
       G.RNGsetModule = RNGsetModule;
     }
   } else {
@@ -395,7 +384,18 @@
           enumerable: false
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      __emitOuter('warn', 'rng_set:export_hide_failed', {
+        module: 'rng_set',
+        diagTag: 'rng_set',
+        surface: 'rng_set',
+        key: 'RNGsetModule',
+        stage: 'apply',
+        message: 'RNGsetModule hide-pass failed',
+        type: 'browser structure missing data',
+        data: { outcome: 'return', action: 'keep_export_shape' }
+      }, e);
+    }
   }
 })();
 

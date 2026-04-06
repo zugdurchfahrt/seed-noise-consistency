@@ -1597,6 +1597,25 @@
         });
         coreInternal = Core.__internal;
       }
+      let prngRoot = (coreInternal.prng && typeof coreInternal.prng === 'object')
+        ? coreInternal.prng
+        : null;
+      if (!prngRoot) {
+        trackedDefineProperty(coreInternal, 'prng', {
+          value: Object.create(null),
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        prngRoot = coreInternal.prng;
+      }
+      if (typeof prngRoot.seed !== 'string') prngRoot.seed = '';
+      if (typeof prngRoot.strToSeed !== 'function') prngRoot.strToSeed = null;
+      if (typeof prngRoot.mulberry32 !== 'function') prngRoot.mulberry32 = null;
+      if (!prngRoot.rand || typeof prngRoot.rand !== 'object') prngRoot.rand = null;
+      if (!prngRoot.pools || typeof prngRoot.pools !== 'object') prngRoot.pools = Object.create(null);
+      if (typeof prngRoot.marker !== 'string' || !prngRoot.marker) prngRoot.marker = 'envrand';
+      if (typeof prngRoot.version !== 'string' || !prngRoot.version) prngRoot.version = '1.1.1';
       if (runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__ && coreInternal.coreToStringState !== runtimeRoot.__CORE_TOSTRING_STATE__) {
         trackedDefineProperty(coreInternal, 'coreToStringState', {
           value: runtimeRoot.__CORE_TOSTRING_STATE__,
@@ -1609,14 +1628,6 @@
       const seed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '';
       if (!seed) {
         throw new Error('UACHPatch: worker canvas seed missing');
-      }
-      if (self.__GLOBAL_SEED !== seed) {
-        trackedDefineProperty(self, '__GLOBAL_SEED', {
-          value: seed,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
       }
       const snapDpr = Number(cache.snap && cache.snap.dpr);
       if (Number.isFinite(snapDpr) && snapDpr > 0) {
