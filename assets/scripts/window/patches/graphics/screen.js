@@ -224,6 +224,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
+  const __screenCanvasModuleState = (__screenStateRoot.__CANVAS__ && typeof __screenStateRoot.__CANVAS__ === 'object')
+    ? __screenStateRoot.__CANVAS__
+    : null;
+  const __screenCanvasState = (__screenCanvasModuleState && __screenCanvasModuleState.__STATE__ && typeof __screenCanvasModuleState.__STATE__ === 'object')
+    ? __screenCanvasModuleState.__STATE__
+    : null;
   const __moduleRollbackStack = [];
   const __screenAppliedGroups = Object.create(null);
 
@@ -928,7 +934,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   function __screenViewportSnapshot() {
     const htmlRoot = document.documentElement || null;
-    const divRoot = (document && typeof document.querySelector === 'function') ? document.querySelector('div') : null;
+    const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
+      ? __screenCanvasState.domCanvasHost
+      : null;
     const snapshot = {
       innerWidth: __screenReadAccessorValue(window, windowProto, 'innerWidth', window),
       innerHeight: __screenReadAccessorValue(window, windowProto, 'innerHeight', window),
@@ -938,6 +946,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       htmlClientHeight: htmlRoot ? htmlRoot.clientHeight : null,
       divClientWidth: divRoot ? divRoot.clientWidth : null,
       divClientHeight: divRoot ? divRoot.clientHeight : null,
+      divOwnerPath: divRoot ? 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost' : null,
       mediaQueries: __screenCollectViewportQueries(),
       visualViewport: null
     };
@@ -994,10 +1003,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       mismatches.push({ key: 'document.documentElement.clientHeight', expected: viewportExpected.innerHeight, actual: snapshot.htmlClientHeight });
     }
     if (snapshot.divClientWidth !== null && !Object.is(snapshot.divClientWidth, viewportExpected.innerWidth)) {
-      mismatches.push({ key: 'document.querySelector("div").clientWidth', expected: viewportExpected.innerWidth, actual: snapshot.divClientWidth });
+      mismatches.push({ key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.clientWidth', expected: viewportExpected.innerWidth, actual: snapshot.divClientWidth });
     }
     if (snapshot.divClientHeight !== null && !Object.is(snapshot.divClientHeight, viewportExpected.innerHeight)) {
-      mismatches.push({ key: 'document.querySelector("div").clientHeight', expected: viewportExpected.innerHeight, actual: snapshot.divClientHeight });
+      mismatches.push({ key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.clientHeight', expected: viewportExpected.innerHeight, actual: snapshot.divClientHeight });
     }
     for (let i = ZERO; i < snapshot.mediaQueries.length; i++) {
       const row = snapshot.mediaQueries[i];
@@ -1161,7 +1170,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const clientWidthDesc = elementProto ? Object.getOwnPropertyDescriptor(elementProto, 'clientWidth') : null;
   const clientHeightDesc = elementProto ? Object.getOwnPropertyDescriptor(elementProto, 'clientHeight') : null;
   const htmlRoot = document.documentElement || null;
-  const divRoot = (document && typeof document.querySelector === 'function') ? document.querySelector('div') : null;
+  const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
+    ? __screenCanvasState.domCanvasHost
+    : null;
   if (htmlRoot) {
     const htmlRootMap = [
       { key: 'clientWidth', expected: viewportExpected.innerWidth },
@@ -1200,6 +1211,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
   }
+  if (!divRoot) {
+    viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost:missing');
+  }
   if (divRoot) {
     const divRootMap = [
       { key: 'clientWidth', expected: viewportExpected.innerWidth },
@@ -1208,14 +1222,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     for (let i = ZERO; i < divRootMap.length; i++) {
       const item = divRootMap[i];
       const fact = __screenDescribeAccessorSurface(divRoot, null, item.key);
-      fact.ownerLabel = 'div';
+      fact.ownerLabel = 'canvas.domCanvasHost';
       viewportObserved.root.push(fact);
       try {
         fact.actual = divRoot[item.key];
       } catch (e) {
         fact.readFailed = true;
         fact.readError = (e && e.message) ? String(e.message) : 'native_read_failed';
-        viewportReasons.push('document.querySelector("div").' + item.key + ':' + fact.readError);
+        viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + fact.readError);
       }
       fact.expected = item.expected;
       fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
@@ -1234,7 +1248,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             enumerable: protoDesc ? !!protoDesc.enumerable : false
           }
         );
-        if (!targetPlan.ok) viewportReasons.push('document.querySelector("div").' + item.key + ':' + targetPlan.reason);
+        if (!targetPlan.ok) viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + targetPlan.reason);
         else viewportTargets.push(targetPlan.target);
       }
     }
@@ -1443,6 +1457,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
 
   // log after DOM ready for document & div
   const onDocumentDivClientSizes = () => {
+    const canvasHost = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
+      ? __screenCanvasState.domCanvasHost
+      : null;
     __screenDiag('info', 'screen:document_div_client_sizes', {
       stage: 'runtime',
       type: __screenTypePipeline,
@@ -1460,8 +1477,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           height: document.documentElement.clientHeight
         },
         div: {
-          width:  document.querySelector("div")?.clientWidth,
-          height: document.querySelector("div")?.clientHeight
+          ownerPath: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
+          width:  canvasHost ? canvasHost.clientWidth : null,
+          height: canvasHost ? canvasHost.clientHeight : null
         }
       }
     });

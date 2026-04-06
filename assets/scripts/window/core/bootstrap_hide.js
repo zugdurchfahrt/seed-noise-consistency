@@ -92,6 +92,33 @@ if (!fontsConfigState) {
 }
 if (!Array.isArray(fontsConfigState.configs)) fontsConfigState.configs = [];
 
+let canvasRoot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
+  ? stateRoot.__CANVAS__
+  : null;
+if (!canvasRoot) {
+  canvasRoot = __defineHiddenValue__(stateRoot, '__CANVAS__', Object.create(null));
+  if (!canvasRoot) throw new Error('[module] CanvasPatchContext.state.__CANVAS__ bootstrap failed');
+} else {
+  __defineHiddenValue__(stateRoot, '__CANVAS__', canvasRoot);
+}
+
+let canvasState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+  ? canvasRoot.__STATE__
+  : null;
+if (!canvasState) {
+  canvasState = __defineHiddenValue__(canvasRoot, '__STATE__', {
+    domReady: false,
+    offscreenReady: false,
+    domCanvas: null,
+    domCanvasHost: null,
+    offscreenCanvas: null,
+    defaultCtx2dFont: ''
+  });
+  if (!canvasState) throw new Error('[module] CanvasPatchContext.state.__CANVAS__.__STATE__ bootstrap failed');
+} else {
+  __defineHiddenValue__(canvasRoot, '__STATE__', canvasState);
+}
+
 let loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 if (!loggerRoot) {
   loggerRoot = __defineHiddenValue__(C, '__logger', Object.create(null));

@@ -132,11 +132,29 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     };
   }
 
+  // === MODULE INITIALIZATION ===
+  // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    throw new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available');
+  }
+  const __canvasModuleSlot = (__stateRoot.__CANVAS__ && typeof __stateRoot.__CANVAS__ === 'object')
+    ? __stateRoot.__CANVAS__
+    : null;
+  if (!__canvasModuleSlot) {
+    throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS__ is undefined — module registration is not available');
+  }
+  const __canvasState = (__canvasModuleSlot.__STATE__ && typeof __canvasModuleSlot.__STATE__ === 'object')
+    ? __canvasModuleSlot.__STATE__
+    : null;
+  if (!__canvasState) {
+    throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS__.__STATE__ is undefined — module registration is not available');
+  }
 
   // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
   const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
     try {
-      const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+      const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string') ? __canvasState.defaultCtx2dFont : '';
       if (cached && cached.trim()) return cached.trim();
 
       const doc = G && G.document;
@@ -153,16 +171,16 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       if (!font) throw new Error('[CanvasPatch] default ctx2d.font missing/invalid');
 
       if (!__defineHidden__(
-        C,
-        '__DEFAULT_CTX2D_FONT__',
+        __canvasState,
+        'defaultCtx2dFont',
         font,
         'canvas:ctx2d:guard:default_font_define_failed',
-        '__DEFAULT_CTX2D_FONT__',
+        'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
         'default font defineProperty failed; fallback assign used'
       )) {
         emitCanvasDiag('warn', 'canvas:ctx2d:guard:default_font_assign_failed', null, {
           stage: 'guard',
-          key: '__DEFAULT_CTX2D_FONT__',
+          key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
           type: 'browser structure missing data',
           message: 'default font fallback assign failed'
         });
@@ -174,34 +192,9 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         key: 'ctx.font',
         type: 'browser structure missing data'
       });
-      const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+      const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string') ? __canvasState.defaultCtx2dFont : '';
       return (cached && cached.trim()) ? cached.trim() : '';
     }
-  })();
-
-  // === MODULE INITIALIZATION ===
-  // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
-  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-  if (!__stateRoot) {
-    throw new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available');
-  }
-  const __canvasState = (function ensureCanvasStateSlot() {
-    const existing = __stateRoot.__CANVAS_STATE__;
-    if (existing && typeof existing === 'object') return existing;
-    const slot = { domReady: false, offscreenReady: false };
-    if (!__defineHidden__(
-      __stateRoot,
-      '__CANVAS_STATE__',
-      slot,
-      'canvas:init:apply:canvas_state_slot_define_failed',
-      '__CANVAS_STATE__',
-      'canvas state slot defineProperty failed; fallback assign used'
-    )) {
-      throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS_STATE__ unavailable');
-    }
-    return (__stateRoot.__CANVAS_STATE__ && typeof __stateRoot.__CANVAS_STATE__ === 'object')
-      ? __stateRoot.__CANVAS_STATE__
-      : slot;
   })();
 
   // keep internal handles inside CanvasPatchContext (non-enumerable),
@@ -251,8 +244,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     }
 
     // SSOT: CanvasPatchContext
-    const existingCanvas = (C && C.__DOM_CANVAS__);
-    const existingHost = (C && C.__DOM_CANVAS_HOST__);
+    const existingCanvas = (__canvasState && __canvasState.domCanvas);
+    const existingHost = (__canvasState && __canvasState.domCanvasHost);
     if (existingCanvas && existingHost && existingHost.contains(existingCanvas) && existingHost.parentNode) {
       __canvasState.domReady = true;
       return;
@@ -322,14 +315,14 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     canvas.style.background = 'transparent';
     div.appendChild(canvas);
 
-    __defineHidden__(C, '__DOM_CANVAS__', canvas,
+    __defineHidden__(__canvasState, 'domCanvas', canvas,
       'canvas:init:apply:dom_storage_define_failed',
-      '__DOM_CANVAS__',
+      'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvas',
       'DOM canvas defineProperty failed; fallback assign used'
     );
-    __defineHidden__(C, '__DOM_CANVAS_HOST__', div,
+    __defineHidden__(__canvasState, 'domCanvasHost', div,
       'canvas:init:apply:dom_storage_define_failed',
-      '__DOM_CANVAS_HOST__',
+      'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
       'DOM host defineProperty failed; fallback assign used'
     );
     __canvasState.domReady = true;
@@ -351,11 +344,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       });
       return;
     }
-    if (!(C && C.__OFFSCREEN_CANVAS__)) {
+    if (!(__canvasState && __canvasState.offscreenCanvas)) {
       const osc = new G.OffscreenCanvas(screenWidth, screenHeight);
-      __defineHidden__(C, '__OFFSCREEN_CANVAS__', osc,
+      __defineHidden__(__canvasState, 'offscreenCanvas', osc,
         'canvas:init:apply:offscreen_storage_define_failed',
-        '__OFFSCREEN_CANVAS__',
+        'CanvasPatchContext.state.__CANVAS__.__STATE__.offscreenCanvas',
         'offscreen defineProperty failed; fallback assign used'
       );
     }
@@ -373,8 +366,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       stage: 'apply',
       message: 'Canvas realInit done',
       data: {
-        hasCanvas: !!(C && C.__DOM_CANVAS__),
-        hasOffscreen: !!(C && C.__OFFSCREEN_CANVAS__)
+        hasCanvas: !!(__canvasState && __canvasState.domCanvas),
+        hasOffscreen: !!(__canvasState && __canvasState.offscreenCanvas)
       }
     });
   }
