@@ -17,10 +17,13 @@ from tools.tools_infra.overseer import logger
 logger = logger.getChild("rand_met")
 
 # ----------------------- CONST -----------------------
-PROJECT_ROOT        = pathlib.Path(__file__).resolve().parents[2]
-ASSETS              = PROJECT_ROOT / 'assets'
+PROJECT_ROOT            = pathlib.Path(__file__).resolve().parents[2]
+ASSETS                  = PROJECT_ROOT / 'assets'
 PROFILE_DATA_SOURCE     = PROJECT_ROOT / 'profile_data_source'
-TOOLS               = PROJECT_ROOT / 'tools'
+TOOLS                   = PROJECT_ROOT / 'tools'
+DESIGNER_BY_FAMILY_PATH = PROFILE_DATA_SOURCE / 'FONTS_DESIGNER_BY_FAMILY_JSON.json'
+LICENSE_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_LICENSE_BY_FAMILY_JSON.json'
+VERSION_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_VERSION_BY_FAMILY_JSON.json'
 GENERATORS          = TOOLS / 'generators'
 TEMPLATES           = ASSETS / 'templates'
 MANIFEST_PATH       = ASSETS/ 'Manifest' / 'fonts-manifest.json'
@@ -29,12 +32,83 @@ FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
 # ----------------------- UTILS -----------------------
 SYS_FONTS_WIN = [
-        'Arial', 'Aptos','Verdana','Tahoma','Times New Roman','Courier New','Georgia',
-        'Palatino','Garamond','Comic Sans MS','Trebuchet MS','Impact',
-        'Lucida Sans','Segoe UI','Segoe UI Symbol','Calibri','Consolas','Candara',
-        'Franklin Gothic Medium','Constantia','Corbel','Century Gothic',
-        'Segoe Print','Segoe Script','DejaVu Sans', 'DejaVu Sans Mono','DejaVu Serif','Gentium','Inter',
-        'Liberation Mono', 'Helvetica', 'Liberation Sans','Liberation Serif','Montserrat','Roboto','Tinos']
+    'Aptos',
+    'Arial',
+    'Bahnschrift',
+    'Calibri',
+    'Cambria',
+    'Candara',
+    'Cascadia Code',
+    'Cascadia Mono',
+    'Comic Sans MS',
+    'Consolas',
+    'Constantia',
+    'Corbel',
+    'Courier',
+    'Courier New',
+    'DejaVu Sans',
+    'DejaVu Sans Mono',
+    'DejaVu Serif',
+    'Ebrima',
+    'Fixedsys',
+    'Franklin Gothic Medium',
+    'Gabriola',
+    'Gadugi',
+    'Gentium',
+    'Georgia',
+    'Impact',
+    'Ink Free',
+    'Inter',
+    'Javanese Text',
+    'Leelawadee UI',
+    'Liberation Mono',
+    'Liberation Sans',
+    'Liberation Serif',
+    'Lucida Console',
+    'Lucida Sans Unicode',
+    'Malgun Gothic',
+    'Microsoft Himalaya',
+    'Microsoft New Tai Lue',
+    'Microsoft PhagsPa',
+    'Microsoft Tai Le',
+    'Microsoft Yi Baiti',
+    'mingliub',
+    'Modern',
+    'Mongolian Baiti',
+    'Montserrat',
+    'MS Sans Serif',
+    'MS Serif',
+    'msgothic',
+    'MV Boli',
+    'Myanmar Text',
+    'Nirmala UI',
+    'Palatino Linotype',
+    'Roboto',
+    'Roman',
+    'Sans Serif Collection',
+    'Script',
+    'Segoe UI',
+    'simsun',
+    'SimSun-ExtB',
+    'SimSun-ExtG',
+    'Sitka',
+    'Sylfaen',
+    'Symbol',
+    'System',
+    'Tahoma',
+    'Terminal',
+    'Times New Roman',
+    'Tinos',
+    'Trebuchet MS',
+    'Verdana',
+    'Webdings',
+    'Wingdings',
+    'YuGothB',
+    'YuGothL',
+    'YuGothM',
+    'YuGothR'
+]
+  
     
 SYS_FONTS_MAC = [
         'Helvetica','Geneva','Lucida Grande','Palatino','Menlo','Monaco',
@@ -43,13 +117,23 @@ SYS_FONTS_MAC = [
         'Trebuchet MS','Comic Sans MS','Georgia']
 
 SUBFAMILIES = [
-        "Thin", "Extra Light", "Light", "Regular", "Medium", "SemiBold", "Bold", "Extra Bold",
-        "Black", "Italic", "Oblique", "Extended", "Narrow", "Expanded", "Ultra Light",
-        "Ultra Bold", "Heavy", "Mono", "Display", "Hairline", "Book", "DemiBold", "Extra Black", "Ultra Black",
-        "Condensed", "Extra Condensed", "Ultra Condensed", "Compressed", "Extra Compressed",
-        "Wide", "Extra Wide", "Ultra Wide", "Slanted", "Backslant", "Caption", "Text", "Subhead", "Headline", "Poster", "Small Caps", "Titling",
-        "Inline", "Shadow", "Variable", "Stencil", "Outline", "Engraved", "Script", "Rounded",
-        "UI", "Micro", "Footnote", "Compact"]
+    "Thin",
+    "ExtraLight",
+    "Light",
+    "Regular",
+    "Medium",
+    "SemiLight",
+    "SemiBold",
+    "Bold",
+    "ExtraBold",
+    "Black",
+    "Italic",
+    "Oblique",
+    "Bold Italic",
+    "Bold Oblique",
+    "Condensed",
+    "SemiCondensed",
+]
 
 PLATFORM_ID_MAP = {
     "Win32": (3, 1, 1033),
@@ -60,10 +144,10 @@ ACCEPT_EXTS = {".woff2", ".woff", ".ttf", ".otf"}
 
 # --- Keyword heuristics for icon/emoji fonts ---
 ICON_KEYWORDS = {
-    "icon", "icons", "emoji", "emojis", "awesome", "material", "fontello",
+    "emoji", "emojis", "awesome", "material", "fontello",
     "ionicons", "bootstrap-icons", "octicons", "simpleicons", "remixicon",
-    "feather", "weather", "symbol", "symbols", "dingbat", "dingbats",
-    "wingdings", "seguiemj", "seguiemoji", "segoe ui emoji"
+    "feather", "weather", "dingbat", "dingbats",
+     "seguiemj", "seguiemoji", "segoe ui emoji"
 }
 
 PUA_RANGES = [
@@ -113,6 +197,46 @@ def _meta_rng() -> random.Random:
     if _META_RNG is None:
         raise RuntimeError("[fonts] META_RNG is required (not initialized)")
     return _META_RNG
+
+
+
+
+def _load_family_mapping(path: pathlib.Path, cache_name: str) -> dict:
+    cached = globals().get(cache_name)
+    if cached is not None:
+        return cached
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        raise RuntimeError(f"[fonts] failed to load family mapping {path}: {e}") from e
+    if not isinstance(data, dict):
+        raise RuntimeError(f"[fonts] family mapping must be a JSON object: {path}")
+    globals()[cache_name] = data
+    return data
+
+
+def _family_mapping_value(path: pathlib.Path, cache_name: str, family: str) -> str | None:
+    mapping = _load_family_mapping(path, cache_name)
+    family_norm = _normalize_whitespace(family)
+    if not family_norm:
+        return None
+    if family_norm in mapping:
+        value = mapping[family_norm]
+    else:
+        value = None
+        lookup_key = family_norm.casefold()
+        for key, item in mapping.items():
+            if isinstance(key, str) and _normalize_whitespace(key).casefold() == lookup_key:
+                value = item
+                break
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise RuntimeError(f"[fonts] family mapping value must be a string for {family_norm}: {path}")
+    value_norm = _normalize_whitespace(value)
+    return value_norm or None
+
 
 
 
@@ -413,7 +537,7 @@ def has_symbol_emoji_traits(tt: TTFont, cmap: Dict[int, str]) -> bool:
             if a <= cp <= b:
                 pua += 1
                 break
-    if pua / total >= 0.5:
+    if pua / total >= 0.7:
         return True
     return False
 
@@ -436,17 +560,89 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     Returns the dictionary like {1: family, 2: subfamily, 3: unique_id, 4: full_name, 5: version, 6: ps_name, 9: designer, 13: license_desc}
     """
     common_families = [
-        "NeoMono", "PrimeSans", "LunaText", "OmniMono", "GravitaPro", "NimbusPro", "CodaSans", "ClarityMono", "Interstate", "Vectora",
-        "Codex", "OrbitaSans", "Viretta", "Axionis", "Lumora", "Equinox", "VisioraX", "Condensed", "AtlasType", "NorthAtlas", "LumenSans",
-        "Qorin", "Torus", "ZenithMono", "QuantumSans", "Auralis", "StellarText", "AxiomSans", "Solvex", "Visage", "Nexora",]
+    'Aptos',
+    'Arial',
+    'Bahnschrift',
+    'Calibri',
+    'Cambria',
+    'Candara',
+    'Cascadia Code',
+    'Cascadia Mono',
+    'Comic Sans MS',
+    'Consolas',
+    'Constantia',
+    'Corbel',
+    'Courier',
+    'Courier New',
+    'DejaVu Sans',
+    'DejaVu Sans Mono',
+    'DejaVu Serif',
+    'Ebrima',
+    'Fixedsys',
+    'Franklin Gothic Medium',
+    'Gabriola',
+    'Gadugi',
+    'Gentium',
+    'Georgia',
+    'Impact',
+    'Ink Free',
+    'Inter',
+    'Javanese Text',
+    'Leelawadee UI',
+    'Liberation Mono',
+    'Liberation Sans',
+    'Liberation Serif',
+    'Lucida Console',
+    'Lucida Sans Unicode',
+    'Malgun Gothic',
+    'Microsoft Himalaya',
+    'Microsoft New Tai Lue',
+    'Microsoft PhagsPa',
+    'Microsoft Tai Le',
+    'Microsoft Yi Baiti',
+    'mingliub',
+    'Modern',
+    'Mongolian Baiti',
+    'Montserrat',
+    'MS Sans Serif',
+    'MS Serif',
+    'msgothic',
+    'MV Boli',
+    'Myanmar Text',
+    'Nirmala UI',
+    'Palatino Linotype',
+    'Roboto',
+    'Roman',
+    'Sans Serif Collection',
+    'Script',
+    'Segoe UI',
+    'simsun',
+    'SimSun-ExtB',
+    'SimSun-ExtG',
+    'Sitka',
+    'Sylfaen',
+    'Symbol',
+    'System',
+    'Tahoma',
+    'Terminal',
+    'Times New Roman',
+    'Tinos',
+    'Trebuchet MS',
+    'Verdana',
+    'Webdings',
+    'Wingdings',
+    'YuGothB',
+    'YuGothL',
+    'YuGothM',
+    'YuGothR'
+    ]
 
     if platform == "MacIntel":
         family_names = SYS_FONTS_MAC + common_families
-        designers = ["Apple Inc.", "5th Dimension", "Futura Design", "Omni Group", "Generation Frontline Foundry", "Bright Kernel Foundry", "FontAddicts Group"]
+        # designers = ["Apple Inc.", "5th Dimension", "Futura Design", "Omni Group", "Generation Frontline Foundry", "Bright Kernel Foundry", "FontAddicts Group"]
     else:
         family_names = SYS_FONTS_WIN + common_families
-        designers = ["Microsoft Corp.", "Dynamix Typefaces", "New Vision Fonts", "Monolith Design", "Pure bury design", "Granite & Grid",
-                    "PrototypeFont Factory", "Sharp Sable Graphics", "Friendly Typefaces", "Cobalt Letterworks"]
+        designers = ["Microsoft Corporation", "Microsoft Corp.","The Monotype Corporation", "Ascender Corporation", "Monotype Imaging Inc.", "Google Inc.", "Adobe Systems Incorporated"]
     
     subfamilies = _normalize_subfamilies(subfamilies_src) if subfamilies_src is not None else SUBFAMILIES
     
@@ -461,10 +657,12 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     subfamily = rng.choice(subfamilies)
     unique_id = f"{family[:2]}-{random_string(12)}"
     full_name = f"{family} {subfamily}".strip()
-    version = f"Version {rng.randint(1,5)}.{rng.randint(0,9999)}"
     ps_name = f"{family}-{subfamily}".replace(" ", "")
-    designer = rng.choice(designers)
-    license_desc = rng.choice(licenses)
+    fallback_designer = rng.choice(designers)
+    fallback_license_desc = rng.choice(licenses)
+    version = f"Version {rng.randint(1,5)}.{rng.randint(0,9999)}"
+    designer = _family_mapping_value(DESIGNER_BY_FAMILY_PATH, "_DESIGNER_BY_FAMILY", family) or fallback_designer
+    license_desc = _family_mapping_value(LICENSE_BY_FAMILY_PATH, "_LICENSE_BY_FAMILY", family) or fallback_license_desc
 
     return {
         1: family,
@@ -598,8 +796,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
 
     # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
-    MIN_N = int(os.environ.get("FONTS_MIN_N", "17"))
-    MAX_N = int(os.environ.get("FONTS_MAX_N", "19"))
+    MIN_N = int(os.environ.get("FONTS_MIN_N", "35"))
+    MAX_N = int(os.environ.get("FONTS_MAX_N", "37"))
     max_n = len(all_names)
 
     if max_n == 0:
@@ -615,7 +813,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         fingerprint_names.sort()  # fix the order in the manifest
         
     # === Step 4: collect temp_configs for Jinja ===
-    max_family_repeats = 6
+    max_family_repeats = 4
     family_counter = defaultdict(int)
     used_families = set()
     temp_configs = []
@@ -675,7 +873,6 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             cfg = {
                 "name": name_no_ext,
                 "url": data_url,
-                "fontFamily": meta_values.get(6, name_no_ext),
                 "family": resolved_family,
                 "cssFamily": _derive_css_family(resolved_family, name_no_ext),
                 "subfamily": subfamily,
@@ -687,7 +884,6 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 "postscript_name": meta_values.get(6, ""),
                 "designer": meta_values.get(9, ""),
                 "license": meta_values.get(13, ""),
-                "fallback": name_no_ext,
                 "platform_id": PLATFORM_ID_MAP[platform][0],
                 "platform_dom": platform  # 'Win32' | 'MacIntel'
             }

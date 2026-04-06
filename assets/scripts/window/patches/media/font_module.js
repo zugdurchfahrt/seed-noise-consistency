@@ -842,7 +842,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       hadOnlyLocal: false,
       localOnlyBlocked: false,
       localOnlyManaged: false,
-      localOnlyNativeError: false,
       localOnlyPassthrough: false,
       unexpectedSourceType: false,
       runtimeConfigMatched: false,
@@ -917,7 +916,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
         hadOnlyLocal: true,
         localOnlyBlocked: false,
         localOnlyManaged: !!managedSource,
-        localOnlyNativeError: false,
         localOnlyPassthrough: !managedSource,
         unexpectedSourceType: unexpectedSourceType,
         runtimeConfigMatched: !!matchedCfg
@@ -1018,20 +1016,6 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
               data: {
                 outcome: 'return',
                 reason: 'local_only_replaced_with_managed_src',
-                family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
-                runtimeConfigMatched: !!sanitized.runtimeConfigMatched
-              }
-            }, null);
-          }
-          if (sanitized.localOnlyNativeError) {
-            __fontDiagPipeline('warn', 'fonts:fontface:local_only_native_invalid_source_path', {
-              stage: 'runtime',
-              diagTag: 'fonts:fontface',
-              key: 'FontFace',
-              message: 'FontFace local-only source has no exact managed match (native invalid-source path)',
-              data: {
-                outcome: 'return',
-                reason: 'local_only_native_invalid_source_path',
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
                 runtimeConfigMatched: !!sanitized.runtimeConfigMatched
               }
