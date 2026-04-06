@@ -601,11 +601,12 @@ const LOGGingModule = function LOGGingModule() {
       return null;
     }
 
-    function shapeDegradeBufferEntry(entry, idx) {
+    function shapeDegradeBufferEntry(entry, idx, limits) {
+      const serialLimits = (limits && typeof limits === "object") ? limits : SERIAL_LIMITS;
       const incident = normalizeDiagIncident(entry, idx);
       const entryType = (entry && typeof entry.type === "string") ? entry.type : (incident && incident.entryType ? incident.entryType : "degrade");
       const entryExtra = (entry && entry.extra && typeof entry.extra === "object")
-        ? normalizeForJSON(entry.extra)
+        ? normalizeForJSONWithLimits(entry.extra, serialLimits)
         : {};
       const extra = (entryExtra && typeof entryExtra === "object")
         ? Object.assign({}, entryExtra)
@@ -620,7 +621,7 @@ const LOGGingModule = function LOGGingModule() {
         if (!Object.prototype.hasOwnProperty.call(extra, "critical")) extra.critical = !!incident.critical;
       }
       const errorValue = (() => {
-        if (entry && Object.prototype.hasOwnProperty.call(entry, "error")) return normalizeForJSON(entry.error);
+        if (entry && Object.prototype.hasOwnProperty.call(entry, "error")) return normalizeForJSONWithLimits(entry.error, serialLimits);
         if (incident && (incident.errName || incident.errMessage)) {
           return {
             name: incident.errName || null,
@@ -710,7 +711,7 @@ const LOGGingModule = function LOGGingModule() {
         meta.byEntryType[entryType] = (meta.byEntryType[entryType] || 0) + 1;
         if (!incident.critical) continue;
         meta.totalCritical += 1;
-        meta.lastCritical.push(shapeDegradeBufferEntry(arr[i], i));
+        meta.lastCritical.push(shapeDegradeBufferEntry(arr[i], i, LAST_CRITICAL_SERIAL_LIMITS));
       }
       if (meta.lastCritical.length > 30) meta.lastCritical = meta.lastCritical.slice(-30);
       meta.lastTimestamp = arr.length ? formatCompactTimestamp(safeEntryTimestamp(arr[arr.length - 1])) : null;
@@ -982,6 +983,14 @@ const LOGGingModule = function LOGGingModule() {
       array: 64,
       string: 512,
       metaKeys: 8
+    };
+
+    const LAST_CRITICAL_SERIAL_LIMITS = {
+      depth: SERIAL_LIMITS.depth + 3,
+      keys: SERIAL_LIMITS.keys * 2,
+      array: SERIAL_LIMITS.array * 2,
+      string: SERIAL_LIMITS.string * 2,
+      metaKeys: SERIAL_LIMITS.metaKeys * 2
     };
 
     const COMPACT_CONSOLE_CAPTURE_CONFIG = {

@@ -1211,9 +1211,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
   }
-  if (!divRoot) {
-    viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost:missing');
-  }
   if (divRoot) {
     const divRootMap = [
       { key: 'clientWidth', expected: viewportExpected.innerWidth },
@@ -1424,7 +1421,149 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
 
 
 
+  function __screenReconcileViewportRootClients(substage) {
+    const localTargets = [];
+    const localReasons = [];
+    const htmlRoot = document.documentElement || null;
+    const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
+      ? __screenCanvasState.domCanvasHost
+      : null;
+    if (!htmlRoot) {
+      localReasons.push('document.documentElement:missing');
+    } else {
+      const htmlRootMap = [
+        { key: 'clientWidth', expected: viewportExpected.innerWidth },
+        { key: 'clientHeight', expected: viewportExpected.innerHeight }
+      ];
+      for (let i = ZERO; i < htmlRootMap.length; i++) {
+        const item = htmlRootMap[i];
+        let actual = null;
+        let readFailed = false;
+        let readError = null;
+        try {
+          actual = htmlRoot[item.key];
+        } catch (e) {
+          readFailed = true;
+          readError = (e && e.message) ? String(e.message) : 'native_read_failed';
+        }
+        if (readFailed) {
+          localReasons.push('document.documentElement.' + item.key + ':' + readError);
+          continue;
+        }
+        if (!Object.is(actual, item.expected)) {
+          const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
+          const targetPlan = __screenBuildAccessorTarget(
+            htmlRoot,
+            null,
+            item.key,
+            item.expected,
+            'screen:viewport_group:html',
+            {
+              allowCreate: true,
+              invalidThis: 'throw',
+              configurable: protoDesc ? !!protoDesc.configurable : true,
+              enumerable: protoDesc ? !!protoDesc.enumerable : false
+            }
+          );
+          if (!targetPlan.ok) localReasons.push('document.documentElement.' + item.key + ':' + targetPlan.reason);
+          else localTargets.push(targetPlan.target);
+        }
+      }
+    }
+    if (!divRoot) {
+      localReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost:missing');
+    } else {
+      const divRootMap = [
+        { key: 'clientWidth', expected: viewportExpected.innerWidth },
+        { key: 'clientHeight', expected: viewportExpected.innerHeight }
+      ];
+      for (let i = ZERO; i < divRootMap.length; i++) {
+        const item = divRootMap[i];
+        let actual = null;
+        let readFailed = false;
+        let readError = null;
+        try {
+          actual = divRoot[item.key];
+        } catch (e) {
+          readFailed = true;
+          readError = (e && e.message) ? String(e.message) : 'native_read_failed';
+        }
+        if (readFailed) {
+          localReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + readError);
+          continue;
+        }
+        if (!Object.is(actual, item.expected)) {
+          const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
+          const targetPlan = __screenBuildAccessorTarget(
+            divRoot,
+            null,
+            item.key,
+            item.expected,
+            'screen:viewport_group:div',
+            {
+              allowCreate: true,
+              invalidThis: 'throw',
+              configurable: protoDesc ? !!protoDesc.configurable : true,
+              enumerable: protoDesc ? !!protoDesc.enumerable : false
+            }
+          );
+          if (!targetPlan.ok) localReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + targetPlan.reason);
+          else localTargets.push(targetPlan.target);
+        }
+      }
+    }
+    let applied = ZERO;
+    let postcheck = null;
+    if (localTargets.length && localReasons.length === ZERO) {
+      applied = applyCoreTargetsGroup('screen:viewport_group:dom_ready', localTargets, 'strict');
+      if (applied > ZERO) {
+        __screenGroupModes.coordinationPatched = true;
+        __screenGroupModes.appliedTargets += applied;
+      }
+    }
+    if (localReasons.length === ZERO) {
+      postcheck = __screenCheckViewportCoherence();
+      if (!postcheck.ok) {
+        if (applied > ZERO) {
+          __screenDiag('error', 'screen:coordination_postcheck_failed', {
+            stage: 'apply',
+            type: __screenTypeBrowser,
+            diagTag: 'screen',
+            key: 'viewport_group',
+            message: 'viewport coordination post-check failed',
+            data: { outcome: 'rollback', group: 'viewport', reason: 'viewport_postcheck_failed', substage: substage, mismatches: postcheck.mismatches }
+          }, null);
+          rollbackAppliedCoreGroup('screen:viewport_group:dom_ready', 'viewport_postcheck_failed');
+          applied = ZERO;
+        }
+        localReasons.push('viewport_postcheck_failed');
+      }
+    }
+    if (localReasons.length === ZERO) {
+      __screenSetGroupOutcome('viewport', applied > ZERO ? 'patched' : 'native_observed', applied > ZERO ? 'dom_ready_reconcile' : 'native_coherent');
+      __screenDiag('info', applied > ZERO ? 'screen:viewport_group_applied' : 'screen:viewport_group_ready', {
+        stage: 'runtime',
+        type: applied > ZERO ? 'ok' : __screenTypePipeline,
+        diagTag: 'screen',
+        key: 'viewport_group',
+        message: applied > ZERO ? 'viewport group reconciled after DOM ready' : 'viewport group coherent after DOM ready',
+        data: { outcome: 'return', group: 'viewport', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, applied: applied, snapshot: postcheck ? postcheck.snapshot : null }
+      }, null);
+    } else {
+      __screenSetGroupOutcome('viewport', 'skip', localReasons[ZERO] || 'viewport_skipped');
+      __screenDiag('warn', 'screen:viewport_group_skipped', {
+        stage: 'runtime',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: 'viewport_group',
+        message: 'viewport group skipped after DOM ready',
+        data: { outcome: 'skip', group: 'viewport', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, details: localReasons }
+      }, null);
+    }
+  }
+
   const onPatchedViewport = () => {
+    __screenReconcileViewportRootClients('DOMContentLoaded');
     __screenDiag('info', 'screen:patched_viewport', {
       stage: 'runtime',
       type: __screenTypePipeline,
@@ -1450,10 +1589,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     });
   };
-  document.addEventListener("DOMContentLoaded", onPatchedViewport);
-  __moduleRollbackStack.push(function rollbackDomContentLoadedPatchedViewport() {
-    document.removeEventListener("DOMContentLoaded", onPatchedViewport);
-  });
+  if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", onPatchedViewport);
+    __moduleRollbackStack.push(function rollbackDomContentLoadedPatchedViewport() {
+      document.removeEventListener("DOMContentLoaded", onPatchedViewport);
+    });
+  } else {
+    onPatchedViewport();
+  }
 
   // log after DOM ready for document & div
   const onDocumentDivClientSizes = () => {
@@ -1484,10 +1627,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     });
   };
-  document.addEventListener("DOMContentLoaded", onDocumentDivClientSizes);
-  __moduleRollbackStack.push(function rollbackDomContentLoadedDocumentDiv() {
-    document.removeEventListener("DOMContentLoaded", onDocumentDivClientSizes);
-  });
+  if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", onDocumentDivClientSizes);
+    __moduleRollbackStack.push(function rollbackDomContentLoadedDocumentDiv() {
+      document.removeEventListener("DOMContentLoaded", onDocumentDivClientSizes);
+    });
+  } else {
+    onDocumentDivClientSizes();
+  }
   
   const __screenCoordinationComplete = (
     __screenGroupModes.displayMode !== 'skip' &&

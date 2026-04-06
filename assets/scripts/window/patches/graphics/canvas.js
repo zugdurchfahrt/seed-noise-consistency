@@ -238,7 +238,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (__canvasState.domReady) return;
 
     const doc = G && G.document;
-    if (!doc || !doc.body || typeof doc.createElement !== 'function') {
+    if (!doc || (!doc.body && !doc.documentElement) || typeof doc.createElement !== 'function') {
       __canvasState.domReady = false;
       return; // нет DOM — выходим
     }
@@ -372,10 +372,11 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     });
   }
 
-  if (typeof G.document !== 'undefined' && G.document.readyState === 'loading') {
-    G.document.addEventListener('DOMContentLoaded', realInit, { once: true });
-  } else if (typeof G.document !== 'undefined') {
+  if (typeof G.document !== 'undefined') {
     realInit();
+    if (!__canvasState.domReady && G.document.readyState === 'loading') {
+      G.document.addEventListener('DOMContentLoaded', realInit, { once: true });
+    }
   }
  
 

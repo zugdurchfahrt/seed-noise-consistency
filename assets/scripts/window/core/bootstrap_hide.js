@@ -419,7 +419,6 @@ __envProfileState__.debug = !!W.__NAV_PATCH_DEBUG__;
 __envProfileState__.fullVersionList = __cloneProfileValue__(W.__FULL_VERSION_LIST);
 __envProfileState__.storageQuotaMb = W.__STORAGE_QUOTA_MB;
 __envProfileState__.storageUsedPct = W.__STORAGE_USED_PCT;
-__envProfileState__.pluginProfiles = __cloneProfileValue__(Array.isArray(W.__PLUGIN_PROFILES__) ? W.__PLUGIN_PROFILES__ : []);
 
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
   return __bootstrapHideEmit__(level, code, {
