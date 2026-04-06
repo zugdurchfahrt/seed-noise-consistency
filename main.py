@@ -114,6 +114,20 @@ def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
         "vpn": _rng_for("vpn"),
     }
 
+
+#
+# rand_met does not receive global_seed directly.
+# main injects one rand_met-specific derivative, and rand_met derives
+# its internal manifest/meta/cache branches from that single seam.
+#
+def _derive_rand_met_seed_material(global_seed: str, label: str) -> str:
+    if not isinstance(global_seed, str) or not global_seed.strip():
+        raise ValueError("global_seed must be a non-empty string")
+    if not isinstance(label, str) or not label.strip():
+        raise ValueError("seed material label must be a non-empty string")
+    material = f"__RAND_SEED_POOL__|{label}|{global_seed}".encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
+
 # ----------------------- PROFILE FUNCTION -----------------------
 def get_random_profile(country_data, platform):
     return {}
@@ -856,7 +870,7 @@ def main():
         headers_rng = seed_int["headers"]
         helpers_module.random = profile_rng
         plugins_dict_module.random = plugins_rng
-        rand_met_module.set_global_seed(global_seed)
+        rand_met_module.RAND_MET_DERIVATIVE = _derive_rand_met_seed_material(global_seed, "rand_met")
         
         if hasattr(headers_adapter_module, "_pick_nav_template"):
             headers_adapter_module._pick_nav_template.cache_clear()

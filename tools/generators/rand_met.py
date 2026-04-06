@@ -157,40 +157,40 @@ PUA_RANGES = [
 ]
 
 
-_MANIFEST_SEED = None
 _META_RNG = None
-_GLOBAL_SEED = None
+RAND_MET_DERIVATIVE = None
 
 
-def set_global_seed(seed: str) -> None:
-    global _GLOBAL_SEED
-    v = str(seed or "").strip()
+def _module_derivative() -> str:
+    if RAND_MET_DERIVATIVE is None:
+        raise RuntimeError("[fonts] rand_met derivative is required (not initialized)")
+    v = str(RAND_MET_DERIVATIVE).strip()
     if not v:
-        raise RuntimeError("[fonts] global seed is required")
-    _GLOBAL_SEED = v
-
-
-def _seed_value() -> str:
-    if _GLOBAL_SEED is None:
-        raise RuntimeError("[fonts] global seed is required (not initialized)")
-    v = str(_GLOBAL_SEED).strip()
-    if not v:
-        raise RuntimeError("[fonts] global seed is required (empty)")
+        raise RuntimeError("[fonts] rand_met derivative is required (empty)")
     return v
 
 
-def _seed_namespace() -> str:
-    raw = _seed_value()
-    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", raw).strip("._-")
-    if not safe:
-        raise RuntimeError("[fonts] global seed is not usable for namespace (sanitized to empty)")
-    return safe
+def _derive_local_material(label: str, *parts: str) -> str:
+    if not isinstance(label, str) or not label.strip():
+        raise RuntimeError("[fonts] local derivation label is required")
+    base = _module_derivative()
+    material_parts = ["__RAND_MET_POOL__", label, base]
+    material_parts.extend("" if part is None else str(part) for part in parts)
+    material = "|".join(material_parts).encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
 
 
-def _rng_for_manifest(platform: str, all_names: list) -> random.Random:
-    global _MANIFEST_SEED
-    _MANIFEST_SEED = f"{_seed_value()}|{platform}|" + "|".join(sorted(all_names))
-    return random.Random(_MANIFEST_SEED)
+def _derive_local_rng(label: str, *parts: str) -> random.Random:
+    numeric_seed = int.from_bytes(hashlib.sha256(_derive_local_material(label, *parts).encode("utf-8")).digest()[:8], "big")
+    return random.Random(numeric_seed)
+
+
+def _manifest_seed_parts(platform: str, all_names: list[str]) -> tuple[str, ...]:
+    return (platform, *sorted(all_names))
+
+
+def _cache_namespace_token() -> str:
+    return _derive_local_material("cache_namespace")
 
 
 def _meta_rng() -> random.Random:
@@ -275,7 +275,7 @@ def _atomic_write_json(path: pathlib.Path, obj: dict) -> None:
 
 def _cache_dir_for(platform: str) -> pathlib.Path:
     """Catalog for per-file base64-cache"""
-    return get_target_dir_for(platform) / "cache_data" / _seed_namespace()
+    return get_target_dir_for(platform) / "cache_data" / _cache_namespace_token()
 
 def _b64_path_for(platform: str, md5: str) -> pathlib.Path:
     return _cache_dir_for(platform) / f"{md5}.b64"
@@ -699,7 +699,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         raise ValueError(f"[fonts] Unknown platform: {platform}")
 
     # Fail-fast: seed is a required session parameter (before any filesystem mutations).
-    _seed_value()
+    _module_derivative()
 
     # === Step 1: Copy new files from fonts_raw → target_dir ===
     target_dir = get_target_dir_for(platform)
@@ -788,11 +788,9 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         logger.warning(f'[WARNING] for {platform} is no .woff2 in {target_dir}')
         return []
 
-    # Stabilized seed from the shared global seed path.
-    _rng = _rng_for_manifest(platform, all_names)
-    _seed = _MANIFEST_SEED
-    if _seed is None:
-        raise RuntimeError("[fonts] _MANIFEST_SEED missing after _rng_for_manifest()")
+    # Stabilized derivation from the injected rand_met module derivative.
+    _seed_parts = _manifest_seed_parts(platform, all_names)
+    _rng = _derive_local_rng("manifest_rng", *_seed_parts)
 
 
     # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
@@ -824,7 +822,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     try:
         global _META_RNG
         _prev_meta_rng = _META_RNG
-        _META_RNG = random.Random(_seed)
+        _META_RNG = _derive_local_rng("meta_rng", *_seed_parts)
         for fname in fingerprint_names:
             rec = files_map.get(fname)
             if not rec:

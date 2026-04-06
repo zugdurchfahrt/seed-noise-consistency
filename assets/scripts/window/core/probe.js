@@ -103,7 +103,7 @@ const __probeRun = async function(){
   }
 
   globalThis.__PROBE_FLAGS__ = {
-    workerScopeAudit: true,
+    workerScopeAudit: false,
     brandCheck: false,
     receiverChecks: false
   };
