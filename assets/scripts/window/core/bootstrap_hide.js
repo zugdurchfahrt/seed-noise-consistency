@@ -413,13 +413,23 @@ const __screenState = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === '
 __envProfileState__.orientationDom = (__screenState && typeof __screenState.orientationDom === 'string' && __screenState.orientationDom)
   ? __screenState.orientationDom
   : (((__envProfileState__.height >= __envProfileState__.width)) ? 'portrait-primary' : 'landscape-primary');
-__envProfileState__.profile = __cloneProfileValue__((W.__PROFILE__ && typeof W.__PROFILE__ === 'object') ? W.__PROFILE__ : null);
+__envProfileState__.profile = Object.create(null);
+__envProfileState__.profile.physical_screen_width = (
+  __isFiniteNumber__(__envProfileState__.width) &&
+  __isFiniteNumber__(__envProfileState__.dpr) &&
+  __envProfileState__.dpr > 0
+) ? Math.round(__envProfileState__.width * __envProfileState__.dpr) : null;
+__envProfileState__.profile.physical_screen_height = (
+  __isFiniteNumber__(__envProfileState__.height) &&
+  __isFiniteNumber__(__envProfileState__.dpr) &&
+  __envProfileState__.dpr > 0
+) ? Math.round(__envProfileState__.height * __envProfileState__.dpr) : null;
 __envProfileState__.strict = (W.__NAV_PATCH_STRICT__ !== undefined) ? !!W.__NAV_PATCH_STRICT__ : true;
 __envProfileState__.debug = !!W.__NAV_PATCH_DEBUG__;
 __envProfileState__.fullVersionList = __cloneProfileValue__(W.__FULL_VERSION_LIST);
 __envProfileState__.storageQuotaMb = W.__STORAGE_QUOTA_MB;
 __envProfileState__.storageUsedPct = W.__STORAGE_USED_PCT;
-
+__envProfileState__.pluginProfiles = __cloneProfileValue__(Array.isArray(W.__PLUGIN_PROFILES__) ? W.__PLUGIN_PROFILES__ : []);
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
   return __bootstrapHideEmit__(level, code, {
     diagTag: 'bootstrap_hide',
@@ -542,7 +552,6 @@ function __sanitizeBootstrapEnvSurface__(win) {
     '__GPU_ARCHITECTURE__',
     '__GPU_VENDOR__',
     '__WEBGPU_DEVICE__',
-    '__PROFILE__',
     '__DEVICES_LABELS',
     '__PLUGIN_PROFILES__'
   ];
@@ -633,7 +642,6 @@ __defineHiddenValue__(C, '__runBootstrapEnvCleanup__', __runBootstrapEnvCleanup_
     "__WEBGPU_DEVICE__",
     "__DEVICES_LABELS",
     "__PLUGIN_PROFILES__",
-    "__PROFILE__",
     "__wrapNativeAccessor",
     "__wrapStrictAccessor",
     "__wrapNativeCtor",

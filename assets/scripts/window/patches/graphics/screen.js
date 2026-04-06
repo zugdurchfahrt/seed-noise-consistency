@@ -1173,44 +1173,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
     ? __screenCanvasState.domCanvasHost
     : null;
-  if (htmlRoot) {
-    const htmlRootMap = [
-      { key: 'clientWidth', expected: viewportExpected.innerWidth },
-      { key: 'clientHeight', expected: viewportExpected.innerHeight }
-    ];
-    for (let i = ZERO; i < htmlRootMap.length; i++) {
-      const item = htmlRootMap[i];
-      const fact = __screenDescribeAccessorSurface(htmlRoot, null, item.key);
-      viewportObserved.root.push(fact);
-      try {
-        fact.actual = htmlRoot[item.key];
-      } catch (e) {
-        fact.readFailed = true;
-        fact.readError = (e && e.message) ? String(e.message) : 'native_read_failed';
-        viewportReasons.push('document.documentElement.' + item.key + ':' + fact.readError);
-      }
-      fact.expected = item.expected;
-      fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
-      if (!fact.readFailed && !fact.matchesExpected) {
-        const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
-        const targetPlan = __screenBuildAccessorTarget(
-          htmlRoot,
-          null,
-          item.key,
-          item.expected,
-          'screen:viewport_group:html',
-          {
-            allowCreate: true,
-            invalidThis: 'throw',
-            configurable: protoDesc ? !!protoDesc.configurable : true,
-            enumerable: protoDesc ? !!protoDesc.enumerable : false
-          }
-        );
-        if (!targetPlan.ok) viewportReasons.push('document.documentElement.' + item.key + ':' + targetPlan.reason);
-        else viewportTargets.push(targetPlan.target);
-      }
-    }
-  }
   if (divRoot) {
     const divRootMap = [
       { key: 'clientWidth', expected: viewportExpected.innerWidth },
@@ -1419,8 +1381,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }, null);
   }
 
-
-
   function __screenReconcileViewportRootClients(substage) {
     const localTargets = [];
     const localReasons = [];
@@ -1450,7 +1410,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           localReasons.push('document.documentElement.' + item.key + ':' + readError);
           continue;
         }
-        if (!Object.is(actual, item.expected)) {
+        const matchesExpected = Object.is(actual, item.expected);
+        if (!matchesExpected) {
           const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
           const targetPlan = __screenBuildAccessorTarget(
             htmlRoot,
@@ -1562,7 +1523,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
   }
 
-  const onPatchedViewport = () => {
+  const onViewportDomReady = () => {
+    const canvasHost = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
+      ? __screenCanvasState.domCanvasHost
+      : null;
     __screenReconcileViewportRootClients('DOMContentLoaded');
     __screenDiag('info', 'screen:patched_viewport', {
       stage: 'runtime',
@@ -1578,8 +1542,21 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         viewportGroupReason: __screenGroupModes.viewportReason,
         displayGroupMode: __screenGroupModes.displayMode,
         displayGroupReason: __screenGroupModes.displayReason,
-        html:   { width:  document.documentElement.clientWidth,  height: document.documentElement.clientHeight },
-        window: { width:  window.innerWidth,  height: window.innerHeight, outerWidth: window.outerWidth, outerHeight: window.outerHeight },
+        html: {
+          width: document.documentElement.clientWidth,
+          height: document.documentElement.clientHeight
+        },
+        div: {
+          ownerPath: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
+          width: canvasHost ? canvasHost.clientWidth : null,
+          height: canvasHost ? canvasHost.clientHeight : null
+        },
+        window: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          outerWidth: window.outerWidth,
+          outerHeight: window.outerHeight
+        },
         screen: {
           width:  window.screen.width,
           height: window.screen.height,
@@ -1590,50 +1567,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     });
   };
   if (document.readyState === 'loading') {
-    document.addEventListener("DOMContentLoaded", onPatchedViewport);
-    __moduleRollbackStack.push(function rollbackDomContentLoadedPatchedViewport() {
-      document.removeEventListener("DOMContentLoaded", onPatchedViewport);
+    document.addEventListener("DOMContentLoaded", onViewportDomReady);
+    __moduleRollbackStack.push(function rollbackDomContentLoadedViewportDomReady() {
+      document.removeEventListener("DOMContentLoaded", onViewportDomReady);
     });
   } else {
-    onPatchedViewport();
-  }
-
-  // log after DOM ready for document & div
-  const onDocumentDivClientSizes = () => {
-    const canvasHost = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
-      ? __screenCanvasState.domCanvasHost
-      : null;
-    __screenDiag('info', 'screen:document_div_client_sizes', {
-      stage: 'runtime',
-      type: __screenTypePipeline,
-      diagTag: 'screen',
-      key: null,
-      message: 'document and div client sizes snapshot',
-      data: {
-        outcome: 'return',
-        reason: 'snapshot',
-        substage: 'DOMContentLoaded',
-        viewportGroupMode: __screenGroupModes.viewportMode,
-        viewportGroupReason: __screenGroupModes.viewportReason,
-        html: {
-          width:  document.documentElement.clientWidth,
-          height: document.documentElement.clientHeight
-        },
-        div: {
-          ownerPath: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
-          width:  canvasHost ? canvasHost.clientWidth : null,
-          height: canvasHost ? canvasHost.clientHeight : null
-        }
-      }
-    });
-  };
-  if (document.readyState === 'loading') {
-    document.addEventListener("DOMContentLoaded", onDocumentDivClientSizes);
-    __moduleRollbackStack.push(function rollbackDomContentLoadedDocumentDiv() {
-      document.removeEventListener("DOMContentLoaded", onDocumentDivClientSizes);
-    });
-  } else {
-    onDocumentDivClientSizes();
+    onViewportDomReady();
   }
   
   const __screenCoordinationComplete = (
