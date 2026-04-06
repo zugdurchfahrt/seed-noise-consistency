@@ -3552,7 +3552,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           Object.defineProperty(mimeArray, String(i), { value: mimeObj, enumerable: true, configurable: true });
           mimeArrayRecord.mimeByIndex[String(i)] = mimeObj;
           const type = mimeObj && mimeObj.type;
-          if (type) {
+          if (type && !Object.prototype.hasOwnProperty.call(mimeArrayRecord.mimeByType, type)) {
             Object.defineProperty(mimeArray, type, { value: mimeObj, enumerable: false, configurable: true });
             mimeArrayRecord.mimeByType[type] = mimeObj;
           }
