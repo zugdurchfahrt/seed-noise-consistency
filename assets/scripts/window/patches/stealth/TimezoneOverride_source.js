@@ -105,9 +105,6 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       if (stateRoot && stateRoot.__GEO_STATE__ && typeof stateRoot.__GEO_STATE__ === 'object') {
         return stateRoot.__GEO_STATE__;
       }
-      if (C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') {
-        return C.__GEO_STATE__;
-      }
       return null;
     }
 
@@ -117,9 +114,6 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
       if (stateRoot && stateRoot.__LANG_STATE__ && typeof stateRoot.__LANG_STATE__ === 'object') {
         return stateRoot.__LANG_STATE__;
-      }
-      if (C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') {
-        return C.__LANG_STATE__;
       }
       return null;
     }

@@ -279,7 +279,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     const __navLangState = (__stateRoot && __stateRoot.__LANG_STATE__ && typeof __stateRoot.__LANG_STATE__ === 'object')
       ? __stateRoot.__LANG_STATE__
-      : ((C && C.__LANG_STATE__ && typeof C.__LANG_STATE__ === 'object') ? C.__LANG_STATE__ : null);
+      : null;
     const __coreOwnerFirstAccessorCapable = !!(
       __core &&
       __core.__internal &&
