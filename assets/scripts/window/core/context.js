@@ -309,11 +309,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
   // NOTE: this value is used as a stable fallback for hook keys (fontStr) when ctx.font is unreadable/empty.
   const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
-    const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+    const cached = (
+      C
+      && C.state
+      && C.state.__CANVAS__
+      && C.state.__CANVAS__.__STATE__
+      && typeof C.state.__CANVAS__.__STATE__.defaultCtx2dFont === 'string'
+    ) ? C.state.__CANVAS__.__STATE__.defaultCtx2dFont : '';
     if (cached && cached.trim()) return cached.trim();
     emitContextDiag('warn', 'context:ctx2d:guard:default_font_missing', null, {
       stage: 'guard',
-      key: '__DEFAULT_CTX2D_FONT__',
+      key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
       type: 'pipeline missing data',
       message: 'shared default ctx2d font missing'
     });

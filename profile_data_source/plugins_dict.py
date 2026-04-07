@@ -11,7 +11,7 @@ logger = logger.getChild("plugins_dict")
 # Structures:
 #  - chromium/edge/webkit: list[variant], где variant ∈ ([], list[dict])
 #  - gecko: list[dict]
-# This setting allows you to keep an “empty” option as well as 1 plugin
+# Chromium/Edge downstream path now treats the full 5-plugin bundle as canonical.
 
 PLUGIN_DICT: Dict[str, List]  = {
     "chromium-viewer": [
@@ -239,8 +239,8 @@ PLUGIN_DICT: Dict[str, List]  = {
 
 # Engine restrictions (lo, hi)
 ENGINE_LIMITS: dict[str, Tuple[int, int]] = {
-    "chromium-viewer": (4, 5),
-    "edge-viewer":     (4, 5),
+    "chromium-viewer": (5, 5),
+    "edge-viewer":     (5, 5),
     "webkit-viewer":   (0, 1),
     "gecko-standard":  (2, 2),
 }
@@ -314,17 +314,29 @@ def _dedup_norm(pls: List[Dict]) -> List[Dict]:
     return out
 
 
-def build_plugins_profile(browser_choice: str, *, rng: Optional[random.Random] = None, strict: bool = False) -> Tuple[List[Dict], List[Dict]]:
-    """Return (plugins_final, mime_types_final) for given browser.
-    - Whitelist filtering names (excludes cross-engine garbage)
-    - Dedup and restriction to Engine_limits
-    - strict=True → AssertionError In case of limits violaton
+def build_plugins_profile(browser_choice: str, *, rng: Optional[random.Random] = None, strict: bool = False) -> List[Dict]:
+    """Return canonical plugins profile for given browser.
+    - Chromium/Edge use the full canonical 5-plugin bundle
+    - WebKit/Gecko preserve existing normalization path
+    - strict=True → AssertionError in case of limits violation
     """
     key = plugin_key_for(browser_choice)
     variants = PLUGIN_DICT.get(key, [])
     names_whitelist = _allowed_names(variants)
 
-    raw = _choose_raw(variants, rng=rng)
+    raw: List[Dict]
+    if key in ("chromium-viewer", "edge-viewer"):
+        raw = []
+        best_len = -1
+        for variant in (variants or []):
+            if not isinstance(variant, list):
+                continue
+            candidate = [dict(p) for p in variant if isinstance(p, dict)]
+            if len(candidate) > best_len:
+                raw = candidate
+                best_len = len(candidate)
+    else:
+        raw = _choose_raw(variants, rng=rng)
     filtered = [p for p in raw if isinstance(p, dict) and p.get("name") in names_whitelist]
     cleaned = _dedup_norm(filtered)
 
@@ -335,24 +347,7 @@ def build_plugins_profile(browser_choice: str, *, rng: Optional[random.Random] =
     if strict:
         assert lo <= len(cleaned) <= hi, f"plugins count {len(cleaned)} outside limits {lo}..{hi} for {key}"
 
-    mime_final: List[Dict] = []
-    seen_mime: set[Tuple[str, str, str]] = set()
-    for p in cleaned:
-        for mt in (p.get("mimeTypes") or []):
-            k = (
-                str(mt.get("type", "")),
-                str(mt.get("suffixes", "")),
-                str(mt.get("description", "")),
-            )
-            if k in seen_mime:
-                continue
-            seen_mime.add(k)
-            mime_final.append({
-                "type": k[0],
-                "suffixes": k[1],
-                "description": k[2],
-            })
     logger.debug("[plugins.unify] browser=%s key=%s → %d: %s", browser_choice, key, len(cleaned), [p.get("name") for p in cleaned])
-    return cleaned, mime_final
+    return cleaned
 
 __all__ = ["PLUGIN_DICT", "plugin_key_for", "build_plugins_profile"]

@@ -230,7 +230,7 @@ def init_driver(
     webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
     devices_conf, generated_platform, generated_platform_version, expected_client_hints,
     vendor_value, language, normalized_languages, device_memory_value, hardware_concurrency_value,
-    device_dpr_value, plugins, mimeTypes, gpu_vendor, gpu_architecture, gpu_type, global_seed,
+    device_dpr_value, plugins, gpu_vendor, gpu_architecture, gpu_type, global_seed,
 ):
     timezone = country_data["timezone"]
     offset_minutes = country_data["offset_minutes"]
@@ -1031,8 +1031,8 @@ def main():
         cpu_win = [(2, 10), (4, 40), (6, 20), (8, 20), (12, 10)]
         device_memory_value, hardware_concurrency_value = choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac)
 
-        # -----------------------  navigator.plugins и navigator.mimeTypes -----------------------
-        plugins_final, mime_types_final = build_plugins_profile(browser_choice, rng=plugins_rng, strict=False)
+        # -----------------------  navigator.plugins source profile (mimeTypes are derived in JS) -----------------------
+        plugins_final = build_plugins_profile(browser_choice, rng=plugins_rng, strict=False)
 
         # ----------------------- mediaDevices.enumerateDevices -----------------------
         audioinput = profile_rng.choice(data["audioinput"])['name']
@@ -1131,7 +1131,6 @@ def main():
             "deviceMemory": device_memory_value,
             "hardwareConcurrency": hardware_concurrency_value,
             "plugins": plugins_final,
-            "mimeTypes": mime_types_final,
             "accept_language": build_accept_language(languages),
         }
 
@@ -1200,7 +1199,7 @@ def main():
             profile["devices_conf"], generated_platform, generated_platform_version,
             expected_client_hints, profile["vendor_value"], profile["language"], profile["languages"],
             profile["deviceMemory"], profile["hardwareConcurrency"], profile["device_dpr_value"],
-            profile["plugins"], profile["mimeTypes"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"],
+            profile["plugins"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"],
             global_seed,
         )
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
