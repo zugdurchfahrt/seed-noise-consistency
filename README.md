@@ -179,7 +179,7 @@ Defines the contract-driven patching engine through `Core.applyTargets`. Downstr
 - `media/audiocontext.js` — AudioContext-aligned seeded/media surface adjustments.
 - `media/font_module.js` — consumes generated font configs, registers `@font-face`, and injects CSS/font-loading glue.
 - `media/RTCPeerConnection.js` — ICE-server normalization and non-relay/network-shaping logic.
-- `navigator/nav_total_set.js`, `navigator/override_ua_data.js`, `navigator/lang_win_scope.js` — navigator, UA-CH, language, and client-hint surface alignment on the window side.
+- `navigator/nav_total_set.js`, `navigator/override_ua_data.js` — navigator, UA-CH, language, and client-hint surface alignment on the window side.
 - `stealth/hide_webdriver.js` — webdriver masking and related native-surface hardening.
 - `stealth/headers_interceptor.js`, `stealth/headers_bridge.js` — request/header shaping on the JS side, synchronized with the CDP/mitmproxy path.
 - `stealth/GeoOverride_source.js`, `stealth/TimezoneOverride_source.js` — geo/timezone overrides.

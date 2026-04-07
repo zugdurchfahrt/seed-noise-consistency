@@ -21,8 +21,6 @@ const __probeRun = async function(){
   const __probeRawConsole = (__probeLoggerRoot && __probeLoggerRoot.__RAW_CONSOLE__ && typeof __probeLoggerRoot.__RAW_CONSOLE__ === "object")
     ? __probeLoggerRoot.__RAW_CONSOLE__
     : null;
-
-
   function __probeDiag(level, code, extra, err) {
     try {
       const x = (extra && typeof extra === 'object') ? extra : {};
@@ -1940,6 +1938,143 @@ const __probeRun = async function(){
     }
 
     const sandboxOracle = makeSandboxOracle();
+    const webglInvocationByPath = new Map();
+
+    function setWebGLInvocation(path, status, detail, err) {
+      webglInvocationByPath.set(path, {
+        status: (typeof status === "string" && status) ? status : "unknown",
+        detail: detail == null ? null : String(detail),
+        error: err ? errorShape(err) : null
+      });
+    }
+
+    function createWebGLProbeContext(kind) {
+      if (typeof document === "undefined" || typeof document.createElement !== "function") return null;
+      try {
+        const canvas = document.createElement("canvas");
+        if (!canvas || typeof canvas.getContext !== "function") return null;
+        if (kind === "webgl2") return canvas.getContext("webgl2");
+        return canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function safeCallWebGLMethod(path, detail, call) {
+      try {
+        const value = call();
+        setWebGLInvocation(path, "called", detail, null);
+        return value;
+      } catch (e) {
+        setWebGLInvocation(path, "threw", detail, e);
+        return null;
+      }
+    }
+
+    function collectWebGLMethodTouches(kind, protoLabel) {
+      const ctx = createWebGLProbeContext(kind);
+      const shaderPrecisionPath = `${protoLabel}.getShaderPrecisionFormat`;
+      const shaderSourcePath = `${protoLabel}.shaderSource`;
+      const getUniformPath = `${protoLabel}.getUniform`;
+
+      if (!ctx) {
+        setWebGLInvocation(shaderPrecisionPath, "skipped", "context unavailable", null);
+        setWebGLInvocation(shaderSourcePath, "skipped", "context unavailable", null);
+        setWebGLInvocation(getUniformPath, "skipped", "context unavailable", null);
+        return;
+      }
+
+      safeCallWebGLMethod(shaderPrecisionPath, `${kind} runtime touch`, function() {
+        return Reflect.apply(ctx.getShaderPrecisionFormat, ctx, [ctx.FRAGMENT_SHADER, ctx.HIGH_FLOAT]);
+      });
+
+      let vertexShader = null;
+      let fragmentShader = null;
+      let program = null;
+      let uniformLocation = null;
+
+      try {
+        if (typeof ctx.createShader === "function") {
+          vertexShader = ctx.createShader(ctx.VERTEX_SHADER);
+          fragmentShader = ctx.createShader(ctx.FRAGMENT_SHADER);
+        }
+
+        if (!vertexShader || !fragmentShader) {
+          setWebGLInvocation(shaderSourcePath, "skipped", "shader creation unavailable", null);
+          setWebGLInvocation(getUniformPath, "skipped", "shader creation unavailable", null);
+          return;
+        }
+
+        safeCallWebGLMethod(shaderSourcePath, `${kind} runtime touch`, function() {
+          Reflect.apply(ctx.shaderSource, ctx, [
+            vertexShader,
+            "attribute vec4 a_position; void main(){ gl_Position = a_position; }"
+          ]);
+          Reflect.apply(ctx.shaderSource, ctx, [
+            fragmentShader,
+            "precision mediump float; uniform float u_probe; void main(){ gl_FragColor = vec4(u_probe, 0.0, 0.0, 1.0); }"
+          ]);
+          return true;
+        });
+
+        if (typeof ctx.compileShader === "function") {
+          ctx.compileShader(vertexShader);
+          ctx.compileShader(fragmentShader);
+        }
+        if (typeof ctx.createProgram !== "function") {
+          setWebGLInvocation(getUniformPath, "skipped", "program creation unavailable", null);
+          return;
+        }
+
+        program = ctx.createProgram();
+        if (!program) {
+          setWebGLInvocation(getUniformPath, "skipped", "program creation failed", null);
+          return;
+        }
+
+        if (typeof ctx.attachShader === "function") {
+          ctx.attachShader(program, vertexShader);
+          ctx.attachShader(program, fragmentShader);
+        }
+        if (typeof ctx.linkProgram === "function") ctx.linkProgram(program);
+        if (typeof ctx.getUniformLocation !== "function") {
+          setWebGLInvocation(getUniformPath, "skipped", "uniform lookup unavailable", null);
+          return;
+        }
+
+        uniformLocation = ctx.getUniformLocation(program, "u_probe");
+        if (!uniformLocation) {
+          setWebGLInvocation(getUniformPath, "skipped", "uniform location missing", null);
+          return;
+        }
+
+        safeCallWebGLMethod(getUniformPath, `${kind} runtime touch`, function() {
+          return Reflect.apply(ctx.getUniform, ctx, [program, uniformLocation]);
+        });
+      } catch (e) {
+        if (!webglInvocationByPath.has(shaderSourcePath)) {
+          setWebGLInvocation(shaderSourcePath, "threw", `${kind} runtime touch`, e);
+        }
+        if (!webglInvocationByPath.has(getUniformPath)) {
+          setWebGLInvocation(getUniformPath, "threw", `${kind} runtime touch`, e);
+        }
+      } finally {
+        try {
+          if (program && typeof ctx.deleteProgram === "function") ctx.deleteProgram(program);
+        } catch (_) {}
+        try {
+          if (vertexShader && typeof ctx.deleteShader === "function") ctx.deleteShader(vertexShader);
+        } catch (_) {}
+        try {
+          if (fragmentShader && typeof ctx.deleteShader === "function") ctx.deleteShader(fragmentShader);
+        } catch (_) {}
+      }
+    }
+
+    // Active touches are needed so the runtime access-path can emit diagnostics for these WebGL hooks.
+    collectWebGLMethodTouches("webgl", "WebGLRenderingContext.prototype");
+    collectWebGLMethodTouches("webgl2", "WebGL2RenderingContext.prototype");
+
     function resolveMethodRoot(path) {
       if (
         typeof path === "string" &&
@@ -1968,6 +2103,7 @@ const __probeRun = async function(){
     const rows = METHOD_PATHS.map((path) => {
       const root = resolveMethodRoot(path);
       const r = readPath(root, path);
+      const webglInvocation = webglInvocationByPath.get(path) || null;
       let toStringStatus = null;
       let toStringError = null;
       let objectToString = null;
@@ -2041,6 +2177,9 @@ const __probeRun = async function(){
         sandboxHasNativeCode,
         sandboxObjToString,
         sandboxObjToStringError,
+        invocationStatus: webglInvocation ? webglInvocation.status : null,
+        invocationDetail: webglInvocation ? webglInvocation.detail : null,
+        invocationError: webglInvocation ? webglInvocation.error : null,
         setProtoStatus,
         setProtoError,
         value: r.ok ? toPrintable(r.value) : null,

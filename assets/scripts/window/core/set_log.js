@@ -602,8 +602,13 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     function shapeDegradeBufferEntry(entry, idx, limits) {
-      const serialLimits = (limits && typeof limits === "object") ? limits : SERIAL_LIMITS;
       const incident = normalizeDiagIncident(entry, idx);
+      const codeHint = (entry && typeof entry.code === "string" && entry.code)
+        ? entry.code
+        : (incident && typeof incident.code === "string" && incident.code)
+          ? incident.code
+          : null;
+      const serialLimits = resolveDegradeSerialLimits(codeHint, (limits && typeof limits === "object") ? limits : SERIAL_LIMITS);
       const entryType = (entry && typeof entry.type === "string") ? entry.type : (incident && incident.entryType ? incident.entryType : "degrade");
       const entryExtra = (entry && entry.extra && typeof entry.extra === "object")
         ? normalizeForJSONWithLimits(entry.extra, serialLimits)
@@ -1043,6 +1048,38 @@ const LOGGingModule = function LOGGingModule() {
           debug: typeof stackLevels.debug === "boolean" ? stackLevels.debug : base.stackLevels.debug,
           trace: typeof stackLevels.trace === "boolean" ? stackLevels.trace : base.stackLevels.trace
         }
+      };
+    }
+
+    __ensureLoggerHiddenValue("__DEGRADE_SERIAL_LIMITS_BY_CODE__", function () {
+      return {
+        "context:webgl:access": {
+          depth: SERIAL_LIMITS.depth + 2,
+          keys: SERIAL_LIMITS.keys,
+          array: SERIAL_LIMITS.array,
+          string: SERIAL_LIMITS.string,
+          metaKeys: SERIAL_LIMITS.metaKeys * 2
+        }
+      };
+    }, function (v) {
+      return !!(v && typeof v === "object");
+    }, true);
+
+    function resolveDegradeSerialLimits(code, fallback) {
+      const base = (fallback && typeof fallback === "object") ? fallback : SERIAL_LIMITS;
+      const map = (__loggerRoot && __loggerRoot.__DEGRADE_SERIAL_LIMITS_BY_CODE__ && typeof __loggerRoot.__DEGRADE_SERIAL_LIMITS_BY_CODE__ === "object")
+        ? __loggerRoot.__DEGRADE_SERIAL_LIMITS_BY_CODE__
+        : null;
+      const override = (map && typeof code === "string" && code && map[code] && typeof map[code] === "object")
+        ? map[code]
+        : null;
+      if (!override) return base;
+      return {
+        depth: toNonNegInt(override.depth, base.depth),
+        keys: toPosInt(override.keys, base.keys),
+        array: toPosInt(override.array, base.array),
+        string: toPosInt(override.string, base.string),
+        metaKeys: toPosInt(override.metaKeys, base.metaKeys)
       };
     }
 
@@ -1492,6 +1529,7 @@ const LOGGingModule = function LOGGingModule() {
           const rawLevel = String(level || "info");
           const normalizedLevel = validLevels.indexOf(rawLevel) !== -1 ? rawLevel : "info";
           const normalizedCode = String(code || "unknown");
+          const serialLimits = resolveDegradeSerialLimits(normalizedCode, SERIAL_LIMITS);
 
           let safeCtx = ctx;
           if (!isPlainObject(safeCtx)) {
@@ -1518,7 +1556,7 @@ const LOGGingModule = function LOGGingModule() {
             && isPlainObject(dataIn)
           )
           ? normalizeProbeReportData(dataIn)
-          : normalizeForJSON(dataIn);
+          : normalizeForJSONWithLimits(dataIn, serialLimits);
 
       const extraObj = {
         level: normalizedLevel,

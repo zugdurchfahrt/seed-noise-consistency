@@ -208,7 +208,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
   function shouldLogWebGLAccess(method) {
     return method === 'getParameter'
       || method === 'getSupportedExtensions'
-      || method === 'getExtension';
+      || method === 'getExtension'
+      || method === 'getShaderPrecisionFormat'
+      || method === 'shaderSource'
+      || method === 'getUniform';
   }
 
   function summarizeWebGLAccessValue(value) {
@@ -534,525 +537,22 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.registerWebGLGetUniformHook               = fn => registerOnce(C.webglGetUniformHooks, fn);
 
   // === 3. Patch utilities ===
-  function chain(proto, method, hooks){
-    if (!proto || typeof proto[method] !== 'function') return false;
-    const current = proto[method];
-    if (patchedMethods.has(current)) return false;
-    const orig = resolveKeptNative(proto, method) || current;
-    const hookList = Array.isArray(hooks) ? hooks : [];
 
-    // Avoid expando flags on "this" (detectable). Use WeakSet recursion guard.
-    const inProgress =
-      (typeof WeakSet === 'function') ? new WeakSet() : null;
-    const wrapped = (method === 'toDataURL')
-      ? ({ toDataURL(type, quality) {
-           const self = this;
-           const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
-            // 2026-02-11: disabled dead guard block (__isChain_toDataURL) as non-wired in runtime.
-            // Internal encode paths guard left commented intentionally for later revisit.
-            // const __CHAIN_GUARD__ = '__isChain_toDataURL';
-            // if (isObj && self[__CHAIN_GUARD__]) return Reflect.apply(orig, self, arguments);
-            if (inProgress && isObj) {
-             if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
-             inProgress.add(self);
-           }
-           try {
-             const patchedArgs = Array.prototype.slice.call(arguments);
-             const out = Reflect.apply(orig, this, patchedArgs);
-             let res = out;
-              for (const hook of hookList){
-                try {
-                  const r = hook.call(this, res, ...patchedArgs);
-                  if (typeof r === 'string') res = r;
-               } catch (e) {
-                 emitContextDiag('error', 'context:chain:hook:post_failed', e, {
-                   key: method,
-                   stage: 'hook',
-                   data: { hook: hook && (hook.name || null) }
-                 });
-                 throw e;
-             }
-           }
-           return res;
-          } finally {
-            if (inProgress && isObj) {
-              inProgress.delete(self);
-            }
-          }
-        } }).toDataURL
-      : ({ [method]() {
-          const self = this;
-          const isObj = self !== null && (typeof self === 'object' || typeof self === 'function');
-          if (inProgress && isObj) {
-            if (inProgress.has(self)) return Reflect.apply(orig, self, arguments);
-            inProgress.add(self);
-          }
-          try {
-            let patchedArgs = Array.prototype.slice.call(arguments);
-            for (const hook of hookList){
-              if (typeof hook !== 'function') continue;
-              try {
-                const next = hook.apply(this, patchedArgs);
-                if (next && Array.isArray(next)) patchedArgs = next;
-              } catch (e) {
-                emitContextDiag('error', 'context:chain:hook:args_failed', e, {
-                  key: method,
-                  stage: 'hook',
-                  data: { hook: hook && (hook.name || null) }
-                });
-                throw e;
-              }
-            }
-            return Reflect.apply(orig, this, patchedArgs);
-          } finally {
-            if (inProgress && isObj) {
-              inProgress.delete(self);
-            }
-          }
-        } })[method];
 
-    Object.defineProperty(wrapped, '__coreBridgeTarget__', {
-      value: orig,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-    const patched = markAsNative(wrapped, method);
-    definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
-    patchedMethods.add(patched);
-    return true;
-  }
-
-  // === WEBGL PATCHING ===
+ // === WEBGL PATCHING ===
   // METHODOLOGY NOTE:
   // WebGL patchMethod is a separate context-level gateway contract.
-  // Its current preflight sequence, diag/console logging, and override-log toggles
+  // Its current preflight sequence, diag/logging, and override-log toggles
   // are part of the patch semantics here, not incidental debug noise.
   // Do not remove, reorder, or "normalize" these paths without explicit manual
   // approval and runtime revalidation of this module.
 
-  // ===== WEBGL hook override logging: two toggles (ВКЛ/ВЫКЛ) =====
-  // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override".
-  // Standard access logging now goes through context:webgl:access in __DEGRADE__.
-  // WEBGL_OVERRIDE_CONSOLE_LOG is kept as a legacy toggle name for the auxiliary
-  // logger-owned WebGL monitor path; it no longer means public console.*.
-  const WEBGL_OVERRIDE_DIAG_LOG    = false; // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
-  const WEBGL_OVERRIDE_CONSOLE_LOG = false; // true=ВКЛ, false=ВЫКЛ (logger WebGL monitor for override)
-
-  function patchMethod(proto, method, hooks) {
-      if (!proto) {
-        emitContextDiag('warn', 'context:webgl:preflight:proto_missing', null, {
-          stage: 'preflight',
-          surface: 'webgl',
-          key: method,
-          type: 'browser structure missing data'
-        });
-        emitWebGLMonitor({
-          eventType: 'preflight_warn',
-          method: method,
-          stage: 'preflight',
-          message: '[patchMethod] proto is not defined',
-          extra: { reason: 'proto_missing', surface: 'webgl' }
-        });
-        return false;
-      }
-      if (!hooks?.length) {
-        emitContextDiag('warn', 'context:webgl:preflight:hooks_missing', null, {
-          stage: 'preflight',
-          surface: 'webgl',
-          key: method,
-          type: 'pipeline missing data'
-        });
-        emitWebGLMonitor({
-          eventType: 'preflight_warn',
-          method: method,
-          stage: 'preflight',
-          message: '[patchMethod] no hooks',
-          extra: { reason: 'hooks_missing', surface: 'webgl' }
-        });
-        return false;
-      }
-      const isWebGLProto =
-        (typeof WebGLRenderingContext !== 'undefined' && proto === WebGLRenderingContext.prototype) ||
-        (typeof WebGL2RenderingContext !== 'undefined' && proto === WebGL2RenderingContext.prototype);
-      if (!isWebGLProto) {
-        emitContextDiag('warn', 'context:webgl:preflight:proto_rejected', null, {
-          stage: 'preflight',
-          surface: 'webgl',
-          key: method,
-          type: 'browser structure missing data'
-        });
-        emitWebGLMonitor({
-          eventType: 'preflight_warn',
-          method: method,
-          stage: 'preflight',
-          message: '[patchMethod] non-WebGL proto rejected',
-          extra: { reason: 'proto_rejected', surface: 'webgl' }
-        });
-        return false;
-      }
-
-      const preflight = corePreflight(proto, method, 'method', 'context:webgl:patchMethod', {
-        wrapLayer: 'named_wrapper',
-        policy: 'throw'
-      });
-      const desc = preflight.desc || Object.getOwnPropertyDescriptor(proto, method);
-      if (!desc || typeof desc.value !== 'function') {
-        throw new TypeError(`[patchMethod] not a function: ${method}`);
-      }
-      if (patchedMethods.has(desc.value)) {
-        emitContextDiag('info', 'context:webgl:apply:already_patched', null, {
-          stage: 'apply',
-          surface: 'webgl',
-          key: method,
-          type: 'pipeline missing data'
-        });
-        emitWebGLMonitor({
-          eventType: 'apply_info',
-          method: method,
-          stage: 'apply',
-          message: '[patchMethod] already patched',
-          extra: { reason: 'already_patched', surface: 'webgl' }
-        });
-        return false;
-      }
-
-      const orig = resolveKeptNative(proto, method) || desc.value;
-      const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
-      const hookMode = (hooks && (typeof hooks === 'object' || typeof hooks === 'function')) ? hooks.mode : undefined;
-      const isPostOrigOnceMode = hookMode === HOOK_MODE_POST_ORIG_ONCE;
-      const forbidOrigCall = function forbidOrigCall() { throw new TypeError(); };
-
-      function invoke(self, argsLike) {
-          const isObj = (self !== null) && (typeof self === 'object' || typeof self === 'function');
-          const args = Array.isArray(argsLike) ? argsLike : Array.prototype.slice.call(argsLike);
-
-          if (guard && isObj) {
-              if (guard.has(self)) return orig.apply(self, args);
-              guard.add(self);
-          }
-
-          try {
-              if (typeof guardInstance === "function" && !guardInstance(proto, self))
-                  return orig.apply(self, args);
-
-              if (isPostOrigOnceMode) {
-                  const out = orig.apply(self, args);
-                  for (const hook of hooks) {
-                      if (typeof hook !== 'function') continue;
-                      try {
-                          hook.apply(self, [forbidOrigCall, ...args, out]);
-                      } catch (e) {
-                          emitContextDiag('error', 'context:webgl:hook:post_failed', e, {
-                            stage: 'hook',
-                            surface: 'webgl',
-                            key: method,
-                            data: { hook: hook.name || 'anon' }
-                          });
-                          emitWebGLMonitor({
-                            eventType: 'hook_error',
-                            method: method,
-                            hook: hook.name || 'anon',
-                            stage: 'hook',
-                            message: '[patchMethod] hook error',
-                            args: args,
-                            result: out,
-                            error: e,
-                            extra: { mode: 'post_orig_once', surface: 'webgl' }
-                          });
-                          throw e;
-                      }
-                  }
-                  emitWebGLAccess(method, args, out, {
-                    source: 'native_post_orig_once'
-                  });
-                  return out;
-              }
-
-              let patched = args;
-              for (const hook of hooks) {
-                  if (typeof hook !== 'function') continue;
-                  try {
-                      const res = hook.apply(self, [orig, ...patched]);
-
-                      // override logging (TOGGLED)
-                      if (res !== undefined && !Array.isArray(res)) {
-                          emitWebGLAccess(method, patched, res, {
-                            source: 'override',
-                            hook: hook.name || 'anon'
-                          });
-                          const webglLoggerGate =
-                            !(__loggerRoot && __loggerRoot._logConfig && __loggerRoot._logConfig.WEBGLlogger === false);
-
-                          if ((__loggerRoot && __loggerRoot.__DEBUG__) && webglLoggerGate) {
-                              if (WEBGL_OVERRIDE_DIAG_LOG) {
-                                emitContextDiag('debug', 'context:webgl:hook:override', null, {
-                                  stage: 'hook',
-                                  surface: 'webgl',
-                                  key: method,
-                                  data: { hook: hook.name || 'anon' }
-                                });
-                              }
-                              if (WEBGL_OVERRIDE_CONSOLE_LOG) {
-                                emitWebGLMonitor({
-                                  eventType: 'override',
-                                  method: method,
-                                  hook: hook.name || 'anon',
-                                  stage: 'hook',
-                                  message: '[patchMethod override]',
-                                  args: patched,
-                                  result: res,
-                                  extra: { surface: 'webgl' }
-                                });
-                              }
-                          }
-
-                          return res; // result substitution
-                      }
-
-                      // argument substitution
-                      if (Array.isArray(res)) {
-                          patched = res;
-                          continue;
-                      }
-
-                   } catch (e) {
-                        emitContextDiag('error', 'context:webgl:hook:failed', e, {
-                          stage: 'hook',
-                          surface: 'webgl',
-                          key: method,
-                          data: { hook: hook.name || 'anon' }
-                        });
-                        emitWebGLMonitor({
-                          eventType: 'hook_error',
-                          method: method,
-                          hook: hook.name || 'anon',
-                          stage: 'hook',
-                          message: '[patchMethod] hook error',
-                          args: patched,
-                          error: e,
-                          extra: { mode: 'override_or_args', surface: 'webgl' }
-                        });
-                        throw e;
-                   }
-               }
-              const out = orig.apply(self, patched);
-              emitWebGLAccess(method, patched, out, {
-                source: 'native'
-              });
-              return out;
-
-          } finally {
-              if (guard && isObj) guard.delete(self);
-          }
-      }
-
-      const wrappedRaw = (function(){
-          switch (orig.length) {
-              case 0: return ({ [method]() { return invoke(this, arguments); } })[method];
-              case 1: return ({ [method](a0) { return invoke(this, arguments); } })[method];
-              case 2: return ({ [method](a0, a1) { return invoke(this, arguments); } })[method];
-              case 7: return ({ [method](a0, a1, a2, a3, a4, a5, a6) { return invoke(this, arguments); } })[method];
-              default: return ({ [method](...a) { return invoke(this, a); } })[method];
-          }
-      })();
-
-      Object.defineProperty(wrappedRaw, '__coreBridgeTarget__', {
-        value: orig,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      const wrapped = markAsNative(wrappedRaw, method);
-      if ((__loggerRoot && __loggerRoot.__DEBUG__) && (method === 'getParameter' || method === 'readPixels')) {
-        emitContextDiag('info', 'context:webgl:wrapLayer:selected', null, {
-          stage: 'apply',
-          surface: 'webgl',
-          key: method,
-          data: { wrapLayer: 'named_wrapper', wrapperClass: 'synthetic_named' }
-        });
-      }
-
-      definePatchedMethod(proto, method, wrapped, { wrapLayer: 'named_wrapper', policy: 'throw' });
-      patchedMethods.add(wrapped);
-
-      return true;
-    }
-
-  function chainAsync(proto, method, hooksGetter){
-    if (!proto || typeof proto[method] !== 'function') return false;
-    const current = proto[method];
-    if (patchedMethods.has(current)) return false;
-    const orig = resolveKeptNative(proto, method) || current;
-
-    const getHooksList = () => (typeof hooksGetter === 'function') ? hooksGetter() : [];
-    const applyHooksAsync = async (self, blob, hookArgs) => {
-      let b = blob;
-      const hooks = getHooksList();
-      if (!(hooks && hooks.length)) return b;
-
-      for (const hook of hooks) {
-        if (typeof hook !== 'function') continue;
-        try {
-          const r = hook.call(self, b, ...(hookArgs || []));
-          const out = (r && typeof r.then === 'function') ? await r : r;
-          if (out instanceof Blob) b = out;
-        } catch (e) {
-          // soft-fail: keep native contract, but not silent-swallow
-          try {
-            emitContextDiag('error', 'context:chain:hook:post_failed', e, {
-              key: method,
-              stage: 'hook',
-              data: { hook: hook && (hook.name || null) }
-            });
-          } catch (_e) {
-            emitWebGLMonitor({
-              eventType: 'hook_error',
-              method: method,
-              hook: hook && (hook.name || ''),
-              stage: 'hook',
-              message: '[chainAsync][hook_failed]',
-              error: e,
-              extra: { mode: 'chainAsync' }
-            });
-          }
-          // keep b unchanged
-        }
-      }
-      return b;
-    };
-
-     if (method === 'toBlob') {
-       const wrapped = ({ toBlob(callback, type, quality) {
-         const self = this;
-         const args = arguments;
-         if (typeof callback === 'function') {
-          const done = (blob) => {
-            let out;
-            try {
-              out = applyHooksAsync(self, blob, args);
-            } catch (e) {
-              emitContextDiag('warn', 'context:chainAsync:hook_failed', e, {
-                stage: 'hook',
-                key: method
-              });
-              callback(blob);
-              return;
-            }
-
-            if (out && typeof out.then === 'function') {
-              out.then(
-                (b2) => { callback(b2); },
-                (e)  => {
-                  emitContextDiag('warn', 'context:chainAsync:hook_failed', e, {
-                    stage: 'hook',
-                    key: method
-                  });
-                  callback(blob);
-                }
-              );
-              return;
-            }
-
-            callback(out);
-          };
-
-          try {
-            return Reflect.apply(orig, self, [done].concat(Array.prototype.slice.call(args, 1)));
-          } catch (e) {
-            throw e;
-          }
-         }
-         // 2026-02-11: keep native contract - toBlob without callback returns undefined.
-         return Reflect.apply(orig, self, args);
-       } }).toBlob;
-       Object.defineProperty(wrapped, '__coreBridgeTarget__', {
-         value: orig,
-         writable: true,
-         configurable: true,
-         enumerable: false
-       });
-       const patched = markAsNative(wrapped, method);
-       definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
-       patchedMethods.add(patched);
-       return true;
-     }
- 
-     if (method === 'convertToBlob') {
-       const wrapped = ({ convertToBlob(options) {
-         const self = this;
-         const args = arguments;
-        let p;
-        try {
-          p = Reflect.apply(orig, self, args);
-        } catch (e) {
-          throw e;
-        }
-
-        if (!(p && typeof p.then === 'function')) {
-          return p;
-        }
-
-        const hooks = getHooksList();
-        if (!(hooks && hooks.length)) {
-          return p;
-        }
-
-        return p.then(
-          (blob) => {
-            const out = applyHooksAsync(self, blob, args);
-            return Promise.resolve(out).then(
-              (b2) => { return b2; },
-              (e)  => { throw e; }
-            );
-          },
-          (e) => { throw e; }
-        );
-      } }).convertToBlob;
-       Object.defineProperty(wrapped, '__coreBridgeTarget__', {
-         value: orig,
-         writable: true,
-         configurable: true,
-         enumerable: false
-       });
-       const patched = markAsNative(wrapped, method);
-       definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
-       patchedMethods.add(patched);
-       return true;
-     }
-
-    const wrapped = ({ [method]() {
-      const self = this;
-      const args = arguments;
-      const p = Reflect.apply(orig, self, args);
-      if (!(p && typeof p.then === 'function')) return p;
-      const hooks = getHooksList();
-      if (!(hooks && hooks.length)) return p;
-      return p.then((blob) => {
-        return Promise.resolve(applyHooksAsync(self, blob, args))
-          .catch((e) => {
-            try {
-              emitContextDiag('error', 'context:chain:hook:post_failed', e, {
-                key: method,
-                stage: 'hook',
-                data: { hook: 'applyHooksAsync' }
-              });
-            } catch (_e) {}
-            return blob; // fallback
-          });
-      });
-    } })[method];
-    Object.defineProperty(wrapped, '__coreBridgeTarget__', {
-      value: orig,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-    const patched = markAsNative(wrapped, method);
-    definePatchedMethod(proto, method, patched, { wrapLayer: 'named_wrapper', policy: 'throw' });
-    patchedMethods.add(patched);
-    return true;
-  }
+  // ===== WEBGL issued override logging: two toggles (ВКЛ/ВЫКЛ) =====
+  // Эти тумблеры влияют ТОЛЬКО на issued override logging в working path.
+  // Standard access logging goes through context:webgl:access in __DEGRADE__.
+  // Второй тумблер оставлен выключенным: отдельный auxiliary monitor-path сейчас не нужен.
+  const WEBGL_OVERRIDE_DIAG_LOG    = true;  // true=ВКЛ, false=ВЫКЛ (__DEGRADE__.diag для issued override)
+  const WEBGL_OVERRIDE_LOG = false; // true=ВКЛ, false=ВЫКЛ (auxiliary monitor path for override)
 
   function installIssuedSerializationMethods(owner) {
     if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return 0;
@@ -1230,28 +730,98 @@ const ContextPatchModule = function ContextPatchModule(window) {
   }
 
   function installIssuedWebGLMethods(ctx) {
-    if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) return 0;
-    if (issuedWebGLPatchedContexts && issuedWebGLPatchedContexts.has(ctx)) return 0;
+    if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) {
+      emitContextDiag('warn', 'context:issued_webgl:preflight:ctx_missing', null, {
+        module: 'webgl',
+        stage: 'preflight',
+        surface: 'webgl',
+        key: 'installIssuedWebGLMethods',
+        type: 'browser structure missing data',
+        message: 'issued webgl ctx is not defined',
+        data: { reason: 'ctx_missing', path: 'issued' }
+      });
+      return 0;
+    }
+    if (issuedWebGLPatchedContexts && issuedWebGLPatchedContexts.has(ctx)) {
+      emitContextDiag('info', 'context:issued_webgl:apply:already_patched', null, {
+        module: 'webgl',
+        stage: 'apply',
+        surface: 'webgl',
+        key: 'installIssuedWebGLMethods',
+        type: 'pipeline missing data',
+        message: 'issued webgl context already patched',
+        data: { reason: 'context_already_patched', path: 'issued' }
+      });
+      return 0;
+    }
     const proto =
       (typeof WebGLRenderingContext !== 'undefined' && ctx instanceof WebGLRenderingContext)
         ? WebGLRenderingContext.prototype
         : ((typeof WebGL2RenderingContext !== 'undefined' && ctx instanceof WebGL2RenderingContext)
             ? WebGL2RenderingContext.prototype
             : null);
-    if (!proto) return 0;
+    if (!proto) {
+      emitContextDiag('warn', 'context:issued_webgl:preflight:proto_rejected', null, {
+        module: 'webgl',
+        stage: 'preflight',
+        surface: 'webgl',
+        key: 'installIssuedWebGLMethods',
+        type: 'browser structure missing data',
+        message: 'issued webgl proto rejected',
+        data: { reason: 'proto_rejected', path: 'issued' }
+      });
+      return 0;
+    }
 
     const methodPlan = [
       ['getParameter', C.webglGetParameterHooks],
       ['getSupportedExtensions', C.webglGetSupportedExtensionsHooks],
       ['getExtension', C.webglGetExtensionHooks],
-      ['readPixels', C.webglReadPixelsHooks]
+      ['readPixels', C.webglReadPixelsHooks],
+      ['getShaderPrecisionFormat', C.webglGetShaderPrecisionFormatHooks],
+      ['shaderSource', C.webglShaderSourceHooks],
+      ['getUniform', C.webglGetUniformHooks]
     ];
     let applied = 0;
 
     for (const [method, hooks] of methodPlan) {
-      if (Object.prototype.hasOwnProperty.call(ctx, method)) continue;
+      if (Object.prototype.hasOwnProperty.call(ctx, method)) {
+        emitContextDiag('info', 'context:issued_webgl:apply:already_patched', null, {
+          module: 'webgl',
+          stage: 'apply',
+          surface: 'webgl',
+          key: method,
+          type: 'pipeline missing data',
+          message: 'issued webgl method already patched',
+          data: { reason: 'issued_own_method_present', path: 'issued' }
+        });
+        continue;
+      }
+      if (!hooks?.length) {
+        emitContextDiag('warn', 'context:issued_webgl:preflight:hooks_missing', null, {
+          module: 'webgl',
+          stage: 'preflight',
+          surface: 'webgl',
+          key: method,
+          type: 'pipeline missing data',
+          message: 'issued webgl hooks missing',
+          data: { reason: 'hooks_missing', path: 'issued' }
+        });
+        continue;
+      }
       const orig = resolveKeptNative(proto, method) || proto[method];
-      if (typeof orig !== 'function') continue;
+      if (typeof orig !== 'function') {
+        emitContextDiag('warn', 'context:issued_webgl:preflight:proto_missing', null, {
+          module: 'webgl',
+          stage: 'preflight',
+          surface: 'webgl',
+          key: method,
+          type: 'browser structure missing data',
+          message: 'issued webgl proto method is not defined',
+          data: { reason: 'proto_missing', path: 'issued' }
+        });
+        continue;
+      }
       const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
       const hookMode = (hooks && (typeof hooks === 'object' || typeof hooks === 'function')) ? hooks.mode : undefined;
       const isPostOrigOnceMode = hookMode === HOOK_MODE_POST_ORIG_ONCE;
@@ -1279,10 +849,18 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 hook.apply(self, [forbidOrigCall, ...args, out]);
               } catch (e) {
                 emitContextDiag('error', 'context:issued_webgl:hook:post_failed', e, {
+                  module: 'webgl',
                   stage: 'hook',
                   surface: 'webgl',
                   key: method,
-                  data: { hook: hook.name || 'anon' }
+                  message: 'issued webgl post-orig hook failed',
+                  data: {
+                    hook: hook.name || 'anon',
+                    mode: 'post_orig_once',
+                    path: 'issued',
+                    args: args,
+                    result: out
+                  }
                 });
                 throw e;
               }
@@ -1303,6 +881,37 @@ const ContextPatchModule = function ContextPatchModule(window) {
                   source: 'issued_override',
                   hook: hook.name || 'anon'
                 });
+                const webglLoggerGate =
+                  !(__loggerRoot && __loggerRoot._logConfig && __loggerRoot._logConfig.WEBGLlogger === false);
+                if ((__loggerRoot && __loggerRoot.__DEBUG__) && webglLoggerGate) {
+                  if (WEBGL_OVERRIDE_DIAG_LOG) {
+                    emitContextDiag('debug', 'context:issued_webgl:hook:override', null, {
+                      module: 'webgl',
+                      stage: 'hook',
+                      surface: 'webgl',
+                      key: method,
+                      message: 'issued webgl override',
+                      data: {
+                        hook: hook.name || 'anon',
+                        path: 'issued',
+                        args: patched,
+                        result: res
+                      }
+                    });
+                  }
+                  if (WEBGL_OVERRIDE_LOG) {
+                    emitWebGLMonitor({
+                      eventType: 'override',
+                      method: method,
+                      hook: hook.name || 'anon',
+                      stage: 'hook',
+                      message: '[installIssuedWebGLMethods override]',
+                      args: patched,
+                      result: res,
+                      extra: { surface: 'webgl', path: 'issued' }
+                    });
+                  }
+                }
                 return res;
               }
               if (Array.isArray(res)) {
@@ -1310,10 +919,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
               }
             } catch (e) {
               emitContextDiag('error', 'context:issued_webgl:hook:failed', e, {
+                module: 'webgl',
                 stage: 'hook',
                 surface: 'webgl',
                 key: method,
-                data: { hook: hook.name || 'anon' }
+                message: 'issued webgl hook failed',
+                data: {
+                  hook: hook.name || 'anon',
+                  mode: 'override_or_args',
+                  path: 'issued',
+                  args: patched
+                }
               });
               throw e;
             }
@@ -1811,6 +1427,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
   }
 
   // === 5. getContext interception for HTMLCanvasElement/OffscreenCanvas ===
+  /* TEMP DEAD CODE: not wired in current execution path.
   function chainGetContext(proto, method, htmlHooks, ctx2dHooks, webglHooks){
     if (!proto || typeof proto[method] !== 'function') return false;
     captureKeepNativeRefs();
@@ -1889,6 +1506,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     patchedMethods.add(patched);
     return true;
   }
+  */
 
   // === 6. applying of patches===
   C.applyCanvasElementPatches = function(){
