@@ -192,16 +192,16 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const SCREEN_HEIGHT = Number(window.__HEIGHT);
   const COLOR_DEPTH   = Number(window.__COLOR_DEPTH);
   const DPR           = Number(window.__DPR);
-  const PHYSICAL_SCREEN_WIDTH = Number(
-    (__screenProfile && __screenProfile.physical_screen_width != null)
-      ? __screenProfile.physical_screen_width
-      : NaN
-  );
-  const PHYSICAL_SCREEN_HEIGHT = Number(
-    (__screenProfile && __screenProfile.physical_screen_height != null)
-      ? __screenProfile.physical_screen_height
-      : NaN
-  );
+  const PHYSICAL_SCREEN_WIDTH = (
+    Number.isFinite(SCREEN_WIDTH) &&
+    Number.isFinite(DPR) &&
+    DPR > 0
+  ) ? Math.round(SCREEN_WIDTH * DPR) : NaN;
+  const PHYSICAL_SCREEN_HEIGHT = (
+    Number.isFinite(SCREEN_HEIGHT) &&
+    Number.isFinite(DPR) &&
+    DPR > 0
+  ) ? Math.round(SCREEN_HEIGHT * DPR) : NaN;
 
   try {
   if (!Number.isFinite(SCREEN_WIDTH) || !Number.isFinite(SCREEN_HEIGHT)) {
@@ -213,19 +213,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!Number.isFinite(DPR) || DPR <= 0) {
     throw new Error('bad dpr');
   }
-  if (Number.isFinite(PHYSICAL_SCREEN_WIDTH) || Number.isFinite(PHYSICAL_SCREEN_HEIGHT)) {
-    if (
-      !Number.isFinite(PHYSICAL_SCREEN_WIDTH) || PHYSICAL_SCREEN_WIDTH <= 0 ||
-      !Number.isFinite(PHYSICAL_SCREEN_HEIGHT) || PHYSICAL_SCREEN_HEIGHT <= 0
-    ) {
-      throw new Error('bad physical width/height');
-    }
-    if (
-      Math.round(SCREEN_WIDTH * DPR) !== PHYSICAL_SCREEN_WIDTH ||
-      Math.round(SCREEN_HEIGHT * DPR) !== PHYSICAL_SCREEN_HEIGHT
-    ) {
-      throw new Error('inconsistent physical width/height');
-    }
+  if (
+    !Number.isFinite(PHYSICAL_SCREEN_WIDTH) || PHYSICAL_SCREEN_WIDTH <= 0 ||
+    !Number.isFinite(PHYSICAL_SCREEN_HEIGHT) || PHYSICAL_SCREEN_HEIGHT <= 0
+  ) {
+    throw new Error('bad derived physical width/height');
   }
 
   // Avoid hardcoded numeric literals for the constant zeros/ones used by layout offsets.

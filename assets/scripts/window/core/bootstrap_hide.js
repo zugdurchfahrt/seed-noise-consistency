@@ -350,14 +350,6 @@ function __ensureGeoTransitState__() {
       enumerable: false
     });
   }
-  if (C.__GEO_STATE__ !== state) {
-    Object.defineProperty(C, '__GEO_STATE__', {
-      value: state,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
   return state;
 }
 
@@ -370,14 +362,6 @@ function __ensureLangTransitState__() {
     state.primaryLanguage = null;
     state.normalizedLanguages = null;
     Object.defineProperty(stateRoot, '__LANG_STATE__', {
-      value: state,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-  }
-  if (C.__LANG_STATE__ !== state) {
-    Object.defineProperty(C, '__LANG_STATE__', {
       value: state,
       writable: true,
       configurable: true,
@@ -508,7 +492,7 @@ if (__langMissingKeys__.length === 0) {
     __langTransitState__.normalizedLanguages.length === 0 ||
     __langTransitState__.normalizedLanguages[0] !== __langTransitState__.primaryLanguage
   ) {
-    throw new Error('[module] CanvasPatchContext.__LANG_STATE__ bootstrap invalid');
+    throw new Error('[module] CanvasPatchContext.state.__LANG_STATE__ bootstrap invalid');
   }
   __setBootstrapTransferStatus__('lang', true, 'owner_ready', { source: 'window_transit' });
 } else {
@@ -551,17 +535,43 @@ const __screenState = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === '
 __envProfileState__.orientationDom = (__screenState && typeof __screenState.orientationDom === 'string' && __screenState.orientationDom)
   ? __screenState.orientationDom
   : (((__envProfileState__.height >= __envProfileState__.width)) ? 'portrait-primary' : 'landscape-primary');
-__envProfileState__.profile = Object.create(null);
-__envProfileState__.profile.physical_screen_width = (
+__envProfileState__.profile = (__envProfileState__.profile && typeof __envProfileState__.profile === 'object')
+  ? __envProfileState__.profile
+  : Object.create(null);
+const __envDerivedPhysicalScreenWidth = (
   __isFiniteNumber__(__envProfileState__.width) &&
   __isFiniteNumber__(__envProfileState__.dpr) &&
   __envProfileState__.dpr > 0
 ) ? Math.round(__envProfileState__.width * __envProfileState__.dpr) : null;
-__envProfileState__.profile.physical_screen_height = (
+const __envDerivedPhysicalScreenHeight = (
   __isFiniteNumber__(__envProfileState__.height) &&
   __isFiniteNumber__(__envProfileState__.dpr) &&
   __envProfileState__.dpr > 0
 ) ? Math.round(__envProfileState__.height * __envProfileState__.dpr) : null;
+const __envProfileHadPhysicalWidth = Object.prototype.hasOwnProperty.call(__envProfileState__.profile, 'physical_screen_width');
+const __envProfileHadPhysicalHeight = Object.prototype.hasOwnProperty.call(__envProfileState__.profile, 'physical_screen_height');
+if (__envProfileHadPhysicalWidth || __envProfileHadPhysicalHeight) {
+  const __envProfilePhysicalWidth = Number(__envProfileState__.profile.physical_screen_width);
+  const __envProfilePhysicalHeight = Number(__envProfileState__.profile.physical_screen_height);
+  if (
+    !__isFiniteNumber__(__envDerivedPhysicalScreenWidth) ||
+    !__isFiniteNumber__(__envDerivedPhysicalScreenHeight) ||
+    !__isFiniteNumber__(__envProfilePhysicalWidth) ||
+    !__isFiniteNumber__(__envProfilePhysicalHeight) ||
+    __envProfilePhysicalWidth !== __envDerivedPhysicalScreenWidth ||
+    __envProfilePhysicalHeight !== __envDerivedPhysicalScreenHeight
+  ) {
+    throw new Error('[module] CanvasPatchContext.state.__ENV_PROFILE__.profile.physical_screen_* overlap invalid');
+  }
+}
+if (__envProfileHadPhysicalWidth) delete __envProfileState__.profile.physical_screen_width;
+if (__envProfileHadPhysicalHeight) delete __envProfileState__.profile.physical_screen_height;
+if (
+  Object.prototype.hasOwnProperty.call(__envProfileState__.profile, 'physical_screen_width') ||
+  Object.prototype.hasOwnProperty.call(__envProfileState__.profile, 'physical_screen_height')
+) {
+  throw new Error('[module] CanvasPatchContext.state.__ENV_PROFILE__.profile.physical_screen_* overlap cleanup failed');
+}
 __envProfileState__.strict = (W.__NAV_PATCH_STRICT__ !== undefined) ? !!W.__NAV_PATCH_STRICT__ : true;
 __envProfileState__.debug = !!W.__NAV_PATCH_DEBUG__;
 __envProfileState__.fullVersionList = __cloneProfileValue__(W.__FULL_VERSION_LIST);

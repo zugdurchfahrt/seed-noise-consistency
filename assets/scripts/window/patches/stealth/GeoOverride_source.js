@@ -304,27 +304,7 @@
     const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
     if (stateRoot && Object.prototype.hasOwnProperty.call(stateRoot, '__GEO_STATE__')) {
       const shared = (stateRoot.__GEO_STATE__ && typeof stateRoot.__GEO_STATE__ === 'object') ? stateRoot.__GEO_STATE__ : null;
-      if (shared && C.__GEO_STATE__ !== shared) {
-        Object.defineProperty(C, '__GEO_STATE__', {
-          value: shared,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      }
       return shared;
-    }
-    if (Object.prototype.hasOwnProperty.call(C, '__GEO_STATE__')) {
-      const existing = (C.__GEO_STATE__ && typeof C.__GEO_STATE__ === 'object') ? C.__GEO_STATE__ : null;
-      if (existing && stateRoot && stateRoot.__GEO_STATE__ !== existing) {
-        Object.defineProperty(stateRoot, '__GEO_STATE__', {
-          value: existing,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      }
-      return existing;
     }
     const state = {
       latitude: null,
@@ -340,12 +320,6 @@
         enumerable: false
       });
     }
-    Object.defineProperty(C, '__GEO_STATE__', {
-      value: state,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
     return state;
   }
 

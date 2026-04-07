@@ -339,16 +339,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const dpr           = Number(__envProfileState.dpr);
     const width         = Number(__envProfileState.width);
     const height        = Number(__envProfileState.height);
-    const physicalWidth = Number(
-      (__envProfileState.profile && __envProfileState.profile.physical_screen_width != null)
-        ? __envProfileState.profile.physical_screen_width
-        : NaN
-    );
-    const physicalHeight = Number(
-      (__envProfileState.profile && __envProfileState.profile.physical_screen_height != null)
-        ? __envProfileState.profile.physical_screen_height
-        : NaN
-    );
+    const physicalWidth = (
+      Number.isFinite(width) &&
+      Number.isFinite(dpr) &&
+      dpr > 0
+    ) ? Math.round(width * dpr) : NaN;
+    const physicalHeight = (
+      Number.isFinite(height) &&
+      Number.isFinite(dpr) &&
+      dpr > 0
+    ) ? Math.round(height * dpr) : NaN;
     const devicesLabels = __navCloneStateValue(__envProfileState.devicesLabels);
     const colorDepth    = Number(__envProfileState.colorDepth);
     const orientationDom = (typeof __envProfileState.orientationDom !== 'undefined')
@@ -560,30 +560,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'bad_dpr');
       return;
     }
-    if (Number.isFinite(physicalWidth) || Number.isFinite(physicalHeight)) {
-      if (
-        !Number.isFinite(physicalWidth) || physicalWidth <= 0 ||
-        !Number.isFinite(physicalHeight) || physicalHeight <= 0 ||
-        Math.round(width * dpr) !== physicalWidth ||
-        Math.round(height * dpr) !== physicalHeight
-      ) {
-        __navDiagPipeline('error', 'nav_total_set:bad_physical_screen_metrics', {
-          stage: 'preflight',
-          key: 'CanvasPatchContext.state.__ENV_PROFILE__.profile',
-          message: 'bad physical screen metrics',
-          data: {
-            outcome: 'skip',
-            reason: 'bad_physical_screen_metrics',
-            width: width,
-            height: height,
-            dpr: dpr,
-            physicalWidth: physicalWidth,
-            physicalHeight: physicalHeight
-          }
-        });
-        __navReleaseEntryGuard(true, 'preflight', 'bad_physical_screen_metrics');
-        return;
-      }
+    if (
+      !Number.isFinite(physicalWidth) || physicalWidth <= 0 ||
+      !Number.isFinite(physicalHeight) || physicalHeight <= 0
+    ) {
+      __navDiagPipeline('error', 'nav_total_set:bad_derived_physical_screen_metrics', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__ENV_PROFILE__.width/height/dpr',
+        message: 'bad derived physical screen metrics',
+        data: {
+          outcome: 'skip',
+          reason: 'bad_derived_physical_screen_metrics',
+          width: width,
+          height: height,
+          dpr: dpr,
+          physicalWidth: physicalWidth,
+          physicalHeight: physicalHeight
+        }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'bad_derived_physical_screen_metrics');
+      return;
     }
 
     // --- Navigator patch registry + logging (filter noise) ---

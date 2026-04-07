@@ -49,22 +49,19 @@ const __canvasStateRoot = (C && C.state && typeof C.state === 'object') ? C.stat
 const __canvasEnvProfile = (__canvasStateRoot && __canvasStateRoot.__ENV_PROFILE__ && typeof __canvasStateRoot.__ENV_PROFILE__ === 'object')
   ? __canvasStateRoot.__ENV_PROFILE__
   : null;
-const __canvasProfile = (__canvasEnvProfile && __canvasEnvProfile.profile && typeof __canvasEnvProfile.profile === 'object')
-  ? __canvasEnvProfile.profile
-  : null;
-const __canvasScreenWidth = Number(G.__WIDTH);
-const __canvasScreenHeight = Number(G.__HEIGHT);
-const __canvasDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : NaN;
-const __canvasPhysicalScreenWidth = Number(
-  (__canvasProfile && __canvasProfile.physical_screen_width != null)
-    ? __canvasProfile.physical_screen_width
-    : NaN
-);
-const __canvasPhysicalScreenHeight = Number(
-  (__canvasProfile && __canvasProfile.physical_screen_height != null)
-    ? __canvasProfile.physical_screen_height
-    : NaN
-);
+const __canvasScreenWidth = Number((__canvasEnvProfile && __canvasEnvProfile.width != null) ? __canvasEnvProfile.width : G.__WIDTH);
+const __canvasScreenHeight = Number((__canvasEnvProfile && __canvasEnvProfile.height != null) ? __canvasEnvProfile.height : G.__HEIGHT);
+const __canvasDpr = Number((__canvasEnvProfile && __canvasEnvProfile.dpr != null) ? __canvasEnvProfile.dpr : G.__DPR);
+const __canvasPhysicalScreenWidth = (
+  Number.isFinite(__canvasScreenWidth) &&
+  Number.isFinite(__canvasDpr) &&
+  __canvasDpr > 0
+) ? Math.round(__canvasScreenWidth * __canvasDpr) : NaN;
+const __canvasPhysicalScreenHeight = (
+  Number.isFinite(__canvasScreenHeight) &&
+  Number.isFinite(__canvasDpr) &&
+  __canvasDpr > 0
+) ? Math.round(__canvasScreenHeight * __canvasDpr) : NaN;
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
     const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
@@ -90,22 +87,19 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   if (
     Number.isFinite(__canvasScreenWidth) &&
     Number.isFinite(__canvasScreenHeight) &&
-    Number.isFinite(__canvasDpr) &&
-    (Number.isFinite(__canvasPhysicalScreenWidth) || Number.isFinite(__canvasPhysicalScreenHeight))
+    Number.isFinite(__canvasDpr)
   ) {
     if (
-      !Number.isFinite(__canvasPhysicalScreenWidth) ||
-      !Number.isFinite(__canvasPhysicalScreenHeight) ||
-      Math.round(__canvasScreenWidth * __canvasDpr) !== __canvasPhysicalScreenWidth ||
-      Math.round(__canvasScreenHeight * __canvasDpr) !== __canvasPhysicalScreenHeight
+      !Number.isFinite(__canvasPhysicalScreenWidth) || __canvasPhysicalScreenWidth <= 0 ||
+      !Number.isFinite(__canvasPhysicalScreenHeight) || __canvasPhysicalScreenHeight <= 0
     ) {
-      emitCanvasDiag('warn', 'canvas:init:preflight:physical_screen_metrics_mismatch', null, {
+      emitCanvasDiag('warn', 'canvas:init:preflight:derived_physical_screen_metrics_invalid', null, {
         stage: 'preflight',
-        key: '__ENV_PROFILE__.profile.physical_screen_*',
-        message: 'physical screen metrics mismatch',
+        key: '__ENV_PROFILE__.width/__ENV_PROFILE__.height/__ENV_PROFILE__.dpr',
+        message: 'derived physical screen metrics invalid',
         data: {
           outcome: 'skip',
-          reason: 'physical_screen_metrics_mismatch',
+          reason: 'derived_physical_screen_metrics_invalid',
           width: __canvasScreenWidth,
           height: __canvasScreenHeight,
           dpr: __canvasDpr,
