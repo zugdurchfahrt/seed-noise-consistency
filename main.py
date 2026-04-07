@@ -261,11 +261,11 @@ def init_driver(
     chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
     chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
     chrome_options.add_argument("--remote-allow-origins=*")
-    chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
+    # chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-features=AsyncDNS")
-    if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
-        chrome_options.add_argument("--auto-open-devtools-for-tabs")
+    # chrome_options.add_argument("--disable-features=AsyncDNS")
+    # if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
+    #     chrome_options.add_argument("--auto-open-devtools-for-tabs")
     chrome_options.binary_location = CHROME_BINARY
     driver = uc.Chrome(
         driver_executable_path=CHROMEDRIVER_PATH,
@@ -711,7 +711,6 @@ def init_driver(
         
     # headers_window_js = f"""
     # window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
-    # console.log("[headers_stage] window.__HEADERS__ injected (safelisted only)");
 
     # {Path(SCRIPTS_PATCHES_STEALTH / "headers_interceptor.js").read_text("utf-8")}
     # HeadersInterceptor(window);

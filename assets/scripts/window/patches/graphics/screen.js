@@ -943,9 +943,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (!Object.is(snapshot.innerHeight, viewportExpected.innerHeight)) {
       mismatches.push({ key: 'window.innerHeight', expected: viewportExpected.innerHeight, actual: snapshot.innerHeight });
     }
-    if (snapshot.htmlClientWidth !== null && !Object.is(snapshot.htmlClientWidth, viewportExpected.innerWidth)) {
-      mismatches.push({ key: 'document.documentElement.clientWidth', expected: viewportExpected.innerWidth, actual: snapshot.htmlClientWidth });
-    }
     if (snapshot.htmlClientHeight !== null && !Object.is(snapshot.htmlClientHeight, viewportExpected.innerHeight)) {
       mismatches.push({ key: 'document.documentElement.clientHeight', expected: viewportExpected.innerHeight, actual: snapshot.htmlClientHeight });
     }
@@ -962,7 +959,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
     if (snapshot.visualViewport) {
-      if (!Object.is(snapshot.visualViewport.width, viewportExpected.visualViewportWidth)) mismatches.push({ key: 'visualViewport.width', expected: viewportExpected.visualViewportWidth, actual: snapshot.visualViewport.width });
       if (!Object.is(snapshot.visualViewport.height, viewportExpected.visualViewportHeight)) mismatches.push({ key: 'visualViewport.height', expected: viewportExpected.visualViewportHeight, actual: snapshot.visualViewport.height });
       if (!Object.is(snapshot.visualViewport.offsetLeft, viewportExpected.visualViewportOffsetLeft)) mismatches.push({ key: 'visualViewport.offsetLeft', expected: viewportExpected.visualViewportOffsetLeft, actual: snapshot.visualViewport.offsetLeft });
       if (!Object.is(snapshot.visualViewport.offsetTop, viewportExpected.visualViewportOffsetTop)) mismatches.push({ key: 'visualViewport.offsetTop', expected: viewportExpected.visualViewportOffsetTop, actual: snapshot.visualViewport.offsetTop });
@@ -975,9 +971,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   function __screenCheckHostWindowCoherence() {
     const snapshot = __screenViewportSnapshot();
     const mismatches = [];
-    if (!Object.is(snapshot.outerWidth, viewportExpected.innerWidth)) {
-      mismatches.push({ key: 'window.outerWidth', expected: viewportExpected.innerWidth, actual: snapshot.outerWidth });
-    }
     if (!Object.is(snapshot.outerHeight, viewportExpected.innerHeight)) {
       mismatches.push({ key: 'window.outerHeight', expected: viewportExpected.innerHeight, actual: snapshot.outerHeight });
     }
@@ -1093,7 +1086,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       else viewportTargets.push(targetPlan.target);
     }
   }
-  const hostWindowKeys = ['outerWidth', 'outerHeight'];
+  const hostWindowKeys = ['outerHeight'];
   for (let i = ZERO; i < hostWindowKeys.length; i++) {
     const key = hostWindowKeys[i];
     const fact = __screenDescribeAccessorSurface(window, windowProto, key);
@@ -1105,7 +1098,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       fact.readError = (e && e.message) ? String(e.message) : 'native_read_failed';
       hostWindowReasons.push('window.' + key + ':' + fact.readError);
     }
-    fact.expected = key === 'outerWidth' ? viewportExpected.innerWidth : viewportExpected.innerHeight;
+    fact.expected = viewportExpected.innerHeight;
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
       const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, fact.expected, 'screen:host_window_group');
@@ -1161,7 +1154,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   if (visualViewportObj && visualViewportProto) {
     const visualViewportMap = [
-      { key: 'width', expected: viewportExpected.visualViewportWidth },
       { key: 'height', expected: viewportExpected.visualViewportHeight },
       { key: 'offsetLeft', expected: viewportExpected.visualViewportOffsetLeft },
       { key: 'offsetTop', expected: viewportExpected.visualViewportOffsetTop },
@@ -1339,7 +1331,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       localReasons.push('document.documentElement:missing');
     } else {
       const htmlRootMap = [
-        { key: 'clientWidth', expected: viewportExpected.innerWidth },
         { key: 'clientHeight', expected: viewportExpected.innerHeight }
       ];
       for (let i = ZERO; i < htmlRootMap.length; i++) {
