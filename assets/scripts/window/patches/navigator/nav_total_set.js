@@ -1335,10 +1335,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // Bucket: object-return identity surfaces.
     function patchObjectReturnAccessor(key, getter, diagTag) {
+      const isCriticalObjectReturnSurface = (key === 'plugins' || key === 'mimeTypes');
       const resolved = __navResolvePrototypeAccessorTarget(key, diagTag, {
         mode: 'proto_chain'
       });
-      if (!resolved || !resolved.owner || !resolved.desc) return false;
+      if (!resolved || !resolved.owner || !resolved.desc) {
+        if (isCriticalObjectReturnSurface) {
+          throw new TypeError('nav_total_set: critical object-return target missing for ' + key);
+        }
+        return false;
+      }
       const owner = resolved.owner;
       const d = resolved.desc;
       if (typeof getter !== 'function') {
@@ -1375,6 +1381,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: key + ' object-return accessor define failed',
           data: { outcome: 'throw', reason: 'apply_failed' }
         }, e);
+        if (isCriticalObjectReturnSurface) throw e;
         return false;
       }
       return true;
@@ -2951,28 +2958,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     });
 
     // ——— L. Plugins & MimeTypes ———
-    const profiles = Array.isArray(pluginProfiles) ? pluginProfiles : [];
+    (function applyPluginsAndMimeTypesSubgraph() {
+      const __navPluginsAppliedCheckpoint = __navModuleApplied.length;
+      const profiles = Array.isArray(pluginProfiles) ? pluginProfiles : [];
       function safeString(val) { return (typeof val === 'symbol' || typeof val === 'undefined') ? '' : String(val); }
-
-      const fakeMimeTypes = [];
-      profiles.forEach((pl, pi) =>
-        (pl.mimeTypes || []).forEach(mt => {
-          const d = (typeof mt === 'string') ? { type: mt, suffixes: '', description: '' } : mt;
-          fakeMimeTypes.push({
-            type:        safeString(d.type),
-            suffixes: safeString(d.suffixes ?? ''),
-            description: safeString(d.description ?? ''),
-            pluginIndex: pi
-          });
-        })
-      );
-
-      const fakePlugins = profiles.map((pl, i) => ({
-        name:        safeString(pl.name),
-        filename:    safeString(pl.filename),
-        description: safeString(pl.description),
-        mimeTypes:   fakeMimeTypes.filter(m => m.pluginIndex === i)
-      }));
+      function __navPluginsError(reason, message) {
+        const err = new Error(message);
+        err.__navPluginsReason = reason;
+        return err;
+      }
       let __navPluginsState = (__navModuleState.__PLUGINS_STATE__ && typeof __navModuleState.__PLUGINS_STATE__ === 'object')
         ? __navModuleState.__PLUGINS_STATE__
         : null;
@@ -2980,49 +2974,133 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         __navPluginsState = Object.create(null);
         __navSetHiddenStateValue(__navModuleState, '__PLUGINS_STATE__', __navPluginsState);
       }
-      __navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', fakePlugins);
-      const __navPluginArrayMeta = (__navPluginsState.__PLUGIN_ARRAY_META__ instanceof WeakMap)
-        ? __navPluginsState.__PLUGIN_ARRAY_META__
-        : new WeakMap();
-      const __navPluginMeta = (__navPluginsState.__PLUGIN_META__ instanceof WeakMap)
-        ? __navPluginsState.__PLUGIN_META__
-        : new WeakMap();
-      const __navMimeTypeArrayMeta = (__navPluginsState.__MIMETYPE_ARRAY_META__ instanceof WeakMap)
-        ? __navPluginsState.__MIMETYPE_ARRAY_META__
-        : new WeakMap();
-      const __navMimeTypeMeta = (__navPluginsState.__MIMETYPE_META__ instanceof WeakMap)
-        ? __navPluginsState.__MIMETYPE_META__
-        : new WeakMap();
-      __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', __navPluginArrayMeta);
-      __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_META__', __navPluginMeta);
-      __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_META__', __navMimeTypeArrayMeta);
-      __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_META__', __navMimeTypeMeta);
+      function __navResetPluginsHiddenState() {
+        __navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_META__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_META__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_META__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ITEM__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_NAMED_ITEM__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__MIME_OBJECTS_SINGLETON__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_SINGLETON__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__GET_MIMETYPES_VALUE__', null);
+        __navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', false);
+        __navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', false);
+      }
+      function __navRollbackPluginsSubgraph(reason, err) {
+        let rollbackErr = null;
+        for (let i = __navModuleApplied.length - 1; i >= __navPluginsAppliedCheckpoint; i--) {
+          const row = __navModuleApplied[i];
+          if (!row || !row.owner || typeof row.key !== 'string') continue;
+          try {
+            if (row.origDesc) Object.defineProperty(row.owner, row.key, row.origDesc);
+            else delete row.owner[row.key];
+          } catch (e) {
+            if (!rollbackErr) rollbackErr = e;
+            __navDiag('error', 'nav_total_set:plugins_rollback_failed', {
+              stage: 'rollback',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:plugins',
+              key: row.key,
+              message: 'plugins/mimeTypes rollback failed',
+              data: { outcome: 'rollback', reason: 'rollback_failed', sourceReason: reason || null }
+            }, e);
+          }
+          if (__navModuleAppliedOwners) {
+            const bucket = __navModuleAppliedOwners.get(row.owner);
+            if (bucket && typeof bucket.delete === 'function') bucket.delete(row.key);
+          }
+        }
+        __navModuleApplied.length = __navPluginsAppliedCheckpoint;
+        __navResetPluginsHiddenState();
+        if (rollbackErr) throw rollbackErr;
+        __navDiag('warn', 'nav_total_set:plugins_skipped', {
+          stage: 'rollback',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:plugins',
+          key: 'plugins',
+          message: 'plugins/mimeTypes subgraph rolled back to native path',
+          data: { outcome: 'skip', reason: reason || 'apply_failed', rollback: 'applied' }
+        }, err || null);
+      }
+      __navResetPluginsHiddenState();
 
-      // --- Caching (one instance per page) ---
-      const __navNativePluginItem = (typeof Plugin === 'function' && Plugin.prototype && typeof Plugin.prototype.item === 'function')
-        ? Plugin.prototype.item
-        : null;
-      const __navNativePluginNamedItem = (typeof Plugin === 'function' && Plugin.prototype && typeof Plugin.prototype.namedItem === 'function')
-        ? Plugin.prototype.namedItem
-        : null;
-      const __navNativePluginArrayItem = (typeof PluginArray === 'function' && PluginArray.prototype && typeof PluginArray.prototype.item === 'function')
-        ? PluginArray.prototype.item
-        : null;
-      const __navNativePluginArrayNamedItem = (typeof PluginArray === 'function' && PluginArray.prototype && typeof PluginArray.prototype.namedItem === 'function')
-        ? PluginArray.prototype.namedItem
-        : null;
-      const __navNativeMimeTypeArrayItem = (typeof MimeTypeArray === 'function' && MimeTypeArray.prototype && typeof MimeTypeArray.prototype.item === 'function')
-        ? MimeTypeArray.prototype.item
-        : null;
-      const __navNativeMimeTypeArrayNamedItem = (typeof MimeTypeArray === 'function' && MimeTypeArray.prototype && typeof MimeTypeArray.prototype.namedItem === 'function')
-        ? MimeTypeArray.prototype.namedItem
-        : null;
-      __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ITEM__', __navNativePluginItem);
-      __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_NAMED_ITEM__', __navNativePluginNamedItem);
-      __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', __navNativePluginArrayItem);
-      __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', __navNativePluginArrayNamedItem);
-      __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', __navNativeMimeTypeArrayItem);
-      __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', __navNativeMimeTypeArrayNamedItem);
+      const pluginProto = (typeof Plugin === 'function' && Plugin.prototype) ? Plugin.prototype : null;
+      const pluginArrayProto = (typeof PluginArray === 'function' && PluginArray.prototype) ? PluginArray.prototype : null;
+      const mimeProto = (typeof MimeType === 'function' && MimeType.prototype) ? MimeType.prototype : null;
+      const mimeTypeArrayProto = (typeof MimeTypeArray === 'function' && MimeTypeArray.prototype) ? MimeTypeArray.prototype : null;
+      if (
+        !pluginProto ||
+        !pluginArrayProto ||
+        !mimeProto ||
+        !mimeTypeArrayProto ||
+        !('plugins' in navigator) ||
+        !('mimeTypes' in navigator)
+      ) {
+        __navDiag('warn', 'nav_total_set:plugins_skipped', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:plugins',
+          key: 'plugins',
+          message: 'plugins/mimeTypes prerequisites missing',
+          data: {
+            outcome: 'skip',
+            reason: 'preflight_missing',
+            hasPluginProto: !!pluginProto,
+            hasPluginArrayProto: !!pluginArrayProto,
+            hasMimeProto: !!mimeProto,
+            hasMimeTypeArrayProto: !!mimeTypeArrayProto,
+            hasNavigatorPlugins: ('plugins' in navigator),
+            hasNavigatorMimeTypes: ('mimeTypes' in navigator)
+          }
+        });
+        return;
+      }
+
+      const fakePlugins = [];
+      let normalizedMimeCount = 0;
+      for (let i = 0; i < profiles.length; i++) {
+        const pl = profiles[i] && typeof profiles[i] === 'object' ? profiles[i] : Object.create(null);
+        const rawMimeTypes = Array.isArray(pl.mimeTypes) ? pl.mimeTypes : [];
+        const mimeTypes = [];
+        for (let j = 0; j < rawMimeTypes.length; j++) {
+          const mt = rawMimeTypes[j];
+          const d = (mt && typeof mt === 'object')
+            ? mt
+            : { type: mt, suffixes: '', description: '' };
+          mimeTypes.push({
+            type: safeString(d.type),
+            suffixes: safeString(d.suffixes == null ? '' : d.suffixes),
+            description: safeString(d.description == null ? '' : d.description)
+          });
+          normalizedMimeCount += 1;
+        }
+        fakePlugins.push({
+          name: safeString(pl.name),
+          filename: safeString(pl.filename),
+          description: safeString(pl.description),
+          mimeTypes: mimeTypes
+        });
+      }
+
+      const __navPluginArrayMeta = new WeakMap();
+      const __navPluginMeta = new WeakMap();
+      const __navMimeTypeArrayMeta = new WeakMap();
+      const __navMimeTypeMeta = new WeakMap();
+      const __navNativePluginItem = (typeof pluginProto.item === 'function') ? pluginProto.item : null;
+      const __navNativePluginNamedItem = (typeof pluginProto.namedItem === 'function') ? pluginProto.namedItem : null;
+      const __navNativePluginArrayItem = (typeof pluginArrayProto.item === 'function') ? pluginArrayProto.item : null;
+      const __navNativePluginArrayNamedItem = (typeof pluginArrayProto.namedItem === 'function') ? pluginArrayProto.namedItem : null;
+      const __navNativeMimeTypeArrayItem = (typeof mimeTypeArrayProto.item === 'function') ? mimeTypeArrayProto.item : null;
+      const __navNativeMimeTypeArrayNamedItem = (typeof mimeTypeArrayProto.namedItem === 'function') ? mimeTypeArrayProto.namedItem : null;
+      let __navCollectionsGraph = null;
       function __navResolveCollectionEntry(dict, key) {
         if (!dict || typeof dict !== 'object') return null;
         const normalizedKey = String(key);
@@ -3044,540 +3122,488 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (!receiver || (typeof receiver !== 'object' && typeof receiver !== 'function')) return null;
         return (__navMimeTypeArrayMeta instanceof WeakMap) ? (__navMimeTypeArrayMeta.get(receiver) || null) : null;
       }
-      function __navCallPluginsNative(nativeFn, thisArg, argsLike) {
-        if (typeof nativeFn !== 'function') return null;
-        const args = Array.prototype.slice.call(argsLike || []);
-        return Reflect.apply(nativeFn, thisArg, args);
-      }
-      let __navPluginProtoMethodsReady = (__navPluginsState.__PROTO_METHODS_READY__ === true);
-      if (!__navPluginProtoMethodsReady) {
-        const pluginProto = (typeof Plugin === 'function' && Plugin.prototype) ? Plugin.prototype : null;
-        const pluginArrayProto = (typeof PluginArray === 'function' && PluginArray.prototype) ? PluginArray.prototype : null;
-        const mimeTypeArrayProto = (typeof MimeTypeArray === 'function' && MimeTypeArray.prototype) ? MimeTypeArray.prototype : null;
-        const protoTargets = [];
-        if (pluginProto && typeof __navNativePluginItem === 'function') {
-          protoTargets.push({
-            owner: pluginProto,
-            key: 'item',
-            resolve: 'proto_chain',
-            kind: 'method',
-            wrapLayer: 'core_wrapper',
-            invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
-            policy: 'throw',
-            diagTag: 'nav_total_set:Plugin.item',
-            validThis(self) {
-              return !!__navGetPluginRecord(self);
-            },
-            invalidThis: 'native',
-            invoke(orig, args) {
-              const record = __navGetPluginRecord(this);
-              if (!record) return Reflect.apply(orig, this, args || []);
-              const index = (args && args.length) ? args[0] : undefined;
-              return __navResolveCollectionEntry(record.mimeByIndex, index);
-            }
-          });
-        }
-        if (pluginProto && typeof __navNativePluginNamedItem === 'function') {
-          protoTargets.push({
-            owner: pluginProto,
-            key: 'namedItem',
-            resolve: 'proto_chain',
-            kind: 'method',
-            wrapLayer: 'core_wrapper',
-            invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
-            policy: 'throw',
-            diagTag: 'nav_total_set:Plugin.namedItem',
-            validThis(self) {
-              return !!__navGetPluginRecord(self);
-            },
-            invalidThis: 'native',
-            invoke(orig, args) {
-              const record = __navGetPluginRecord(this);
-              if (!record) return Reflect.apply(orig, this, args || []);
-              const type = (args && args.length) ? args[0] : undefined;
-              return __navResolveCollectionEntry(record.mimeByType, type);
-            }
-          });
-        }
-        if (pluginArrayProto && typeof __navNativePluginArrayItem === 'function') {
-          protoTargets.push({
-            owner: pluginArrayProto,
-            key: 'item',
-            resolve: 'proto_chain',
-            kind: 'method',
-            wrapLayer: 'core_wrapper',
-            invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
-            policy: 'throw',
-            diagTag: 'nav_total_set:PluginArray.item',
-            validThis(self) {
-              return !!__navGetPluginArrayRecord(self);
-            },
-            invalidThis: 'native',
-            invoke(orig, args) {
-              const record = __navGetPluginArrayRecord(this);
-              if (!record) return Reflect.apply(orig, this, args || []);
-              const index = (args && args.length) ? args[0] : undefined;
-              return __navResolveCollectionEntry(record.pluginsByIndex, index);
-            }
-          });
-        }
-        if (pluginArrayProto && typeof __navNativePluginArrayNamedItem === 'function') {
-          protoTargets.push({
-            owner: pluginArrayProto,
-            key: 'namedItem',
-            resolve: 'proto_chain',
-            kind: 'method',
-            wrapLayer: 'core_wrapper',
-            invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
-            policy: 'throw',
-            diagTag: 'nav_total_set:PluginArray.namedItem',
-            validThis(self) {
-              return !!__navGetPluginArrayRecord(self);
-            },
-            invalidThis: 'native',
-            invoke(orig, args) {
-              const record = __navGetPluginArrayRecord(this);
-              if (!record) return Reflect.apply(orig, this, args || []);
-              const name = (args && args.length) ? args[0] : undefined;
-              return __navResolveCollectionEntry(record.pluginsByName, name);
-            }
-          });
-        }
-        if (mimeTypeArrayProto && typeof __navNativeMimeTypeArrayItem === 'function') {
-          protoTargets.push({
-            owner: mimeTypeArrayProto,
-            key: 'item',
-            resolve: 'proto_chain',
-            kind: 'method',
-            wrapLayer: 'core_wrapper',
-            invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
-            policy: 'throw',
-            diagTag: 'nav_total_set:MimeTypeArray.item',
-            validThis(self) {
-              return !!__navGetMimeTypeArrayRecord(self);
-            },
-            invalidThis: 'native',
-            invoke(orig, args) {
-              const record = __navGetMimeTypeArrayRecord(this);
-              if (!record) return Reflect.apply(orig, this, args || []);
-              const index = (args && args.length) ? args[0] : undefined;
-              return __navResolveCollectionEntry(record.mimeByIndex, index);
-            }
-          });
-        }
-        if (mimeTypeArrayProto && typeof __navNativeMimeTypeArrayNamedItem === 'function') {
-          protoTargets.push({
-            owner: mimeTypeArrayProto,
-            key: 'namedItem',
-            resolve: 'proto_chain',
-            kind: 'method',
-            wrapLayer: 'core_wrapper',
-            invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
-            policy: 'throw',
-            diagTag: 'nav_total_set:MimeTypeArray.namedItem',
-            validThis(self) {
-              return !!__navGetMimeTypeArrayRecord(self);
-            },
-            invalidThis: 'native',
-            invoke(orig, args) {
-              const record = __navGetMimeTypeArrayRecord(this);
-              if (!record) return Reflect.apply(orig, this, args || []);
-              const type = (args && args.length) ? args[0] : undefined;
-              return __navResolveCollectionEntry(record.mimeByType, type);
-            }
-          });
-        }
-        if (protoTargets.length === 6) {
-          const protoApplied = applyCoreTargetsGroup('nav_total_set:plugins_proto_methods', protoTargets, 'skip');
-          __navPluginProtoMethodsReady = (protoApplied === protoTargets.length);
-        }
-        if (!__navPluginProtoMethodsReady) {
-          __navDiag('warn', 'nav_total_set:plugins_proto_methods_fallback_own', {
-            stage: 'apply',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:plugins',
-            key: 'plugins',
-            message: 'plugins/mimeTypes prototype methods not fully patched; keeping own-method fallback',
-            data: { outcome: 'return', reason: 'proto_methods_not_ready', fallback: 'own_methods' }
-          });
-        }
-        __navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', !!__navPluginProtoMethodsReady);
-      }
-      let __navPluginProtoAccessorsReady = (__navPluginsState.__PROTO_ACCESSORS_READY__ === true);
-      if (!__navPluginProtoAccessorsReady) {
-        const pluginProto = (typeof Plugin === 'function' && Plugin.prototype) ? Plugin.prototype : null;
-        const mimeProto = (typeof MimeType === 'function' && MimeType.prototype) ? MimeType.prototype : null;
-        const accessorTargets = [];
-        if (pluginProto) {
-          const pluginAccessorSpecs = [
-            ['name', function navPluginNameValue() {
-              const record = __navGetPluginRecord(this);
-              return record ? record.name : '';
-            }],
-            ['filename', function navPluginFilenameValue() {
-              const record = __navGetPluginRecord(this);
-              return record ? record.filename : '';
-            }],
-            ['description', function navPluginDescriptionValue() {
-              const record = __navGetPluginRecord(this);
-              return record ? record.description : '';
-            }],
-            ['length', function navPluginLengthValue() {
-              const record = __navGetPluginRecord(this);
-              return record ? record.mimeList.length : 0;
-            }]
-          ];
-          for (let i = 0; i < pluginAccessorSpecs.length; i++) {
-            const spec = pluginAccessorSpecs[i];
-            const key = spec[0];
-            const desc = Object.getOwnPropertyDescriptor(pluginProto, key);
-            if (desc && typeof desc.get === 'function') {
-              accessorTargets.push({
-                owner: pluginProto,
-                key: key,
-                kind: 'accessor',
-                wrapLayer: 'strict_accessor_gateway',
-                resolve: 'proto_chain',
-                policy: 'strict',
-                diagTag: 'nav_total_set:Plugin.' + key,
-                validThis(self) {
-                  return !!__navGetPluginRecord(self);
-                },
-                invalidThis: 'native',
-                getImpl: spec[1]
-              });
-            }
-          }
-        }
-        if (mimeProto) {
-          const mimeAccessorSpecs = [
-            ['type', function navMimeTypeValue() {
-              const record = __navGetMimeTypeRecord(this);
-              return record ? record.type : '';
-            }],
-            ['suffixes', function navMimeSuffixesValue() {
-              const record = __navGetMimeTypeRecord(this);
-              return record ? record.suffixes : '';
-            }],
-            ['description', function navMimeDescriptionValue() {
-              const record = __navGetMimeTypeRecord(this);
-              return record ? record.description : '';
-            }],
-            ['enabledPlugin', function navMimeEnabledPluginValue() {
-              const record = __navGetMimeTypeRecord(this);
-              return record ? record.enabledPlugin : null;
-            }]
-          ];
-          for (let i = 0; i < mimeAccessorSpecs.length; i++) {
-            const spec = mimeAccessorSpecs[i];
-            const key = spec[0];
-            const desc = Object.getOwnPropertyDescriptor(mimeProto, key);
-            if (desc && typeof desc.get === 'function') {
-              accessorTargets.push({
-                owner: mimeProto,
-                key: key,
-                kind: 'accessor',
-                wrapLayer: 'strict_accessor_gateway',
-                resolve: 'proto_chain',
-                policy: 'strict',
-                diagTag: 'nav_total_set:MimeType.' + key,
-                validThis(self) {
-                  return !!__navGetMimeTypeRecord(self);
-                },
-                invalidThis: 'native',
-                getImpl: spec[1]
-              });
-            }
-          }
-        }
-        if (accessorTargets.length === 8) {
-          const accessorsApplied = applyCoreTargetsGroup('nav_total_set:plugins_proto_accessors', accessorTargets, 'skip');
-          __navPluginProtoAccessorsReady = (accessorsApplied === accessorTargets.length);
-        }
-        if (!__navPluginProtoAccessorsReady) {
-          __navDiag('warn', 'nav_total_set:plugins_proto_accessors_fallback_own', {
-            stage: 'apply',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:plugins',
-            key: 'plugins',
-            message: 'Plugin/MimeType prototype accessors not fully patched; keeping own metadata fallback',
-            data: { outcome: 'return', reason: 'proto_accessors_not_ready', fallback: 'own_metadata' }
-          });
-        }
-        __navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', !!__navPluginProtoAccessorsReady);
+      function __navEnsureCollectionsGraph() {
+        if (__navCollectionsGraph) return __navCollectionsGraph;
+        throw __navPluginsError('collections_not_ready', 'plugins/mimeTypes collections graph missing');
       }
 
-      // 4.3. PluginArray (enumerable fields, compatible with JSON/assign)
-      function createPluginArray(plugins) {
-        if (__navPluginsState.__PLUGIN_ARRAY_SINGLETON__) return __navPluginsState.__PLUGIN_ARRAY_SINGLETON__;
-
-        const arr = [];
-        const mimeObjects = [];
-        for (let i = 0; i < plugins.length; i++) {
-          const p = plugins[i];
-          function itemMethod(index) {
+      try {
+        const protoTargets = [{
+          owner: pluginProto,
+          key: 'item',
+          resolve: 'proto_chain',
+          kind: 'method',
+          wrapLayer: 'core_wrapper',
+          invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
+          policy: 'throw',
+          diagTag: 'nav_total_set:Plugin.item',
+          validThis(self) {
+            return !!__navGetPluginRecord(self);
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
             const record = __navGetPluginRecord(this);
-            if (!record) return __navCallPluginsNative(__navNativePluginItem, this, arguments);
+            if (!record) return Reflect.apply(orig, this, args || []);
+            const index = (args && args.length) ? args[0] : undefined;
             return __navResolveCollectionEntry(record.mimeByIndex, index);
           }
-          function namedItemMethod(type) {
+        }, {
+          owner: pluginProto,
+          key: 'namedItem',
+          resolve: 'proto_chain',
+          kind: 'method',
+          wrapLayer: 'core_wrapper',
+          invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
+          policy: 'throw',
+          diagTag: 'nav_total_set:Plugin.namedItem',
+          validThis(self) {
+            return !!__navGetPluginRecord(self);
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
             const record = __navGetPluginRecord(this);
-            if (!record) return __navCallPluginsNative(__navNativePluginNamedItem, this, arguments);
+            if (!record) return Reflect.apply(orig, this, args || []);
+            const type = (args && args.length) ? args[0] : undefined;
             return __navResolveCollectionEntry(record.mimeByType, type);
           }
-          let pluginItemValue = itemMethod;
-          if (typeof __navNativePluginItem === 'function') {
-            Object.defineProperty(itemMethod, '__coreBridgeTarget__', {
-              value: __navNativePluginItem,
-              writable: true,
-              configurable: true,
-              enumerable: false
-            });
-            pluginItemValue = __navMark(itemMethod, 'item');
+        }, {
+          owner: pluginArrayProto,
+          key: 'item',
+          resolve: 'proto_chain',
+          kind: 'method',
+          wrapLayer: 'core_wrapper',
+          invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
+          policy: 'throw',
+          diagTag: 'nav_total_set:PluginArray.item',
+          validThis(self) {
+            return !!__navGetPluginArrayRecord(self);
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
+            const record = __navGetPluginArrayRecord(this);
+            if (!record) return Reflect.apply(orig, this, args || []);
+            const index = (args && args.length) ? args[0] : undefined;
+            return __navResolveCollectionEntry(record.pluginsByIndex, index);
           }
-          let pluginNamedItemValue = namedItemMethod;
-          if (typeof __navNativePluginNamedItem === 'function') {
-            Object.defineProperty(namedItemMethod, '__coreBridgeTarget__', {
-              value: __navNativePluginNamedItem,
-              writable: true,
-              configurable: true,
-              enumerable: false
-            });
-            pluginNamedItemValue = __navMark(namedItemMethod, 'namedItem');
+        }, {
+          owner: pluginArrayProto,
+          key: 'namedItem',
+          resolve: 'proto_chain',
+          kind: 'method',
+          wrapLayer: 'core_wrapper',
+          invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
+          policy: 'throw',
+          diagTag: 'nav_total_set:PluginArray.namedItem',
+          validThis(self) {
+            return !!__navGetPluginArrayRecord(self);
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
+            const record = __navGetPluginArrayRecord(this);
+            if (!record) return Reflect.apply(orig, this, args || []);
+            const name = (args && args.length) ? args[0] : undefined;
+            return __navResolveCollectionEntry(record.pluginsByName, name);
           }
+        }, {
+          owner: mimeTypeArrayProto,
+          key: 'item',
+          resolve: 'proto_chain',
+          kind: 'method',
+          wrapLayer: 'core_wrapper',
+          invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
+          policy: 'throw',
+          diagTag: 'nav_total_set:MimeTypeArray.item',
+          validThis(self) {
+            return !!__navGetMimeTypeArrayRecord(self);
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
+            const record = __navGetMimeTypeArrayRecord(this);
+            if (!record) return Reflect.apply(orig, this, args || []);
+            const index = (args && args.length) ? args[0] : undefined;
+            return __navResolveCollectionEntry(record.mimeByIndex, index);
+          }
+        }, {
+          owner: mimeTypeArrayProto,
+          key: 'namedItem',
+          resolve: 'proto_chain',
+          kind: 'method',
+          wrapLayer: 'core_wrapper',
+          invokeClass: 'brand_strict',
+          wrapperClass: 'core_proxy',
+          policy: 'throw',
+          diagTag: 'nav_total_set:MimeTypeArray.namedItem',
+          validThis(self) {
+            return !!__navGetMimeTypeArrayRecord(self);
+          },
+          invalidThis: 'native',
+          invoke(orig, args) {
+            const record = __navGetMimeTypeArrayRecord(this);
+            if (!record) return Reflect.apply(orig, this, args || []);
+            const type = (args && args.length) ? args[0] : undefined;
+            return __navResolveCollectionEntry(record.mimeByType, type);
+          }
+        }];
+        const protoApplied = applyCoreTargetsGroup('nav_total_set:plugins_proto_methods', protoTargets, 'throw');
+        if (protoApplied !== protoTargets.length) {
+          throw __navPluginsError('proto_methods_incomplete', 'plugins/mimeTypes prototype methods patch incomplete');
+        }
 
-          // Create plugin object: metadata non-enumerable, mime indexes enumerable
-          const pluginObj = Object.create(Plugin.prototype, (__navPluginProtoMethodsReady && __navPluginProtoAccessorsReady) ? {} : {
-            name:        { value: String(p.name),        enumerable: false, configurable: true },
-            filename:    { value: String(p.filename),    enumerable: false, configurable: true },
-            description: { value: String(p.description), enumerable: false, configurable: true },
-            length:      { value: p.mimeTypes.length,    enumerable: false, configurable: true }
-          });
-          if (!__navPluginProtoMethodsReady) {
-            Object.defineProperty(pluginObj, 'item', {
-              value: pluginItemValue,
-              enumerable: false,
-              configurable: true
-            });
-            Object.defineProperty(pluginObj, 'namedItem', {
-              value: pluginNamedItemValue,
-              enumerable: false,
-              configurable: true
-            });
+        const accessorTargets = [{
+          owner: pluginProto,
+          key: 'name',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'nav_total_set:Plugin.name',
+          validThis(self) {
+            return !!__navGetPluginRecord(self);
+          },
+          invalidThis: 'native',
+          getImpl: function navPluginNameValue() {
+            const record = __navGetPluginRecord(this);
+            return record ? record.name : '';
           }
-          const pluginRecord = {
-            index: i,
-            name: String(p.name),
-            filename: String(p.filename),
-            description: String(p.description),
-            plugin: pluginObj,
+        }, {
+          owner: pluginProto,
+          key: 'filename',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'nav_total_set:Plugin.filename',
+          validThis(self) {
+            return !!__navGetPluginRecord(self);
+          },
+          invalidThis: 'native',
+          getImpl: function navPluginFilenameValue() {
+            const record = __navGetPluginRecord(this);
+            return record ? record.filename : '';
+          }
+        }, {
+          owner: pluginProto,
+          key: 'description',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'nav_total_set:Plugin.description',
+          validThis(self) {
+            return !!__navGetPluginRecord(self);
+          },
+          invalidThis: 'native',
+          getImpl: function navPluginDescriptionValue() {
+            const record = __navGetPluginRecord(this);
+            return record ? record.description : '';
+          }
+        }, {
+          owner: pluginProto,
+          key: 'length',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'nav_total_set:Plugin.length',
+          validThis(self) {
+            return !!__navGetPluginRecord(self);
+          },
+          invalidThis: 'native',
+          getImpl: function navPluginLengthValue() {
+            const record = __navGetPluginRecord(this);
+            return record ? record.mimeList.length : 0;
+          }
+        }, {
+          owner: mimeProto,
+          key: 'type',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'nav_total_set:MimeType.type',
+          validThis(self) {
+            return !!__navGetMimeTypeRecord(self);
+          },
+          invalidThis: 'native',
+          getImpl: function navMimeTypeValue() {
+            const record = __navGetMimeTypeRecord(this);
+            return record ? record.type : '';
+          }
+        }, {
+          owner: mimeProto,
+          key: 'suffixes',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'nav_total_set:MimeType.suffixes',
+          validThis(self) {
+            return !!__navGetMimeTypeRecord(self);
+          },
+          invalidThis: 'native',
+          getImpl: function navMimeSuffixesValue() {
+            const record = __navGetMimeTypeRecord(this);
+            return record ? record.suffixes : '';
+          }
+        }, {
+          owner: mimeProto,
+          key: 'description',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'nav_total_set:MimeType.description',
+          validThis(self) {
+            return !!__navGetMimeTypeRecord(self);
+          },
+          invalidThis: 'native',
+          getImpl: function navMimeDescriptionValue() {
+            const record = __navGetMimeTypeRecord(this);
+            return record ? record.description : '';
+          }
+        }, {
+          owner: mimeProto,
+          key: 'enabledPlugin',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'nav_total_set:MimeType.enabledPlugin',
+          validThis(self) {
+            return !!__navGetMimeTypeRecord(self);
+          },
+          invalidThis: 'native',
+          getImpl: function navMimeEnabledPluginValue() {
+            const record = __navGetMimeTypeRecord(this);
+            return record ? record.enabledPlugin : null;
+          }
+        }];
+        const accessorsApplied = applyCoreTargetsGroup('nav_total_set:plugins_proto_accessors', accessorTargets, 'throw');
+        if (accessorsApplied !== accessorTargets.length) {
+          throw __navPluginsError('proto_accessors_incomplete', 'plugins/mimeTypes prototype accessors patch incomplete');
+        }
+
+        function __navBuildCollectionsGraph() {
+          if (__navCollectionsGraph) return __navCollectionsGraph;
+          const pluginList = [];
+          const mimeList = [];
+          const pluginArray = Object.create(PluginArray.prototype, {
+            length: { value: fakePlugins.length, enumerable: true, configurable: true }
+          });
+          const mimeArray = Object.create(MimeTypeArray.prototype, {
+            length: { value: normalizedMimeCount, enumerable: true, configurable: true }
+          });
+          const pluginArrayRecord = {
+            pluginArray: pluginArray,
+            pluginsByIndex: Object.create(null),
+            pluginsByName: Object.create(null),
+            pluginList: pluginList
+          };
+          const mimeArrayRecord = {
+            mimeArray: mimeArray,
             mimeByIndex: Object.create(null),
             mimeByType: Object.create(null),
-            mimeList: []
+            mimeList: mimeList
           };
+          __navPluginArrayMeta.set(pluginArray, pluginArrayRecord);
+          __navMimeTypeArrayMeta.set(mimeArray, mimeArrayRecord);
 
-          // mime-??????? (enumerable ????, enabledPlugin ? ?? pluginObj)
-          for (let j = 0; j < p.mimeTypes.length; j++) {
-            const m = p.mimeTypes[j];
-            const mType = String(m.type);
-            const mimeObj = Object.create(MimeType.prototype, __navPluginProtoAccessorsReady ? {} : {
-              type:         { value: mType,                          enumerable: true, configurable: true },
-              suffixes:     { value: String(m.suffixes ?? ''),       enumerable: true, configurable: true },
-              description:  { value: String(m.description ?? ''),    enumerable: true, configurable: true },
-              enabledPlugin:{ value: pluginObj,                      enumerable: true, configurable: true }
-            });
-            // index on the plugin itself ? enumerable
-            Object.defineProperty(pluginObj, String(j), { value: mimeObj, enumerable: true, configurable: true });
-            if (mType) {
-              Object.defineProperty(pluginObj, mType, { value: mimeObj, enumerable: false, configurable: true });
+          for (let i = 0; i < fakePlugins.length; i++) {
+            const p = fakePlugins[i];
+            const pluginObj = Object.create(Plugin.prototype);
+            const pluginRecord = {
+              index: i,
+              name: String(p.name),
+              filename: String(p.filename),
+              description: String(p.description),
+              plugin: pluginObj,
+              mimeByIndex: Object.create(null),
+              mimeByType: Object.create(null),
+              mimeList: []
+            };
+            __navPluginMeta.set(pluginObj, pluginRecord);
+            pluginList.push(pluginObj);
+            Object.defineProperty(pluginArray, String(i), { value: pluginObj, enumerable: true, configurable: true });
+            pluginArrayRecord.pluginsByIndex[String(i)] = pluginObj;
+            if (pluginRecord.name && !Object.prototype.hasOwnProperty.call(pluginArrayRecord.pluginsByName, pluginRecord.name)) {
+              Object.defineProperty(pluginArray, pluginRecord.name, { value: pluginObj, enumerable: false, configurable: true });
+              pluginArrayRecord.pluginsByName[pluginRecord.name] = pluginObj;
             }
-            pluginRecord.mimeByIndex[String(j)] = mimeObj;
-            if (mType) {
-              pluginRecord.mimeByType[mType] = mimeObj;
+          }
+
+          let mimeGlobalIndex = 0;
+          for (let i = 0; i < fakePlugins.length; i++) {
+            const p = fakePlugins[i];
+            const pluginObj = pluginList[i];
+            const pluginRecord = __navGetPluginRecord(pluginObj);
+            for (let j = 0; j < p.mimeTypes.length; j++) {
+              const m = p.mimeTypes[j];
+              const mimeType = String(m.type);
+              const mimeObj = Object.create(MimeType.prototype);
+              Object.defineProperty(pluginObj, String(j), { value: mimeObj, enumerable: true, configurable: true });
+              if (mimeType && !Object.prototype.hasOwnProperty.call(pluginRecord.mimeByType, mimeType)) {
+                Object.defineProperty(pluginObj, mimeType, { value: mimeObj, enumerable: false, configurable: true });
+              }
+              Object.defineProperty(mimeArray, String(mimeGlobalIndex), { value: mimeObj, enumerable: true, configurable: true });
+              pluginRecord.mimeByIndex[String(j)] = mimeObj;
+              if (mimeType && !Object.prototype.hasOwnProperty.call(pluginRecord.mimeByType, mimeType)) {
+                pluginRecord.mimeByType[mimeType] = mimeObj;
+              }
+              pluginRecord.mimeList.push(mimeObj);
+              mimeArrayRecord.mimeByIndex[String(mimeGlobalIndex)] = mimeObj;
+              if (mimeType && !Object.prototype.hasOwnProperty.call(mimeArrayRecord.mimeByType, mimeType)) {
+                Object.defineProperty(mimeArray, mimeType, { value: mimeObj, enumerable: false, configurable: true });
+                mimeArrayRecord.mimeByType[mimeType] = mimeObj;
+              }
+              __navMimeTypeMeta.set(mimeObj, {
+                index: j,
+                type: mimeType,
+                suffixes: String(m.suffixes == null ? '' : m.suffixes),
+                description: String(m.description == null ? '' : m.description),
+                mimeType: mimeObj,
+                enabledPlugin: pluginObj
+              });
+              mimeList.push(mimeObj);
+              mimeGlobalIndex += 1;
             }
-            pluginRecord.mimeList.push(mimeObj);
-            __navMimeTypeMeta.set(mimeObj, {
-              index: j,
-              type: mType,
-              suffixes: String(m.suffixes ?? ''),
-              description: String(m.description ?? ''),
-              mimeType: mimeObj,
-              enabledPlugin: pluginObj
-            });
-            mimeObjects.push(mimeObj);
           }
 
-          __navPluginMeta.set(pluginObj, pluginRecord);
-          arr.push(pluginObj);
+          __navCollectionsGraph = {
+            pluginArray: pluginArray,
+            mimeArray: mimeArray,
+            pluginList: pluginList,
+            mimeList: mimeList
+          };
+          return __navCollectionsGraph;
+        }
+        function __navGetPluginsValue() {
+          return __navEnsureCollectionsGraph().pluginArray;
+        }
+        function __navGetMimeTypesValue() {
+          return __navEnsureCollectionsGraph().mimeArray;
+        }
+        function __navPostcheckPluginsSubgraph() {
+          const pluginArrayA = __navGetPluginsValue();
+          const pluginArrayB = __navGetPluginsValue();
+          const mimeArrayA = __navGetMimeTypesValue();
+          const mimeArrayB = __navGetMimeTypesValue();
+          if (pluginArrayA !== pluginArrayB) throw __navPluginsError('postcheck_failed', 'navigator.plugins identity unstable');
+          if (mimeArrayA !== mimeArrayB) throw __navPluginsError('postcheck_failed', 'navigator.mimeTypes identity unstable');
+          if (navigator.plugins !== pluginArrayA || navigator.plugins !== navigator.plugins) {
+            throw __navPluginsError('postcheck_failed', 'navigator.plugins getter did not return stable singleton');
+          }
+          if (navigator.mimeTypes !== mimeArrayA || navigator.mimeTypes !== navigator.mimeTypes) {
+            throw __navPluginsError('postcheck_failed', 'navigator.mimeTypes getter did not return stable singleton');
+          }
+          if (pluginArrayA.length !== fakePlugins.length) throw __navPluginsError('postcheck_failed', 'navigator.plugins length mismatch');
+          if (mimeArrayA.length !== normalizedMimeCount) throw __navPluginsError('postcheck_failed', 'navigator.mimeTypes length mismatch');
+          if (Object.prototype.toString.call(pluginArrayA) !== '[object PluginArray]') {
+            throw __navPluginsError('postcheck_failed', 'navigator.plugins tag mismatch');
+          }
+          if (Object.prototype.toString.call(mimeArrayA) !== '[object MimeTypeArray]') {
+            throw __navPluginsError('postcheck_failed', 'navigator.mimeTypes tag mismatch');
+          }
+          if (Object.prototype.hasOwnProperty.call(pluginArrayA, 'item') || Object.prototype.hasOwnProperty.call(pluginArrayA, 'namedItem')) {
+            throw __navPluginsError('postcheck_failed', 'PluginArray own-method fallback detected');
+          }
+          if (Object.prototype.hasOwnProperty.call(mimeArrayA, 'item') || Object.prototype.hasOwnProperty.call(mimeArrayA, 'namedItem')) {
+            throw __navPluginsError('postcheck_failed', 'MimeTypeArray own-method fallback detected');
+          }
+          const firstPlugin = pluginArrayA.length ? pluginArrayA[0] : null;
+          if (firstPlugin) {
+            if (
+              Object.prototype.hasOwnProperty.call(firstPlugin, 'item') ||
+              Object.prototype.hasOwnProperty.call(firstPlugin, 'namedItem') ||
+              Object.prototype.hasOwnProperty.call(firstPlugin, 'name') ||
+              Object.prototype.hasOwnProperty.call(firstPlugin, 'filename') ||
+              Object.prototype.hasOwnProperty.call(firstPlugin, 'description') ||
+              Object.prototype.hasOwnProperty.call(firstPlugin, 'length')
+            ) {
+              throw __navPluginsError('postcheck_failed', 'Plugin own fallback detected');
+            }
+          }
+          const firstMime = mimeArrayA.length ? mimeArrayA[0] : null;
+          if (firstMime) {
+            if (
+              Object.prototype.hasOwnProperty.call(firstMime, 'type') ||
+              Object.prototype.hasOwnProperty.call(firstMime, 'suffixes') ||
+              Object.prototype.hasOwnProperty.call(firstMime, 'description') ||
+              Object.prototype.hasOwnProperty.call(firstMime, 'enabledPlugin')
+            ) {
+              throw __navPluginsError('postcheck_failed', 'MimeType own fallback detected');
+            }
+            if (firstPlugin && firstMime.enabledPlugin !== firstPlugin) {
+              throw __navPluginsError('postcheck_failed', 'MimeType.enabledPlugin linkage mismatch');
+            }
+          }
+        }
+        const graph = __navBuildCollectionsGraph();
+        try {
+          if (patchObjectReturnAccessor('plugins', function pluginsAccessorValue() {
+            return __navGetPluginsValue();
+          }, 'nav_total_set:plugins') !== true) {
+            throw __navPluginsError('plugins_getter_apply_failed', 'navigator.plugins getter patch failed');
+          }
+        } catch (e) {
+          if (!e.__navPluginsReason) e.__navPluginsReason = 'plugins_getter_apply_failed';
+          throw e;
+        }
+        try {
+          if (patchObjectReturnAccessor('mimeTypes', function mimeTypesAccessorValue() {
+            return __navGetMimeTypesValue();
+          }, 'nav_total_set:mimeTypes') !== true) {
+            throw __navPluginsError('mimeTypes_getter_apply_failed', 'navigator.mimeTypes getter patch failed');
+          }
+        } catch (e) {
+          if (!e.__navPluginsReason) e.__navPluginsReason = 'mimeTypes_getter_apply_failed';
+          throw e;
         }
 
-        // array of plugins
-        function pluginArrayItemRaw(index) {
-          const record = __navGetPluginArrayRecord(this);
-          if (!record) return __navCallPluginsNative(__navNativePluginArrayItem, this, arguments);
-          return __navResolveCollectionEntry(record.pluginsByIndex, index);
-        }
-        let pluginArrayItemValue = pluginArrayItemRaw;
-        if (typeof __navNativePluginArrayItem === 'function') {
-          Object.defineProperty(pluginArrayItemRaw, '__coreBridgeTarget__', {
-            value: __navNativePluginArrayItem,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          pluginArrayItemValue = __navMark(pluginArrayItemRaw, 'item');
-        }
-        function pluginArrayNamedItemRaw(name) {
-          const record = __navGetPluginArrayRecord(this);
-          if (!record) return __navCallPluginsNative(__navNativePluginArrayNamedItem, this, arguments);
-          return __navResolveCollectionEntry(record.pluginsByName, name);
-        }
-        let pluginArrayNamedItemValue = pluginArrayNamedItemRaw;
-        if (typeof __navNativePluginArrayNamedItem === 'function') {
-          Object.defineProperty(pluginArrayNamedItemRaw, '__coreBridgeTarget__', {
-            value: __navNativePluginArrayNamedItem,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          pluginArrayNamedItemValue = __navMark(pluginArrayNamedItemRaw, 'namedItem');
-        }
-        const pluginArray = Object.create(PluginArray.prototype, __navPluginProtoMethodsReady ? {
-          length:    { value: arr.length, enumerable: true, configurable: true }
-        } : {
-          length:    { value: arr.length, enumerable: true, configurable: true },
-          item:      { value: pluginArrayItemValue, enumerable: false, configurable: true },
-          namedItem: { value: pluginArrayNamedItemValue, enumerable: false, configurable: true }
+        __navPostcheckPluginsSubgraph();
+        __navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', fakePlugins);
+        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', __navPluginArrayMeta);
+        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_META__', __navPluginMeta);
+        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_META__', __navMimeTypeArrayMeta);
+        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_META__', __navMimeTypeMeta);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ITEM__', __navNativePluginItem);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_NAMED_ITEM__', __navNativePluginNamedItem);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', __navNativePluginArrayItem);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', __navNativePluginArrayNamedItem);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', __navNativeMimeTypeArrayItem);
+        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', __navNativeMimeTypeArrayNamedItem);
+        __navSetHiddenStateValue(__navPluginsState, '__MIME_OBJECTS_SINGLETON__', graph.mimeList);
+        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', graph.pluginArray);
+        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_SINGLETON__', graph.mimeArray);
+        __navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', __navGetPluginsValue);
+        __navSetHiddenStateValue(__navPluginsState, '__GET_MIMETYPES_VALUE__', __navGetMimeTypesValue);
+        __navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', true);
+        __navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', true);
+        __navDiag('info', 'nav_total_set:plugins_ready', {
+          stage: 'apply',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:plugins',
+          key: 'plugins',
+          message: 'plugins/mimeTypes subgraph applied',
+          data: {
+            outcome: 'return',
+            reason: 'ready',
+            plugins: fakePlugins.length,
+            mimeTypes: normalizedMimeCount
+          }
         });
-        const pluginArrayRecord = {
-          pluginArray: pluginArray,
-          pluginsByIndex: Object.create(null),
-          pluginsByName: Object.create(null),
-          pluginList: arr
-        };
-
-        // Indexes ? enumerable + named props (non-enumerable)
-        for (let i = 0; i < arr.length; i++) {
-          const pluginObj = arr[i];
-          Object.defineProperty(pluginArray, String(i), { value: pluginObj, enumerable: true, configurable: true });
-          pluginArrayRecord.pluginsByIndex[String(i)] = pluginObj;
-          const pname = pluginObj && pluginObj.name;
-          if (pname) {
-            Object.defineProperty(pluginArray, pname, { value: pluginObj, enumerable: false, configurable: true });
-            pluginArrayRecord.pluginsByName[pname] = pluginObj;
-          }
-        }
-
-        __navPluginArrayMeta.set(pluginArray, pluginArrayRecord);
-        __navSetHiddenStateValue(__navPluginsState, '__MIME_OBJECTS_SINGLETON__', mimeObjects);
-        return __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', pluginArray);
+      } catch (e) {
+        const reason = (e && typeof e.__navPluginsReason === 'string' && e.__navPluginsReason)
+          ? e.__navPluginsReason
+          : 'apply_failed';
+        __navRollbackPluginsSubgraph(reason, e);
       }
+    })();
 
-      // MimeTypeArray (in same time - for case of direct circulation)
-      function createMimeTypeArray(plugins) {
-        if (__navPluginsState.__MIMETYPE_ARRAY_SINGLETON__) return __navPluginsState.__MIMETYPE_ARRAY_SINGLETON__;
-
-        createPluginArray(plugins);
-        const mimes = Array.isArray(__navPluginsState.__MIME_OBJECTS_SINGLETON__) ? __navPluginsState.__MIME_OBJECTS_SINGLETON__ : [];
-        function mimeArrayItemRaw(index) {
-          const record = __navGetMimeTypeArrayRecord(this);
-          if (!record) return __navCallPluginsNative(__navNativeMimeTypeArrayItem, this, arguments);
-          return __navResolveCollectionEntry(record.mimeByIndex, index);
-        }
-        let mimeArrayItemValue = mimeArrayItemRaw;
-        if (typeof __navNativeMimeTypeArrayItem === 'function') {
-          Object.defineProperty(mimeArrayItemRaw, '__coreBridgeTarget__', {
-            value: __navNativeMimeTypeArrayItem,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          mimeArrayItemValue = __navMark(mimeArrayItemRaw, 'item');
-        }
-        function mimeArrayNamedItemRaw(type) {
-          const record = __navGetMimeTypeArrayRecord(this);
-          if (!record) return __navCallPluginsNative(__navNativeMimeTypeArrayNamedItem, this, arguments);
-          return __navResolveCollectionEntry(record.mimeByType, type);
-        }
-        let mimeArrayNamedItemValue = mimeArrayNamedItemRaw;
-        if (typeof __navNativeMimeTypeArrayNamedItem === 'function') {
-          Object.defineProperty(mimeArrayNamedItemRaw, '__coreBridgeTarget__', {
-            value: __navNativeMimeTypeArrayNamedItem,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          mimeArrayNamedItemValue = __navMark(mimeArrayNamedItemRaw, 'namedItem');
-        }
-        const mimeArray = Object.create(MimeTypeArray.prototype, __navPluginProtoMethodsReady ? {
-          length:    { value: mimes.length, enumerable: true, configurable: true }
-        } : {
-          length:    { value: mimes.length, enumerable: true, configurable: true },
-          item:      { value: mimeArrayItemValue, enumerable: false, configurable: true },
-          namedItem: { value: mimeArrayNamedItemValue, enumerable: false, configurable: true }
-        });
-        const mimeArrayRecord = {
-          mimeArray: mimeArray,
-          mimeByIndex: Object.create(null),
-          mimeByType: Object.create(null),
-          mimeList: mimes
-        };
-
-        for (let i = 0; i < mimes.length; i++) {
-          const mimeObj = mimes[i];
-          Object.defineProperty(mimeArray, String(i), { value: mimeObj, enumerable: true, configurable: true });
-          mimeArrayRecord.mimeByIndex[String(i)] = mimeObj;
-          const type = mimeObj && mimeObj.type;
-          if (type && !Object.prototype.hasOwnProperty.call(mimeArrayRecord.mimeByType, type)) {
-            Object.defineProperty(mimeArray, type, { value: mimeObj, enumerable: false, configurable: true });
-            mimeArrayRecord.mimeByType[type] = mimeObj;
-          }
-        }
-
-        __navMimeTypeArrayMeta.set(mimeArray, mimeArrayRecord);
-        return __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_SINGLETON__', mimeArray);
-      }
-      function __navGetPluginsValue() {
-        const normalizedProfiles = Array.isArray(__navPluginsState.__NORMALIZED_PLUGIN_PROFILES__)
-          ? __navPluginsState.__NORMALIZED_PLUGIN_PROFILES__
-          : fakePlugins;
-        return createPluginArray(normalizedProfiles);
-      }
-      function __navGetMimeTypesValue() {
-        const normalizedProfiles = Array.isArray(__navPluginsState.__NORMALIZED_PLUGIN_PROFILES__)
-          ? __navPluginsState.__NORMALIZED_PLUGIN_PROFILES__
-          : fakePlugins;
-        return createMimeTypeArray(normalizedProfiles);
-      }
-      __navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', __navGetPluginsValue);
-      __navSetHiddenStateValue(__navPluginsState, '__GET_MIMETYPES_VALUE__', __navGetMimeTypesValue);
-
-      // Getters - like in ORIG: enumerable: true
-      if ('plugins' in navigator) {
-        patchObjectReturnAccessor('plugins', function pluginsAccessorValue() {
-          const getPluginsValue = (__navPluginsState && typeof __navPluginsState.__GET_PLUGINS_VALUE__ === 'function')
-            ? __navPluginsState.__GET_PLUGINS_VALUE__
-            : __navGetPluginsValue;
-          return getPluginsValue();
-        }, 'nav_total_set:plugins');
-      }
-      if ('mimeTypes' in navigator) {
-        patchObjectReturnAccessor('mimeTypes', function mimeTypesAccessorValue() {
-          const getMimeTypesValue = (__navPluginsState && typeof __navPluginsState.__GET_MIMETYPES_VALUE__ === 'function')
-            ? __navPluginsState.__GET_MIMETYPES_VALUE__
-            : __navGetMimeTypesValue;
-          return getMimeTypesValue();
-        }, 'nav_total_set:mimeTypes');
-      }
-
-   
-   
     //  ——— Debug information (unified log) ———
     if (DEBUG) {
       const hasUAD = ('userAgentData' in navigator);
