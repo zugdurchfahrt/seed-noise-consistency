@@ -73,11 +73,11 @@ class VPNClient:
 
         self._terminate_vpn_processes()
 
-        self._clean_directories()
-
         subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
         self._kill_old_processes()
+        
+        self._clean_directories()
 
         self._create_auth_file()
 

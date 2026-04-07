@@ -166,7 +166,7 @@ const LOGGingModule = function LOGGingModule() {
       { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto", critical: true },
       { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto", critical: true },
       { module: "uad_override", diagTag: "uad_override", codePrefix: "uad_override", source: "cdp", emitter: "diag", functions: "auto", critical: true },
-      { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto", critical: false },
+      { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "cdp", emitter: "diag", functions: "auto", critical: false },
       { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto", critical: false },
       {
         module: "WORKER_PATCH_SRC",
@@ -1316,6 +1316,87 @@ const LOGGingModule = function LOGGingModule() {
       }
     }
 
+    const WEBGL_MONITOR_LIMIT = toPosInt(global.__WEBGL_MONITOR_LIMIT, 200);
+    __ensureLoggerHiddenValue("__WEBGL_MONITOR_STATE__", function () {
+      return {
+        limit: WEBGL_MONITOR_LIMIT,
+        entries: []
+      };
+    }, function (v) {
+      return !!(v && typeof v === "object" && Array.isArray(v.entries));
+    }, true);
+
+    function getWebGLMonitorState() {
+      const state = __loggerRoot.__WEBGL_MONITOR_STATE__;
+      if (state && typeof state === "object" && Array.isArray(state.entries)) {
+        if (!Number.isFinite(state.limit) || state.limit <= 0) state.limit = WEBGL_MONITOR_LIMIT;
+        return state;
+      }
+      return __ensureLoggerHiddenValue("__WEBGL_MONITOR_STATE__", function () {
+        return {
+          limit: WEBGL_MONITOR_LIMIT,
+          entries: []
+        };
+      }, function (v) {
+        return !!(v && typeof v === "object" && Array.isArray(v.entries));
+      }, true);
+    }
+
+    function shapeWebGLMonitorEntry(entry, idx) {
+      const safeEntry = (entry && typeof entry === "object") ? entry : {};
+      return {
+        idx: idx,
+        timestamp: (typeof safeEntry.timestamp === "string" && safeEntry.timestamp) ? safeEntry.timestamp : "",
+        eventType: (typeof safeEntry.eventType === "string" && safeEntry.eventType) ? safeEntry.eventType : "",
+        method: (typeof safeEntry.method === "string" && safeEntry.method) ? safeEntry.method : "",
+        hook: (typeof safeEntry.hook === "string" && safeEntry.hook) ? safeEntry.hook : "",
+        stage: (typeof safeEntry.stage === "string" && safeEntry.stage) ? safeEntry.stage : "",
+        message: (typeof safeEntry.message === "string" && safeEntry.message) ? safeEntry.message : "",
+        args: Object.prototype.hasOwnProperty.call(safeEntry, "args") ? normalizeForJSON(safeEntry.args) : [],
+        result: Object.prototype.hasOwnProperty.call(safeEntry, "result") ? normalizeForJSON(safeEntry.result) : null,
+        error: safeEntry.error instanceof Error ? {
+          name: safeEntry.error.name,
+          message: safeEntry.error.message,
+          stack: safeEntry.error.stack || null
+        } : (safeEntry.error ? normalizeForJSON(safeEntry.error) : null),
+        extra: Object.prototype.hasOwnProperty.call(safeEntry, "extra") ? normalizeForJSON(safeEntry.extra) : null
+      };
+    }
+
+    __defineLoggerHiddenValue("__pushWebGLMonitor__", function (entry) {
+      try {
+        const state = getWebGLMonitorState();
+        const safeEntry = shapeWebGLMonitorEntry(entry, state.entries.length);
+        state.entries.push(safeEntry);
+        if (state.entries.length > state.limit) {
+          state.entries.splice(0, state.entries.length - state.limit);
+        }
+      } catch (e) {
+        try { recordLoggerError(e, "__pushWebGLMonitor__"); } catch (_) {}
+      }
+    }, false);
+
+    __defineLoggerHiddenValue("__getWebGLMonitor__", function () {
+      try {
+        const state = getWebGLMonitorState();
+        return state.entries.slice();
+      } catch (e) {
+        try { recordLoggerError(e, "__getWebGLMonitor__"); } catch (_) {}
+        return [];
+      }
+    }, false);
+
+    __defineLoggerHiddenValue("__clearWebGLMonitor__", function () {
+      try {
+        const state = getWebGLMonitorState();
+        state.entries.length = 0;
+        return true;
+      } catch (e) {
+        try { recordLoggerError(e, "__clearWebGLMonitor__"); } catch (_) {}
+        return false;
+      }
+    }, false);
+
     function pushEntry(entry) {
       try {
         _buf().push(entry);
@@ -1759,70 +1840,9 @@ const LOGGingModule = function LOGGingModule() {
       }
     }
 
-    // ===== 3) Patch console.* (single source of truth) =====
-    for (const level of LOG_LEVELS) {
-      const orig = origConsole[level];
-      if (!orig) continue;
-
-      console[level] = function () {
-        const args = Array.prototype.slice.call(arguments);
-        const extracted = extractConsoleBufferMeta(args);
-        const consoleArgs = extracted.args;
-        const bufferMeta = extracted.meta;
-
-        // keep your existing filter
-        for (let i = 0; i < consoleArgs.length; i++) {
-          const a = consoleArgs[i];
-          if (typeof a === "string" && a.indexOf("undetected chromedriver") !== -1) {
-            return;
-          }
-        }
-
-        pushLog(
-          level,
-          consoleArgs,
-          level === "error" || level === "warn" || level === "log",
-          "console",
-          bufferMeta
-        );
-
-        guardedApply(orig, console, consoleArgs, "console." + level);
-      };
-    }
-    if (origConsole.group) {
-      console.group = function () {
-        const args = Array.prototype.slice.call(arguments);
-        const label = args.length ? args.map((a) => {
-          try {
-            return (typeof a === "string") ? a : safeTag(a);
-          } catch (_) {
-            return "[Unserializable]";
-          }
-        }).join(" ") : "group";
-        consoleGroupStack.push(label);
-        guardedApply(origConsole.group, console, args, "console.group");
-      };
-    }
-    if (origConsole.groupCollapsed) {
-      console.groupCollapsed = function () {
-        const args = Array.prototype.slice.call(arguments);
-        const label = args.length ? args.map((a) => {
-          try {
-            return (typeof a === "string") ? a : safeTag(a);
-          } catch (_) {
-            return "[Unserializable]";
-          }
-        }).join(" ") : "groupCollapsed";
-        consoleGroupStack.push(label);
-        guardedApply(origConsole.groupCollapsed, console, args, "console.groupCollapsed");
-      };
-    }
-    if (origConsole.groupEnd) {
-      console.groupEnd = function () {
-        if (consoleGroupStack.length) consoleGroupStack.pop();
-        guardedApply(origConsole.groupEnd, console, [], "console.groupEnd");
-      };
-    }
+    // ===== 3) Keep public console.* native =====
+    // Pipeline diagnostics must stay inside __DEGRADE__/private logger state.
+    // Do not wrap or mirror public console methods here.
 
     // ===== 4) Module logger C.__logger.log (no double logging) =====
     __ensureLoggerHiddenValue("_logConfig", function () { return {

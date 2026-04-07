@@ -10,39 +10,78 @@
 
 const HeadersInterceptor = function HeadersInterceptor(window) {
   'use strict';
-  const LOG_PREFIX = '[headers_interceptor.js]';
+  const __MODULE = 'headers_interceptor';
+  const __SURFACE = 'network';
+  const __typePipeline = 'pipeline missing data';
+  const __typeBrowser = 'browser structure missing data';
+  const __flagKey = '__PATCH_HEADERS_INTERCEPTOR__';
+  const __core = window && window.Core;
+  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
+    ? window.CanvasPatchContext.__logger
+    : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
+  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const DEBUG = !!window.__HEADERS_DEBUG__;
 
   // --------------------------- У Т И Л И Т Ы -----------------------------
   const ORIGIN = window.location.origin;
 
-  function dlog() {
-    if (DEBUG) console.debug.apply(console, [LOG_PREFIX].concat([].slice.call(arguments)));
+  function __emit(level, code, ctx, err) {
+    try {
+      if (__diag) return __diag(level, code, ctx || null, err || null);
+      if (typeof __D === 'function') {
+        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
+        const safeLevel = (level === undefined || level === null) ? 'info' : level;
+        const safeErr = (err === undefined || err === null) ? null : err;
+        return __D(String(code), safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
+      }
+    } catch (_) {
+      return undefined;
+    }
+    return undefined;
+  }
+
+  function __moduleDiag(level, code, extra, err) {
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const ctx = {
+      module: __MODULE,
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : __SURFACE,
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: x.stage,
+      message: x.message,
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: x.type
+    };
+    return __emit(level, code, ctx, err || null);
+  }
+
+  function dlog(message, host, key) {
+    if (!DEBUG) return;
+    emitDegrade('info', 'headers_interceptor:cors:blocked_non_safelisted_debug', null, {
+      type: 'pipeline telemetry',
+      stage: 'runtime',
+      surface: 'network',
+      key: (typeof key === 'string' && key) ? key : null,
+      message: (typeof message === 'string' && message) ? message : 'headers_interceptor debug event',
+      data: {
+        host: (typeof host === 'string' && host) ? host : null,
+        header: (typeof key === 'string' && key) ? key : null,
+        debug: true
+      }
+    });
   }
 
   function emitDegrade(level, code, err, extra) {
-    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-      ? window.CanvasPatchContext.__logger
-      : null;
-    const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-    if (typeof d !== 'function') return;
-    const e = err instanceof Error
-      ? err
-      : (err == null ? null : new Error(String(err)));
-    const ctx = Object.assign({
-      type: 'browser structure missing data',
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
+    return __moduleDiag(level, code, Object.assign({
+      type: __typeBrowser,
       stage: 'apply',
-      module: 'headers_interceptor',
-      surface: 'network',
       key: null,
       policy: 'skip',
       action: 'native'
-    }, extra || null);
-    if (typeof d.diag === 'function') {
-      d.diag(level, code, ctx, e);
-      return;
-    }
-    d(code, e, ctx);
+    }, x), e);
   }
 
   /** Безопасный разбор URL c базой location.href */
@@ -233,6 +272,55 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
   };
 
   // --------------------------- ГЕЙТ НА ИНИТ -------------------------------
+  let __guardToken = null;
+  try {
+    if (!__core || typeof __core.guardFlag !== 'function') {
+      emitDegrade('warn', 'headers_interceptor:guard_missing', null, {
+        stage: 'guard',
+        key: __flagKey,
+        type: __typePipeline,
+        message: 'Core.guardFlag missing',
+        data: {
+          outcome: 'skip',
+          reason: 'missing_dep_core_guard'
+        }
+      });
+      return;
+    }
+    __guardToken = __core.guardFlag(__flagKey, __MODULE);
+  } catch (e) {
+    emitDegrade('warn', 'headers_interceptor:guard_failed', e, {
+      stage: 'guard',
+      key: __flagKey,
+      type: __typePipeline,
+      message: 'guardFlag threw',
+      data: {
+        outcome: 'skip',
+        reason: 'guard_failed'
+      }
+    });
+    return;
+  }
+  if (!__guardToken) return;
+
+  function releaseGuard(rollbackOk, stage, reason) {
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __MODULE);
+      }
+    } catch (e) {
+      emitDegrade('warn', 'headers_interceptor:guard_release_failed', e, {
+        stage: stage || 'rollback',
+        key: __flagKey,
+        type: __typePipeline,
+        message: 'releaseGuardFlag failed',
+        data: {
+          outcome: 'skip',
+          reason: reason || 'guard_release_failed'
+        }
+      });
+    }
+  }
 
   const C = window.CanvasPatchContext;
   if (!C) {
@@ -240,9 +328,34 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       stage: 'preflight',
       surface: 'CanvasPatchContext',
       key: 'CanvasPatchContext',
-      type: 'pipeline missing data'
+      type: __typePipeline,
+      message: 'CanvasPatchContext missing',
+      data: {
+        outcome: 'skip',
+        reason: 'canvas_patch_context_missing',
+        missing: 'CanvasPatchContext'
+      }
     });
+    releaseGuard(true, 'preflight', 'canvas_patch_context_missing');
     return; // API уже экспортирован
+  }
+
+  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  if (!__stateRoot) {
+    emitDegrade('warn', 'headers_interceptor:init:preflight:canvas_state_missing', null, {
+      stage: 'preflight',
+      surface: 'CanvasPatchContext.state',
+      key: 'CanvasPatchContext.state',
+      type: __typePipeline,
+      message: 'CanvasPatchContext.state missing',
+      data: {
+        outcome: 'skip',
+        reason: 'canvas_patch_state_missing',
+        missing: 'CanvasPatchContext.state'
+      }
+    });
+    releaseGuard(true, 'preflight', 'canvas_patch_state_missing');
+    return;
   }
 
   const RAW_H = (window.__HEADERS__ && typeof window.__HEADERS__ === 'object') ? window.__HEADERS__ : null;
@@ -251,14 +364,17 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       stage: 'preflight',
       surface: '__HEADERS__',
       key: '__HEADERS__',
-      type: 'pipeline missing data'
+      type: __typePipeline,
+      message: 'window.__HEADERS__ missing',
+      data: {
+        outcome: 'skip',
+        reason: 'headers_missing',
+        missing: '__HEADERS__'
+      }
     });
+    releaseGuard(true, 'preflight', 'headers_missing');
     return; // API уже экспортирован; main.py вызовет HeadersInterceptor(window) повторно после инжекта
   }
-
-  // idempotent guard: допускаем повторный вызов, но патчим сеть только 1 раз
-  if (window.__HEADERS_INTERCEPTOR_INSTALLED__) return;
-  window.__HEADERS_INTERCEPTOR_INSTALLED__ = true;
 
   const HEADER_PROFILES = {
     min: [],
@@ -430,9 +546,10 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     stage: 'apply',
     surface: 'HeadersInterceptor',
     key: 'install',
-    type: 'pipeline missing data',
+    type: 'pipeline telemetry',
     policy: 'skip',
     action: 'skip',
-    data: { profile: headerProfile }
+    data: { profile: headerProfile, outcome: 'return' }
   });
+  releaseGuard(false, 'apply', 'installed');
 }

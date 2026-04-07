@@ -151,13 +151,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
   const NOP = () => {};
   function emitContextDiag(level, code, err, extra) {
     try {
-      const __MODULE  = "context";
+      const x = (extra && typeof extra === "object") ? extra : {};
+      const __MODULE  = (typeof x.module === "string" && x.module) ? x.module : "context";
       const __SURFACE = "canvas"; // дефолт для ctx2d веток; webgl приходит из extra.surface
 
       const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
       const __diag = (__D && typeof __D.diag === "function") ? __D.diag.bind(__D) : null;
-
-      const x = (extra && typeof extra === "object") ? extra : {};
 
       const ctx = {
         module: __MODULE,
@@ -182,6 +181,91 @@ const ContextPatchModule = function ContextPatchModule(window) {
     } catch (_emitErr) {
       return undefined;
     }
+  }
+
+  function emitWebGLMonitor(entry) {
+    try {
+      const push = (__loggerRoot && typeof __loggerRoot.__pushWebGLMonitor__ === 'function')
+        ? __loggerRoot.__pushWebGLMonitor__
+        : null;
+      if (typeof push !== 'function') return;
+      const x = (entry && typeof entry === 'object') ? entry : {};
+      push({
+        eventType: (typeof x.eventType === 'string' && x.eventType) ? x.eventType : 'webgl',
+        method: (typeof x.method === 'string' && x.method) ? x.method : '',
+        hook: (typeof x.hook === 'string' && x.hook) ? x.hook : '',
+        stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+        message: (typeof x.message === 'string' && x.message) ? x.message : '',
+        args: Object.prototype.hasOwnProperty.call(x, 'args') ? x.args : [],
+        result: Object.prototype.hasOwnProperty.call(x, 'result') ? x.result : null,
+        error: Object.prototype.hasOwnProperty.call(x, 'error') ? x.error : null,
+        extra: Object.prototype.hasOwnProperty.call(x, 'extra') ? x.extra : null,
+        timestamp: new Date().toISOString()
+      });
+    } catch (_) {}
+  }
+
+  function shouldLogWebGLAccess(method) {
+    return method === 'getParameter'
+      || method === 'getSupportedExtensions'
+      || method === 'getExtension';
+  }
+
+  function summarizeWebGLAccessValue(value) {
+    if (value == null) return value;
+    const t = typeof value;
+    if (t === 'string' || t === 'number' || t === 'boolean') return value;
+    if (Array.isArray(value)) {
+      return {
+        kind: 'Array',
+        length: value.length,
+        sample: value.slice(0, 16)
+      };
+    }
+    try {
+      if (typeof ArrayBuffer !== 'undefined' && typeof ArrayBuffer.isView === 'function' && ArrayBuffer.isView(value)) {
+        return {
+          kind: (value && value.constructor && value.constructor.name) ? value.constructor.name : 'TypedArray',
+          length: (value && typeof value.length === 'number') ? value.length : 0,
+          sample: Array.prototype.slice.call(value, 0, 16)
+        };
+      }
+    } catch (_) {}
+    let ctorName = null;
+    let tag = null;
+    try { ctorName = (value && value.constructor && value.constructor.name) ? value.constructor.name : null; } catch (_) {}
+    try { tag = Object.prototype.toString.call(value); } catch (_) {}
+    return {
+      kind: ctorName || tag || t
+    };
+  }
+
+  function emitWebGLAccess(method, args, result, extra) {
+    try {
+      if (!shouldLogWebGLAccess(method)) return;
+      const x = (extra && typeof extra === 'object') ? extra : {};
+      const safeArgs = Array.isArray(args) ? args : [];
+      emitContextDiag('info', 'context:webgl:access', null, {
+        module: 'webgl',
+        stage: 'runtime',
+        surface: 'webgl',
+        key: method,
+        message: 'webgl access',
+        data: {
+          outcome: 'return',
+          reason: 'webgl_access',
+          extra: {
+            method: method,
+            source: (typeof x.source === 'string' && x.source) ? x.source : 'native',
+            hook: (typeof x.hook === 'string' && x.hook) ? x.hook : null,
+            request: safeArgs.length ? safeArgs[0] : null,
+            args: safeArgs,
+            result: result,
+            resultMeta: summarizeWebGLAccessValue(result)
+          }
+        }
+      });
+    } catch (_) {}
   }
 
   const patchedMethods = new WeakSet();
@@ -548,10 +632,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // approval and runtime revalidation of this module.
 
   // ===== WEBGL hook override logging: two toggles (ВКЛ/ВЫКЛ) =====
-  // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override" (emitContextDiag + console.warn ниже),
-  // НЕ отключают хук, НЕ отключают патчинг, НЕ трогают остальные warn/error.
+  // Эти тумблеры влияют ТОЛЬКО на логирование ветки "override".
+  // Standard access logging now goes through context:webgl:access in __DEGRADE__.
+  // WEBGL_OVERRIDE_CONSOLE_LOG is kept as a legacy toggle name for the auxiliary
+  // logger-owned WebGL monitor path; it no longer means public console.*.
   const WEBGL_OVERRIDE_DIAG_LOG    = false; // true=ВКЛ, false=ВЫКЛ (emitContextDiag для override)
-  const WEBGL_OVERRIDE_CONSOLE_LOG = false; // true=ВКЛ, false=ВЫКЛ (console.warn для override)
+  const WEBGL_OVERRIDE_CONSOLE_LOG = false; // true=ВКЛ, false=ВЫКЛ (logger WebGL monitor for override)
 
   function patchMethod(proto, method, hooks) {
       if (!proto) {
@@ -561,7 +647,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: method,
           type: 'browser structure missing data'
         });
-        console.warn(`[patchMethod] proto is not defined: ${method}`);
+        emitWebGLMonitor({
+          eventType: 'preflight_warn',
+          method: method,
+          stage: 'preflight',
+          message: '[patchMethod] proto is not defined',
+          extra: { reason: 'proto_missing', surface: 'webgl' }
+        });
         return false;
       }
       if (!hooks?.length) {
@@ -571,7 +663,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: method,
           type: 'pipeline missing data'
         });
-        console.warn(`[patchMethod] no hooks: ${method}`);
+        emitWebGLMonitor({
+          eventType: 'preflight_warn',
+          method: method,
+          stage: 'preflight',
+          message: '[patchMethod] no hooks',
+          extra: { reason: 'hooks_missing', surface: 'webgl' }
+        });
         return false;
       }
       const isWebGLProto =
@@ -584,7 +682,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: method,
           type: 'browser structure missing data'
         });
-        console.warn(`[patchMethod] non-WebGL proto rejected: ${method}`);
+        emitWebGLMonitor({
+          eventType: 'preflight_warn',
+          method: method,
+          stage: 'preflight',
+          message: '[patchMethod] non-WebGL proto rejected',
+          extra: { reason: 'proto_rejected', surface: 'webgl' }
+        });
         return false;
       }
 
@@ -603,7 +707,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: method,
           type: 'pipeline missing data'
         });
-        console.warn(`[patchMethod] already patched: ${method}`);
+        emitWebGLMonitor({
+          eventType: 'apply_info',
+          method: method,
+          stage: 'apply',
+          message: '[patchMethod] already patched',
+          extra: { reason: 'already_patched', surface: 'webgl' }
+        });
         return false;
       }
 
@@ -639,10 +749,23 @@ const ContextPatchModule = function ContextPatchModule(window) {
                             key: method,
                             data: { hook: hook.name || 'anon' }
                           });
-                          console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
+                          emitWebGLMonitor({
+                            eventType: 'hook_error',
+                            method: method,
+                            hook: hook.name || 'anon',
+                            stage: 'hook',
+                            message: '[patchMethod] hook error',
+                            args: args,
+                            result: out,
+                            error: e,
+                            extra: { mode: 'post_orig_once', surface: 'webgl' }
+                          });
                           throw e;
                       }
                   }
+                  emitWebGLAccess(method, args, out, {
+                    source: 'native_post_orig_once'
+                  });
                   return out;
               }
 
@@ -654,6 +777,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
                       // override logging (TOGGLED)
                       if (res !== undefined && !Array.isArray(res)) {
+                          emitWebGLAccess(method, patched, res, {
+                            source: 'override',
+                            hook: hook.name || 'anon'
+                          });
                           const webglLoggerGate =
                             !(__loggerRoot && __loggerRoot._logConfig && __loggerRoot._logConfig.WEBGLlogger === false);
 
@@ -667,7 +794,16 @@ const ContextPatchModule = function ContextPatchModule(window) {
                                 });
                               }
                               if (WEBGL_OVERRIDE_CONSOLE_LOG) {
-                                console.warn('[patchMethod override]', method, hook.name || 'anon', res);
+                                emitWebGLMonitor({
+                                  eventType: 'override',
+                                  method: method,
+                                  hook: hook.name || 'anon',
+                                  stage: 'hook',
+                                  message: '[patchMethod override]',
+                                  args: patched,
+                                  result: res,
+                                  extra: { surface: 'webgl' }
+                                });
                               }
                           }
 
@@ -687,11 +823,24 @@ const ContextPatchModule = function ContextPatchModule(window) {
                           key: method,
                           data: { hook: hook.name || 'anon' }
                         });
-                        console.error(`[patchMethod] hook error ${method} (${hook.name || 'anon'}):`, e);
+                        emitWebGLMonitor({
+                          eventType: 'hook_error',
+                          method: method,
+                          hook: hook.name || 'anon',
+                          stage: 'hook',
+                          message: '[patchMethod] hook error',
+                          args: patched,
+                          error: e,
+                          extra: { mode: 'override_or_args', surface: 'webgl' }
+                        });
                         throw e;
                    }
                }
-              return orig.apply(self, patched);
+              const out = orig.apply(self, patched);
+              emitWebGLAccess(method, patched, out, {
+                source: 'native'
+              });
+              return out;
 
           } finally {
               if (guard && isObj) guard.delete(self);
@@ -757,7 +906,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
               data: { hook: hook && (hook.name || null) }
             });
           } catch (_e) {
-            if (__loggerRoot && __loggerRoot.__DEBUG__) console.error('[chainAsync][hook_failed]', method, hook && hook.name, e);
+            emitWebGLMonitor({
+              eventType: 'hook_error',
+              method: method,
+              hook: hook && (hook.name || ''),
+              stage: 'hook',
+              message: '[chainAsync][hook_failed]',
+              error: e,
+              extra: { mode: 'chainAsync' }
+            });
           }
           // keep b unchanged
         }
@@ -946,7 +1103,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 data: { hook: hook && (hook.name || null) }
               });
             } catch (_e) {
-              if (__loggerRoot && __loggerRoot.__DEBUG__) console.error('[issuedSerialization][hook_failed]', method, hook && hook.name, e);
+              emitWebGLMonitor({
+                eventType: 'hook_error',
+                method: method,
+                hook: hook && (hook.name || ''),
+                stage: 'hook',
+                message: '[issuedSerialization][hook_failed]',
+                error: e,
+                extra: { mode: 'issuedSerialization' }
+              });
             }
           }
         }
@@ -1077,6 +1242,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
     const methodPlan = [
       ['getParameter', C.webglGetParameterHooks],
+      ['getSupportedExtensions', C.webglGetSupportedExtensionsHooks],
+      ['getExtension', C.webglGetExtensionHooks],
       ['readPixels', C.webglReadPixelsHooks]
     ];
     let applied = 0;
@@ -1120,6 +1287,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 throw e;
               }
             }
+            emitWebGLAccess(method, args, out, {
+              source: 'issued_native_post_orig_once'
+            });
             return out;
           }
 
@@ -1129,6 +1299,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
             try {
               const res = hook.apply(self, [orig, ...patched]);
               if (res !== undefined && !Array.isArray(res)) {
+                emitWebGLAccess(method, patched, res, {
+                  source: 'issued_override',
+                  hook: hook.name || 'anon'
+                });
                 return res;
               }
               if (Array.isArray(res)) {
@@ -1144,7 +1318,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
               throw e;
             }
           }
-          return orig.apply(self, patched);
+          const out = orig.apply(self, patched);
+          emitWebGLAccess(method, patched, out, {
+            source: 'issued_native'
+          });
+          return out;
         } finally {
           if (guard && isObj) guard.delete(self);
         }
