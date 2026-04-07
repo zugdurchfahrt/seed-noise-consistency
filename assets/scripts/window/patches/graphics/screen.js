@@ -236,23 +236,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     throw new Error('Core.applyTargets missing');
   }
   
-  function safeDefine(obj, prop, descriptor) {
-    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return;
-    const d = Object.getOwnPropertyDescriptor(obj, prop);
-    const hadOwn = Object.prototype.hasOwnProperty.call(obj, prop);
-    if (d && d.configurable === false) {
-      throw new TypeError(`${prop} non-configurable`);
-    }
-    if (hadOwn) delete obj[prop];
-    Object.defineProperty(obj, prop, descriptor);
-    __moduleRollbackStack.push(function rollbackSafeDefine() {
-      if (d) {
-        Object.defineProperty(obj, prop, d);
-      } else {
-        delete obj[prop];
-      }
-    });
-  }
   let __screenReceiverCheckDiagSent = false;
   function receiverMatchesTarget(target, thisArg) {
     try {
@@ -760,39 +743,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     return String(Math.round(width / divisor)) + '/' + String(Math.round(height / divisor));
   }
   const expectedDeviceAspectText = __screenAspectText(SCREEN_WIDTH, SCREEN_HEIGHT);
-  function __screenNormalizeMediaText(value) {
-    return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  }
-  function __screenEvaluateMediaQuery(mediaText) {
-    const normalized = __screenNormalizeMediaText(mediaText);
-    if (!normalized || normalized.indexOf(',') !== -1 || normalized.indexOf(' not ') !== -1 || normalized.startsWith('not ') || normalized.startsWith('only ')) {
-      return { handled: false, matches: null, media: normalized };
-    }
-    const clauses = normalized.match(/\([^)]+\)/g);
-    if (!clauses || !clauses.length) return { handled: false, matches: null, media: normalized };
-    let handled = false;
-    let matches = true;
-    for (let i = ZERO; i < clauses.length; i++) {
-      const clause = clauses[i].slice(1, -1).trim();
-      const sep = clause.indexOf(':');
-      if (sep === -1) return { handled: false, matches: null, media: normalized };
-      const feature = clause.slice(ZERO, sep).trim();
-      const rawValue = clause.slice(sep + ONE).trim();
-      let next = null;
-      if (feature === 'device-width') next = rawValue === (String(SCREEN_WIDTH) + 'px');
-      else if (feature === 'device-height') next = rawValue === (String(SCREEN_HEIGHT) + 'px');
-      else if (feature === 'width') next = rawValue === (String(viewportExpected.innerWidth) + 'px');
-      else if (feature === 'height') next = rawValue === (String(viewportExpected.innerHeight) + 'px');
-      else if (feature === 'orientation') next = rawValue === expectedOrientationMedia;
-      else if (feature === 'display-mode') next = rawValue === 'browser';
-      else if (feature === 'device-aspect-ratio') next = rawValue === expectedDeviceAspectText;
-      else if (feature === 'aspect-ratio') next = rawValue === expectedDeviceAspectText;
-      else return { handled: false, matches: null, media: normalized };
-      handled = true;
-      if (!next) matches = false;
-    }
-    return { handled: handled, matches: handled ? matches : null, media: normalized };
-  }
   function __screenBuildAccessorTarget(owner, proto, key, valueFactory, groupTag, options) {
     const opts = options || {};
     const target = chooseTarget(owner, proto, key);
@@ -942,9 +892,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     if (!Object.is(snapshot.innerHeight, viewportExpected.innerHeight)) {
       mismatches.push({ key: 'window.innerHeight', expected: viewportExpected.innerHeight, actual: snapshot.innerHeight });
-    }
-    if (snapshot.htmlClientHeight !== null && !Object.is(snapshot.htmlClientHeight, viewportExpected.innerHeight)) {
-      mismatches.push({ key: 'document.documentElement.clientHeight', expected: viewportExpected.innerHeight, actual: snapshot.htmlClientHeight });
     }
     if (snapshot.divClientWidth !== null && !Object.is(snapshot.divClientWidth, viewportExpected.innerWidth)) {
       mismatches.push({ key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.clientWidth', expected: viewportExpected.innerWidth, actual: snapshot.divClientWidth });
@@ -1109,7 +1056,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const elementProto = (typeof Element !== 'undefined' && Element && Element.prototype) ? Element.prototype : null;
   const clientWidthDesc = elementProto ? Object.getOwnPropertyDescriptor(elementProto, 'clientWidth') : null;
   const clientHeightDesc = elementProto ? Object.getOwnPropertyDescriptor(elementProto, 'clientHeight') : null;
-  const htmlRoot = document.documentElement || null;
   const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
     ? __screenCanvasState.domCanvasHost
     : null;
@@ -1323,52 +1269,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   function __screenReconcileViewportRootClients(substage) {
     const localTargets = [];
     const localReasons = [];
-    const htmlRoot = document.documentElement || null;
     const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
       ? __screenCanvasState.domCanvasHost
       : null;
-    if (!htmlRoot) {
-      localReasons.push('document.documentElement:missing');
-    } else {
-      const htmlRootMap = [
-        { key: 'clientHeight', expected: viewportExpected.innerHeight }
-      ];
-      for (let i = ZERO; i < htmlRootMap.length; i++) {
-        const item = htmlRootMap[i];
-        let actual = null;
-        let readFailed = false;
-        let readError = null;
-        try {
-          actual = htmlRoot[item.key];
-        } catch (e) {
-          readFailed = true;
-          readError = (e && e.message) ? String(e.message) : 'native_read_failed';
-        }
-        if (readFailed) {
-          localReasons.push('document.documentElement.' + item.key + ':' + readError);
-          continue;
-        }
-        const matchesExpected = Object.is(actual, item.expected);
-        if (!matchesExpected) {
-          const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
-          const targetPlan = __screenBuildAccessorTarget(
-            htmlRoot,
-            null,
-            item.key,
-            item.expected,
-            'screen:viewport_group:html',
-            {
-              allowCreate: true,
-              invalidThis: 'throw',
-              configurable: protoDesc ? !!protoDesc.configurable : true,
-              enumerable: protoDesc ? !!protoDesc.enumerable : false
-            }
-          );
-          if (!targetPlan.ok) localReasons.push('document.documentElement.' + item.key + ':' + targetPlan.reason);
-          else localTargets.push(targetPlan.target);
-        }
-      }
-    }
     if (divRoot) {
       const divRootMap = [
         { key: 'clientWidth', expected: viewportExpected.innerWidth },
@@ -1501,6 +1404,41 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         }
       }
     });
+    const __screenCoordinationComplete = (
+      __screenGroupModes.displayMode !== 'skip' &&
+      __screenGroupModes.viewportMode !== 'skip' &&
+      __screenGroupModes.hostWindowMode !== 'read_failed' &&
+      __screenGroupModes.hostWindowMode !== 'skip'
+    );
+    const __screenSummaryCode = __screenCoordinationComplete
+      ? (__screenGroupModes.coordinationPatched ? 'screen:patches_applied' : 'screen:coordination_ready')
+      : 'screen:coordination_incomplete';
+    __screenDiag(__screenCoordinationComplete ? 'info' : 'warn', __screenSummaryCode, {
+      stage: 'runtime',
+      type: __screenCoordinationComplete
+        ? (__screenGroupModes.coordinationPatched ? 'ok' : __screenTypePipeline)
+        : __screenTypeBrowser,
+      diagTag: 'screen',
+      key: null,
+      message: __screenCoordinationComplete
+        ? (__screenGroupModes.coordinationPatched ? 'screen module coordinated and applied' : 'screen module completed with coherent native state')
+        : 'screen module completed with incomplete coordination',
+      data: {
+        outcome: 'return',
+        reason: __screenCoordinationComplete
+          ? (__screenGroupModes.coordinationPatched ? 'coordinated_apply' : 'coherent_native_completion')
+          : 'coordination_incomplete',
+        substage: 'DOMContentLoaded',
+        displayGroupMode: __screenGroupModes.displayMode,
+        displayGroupReason: __screenGroupModes.displayReason,
+        viewportGroupMode: __screenGroupModes.viewportMode,
+        viewportGroupReason: __screenGroupModes.viewportReason,
+        hostWindowGroupMode: __screenGroupModes.hostWindowMode,
+        hostWindowGroupReason: __screenGroupModes.hostWindowReason,
+        appliedTargets: __screenGroupModes.appliedTargets,
+        hostWindowObserved: hostWindowObserved
+      }
+    });
   };
   if (document.readyState === 'loading') {
     document.addEventListener("DOMContentLoaded", onViewportDomReady);
@@ -1510,42 +1448,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   } else {
     onViewportDomReady();
   }
-  
-  const __screenCoordinationComplete = (
-    __screenGroupModes.displayMode !== 'skip' &&
-    __screenGroupModes.viewportMode !== 'skip' &&
-    __screenGroupModes.hostWindowMode !== 'read_failed' &&
-    __screenGroupModes.hostWindowMode !== 'skip'
-  );
-  const __screenSummaryCode = __screenCoordinationComplete
-    ? (__screenGroupModes.coordinationPatched ? 'screen:patches_applied' : 'screen:coordination_ready')
-    : 'screen:coordination_incomplete';
-  __screenDiag(__screenCoordinationComplete ? 'info' : 'warn', __screenSummaryCode, {
-    stage: 'apply',
-    type: __screenCoordinationComplete
-      ? (__screenGroupModes.coordinationPatched ? 'ok' : __screenTypePipeline)
-      : __screenTypeBrowser,
-    diagTag: 'screen',
-    key: null,
-    message: __screenCoordinationComplete
-      ? (__screenGroupModes.coordinationPatched ? 'screen module coordinated and applied' : 'screen module completed with coherent native state')
-      : 'screen module completed with incomplete coordination',
-    data: {
-      outcome: 'return',
-      reason: __screenCoordinationComplete
-        ? (__screenGroupModes.coordinationPatched ? 'coordinated_apply' : 'coherent_native_completion')
-        : 'coordination_incomplete',
-      substage: 'module_apply',
-      displayGroupMode: __screenGroupModes.displayMode,
-      displayGroupReason: __screenGroupModes.displayReason,
-      viewportGroupMode: __screenGroupModes.viewportMode,
-      viewportGroupReason: __screenGroupModes.viewportReason,
-      hostWindowGroupMode: __screenGroupModes.hostWindowMode,
-      hostWindowGroupReason: __screenGroupModes.hostWindowReason,
-      appliedTargets: __screenGroupModes.appliedTargets,
-      hostWindowObserved: hostWindowObserved
-    }
-  });
   } catch (e) {
     let rollbackErr = null;
     for (let i = __moduleRollbackStack.length - 1; i >= 0; i--) {
