@@ -1378,9 +1378,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         }
       }
     }
-    if (!divRoot) {
-      localReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost:missing');
-    } else {
+    if (divRoot) {
       const divRootMap = [
         { key: 'clientWidth', expected: viewportExpected.innerWidth },
         { key: 'clientHeight', expected: viewportExpected.innerHeight }
