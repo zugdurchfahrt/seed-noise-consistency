@@ -79,10 +79,18 @@
   function __ensureWorkerWrkRuntimeRoot() {
     const C = __ensureWorkerCanvasPatchContext();
     if (!C) return null;
-    const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-      ? C.__wrkRuntime__
+    const stateRoot = (C.state && typeof C.state === 'object')
+      ? C.state
+      : __setHiddenValue(C, 'state', Object.create(null));
+    if (!stateRoot) return null;
+    const wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+      ? stateRoot.__WRK__
+      : __setHiddenValue(stateRoot, '__WRK__', Object.create(null));
+    if (!wrkState) return null;
+    const wrkRuntime = (wrkState.runtime && typeof wrkState.runtime === 'object')
+      ? wrkState.runtime
       : null;
-    return wrkRuntime || __setHiddenValue(C, '__wrkRuntime__', Object.create(null));
+    return wrkRuntime || __setHiddenValue(wrkState, 'runtime', Object.create(null));
   }
 
   function __isCoreToStringStateOk(state) {
@@ -170,7 +178,7 @@
 
     const ownedCoreToStringState = validateCoreToStringStateCandidate(
       (__wrkRuntimeRoot && __wrkRuntimeRoot.__CORE_TOSTRING_STATE__) ? __wrkRuntimeRoot.__CORE_TOSTRING_STATE__ : null,
-      'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__'
+      'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__'
     );
     let sharedCoreToStringState = ownedCoreToStringState || null;
 
@@ -206,7 +214,7 @@
       } catch (eState) {
         __wrkDiag('error', 'wrk:core_tostring_state_owner_define_failed', {
           stage: 'apply',
-          key: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
+          key: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
           message: 'failed to define owner-route __CORE_TOSTRING_STATE__',
           type: 'pipeline missing data',
           data: { outcome: 'throw' }

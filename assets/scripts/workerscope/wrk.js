@@ -110,19 +110,19 @@ const WrkModule = function WrkModule(window) {
   }
 
   function __ensureWrkRuntimeRoot__() {
-    const C = __resolveCanvasPatchContext__();
-    if (!C) return null;
-    const runtimeRoot = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-      ? C.__wrkRuntime__
+    const wrkState = __ensureWrkStateRoot__();
+    if (!wrkState) return null;
+    const runtimeRoot = (wrkState.runtime && typeof wrkState.runtime === 'object')
+      ? wrkState.runtime
       : null;
     return runtimeRoot;
   }
 
   function __ensureWrkHooksRoot__() {
-    const C = __resolveCanvasPatchContext__();
-    if (!C) return null;
-    const hooksRoot = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
-      ? C.__wrkHooks__
+    const wrkState = __ensureWrkStateRoot__();
+    if (!wrkState) return null;
+    const hooksRoot = (wrkState.hooks && typeof wrkState.hooks === 'object')
+      ? wrkState.hooks
       : null;
     return hooksRoot;
   }
@@ -153,9 +153,17 @@ const WrkModule = function WrkModule(window) {
       ? scope.CanvasPatchContext
       : __setHiddenValue__(scope, 'CanvasPatchContext', Object.create(null));
     if (!C) return null;
-    const runtimeRoot = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-      ? C.__wrkRuntime__
-      : __setHiddenValue__(C, '__wrkRuntime__', Object.create(null));
+    const stateRoot = (C.state && typeof C.state === 'object')
+      ? C.state
+      : __setHiddenValue__(C, 'state', Object.create(null));
+    if (!stateRoot) return null;
+    const wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+      ? stateRoot.__WRK__
+      : __setHiddenValue__(stateRoot, '__WRK__', Object.create(null));
+    if (!wrkState) return null;
+    const runtimeRoot = (wrkState.runtime && typeof wrkState.runtime === 'object')
+      ? wrkState.runtime
+      : __setHiddenValue__(wrkState, 'runtime', Object.create(null));
     return runtimeRoot;
   }
 
@@ -215,7 +223,7 @@ const WrkModule = function WrkModule(window) {
     const err = new Error('[WrkModule] FAIL_FAST: worker patch runtime not ready');
     __wrkDiag('error', 'wrk:worker_patch_runtime_missing', {
       stage: (typeof stage === 'string' && stage) ? stage : 'preflight',
-      key: 'CanvasPatchContext.__wrkRuntime__',
+      key: 'CanvasPatchContext.state.__WRK__.runtime',
       message: (typeof reason === 'string' && reason) ? reason : 'worker patch runtime not ready',
       type: 'pipeline missing data',
       data: { outcome: 'throw', reason: 'worker_patch_runtime_missing' }
@@ -236,7 +244,7 @@ const WrkModule = function WrkModule(window) {
     const err = new Error('[WrkModule] FAIL_FAST: worker patch api not ready');
     __wrkDiag('error', 'wrk:worker_patch_api_missing', {
       stage: (typeof stage === 'string' && stage) ? stage : 'preflight',
-      key: 'CanvasPatchContext.__wrkRuntime__.workerPatchApi',
+      key: 'CanvasPatchContext.state.__WRK__.runtime.workerPatchApi',
       message: (typeof reason === 'string' && reason) ? reason : 'worker patch api not ready',
       type: 'pipeline missing data',
       data: { outcome: 'throw', reason: 'worker_patch_api_missing' }
@@ -1090,9 +1098,15 @@ function mkModuleWorkerSource(snapshot, absUrl){
         var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
           ? self.CanvasPatchContext
           : __ensureHiddenValue(self, 'CanvasPatchContext', Object.create(null));
-        var wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-          ? C.__wrkRuntime__
-          : __ensureHiddenValue(C, '__wrkRuntime__', Object.create(null));
+        var stateRoot = (C.state && typeof C.state === 'object')
+          ? C.state
+          : __ensureHiddenValue(C, 'state', Object.create(null));
+        var wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+          ? stateRoot.__WRK__
+          : __ensureHiddenValue(stateRoot, '__WRK__', Object.create(null));
+        var wrkRuntime = (wrkState.runtime && typeof wrkState.runtime === 'object')
+          ? wrkState.runtime
+          : __ensureHiddenValue(wrkState, 'runtime', Object.create(null));
         __ensureHiddenValue(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
         __ensureHiddenValue(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
         __ensureHiddenValue(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
@@ -1523,9 +1537,15 @@ function mkClassicWorkerSource(snapshot, absUrl){
         var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
           ? self.CanvasPatchContext
           : __ensureHiddenValue(self, 'CanvasPatchContext', Object.create(null));
-        var wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-          ? C.__wrkRuntime__
-          : __ensureHiddenValue(C, '__wrkRuntime__', Object.create(null));
+        var stateRoot = (C.state && typeof C.state === 'object')
+          ? C.state
+          : __ensureHiddenValue(C, 'state', Object.create(null));
+        var wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+          ? stateRoot.__WRK__
+          : __ensureHiddenValue(stateRoot, '__WRK__', Object.create(null));
+        var wrkRuntime = (wrkState.runtime && typeof wrkState.runtime === 'object')
+          ? wrkState.runtime
+          : __ensureHiddenValue(wrkState, 'runtime', Object.create(null));
         __ensureHiddenValue(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
         __ensureHiddenValue(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
         __ensureHiddenValue(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
@@ -1877,7 +1897,7 @@ function SafeWorkerOverride(G){
     const e = new Error('[WorkerOverride] FAIL_FAST: worker patch api not ready');
     __wrkDiag('error', 'wrk:worker_override_bridge_not_ready', {
       stage: 'preflight',
-      key: 'CanvasPatchContext.__wrkRuntime__.workerPatchApi',
+      key: 'CanvasPatchContext.state.__WRK__.runtime.workerPatchApi',
       message: 'worker override runtime api not ready',
       type: 'pipeline missing data',
       data: { outcome: 'throw', reason: 'worker_patch_api_not_ready' }
@@ -2709,7 +2729,7 @@ function ServiceWorkerOverride(G){
 
   __wrkDiag('info', 'wrk:worker_patch_hooks_ready', {
     stage: 'apply',
-    key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
+    key: 'CanvasPatchContext.state.__WRK__.hooks.WorkerPatchHooks',
     message: 'WorkerPatchHooks ready',
     type: 'pipeline missing data',
     data: { outcome: 'return' }
@@ -2790,7 +2810,7 @@ function ServiceWorkerOverride(G){
   } catch (e) {
     __wrkDiag('warn', 'wrk:hide_pipeline_surface_failed', {
       stage: 'apply',
-      key: 'CanvasPatchContext.__wrkRuntime__',
+      key: 'CanvasPatchContext.state.__WRK__.runtime',
       message: 'hide pipeline surface failed',
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'hide_pipeline_surface_failed' }

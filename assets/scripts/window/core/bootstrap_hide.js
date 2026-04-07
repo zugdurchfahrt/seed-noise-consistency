@@ -200,24 +200,24 @@ if (!wrkBootstrapState) {
   __defineHiddenValue__(wrkRoot, 'bootstrap', wrkBootstrapState);
 }
 
-let wrkRuntimeRoot = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-  ? C.__wrkRuntime__
+let wrkRuntimeState = (wrkRoot.runtime && typeof wrkRoot.runtime === 'object')
+  ? wrkRoot.runtime
   : null;
-if (!wrkRuntimeRoot) {
-  wrkRuntimeRoot = __defineHiddenValue__(C, '__wrkRuntime__', Object.create(null));
-  if (!wrkRuntimeRoot) throw new Error('[module] CanvasPatchContext.__wrkRuntime__ bootstrap failed');
+if (!wrkRuntimeState) {
+  wrkRuntimeState = __defineHiddenValue__(wrkRoot, 'runtime', Object.create(null));
+  if (!wrkRuntimeState) throw new Error('[module] CanvasPatchContext.state.__WRK__.runtime bootstrap failed');
 } else {
-  __defineHiddenValue__(C, '__wrkRuntime__', wrkRuntimeRoot);
+  __defineHiddenValue__(wrkRoot, 'runtime', wrkRuntimeState);
 }
 
-let wrkHooksRoot = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
-  ? C.__wrkHooks__
+let wrkHooksState = (wrkRoot.hooks && typeof wrkRoot.hooks === 'object')
+  ? wrkRoot.hooks
   : null;
-if (!wrkHooksRoot) {
-  wrkHooksRoot = __defineHiddenValue__(C, '__wrkHooks__', Object.create(null));
-  if (!wrkHooksRoot) throw new Error('[module] CanvasPatchContext.__wrkHooks__ bootstrap failed');
+if (!wrkHooksState) {
+  wrkHooksState = __defineHiddenValue__(wrkRoot, 'hooks', Object.create(null));
+  if (!wrkHooksState) throw new Error('[module] CanvasPatchContext.state.__WRK__.hooks bootstrap failed');
 } else {
-  __defineHiddenValue__(C, '__wrkHooks__', wrkHooksRoot);
+  __defineHiddenValue__(wrkRoot, 'hooks', wrkHooksState);
 }
 
 let patchStateRoot = (C.__patchState && typeof C.__patchState === 'object')

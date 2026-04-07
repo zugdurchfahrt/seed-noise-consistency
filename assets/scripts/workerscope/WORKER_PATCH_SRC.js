@@ -71,8 +71,14 @@
       const C = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
         ? self.CanvasPatchContext
         : null;
-      const wrkRuntime = (C && C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-        ? C.__wrkRuntime__
+      const stateRoot = (C && C.state && typeof C.state === 'object')
+        ? C.state
+        : null;
+      const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+        ? stateRoot.__WRK__
+        : null;
+      const wrkRuntime = (wrkState && wrkState.runtime && typeof wrkState.runtime === 'object')
+        ? wrkState.runtime
         : null;
       return wrkRuntime;
     };
@@ -218,8 +224,8 @@
           type: 'pipeline missing data',
           stage: 'preflight',
           module: 'WORKER_PATCH_SRC',
-          surface: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
-          key: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
+          surface: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
+          key: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
           policy: 'throw',
           action: 'throw'
         }, e);
@@ -296,8 +302,8 @@
           type: 'pipeline missing data',
           stage: 'contract',
           module: 'WORKER_PATCH_SRC',
-          surface: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
-          key: 'CanvasPatchContext.__wrkRuntime__.__CORE_TOSTRING_STATE__',
+          surface: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
+          key: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
           policy: 'throw',
           action: 'throw'
         }, e);

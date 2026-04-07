@@ -77,10 +77,10 @@
   }
 
   function __ensureWrkRuntimeRoot() {
-    const C = __resolveCanvasPatchContext();
-    if (!C) return null;
-    const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-      ? C.__wrkRuntime__
+    const wrkState = __ensureWrkStateRoot();
+    if (!wrkState) return null;
+    const wrkRuntime = (wrkState.runtime && typeof wrkState.runtime === 'object')
+      ? wrkState.runtime
       : null;
     return wrkRuntime;
   }
@@ -96,10 +96,10 @@
   }
 
   function __ensureWrkHooksRoot() {
-    const C = __resolveCanvasPatchContext();
-    if (!C) return null;
-    const wrkHooks = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
-      ? C.__wrkHooks__
+    const wrkState = __ensureWrkStateRoot();
+    if (!wrkState) return null;
+    const wrkHooks = (wrkState.hooks && typeof wrkState.hooks === 'object')
+      ? wrkState.hooks
       : null;
     return wrkHooks;
   }
@@ -422,7 +422,7 @@
       const err = new Error('WorkerBootstrap: WorkerPatchHooks missing');
       __moduleDiag('error', __MODULE + ':hooks_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.__wrkHooks__.WorkerPatchHooks',
+        key: 'CanvasPatchContext.state.__WRK__.hooks.WorkerPatchHooks',
         message: 'WorkerPatchHooks missing',
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'hooks_missing' }

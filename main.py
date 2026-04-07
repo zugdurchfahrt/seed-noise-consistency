@@ -428,10 +428,13 @@ def init_driver(
                     }});
                     return value;
                 }}
-                const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
-                    ? C.__wrkRuntime__
+                const wrkState = (C.state && typeof C.state === 'object' && C.state.__WRK__ && typeof C.state.__WRK__ === 'object')
+                    ? C.state.__WRK__
                     : null;
-                if (!wrkRuntime) throw new Error('WorkerscopeInit: CanvasPatchContext.__wrkRuntime__ missing');
+                const wrkRuntime = (wrkState && wrkState.runtime && typeof wrkState.runtime === 'object')
+                    ? wrkState.runtime
+                    : null;
+                if (!wrkRuntime) throw new Error('WorkerscopeInit: CanvasPatchContext.state.__WRK__.runtime missing');
                 defineHidden(wrkRuntime, 'inlinePatch', {json.dumps(worker_patch_src)});
                 defineHidden(wrkRuntime, 'inlineReflect', {json.dumps(worker_reflect_src)});
                 defineHidden(wrkRuntime, 'inlineCoreWindow', {json.dumps(worker_core_window_src)});
