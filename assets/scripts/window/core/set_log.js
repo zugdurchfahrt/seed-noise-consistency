@@ -766,6 +766,23 @@ const LOGGingModule = function LOGGingModule() {
       dir: console.dir && console.dir.bind(console),
     };
     __defineLoggerHiddenValue("__RAW_CONSOLE__", Object.freeze(origConsole), true);
+
+    function getRawConsole() {
+      const raw = (__loggerRoot && __loggerRoot.__RAW_CONSOLE__ && typeof __loggerRoot.__RAW_CONSOLE__ === "object")
+        ? __loggerRoot.__RAW_CONSOLE__
+        : null;
+      return raw || origConsole || null;
+    }
+
+    function emitRawConsoleError(err) {
+      try {
+        const raw = getRawConsole();
+        const fn = raw && typeof raw.error === "function" ? raw.error : null;
+        if (typeof fn !== "function") return;
+        fn(err);
+      } catch (_) {}
+    }
+
     const consoleGroupStack = [];
 
     function getLoggerGuard() {
@@ -1440,9 +1457,9 @@ const LOGGingModule = function LOGGingModule() {
       } catch (e) {
         // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
         // иначе рекурсия по пути ошибок (само-логирование логгера).
-        // (если очень надо сигналить — делай это через origConsole.* или просто молчи)
+        // (если очень надо сигналить — делай это через __RAW_CONSOLE__ или просто молчи)
         if (env && env.DEBUG_DEGRADES) {
-          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          emitRawConsoleError(e);
           // Keep last-known logger failure in memory; never throw outward from the logger.
           try { recordLoggerError(e, "pushEntry"); } catch (_) {}
         }
@@ -1454,14 +1471,14 @@ const LOGGingModule = function LOGGingModule() {
     const __degradeApi = function (code, err, extra) {
     degradeFn = __degradeApi;
       try {
-        if (typeof pushEntry !== "function") {
-          if (env && env.DEBUG_DEGRADES) {
-            const te = new TypeError("[set_log] pushEntry is missing");
-            try { recordLoggerError(te, "__DEGRADE__:pushEntry_missing"); } catch (_) {}
-            if (origConsole && origConsole.error) { try { origConsole.error(te); } catch (_) {} }
+          if (typeof pushEntry !== "function") {
+            if (env && env.DEBUG_DEGRADES) {
+              const te = new TypeError("[set_log] pushEntry is missing");
+              try { recordLoggerError(te, "__DEGRADE__:pushEntry_missing"); } catch (_) {}
+              emitRawConsoleError(te);
+            }
+            return;
           }
-          return;
-        }
         const normalizedExtra = extra ? normalizeForJSON(extra) : null;
 
         if (isProbeReceiverGuardActive()) {
@@ -1481,12 +1498,10 @@ const LOGGingModule = function LOGGingModule() {
           timestamp: new Date().toISOString(),
         });
         } catch (e) {
-        if (env && env.DEBUG_DEGRADES) {
-            if (origConsole && origConsole.error) {
-            try { origConsole.error(e); } catch (_) {}
-            }
+          if (env && env.DEBUG_DEGRADES) {
+            emitRawConsoleError(e);
             try { recordLoggerError(e, "__DEGRADE__"); } catch (_) {}
-        }
+          }
         }
     };
     degradeFn = __degradeApi;
@@ -1520,7 +1535,7 @@ const LOGGingModule = function LOGGingModule() {
      * @param {Error} [err] - опциональная ошибка
      *
      * Записывает в shape: { type:'degrade', code, error, extra:{ level, type, ... }, timestamp }.
-     * Fail-safe: не бросает исключения и не пишет в console.
+     * Fail-safe: не бросает исключения; штатно пишет только в logger/degrade buffer.
      */
   Object.defineProperty(__degradeApi, "diag", {
       value(level, code, ctx, err) {
@@ -1871,7 +1886,7 @@ const LOGGingModule = function LOGGingModule() {
         }, null);
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
-          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          emitRawConsoleError(e);
           // Do not call __DEGRADE__ here (it writes through pushEntry); avoid recursion.
           try { recordLoggerError(e, "pushLog"); } catch (_) {}
         }
@@ -1921,7 +1936,7 @@ const LOGGingModule = function LOGGingModule() {
         });
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
-          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          emitRawConsoleError(e);
           try { recordLoggerError(e, "onerror"); } catch (_) {}
         }
       }
@@ -1973,7 +1988,7 @@ const LOGGingModule = function LOGGingModule() {
           });
         } catch (e) {
           if (env && env.DEBUG_DEGRADES) {
-            if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+            emitRawConsoleError(e);
             try { recordLoggerError(e, "resource_error"); } catch (_) {}
           }
         }
@@ -1994,7 +2009,7 @@ const LOGGingModule = function LOGGingModule() {
         });
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
-          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          emitRawConsoleError(e);
           try { recordLoggerError(e, "unhandledrejection"); } catch (_) {}
         }
       }
@@ -2020,11 +2035,11 @@ const LOGGingModule = function LOGGingModule() {
               timestamp: new Date().toISOString(),
             });
            } catch (e) {
-             if (env && env.DEBUG_DEGRADES) {
-               if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-               try { recordLoggerError(e, "worker_error"); } catch (_) {}
-             }
-           }
+              if (env && env.DEBUG_DEGRADES) {
+                emitRawConsoleError(e);
+                try { recordLoggerError(e, "worker_error"); } catch (_) {}
+              }
+            }
          });
 
         global.addEventListener("unhandledrejection", function (event) {
@@ -2038,19 +2053,19 @@ const LOGGingModule = function LOGGingModule() {
               timestamp: new Date().toISOString(),
             });
            } catch (e) {
-             if (env && env.DEBUG_DEGRADES) {
-               if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-               try { recordLoggerError(e, "worker_unhandledrejection"); } catch (_) {}
-             }
-           }
-         });
+              if (env && env.DEBUG_DEGRADES) {
+                emitRawConsoleError(e);
+                try { recordLoggerError(e, "worker_unhandledrejection"); } catch (_) {}
+              }
+            }
+          });
       }
      } catch (e) {
-       if (env && env.DEBUG_DEGRADES) {
-         if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
-         try { recordLoggerError(e, "worker_context"); } catch (_) {}
-       }
-     }
+        if (env && env.DEBUG_DEGRADES) {
+          emitRawConsoleError(e);
+          try { recordLoggerError(e, "worker_context"); } catch (_) {}
+        }
+      }
 
     // ===== 6) Export helper (in-session) =====
     __defineLoggerHiddenValue("exportMyDebugLog", function () {
@@ -2072,7 +2087,7 @@ const LOGGingModule = function LOGGingModule() {
             document.body.removeChild(a);
           } catch (e) {
             if (env && env.DEBUG_DEGRADES) {
-              if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+              emitRawConsoleError(e);
               try { recordLoggerError(e, "exportMyDebugLog:removeChild"); } catch (_) {}
             }
           }
@@ -2080,14 +2095,14 @@ const LOGGingModule = function LOGGingModule() {
             URL.revokeObjectURL(url);
           } catch (e) {
             if (env && env.DEBUG_DEGRADES) {
-              if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+              emitRawConsoleError(e);
               try { recordLoggerError(e, "exportMyDebugLog:revokeObjectURL"); } catch (_) {}
             }
           }
         }, 5500);
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
-          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          emitRawConsoleError(e);
           try { recordLoggerError(e, "exportMyDebugLog"); } catch (_) {}
         }
       }
@@ -2109,7 +2124,7 @@ const LOGGingModule = function LOGGingModule() {
         }
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
-          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          emitRawConsoleError(e);
           try { recordLoggerError(e, "DEBUG_ALL_ON"); } catch (_) {}
         }
       }
@@ -2129,7 +2144,7 @@ const LOGGingModule = function LOGGingModule() {
         }
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
-          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          emitRawConsoleError(e);
           try { recordLoggerError(e, "DEBUG_ALL_OFF"); } catch (_) {}
         }
       }
@@ -2141,7 +2156,7 @@ const LOGGingModule = function LOGGingModule() {
         else __loggerRoot.DEBUG_ALL_ON();
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
-          if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+          emitRawConsoleError(e);
           try { recordLoggerError(e, "DEBUG_ALL_TOGGLE"); } catch (_) {}
         }
       }
@@ -2153,7 +2168,7 @@ const LOGGingModule = function LOGGingModule() {
         env.DEBUG_DEGRADES = true;
         if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_ON", null);
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "DEBUG_DEGRADES_ON"); } catch (_) {}
       }
     }, false);
@@ -2163,7 +2178,7 @@ const LOGGingModule = function LOGGingModule() {
         env.DEBUG_DEGRADES = false;
         if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_OFF", null);
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "DEBUG_DEGRADES_OFF"); } catch (_) {}
       }
     }, false);
@@ -2173,7 +2188,7 @@ const LOGGingModule = function LOGGingModule() {
         env.DEBUG_DEGRADES = !env.DEBUG_DEGRADES;
         if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_TOGGLE", null, { enabled: !!env.DEBUG_DEGRADES });
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
       }
     }, false);
@@ -2191,7 +2206,7 @@ const LOGGingModule = function LOGGingModule() {
           });
         }
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "CONSOLE_CAPTURE_COMPACT_ON"); } catch (_) {}
       }
     }, false);
@@ -2209,7 +2224,7 @@ const LOGGingModule = function LOGGingModule() {
           });
         }
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "CONSOLE_CAPTURE_COMPACT_OFF"); } catch (_) {}
       }
     }, false);
@@ -2219,7 +2234,7 @@ const LOGGingModule = function LOGGingModule() {
         if (__loggerRoot.__CONSOLE_CAPTURE_COMPACT__ === false) __loggerRoot.CONSOLE_CAPTURE_COMPACT_ON();
         else __loggerRoot.CONSOLE_CAPTURE_COMPACT_OFF();
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "CONSOLE_CAPTURE_COMPACT_TOGGLE"); } catch (_) {}
       }
     }, false);
@@ -2230,7 +2245,7 @@ const LOGGingModule = function LOGGingModule() {
         const mode = getLoggerGuardMode();
         if (mode) mode.expectedReceiverThrow = true;
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_ON"); } catch (_) {}
       }
     }, false);
@@ -2241,7 +2256,7 @@ const LOGGingModule = function LOGGingModule() {
         const mode = getLoggerGuardMode();
         if (mode) mode.expectedReceiverThrow = false;
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_OFF"); } catch (_) {}
       }
     }, false);
@@ -2253,7 +2268,7 @@ const LOGGingModule = function LOGGingModule() {
         if (mode) mode.expectedReceiverThrow = !next;
         env.EXPECTED_RECEIVER_THROW_GUARD = !!(mode && mode.expectedReceiverThrow !== false);
       } catch (e) {
-        if (origConsole && origConsole.error) { try { origConsole.error(e); } catch (_) {} }
+        emitRawConsoleError(e);
         try { recordLoggerError(e, "EXPECTED_RECEIVER_THROW_GUARD_TOGGLE"); } catch (_) {}
       }
     }, false);
