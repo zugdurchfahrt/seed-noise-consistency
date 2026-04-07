@@ -91,7 +91,7 @@ setup_logger(child_levels={
     "plugins_dict": logging.DEBUG,
     "brandmauer": logging.INFO,
 })
-# ----------------------- GLOBAL VARIABLES -----------------------
+                                                                                                                                                                                                                                                                                                # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
 
 def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
@@ -388,6 +388,7 @@ def init_driver(
             # --- logger after bootstrap owner-space ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
+            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
@@ -429,7 +430,8 @@ def init_driver(
                 }}
                 const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
                     ? C.__wrkRuntime__
-                    : defineHidden(C, '__wrkRuntime__', Object.create(null));
+                    : null;
+                if (!wrkRuntime) throw new Error('WorkerscopeInit: CanvasPatchContext.__wrkRuntime__ missing');
                 defineHidden(wrkRuntime, 'inlinePatch', {json.dumps(worker_patch_src)});
                 defineHidden(wrkRuntime, 'inlineReflect', {json.dumps(worker_reflect_src)});
                 defineHidden(wrkRuntime, 'inlineCoreWindow', {json.dumps(worker_core_window_src)});
@@ -473,7 +475,7 @@ def init_driver(
             }})(window);
             """,
             # --- self-executing sources after dependencies ---
-            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+           
             Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8"),
         ]
         return "\n;\n".join(parts)

@@ -119,6 +119,144 @@ if (!canvasState) {
   __defineHiddenValue__(canvasRoot, '__STATE__', canvasState);
 }
 
+let screenRoot = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
+  ? stateRoot.__SCREEN__
+  : null;
+if (!screenRoot) {
+  screenRoot = __defineHiddenValue__(stateRoot, '__SCREEN__', Object.create(null));
+  if (!screenRoot) throw new Error('[module] CanvasPatchContext.state.__SCREEN__ bootstrap failed');
+} else {
+  __defineHiddenValue__(stateRoot, '__SCREEN__', screenRoot);
+}
+if (!Object.prototype.hasOwnProperty.call(screenRoot, 'orientationDom')) screenRoot.orientationDom = null;
+
+let navRoot = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
+  ? stateRoot.__NAV_TOTAL_SET__
+  : null;
+if (!navRoot) {
+  navRoot = __defineHiddenValue__(stateRoot, '__NAV_TOTAL_SET__', Object.create(null));
+  if (!navRoot) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__ bootstrap failed');
+} else {
+  __defineHiddenValue__(stateRoot, '__NAV_TOTAL_SET__', navRoot);
+}
+
+let navDataStoreState = (navRoot.__DATA_STORE_STATE__ && typeof navRoot.__DATA_STORE_STATE__ === 'object')
+  ? navRoot.__DATA_STORE_STATE__
+  : null;
+if (!navDataStoreState) {
+  navDataStoreState = __defineHiddenValue__(navRoot, '__DATA_STORE_STATE__', Object.create(null));
+  if (!navDataStoreState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ bootstrap failed');
+} else {
+  __defineHiddenValue__(navRoot, '__DATA_STORE_STATE__', navDataStoreState);
+}
+
+let navScalarState = (navRoot.__SCALAR_STATE__ && typeof navRoot.__SCALAR_STATE__ === 'object')
+  ? navRoot.__SCALAR_STATE__
+  : null;
+if (!navScalarState) {
+  navScalarState = __defineHiddenValue__(navRoot, '__SCALAR_STATE__', Object.create(null));
+  if (!navScalarState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ bootstrap failed');
+} else {
+  __defineHiddenValue__(navRoot, '__SCALAR_STATE__', navScalarState);
+}
+
+let navObjectState = (navRoot.__OBJECT_STATE__ && typeof navRoot.__OBJECT_STATE__ === 'object')
+  ? navRoot.__OBJECT_STATE__
+  : null;
+if (!navObjectState) {
+  navObjectState = __defineHiddenValue__(navRoot, '__OBJECT_STATE__', Object.create(null));
+  if (!navObjectState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ bootstrap failed');
+} else {
+  __defineHiddenValue__(navRoot, '__OBJECT_STATE__', navObjectState);
+}
+
+let hideWebdriverRoot = (stateRoot.__HIDE_WEBDRIVER__ && typeof stateRoot.__HIDE_WEBDRIVER__ === 'object')
+  ? stateRoot.__HIDE_WEBDRIVER__
+  : null;
+if (!hideWebdriverRoot) {
+  hideWebdriverRoot = __defineHiddenValue__(stateRoot, '__HIDE_WEBDRIVER__', Object.create(null));
+  if (!hideWebdriverRoot) throw new Error('[module] CanvasPatchContext.state.__HIDE_WEBDRIVER__ bootstrap failed');
+} else {
+  __defineHiddenValue__(stateRoot, '__HIDE_WEBDRIVER__', hideWebdriverRoot);
+}
+
+let wrkRoot = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+  ? stateRoot.__WRK__
+  : null;
+if (!wrkRoot) {
+  wrkRoot = __defineHiddenValue__(stateRoot, '__WRK__', Object.create(null));
+  if (!wrkRoot) throw new Error('[module] CanvasPatchContext.state.__WRK__ bootstrap failed');
+} else {
+  __defineHiddenValue__(stateRoot, '__WRK__', wrkRoot);
+}
+
+let wrkBootstrapState = (wrkRoot.bootstrap && typeof wrkRoot.bootstrap === 'object')
+  ? wrkRoot.bootstrap
+  : null;
+if (!wrkBootstrapState) {
+  wrkBootstrapState = __defineHiddenValue__(wrkRoot, 'bootstrap', Object.create(null));
+  if (!wrkBootstrapState) throw new Error('[module] CanvasPatchContext.state.__WRK__.bootstrap bootstrap failed');
+} else {
+  __defineHiddenValue__(wrkRoot, 'bootstrap', wrkBootstrapState);
+}
+
+let wrkRuntimeRoot = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
+  ? C.__wrkRuntime__
+  : null;
+if (!wrkRuntimeRoot) {
+  wrkRuntimeRoot = __defineHiddenValue__(C, '__wrkRuntime__', Object.create(null));
+  if (!wrkRuntimeRoot) throw new Error('[module] CanvasPatchContext.__wrkRuntime__ bootstrap failed');
+} else {
+  __defineHiddenValue__(C, '__wrkRuntime__', wrkRuntimeRoot);
+}
+
+let wrkHooksRoot = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
+  ? C.__wrkHooks__
+  : null;
+if (!wrkHooksRoot) {
+  wrkHooksRoot = __defineHiddenValue__(C, '__wrkHooks__', Object.create(null));
+  if (!wrkHooksRoot) throw new Error('[module] CanvasPatchContext.__wrkHooks__ bootstrap failed');
+} else {
+  __defineHiddenValue__(C, '__wrkHooks__', wrkHooksRoot);
+}
+
+let patchStateRoot = (C.__patchState && typeof C.__patchState === 'object')
+  ? C.__patchState
+  : null;
+if (!patchStateRoot) {
+  patchStateRoot = __defineHiddenValue__(C, '__patchState', {
+    canvas: false,
+    offscreen: false,
+    webgl: false,
+    hooksRegistered: false
+  });
+  if (!patchStateRoot) throw new Error('[module] CanvasPatchContext.__patchState__ bootstrap failed');
+} else {
+  __defineHiddenValue__(C, '__patchState', patchStateRoot);
+}
+
+let hookModeStore = (C.__hookModeStore && typeof C.__hookModeStore === 'object')
+  ? C.__hookModeStore
+  : null;
+if (!hookModeStore) {
+  hookModeStore = __defineHiddenValue__(C, '__hookModeStore', Object.create(null));
+  if (!hookModeStore) throw new Error('[module] CanvasPatchContext.__hookModeStore bootstrap failed');
+} else {
+  __defineHiddenValue__(C, '__hookModeStore', hookModeStore);
+}
+if (!Object.prototype.hasOwnProperty.call(hookModeStore, 'post_orig_once')) {
+  Object.defineProperty(hookModeStore, 'post_orig_once', {
+    value: Object.freeze({}),
+    writable: false,
+    configurable: false,
+    enumerable: false
+  });
+}
+
+if (typeof C.__READY__ !== 'boolean') {
+  __defineHiddenValue__(C, '__READY__', false);
+}
+
 let loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 if (!loggerRoot) {
   loggerRoot = __defineHiddenValue__(C, '__logger', Object.create(null));

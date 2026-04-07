@@ -390,15 +390,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
   // === 5) anti‑FP hooks  ===
   // readPixels is void and writes into the provided buffer.
   // Its noise hook must run post-orig; the executor mode is set here (not globally).
-  const hookModeStore = (C.__hookModeStore && typeof C.__hookModeStore === 'object') ? C.__hookModeStore : {};
-  if (!Object.prototype.hasOwnProperty.call(C, '__hookModeStore')) {
-    Object.defineProperty(C, '__hookModeStore', {
-      value: hookModeStore,
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
-  }
+  const hookModeStore = (C.__hookModeStore && typeof C.__hookModeStore === 'object') ? C.__hookModeStore : null;
+  if (!hookModeStore) throw new Error('[WebGLPatch] CanvasPatchContext.__hookModeStore missing');
   if (!Object.prototype.hasOwnProperty.call(hookModeStore, 'post_orig_once')) {
     Object.defineProperty(hookModeStore, 'post_orig_once', {
       value: Object.freeze({}),

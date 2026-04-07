@@ -39,12 +39,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       __defineHiddenValue__(C, '__patchState', existing);
       return existing;
     }
-    return __defineHiddenValue__(C, '__patchState', {
-      canvas: false,
-      offscreen: false,
-      webgl: false,
-      hooksRegistered: false,
-    });
+    throw new Error('[CanvasPatch] CanvasPatchContext.__patchState missing');
   })();
   function __ensurePatchState__(owner) {
     const target = (owner && (typeof owner === 'object' || typeof owner === 'function'))
@@ -57,20 +52,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
       __defineHiddenValue__(target, '__patchState', existing);
       return existing;
     }
-    __defineHiddenValue__(target, '__patchState', patchState);
+    if (target === C) return patchState;
     return patchState;
   }
   const hookModeStore = (C.__hookModeStore && typeof C.__hookModeStore === 'object')
     ? C.__hookModeStore
-    : {};
-  if (!Object.prototype.hasOwnProperty.call(C, '__hookModeStore')) {
-    Object.defineProperty(C, '__hookModeStore', {
-      value: hookModeStore,
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
-  }
+    : null;
+  if (!hookModeStore) throw new Error('[CanvasPatch] CanvasPatchContext.__hookModeStore missing');
   if (!Object.prototype.hasOwnProperty.call(hookModeStore, 'post_orig_once')) {
     Object.defineProperty(hookModeStore, 'post_orig_once', {
       value: Object.freeze({}),
@@ -216,22 +204,35 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
 
   function getHooks(){
-    return (typeof global !== 'undefined' && global.CanvasPatchHooks) ? global.CanvasPatchHooks : null;
+    return (typeof global !== 'undefined'
+      && global.CanvasPatchHooks
+      && typeof global.CanvasPatchHooks === 'object')
+      ? global.CanvasPatchHooks
+      : null;
   }
 
-  // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
-  // NOTE: this value is used as a stable fallback for hook keys (fontStr) when ctx.font is unreadable/empty.
-  const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
-    const cached = (C && typeof C.__DEFAULT_CTX2D_FONT__ === 'string') ? C.__DEFAULT_CTX2D_FONT__ : '';
+  function getCanvasState() {
+    return (C && C.state && typeof C.state === 'object'
+        && C.state.__CANVAS__ && typeof C.state.__CANVAS__ === 'object'
+        && C.state.__CANVAS__.__STATE__ && typeof C.state.__CANVAS__.__STATE__ === 'object')
+      ? C.state.__CANVAS__.__STATE__
+      : null;
+  }
+
+  // Native default ctx2d font (MDN/Chromium-consistent) is read from canonical canvas state.
+  // NOTE: this value is used as a fallback for hook keys (fontStr) when ctx.font is unreadable/empty.
+  function getDefaultCtx2DFont() {
+    const canvasState = getCanvasState();
+    const cached = (canvasState && typeof canvasState.defaultCtx2dFont === 'string') ? canvasState.defaultCtx2dFont : '';
     if (cached && cached.trim()) return cached.trim();
     emitContextDiag('warn', 'context:ctx2d:guard:default_font_missing', null, {
       stage: 'guard',
-      key: '__DEFAULT_CTX2D_FONT__',
+      key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
       type: 'pipeline missing data',
       message: 'shared default ctx2d font missing'
     });
     return '';
-  })();
+  }
 
   function keepNativeMethods(proto, methods) {
     if (!proto || !Array.isArray(methods) || !methods.length) return false;
@@ -1452,7 +1453,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
       const getFontStr = (self) => {
       try {
-        const f = self && typeof self.font === 'string' && self.font.trim() ? self.font : DEFAULT_CTX2D_FONT;
+        const f = self && typeof self.font === 'string' && self.font.trim() ? self.font : getDefaultCtx2DFont();
         return f;
       } catch (e) {
         emitContextDiag('warn', 'context:ctx2d:runtime:font_read_failed', e, {
@@ -1460,7 +1461,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: 'font',
           type: 'browser structure missing data'
         });
-        return DEFAULT_CTX2D_FONT;
+        return getDefaultCtx2DFont();
       }
     };
 
@@ -1718,16 +1719,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (state.canvas) return 0;
     if (typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype) return 0;
     captureKeepNativeRefs();
+    const canvasState = getCanvasState();
     let applied = 0, total = 2;
     applied += installIssuedCanvasFactory(
       this.htmlCanvasGetContextHooks,
       this.ctx2DGetContextHooks,
       this.webglGetContextHooks
     );
-    if (C && C.__DOM_CANVAS__) {
+    if (canvasState && canvasState.domCanvas) {
       total += 3;
-      applied += installIssuedSerializationMethods(C.__DOM_CANVAS__);
-      applied += installIssuedGetContextMethod(C.__DOM_CANVAS__, this.htmlCanvasGetContextHooks, this.ctx2DGetContextHooks, this.webglGetContextHooks);
+      applied += installIssuedSerializationMethods(canvasState.domCanvas);
+      applied += installIssuedGetContextMethod(canvasState.domCanvas, this.htmlCanvasGetContextHooks, this.ctx2DGetContextHooks, this.webglGetContextHooks);
     }
     state.canvas = applied > 0;
     if (__loggerRoot && __loggerRoot.__DEBUG__) {
@@ -1748,15 +1750,16 @@ const ContextPatchModule = function ContextPatchModule(window) {
     let applied = 0, total = 1;
     if (typeof OffscreenCanvas !== 'undefined'){
       captureKeepNativeRefs();
+      const canvasState = getCanvasState();
       applied += installIssuedOffscreenFactory(
         Ctx.offscreenGetContextHooks,
         Ctx.ctx2DGetContextHooks,
         Ctx.webglGetContextHooks
       );
-      if (C && C.__OFFSCREEN_CANVAS__) {
+      if (canvasState && canvasState.offscreenCanvas) {
         total += 2;
-        applied += installIssuedSerializationMethods(C.__OFFSCREEN_CANVAS__);
-        applied += installIssuedGetContextMethod(C.__OFFSCREEN_CANVAS__, Ctx.offscreenGetContextHooks, Ctx.ctx2DGetContextHooks, Ctx.webglGetContextHooks);
+        applied += installIssuedSerializationMethods(canvasState.offscreenCanvas);
+        applied += installIssuedGetContextMethod(canvasState.offscreenCanvas, Ctx.offscreenGetContextHooks, Ctx.ctx2DGetContextHooks, Ctx.webglGetContextHooks);
       }
       state.offscreen = true;
     }

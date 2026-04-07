@@ -151,15 +151,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'canvas_patch_state_missing');
       return;
     }
-    if (!(__stateRoot.__NAV_TOTAL_SET__ && typeof __stateRoot.__NAV_TOTAL_SET__ === 'object')) {
-      Object.defineProperty(__stateRoot, '__NAV_TOTAL_SET__', {
-        value: Object.create(null),
-        writable: true,
-        configurable: true,
-        enumerable: false
+    const __navModuleState = (__stateRoot.__NAV_TOTAL_SET__ && typeof __stateRoot.__NAV_TOTAL_SET__ === 'object')
+      ? __stateRoot.__NAV_TOTAL_SET__
+      : null;
+    if (!__navModuleState) {
+      __navDiagPipeline('warn', 'nav_total_set:module_state_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__',
+        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__ missing',
+        data: { outcome: 'skip', reason: 'module_state_missing' }
       });
+      __navReleaseEntryGuard(true, 'preflight', 'module_state_missing');
+      return;
     }
-    const __navModuleState = __stateRoot.__NAV_TOTAL_SET__;
     function __navCloneStateValue(value) {
       if (Array.isArray(value)) return value.map(__navCloneStateValue);
       if (value && typeof value === 'object') {
@@ -188,29 +192,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       });
       return value;
     }
-    let __navProfileState = (__navModuleState.__PROFILE_STATE__ && typeof __navModuleState.__PROFILE_STATE__ === 'object')
-      ? __navModuleState.__PROFILE_STATE__
+    let __navDataStoreState = (__navModuleState.__DATA_STORE_STATE__ && typeof __navModuleState.__DATA_STORE_STATE__ === 'object')
+      ? __navModuleState.__DATA_STORE_STATE__
       : null;
-    if (!__navProfileState) {
-      __navProfileState = Object.create(null);
-      Object.defineProperty(__navModuleState, '__PROFILE_STATE__', {
-        value: __navProfileState,
-        writable: true,
-        configurable: true,
-        enumerable: false
+    if (!__navDataStoreState) {
+      __navDiagPipeline('warn', 'nav_total_set:data_store_state_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__',
+        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing',
+        data: { outcome: 'skip', reason: 'data_store_state_missing' }
       });
+      __navReleaseEntryGuard(true, 'preflight', 'data_store_state_missing');
+      return;
     }
     let __navObjectState = (__navModuleState.__OBJECT_STATE__ && typeof __navModuleState.__OBJECT_STATE__ === 'object')
       ? __navModuleState.__OBJECT_STATE__
       : null;
     if (!__navObjectState) {
-      __navObjectState = Object.create(null);
-      Object.defineProperty(__navModuleState, '__OBJECT_STATE__', {
-        value: __navObjectState,
-        writable: true,
-        configurable: true,
-        enumerable: false
+      __navDiagPipeline('warn', 'nav_total_set:object_state_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__',
+        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ missing',
+        data: { outcome: 'skip', reason: 'object_state_missing' }
       });
+      __navReleaseEntryGuard(true, 'preflight', 'object_state_missing');
+      return;
     }
 
     // basic random from the existing seed initialization
@@ -321,63 +327,45 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     try {
-    __navProfileState.meta = __navCloneStateValue((__envProfileState.meta && typeof __envProfileState.meta === 'object') ? __envProfileState.meta : {});
-    __navProfileState.navPlat = __envProfileState.navPlat;
-    __navProfileState.generatedPlatform = __envProfileState.generatedPlatform;
-    __navProfileState.generatedPlatformVersion = __envProfileState.generatedPlatformVersion;
-    __navProfileState.userAgent = __envProfileState.userAgent;
-    __navProfileState.vendor = __envProfileState.vendor;
-    __navProfileState.mem = Number(__envProfileState.mem);
-    __navProfileState.cpu = Number(__envProfileState.cpu);
-    __navProfileState.dpr = Number(__envProfileState.dpr);
-    __navProfileState.width = Number(__envProfileState.width);
-    __navProfileState.height = Number(__envProfileState.height);
-    __navProfileState.physicalWidth = Number(
+    // ---- Hard consistency for platform ----
+    // ——— A. Input/meta ———
+    const meta          = (__envProfileState.meta && typeof __envProfileState.meta === 'object') ? __envProfileState.meta : {};
+    const navPlat       = __envProfileState.navPlat;     // 'Win32' | 'MacIntel'
+    const gen           = __envProfileState.generatedPlatform; // "Windows" | "macOS"
+    const userAgent     = __envProfileState.userAgent;
+    const vendor        = __envProfileState.vendor;
+    const mem           = Number(__envProfileState.mem);
+    const cpu           = Number(__envProfileState.cpu);
+    const dpr           = Number(__envProfileState.dpr);
+    const width         = Number(__envProfileState.width);
+    const height        = Number(__envProfileState.height);
+    const physicalWidth = Number(
       (__envProfileState.profile && __envProfileState.profile.physical_screen_width != null)
         ? __envProfileState.profile.physical_screen_width
         : NaN
     );
-    __navProfileState.physicalHeight = Number(
+    const physicalHeight = Number(
       (__envProfileState.profile && __envProfileState.profile.physical_screen_height != null)
         ? __envProfileState.profile.physical_screen_height
         : NaN
     );
-    __navProfileState.devicesLabels = __navCloneStateValue(__envProfileState.devicesLabels);
-    __navProfileState.colorDepth = Number(__envProfileState.colorDepth);
-    __navProfileState.orientationDom = (typeof __envProfileState.orientationDom !== 'undefined')
+    const devicesLabels = __navCloneStateValue(__envProfileState.devicesLabels);
+    const colorDepth    = Number(__envProfileState.colorDepth);
+    const orientationDom = (typeof __envProfileState.orientationDom !== 'undefined')
       ? __envProfileState.orientationDom
       : ((__navScreenState && typeof __navScreenState.orientationDom === 'string' && __navScreenState.orientationDom)
         ? __navScreenState.orientationDom
-        : (((__navProfileState.height >= __navProfileState.width)) ? 'portrait-primary' : 'landscape-primary'));
-    __navProfileState.strict = (__envProfileState.strict !== undefined) ? !!__envProfileState.strict : true;
-    __navProfileState.debug = !!__envProfileState.debug;
-    __navProfileState.fullVersionList = __navCloneStateValue(__envProfileState.fullVersionList);
-    __navProfileState.storageQuotaMb = __envProfileState.storageQuotaMb;
-    __navProfileState.storageUsedPct = __envProfileState.storageUsedPct;
-    __navProfileState.pluginProfiles = __navCloneStateValue(Array.isArray(__envProfileState.pluginProfiles) ? __envProfileState.pluginProfiles : []);
-    __navProfileState.primaryLanguage = __navPrimaryLanguage;
-    __navProfileState.normalizedLanguages = __navCloneStateValue(__navNormalizedLanguages);
-    // ---- Hard consistency for platform ----
-    // ——— A. Input/meta ———
-    const meta          = __navProfileState.meta || {};
-    const navPlat       = __navProfileState.navPlat;     // 'Win32' | 'MacIntel'
-    const gen           = __navProfileState.generatedPlatform; // "Windows" | "macOS"
-    const userAgent     = __navProfileState.userAgent;
-    const vendor        = __navProfileState.vendor;
-    const mem           = __navProfileState.mem;
-    const cpu           = __navProfileState.cpu;
-    const dpr           = __navProfileState.dpr;
-    const width         = __navProfileState.width;
-    const height        = __navProfileState.height;
-    const physicalWidth = __navProfileState.physicalWidth;
-    const physicalHeight = __navProfileState.physicalHeight;
-    const devicesLabels = __navProfileState.devicesLabels;
-    const colorDepth    = __navProfileState.colorDepth;
-    const orientationDom = __navProfileState.orientationDom;
+        : (((height >= width)) ? 'portrait-primary' : 'landscape-primary'));
+    const fullVersionList = __navCloneStateValue(__envProfileState.fullVersionList);
+    const storageQuotaMb = __envProfileState.storageQuotaMb;
+    const storageUsedPct = __envProfileState.storageUsedPct;
+    const pluginProfiles = __navCloneStateValue(Array.isArray(__envProfileState.pluginProfiles) ? __envProfileState.pluginProfiles : []);
+    const primaryLanguage = __navPrimaryLanguage;
+    const normalizedLanguages = __navCloneStateValue(__navNormalizedLanguages);
 
     // strictness & diagnostics
-    const STRICT        = __navProfileState.strict;
-    const DEBUG         = __navProfileState.debug;
+    const STRICT        = (__envProfileState.strict !== undefined) ? !!__envProfileState.strict : true;
+    const DEBUG         = !!__envProfileState.debug;
     let mediaDevicesLabelsUnlocked = false;
     let mediaMicGranted = false;
     let mediaCameraGranted = false;
@@ -722,9 +710,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     function __navBuildUserAgentDataHighEntropySource() {
       const safeDeviceMemory = __navIsValidDeviceMemoryValue(mem) ? mem : undefined;
       const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(cpu) ? cpu : undefined;
-      const fullVersionList = (meta && meta.fullVersionList != null)
+      const highEntropyFullVersionList = (meta && meta.fullVersionList != null)
         ? meta.fullVersionList
-        : __navProfileState.fullVersionList;
+        : fullVersionList;
       return {
         architecture: meta.architecture,
         bitness: meta.bitness,
@@ -733,7 +721,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         mobile: meta.mobile,
         platform: chPlatform,
         platformVersion: meta.platformVersion,
-        fullVersionList: fullVersionList,
+        fullVersionList: highEntropyFullVersionList,
         deviceMemory: safeDeviceMemory,
         hardwareConcurrency: safeHardwareConcurrency,
         wow64: meta.wow64,
@@ -812,26 +800,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         return true;
       }
       try {
-        const packetMeta = (__navProfileState.meta && typeof __navProfileState.meta === 'object')
-          ? __navProfileState.meta
-          : null;
+        const packetMeta = (meta && typeof meta === 'object') ? meta : null;
         assert(packetMeta, 'worker_env_snapshot.meta missing');
         const packet = {
-          ua: __navProfileState.userAgent,
-          language: __navProfileState.primaryLanguage || packetMeta.language,
-          languages: __navCloneStateValue(__navProfileState.normalizedLanguages || packetMeta.languages),
-          deviceMemory: __navProfileState.mem,
-          hardwareConcurrency: __navProfileState.cpu,
+          ua: userAgent,
+          language: primaryLanguage || packetMeta.language,
+          languages: __navCloneStateValue(normalizedLanguages || packetMeta.languages),
+          deviceMemory: mem,
+          hardwareConcurrency: cpu,
           uaData: {
             brands: __navCloneStateValue(packetMeta.brands),
             mobile: packetMeta.mobile,
-            platform: packetMeta.platform || __navProfileState.generatedPlatform,
+            platform: packetMeta.platform || gen,
             he: {
               architecture: packetMeta.architecture,
               bitness: packetMeta.bitness,
               model: packetMeta.model,
-              platformVersion: packetMeta.platformVersion || __navProfileState.generatedPlatformVersion,
-              fullVersionList: __navCloneStateValue(packetMeta.fullVersionList != null ? packetMeta.fullVersionList : __navProfileState.fullVersionList),
+              platformVersion: packetMeta.platformVersion || __envProfileState.generatedPlatformVersion,
+              fullVersionList: __navCloneStateValue(packetMeta.fullVersionList != null ? packetMeta.fullVersionList : fullVersionList),
               wow64: packetMeta.wow64,
               formFactors: __navCloneStateValue(packetMeta.formFactors)
             }
@@ -853,11 +839,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         assert(isBrandList(packet.uaData.he.fullVersionList), 'worker_env_snapshot.uaData.he.fullVersionList missing');
         assert(typeof packet.uaData.he.wow64 === 'boolean', 'worker_env_snapshot.uaData.he.wow64 missing');
         assert(isStringArray(packet.uaData.he.formFactors, false), 'worker_env_snapshot.uaData.he.formFactors missing');
-        __navSetHiddenStateValue(__navProfileState, '__WORKER_ENV_SNAPSHOT__', __navCloneStateValue(packet));
+        __navSetHiddenStateValue(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__', __navCloneStateValue(packet));
       } catch (e) {
         try {
-          const own = Object.getOwnPropertyDescriptor(__navProfileState, '__WORKER_ENV_SNAPSHOT__');
-          if (own && own.configurable) delete __navProfileState.__WORKER_ENV_SNAPSHOT__;
+          const own = Object.getOwnPropertyDescriptor(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__');
+          if (own && own.configurable) delete __navDataStoreState.__WORKER_ENV_SNAPSHOT__;
         } catch (_) {}
         __navDiag('error', 'nav_total_set:worker_env_snapshot_invalid', {
           stage: 'apply',
@@ -2406,8 +2392,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
         });
       } else {
-      const QUOTA_MB   = Number(__navProfileState.storageQuotaMb ?? 120);
-      const USED_PCT   = Math.max(0, Math.min(100, Number(__navProfileState.storageUsedPct ?? 3))); // ~3% занято
+      const QUOTA_MB   = Number(storageQuotaMb ?? 120);
+      const USED_PCT   = Math.max(0, Math.min(100, Number(storageUsedPct ?? 3))); // ~3% занято
       const quotaBytes = Math.floor(QUOTA_MB * 1024 * 1024);
       let usageBytes   = Math.max(0, Math.floor(quotaBytes * USED_PCT / 100));
 
@@ -2969,7 +2955,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     });
 
     // ——— L. Plugins & MimeTypes ———
-    const profiles = Array.isArray(__navProfileState.pluginProfiles) ? __navProfileState.pluginProfiles : [];
+    const profiles = Array.isArray(pluginProfiles) ? pluginProfiles : [];
       function safeString(val) { return (typeof val === 'symbol' || typeof val === 'undefined') ? '' : String(val); }
 
       const fakeMimeTypes = [];

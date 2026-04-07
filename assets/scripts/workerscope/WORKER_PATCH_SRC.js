@@ -1642,6 +1642,47 @@
       if (!(stateRoot && typeof stateRoot === 'object')) {
         throw new Error('UACHPatch: CanvasPatchContext.state missing');
       }
+      const ensureWorkerCanvasStateSlot = () => {
+        let canvasRoot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
+          ? stateRoot.__CANVAS__
+          : null;
+        if (!canvasRoot) {
+          trackedDefineProperty(stateRoot, '__CANVAS__', {
+            value: Object.create(null),
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          canvasRoot = stateRoot.__CANVAS__;
+        }
+        if (!(canvasRoot && typeof canvasRoot === 'object')) {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__ missing');
+        }
+        let canvasState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+          ? canvasRoot.__STATE__
+          : null;
+        if (!canvasState) {
+          trackedDefineProperty(canvasRoot, '__STATE__', {
+            value: {
+              domReady: false,
+              offscreenReady: false,
+              domCanvas: null,
+              domCanvasHost: null,
+              offscreenCanvas: null,
+              defaultCtx2dFont: ''
+            },
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          canvasState = canvasRoot.__STATE__;
+        }
+        if (!(canvasState && typeof canvasState === 'object')) {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__.__STATE__ missing');
+        }
+        return canvasState;
+      };
+      ensureWorkerCanvasStateSlot();
       restoreWorkerFontsState(stateRoot);
 
       executeWorkerInlineModule(sources.inlineCoreWindow, 'CoreWindowModule', 'inlineCoreWindow');

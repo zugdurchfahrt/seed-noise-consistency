@@ -71,13 +71,19 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
     ? __envProfileState.profile
     : null;
-  if (!(__stateRoot.__HIDE_WEBDRIVER__ && typeof __stateRoot.__HIDE_WEBDRIVER__ === 'object')) {
-    Object.defineProperty(__stateRoot, '__HIDE_WEBDRIVER__', {
-      value: Object.create(null),
-      writable: true,
-      configurable: true,
-      enumerable: false
+  const __hideWebdriverState = (__stateRoot.__HIDE_WEBDRIVER__ && typeof __stateRoot.__HIDE_WEBDRIVER__ === 'object')
+    ? __stateRoot.__HIDE_WEBDRIVER__
+    : null;
+  if (!__hideWebdriverState) {
+    degrade('hide_webdriver:module_state_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext.state.__HIDE_WEBDRIVER__ missing'), {
+      level: 'warn',
+      stage: 'preflight',
+      key: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__',
+      message: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__ missing',
+      type: __typePipeline,
+      data: { outcome: 'skip', reason: 'module_state_missing', missing: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__' }
     });
+    return;
   }
 
   const Core = window && window.Core;

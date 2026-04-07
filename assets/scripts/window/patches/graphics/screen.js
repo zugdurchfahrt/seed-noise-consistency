@@ -147,51 +147,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     ? __screenStateRoot.__SCREEN__
     : null;
   if (!__screenState) {
-    try {
-      Object.defineProperty(__screenStateRoot, '__SCREEN__', {
-        value: Object.create(null),
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      __screenState = (__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')
-        ? __screenStateRoot.__SCREEN__
-        : null;
-    } catch (stateDefineErr) {
-      __screenDiag('warn', 'screen:screen_state_define_failed', {
-        stage: 'preflight',
-        type: __screenTypePipeline,
-        diagTag: 'screen',
-        key: 'CanvasPatchContext.state.__SCREEN__',
-        message: 'Object.defineProperty(CanvasPatchContext.state,"__SCREEN__") failed',
-        data: {
-          outcome: 'skip',
-          reason: 'screen_state_define_failed',
-          missing: 'CanvasPatchContext.state.__SCREEN__'
-        }
-      }, stateDefineErr);
-      try {
-        if (__core && typeof __core.releaseGuardFlag === 'function') {
-          __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
-        }
-      } catch (releaseErr) {
-        __screenDiag('warn', 'screen:guard_release_failed', {
-          stage: 'preflight',
-          type: __screenTypePipeline,
-          diagTag: 'screen',
-          key: __flagKey,
-          message: 'guard release failed after screen state define skip',
-          data: {
-            outcome: 'skip',
-            reason: 'guard_release_failed',
-            substage: 'CanvasPatchContext.state.__SCREEN__'
-          }
-        }, releaseErr);
-      }
-      return;
-    }
-  }
-  if (!__screenState) {
     __screenDiag('warn', 'screen:screen_state_missing', {
       stage: 'preflight',
       type: __screenTypePipeline,

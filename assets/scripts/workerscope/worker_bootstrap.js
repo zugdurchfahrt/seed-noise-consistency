@@ -51,9 +51,6 @@
     let wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
       ? stateRoot.__WRK__
       : null;
-    if (!wrkState) {
-      wrkState = __setHiddenValue(stateRoot, '__WRK__', Object.create(null));
-    }
     return wrkState;
   }
 
@@ -85,7 +82,7 @@
     const wrkRuntime = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
       ? C.__wrkRuntime__
       : null;
-    return wrkRuntime || __setHiddenValue(C, '__wrkRuntime__', Object.create(null));
+    return wrkRuntime;
   }
 
   function __syncWrkRuntime(patch) {
@@ -104,7 +101,7 @@
     const wrkHooks = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
       ? C.__wrkHooks__
       : null;
-    return wrkHooks || __setHiddenValue(C, '__wrkHooks__', Object.create(null));
+    return wrkHooks;
   }
 
   function __captureWorkerPatchHooks(hooks) {

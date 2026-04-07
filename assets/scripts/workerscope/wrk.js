@@ -105,7 +105,7 @@ const WrkModule = function WrkModule(window) {
     if (!stateRoot) return null;
     const wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
       ? stateRoot.__WRK__
-      : __setHiddenValue__(stateRoot, '__WRK__', Object.create(null));
+      : null;
     return wrkState;
   }
 
@@ -114,7 +114,7 @@ const WrkModule = function WrkModule(window) {
     if (!C) return null;
     const runtimeRoot = (C.__wrkRuntime__ && typeof C.__wrkRuntime__ === 'object')
       ? C.__wrkRuntime__
-      : __setHiddenValue__(C, '__wrkRuntime__', Object.create(null));
+      : null;
     return runtimeRoot;
   }
 
@@ -123,7 +123,7 @@ const WrkModule = function WrkModule(window) {
     if (!C) return null;
     const hooksRoot = (C.__wrkHooks__ && typeof C.__wrkHooks__ === 'object')
       ? C.__wrkHooks__
-      : __setHiddenValue__(C, '__wrkHooks__', Object.create(null));
+      : null;
     return hooksRoot;
   }
 
@@ -439,11 +439,11 @@ function EnvBus(G){
     const navModuleState = (stateRoot && stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
       ? stateRoot.__NAV_TOTAL_SET__
       : null;
-    const profileState = (navModuleState && navModuleState.__PROFILE_STATE__ && typeof navModuleState.__PROFILE_STATE__ === 'object')
-      ? navModuleState.__PROFILE_STATE__
+    const dataStoreState = (navModuleState && navModuleState.__DATA_STORE_STATE__ && typeof navModuleState.__DATA_STORE_STATE__ === 'object')
+      ? navModuleState.__DATA_STORE_STATE__
       : null;
-    const packet = (profileState && profileState.__WORKER_ENV_SNAPSHOT__ && typeof profileState.__WORKER_ENV_SNAPSHOT__ === 'object')
-      ? profileState.__WORKER_ENV_SNAPSHOT__
+    const packet = (dataStoreState && dataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
+      ? dataStoreState.__WORKER_ENV_SNAPSHOT__
       : null;
     if (!packet) throw new Error('EnvBus: __WORKER_ENV_SNAPSHOT__ missing');
     const out = __cloneEnvValue(packet);
