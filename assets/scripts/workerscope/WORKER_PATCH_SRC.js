@@ -1552,7 +1552,17 @@
     };
 
     const installWorkerCanvasPipeline = () => {
-      if (self.__WORKER_CANVAS_PATCH_INSTALLED__ === true) return true;
+      const existingCanvasState = (self.CanvasPatchContext
+        && typeof self.CanvasPatchContext === 'object'
+        && self.CanvasPatchContext.state
+        && typeof self.CanvasPatchContext.state === 'object'
+        && self.CanvasPatchContext.state.__CANVAS__
+        && typeof self.CanvasPatchContext.state.__CANVAS__ === 'object'
+        && self.CanvasPatchContext.state.__CANVAS__.__STATE__
+        && typeof self.CanvasPatchContext.state.__CANVAS__.__STATE__ === 'object')
+        ? self.CanvasPatchContext.state.__CANVAS__.__STATE__
+        : null;
+      if (existingCanvasState && existingCanvasState.__WORKER_CANVAS_PATCH_INSTALLED__ === true) return true;
 
       const sources = resolveWorkerCanvasPatchSources();
       const runtimeRoot = sources.runtimeRoot;
@@ -1682,7 +1692,7 @@
         }
         return canvasState;
       };
-      ensureWorkerCanvasStateSlot();
+      const canvasState = ensureWorkerCanvasStateSlot();
       restoreWorkerFontsState(stateRoot);
 
       executeWorkerInlineModule(sources.inlineCoreWindow, 'CoreWindowModule', 'inlineCoreWindow');
@@ -1732,7 +1742,7 @@
         patchCtx.applyWebGLContextPatches();
       }
 
-      trackedDefineProperty(self, '__WORKER_CANVAS_PATCH_INSTALLED__', {
+      trackedDefineProperty(canvasState, '__WORKER_CANVAS_PATCH_INSTALLED__', {
         value: true,
         writable: true,
         configurable: true,
