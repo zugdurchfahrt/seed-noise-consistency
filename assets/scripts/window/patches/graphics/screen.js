@@ -918,6 +918,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   function __screenCheckHostWindowCoherence() {
     const snapshot = __screenViewportSnapshot();
     const mismatches = [];
+    if (!Object.is(snapshot.outerWidth, viewportExpected.innerWidth)) {
+      mismatches.push({ key: 'window.outerWidth', expected: viewportExpected.innerWidth, actual: snapshot.outerWidth });
+    }
     if (!Object.is(snapshot.outerHeight, viewportExpected.innerHeight)) {
       mismatches.push({ key: 'window.outerHeight', expected: viewportExpected.innerHeight, actual: snapshot.outerHeight });
     }
@@ -1033,9 +1036,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       else viewportTargets.push(targetPlan.target);
     }
   }
-  const hostWindowKeys = ['outerHeight'];
-  for (let i = ZERO; i < hostWindowKeys.length; i++) {
-    const key = hostWindowKeys[i];
+  const hostWindowMap = [
+    { key: 'outerWidth', expected: viewportExpected.innerWidth },
+    { key: 'outerHeight', expected: viewportExpected.innerHeight }
+  ];
+  for (let i = ZERO; i < hostWindowMap.length; i++) {
+    const item = hostWindowMap[i];
+    const key = item.key;
     const fact = __screenDescribeAccessorSurface(window, windowProto, key);
     hostWindowObserved.push(fact);
     try {
@@ -1045,10 +1052,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       fact.readError = (e && e.message) ? String(e.message) : 'native_read_failed';
       hostWindowReasons.push('window.' + key + ':' + fact.readError);
     }
-    fact.expected = viewportExpected.innerHeight;
-    fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
+    fact.expected = item.expected;
+    fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, fact.expected, 'screen:host_window_group');
+      const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, item.expected, 'screen:host_window_group');
       if (!targetPlan.ok) hostWindowReasons.push('window.' + key + ':' + targetPlan.reason);
       else hostWindowTargets.push(targetPlan.target);
     }
@@ -1100,6 +1107,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   if (visualViewportObj && visualViewportProto) {
     const visualViewportMap = [
+      { key: 'width', expected: viewportExpected.visualViewportWidth },
       { key: 'height', expected: viewportExpected.visualViewportHeight },
       { key: 'offsetLeft', expected: viewportExpected.visualViewportOffsetLeft },
       { key: 'offsetTop', expected: viewportExpected.visualViewportOffsetTop },
@@ -1269,9 +1277,53 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   function __screenReconcileViewportRootClients(substage) {
     const localTargets = [];
     const localReasons = [];
+    const htmlRoot = document.documentElement || null;
     const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
       ? __screenCanvasState.domCanvasHost
       : null;
+    if (!htmlRoot) {
+      localReasons.push('document.documentElement:missing');
+    } else {
+      const htmlRootMap = [
+        { key: 'clientWidth', expected: viewportExpected.innerWidth },
+        { key: 'clientHeight', expected: viewportExpected.innerHeight }
+      ];
+      for (let i = ZERO; i < htmlRootMap.length; i++) {
+        const item = htmlRootMap[i];
+        let actual = null;
+        let readFailed = false;
+        let readError = null;
+        try {
+          actual = htmlRoot[item.key];
+        } catch (e) {
+          readFailed = true;
+          readError = (e && e.message) ? String(e.message) : 'native_read_failed';
+        }
+        if (readFailed) {
+          localReasons.push('document.documentElement.' + item.key + ':' + readError);
+          continue;
+        }
+        const matchesExpected = Object.is(actual, item.expected);
+        if (!matchesExpected) {
+          const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
+          const targetPlan = __screenBuildAccessorTarget(
+            htmlRoot,
+            null,
+            item.key,
+            item.expected,
+            'screen:viewport_group:html',
+            {
+              allowCreate: true,
+              invalidThis: 'throw',
+              configurable: protoDesc ? !!protoDesc.configurable : true,
+              enumerable: protoDesc ? !!protoDesc.enumerable : false
+            }
+          );
+          if (!targetPlan.ok) localReasons.push('document.documentElement.' + item.key + ':' + targetPlan.reason);
+          else localTargets.push(targetPlan.target);
+        }
+      }
+    }
     if (divRoot) {
       const divRootMap = [
         { key: 'clientWidth', expected: viewportExpected.innerWidth },

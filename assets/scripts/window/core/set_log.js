@@ -146,10 +146,10 @@ const LOGGingModule = function LOGGingModule() {
     const DIAG_DUP_MAP_MAX = toPosInt(global.__DIAG_DUP_MAP_MAX, 2048);
     const DIAG_DUP_COUNTS = new Map();
     const LOGGER_MODULE_AUDIT_SLOTS = [
-      { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "diag", functions: "none", critical: true },
-      { module: "bootstrap_hide", diagTag: "bootstrap_hide", codePrefix: "bootstrap_hide", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "diag", functions: "none", critical: true, requiresEmission: false },
+      { module: "bootstrap_hide", diagTag: "bootstrap_hide", codePrefix: "bootstrap_hide", source: "bundle", emitter: "diag", functions: "none", critical: true, requiresEmission: false },
       { module: "core_window", diagTag: "core_window", codePrefix: "core_window", source: "bundle", emitter: "diag", functions: "none", critical: true },
-      { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none", critical: true, requiresEmission: false },
       { module: "rtc", diagTag: "rtc", codePrefix: "rtc", source: "bundle", emitter: "diag", functions: "auto", critical: true },
       { module: "hide_webdriver", diagTag: "hide_webdriver", codePrefix: "hide_webdriver", source: "bundle", emitter: "diag", functions: "auto", critical: true },
       { module: "wrk", diagTag: "wrk", codePrefix: "wrk", source: "bundle", emitter: "diag", functions: "none", critical: true },
@@ -166,7 +166,7 @@ const LOGGingModule = function LOGGingModule() {
       { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto", critical: true },
       { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto", critical: true },
       { module: "uad_override", diagTag: "uad_override", codePrefix: "uad_override", source: "cdp", emitter: "diag", functions: "auto", critical: true },
-      { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "cdp", emitter: "diag", functions: "auto", critical: false },
+      { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto", critical: false },
       { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto", critical: false },
       {
         module: "WORKER_PATCH_SRC",
@@ -307,6 +307,7 @@ const LOGGingModule = function LOGGingModule() {
 
     function moduleEntryStatus(slot, entry) {
       if (slot && slot.emitter === "missing") return "missing_emitter";
+      if (!entry && slot && slot.requiresEmission === false) return "not_required";
       if (!entry) return (slot && slot.source === "disabled") ? "disabled" : "not_emitted";
       const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
       const level = (extra && typeof extra.level === "string") ? extra.level : null;

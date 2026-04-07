@@ -299,76 +299,32 @@ const CoreWindowModule = function CoreWindowModule(window) {
   }
 
   {
-    const wrappedFunctionToString = new Proxy(nativeToString, {
-      apply(target, thisArg, argList) {
-        if (typeof thisArg !== 'function') {
-          return Reflect.apply(target, thisArg, argList || []);
-        }
-        const nativeLabel = resolveNativeLabel(thisArg);
-        if (typeof nativeLabel === 'string' && nativeLabel) {
-          return nativeLabel;
-        }
-        return Reflect.apply(target, thisArg, argList || []);
-      }
-    });
     const currentProto = Reflect.getPrototypeOf(currentRealmToString);
     const nativeProto = Reflect.getPrototypeOf(nativeToString);
-    const wrappedProto = Reflect.getPrototypeOf(wrappedFunctionToString);
-    let toStringInstalled = false;
     try {
-      if (wrappedProto !== currentProto || wrappedProto !== nativeProto) {
+      if (currentProto !== nativeProto) {
         throw new Error('[CoreWindow] Function.prototype.toString prototype bridge mismatch');
       }
-      toStringProxyTargetMap.set(wrappedFunctionToString, nativeToString);
-      toStringOverrideMap.set(wrappedFunctionToString, 'function toString() { [native code] }');
-      if (toStringProxyTargetMap.get(wrappedFunctionToString) !== nativeToString
-          || toStringOverrideMap.get(wrappedFunctionToString) !== 'function toString() { [native code] }') {
-        throw new Error('[CoreWindow] Function.prototype.toString bridge registration failed');
+      if (currentRealmToString !== nativeToString) {
+        safeDefine(Function.prototype, 'toString', {
+          value: nativeToString,
+          writable: !!fpToStringDesc.writable,
+          configurable: !!fpToStringDesc.configurable,
+          enumerable: !!fpToStringDesc.enumerable
+        });
       }
-      safeDefine(Function.prototype, 'toString', {
-        value: wrappedFunctionToString,
-        writable: !!fpToStringDesc.writable,
-        configurable: !!fpToStringDesc.configurable,
-        enumerable: !!fpToStringDesc.enumerable
-      });
-      toStringInstalled = true;
       const installedToStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
       const installedToString = installedToStringDesc && installedToStringDesc.value;
-      if (typeof installedToString !== 'function') {
-        throw new Error('[CoreWindow] Function.prototype.toString install post-check failed');
-      }
-      if (toStringProxyTargetMap.get(installedToString) !== nativeToString) {
-        throw new Error('[CoreWindow] Function.prototype.toString bridge target post-check failed');
-      }
-      if (resolveNativeLabel(installedToString) !== 'function toString() { [native code] }') {
-        throw new Error('[CoreWindow] Function.prototype.toString native label post-check failed');
+      if (installedToString !== nativeToString) {
+        throw new Error('[CoreWindow] Function.prototype.toString native restore post-check failed');
       }
     } catch (e) {
-      toStringProxyTargetMap.delete(wrappedFunctionToString);
-      toStringOverrideMap.delete(wrappedFunctionToString);
-      if (toStringInstalled) {
-        try {
-          Object.defineProperty(Function.prototype, 'toString', fpToStringDesc);
-        } catch (rollbackErr) {
-          __emit('error', 'core_window:toString_rollback_failed', {
-            module: 'core',
-            diagTag: 'core_window',
-            surface: 'core',
-            key: 'Function.prototype.toString',
-            stage: 'rollback',
-            message: 'Function.prototype.toString rollback failed',
-            type: 'rollback_failed',
-            data: { outcome: 'throw' }
-          }, rollbackErr);
-          throw rollbackErr;
-        }
-      }
       __emit('error', 'core_window:toString_install_failed', {
         module: 'core',
         diagTag: 'core_window',
         surface: 'core',
         key: 'Function.prototype.toString',
-        stage: toStringInstalled ? 'rollback' : 'preflight',
+        stage: 'preflight',
         message: 'Function.prototype.toString install failed',
         type: 'contract violation',
         data: { outcome: 'throw' }
@@ -662,7 +618,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const origGet = desc && desc.get;
 
     if (typeof origGet === 'function') {
-      const markAsNative = __requireMarkAsNative(name, 'wrapStrictAccessor');
       let wrapped = Object.getOwnPropertyDescriptor(({
         get [key]() {
           if (onAccess) onAccess(key, wrapped, this);
@@ -672,7 +627,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return valueFromGetter(this);
         }
       }), key).get;
-      wrapped = __registerToStringWrapper(wrapped, origGet, name, '__wrapStrictAccessor');
       return wrapped;
     }
 
@@ -1596,8 +1550,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               return invokeMethodPath(thisArg, argList);
             });
           } else {
-            const wrappedRaw = buildMethodWrapperByArity(orig, key, invokeMethodPath);
-            wrapped = __registerToStringWrapper(wrappedRaw, orig, key, 'Core.applyTargets:method');
+            wrapped = buildMethodWrapperByArity(orig, key, invokeMethodPath);
           }
           knownWrapped.add(wrapped);
         } catch (e) {
@@ -1734,8 +1687,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               return invokePromisePath(thisArg, argList);
             });
           } else {
-            const wrappedRaw = buildPromiseMethodWrapperByArity(orig, key, invokePromisePath);
-            wrapped = __registerToStringWrapper(wrappedRaw, orig, key, 'Core.applyTargets:promise_method');
+            wrapped = buildPromiseMethodWrapperByArity(orig, key, invokePromisePath);
           }
           knownWrapped.add(wrapped);
         } catch (e) {
