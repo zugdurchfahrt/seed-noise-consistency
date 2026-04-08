@@ -916,7 +916,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     return { ok: mismatches.length === ZERO, snapshot: snapshot, mismatches: mismatches };
   }
   function __screenCheckHostWindowCoherence() {
-    const snapshot = __screenViewportSnapshot();
+    const snapshot = {
+      outerWidth: __screenReadAccessorValue(window, windowProto, 'outerWidth', window),
+      outerHeight: __screenReadAccessorValue(window, windowProto, 'outerHeight', window)
+    };
     const mismatches = [];
     if (!Object.is(snapshot.outerWidth, viewportExpected.innerWidth)) {
       mismatches.push({ key: 'window.outerWidth', expected: viewportExpected.innerWidth, actual: snapshot.outerWidth });
@@ -1412,13 +1415,17 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         data: { outcome: 'skip', group: 'viewport', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, details: localReasons }
       }, null);
     }
+    return { applied: applied, postcheck: postcheck, reasons: localReasons };
   }
 
   const onViewportDomReady = () => {
-    const canvasHost = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
-      ? __screenCanvasState.domCanvasHost
-      : null;
-    __screenReconcileViewportRootClients('DOMContentLoaded');
+    const reconcileResult = __screenReconcileViewportRootClients('DOMContentLoaded');
+    const runtimeSnapshot = (
+      reconcileResult &&
+      reconcileResult.postcheck &&
+      reconcileResult.postcheck.snapshot &&
+      (!reconcileResult.reasons || reconcileResult.reasons.length === ZERO)
+    ) ? reconcileResult.postcheck.snapshot : null;
     __screenDiag('info', 'screen:patched_viewport', {
       stage: 'runtime',
       type: __screenTypePipeline,
@@ -1434,19 +1441,19 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         displayGroupMode: __screenGroupModes.displayMode,
         displayGroupReason: __screenGroupModes.displayReason,
         html: {
-          width: document.documentElement.clientWidth,
-          height: document.documentElement.clientHeight
+          width: runtimeSnapshot ? runtimeSnapshot.htmlClientWidth : (document.documentElement ? document.documentElement.clientWidth : null),
+          height: runtimeSnapshot ? runtimeSnapshot.htmlClientHeight : (document.documentElement ? document.documentElement.clientHeight : null)
         },
         div: {
           ownerPath: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
-          width: canvasHost ? canvasHost.clientWidth : null,
-          height: canvasHost ? canvasHost.clientHeight : null
+          width: runtimeSnapshot ? runtimeSnapshot.divClientWidth : ((__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object') ? __screenCanvasState.domCanvasHost.clientWidth : null),
+          height: runtimeSnapshot ? runtimeSnapshot.divClientHeight : ((__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object') ? __screenCanvasState.domCanvasHost.clientHeight : null)
         },
         window: {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          outerWidth: window.outerWidth,
-          outerHeight: window.outerHeight
+          width: runtimeSnapshot ? runtimeSnapshot.innerWidth : window.innerWidth,
+          height: runtimeSnapshot ? runtimeSnapshot.innerHeight : window.innerHeight,
+          outerWidth: runtimeSnapshot ? runtimeSnapshot.outerWidth : window.outerWidth,
+          outerHeight: runtimeSnapshot ? runtimeSnapshot.outerHeight : window.outerHeight
         },
         screen: {
           width:  window.screen.width,
