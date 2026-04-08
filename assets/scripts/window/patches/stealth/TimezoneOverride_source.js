@@ -510,10 +510,6 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         }
       });
 
-      rememberProtoValue(Date.prototype, "toLocaleString");
-      rememberProtoValue(Date.prototype, "toLocaleDateString");
-      rememberProtoValue(Date.prototype, "toLocaleTimeString");
-
       const origToLocaleString = Date.prototype.toLocaleString;
       const origToLocaleDateString = Date.prototype.toLocaleDateString;
       const origToLocaleTimeString = Date.prototype.toLocaleTimeString;
@@ -526,51 +522,12 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         }, e);
         throw e;
       }
-      const patchedToLocaleString = createNativeShapedMethod("toLocaleString", origToLocaleString, function toLocaleStringImpl(locales, options) {
-        if (locales == null) locales = spoofedLocales;
-        options = applyDefaultTimeZoneOption(options);
-        try {
-          return Reflect.apply(origToLocaleString, this, [locales, options]);
-        } catch (e) {
-          diagBrowser("warn", "tz:Date:toLocaleString:native_throw", {
-            stage: "runtime",
-            message: "native toLocaleString threw",
-            data: { reason: "native_throw", timezone: timezone }
-          }, e);
-          throw e;
-        }
-      });
-      const patchedToLocaleDateString = createNativeShapedMethod("toLocaleDateString", origToLocaleDateString, function toLocaleDateStringImpl(locales, options) {
-        if (locales == null) locales = spoofedLocales;
-        options = applyDefaultTimeZoneOption(options);
-        try {
-          return Reflect.apply(origToLocaleDateString, this, [locales, options]);
-        } catch (e) {
-          diagBrowser("warn", "tz:Date:toLocaleDateString:native_throw", {
-            stage: "runtime",
-            message: "native toLocaleDateString threw",
-            data: { reason: "native_throw", timezone: timezone }
-          }, e);
-          throw e;
-        }
-      });
-      const patchedToLocaleTimeString = createNativeShapedMethod("toLocaleTimeString", origToLocaleTimeString, function toLocaleTimeStringImpl(locales, options) {
-        if (locales == null) locales = spoofedLocales;
-        options = applyDefaultTimeZoneOption(options);
-        try {
-          return Reflect.apply(origToLocaleTimeString, this, [locales, options]);
-        } catch (e) {
-          diagBrowser("warn", "tz:Date:toLocaleTimeString:native_throw", {
-            stage: "runtime",
-            message: "native toLocaleTimeString threw",
-            data: { reason: "native_throw", timezone: timezone }
-          }, e);
-          throw e;
-        }
-      });
-      redefineMethod(Date.prototype, "toLocaleString", patchedToLocaleString, "tz:Date:toLocaleString");
-      redefineMethod(Date.prototype, "toLocaleDateString", patchedToLocaleDateString, "tz:Date:toLocaleDateString");
-      redefineMethod(Date.prototype, "toLocaleTimeString", patchedToLocaleTimeString, "tz:Date:toLocaleTimeString");
+      diagPipeline("info", "tz:Date:toLocale_native_passthrough", {
+        key: "Date.prototype.toLocale*",
+        stage: "apply",
+        message: "Date.prototype.toLocale* left native for timezone spoof experiment",
+        data: { outcome: "return", reason: "native_passthrough", timezone: timezone, locale: spoofedLocale }
+      }, null);
 
       diagPipeline("info", "tz:applied", {
         key: null,
