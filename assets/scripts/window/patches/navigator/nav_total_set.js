@@ -240,30 +240,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'rand_missing');
       return;
     }
-    let mark = null;
-    try {
-      mark = (__navCoreInternal && typeof __navCoreInternal.markAsNative === 'function')
-        ? __navCoreInternal.markAsNative
-        : null;
-    } catch (e) {
-      __navDiagPipeline('error', 'nav_total_set:mark_as_native_failed', {
-        stage: 'preflight',
-        message: 'Core.__internal.markAsNative failed',
-        data: { outcome: 'skip', reason: 'core_internal_mark_as_native_failed', policy: 'skip', action: 'native' }
-      }, e);
-      __navReleaseEntryGuard(true, 'preflight', 'mark_as_native_failed');
-      return;
-    }
-    if (typeof mark !== 'function') {
-      __navDiagPipeline('warn', 'nav_total_set:mark_as_native_missing', {
-        stage: 'preflight',
-        message: 'Core.__internal.markAsNative missing',
-        data: { outcome: 'skip', reason: 'missing_dep_core_internal_mark_as_native', policy: 'skip', action: 'native' }
-      });
-      __navReleaseEntryGuard(true, 'preflight', 'mark_as_native_missing');
-      return;
-    }
-    const __navMark = mark;
     const __envProfileState = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
       ? __stateRoot.__ENV_PROFILE__
       : null;
@@ -800,8 +776,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         assert(packetMeta, 'worker_env_snapshot.meta missing');
         const packet = {
           ua: userAgent,
-          language: primaryLanguage || packetMeta.language,
-          languages: __navCloneStateValue(normalizedLanguages || packetMeta.languages),
+          language: primaryLanguage,
+          languages: __navCloneStateValue(normalizedLanguages),
           deviceMemory: mem,
           hardwareConcurrency: cpu,
           uaData: {
