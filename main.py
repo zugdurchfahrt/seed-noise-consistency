@@ -389,7 +389,7 @@ def init_driver(
             # --- logger after bootstrap owner-space ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
-            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
@@ -1255,7 +1255,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://browserleaks.com/fonts")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
