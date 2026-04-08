@@ -165,6 +165,10 @@
       if (typeof s.webgl.unmaskedVendor !== 'string' || !s.webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
       if (typeof s.webgl.unmaskedRenderer !== 'string' || !s.webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
       if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
+      if (!s.envProfile || typeof s.envProfile !== 'object') throw new Error('UACHPatch: missing envProfile');
+      if (!Number.isFinite(Number(s.envProfile.width))) throw new Error('UACHPatch: bad envProfile.width');
+      if (!Number.isFinite(Number(s.envProfile.height))) throw new Error('UACHPatch: bad envProfile.height');
+      if (!Number.isFinite(Number(s.envProfile.dpr)) || Number(s.envProfile.dpr) <= 0) throw new Error('UACHPatch: bad envProfile.dpr');
       const he = (s.uaData && s.uaData.he) || s.highEntropy;
       if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
       for (const k of HE_KEYS) {
@@ -1442,6 +1446,55 @@
       const runner = new Function('window', source + '\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
       return runner(self);
     };
+    const syncWorkerEnvProfileState = stateRoot => {
+      if (!stateRoot || typeof stateRoot !== 'object') {
+        throw new Error('UACHPatch: CanvasPatchContext.state missing for envProfile sync');
+      }
+      const snap = requireSnap(cache.snap, 'env_profile_sync');
+      const envProfileSnap = snap.envProfile;
+      let envProfileRoot = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+        ? stateRoot.__ENV_PROFILE__
+        : null;
+      if (!envProfileRoot) {
+        trackedDefineProperty(stateRoot, '__ENV_PROFILE__', {
+          value: Object.create(null),
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        envProfileRoot = stateRoot.__ENV_PROFILE__;
+      }
+      if (!(envProfileRoot && typeof envProfileRoot === 'object')) {
+        throw new Error('UACHPatch: CanvasPatchContext.state.__ENV_PROFILE__ missing');
+      }
+      const cloneEnvProfileValue = value => {
+        if (Array.isArray(value)) {
+          const out = [];
+          for (let i = 0; i < value.length; i++) out.push(cloneEnvProfileValue(value[i]));
+          return out;
+        }
+        if (value && typeof value === 'object') {
+          const out = Object.create(null);
+          const keys = Object.keys(value);
+          for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            out[key] = cloneEnvProfileValue(value[key]);
+          }
+          return out;
+        }
+        return value;
+      };
+      const prevKeys = Object.keys(envProfileRoot);
+      for (let i = 0; i < prevKeys.length; i++) {
+        delete envProfileRoot[prevKeys[i]];
+      }
+      const nextKeys = Object.keys(envProfileSnap);
+      for (let i = 0; i < nextKeys.length; i++) {
+        const key = nextKeys[i];
+        envProfileRoot[key] = cloneEnvProfileValue(envProfileSnap[key]);
+      }
+      return envProfileRoot;
+    };
     const restoreWorkerFontsState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
         throw new Error('UACHPatch: CanvasPatchContext.state missing for fonts restore');
@@ -1697,6 +1750,7 @@
         return canvasState;
       };
       const canvasState = ensureWorkerCanvasStateSlot();
+      syncWorkerEnvProfileState(stateRoot);
       restoreWorkerFontsState(stateRoot);
 
       executeWorkerInlineModule(sources.inlineCoreWindow, 'CoreWindowModule', 'inlineCoreWindow');
@@ -1811,6 +1865,12 @@
         throw e;
       }
       if (typeof prev==='function') prev.call(self,s);
+      const stateRoot = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
+        ? self.CanvasPatchContext.state
+        : null;
+      if (stateRoot) {
+        syncWorkerEnvProfileState(stateRoot);
+      }
       // Paradigm: seed is immutable within session.
       const curSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
       if (prevSeed != null && curSeed != null && prevSeed !== curSeed) {

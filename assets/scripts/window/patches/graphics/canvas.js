@@ -490,35 +490,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return { key, approx, widthNoise };
   }
 
-  function getManagedFontConfig(font) {
-    try {
-      const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-      const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
-        ? stateRoot.__FONTS__
-        : null;
-      const fontsConfigState = (fontsRoot && fontsRoot.__CONFIG__ && typeof fontsRoot.__CONFIG__ === 'object')
-        ? fontsRoot.__CONFIG__
-        : null;
-      const cfgs = Array.isArray(fontsConfigState && fontsConfigState.configs) ? fontsConfigState.configs : [];
-      const fontStr = String(font || '');
-      const fontLower = fontStr.toLowerCase();
-      for (const c of cfgs) {
-        if (!c || typeof c !== 'object') continue;
-        const fam = (c.family instanceof RegExp) ? c.family : new RegExp(c.family || '.*', 'i');
-        const wt  = (c.weight == null) ? null : String(c.weight).toLowerCase();
-        if (fam.test(fontStr) && (!wt || fontLower.includes(wt))) {
-          return c;
-        }
-      }
-    } catch (e) {
-      emitCanvasDiag('warn', 'canvas:fonts:managed_config_resolve_failed', e, {
-        stage: 'runtime',
-        key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs'
-      });
-    }
-    return null;
-  }
-
   //  Proxy TextMetrics
   function applyMeasureTextHook(nativeMetrics, text, font) {
     try {
@@ -527,7 +498,8 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       // the cached values can "cement" early/fallback metrics forever for that key.
       //
       // Mitigation (minimal, MDN/Chromium-consistent):
-      // - Do not create/use TextMetrics cache until fonts are ready.
+      // - Do not create/use TextMetrics cache until fonts are ready in CanvasPatchContext.state.__FONTS__.__STATE__.
+      // - Couple cache epoch to familySnapshot.versionToken so runtime font-family transitions invalidate old keys.
       // - Keep API-shape compatibility: do not synthesize values for properties absent on native TextMetrics.
 
       const fontStr = (typeof font === 'string' && font.trim())
@@ -615,10 +587,16 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     return [text, x + dx, y + dy, ...rest];
   }
 
+ // ===== fillRectNoiseHook  =====
+  function fillRectNoiseHook(x, y, w, h){
+    return [ q256(x), q256(y), q256(w), q256(h) ];
+  }
+
+
   // === Font size scaling: masters for fillText/strokeText (Layer 1) ===
   //
-  // Requirements:
-  // - Reads managed font configs from `CanvasPatchContext.state.__FONTS__.__CONFIG__.configs` (optional)
+  // Legacy reference:
+  // - Historical scaling masters read managed font configs from `CanvasPatchContext.state.__FONTS__.__CONFIG__.configs`
   // - Writes global idempotency flag: `window.__PATCH_FONT_SCALE_HOOKS__`
   // - Exports masters: `applyFillTextHook` / `applyStrokeTextHook` (via final export section)
   
@@ -753,9 +731,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   //   };
   // })();
 
-  function fillRectNoiseHook(x, y, w, h){
-    return [ q256(x), q256(y), q256(w), q256(h) ];
-  }
 
 
   // Keep native-shaped blob output here; draw/text noise remains in canvas pipeline.

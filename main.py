@@ -52,11 +52,11 @@ PY_MODULE_DIRS = [
     PROJECT_ROOT / "tools" / "generators",
     PROJECT_ROOT / "profile_data_source",
 ]
-
 for d in PY_MODULE_DIRS:
     if not d.exists():
         raise FileNotFoundError(d)
     sys.path.insert(0, str(d))
+    
 # ----------------------- DICTS-----------------------
 from profile_data_source.depo_browser import chrome_versions, edge_versions, safari_versions, firefox_versions
 from profile_data_source.datashell_win32 import data_4_win32
@@ -83,6 +83,7 @@ from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
 # from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
+
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
@@ -91,9 +92,11 @@ setup_logger(child_levels={
     "plugins_dict": logging.DEBUG,
     "brandmauer": logging.INFO,
 })
-                                                                                                                                                                                                                                                                                                # ----------------------- GLOBAL VARIABLES -----------------------
+
+# ----------------------- RNG POOLS -----------------------                                                                                                                                                                                                                                                                                            # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
 
+# ----------------------- RNG POOLS -----------------------
 def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
     if not isinstance(global_seed, str) or not global_seed.strip():
         raise ValueError("global_seed must be a non-empty string")
@@ -114,8 +117,6 @@ def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
         "vpn": _rng_for("vpn"),
     }
 
-
-#
 # rand_met does not receive global_seed directly.
 # main injects one rand_met-specific derivative, and rand_met derives
 # its internal manifest/meta/cache branches from that single seam.
@@ -388,7 +389,7 @@ def init_driver(
             # --- logger after bootstrap owner-space ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
-            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
@@ -1254,7 +1255,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

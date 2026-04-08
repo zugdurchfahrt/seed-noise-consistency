@@ -119,6 +119,42 @@ if (!canvasState) {
   __defineHiddenValue__(canvasRoot, '__STATE__', canvasState);
 }
 
+const __bootstrapDefaultCtx2dFontCached__ = (typeof canvasState.defaultCtx2dFont === 'string' && canvasState.defaultCtx2dFont.trim())
+  ? canvasState.defaultCtx2dFont.trim()
+  : '';
+if (!__bootstrapDefaultCtx2dFontCached__) {
+  try {
+    const doc = (W && W.document && typeof W.document.createElement === 'function')
+      ? W.document
+      : null;
+    const bootstrapCanvas = doc
+      ? doc.createElement('canvas')
+      : ((typeof W.OffscreenCanvas === 'function') ? new W.OffscreenCanvas(1, 1) : null);
+    if (!bootstrapCanvas || typeof bootstrapCanvas.getContext !== 'function') {
+      throw new Error('[module] CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont source missing');
+    }
+    const bootstrapCtx = bootstrapCanvas.getContext('2d');
+    const font = (bootstrapCtx && typeof bootstrapCtx.font === 'string' && bootstrapCtx.font.trim())
+      ? bootstrapCtx.font.trim()
+      : '';
+    if (!font) {
+      throw new Error('[module] CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont invalid');
+    }
+    canvasState.defaultCtx2dFont = font;
+  } catch (e) {
+    __emitBootstrapTransferDiag__(
+      'error',
+      'bootstrap_hide:canvas_default_font_missing',
+      'state.__CANVAS__.__STATE__.defaultCtx2dFont',
+      'canvas default font owner-transfer failed',
+      'bootstrap_input_incomplete',
+      e,
+      null
+    );
+    throw e;
+  }
+}
+
 let screenRoot = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
   ? stateRoot.__SCREEN__
   : null;

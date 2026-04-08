@@ -636,6 +636,7 @@ function EnvBus(G){
   }
   function envSnapshot(){
     const packet = __requireWorkerEnvPacket();
+    const stateRoot = __resolveCanvasPatchStateRoot();
     const langs = packet.languages.slice();
     const lang = packet.language;
     const ua = packet.ua;
@@ -658,7 +659,21 @@ function EnvBus(G){
     const uaData = __cloneEnvValue(packet.uaData);
     const he = __cloneEnvValue(packet.uaData.he);
     uaData.he = he;
-
+    const envProfile = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+      ? __cloneEnvValue(stateRoot.__ENV_PROFILE__)
+      : null;
+    if (!envProfile || typeof envProfile !== 'object') {
+      throw new Error('EnvBus: __ENV_PROFILE__ missing');
+    }
+    if (!Number.isFinite(Number(envProfile.width))) {
+      throw new Error('EnvBus: __ENV_PROFILE__.width missing');
+    }
+    if (!Number.isFinite(Number(envProfile.height))) {
+      throw new Error('EnvBus: __ENV_PROFILE__.height missing');
+    }
+    if (!Number.isFinite(Number(envProfile.dpr)) || Number(envProfile.dpr) <= 0) {
+      throw new Error('EnvBus: __ENV_PROFILE__.dpr missing');
+    }
     const windowKeys = (() => {
       try {
         const keys = Object.getOwnPropertyNames(G);
@@ -677,6 +692,7 @@ function EnvBus(G){
       highEntropy: he,
       fontsState: __cloneFontsStateForWorker__(),
       fontsConfig: __cloneFontsConfigForWorker__(),
+      envProfile,
       webgl: {
         vendor: webglVendor,
         renderer: webglRenderer,
@@ -916,6 +932,19 @@ function mkModuleWorkerSource(snapshot, absUrl){
               connectPorts = [];
               for (var j = 0; j < ports.length; j++) {
                 try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
+                try {
+                  if (typeof ports[j].addEventListener === 'function') {
+                    ports[j].addEventListener('message', function(msgEv){
+                      try {
+                        var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
+                        var syncSnap = syncPacket && syncPacket.envSnapshot;
+                        if (syncSnap && typeof self.__applyEnvSnapshot__ === 'function') {
+                          self.__applyEnvSnapshot__(syncSnap);
+                        }
+                      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_env_sync' }); }
+                    });
+                  }
+                } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_listener_install' }); }
                 __ENV_SHARED_PORTS__.push(ports[j]);
                 connectPorts.push(ports[j]);
               }
@@ -1356,6 +1385,19 @@ function mkClassicWorkerSource(snapshot, absUrl){
               connectPorts = [];
               for (var j = 0; j < ports.length; j++) {
                 try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
+                try {
+                  if (typeof ports[j].addEventListener === 'function') {
+                    ports[j].addEventListener('message', function(msgEv){
+                      try {
+                        var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
+                        var syncSnap = syncPacket && syncPacket.envSnapshot;
+                        if (syncSnap && typeof self.__applyEnvSnapshot__ === 'function') {
+                          self.__applyEnvSnapshot__(syncSnap);
+                        }
+                      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_env_sync' }); }
+                    });
+                  }
+                } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_listener_install' }); }
                 __ENV_SHARED_PORTS__.push(ports[j]);
                 connectPorts.push(ports[j]);
               }
@@ -2235,13 +2277,19 @@ function SafeSharedWorkerOverride(G){
           }
         };
         port.addEventListener('message', onMsg);
-        __wrkBestEffort('wrk:shared_worker_port_start_failed', {
+        __wrkBestEffort('wrk:shared_worker_port_sync_failed', {
           stage: 'runtime',
-          key: 'port.start',
-          message: 'shared worker port start failed',
+          key: '__ENV_SYNC__',
+          message: 'shared worker per-connect env sync failed',
           type: 'browser structure missing data',
-          data: { outcome: 'skip', reason: 'shared_worker_port_start_failed' }
-        }, () => { if (typeof port.start === 'function') port.start(); });
+          data: { outcome: 'skip', reason: 'shared_worker_port_sync_failed' }
+        }, () => {
+          const connectSnap = requireWorkerSnapshot(workerPatchApi.envSnapshot(), 'connect');
+          __wrkRuntimeSet__('lastSnap', connectSnap);
+          workerPatchApi.publishSnapshot(connectSnap);
+          port.start();
+          port.postMessage({ __ENV_SYNC__: { envSnapshot: connectSnap } });
+        });
       }
     } catch(e) {
       __wrkDiag('warn', 'wrk:shared_worker_handshake_failed', {
