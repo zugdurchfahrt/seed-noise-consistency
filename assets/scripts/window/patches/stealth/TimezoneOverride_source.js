@@ -438,33 +438,12 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
 
       if (OrigDTF && OrigDTF.prototype && typeof OrigDTF.prototype.resolvedOptions === "function") {
         const proto = OrigDTF.prototype;
-        rememberProtoValue(proto, "resolvedOptions");
-        const origResolvedOptions = proto.resolvedOptions;
-        // Keep this path unchanged until constructor-time caller intent can be tracked per instance.
-        const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", origResolvedOptions, function resolvedOptionsImpl() {
-          let ro;
-          try {
-            ro = Reflect.apply(origResolvedOptions, this, []);
-          } catch (e) {
-            diagBrowser("warn", "tz:DateTimeFormat:resolvedOptions:native_throw", {
-              stage: "runtime",
-              message: "native resolvedOptions threw",
-              data: { reason: "native_throw", timezone: timezone }
-            }, e);
-            throw e;
-          }
-          try {
-            if (ro && typeof ro === "object") ro.timeZone = timezone;
-          } catch (e) {
-            diagBrowser("error", "tz:DateTimeFormat:resolvedOptions:post_failed", {
-              stage: "hook",
-              message: "resolvedOptions post-processing failed",
-              data: { reason: "post_failed", timezone: timezone }
-            }, e);
-          }
-          return ro;
-        });
-        redefineMethod(proto, "resolvedOptions", patchedResolvedOptions, "tz:DateTimeFormat:resolvedOptions");
+        diagPipeline("info", "tz:DateTimeFormat:resolvedOptions_native_passthrough", {
+          key: "DateTimeFormat.prototype.resolvedOptions",
+          stage: "apply",
+          message: "DateTimeFormat.prototype.resolvedOptions left native; constructor patch owns defaults",
+          data: { outcome: "return", reason: "native_passthrough", timezone: timezone }
+        }, null);
       }
 
       function patchIntlCtorDefaultLocales(ctorName) {
@@ -509,42 +488,15 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       function patchIntlResolvedOptions(proto, fields) {
         const origResolvedOptions = proto.resolvedOptions;
         if (typeof origResolvedOptions !== "function") return;
-        rememberProtoValue(proto, "resolvedOptions");
-        // Keep this path unchanged until constructor-time caller intent can be tracked per instance.
-        const patchedResolvedOptions = createNativeShapedMethod("resolvedOptions", origResolvedOptions, function resolvedOptionsImpl() {
-          let options;
-          try {
-            options = Reflect.apply(origResolvedOptions, this, []);
-          } catch (e) {
-            diagBrowser("warn", "tz:IntlResolvedOptions:native_throw", {
-              stage: "runtime",
-              message: "native resolvedOptions threw",
-              data: { reason: "native_throw", timezone: timezone }
-            }, e);
-            throw e;
-          }
-          try {
-            fields.forEach(([field, value]) => {
-              try {
-                options[field] = value;
-              } catch (e) {
-                diagBrowser("error", "tz:IntlResolvedOptions:post_failed", {
-                  stage: "hook",
-                  message: "resolvedOptions field post-processing failed",
-                  data: { reason: "post_failed", field: field, timezone: timezone }
-                }, e);
-              }
-            });
-          } catch (e) {
-            diagBrowser("error", "tz:IntlResolvedOptions:post_failed", {
-              stage: "hook",
-              message: "resolvedOptions post-processing failed",
-              data: { reason: "post_failed", timezone: timezone }
-            }, e);
-          }
-          return options;
-        });
-        redefineMethod(proto, "resolvedOptions", patchedResolvedOptions, "tz:IntlResolvedOptions");
+        const ctorName = (proto && proto.constructor && typeof proto.constructor.name === "string" && proto.constructor.name)
+          ? proto.constructor.name
+          : "Intl";
+        diagPipeline("info", "tz:IntlResolvedOptions:native_passthrough", {
+          key: ctorName + ".prototype.resolvedOptions",
+          stage: "apply",
+          message: ctorName + ".prototype.resolvedOptions left native; constructor patch owns defaults",
+          data: { outcome: "return", reason: "native_passthrough", fields: fields, timezone: timezone }
+        }, null);
       }
 
       [

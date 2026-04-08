@@ -224,6 +224,7 @@
       return nextState;
     }
 
+    // Compatibility-only label primitive: do not native-label source-text-observable JS functions.
     function baseMarkAsNative(func, name = "") {
       if (typeof func !== 'function') return func;
       try {
@@ -238,6 +239,10 @@
             data: { outcome: 'throw' }
           }, bridgeErr);
           throw bridgeErr;
+        }
+        const currentSource = Reflect.apply(nativeToString, func, []);
+        if (typeof currentSource === 'string' && currentSource.indexOf('[native code]') === -1) {
+          return func;
         }
         const bridgeTarget = __resolveWrappedBridgeTarget(func.__coreBridgeTarget__, 'baseMarkAsNative');
         const nativeName = name || bridgeTarget.name || func.name || "";
@@ -640,9 +645,13 @@
         configurable: true,
         enumerable: false
       });
+      const seedProbeSource = Reflect.apply(nativeToString, seedProbe, []);
       markAsNative(seedProbe, 'toString');
-      if (typeof toStringOverrideMap.get(seedProbe) !== 'string') {
-        throw new Error('UACHPatch: toString probe missing native label');
+      if (typeof toStringOverrideMap.get(seedProbe) === 'string') {
+        throw new Error('UACHPatch: source-text toString probe must stay unlabeled');
+      }
+      if (Reflect.apply(Function.prototype.toString, seedProbe, []) !== seedProbeSource) {
+        throw new Error('UACHPatch: source-text toString probe forwarding mismatch');
       }
       toStringProxyTargetMap.delete(seedProbe);
       toStringOverrideMap.delete(seedProbe);

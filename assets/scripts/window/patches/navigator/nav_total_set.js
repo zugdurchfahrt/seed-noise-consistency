@@ -2416,31 +2416,39 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             diagTag: 'nav_total_set:storage.estimate',
           key: 'storage.estimate',
           message: 'storage.estimate original missing'
-        });
-      } else {
-        __navRegisterKey('storage.estimate');
-        applyCoreTargetsGroup('nav_total_set:storage.estimate', [{
-          owner: storageOwner,
-          key: 'estimate',
-          resolve: 'proto_chain',
-          kind: 'promise_method',
-          wrapLayer: 'core_wrapper',
-          invokeClass: 'brand_strict',
-          wrapperClass: 'core_proxy',
-          policy: 'throw',
-          diagTag: 'nav_total_set:storage.estimate',
-          validThis(self) {
-            return self === navigator.storage;
-          },
-          invalidThis: 'native',
-          invoke(orig, args) {
-            __navLogAccess('storage.estimate', null, { bucket: 'core_wrapper' });
-            tickUsage();
-            return Promise.resolve({ quota: quotaBytes, usage: usageBytes });
-          }
-        }], 'throw');
-      }
-      if (navigator.webkitTemporaryStorage) {
+         });
+       } else {
+         __navRegisterKey('storage.estimate');
+         const buildStorageEstimateSnapshot = function buildStorageEstimateSnapshot(sourceTag) {
+           tickUsage();
+           __navLogAccess('storage.estimate', null, {
+             bucket: 'hidden_snapshot_gate',
+             source: sourceTag || 'snapshot_gate'
+           });
+           return {
+             quota: quotaBytes,
+             usage: usageBytes
+           };
+         };
+         __navSetHiddenStateValue(__navModuleState, '__STORAGE_ESTIMATE_IMPL__', buildStorageEstimateSnapshot);
+         __navSetHiddenStateValue(__navModuleState, '__STORAGE_ESTIMATE_SNAPSHOT_GATE__', function storageEstimateSnapshotGate() {
+           return Promise.resolve(buildStorageEstimateSnapshot('snapshot_gate'));
+         });
+         __navDiag('info', 'nav_total_set:storage_estimate_native_passthrough', {
+           surface: 'navigator',
+           stage: 'apply',
+           type: __navTypePipeline,
+           diagTag: 'nav_total_set:storage.estimate',
+           key: 'storage.estimate',
+           message: 'storage.estimate left native; synthetic estimate moved to hidden gate',
+           data: {
+             outcome: 'return',
+             reason: 'native_passthrough',
+             ownerIsPrototype: storageOwner !== navigator.storage
+           }
+         });
+       }
+       if (navigator.webkitTemporaryStorage) {
         const tmpProto = Object.getPrototypeOf(navigator.webkitTemporaryStorage) || navigator.webkitTemporaryStorage;
         const tmpResolved = __navResolveDescriptor
           ? __navResolveDescriptor(tmpProto, 'queryUsageAndQuota', { mode: 'proto_chain' })

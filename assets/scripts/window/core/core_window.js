@@ -178,7 +178,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     throw new Error('[CoreWindow] Function.prototype.toString missing');
   }
 
-  // Unified global function-mask
+  // Compatibility-only label primitive: do not native-label source-text-observable JS functions.
   function baseMarkAsNative(func, name = "") {
     if (typeof func !== 'function') return func;
     try {
@@ -196,6 +196,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
           data: { outcome: 'throw' }
         }, bridgeErr);
         throw bridgeErr;
+      }
+      const currentSource = Reflect.apply(nativeToString, func, []);
+      if (typeof currentSource === 'string' && currentSource.indexOf('[native code]') === -1) {
+        return func;
       }
       const bridgeTarget = __resolveWrappedBridgeTarget(func.__coreBridgeTarget__, 'baseMarkAsNative');
       const nativeName = name || bridgeTarget.name || func.name || "";

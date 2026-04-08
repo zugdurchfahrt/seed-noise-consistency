@@ -280,7 +280,7 @@
     }
 
     // sanity: worker follows window-style nativeization.
-    // markAsNative must write labels into shared CORE state; public Function.prototype.toString stays native.
+    // markAsNative must not relabel source-text probes; public Function.prototype.toString stays native.
     {
       const st = __resolveCoreToStringState__();
       const probe = function probe(){};
@@ -290,15 +290,13 @@
         configurable: true,
         enumerable: false
       });
-      const nativeProbe = Reflect.apply(nativeToString, probe, []);
       markAsNative(probe, 'toString');
       const actual = st && st.overrideMap && typeof st.overrideMap.get === 'function'
         ? st.overrideMap.get(probe)
         : undefined;
-      if (typeof actual !== 'string'
-          || actual === nativeProbe) {
-        const e = new Error('UACHPatch: toString override map missing native label');
-        emitDegrade('error', 'worker_patch_src:tostring_state:contract:native_label_missing', {
+      if (typeof actual === 'string') {
+        const e = new Error('UACHPatch: source-text toString probe must stay unlabeled');
+        emitDegrade('error', 'worker_patch_src:tostring_state:contract:unexpected_source_label', {
           type: 'pipeline missing data',
           stage: 'contract',
           module: 'WORKER_PATCH_SRC',
