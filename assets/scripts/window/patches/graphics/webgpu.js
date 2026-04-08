@@ -145,10 +145,6 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     });
   }
   const __webgpuState = __stateRoot.__WEBGPU__;
-  const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
-    ? __core.__internal
-    : null;
-
   const Core = __core;
   if (!Core || typeof Core.applyTargets !== 'function') {
     degrade('fatal', 'webgpu:core_missing', new Error('[WebGPUPatchModule] Core.applyTargets is required'), {
@@ -162,15 +158,16 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     return;
   }
   const markNative = (function resolveMarkNative() {
-    const m = (__coreInternal && typeof __coreInternal.markAsNative === 'function')
-      ? __coreInternal.markAsNative
+    const ensure = (Core && typeof Core.__ensureMarkAsNative === 'function')
+      ? Core.__ensureMarkAsNative
       : null;
+    const m = ensure ? ensure() : null;
     if (typeof m !== 'function') {
-      degrade('fatal', 'webgpu:mark_native_missing', new Error('[WebGPUPatchModule] Core.__internal.markAsNative missing'), {
+      degrade('fatal', 'webgpu:mark_native_missing', new Error('[WebGPUPatchModule] Core.__ensureMarkAsNative missing'), {
         stage: 'preflight',
         type: __webgpuTypePipeline,
-        key: 'Core.__internal.markAsNative',
-        message: 'Core.__internal.markAsNative missing',
+        key: 'Core.__ensureMarkAsNative',
+        message: 'Core.__ensureMarkAsNative missing',
         data: { outcome: 'skip', reason: 'missing_dep_markAsNative' }
       });
       return null;

@@ -182,18 +182,19 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
     let markNative = null;
     try {
-      const m = (__coreInternal && typeof __coreInternal.markAsNative === 'function')
-        ? __coreInternal.markAsNative
+      const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function')
+        ? __core.__ensureMarkAsNative
         : null;
+      const m = ensure ? ensure() : null;
       if (typeof m !== 'function') {
-        throw new Error('Core.__internal.markAsNative missing');
+        throw new Error('Core.__ensureMarkAsNative missing');
       }
       markNative = m;
     } catch (e) {
       __webglDiagPipeline('fatal', 'webgl:mark_native_missing', {
         stage: 'preflight',
-        key: null,
-        message: 'Core.__internal.markAsNative missing',
+        key: 'Core.__ensureMarkAsNative',
+        message: 'Core.__ensureMarkAsNative missing',
         data: { outcome: 'throw' }
       }, e);
       throw e;

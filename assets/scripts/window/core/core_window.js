@@ -423,7 +423,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const e = new TypeError('[CoreWindow] __wrapNativeApply: applyImpl must be function');
       __throwWrapFactoryPreflight('core_window:wrapNativeApply:bad_applyImpl', name, '__wrapNativeApply: applyImpl must be function', e);
     }
-    const markAsNative = __requireMarkAsNative(name || (nativeFn && nativeFn.name) || null, 'wrapNativeApply');
+    __requireMarkAsNative(name || (nativeFn && nativeFn.name) || null, 'wrapNativeApply');
     const wrapped = new Proxy(nativeFn, {
       apply(target, thisArg, argList) {
         try {
@@ -474,7 +474,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const e = new TypeError('[CoreWindow] __wrapNativeCtor: argsImpl must be function');
       __throwWrapFactoryPreflight('core_window:wrapNativeCtor:bad_argsImpl', name || '__wrapNativeCtor', '__wrapNativeCtor: argsImpl must be function', e);
     }
-    const markAsNative = __requireMarkAsNative(name || (nativeFn && nativeFn.name) || '__wrapNativeCtor', 'wrapNativeCtor');
+    __requireMarkAsNative(name || (nativeFn && nativeFn.name) || '__wrapNativeCtor', 'wrapNativeCtor');
     const wrapped = new Proxy(nativeFn, {
       apply(target, thisArg, argList) {
         let nextArgs;
@@ -857,12 +857,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
       __internal.guards = __guardRegistry;
       __internal.knownWrapped = knownWrapped;
       __internal.prng = __prngRoot;
-      safeDefine(__internal, 'markAsNative', {
-        value: baseMarkAsNative,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
       safeDefine(__internal, '__ACCESSOR_OWNER_FIRST_CAPABLE__', {
         value: true,
         writable: true,

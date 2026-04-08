@@ -2029,7 +2029,7 @@ function SafeWorkerOverride(G){
           diagTag: 'worker_patch',
           surface: 'worker',
           key: 'installWorkerUACHMirror',
-          message: 'worker patch installed',
+          message: 'worker patch installed (Worker)',
           type: 'pipeline missing data',
           data: { outcome: 'return', reason: 'worker_patch_ok_confirmed', scope: 'Worker' }
         }, null);
@@ -2253,7 +2253,7 @@ function SafeSharedWorkerOverride(G){
                 diagTag: 'worker_patch',
                 surface: 'worker',
                 key: 'installWorkerUACHMirror',
-                message: 'worker patch installed',
+                message: 'worker patch installed (SharedWorker)',
                 type: 'pipeline missing data',
                 data: { outcome: 'return', reason: 'worker_patch_ok_confirmed', scope: 'SharedWorker' }
               }, null);
