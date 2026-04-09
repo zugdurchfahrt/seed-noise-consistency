@@ -305,8 +305,7 @@ def _get_data_url(platform: str, target_dir: pathlib.Path, fname: str, rec: dict
         with open(target_dir / fname, "rb") as rf:
             data = rf.read()
         if not _is_woff2_header(data):
-            logger.warning(f"[fonts] skipping no-woff2 while building data URL: {fname}")
-            return ""
+            raise RuntimeError(f"[fonts] invalid woff2 payload while building data URL: {fname}")
         b64 = base64.b64encode(data).decode("ascii")
         _atomic_write_text(b64_path, b64)
     return "data:font/woff2;base64," + b64
@@ -326,7 +325,7 @@ def _cleanup_cache(platform: str, valid_md5s: _Set[str]) -> int:
                 p.unlink()
                 removed += 1
             except Exception as e:
-                logger.warning(f"[fonts] cache_data cleanup: can not remove orphan {p.name} ({e})")
+                raise RuntimeError(f"[fonts] cache_data cleanup failed for orphan {p.name}: {e}") from e
     if removed: logger.info(f"[fonts] cache_data cleanup: removed {removed} orphan .b64")
     return removed
 
@@ -338,22 +337,33 @@ def _load_index(path: pathlib.Path, platform: str) -> dict:
     try:
         with open(path, "r", encoding="utf-8") as f:
             idx = json.load(f) or {}
-        if not isinstance(idx, dict) or "files" not in idx or idx.get("platform") != platform:
-            return {"version": 1, "platform": platform, "files": {}}
+        if not isinstance(idx, dict):
+            raise RuntimeError(f"[fonts] index must be a JSON object: {path}")
+        if idx.get("platform") != platform:
+            raise RuntimeError(f"[fonts] index platform mismatch for {path}: expected {platform}, got {idx.get('platform')!r}")
+        if "files" not in idx:
+            raise RuntimeError(f"[fonts] index missing files map: {path}")
+        if not isinstance(idx.get("files"), dict):
+            raise RuntimeError(f"[fonts] index files must be an object: {path}")
         if "version" not in idx:
             idx["version"] = 1
-        if "files" not in idx:
-            idx["files"] = {}
         return idx
     except Exception as e:
-        logger.warning(f"[fonts] index load failed for {platform} at {path} ({e})")
-        return {"version": 1, "platform": platform, "files": {}}
+        raise RuntimeError(f"[fonts] index load failed for {platform} at {path}: {e}") from e
 
 def _md5_bytes(b: bytes) -> str:
     h = hashlib.md5(); h.update(b); return h.hexdigest()
 
 def _is_woff2_header(b: bytes) -> bool:
     return len(b) >= 4 and b[:4] == b"wOF2"
+
+def _transport_signature_for(configs: list[dict]) -> str:
+    material = json.dumps(
+        [c for c in configs if isinstance(c, dict)],
+        ensure_ascii=False,
+        separators=(",", ":")
+    )
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 def ensure_platform_index(platform: str) -> dict:
     """
@@ -395,8 +405,7 @@ def ensure_platform_index(platform: str) -> dict:
             with open(path, "rb") as rf:
                 data = rf.read()
             if not _is_woff2_header(data):
-                logger.warning(f"[fonts] skipping not-woff2: {path}")
-                continue
+                raise RuntimeError(f"[fonts] invalid woff2 in generated catalog: {path}")
             files_map[name] = {
                 "size": st.st_size,
                 "mtime": st.st_mtime,
@@ -409,10 +418,7 @@ def ensure_platform_index(platform: str) -> dict:
                 with open(path, "rb") as rf:
                     data = rf.read()
                 if not _is_woff2_header(data):
-                    logger.warning(f"[fonts] skipping not-woff2 (md5 backfill): {path}")
-                    files_map.pop(name, None)
-                    changed.append(name)
-                    continue
+                    raise RuntimeError(f"[fonts] invalid woff2 during md5 backfill: {path}")
                 rec["md5"] = _md5_bytes(data)
                 changed.append(name)
     # Save the index for changes
@@ -422,10 +428,7 @@ def ensure_platform_index(platform: str) -> dict:
         
     # claning orphaned .b64 after the index is actualized
     valid_md5s = {rec.get("md5") for rec in files_map.values() if isinstance(rec, dict) and rec.get("md5")}
-    try:
-        _cleanup_cache(platform, valid_md5s)
-    except Exception as e:
-        logger.warning(f"[fonts] cache cleanup failed: {e}")
+    _cleanup_cache(platform, valid_md5s)
     return idx
 
 def random_string(length=12):
@@ -871,6 +874,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             cfg = {
                 "name": name_no_ext,
                 "url": data_url,
+                "md5": rec.get("md5", ""),
                 "family": resolved_family,
                 "cssFamily": _derive_css_family(resolved_family, name_no_ext),
                 "subfamily": subfamily,
@@ -896,39 +900,86 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     finally:
         _META_RNG = _prev_meta_rng
 
-    # === Step 5: create fonts-manifest.json for fingerprint_files =====
-    os.makedirs(manifest_path.parent, exist_ok=True)
-    with open(MANIFEST_PATH, "w", encoding="utf-8") as mf:
-        json.dump(temp_configs, mf, ensure_ascii=False, indent=2)
-    logger.info(f"fonts-manifest.json generated: ({len(temp_configs)} fonts)")
-
-    # === Step 5: render Jinja-template font_patch.generated.js =====
-    env = Environment(loader=FileSystemLoader(TEMPLATES), trim_blocks=True)
-    template = env.get_template('font_patch.template.j2')
-    # Data preparation for JS (with the right fields) from configs_json
-    configs_for_js = [
+    runtime_font_metadata = [
         {
             "name": c["name"],
             "family": c["family"],
-            "cssFamily": c.get("cssFamily") or c.get("family"),  # runtime CSS family (prefer generated cssFamily)
-            "url": c["url"],
+            "cssFamily": c.get("cssFamily") or c.get("family"),
             "platform_id": c["platform_id"],
             "platform_dom": c.get("platform_dom"),
             "weight": c.get("weight", "normal"),
             "style": c.get("style", "normal"),
+            "md5": c.get("md5", ""),
         }
         for c in temp_configs
     ]
-    configs_json = json.dumps(configs_for_js, ensure_ascii=False)
 
-    output = template.render(
-        configs_json=configs_json,
-        PLATFORM=platform
-    )
+    configs_for_js = [
+        {
+            "name": meta["name"],
+            "family": meta["family"],
+            "cssFamily": meta["cssFamily"],  # runtime CSS family (prefer generated cssFamily)
+            "url": c["url"],
+            "platform_id": meta["platform_id"],
+            "platform_dom": meta["platform_dom"],
+            "weight": meta["weight"],
+            "style": meta["style"],
+        }
+        for meta, c in zip(runtime_font_metadata, temp_configs)
+    ]
+    next_transport_signature = _transport_signature_for(runtime_font_metadata)
+    prev_transport_signature = idx.get("transport_signature")
+    signature_changed = (prev_transport_signature != next_transport_signature)
 
-    os.makedirs(PATCH_OUT.parent, exist_ok=True)
-    with open(PATCH_OUT, "w", encoding="utf-8") as outf:
-        outf.write(output)
-    logger.info(f" File is generated {PATCH_OUT.name}")
+    manifest_payload = [
+        {
+            "name": c["name"],
+            "family": c["family"],
+            "cssFamily": c.get("cssFamily") or c.get("family"),
+            "subfamily": c.get("subfamily", ""),
+            "weight": c.get("weight", "normal"),
+            "style": c.get("style", "normal"),
+            "unique_id": c.get("unique_id", ""),
+            "full_name": c.get("full_name", ""),
+            "version": c.get("version", ""),
+            "postscript_name": c.get("postscript_name", ""),
+            "designer": c.get("designer", ""),
+            "license": c.get("license", ""),
+            "platform_id": c.get("platform_id", ""),
+            "platform_dom": c.get("platform_dom", ""),
+            "md5": c.get("md5", ""),
+        }
+        for c in temp_configs
+    ]
+    should_refresh_transport_artifacts = signature_changed or not PATCH_OUT.exists()
+
+    # === Step 5: create fonts-manifest.json for fingerprint_files =====
+    os.makedirs(manifest_path.parent, exist_ok=True)
+    with open(manifest_path, "w", encoding="utf-8") as mf:
+        json.dump(manifest_payload, mf, ensure_ascii=False, indent=2)
+    logger.info(f"fonts-manifest.json generated: ({len(manifest_payload)} fonts)")
+
+    # === Step 5: render Jinja-template font_patch.generated.js =====
+    if should_refresh_transport_artifacts:
+        env = Environment(loader=FileSystemLoader(TEMPLATES), trim_blocks=True)
+        template = env.get_template('font_patch.template.j2')
+        # Data preparation for JS (with the right fields) from configs_json
+        configs_json = json.dumps(configs_for_js, ensure_ascii=False)
+
+        output = template.render(
+            configs_json=configs_json,
+            PLATFORM=platform
+        )
+
+        os.makedirs(PATCH_OUT.parent, exist_ok=True)
+        with open(PATCH_OUT, "w", encoding="utf-8") as outf:
+            outf.write(output)
+        logger.info(f" File is generated {PATCH_OUT.name}")
+    else:
+        logger.info(f" File is kept as-is {PATCH_OUT.name} (unchanged transport_signature)")
+
+    if signature_changed:
+        idx["transport_signature"] = next_transport_signature
+        _atomic_write_json(_index_path_for(platform), idx)
 
     return temp_configs
