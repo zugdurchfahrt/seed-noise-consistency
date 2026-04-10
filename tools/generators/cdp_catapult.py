@@ -25,6 +25,7 @@ SW_LANGS = None
 SW_HC = None
 SW_DM = None
 SW_META = None
+SW_WEBGL = None
 # --- Dedicated/Shared Worker CDP_GLOBAL_SEED injector (WorkerGlobalScope) ---
 WORKER_SEED_INJECT_ENABLED = True
 CDP_GLOBAL_SEED = None
@@ -228,6 +229,12 @@ atexit.register(_stop_injectors_atexit)
 def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
     if not isinstance(SW_META, dict) or not SW_META:
         raise ValueError("SW inject: expected_client_hints missing")
+    if not isinstance(SW_WEBGL, dict) or not SW_WEBGL:
+        raise ValueError("SW inject: webgl snapshot missing")
+    for key in ("vendor", "renderer", "unmaskedVendor", "unmaskedRenderer"):
+        value = SW_WEBGL.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"SW inject: bad webgl.{key}")
 
     prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
     reflect_path = SCRIPTS_WORKERSCOPE / "set_reflect.js"
@@ -248,7 +255,8 @@ def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_c
     langs: {json.dumps(normalized_languages, ensure_ascii=False)},
     hc: {json.dumps(hardware_concurrency)},
     dm: {json.dumps(device_memory)},
-    meta: {json.dumps(SW_META, ensure_ascii=False)}
+    meta: {json.dumps(SW_META, ensure_ascii=False)},
+    webgl: {json.dumps(SW_WEBGL, ensure_ascii=False)}
   }};
   function defineHidden(obj, key, value) {{
     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) {{

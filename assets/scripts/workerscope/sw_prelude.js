@@ -29,6 +29,10 @@
     __trackDeleteOwnIfConfigurable(G, __swDiagBindingName);
   }
 
+  const __swWrapNativeApply = (typeof G.__wrapNativeApply === 'function')
+    ? G.__wrapNativeApply
+    : null;
+
   function __relaySWDiag(level, code, ctx, err) {
     try {
       const reporter = __swDiagReporter;
@@ -226,6 +230,7 @@
     const hc = env.hc;
     const dm = env.dm;
     const meta = env.meta;
+    const webgl = env.webgl;
 
     if (typeof primary !== 'string' || !primary) {
       __fail('sw_prelude:language_invalid', {
@@ -272,6 +277,51 @@
         data: { outcome: 'throw', reason: 'meta_invalid' }
       }, new Error('SW uaData meta invalid'));
     }
+    if (!webgl || typeof webgl !== 'object') {
+      __fail('sw_prelude:webgl_env_missing', {
+        stage: 'preflight',
+        key: 'webgl',
+        message: 'service worker webgl env missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'webgl_env_missing' }
+      }, new Error('SW webgl env missing'));
+    }
+    if (typeof webgl.vendor !== 'string' || !webgl.vendor) {
+      __fail('sw_prelude:webgl_vendor_missing', {
+        stage: 'preflight',
+        key: 'webgl.vendor',
+        message: 'service worker webgl.vendor missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'webgl_vendor_missing' }
+      }, new Error('SW webgl.vendor missing'));
+    }
+    if (typeof webgl.renderer !== 'string' || !webgl.renderer) {
+      __fail('sw_prelude:webgl_renderer_missing', {
+        stage: 'preflight',
+        key: 'webgl.renderer',
+        message: 'service worker webgl.renderer missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'webgl_renderer_missing' }
+      }, new Error('SW webgl.renderer missing'));
+    }
+    if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) {
+      __fail('sw_prelude:webgl_unmasked_vendor_missing', {
+        stage: 'preflight',
+        key: 'webgl.unmaskedVendor',
+        message: 'service worker webgl.unmaskedVendor missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'webgl_unmasked_vendor_missing' }
+      }, new Error('SW webgl.unmaskedVendor missing'));
+    }
+    if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) {
+      __fail('sw_prelude:webgl_unmasked_renderer_missing', {
+        stage: 'preflight',
+        key: 'webgl.unmaskedRenderer',
+        message: 'service worker webgl.unmaskedRenderer missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'webgl_unmasked_renderer_missing' }
+      }, new Error('SW webgl.unmaskedRenderer missing'));
+    }
     if (typeof __swWrapStrictAccessor !== 'function') {
       __fail('sw_prelude:wrap_strict_accessor_missing', {
         stage: 'preflight',
@@ -293,6 +343,155 @@
         data: { outcome: 'skip', reason: 'languages_freeze_failed' }
       }, e);
     }
+
+    function __installServiceWorkerWebGLMirror(snapshot) {
+      const OffscreenCanvasCtor = (typeof G.OffscreenCanvas === 'function') ? G.OffscreenCanvas : null;
+      if (!OffscreenCanvasCtor || !OffscreenCanvasCtor.prototype) {
+        __swDiag('info', 'sw_prelude:webgl_mirror_skipped', {
+          stage: 'apply',
+          key: 'OffscreenCanvas',
+          message: 'service worker webgl mirror skipped',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'offscreen_canvas_missing' }
+        }, null);
+        return false;
+      }
+      if (typeof __swWrapNativeApply !== 'function') {
+        __fail('sw_prelude:webgl_wrap_native_apply_missing', {
+          stage: 'preflight',
+          key: '__wrapNativeApply',
+          message: 'service worker native apply bridge missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'webgl_wrap_native_apply_missing' }
+        }, new Error('SW __wrapNativeApply missing'));
+      }
+      const oscProto = OffscreenCanvasCtor.prototype;
+      const dGetContext = Object.getOwnPropertyDescriptor(oscProto, 'getContext');
+      if (!dGetContext || dGetContext.configurable === false || typeof dGetContext.value !== 'function') {
+        __fail('sw_prelude:webgl_descriptor_missing', {
+          stage: 'preflight',
+          key: 'OffscreenCanvas.prototype.getContext',
+          message: 'service worker OffscreenCanvas.getContext descriptor missing',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'webgl_descriptor_missing' }
+        }, new Error('SW OffscreenCanvas.getContext descriptor missing'));
+      }
+      const nativeGetContext = dGetContext.value;
+      const patchedContexts = (typeof WeakSet === 'function') ? new WeakSet() : null;
+      const debugInfoCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
+      if (!patchedContexts || !debugInfoCache) {
+        __fail('sw_prelude:webgl_weak_structures_missing', {
+          stage: 'preflight',
+          key: 'WeakSet',
+          message: 'service worker webgl weak structures missing',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'webgl_weak_structures_missing' }
+        }, new Error('SW webgl weak structures missing'));
+      }
+
+      const patchContextInstance = function(ctx) {
+        if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) return ctx;
+        if (patchedContexts.has(ctx)) return ctx;
+        patchedContexts.add(ctx);
+
+        const dGetParameter = Object.getOwnPropertyDescriptor(ctx, 'getParameter');
+        const origGetParameter = (dGetParameter && typeof dGetParameter.value === 'function')
+          ? dGetParameter.value
+          : (typeof ctx.getParameter === 'function' ? ctx.getParameter : null);
+        if (!origGetParameter) {
+          __fail('sw_prelude:webgl_get_parameter_missing', {
+            stage: 'preflight',
+            key: 'getParameter',
+            message: 'service worker webgl getParameter missing',
+            type: 'browser structure missing data',
+            data: { outcome: 'throw', reason: 'webgl_get_parameter_missing' }
+          }, new Error('SW webgl getParameter missing'));
+        }
+
+        const dGetExtension = Object.getOwnPropertyDescriptor(ctx, 'getExtension');
+        const origGetExtension = (dGetExtension && typeof dGetExtension.value === 'function')
+          ? dGetExtension.value
+          : (typeof ctx.getExtension === 'function' ? ctx.getExtension : null);
+
+        if (typeof origGetExtension === 'function') {
+          const wrappedGetExtension = __swWrapNativeApply(origGetExtension, 'getExtension', function(target, thisArg, argList) {
+            if (!thisArg || (typeof thisArg !== 'object' && typeof thisArg !== 'function') || !patchedContexts.has(thisArg)) {
+              return Reflect.apply(target, thisArg, argList || []);
+            }
+            const ext = Reflect.apply(target, thisArg, argList || []);
+            if ((argList && argList[0]) === 'WEBGL_debug_renderer_info') {
+              debugInfoCache.set(thisArg, ext || null);
+            }
+            return ext;
+          });
+          __trackDefineProperty(ctx, 'getExtension', {
+            configurable: dGetExtension ? !!dGetExtension.configurable : true,
+            enumerable: dGetExtension ? !!dGetExtension.enumerable : false,
+            writable: dGetExtension && Object.prototype.hasOwnProperty.call(dGetExtension, 'writable') ? dGetExtension.writable : true,
+            value: wrappedGetExtension
+          });
+        }
+
+        const wrappedGetParameter = __swWrapNativeApply(origGetParameter, 'getParameter', function(target, thisArg, argList) {
+          if (!thisArg || (typeof thisArg !== 'object' && typeof thisArg !== 'function') || !patchedContexts.has(thisArg)) {
+            return Reflect.apply(target, thisArg, argList || []);
+          }
+          const pname = argList && argList[0];
+          let dbg = debugInfoCache.has(thisArg) ? debugInfoCache.get(thisArg) : undefined;
+          if (dbg === undefined) {
+            dbg = null;
+            if (typeof origGetExtension === 'function') {
+              try {
+                dbg = Reflect.apply(origGetExtension, thisArg, ['WEBGL_debug_renderer_info']);
+              } catch (_) {
+                dbg = null;
+              }
+            }
+            debugInfoCache.set(thisArg, dbg);
+          }
+          if (dbg) {
+            if (pname === dbg.UNMASKED_VENDOR_WEBGL) return snapshot.unmaskedVendor;
+            if (pname === dbg.UNMASKED_RENDERER_WEBGL) return snapshot.unmaskedRenderer;
+          }
+          if (pname === thisArg.VENDOR || pname === 0x1F00) return snapshot.vendor;
+          if (pname === thisArg.RENDERER || pname === 0x1F01) return snapshot.renderer;
+          return Reflect.apply(target, thisArg, argList || []);
+        });
+        __trackDefineProperty(ctx, 'getParameter', {
+          configurable: dGetParameter ? !!dGetParameter.configurable : true,
+          enumerable: dGetParameter ? !!dGetParameter.enumerable : false,
+          writable: dGetParameter && Object.prototype.hasOwnProperty.call(dGetParameter, 'writable') ? dGetParameter.writable : true,
+          value: wrappedGetParameter
+        });
+        return ctx;
+      };
+
+      const wrappedGetContext = __swWrapNativeApply(nativeGetContext, 'getContext', function(target, thisArg, argList) {
+        const res = Reflect.apply(target, thisArg, argList || []);
+        if (!res) return res;
+        const kind = argList && argList[0];
+        if (kind === 'webgl' || kind === 'webgl2' || kind === 'experimental-webgl') {
+          return patchContextInstance(res);
+        }
+        return res;
+      });
+      __trackDefineProperty(oscProto, 'getContext', {
+        configurable: !!dGetContext.configurable,
+        enumerable: !!dGetContext.enumerable,
+        writable: dGetContext && Object.prototype.hasOwnProperty.call(dGetContext, 'writable') ? dGetContext.writable : true,
+        value: wrappedGetContext
+      });
+      __swDiag('info', 'sw_prelude:webgl_mirror_installed', {
+        stage: 'apply',
+        key: 'OffscreenCanvas.prototype.getContext',
+        message: 'service worker webgl mirror installed',
+        type: 'pipeline missing data',
+        data: { outcome: 'return' }
+      }, null);
+      return true;
+    }
+
+    __installServiceWorkerWebGLMirror(webgl);
 
     const nav = G.navigator;
     if (!nav) {

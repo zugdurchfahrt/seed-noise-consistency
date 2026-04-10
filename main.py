@@ -347,6 +347,12 @@ def init_driver(
     rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
       
     cdp.SW_META = expected_client_hints
+    cdp.SW_WEBGL = {
+        "vendor": profile["webgl_vendor"],
+        "renderer": profile["webgl_renderer"],
+        "unmaskedVendor": profile["webgl_unmasked_vendor"],
+        "unmaskedRenderer": profile["webgl_unmasked_renderer"],
+    }
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
       
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
