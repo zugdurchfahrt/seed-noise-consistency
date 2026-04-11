@@ -395,6 +395,40 @@ const __probeRun = async function(){
       keys: ["queryUsageAndQuota"]
     },
     {
+      label: "Screen.prototype",
+      getProto: () => {
+        if (typeof window === "undefined" || !window.screen) return null;
+        return Object.getPrototypeOf(window.screen);
+      },
+      getTarget: () => {
+        if (typeof window === "undefined" || !window.screen) return null;
+        return window.screen;
+      },
+      keys: [
+        "width",
+        "height",
+        "availWidth",
+        "availHeight",
+        "colorDepth",
+        "pixelDepth",
+        "availLeft",
+        "availTop",
+        "orientation"
+      ]
+    },
+    {
+      label: "ScreenOrientation.prototype",
+      getProto: () => {
+        if (typeof window === "undefined" || !window.screen || !window.screen.orientation) return null;
+        return Object.getPrototypeOf(window.screen.orientation);
+      },
+      getTarget: () => {
+        if (typeof window === "undefined" || !window.screen || !window.screen.orientation) return null;
+        return window.screen.orientation;
+      },
+      keys: ["type", "angle"]
+    },
+    {
       label: "HTMLCanvasElement.prototype",
       getProto: () => (typeof HTMLCanvasElement !== "undefined" ? HTMLCanvasElement.prototype : null),
       getTarget: () => {
@@ -3213,6 +3247,17 @@ function printToStringCrossRealmChecks() {
     { p: "Navigator.prototype", k: "userAgent", exp: { exists: true,  hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
     { p: "Navigator.prototype", k: "webdriver", exp: { exists: true,  hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
     { p: "Navigator.prototype", k: "oscpu",     exp: { exists: false } },
+    { p: "Screen.prototype", k: "width",        exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "Screen.prototype", k: "height",       exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "Screen.prototype", k: "availWidth",   exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "Screen.prototype", k: "availHeight",  exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "Screen.prototype", k: "colorDepth",   exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "Screen.prototype", k: "pixelDepth",   exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "Screen.prototype", k: "availLeft",    exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "Screen.prototype", k: "availTop",     exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "Screen.prototype", k: "orientation",  exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "ScreenOrientation.prototype", k: "type",  exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
+    { p: "ScreenOrientation.prototype", k: "angle", exp: { exists: true, hasGetter: true, hasSetter: false, hasValue: false, enumerable: null, configurable: null, writable: null, valueType: null, toStringCheckTarget: "descriptor.get/descriptor.set" } },
     { p: "Permissions.prototype",         k: "query",              exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "MediaDevices.prototype",        k: "enumerateDevices",   exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },
     { p: "StorageManager.prototype",      k: "estimate",           exp: { exists: true, hasValue: true, valueType: "function", hasGetter: false, hasSetter: false, enumerable: null, configurable: null, writable: null, toStringCheckTarget: "resolved" } },

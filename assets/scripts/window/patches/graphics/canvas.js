@@ -232,7 +232,26 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     if (__canvasState.domReady) return;
 
     const doc = G && G.document;
+    const docReadyState = (doc && typeof doc.readyState === 'string') ? doc.readyState : null;
     if (!doc || (!doc.body && !doc.documentElement) || typeof doc.createElement !== 'function') {
+      const domDeferred = !!(doc && typeof doc.createElement === 'function' && docReadyState === 'loading');
+      emitCanvasDiag(domDeferred ? 'info' : 'warn', domDeferred ? 'canvas:init:preflight:dom_deferred' : 'canvas:init:preflight:dom_unavailable', null, {
+        stage: 'preflight',
+        key: 'document',
+        type: 'browser structure missing data',
+        message: domDeferred
+          ? 'document root not ready yet for DOM canvas host init'
+          : 'document/createElement unavailable for DOM canvas host init',
+        data: {
+          outcome: 'skip',
+          reason: domDeferred ? 'dom_deferred' : 'dom_unavailable',
+          hasDocument: !!doc,
+          hasDocumentElement: !!(doc && doc.documentElement),
+          hasBody: !!(doc && doc.body),
+          hasCreateElement: !!(doc && typeof doc.createElement === 'function'),
+          documentReadyState: docReadyState
+        }
+      });
       __canvasState.domReady = false;
       return; // нет DOM — выходим
     }
@@ -247,21 +266,35 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
     const screenWidth = __canvasScreenWidth;
     const screenHeight = __canvasScreenHeight;
-    if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
-      emitCanvasDiag('warn', 'canvas:init:preflight:screen_dims_missing', null, {
+    const viewportWidth = (
+      Number.isFinite(G.innerWidth) && G.innerWidth > 0
+    ) ? Math.round(G.innerWidth) : (
+      Number.isFinite(screenWidth) && screenWidth > 0 ? Math.round(screenWidth) : NaN
+    );
+    const viewportHeight = (
+      Number.isFinite(G.innerHeight) && G.innerHeight > 0
+    ) ? Math.round(G.innerHeight) : (
+      Number.isFinite(screenHeight) && screenHeight > 0 ? Math.round(screenHeight) : NaN
+    );
+    if (!Number.isFinite(viewportWidth) || !Number.isFinite(viewportHeight) || viewportWidth <= 0 || viewportHeight <= 0) {
+      emitCanvasDiag('warn', 'canvas:init:preflight:viewport_dims_missing', null, {
         stage: 'preflight',
-        key: '__WIDTH/__HEIGHT',
+        key: 'innerWidth/innerHeight/__WIDTH/__HEIGHT',
         type: 'pipeline missing data',
-        data: { __WIDTH: screenWidth, __HEIGHT: screenHeight }
+        message: 'viewport dimensions unavailable for DOM canvas host init',
+        data: {
+          outcome: 'skip',
+          reason: 'viewport_dims_missing',
+          innerWidth: Number.isFinite(G.innerWidth) ? G.innerWidth : null,
+          innerHeight: Number.isFinite(G.innerHeight) ? G.innerHeight : null,
+          __WIDTH: screenWidth,
+          __HEIGHT: screenHeight,
+          viewportWidth: viewportWidth,
+          viewportHeight: viewportHeight
+        }
       });
       return;
     }
-    const viewportWidth = (
-      Number.isFinite(G.innerWidth) && G.innerWidth > 0
-    ) ? Math.round(G.innerWidth) : Math.round(screenWidth);
-    const viewportHeight = (
-      Number.isFinite(G.innerHeight) && G.innerHeight > 0
-    ) ? Math.round(G.innerHeight) : Math.round(screenHeight);
     const div = doc.createElement('div');
     const canvas = doc.createElement('canvas');
     const baseCanvasWidth = Number(canvas.width);
@@ -304,9 +337,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const rng = __prng.mulberry32(__prng.strToSeed(__prng.seed + '|canvasId'));
     const u1 = rng();
     const u2 = rng();
-
     div.id = 'canvas_01' + u1.toString(36).slice(2, 10);
-
     const OFFSCREEN_LEFT_PX =
       -(viewportWidth + Math.floor(1000 + u2 * 4002));
 
@@ -327,16 +358,36 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     canvas.style.background = 'transparent';
     div.appendChild(canvas);
 
-    __defineHidden__(__canvasState, 'domCanvas', canvas,
+    const canvasStored = __defineHidden__(__canvasState, 'domCanvas', canvas,
       'canvas:init:apply:dom_storage_define_failed',
       'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvas',
       'DOM canvas defineProperty failed; fallback assign used'
     );
-    __defineHidden__(__canvasState, 'domCanvasHost', div,
+    const hostStored = __defineHidden__(__canvasState, 'domCanvasHost', div,
       'canvas:init:apply:dom_storage_define_failed',
       'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
       'DOM host defineProperty failed; fallback assign used'
     );
+    const domCanvasReady = !!(__canvasState && __canvasState.domCanvas === canvas);
+    const domHostReady = !!(__canvasState && __canvasState.domCanvasHost === div);
+    if (!canvasStored || !hostStored || !domCanvasReady || !domHostReady) {
+      emitCanvasDiag('warn', 'canvas:init:apply:dom_storage_incomplete', null, {
+        stage: 'apply',
+        key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvas/domCanvasHost',
+        type: 'browser structure missing data',
+        message: 'dom canvas host storage incomplete',
+        data: {
+          outcome: 'skip',
+          reason: 'dom_storage_incomplete',
+          canvasStored: !!canvasStored,
+          hostStored: !!hostStored,
+          domCanvasReady: domCanvasReady,
+          domHostReady: domHostReady
+        }
+      });
+      __canvasState.domReady = false;
+      return;
+    }
     __canvasState.domReady = true;
   }
 
@@ -374,12 +425,37 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   function realInit() {
     _ensureDomOnce();
     _ensureOffscreenOnce();
-    emitCanvasDiag('info', 'canvas:init:apply:real_init', null, {
+    const hasCanvas = !!(__canvasState && __canvasState.domCanvas);
+    const hasCanvasHost = !!(__canvasState && __canvasState.domCanvasHost);
+    const hasOffscreen = !!(__canvasState && __canvasState.offscreenCanvas);
+    const domReady = !!(__canvasState && __canvasState.domReady === true);
+    const documentReadyState = (G.document && typeof G.document.readyState === 'string') ? G.document.readyState : null;
+    if (domReady && hasCanvas && hasCanvasHost) {
+      emitCanvasDiag('info', 'canvas:init:apply:real_init', null, {
+        stage: 'apply',
+        message: 'Canvas realInit done',
+        data: {
+          hasCanvas: hasCanvas,
+          hasCanvasHost: hasCanvasHost,
+          hasOffscreen: hasOffscreen,
+          domReady: domReady
+        }
+      });
+      return;
+    }
+    const initDeferred = !domReady && documentReadyState === 'loading';
+    emitCanvasDiag(initDeferred ? 'info' : 'warn', initDeferred ? 'canvas:init:apply:real_init_deferred' : 'canvas:init:apply:real_init_incomplete', null, {
       stage: 'apply',
-      message: 'Canvas realInit done',
+      type: 'browser structure missing data',
+      message: initDeferred ? 'Canvas realInit deferred until DOMContentLoaded' : 'Canvas realInit incomplete',
       data: {
-        hasCanvas: !!(__canvasState && __canvasState.domCanvas),
-        hasOffscreen: !!(__canvasState && __canvasState.offscreenCanvas)
+        outcome: 'skip',
+        reason: initDeferred ? 'real_init_deferred' : 'real_init_incomplete',
+        hasCanvas: hasCanvas,
+        hasCanvasHost: hasCanvasHost,
+        hasOffscreen: hasOffscreen,
+        domReady: domReady,
+        documentReadyState: documentReadyState
       }
     });
   }

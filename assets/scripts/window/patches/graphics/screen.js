@@ -279,6 +279,127 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       return false;
     }
   }
+  function cleanupRegisteredCoreTarget(owner, key, groupTag, substage, rollbackReason) {
+    const coreIsTargetRegistered = (__core && typeof __core.isTargetRegistered === 'function')
+      ? __core.isTargetRegistered
+      : null;
+    if (typeof coreIsTargetRegistered !== 'function') {
+      return true;
+    }
+    let registered = false;
+    try {
+      registered = !!coreIsTargetRegistered(owner, key);
+    } catch (e) {
+      __screenDiag('error', groupTag + ':registry_check_failed', {
+        stage: 'rollback',
+        type: __screenTypePipeline,
+        diagTag: groupTag,
+        key: key || null,
+        message: 'target registry status check failed',
+        data: {
+          outcome: 'throw',
+          reason: 'registry_check_failed',
+          substage: substage || 'rollback(registry_check)',
+          rollbackReason: rollbackReason || 'rollback'
+        }
+      }, e);
+      return false;
+    }
+    if (!registered) {
+      return true;
+    }
+    const registry = (__core && __core.__targetRegistry instanceof WeakMap)
+      ? __core.__targetRegistry
+      : null;
+    if (!registry) {
+      __screenDiag('error', groupTag + ':registry_cleanup_failed', {
+        stage: 'rollback',
+        type: __screenTypePipeline,
+        diagTag: groupTag,
+        key: key || null,
+        message: 'core target registry missing during rollback cleanup',
+        data: {
+          outcome: 'throw',
+          reason: 'registry_missing',
+          substage: substage || 'rollback(registry_cleanup)',
+          rollbackReason: rollbackReason || 'rollback'
+        }
+      }, null);
+      return false;
+    }
+    try {
+      const bucket = registry.get(owner);
+      if (!bucket || typeof bucket.delete !== 'function') {
+        __screenDiag('error', groupTag + ':registry_cleanup_failed', {
+          stage: 'rollback',
+          type: __screenTypePipeline,
+          diagTag: groupTag,
+          key: key || null,
+          message: 'core target registry bucket missing during rollback cleanup',
+          data: {
+            outcome: 'throw',
+            reason: 'registry_bucket_missing',
+            substage: substage || 'rollback(registry_cleanup)',
+            rollbackReason: rollbackReason || 'rollback'
+          }
+        }, null);
+        return false;
+      }
+      bucket.delete(String(key));
+      if (bucket.size === ZERO) {
+        registry.delete(owner);
+      }
+    } catch (e) {
+      __screenDiag('error', groupTag + ':registry_cleanup_failed', {
+        stage: 'rollback',
+        type: __screenTypePipeline,
+        diagTag: groupTag,
+        key: key || null,
+        message: 'core target registry cleanup failed',
+        data: {
+          outcome: 'throw',
+          reason: 'registry_cleanup_failed',
+          substage: substage || 'rollback(registry_cleanup)',
+          rollbackReason: rollbackReason || 'rollback'
+        }
+      }, e);
+      return false;
+    }
+    try {
+      if (coreIsTargetRegistered(owner, key)) {
+        __screenDiag('error', groupTag + ':registry_cleanup_failed', {
+          stage: 'rollback',
+          type: __screenTypePipeline,
+          diagTag: groupTag,
+          key: key || null,
+          message: 'core target registry cleanup incomplete',
+          data: {
+            outcome: 'throw',
+            reason: 'registry_cleanup_incomplete',
+            substage: substage || 'rollback(registry_cleanup)',
+            rollbackReason: rollbackReason || 'rollback'
+          }
+        }, null);
+        return false;
+      }
+    } catch (e) {
+      __screenDiag('error', groupTag + ':registry_check_failed', {
+        stage: 'rollback',
+        type: __screenTypePipeline,
+        diagTag: groupTag,
+        key: key || null,
+        message: 'target registry status re-check failed',
+        data: {
+          outcome: 'throw',
+          reason: 'registry_check_failed',
+          substage: substage || 'rollback(registry_check)',
+          rollbackReason: rollbackReason || 'rollback'
+        }
+      }, e);
+      return false;
+    }
+    return true;
+  }
   function applyCoreTargetsGroup(groupTag, targets, policy) {
     const groupPolicy = (policy === 'throw' || policy === 'strict') ? 'throw' : 'skip';
     let plans = [];
@@ -391,6 +512,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         try {
           if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
           else delete p.owner[p.key];
+          if (!cleanupRegisteredCoreTarget(p.owner, p.key, groupTag, 'rollback(registry_cleanup)', 'apply_failed') && !rollbackErr) {
+            rollbackErr = new Error('target_registry_cleanup_failed');
+          }
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
           __screenDiag('error', groupTag + ':rollback_failed', {
@@ -433,6 +557,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           const p = appliedSnapshot[i];
           if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
           else delete p.owner[p.key];
+          cleanupRegisteredCoreTarget(p.owner, p.key, groupTag, 'rollback(module_teardown)', 'module_teardown');
         }
         delete __screenAppliedGroups[groupTag];
       });
@@ -450,6 +575,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       try {
         if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
         else delete p.owner[p.key];
+        if (!cleanupRegisteredCoreTarget(p.owner, p.key, groupTag, 'rollback(postcheck)', reason || 'postcheck_failed') && !rollbackErr) {
+          rollbackErr = new Error('target_registry_cleanup_failed');
+        }
       } catch (re) {
         if (!rollbackErr) rollbackErr = re;
         __screenDiag('error', groupTag + ':rollback_failed', {
@@ -494,10 +622,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
 
   const mqlMatches = new WeakMap();
   const mqlProto = (typeof MediaQueryList !== 'undefined' && MediaQueryList.prototype) ? MediaQueryList.prototype : null;
+  const mqlMatchesDesc = mqlProto ? Object.getOwnPropertyDescriptor(mqlProto, 'matches') : null;
+  const mqlOrigMatchesGet = (mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function') ? mqlMatchesDesc.get : null;
   if (mqlProto) {
-    const matchesDesc = Object.getOwnPropertyDescriptor(mqlProto, 'matches');
-    if (matchesDesc && typeof matchesDesc.get === 'function' && matchesDesc.configurable) {
-      const origMatchesGet = matchesDesc.get;
+    if (mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function' && mqlMatchesDesc.configurable && typeof mqlOrigMatchesGet === 'function') {
       applyCoreTargetsGroup('screen:mql_matches', [{
         owner: mqlProto,
         key: 'matches',
@@ -512,10 +640,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         invalidThis: 'native',
         getImpl() {
           if (mqlMatches.has(this)) return mqlMatches.get(this);
-          return Reflect.apply(origMatchesGet, this, []);
+          return Reflect.apply(mqlOrigMatchesGet, this, []);
         }
       }], 'strict');
-    } else if (!(matchesDesc && typeof matchesDesc.get === 'function')) {
+    } else if (!(mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function')) {
       __screenDiag('warn', 'screen:mql_matches_descriptor_missing', {
         stage: 'preflight',
         type: __screenTypeBrowser,
@@ -531,12 +659,23 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenGroupModes = {
     displayMode: 'pending',
     displayReason: 'pending',
+    displayDetails: [],
+    displayMismatches: [],
+    displaySubstage: 'apply',
     viewportMode: 'pending',
     viewportReason: 'pending',
+    viewportDetails: [],
+    viewportMismatches: [],
+    viewportSubstage: 'apply',
     hostWindowMode: 'native_observed',
     hostWindowReason: 'native_host_window',
+    hostWindowDetails: [],
+    hostWindowMismatches: [],
+    hostWindowSubstage: 'apply',
     coordinationPatched: false,
-    appliedTargets: ZERO
+    appliedTargets: ZERO,
+    deferredViewportRetryScheduled: false,
+    deferredViewportRetryUsed: false
   };
   const screenObj = window.screen;
   const screenProto = screenObj && Object.getPrototypeOf(screenObj);
@@ -585,6 +724,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (deviceW) { touched = true; matches = matches && SCREEN_WIDTH === parseInt(deviceW[1], 10); }
     const deviceH = q.match(/\(device-height:\s*(\d+)px\)/);
     if (deviceH) { touched = true; matches = matches && SCREEN_HEIGHT === parseInt(deviceH[1], 10); }
+    const exactW = q.match(/\(width:\s*(\d+)px\)/);
+    if (exactW) { touched = true; matches = matches && viewportExpected.innerWidth === parseInt(exactW[1], 10); }
+    const exactH = q.match(/\(height:\s*(\d+)px\)/);
+    if (exactH) { touched = true; matches = matches && viewportExpected.innerHeight === parseInt(exactH[1], 10); }
     const maxW = q.match(/\(max-width:\s*(\d+)px\)/);
     if (maxW) { touched = true; matches = matches && SCREEN_WIDTH <= parseInt(maxW[1], 10); }
     const minW = q.match(/\(min-width:\s*(\d+)px\)/);
@@ -695,6 +838,52 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       __screenGroupModes.hostWindowMode = mode;
       __screenGroupModes.hostWindowReason = reason;
     }
+  }
+  function __screenCloneList(list) {
+    return Array.isArray(list) ? list.slice() : [];
+  }
+  function __screenHasCanvasHost() {
+    return !!(__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object');
+  }
+  function __screenHasVisualViewport() {
+    return !!(visualViewportObj && visualViewportProto);
+  }
+  function __screenCurrentReadyState() {
+    return (typeof document !== 'undefined' && document && typeof document.readyState === 'string')
+      ? document.readyState
+      : null;
+  }
+  function __screenSetGroupEvidence(groupName, substage, details, mismatches) {
+    const safeSubstage = (typeof substage === 'string' && substage) ? substage : 'apply';
+    const safeDetails = __screenCloneList(details);
+    const safeMismatches = __screenCloneList(mismatches);
+    if (groupName === 'display') {
+      __screenGroupModes.displaySubstage = safeSubstage;
+      __screenGroupModes.displayDetails = safeDetails;
+      __screenGroupModes.displayMismatches = safeMismatches;
+      return;
+    }
+    if (groupName === 'viewport') {
+      __screenGroupModes.viewportSubstage = safeSubstage;
+      __screenGroupModes.viewportDetails = safeDetails;
+      __screenGroupModes.viewportMismatches = safeMismatches;
+      return;
+    }
+    if (groupName === 'hostWindow') {
+      __screenGroupModes.hostWindowSubstage = safeSubstage;
+      __screenGroupModes.hostWindowDetails = safeDetails;
+      __screenGroupModes.hostWindowMismatches = safeMismatches;
+    }
+  }
+  function __screenAugmentData(groupName, data) {
+    const out = Object.assign({}, (data && typeof data === 'object') ? data : null);
+    const normalizedGroup = (typeof groupName === 'string' && groupName) ? groupName : (out.group || null);
+    if (normalizedGroup != null) out.group = normalizedGroup;
+    if (!Object.prototype.hasOwnProperty.call(out, 'hasCanvasHost')) out.hasCanvasHost = __screenHasCanvasHost();
+    if (!Object.prototype.hasOwnProperty.call(out, 'hasVisualViewport')) out.hasVisualViewport = __screenHasVisualViewport();
+    if (!Object.prototype.hasOwnProperty.call(out, 'documentReadyState')) out.documentReadyState = __screenCurrentReadyState();
+    if (!Object.prototype.hasOwnProperty.call(out, 'appliedTargets')) out.appliedTargets = __screenGroupModes.appliedTargets;
+    return out;
   }
   function __screenDescribeAccessorSurface(owner, proto, key) {
     const target = chooseTarget(owner, proto, key);
@@ -887,6 +1076,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   function __screenCheckViewportCoherence() {
     const snapshot = __screenViewportSnapshot();
     const mismatches = [];
+    const enforceVisualViewport = (
+      __screenGroupModes.viewportSubstage === 'DOMContentLoaded' ||
+      __screenGroupModes.viewportSubstage === 'deferred_late_surface_reconcile'
+    );
     if (!Object.is(snapshot.innerWidth, viewportExpected.innerWidth)) {
       mismatches.push({ key: 'window.innerWidth', expected: viewportExpected.innerWidth, actual: snapshot.innerWidth });
     }
@@ -905,7 +1098,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         mismatches.push({ key: 'matchMedia.' + row.key, expected: true, actual: row.matches, readFailed: !!row.readFailed });
       }
     }
-    if (snapshot.visualViewport) {
+    if (enforceVisualViewport && snapshot.visualViewport) {
       if (!Object.is(snapshot.visualViewport.height, viewportExpected.visualViewportHeight)) mismatches.push({ key: 'visualViewport.height', expected: viewportExpected.visualViewportHeight, actual: snapshot.visualViewport.height });
       if (!Object.is(snapshot.visualViewport.offsetLeft, viewportExpected.visualViewportOffsetLeft)) mismatches.push({ key: 'visualViewport.offsetLeft', expected: viewportExpected.visualViewportOffsetLeft, actual: snapshot.visualViewport.offsetLeft });
       if (!Object.is(snapshot.visualViewport.offsetTop, viewportExpected.visualViewportOffsetTop)) mismatches.push({ key: 'visualViewport.offsetTop', expected: viewportExpected.visualViewportOffsetTop, actual: snapshot.visualViewport.offsetTop });
@@ -960,7 +1153,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       policy: 'strict',
       diagTag: 'screen:matchMedia',
       validThis: isMatchMediaThis,
-      invalidThis: 'throw',
+      invalidThis: 'native',
       invoke: matchMediaInvokeCore
     });
   }
@@ -1137,8 +1330,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         else viewportTargets.push(targetPlan.target);
       }
     }
-  } else {
-    viewportReasons.push('visualViewport:missing');
   }
   if (displayTargets.length && displayReasons.length === ZERO) {
     displayAppliedCount = applyCoreTargetsGroup('screen:display_group', displayTargets, 'strict');
@@ -1156,7 +1347,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           diagTag: 'screen',
           key: 'display_group',
           message: 'display coordination post-check failed',
-          data: { outcome: 'rollback', group: 'display', reason: 'display_postcheck_failed', mismatches: displayPostcheck.mismatches }
+          data: __screenAugmentData('display', { outcome: 'rollback', reason: 'display_postcheck_failed', substage: 'apply', details: ['display_postcheck_failed'], mismatches: displayPostcheck.mismatches })
         }, null);
         rollbackAppliedCoreGroup('screen:display_group', 'display_postcheck_failed');
         displayAppliedCount = ZERO;
@@ -1166,6 +1357,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   if (displayReasons.length === ZERO) {
     __screenState.orientationDom = orientationExpected.type;
+    __screenSetGroupEvidence('display', 'apply', [], displayPostcheck ? displayPostcheck.mismatches : []);
     __screenSetGroupOutcome('display', displayAppliedCount > ZERO ? 'patched' : 'native_observed', displayAppliedCount > ZERO ? 'coordinated_apply' : 'native_coherent');
     __screenDiag('info', displayAppliedCount > ZERO ? 'screen:display_group_applied' : 'screen:display_group_ready', {
       stage: 'apply',
@@ -1173,9 +1365,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       diagTag: 'screen',
       key: 'display_group',
       message: displayAppliedCount > ZERO ? 'display group coordinated' : 'display group already coherent',
-      data: { outcome: 'return', group: 'display', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, applied: displayAppliedCount, snapshot: displayPostcheck ? displayPostcheck.snapshot : null }
+      data: __screenAugmentData('display', { outcome: 'return', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', details: [], mismatches: displayPostcheck ? displayPostcheck.mismatches : [], applied: displayAppliedCount, snapshot: displayPostcheck ? displayPostcheck.snapshot : null })
     }, null);
   } else {
+    __screenSetGroupEvidence('display', 'apply', displayReasons, displayPostcheck ? displayPostcheck.mismatches : []);
     __screenSetGroupOutcome('display', 'skip', displayReasons[ZERO] || 'display_skipped');
     __screenDiag('warn', 'screen:display_group_skipped', {
       stage: 'preflight',
@@ -1183,7 +1376,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       diagTag: 'screen',
       key: 'display_group',
       message: 'display group skipped',
-      data: { outcome: 'skip', group: 'display', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, observed: displayObserved, details: displayReasons }
+      data: __screenAugmentData('display', { outcome: 'skip', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', observed: displayObserved, details: displayReasons, mismatches: displayPostcheck ? displayPostcheck.mismatches : [] })
     }, null);
   }
   if (viewportTargets.length && viewportReasons.length === ZERO) {
@@ -1202,7 +1395,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           diagTag: 'screen',
           key: 'viewport_group',
           message: 'viewport coordination post-check failed',
-          data: { outcome: 'rollback', group: 'viewport', reason: 'viewport_postcheck_failed', mismatches: viewportPostcheck.mismatches }
+          data: __screenAugmentData('viewport', { outcome: 'rollback', reason: 'viewport_postcheck_failed', substage: 'apply', details: ['viewport_postcheck_failed'], mismatches: viewportPostcheck.mismatches })
         }, null);
         rollbackAppliedCoreGroup('screen:viewport_group', 'viewport_postcheck_failed');
         viewportAppliedCount = ZERO;
@@ -1211,6 +1404,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
   }
   if (viewportReasons.length === ZERO) {
+    __screenSetGroupEvidence('viewport', 'apply', [], viewportPostcheck ? viewportPostcheck.mismatches : []);
     __screenSetGroupOutcome('viewport', viewportAppliedCount > ZERO ? 'patched' : 'native_observed', viewportAppliedCount > ZERO ? 'coordinated_apply' : 'native_coherent');
     __screenDiag('info', viewportAppliedCount > ZERO ? 'screen:viewport_group_applied' : 'screen:viewport_group_ready', {
       stage: 'apply',
@@ -1218,9 +1412,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       diagTag: 'screen',
       key: 'viewport_group',
       message: viewportAppliedCount > ZERO ? 'viewport group coordinated' : 'viewport group already coherent',
-      data: { outcome: 'return', group: 'viewport', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, applied: viewportAppliedCount, snapshot: viewportPostcheck ? viewportPostcheck.snapshot : null }
+      data: __screenAugmentData('viewport', { outcome: 'return', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: 'apply', details: [], mismatches: viewportPostcheck ? viewportPostcheck.mismatches : [], applied: viewportAppliedCount, snapshot: viewportPostcheck ? viewportPostcheck.snapshot : null })
     }, null);
   } else {
+    __screenSetGroupEvidence('viewport', 'apply', viewportReasons, viewportPostcheck ? viewportPostcheck.mismatches : []);
     __screenSetGroupOutcome('viewport', 'skip', viewportReasons[ZERO] || 'viewport_skipped');
     __screenDiag('warn', 'screen:viewport_group_skipped', {
       stage: 'preflight',
@@ -1228,7 +1423,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       diagTag: 'screen',
       key: 'viewport_group',
       message: 'viewport group skipped',
-      data: { outcome: 'skip', group: 'viewport', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, observed: viewportObserved, details: viewportReasons }
+      data: __screenAugmentData('viewport', { outcome: 'skip', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: 'apply', observed: viewportObserved, details: viewportReasons, mismatches: viewportPostcheck ? viewportPostcheck.mismatches : [] })
     }, null);
   }
   if (hostWindowTargets.length && hostWindowReasons.length === ZERO) {
@@ -1247,7 +1442,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           diagTag: 'screen',
           key: 'host_window_group',
           message: 'host-window coordination post-check failed',
-          data: { outcome: 'rollback', group: 'hostWindow', reason: 'host_window_postcheck_failed', mismatches: hostWindowPostcheck.mismatches }
+          data: __screenAugmentData('hostWindow', { outcome: 'rollback', reason: 'host_window_postcheck_failed', substage: 'apply', details: ['host_window_postcheck_failed'], mismatches: hostWindowPostcheck.mismatches })
         }, null);
         rollbackAppliedCoreGroup('screen:host_window_group', 'host_window_postcheck_failed');
         hostWindowAppliedCount = ZERO;
@@ -1256,6 +1451,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
   }
   if (hostWindowReasons.length === ZERO) {
+    __screenSetGroupEvidence('hostWindow', 'apply', [], hostWindowPostcheck ? hostWindowPostcheck.mismatches : []);
     __screenSetGroupOutcome('hostWindow', hostWindowAppliedCount > ZERO ? 'patched' : 'native_observed', hostWindowAppliedCount > ZERO ? 'coordinated_apply' : 'native_coherent');
     __screenDiag('info', hostWindowAppliedCount > ZERO ? 'screen:host_window_group_applied' : 'screen:host_window_group_ready', {
       stage: 'apply',
@@ -1263,9 +1459,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       diagTag: 'screen',
       key: 'host_window_group',
       message: hostWindowAppliedCount > ZERO ? 'host-window group coordinated' : 'host-window group already coherent',
-      data: { outcome: 'return', group: 'hostWindow', mode: __screenGroupModes.hostWindowMode, reason: __screenGroupModes.hostWindowReason, applied: hostWindowAppliedCount, snapshot: hostWindowPostcheck ? hostWindowPostcheck.snapshot : null }
+      data: __screenAugmentData('hostWindow', { outcome: 'return', mode: __screenGroupModes.hostWindowMode, reason: __screenGroupModes.hostWindowReason, substage: 'apply', details: [], mismatches: hostWindowPostcheck ? hostWindowPostcheck.mismatches : [], applied: hostWindowAppliedCount, snapshot: hostWindowPostcheck ? hostWindowPostcheck.snapshot : null })
     }, null);
   } else {
+    __screenSetGroupEvidence('hostWindow', 'apply', hostWindowReasons, hostWindowPostcheck ? hostWindowPostcheck.mismatches : []);
     __screenSetGroupOutcome('hostWindow', 'skip', hostWindowReasons[ZERO] || 'host_window_skipped');
     __screenDiag('warn', 'screen:host_window_group_skipped', {
       stage: 'preflight',
@@ -1273,7 +1470,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       diagTag: 'screen',
       key: 'host_window_group',
       message: 'host-window group skipped',
-      data: { outcome: 'skip', group: 'hostWindow', mode: __screenGroupModes.hostWindowMode, reason: __screenGroupModes.hostWindowReason, observed: hostWindowObserved, details: hostWindowReasons }
+      data: __screenAugmentData('hostWindow', { outcome: 'skip', mode: __screenGroupModes.hostWindowMode, reason: __screenGroupModes.hostWindowReason, substage: 'apply', observed: hostWindowObserved, details: hostWindowReasons, mismatches: hostWindowPostcheck ? hostWindowPostcheck.mismatches : [] })
     }, null);
   }
 
@@ -1284,6 +1481,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
       ? __screenCanvasState.domCanvasHost
       : null;
+    const coreIsTargetRegistered = (__core && typeof __core.isTargetRegistered === 'function')
+      ? __core.isTargetRegistered
+      : null;
+    __screenGroupModes.viewportSubstage = substage;
     if (!htmlRoot) {
       localReasons.push('document.documentElement:missing');
     } else {
@@ -1367,6 +1568,105 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         }
       }
     }
+    const runtimeViewportQueries = __screenCollectViewportQueries();
+    let needsViewportQueryCoordination = false;
+    for (let i = ZERO; i < runtimeViewportQueries.length; i++) {
+      const row = runtimeViewportQueries[i];
+      if (row.readFailed || row.matches !== true) {
+        needsViewportQueryCoordination = true;
+        break;
+      }
+    }
+    if (needsViewportQueryCoordination) {
+      const matchMediaRegistered = !!(coreIsTargetRegistered && mmTarget && coreIsTargetRegistered(mmTarget, 'matchMedia'));
+      const mqlMatchesRegistered = !!(coreIsTargetRegistered && mqlProto && coreIsTargetRegistered(mqlProto, 'matches'));
+      if (!(mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')) {
+        localReasons.push('matchMedia:descriptor_invalid');
+      } else if (!matchMediaRegistered) {
+        localTargets.push({
+          owner: mmTarget,
+          key: 'matchMedia',
+          kind: 'method',
+          wrapLayer: 'core_wrapper',
+          invokeClass: 'brand_strict',
+          resolve: matchMediaResolve,
+          policy: 'strict',
+          diagTag: 'screen:viewport_group:matchMedia',
+          validThis: isMatchMediaThis,
+          invalidThis: 'native',
+          invoke: matchMediaInvokeCore
+        });
+      }
+      if (!(mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function')) {
+        localReasons.push('matchMedia.matches:descriptor_missing');
+      } else if (!mqlMatchesDesc.configurable && !mqlMatchesRegistered) {
+        localReasons.push('matchMedia.matches:non_configurable');
+      } else if (!mqlMatchesRegistered && typeof mqlOrigMatchesGet === 'function') {
+        localTargets.push({
+          owner: mqlProto,
+          key: 'matches',
+          kind: 'accessor',
+          wrapLayer: 'strict_accessor_gateway',
+          resolve: 'proto_chain',
+          policy: 'strict',
+          diagTag: 'screen:viewport_group:mql_matches',
+          validThis(self) {
+            return receiverMatchesTarget(mqlProto, self);
+          },
+          invalidThis: 'native',
+          getImpl() {
+            if (mqlMatches.has(this)) return mqlMatches.get(this);
+            return Reflect.apply(mqlOrigMatchesGet, this, []);
+          }
+        });
+      }
+      if (matchMediaRegistered && mqlMatchesRegistered) {
+        for (let i = ZERO; i < runtimeViewportQueries.length; i++) {
+          const row = runtimeViewportQueries[i];
+          if (!row.readFailed && row.matches === true) continue;
+          localReasons.push('matchMedia.' + row.key + ':' + (row.readFailed ? row.readError : 'unexpected_false'));
+        }
+      }
+    }
+    if (visualViewportObj && visualViewportProto) {
+      const visualViewportMap = [
+        { key: 'height', expected: viewportExpected.visualViewportHeight },
+        { key: 'offsetLeft', expected: viewportExpected.visualViewportOffsetLeft },
+        { key: 'offsetTop', expected: viewportExpected.visualViewportOffsetTop },
+        { key: 'pageLeft', expected: viewportExpected.visualViewportPageLeft },
+        { key: 'pageTop', expected: viewportExpected.visualViewportPageTop },
+        { key: 'scale', expected: viewportExpected.visualViewportScale }
+      ];
+      for (let i = ZERO; i < visualViewportMap.length; i++) {
+        const item = visualViewportMap[i];
+        let actual = null;
+        let readFailed = false;
+        let readError = null;
+        try {
+          actual = __screenReadAccessorValue(visualViewportObj, visualViewportProto, item.key, visualViewportObj);
+        } catch (e) {
+          readFailed = true;
+          readError = (e && e.message) ? String(e.message) : 'native_read_failed';
+        }
+        if (readFailed) {
+          localReasons.push('visualViewport.' + item.key + ':' + readError);
+          continue;
+        }
+        if (!Object.is(actual, item.expected)) {
+          const targetPlan = __screenBuildAccessorTarget(
+            visualViewportObj,
+            visualViewportProto,
+            item.key,
+            item.expected,
+            'screen:viewport_group:visualViewport'
+          );
+          if (!targetPlan.ok) localReasons.push('visualViewport.' + item.key + ':' + targetPlan.reason);
+          else localTargets.push(targetPlan.target);
+        }
+      }
+    } else {
+      localReasons.push('visualViewport:missing');
+    }
     let applied = ZERO;
     let postcheck = null;
     if (localTargets.length && localReasons.length === ZERO) {
@@ -1386,7 +1686,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             diagTag: 'screen',
             key: 'viewport_group',
             message: 'viewport coordination post-check failed',
-            data: { outcome: 'rollback', group: 'viewport', reason: 'viewport_postcheck_failed', substage: substage, mismatches: postcheck.mismatches }
+            data: __screenAugmentData('viewport', { outcome: 'rollback', reason: 'viewport_postcheck_failed', substage: substage, details: ['viewport_postcheck_failed'], mismatches: postcheck.mismatches })
           }, null);
           rollbackAppliedCoreGroup('screen:viewport_group:dom_ready', 'viewport_postcheck_failed');
           applied = ZERO;
@@ -1395,16 +1695,20 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
     if (localReasons.length === ZERO) {
-      __screenSetGroupOutcome('viewport', applied > ZERO ? 'patched' : 'native_observed', applied > ZERO ? 'dom_ready_reconcile' : 'native_coherent');
+      __screenSetGroupEvidence('viewport', substage, [], postcheck ? postcheck.mismatches : []);
+      __screenSetGroupOutcome('viewport', applied > ZERO ? 'patched' : 'native_observed', applied > ZERO ? (substage === 'deferred_late_surface_reconcile' ? 'deferred_late_surface_reconcile' : 'dom_ready_reconcile') : 'native_coherent');
       __screenDiag('info', applied > ZERO ? 'screen:viewport_group_applied' : 'screen:viewport_group_ready', {
         stage: 'runtime',
         type: applied > ZERO ? 'ok' : __screenTypePipeline,
         diagTag: 'screen',
         key: 'viewport_group',
-        message: applied > ZERO ? 'viewport group reconciled after DOM ready' : 'viewport group coherent after DOM ready',
-        data: { outcome: 'return', group: 'viewport', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, applied: applied, snapshot: postcheck ? postcheck.snapshot : null }
+        message: applied > ZERO
+          ? (substage === 'deferred_late_surface_reconcile' ? 'viewport group reconciled after deferred late-surface retry' : 'viewport group reconciled after DOM ready')
+          : 'viewport group coherent after DOM ready',
+        data: __screenAugmentData('viewport', { outcome: 'return', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, details: [], mismatches: postcheck ? postcheck.mismatches : [], applied: applied, snapshot: postcheck ? postcheck.snapshot : null })
       }, null);
     } else {
+      __screenSetGroupEvidence('viewport', substage, localReasons, postcheck ? postcheck.mismatches : []);
       __screenSetGroupOutcome('viewport', 'skip', localReasons[ZERO] || 'viewport_skipped');
       __screenDiag('warn', 'screen:viewport_group_skipped', {
         stage: 'runtime',
@@ -1412,14 +1716,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         diagTag: 'screen',
         key: 'viewport_group',
         message: 'viewport group skipped after DOM ready',
-        data: { outcome: 'skip', group: 'viewport', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, details: localReasons }
+        data: __screenAugmentData('viewport', { outcome: 'skip', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, details: localReasons, mismatches: postcheck ? postcheck.mismatches : [] })
       }, null);
     }
     return { applied: applied, postcheck: postcheck, reasons: localReasons };
   }
-
-  const onViewportDomReady = () => {
-    const reconcileResult = __screenReconcileViewportRootClients('DOMContentLoaded');
+  function __screenEmitRuntimeSummary(substage, reconcileResult) {
     const runtimeSnapshot = (
       reconcileResult &&
       reconcileResult.postcheck &&
@@ -1432,10 +1734,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       diagTag: 'screen',
       key: null,
       message: 'runtime viewport snapshot',
-      data: {
+      data: __screenAugmentData('viewport', {
         outcome: 'return',
         reason: 'snapshot',
-        substage: 'DOMContentLoaded',
+        substage: substage,
+        details: __screenGroupModes.viewportDetails,
+        mismatches: __screenGroupModes.viewportMismatches,
         viewportGroupMode: __screenGroupModes.viewportMode,
         viewportGroupReason: __screenGroupModes.viewportReason,
         displayGroupMode: __screenGroupModes.displayMode,
@@ -1446,8 +1750,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         },
         div: {
           ownerPath: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
-          width: runtimeSnapshot ? runtimeSnapshot.divClientWidth : ((__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object') ? __screenCanvasState.domCanvasHost.clientWidth : null),
-          height: runtimeSnapshot ? runtimeSnapshot.divClientHeight : ((__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object') ? __screenCanvasState.domCanvasHost.clientHeight : null)
+          width: runtimeSnapshot ? runtimeSnapshot.divClientWidth : (__screenHasCanvasHost() ? __screenCanvasState.domCanvasHost.clientWidth : null),
+          height: runtimeSnapshot ? runtimeSnapshot.divClientHeight : (__screenHasCanvasHost() ? __screenCanvasState.domCanvasHost.clientHeight : null)
         },
         window: {
           width: runtimeSnapshot ? runtimeSnapshot.innerWidth : window.innerWidth,
@@ -1456,12 +1760,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           outerHeight: runtimeSnapshot ? runtimeSnapshot.outerHeight : window.outerHeight
         },
         screen: {
-          width:  window.screen.width,
+          width: window.screen.width,
           height: window.screen.height,
           physicalWidth: (__screenState && Number.isFinite(__screenState.physicalWidth)) ? __screenState.physicalWidth : null,
           physicalHeight: (__screenState && Number.isFinite(__screenState.physicalHeight)) ? __screenState.physicalHeight : null
         }
-      }
+      })
     });
     const __screenCoordinationComplete = (
       __screenGroupModes.displayMode !== 'skip' &&
@@ -1472,6 +1776,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const __screenSummaryCode = __screenCoordinationComplete
       ? (__screenGroupModes.coordinationPatched ? 'screen:patches_applied' : 'screen:coordination_ready')
       : 'screen:coordination_incomplete';
+    const summaryDetails = []
+      .concat(__screenGroupModes.displayDetails)
+      .concat(__screenGroupModes.viewportDetails)
+      .concat(__screenGroupModes.hostWindowDetails);
+    const summaryMismatches = []
+      .concat(__screenCloneList(__screenGroupModes.displayMismatches))
+      .concat(__screenCloneList(__screenGroupModes.viewportMismatches))
+      .concat(__screenCloneList(__screenGroupModes.hostWindowMismatches));
     __screenDiag(__screenCoordinationComplete ? 'info' : 'warn', __screenSummaryCode, {
       stage: 'runtime',
       type: __screenCoordinationComplete
@@ -1482,22 +1794,64 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       message: __screenCoordinationComplete
         ? (__screenGroupModes.coordinationPatched ? 'screen module coordinated and applied' : 'screen module completed with coherent native state')
         : 'screen module completed with incomplete coordination',
-      data: {
+      data: __screenAugmentData('coordination', {
         outcome: 'return',
         reason: __screenCoordinationComplete
           ? (__screenGroupModes.coordinationPatched ? 'coordinated_apply' : 'coherent_native_completion')
           : 'coordination_incomplete',
-        substage: 'DOMContentLoaded',
+        substage: substage,
+        details: summaryDetails,
+        mismatches: summaryMismatches,
         displayGroupMode: __screenGroupModes.displayMode,
         displayGroupReason: __screenGroupModes.displayReason,
+        displayGroupSubstage: __screenGroupModes.displaySubstage,
         viewportGroupMode: __screenGroupModes.viewportMode,
         viewportGroupReason: __screenGroupModes.viewportReason,
+        viewportGroupSubstage: __screenGroupModes.viewportSubstage,
         hostWindowGroupMode: __screenGroupModes.hostWindowMode,
         hostWindowGroupReason: __screenGroupModes.hostWindowReason,
-        appliedTargets: __screenGroupModes.appliedTargets,
+        hostWindowGroupSubstage: __screenGroupModes.hostWindowSubstage,
         hostWindowObserved: hostWindowObserved
-      }
+      })
     });
+    return __screenCoordinationComplete;
+  }
+  function __screenScheduleDeferredViewportReconcile(triggerReason) {
+    if (__screenGroupModes.deferredViewportRetryScheduled || __screenGroupModes.deferredViewportRetryUsed) {
+      return false;
+    }
+    __screenGroupModes.deferredViewportRetryScheduled = true;
+    __screenDiag('info', 'screen:deferred_viewport_reconcile_scheduled', {
+      stage: 'runtime',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: 'viewport_group',
+      message: 'deferred viewport reconcile scheduled',
+      data: __screenAugmentData('viewport', {
+        outcome: 'return',
+        reason: 'deferred_reconcile_scheduled',
+        substage: 'DOMContentLoaded',
+        details: [triggerReason || 'viewport_incomplete_after_domcontentloaded']
+      })
+    }, null);
+    window.setTimeout(function runDeferredViewportReconcile() {
+      __screenGroupModes.deferredViewportRetryScheduled = false;
+      __screenGroupModes.deferredViewportRetryUsed = true;
+      const deferredResult = __screenReconcileViewportRootClients('deferred_late_surface_reconcile');
+      __screenEmitRuntimeSummary('deferred_late_surface_reconcile', deferredResult);
+    }, ZERO);
+    return true;
+  }
+
+  const onViewportDomReady = () => {
+    const reconcileResult = __screenReconcileViewportRootClients('DOMContentLoaded');
+    const __screenCoordinationComplete = __screenEmitRuntimeSummary('DOMContentLoaded', reconcileResult);
+    if (!__screenCoordinationComplete) {
+      const triggerReason = (reconcileResult && Array.isArray(reconcileResult.reasons) && reconcileResult.reasons.length > ZERO)
+        ? String(reconcileResult.reasons[ZERO])
+        : 'coordination_incomplete';
+      __screenScheduleDeferredViewportReconcile(triggerReason);
+    }
   };
   if (document.readyState === 'loading') {
     document.addEventListener("DOMContentLoaded", onViewportDomReady);

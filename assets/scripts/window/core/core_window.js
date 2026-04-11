@@ -631,6 +631,21 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return valueFromGetter(this);
         }
       }), key).get;
+      try {
+        wrapped = __registerToStringWrapper(wrapped, origGet, name, '__wrapStrictAccessor');
+      } catch (e) {
+        __emit('error', 'core_window:wrapStrictAccessor:mark_failed', {
+          module: 'core',
+          diagTag: 'core_window',
+          surface: 'core',
+          key: key,
+          stage: 'apply',
+          message: '__wrapStrictAccessor mark/bridge registration failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', stx: (e && e.stack) ? String(e.stack) : null }
+        }, e);
+        throw e;
+      }
       return wrapped;
     }
 
