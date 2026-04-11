@@ -262,9 +262,28 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const viewportHeight = (
       Number.isFinite(G.innerHeight) && G.innerHeight > 0
     ) ? Math.round(G.innerHeight) : Math.round(screenHeight);
-    const baseCanvasWidth = 300;
-    const baseCanvasHeight = 150;
     const div = doc.createElement('div');
+    const canvas = doc.createElement('canvas');
+    const baseCanvasWidth = Number(canvas.width);
+    const baseCanvasHeight = Number(canvas.height);
+    if (
+      !Number.isFinite(baseCanvasWidth) || baseCanvasWidth <= 0 ||
+      !Number.isFinite(baseCanvasHeight) || baseCanvasHeight <= 0
+    ) {
+      emitCanvasDiag('warn', 'canvas:init:preflight:native_default_bitmap_size_invalid', null, {
+        stage: 'preflight',
+        key: 'HTMLCanvasElement.width/height',
+        type: 'browser structure missing data',
+        message: 'native canvas default bitmap size invalid',
+        data: {
+          outcome: 'skip',
+          reason: 'native_default_bitmap_size_invalid',
+          width: baseCanvasWidth,
+          height: baseCanvasHeight
+        }
+      });
+      return;
+    }
     const __prng = __resolvePrngState();
     if (typeof __prng.seed !== 'string' || !__prng.seed) {
       emitCanvasDiag('warn', 'canvas:init:preflight:core_prng_seed_missing', null, {
@@ -300,7 +319,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     div.style.pointerEvents = 'none';
     (doc.body || doc.documentElement).appendChild(div);
 
-    const canvas = doc.createElement('canvas');
     canvas.width = baseCanvasWidth;
     canvas.height = baseCanvasHeight;
     canvas.style.width = viewportWidth + 'px';

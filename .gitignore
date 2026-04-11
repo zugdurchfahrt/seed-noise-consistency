@@ -32,6 +32,8 @@ MANIFEST
 user_data
 profiles/
 docs/Samples4Context
+assets/generated_fonts/Win32/
+
 cfg_vpn/
 JS_fonts_patch
 proxy_error_log.txt
@@ -42,9 +44,10 @@ runmine_mcp.py
 proxy_out_log.txt
 profile.json
 runmine_mcp.py
-/assets/generated_fonts
-/assets/generated_fonts/Win32
-/assets/generated_fonts/MacIntel
+assets/generated_fonts
+assets/generated_fonts/Win32
+assets/generated_fonts/Win32/fonts_index.json
+assets/generated_fonts/MacIntel
 
 
 # PyInstaller

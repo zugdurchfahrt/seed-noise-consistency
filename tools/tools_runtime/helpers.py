@@ -14,15 +14,27 @@ def build_device_metrics(profile: dict) -> dict:
     w   = int(profile["screen_width"])
     h   = int(profile["screen_height"])
     dpr = float(profile.get("device_dpr_value", 1))
+    if dpr <= 0:
+        raise ValueError(f"invalid device_dpr_value: {dpr!r}")
+    derived_physical_w = round(w * dpr)
+    derived_physical_h = round(h * dpr)
     physical_w = profile.get("physical_screen_width")
     physical_h = profile.get("physical_screen_height")
 
-    if physical_w is not None and round(w * dpr) != int(physical_w):
+    if physical_w is None:
+        physical_w = derived_physical_w
+    else:
+        physical_w = int(physical_w)
+    if physical_w != derived_physical_w:
         raise ValueError(
             f"inconsistent width metrics: screen_width={w}, dpr={dpr}, "
             f"physical_screen_width={physical_w}"
         )
-    if physical_h is not None and round(h * dpr) != int(physical_h):
+    if physical_h is None:
+        physical_h = derived_physical_h
+    else:
+        physical_h = int(physical_h)
+    if physical_h != derived_physical_h:
         raise ValueError(
             f"inconsistent height metrics: screen_height={h}, dpr={dpr}, "
             f"physical_screen_height={physical_h}"
@@ -36,8 +48,8 @@ def build_device_metrics(profile: dict) -> dict:
         "height": h,
         "deviceScaleFactor": dpr,
         "mobile": False,
-        "screenWidth": w,
-        "screenHeight": h,
+        "screenWidth": physical_w,
+        "screenHeight": physical_h,
         "screenOrientation": {"type": otype, "angle": 0},
     }
 
