@@ -618,8 +618,8 @@
 
     const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
       || Object.getOwnPropertyDescriptor(uad, 'fullVersionList')
-      || null;
-    if (dFull && dFull.configurable === false) {
+      || { configurable: true, enumerable: false };
+    if (dFull.configurable === false) {
       __fail('sw_prelude:full_version_list_nonconfigurable', {
         stage: 'preflight',
         key: 'fullVersionList',
@@ -658,17 +658,6 @@
     const mobileValue = meta.mobile;
     const platformValue = chPlatform;
     const isUadThis = recv => (recv === uad);
-    const uadAccessorBridgeGet = (dFull && typeof dFull.get === 'function')
-      ? dFull.get
-      : ((typeof dBrands.get === 'function')
-        ? dBrands.get
-        : ((typeof dMobile.get === 'function')
-          ? dMobile.get
-          : ((typeof dPlatform.get === 'function')
-            ? dPlatform.get
-            : (uadGetterInfo && uadGetterInfo.desc && typeof uadGetterInfo.desc.get === 'function')
-              ? uadGetterInfo.desc.get
-              : null)));
 
     function defAcc(key, getter) {
       const resolved = __resolveDescriptor(proto, key);
@@ -824,19 +813,16 @@
       });
     }
 
-    if (dFull) {
-      __trackDefineProperty(uadProto, 'fullVersionList', {
-        get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull.get, dFull.value),
-        enumerable: !!dFull.enumerable,
-        configurable: !!dFull.configurable
-      });
-    }
+    __trackDefineProperty(uadProto, 'fullVersionList', {
+      get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull.get, dFull.value),
+      enumerable: !!dFull.enumerable,
+      configurable: !!dFull.configurable
+    });
 
-    const getHighEntropyValues = __swWrapNativeApply(origGHEV, 'getHighEntropyValues', function(target, thisArg, argList) {
-      const keys = (argList && argList.length) ? argList[0] : undefined;
-      if (!isUadThis(thisArg)) {
+    const getHighEntropyValues = function(keys) {
+      if (!isUadThis(this)) {
         try {
-          return Reflect.apply(target, thisArg, [keys]);
+          return Reflect.apply(origGHEV, this, [keys]);
         } catch (e) {
           __reportNativeThrow('sw_prelude:illegal_invocation', 'getHighEntropyValues', 'service worker getHighEntropyValues illegal invocation', e);
           throw e;
@@ -883,7 +869,7 @@
         result[hint] = val;
       }
       return Promise.resolve(result);
-    });
+    };
     __trackDeleteOwnIfConfigurable(uad, 'getHighEntropyValues');
     __trackDefineProperty(uadProto, 'getHighEntropyValues', {
       value: getHighEntropyValues,

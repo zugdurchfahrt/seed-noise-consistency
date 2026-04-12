@@ -446,34 +446,18 @@ def run():
             "(() => {"
             " const nav = globalThis.navigator;"
             " if (!nav) return null;"
-            " const uad = nav.userAgentData;"
-            " if (!uad) {"
-            "  return {"
-            "   language: nav.language,"
-            "   languages: nav.languages,"
-            "   hardwareConcurrency: nav.hardwareConcurrency,"
-            "   deviceMemory: nav.deviceMemory,"
-            "   uad: null"
-            "  };"
-            " }"
-            " return Promise.resolve("
-            "   (typeof uad.getHighEntropyValues === 'function')"
-            "     ? uad.getHighEntropyValues(['fullVersionList'])"
-            "     : null"
-            " ).then(function(he) {"
-            "  return {"
-            "   language: nav.language,"
-            "   languages: nav.languages,"
-            "   hardwareConcurrency: nav.hardwareConcurrency,"
-            "   deviceMemory: nav.deviceMemory,"
-            "   uad: {"
-            "    platform: uad.platform,"
-            "    mobile: uad.mobile,"
-            "    brands: uad.brands,"
-            "    heFullVersionList: he && he.fullVersionList"
-            "   }"
-            "  };"
-            " });"
+            " return {"
+            "  language: nav.language,"
+            "  languages: nav.languages,"
+            "  hardwareConcurrency: nav.hardwareConcurrency,"
+            "  deviceMemory: nav.deviceMemory,"
+             "  uad: nav.userAgentData ? {"
+             "    platform: nav.userAgentData.platform,"
+             "    mobile: nav.userAgentData.mobile,"
+             "    brands: nav.userAgentData.brands,"
+             "    fullVersionList: nav.userAgentData.fullVersionList"
+             "  } : null"
+             " };"
              "})()"
          )
 
@@ -645,9 +629,9 @@ def run():
                             _resume_sw_session(ws, sid, "sanity_uad_brands_mismatch")
                             _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
                             return
-                        if list(uad.get("heFullVersionList") or []) != list(exp["uad"].get("fullVersionList") or []):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_full_version_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy fullVersionList mismatch", {"expected": exp, "got": out})
+                        if list(uad.get("fullVersionList") or []) != list(exp["uad"].get("fullVersionList") or []):
+                            _resume_sw_session(ws, sid, "sanity_uad_full_version_mismatch")
+                            _fatal(ws, "sw sanity: uad fullVersionList mismatch", {"expected": exp, "got": out})
                             return
                         logger.info("SW inject: sanity OK target values match profile")
                         _resume_sw_session(ws, sid, "sanity_ok")
@@ -731,7 +715,7 @@ def run():
                 send_sess(ws, sessionId, "Runtime.evaluate", {
                     "expression": sanity_expr,
                     "returnByValue": True,
-                    "awaitPromise": True
+                    "awaitPromise": False
                 })
             except Exception as e:
                 _resume_sw_session(ws, sessionId, "prelude_send_failed")

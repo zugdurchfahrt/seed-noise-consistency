@@ -2721,15 +2721,7 @@ function ServiceWorkerOverride(G){
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','fullVersionList','formFactors','wow64'];
-    const packet = (() => {
-      const lastSnap = __wrkRuntimeGet__('lastSnap');
-      if (lastSnap && typeof lastSnap === 'object') return lastSnap;
-      const workerPatchApi = __requireWorkerPatchApi__('worker patch hooks runtime api not ready', 'preflight');
-      if (workerPatchApi && typeof workerPatchApi.envSnapshot === 'function') {
-        return workerPatchApi.envSnapshot();
-      }
-      return EnvBus(G).envSnapshot();
-    })();
+    const packet = EnvBus(G).envSnapshot();
     const heSource = (packet && packet.uaData && packet.uaData.he && typeof packet.uaData.he === 'object')
       ? packet.uaData.he
       : null;
