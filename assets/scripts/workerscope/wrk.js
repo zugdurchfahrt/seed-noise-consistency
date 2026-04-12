@@ -659,12 +659,26 @@ function EnvBus(G){
     const uaData = __cloneEnvValue(packet.uaData);
     const he = __cloneEnvValue(packet.uaData.he);
     uaData.he = he;
+    const screenRoot = (stateRoot && stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
+      ? stateRoot.__SCREEN__
+      : null;
+    const screenState = (screenRoot && screenRoot.__STATE__ && typeof screenRoot.__STATE__ === 'object')
+      ? screenRoot.__STATE__
+      : null;
     const envProfile = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
       ? __cloneEnvValue(stateRoot.__ENV_PROFILE__)
       : null;
     if (!envProfile || typeof envProfile !== 'object') {
       throw new Error('EnvBus: __ENV_PROFILE__ missing');
     }
+    if (!screenState || typeof screenState !== 'object') {
+      throw new Error('EnvBus: __SCREEN__.__STATE__ missing');
+    }
+    envProfile.width = Number(screenState.width);
+    envProfile.height = Number(screenState.height);
+    envProfile.dpr = Number(screenState.dpr);
+    envProfile.colorDepth = Number(screenState.colorDepth);
+    envProfile.orientationDom = screenState.orientationDom;
     if (!Number.isFinite(Number(envProfile.width))) {
       throw new Error('EnvBus: __ENV_PROFILE__.width missing');
     }

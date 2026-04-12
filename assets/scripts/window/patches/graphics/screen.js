@@ -179,6 +179,42 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
+  const __screenMetricsState = (__screenState.__STATE__ && typeof __screenState.__STATE__ === 'object')
+    ? __screenState.__STATE__
+    : null;
+  if (!__screenMetricsState) {
+    __screenDiag('warn', 'screen:screen_metrics_state_missing', {
+      stage: 'preflight',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: 'CanvasPatchContext.state.__SCREEN__.__STATE__',
+      message: 'CanvasPatchContext.state.__SCREEN__.__STATE__ unavailable',
+      data: {
+        outcome: 'skip',
+        reason: 'screen_metrics_state_missing',
+        missing: 'CanvasPatchContext.state.__SCREEN__.__STATE__'
+      }
+    }, new Error('[ScreenPatch] CanvasPatchContext.state.__SCREEN__.__STATE__ unavailable'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
+      }
+    } catch (releaseErr) {
+      __screenDiag('warn', 'screen:guard_release_failed', {
+        stage: 'preflight',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: __flagKey,
+        message: 'guard release failed after screen metrics state missing skip',
+        data: {
+          outcome: 'skip',
+          reason: 'guard_release_failed',
+          substage: 'CanvasPatchContext.state.__SCREEN__.__STATE__'
+        }
+      }, releaseErr);
+    }
+    return;
+  }
   const __screenCanvasModuleState = (__screenStateRoot.__CANVAS__ && typeof __screenStateRoot.__CANVAS__ === 'object')
     ? __screenStateRoot.__CANVAS__
     : null;
@@ -188,20 +224,16 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __moduleRollbackStack = [];
   const __screenAppliedGroups = Object.create(null);
 
-  const SCREEN_WIDTH  = Number(window.__WIDTH);
-  const SCREEN_HEIGHT = Number(window.__HEIGHT);
-  const COLOR_DEPTH   = Number(window.__COLOR_DEPTH);
-  const DPR           = Number(window.__DPR);
-  const PHYSICAL_SCREEN_WIDTH = (
-    Number.isFinite(SCREEN_WIDTH) &&
-    Number.isFinite(DPR) &&
-    DPR > 0
-  ) ? Math.round(SCREEN_WIDTH * DPR) : NaN;
-  const PHYSICAL_SCREEN_HEIGHT = (
-    Number.isFinite(SCREEN_HEIGHT) &&
-    Number.isFinite(DPR) &&
-    DPR > 0
-  ) ? Math.round(SCREEN_HEIGHT * DPR) : NaN;
+  const SCREEN_WIDTH  = Number(__screenMetricsState.width);
+  const SCREEN_HEIGHT = Number(__screenMetricsState.height);
+  const COLOR_DEPTH   = Number(__screenMetricsState.colorDepth);
+  const DPR           = Number(__screenMetricsState.dpr);
+  const ORIENTATION_DOM = (typeof __screenMetricsState.orientationDom === 'string' && __screenMetricsState.orientationDom)
+    ? __screenMetricsState.orientationDom
+    : null;
+  const ORIENTATION_MEDIA = (ORIENTATION_DOM === 'portrait-primary')
+    ? 'portrait'
+    : ((ORIENTATION_DOM === 'landscape-primary') ? 'landscape' : null);
 
   try {
   if (!Number.isFinite(SCREEN_WIDTH) || !Number.isFinite(SCREEN_HEIGHT)) {
@@ -213,21 +245,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!Number.isFinite(DPR) || DPR <= 0) {
     throw new Error('bad dpr');
   }
-  if (
-    !Number.isFinite(PHYSICAL_SCREEN_WIDTH) || PHYSICAL_SCREEN_WIDTH <= 0 ||
-    !Number.isFinite(PHYSICAL_SCREEN_HEIGHT) || PHYSICAL_SCREEN_HEIGHT <= 0
-  ) {
-    throw new Error('bad derived physical width/height');
+  if (ORIENTATION_DOM !== 'portrait-primary' && ORIENTATION_DOM !== 'landscape-primary') {
+    throw new Error('bad orientationDom');
   }
 
   // Avoid hardcoded numeric literals for the constant zeros/ones used by layout offsets.
   // These values are derived from existing profile-driven values.
   const ZERO = SCREEN_WIDTH - SCREEN_WIDTH;
   const ONE = DPR / DPR;
-  if (Number.isFinite(PHYSICAL_SCREEN_WIDTH) && Number.isFinite(PHYSICAL_SCREEN_HEIGHT)) {
-    __screenState.physicalWidth = PHYSICAL_SCREEN_WIDTH;
-    __screenState.physicalHeight = PHYSICAL_SCREEN_HEIGHT;
-  }
 
   const __coreApplyTargets = (__core && typeof __core.applyTargets === 'function')
     ? __core.applyTargets
@@ -766,7 +791,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       const actual = (SCREEN_WIDTH > SCREEN_HEIGHT) ? 'landscape' : 'portrait';
       matches = matches && actual === orientation[1];
     }
-    __screenState.orientationDom = (SCREEN_WIDTH > SCREEN_HEIGHT) ? 'landscape-primary' : 'portrait-primary';
     const color = q.match(/\(color:\s*(\d+)\)/);
     if (color) {
       touched = true;
@@ -799,8 +823,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const list = Array.isArray(args) ? args : [];
     return matchMediaInvoke(orig, this, list);
   };
-  const expectedOrientationType = (SCREEN_HEIGHT >= SCREEN_WIDTH) ? 'portrait-primary' : 'landscape-primary';
-  const expectedOrientationMedia = (SCREEN_HEIGHT >= SCREEN_WIDTH) ? 'portrait' : 'landscape';
+  const expectedOrientationType = ORIENTATION_DOM;
+  const expectedOrientationMedia = ORIENTATION_MEDIA;
   const screenExpected = {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
@@ -1356,7 +1380,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
   }
   if (displayReasons.length === ZERO) {
-    __screenState.orientationDom = orientationExpected.type;
     __screenSetGroupEvidence('display', 'apply', [], displayPostcheck ? displayPostcheck.mismatches : []);
     __screenSetGroupOutcome('display', displayAppliedCount > ZERO ? 'patched' : 'native_observed', displayAppliedCount > ZERO ? 'coordinated_apply' : 'native_coherent');
     __screenDiag('info', displayAppliedCount > ZERO ? 'screen:display_group_applied' : 'screen:display_group_ready', {
@@ -1761,9 +1784,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         },
         screen: {
           width: window.screen.width,
-          height: window.screen.height,
-          physicalWidth: (__screenState && Number.isFinite(__screenState.physicalWidth)) ? __screenState.physicalWidth : null,
-          physicalHeight: (__screenState && Number.isFinite(__screenState.physicalHeight)) ? __screenState.physicalHeight : null
+          height: window.screen.height
         }
       })
     });

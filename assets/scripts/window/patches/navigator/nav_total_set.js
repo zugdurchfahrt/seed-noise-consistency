@@ -265,6 +265,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navScreenState = (__stateRoot && __stateRoot.__SCREEN__ && typeof __stateRoot.__SCREEN__ === 'object')
       ? __stateRoot.__SCREEN__
       : null;
+    const __navScreenMetricsState = (__navScreenState && __navScreenState.__STATE__ && typeof __navScreenState.__STATE__ === 'object')
+      ? __navScreenState.__STATE__
+      : null;
     const __navPrimaryLanguage = (__navLangState && typeof __navLangState.primaryLanguage === 'string' && __navLangState.primaryLanguage)
       ? __navLangState.primaryLanguage
       : null;
@@ -312,26 +315,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const vendor        = __envProfileState.vendor;
     const mem           = Number(__envProfileState.mem);
     const cpu           = Number(__envProfileState.cpu);
-    const dpr           = Number(__envProfileState.dpr);
-    const width         = Number(__envProfileState.width);
-    const height        = Number(__envProfileState.height);
-    const physicalWidth = (
-      Number.isFinite(width) &&
-      Number.isFinite(dpr) &&
-      dpr > 0
-    ) ? Math.round(width * dpr) : NaN;
-    const physicalHeight = (
-      Number.isFinite(height) &&
-      Number.isFinite(dpr) &&
-      dpr > 0
-    ) ? Math.round(height * dpr) : NaN;
+    const dpr           = Number(__navScreenMetricsState && __navScreenMetricsState.dpr);
     const devicesLabels = __navCloneStateValue(__envProfileState.devicesLabels);
-    const colorDepth    = Number(__envProfileState.colorDepth);
-    const orientationDom = (typeof __envProfileState.orientationDom !== 'undefined')
-      ? __envProfileState.orientationDom
-      : ((__navScreenState && typeof __navScreenState.orientationDom === 'string' && __navScreenState.orientationDom)
-        ? __navScreenState.orientationDom
-        : (((height >= width)) ? 'portrait-primary' : 'landscape-primary'));
+    const colorDepth    = Number(__navScreenMetricsState && __navScreenMetricsState.colorDepth);
     const fullVersionList = __navCloneStateValue(__envProfileState.fullVersionList);
     const storageQuotaMb = __envProfileState.storageQuotaMb;
     const storageUsedPct = __envProfileState.storageUsedPct;
@@ -534,27 +520,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         data: { outcome: 'skip', reason: 'bad_dpr', dpr: dpr }
       });
       __navReleaseEntryGuard(true, 'preflight', 'bad_dpr');
-      return;
-    }
-    if (
-      !Number.isFinite(physicalWidth) || physicalWidth <= 0 ||
-      !Number.isFinite(physicalHeight) || physicalHeight <= 0
-    ) {
-      __navDiagPipeline('error', 'nav_total_set:bad_derived_physical_screen_metrics', {
-        stage: 'preflight',
-        key: 'CanvasPatchContext.state.__ENV_PROFILE__.width/height/dpr',
-        message: 'bad derived physical screen metrics',
-        data: {
-          outcome: 'skip',
-          reason: 'bad_derived_physical_screen_metrics',
-          width: width,
-          height: height,
-          dpr: dpr,
-          physicalWidth: physicalWidth,
-          physicalHeight: physicalHeight
-        }
-      });
-      __navReleaseEntryGuard(true, 'preflight', 'bad_derived_physical_screen_metrics');
       return;
     }
 

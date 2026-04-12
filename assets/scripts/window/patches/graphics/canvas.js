@@ -46,22 +46,15 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 const C  = G.CanvasPatchContext;
 const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 const __canvasStateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-const __canvasEnvProfile = (__canvasStateRoot && __canvasStateRoot.__ENV_PROFILE__ && typeof __canvasStateRoot.__ENV_PROFILE__ === 'object')
-  ? __canvasStateRoot.__ENV_PROFILE__
+const __canvasScreenRoot = (__canvasStateRoot && __canvasStateRoot.__SCREEN__ && typeof __canvasStateRoot.__SCREEN__ === 'object')
+  ? __canvasStateRoot.__SCREEN__
   : null;
-const __canvasScreenWidth = Number((__canvasEnvProfile && __canvasEnvProfile.width != null) ? __canvasEnvProfile.width : G.__WIDTH);
-const __canvasScreenHeight = Number((__canvasEnvProfile && __canvasEnvProfile.height != null) ? __canvasEnvProfile.height : G.__HEIGHT);
-const __canvasDpr = Number((__canvasEnvProfile && __canvasEnvProfile.dpr != null) ? __canvasEnvProfile.dpr : G.__DPR);
-const __canvasPhysicalScreenWidth = (
-  Number.isFinite(__canvasScreenWidth) &&
-  Number.isFinite(__canvasDpr) &&
-  __canvasDpr > 0
-) ? Math.round(__canvasScreenWidth * __canvasDpr) : NaN;
-const __canvasPhysicalScreenHeight = (
-  Number.isFinite(__canvasScreenHeight) &&
-  Number.isFinite(__canvasDpr) &&
-  __canvasDpr > 0
-) ? Math.round(__canvasScreenHeight * __canvasDpr) : NaN;
+const __canvasScreenState = (__canvasScreenRoot && __canvasScreenRoot.__STATE__ && typeof __canvasScreenRoot.__STATE__ === 'object')
+  ? __canvasScreenRoot.__STATE__
+  : null;
+const __canvasScreenWidth = Number(__canvasScreenState && __canvasScreenState.width);
+const __canvasScreenHeight = Number(__canvasScreenState && __canvasScreenState.height);
+const __canvasDpr = Number(__canvasScreenState && __canvasScreenState.dpr);
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
     const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
@@ -90,21 +83,20 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     Number.isFinite(__canvasDpr)
   ) {
     if (
-      !Number.isFinite(__canvasPhysicalScreenWidth) || __canvasPhysicalScreenWidth <= 0 ||
-      !Number.isFinite(__canvasPhysicalScreenHeight) || __canvasPhysicalScreenHeight <= 0
+      __canvasScreenWidth <= 0 ||
+      __canvasScreenHeight <= 0 ||
+      __canvasDpr <= 0
     ) {
-      emitCanvasDiag('warn', 'canvas:init:preflight:derived_physical_screen_metrics_invalid', null, {
+      emitCanvasDiag('warn', 'canvas:init:preflight:screen_metrics_invalid', null, {
         stage: 'preflight',
-        key: '__ENV_PROFILE__.width/__ENV_PROFILE__.height/__ENV_PROFILE__.dpr',
-        message: 'derived physical screen metrics invalid',
+        key: 'CanvasPatchContext.state.__SCREEN__.__STATE__.width/height/dpr',
+        message: 'screen metrics invalid',
         data: {
           outcome: 'skip',
-          reason: 'derived_physical_screen_metrics_invalid',
+          reason: 'screen_metrics_invalid',
           width: __canvasScreenWidth,
           height: __canvasScreenHeight,
-          dpr: __canvasDpr,
-          physicalWidth: __canvasPhysicalScreenWidth,
-          physicalHeight: __canvasPhysicalScreenHeight
+          dpr: __canvasDpr
         }
       });
     }

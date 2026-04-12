@@ -164,7 +164,15 @@ if (!screenRoot) {
 } else {
   __defineHiddenValue__(stateRoot, '__SCREEN__', screenRoot);
 }
-if (!Object.prototype.hasOwnProperty.call(screenRoot, 'orientationDom')) screenRoot.orientationDom = null;
+let screenState = (screenRoot.__STATE__ && typeof screenRoot.__STATE__ === 'object')
+  ? screenRoot.__STATE__
+  : null;
+if (!screenState) {
+  screenState = __defineHiddenValue__(screenRoot, '__STATE__', Object.create(null));
+  if (!screenState) throw new Error('[module] CanvasPatchContext.state.__SCREEN__.__STATE__ bootstrap failed');
+} else {
+  __defineHiddenValue__(screenRoot, '__STATE__', screenState);
+}
 
 let navRoot = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
   ? stateRoot.__NAV_TOTAL_SET__
@@ -552,11 +560,16 @@ __envProfileState__.userAgent = W.__USER_AGENT;
 __envProfileState__.vendor = W.__VENDOR;
 __envProfileState__.mem = Number(W.__memory);
 __envProfileState__.cpu = Number(W.__cpu);
-__envProfileState__.dpr = Number(W.__DPR);
-__envProfileState__.width = Number(W.__WIDTH ?? (W.screen && W.screen.width));
-__envProfileState__.height = Number(W.__HEIGHT ?? (W.screen && W.screen.height));
 __envProfileState__.devicesLabels = __cloneProfileValue__(W.__DEVICES_LABELS);
-__envProfileState__.colorDepth = Number(W.__COLOR_DEPTH);
+
+screenState.dpr = Number(W.__DPR);
+screenState.width = Number(W.__WIDTH ?? (W.screen && W.screen.width));
+screenState.height = Number(W.__HEIGHT ?? (W.screen && W.screen.height));
+screenState.colorDepth = Number(W.__COLOR_DEPTH);
+screenState.orientationDom = ((screenState.height >= screenState.width))
+  ? 'portrait-primary'
+  : 'landscape-primary';
+
 __envProfileState__.webglRenderer = W.__WEBGL_RENDERER__;
 __envProfileState__.webglVendor = W.__WEBGL_VENDOR__;
 __envProfileState__.webglUnmaskedVendor = W.__WEBGL_UNMASKED_VENDOR__;
@@ -565,49 +578,9 @@ __envProfileState__.gpuType = W.__GPU_TYPE__;
 __envProfileState__.gpuArchitecture = W.__GPU_ARCHITECTURE__;
 __envProfileState__.gpuVendor = W.__GPU_VENDOR__;
 __envProfileState__.webgpuDevice = W.__WEBGPU_DEVICE__;
-const __screenState = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
-  ? stateRoot.__SCREEN__
-  : null;
-__envProfileState__.orientationDom = (__screenState && typeof __screenState.orientationDom === 'string' && __screenState.orientationDom)
-  ? __screenState.orientationDom
-  : (((__envProfileState__.height >= __envProfileState__.width)) ? 'portrait-primary' : 'landscape-primary');
 __envProfileState__.profile = (__envProfileState__.profile && typeof __envProfileState__.profile === 'object')
   ? __envProfileState__.profile
   : Object.create(null);
-const __envDerivedPhysicalScreenWidth = (
-  __isFiniteNumber__(__envProfileState__.width) &&
-  __isFiniteNumber__(__envProfileState__.dpr) &&
-  __envProfileState__.dpr > 0
-) ? Math.round(__envProfileState__.width * __envProfileState__.dpr) : null;
-const __envDerivedPhysicalScreenHeight = (
-  __isFiniteNumber__(__envProfileState__.height) &&
-  __isFiniteNumber__(__envProfileState__.dpr) &&
-  __envProfileState__.dpr > 0
-) ? Math.round(__envProfileState__.height * __envProfileState__.dpr) : null;
-const __envProfileHadPhysicalWidth = Object.prototype.hasOwnProperty.call(__envProfileState__.profile, 'physical_screen_width');
-const __envProfileHadPhysicalHeight = Object.prototype.hasOwnProperty.call(__envProfileState__.profile, 'physical_screen_height');
-if (__envProfileHadPhysicalWidth || __envProfileHadPhysicalHeight) {
-  const __envProfilePhysicalWidth = Number(__envProfileState__.profile.physical_screen_width);
-  const __envProfilePhysicalHeight = Number(__envProfileState__.profile.physical_screen_height);
-  if (
-    !__isFiniteNumber__(__envDerivedPhysicalScreenWidth) ||
-    !__isFiniteNumber__(__envDerivedPhysicalScreenHeight) ||
-    !__isFiniteNumber__(__envProfilePhysicalWidth) ||
-    !__isFiniteNumber__(__envProfilePhysicalHeight) ||
-    __envProfilePhysicalWidth !== __envDerivedPhysicalScreenWidth ||
-    __envProfilePhysicalHeight !== __envDerivedPhysicalScreenHeight
-  ) {
-    throw new Error('[module] CanvasPatchContext.state.__ENV_PROFILE__.profile.physical_screen_* overlap invalid');
-  }
-}
-if (__envProfileHadPhysicalWidth) delete __envProfileState__.profile.physical_screen_width;
-if (__envProfileHadPhysicalHeight) delete __envProfileState__.profile.physical_screen_height;
-if (
-  Object.prototype.hasOwnProperty.call(__envProfileState__.profile, 'physical_screen_width') ||
-  Object.prototype.hasOwnProperty.call(__envProfileState__.profile, 'physical_screen_height')
-) {
-  throw new Error('[module] CanvasPatchContext.state.__ENV_PROFILE__.profile.physical_screen_* overlap cleanup failed');
-}
 __envProfileState__.strict = (W.__NAV_PATCH_STRICT__ !== undefined) ? !!W.__NAV_PATCH_STRICT__ : true;
 __envProfileState__.debug = !!W.__NAV_PATCH_DEBUG__;
 __envProfileState__.fullVersionList = __cloneProfileValue__(W.__FULL_VERSION_LIST);
