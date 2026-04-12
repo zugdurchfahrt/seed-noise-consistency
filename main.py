@@ -225,6 +225,21 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
                 driver.execute_cdp_cmd("Fetch.continueRequest", {"requestId": rid})
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
 
+
+def build_bootstrap_device_metrics():
+    width = 1366
+    height = 768
+    dpr = 1
+    return {
+        "width": width,
+        "height": height,
+        "deviceScaleFactor": dpr,
+        "mobile": False,
+        "screenWidth": width,
+        "screenHeight": height,
+        "screenOrientation": {"type": "landscapePrimary", "angle": 0},
+    }
+
 # ----------------------- function init_driver -----------------------
 def init_driver(
     profile, country_data, platform, user_agent, screen_width, screen_height,
@@ -332,16 +347,10 @@ def init_driver(
         longitude=135.0,
         accuracy=100,
         blocked_urls=["stun:*", "turn:*"] ,
-        device_metrics={
-            "width": 1366,
-            "height": 768,
-            "deviceScaleFactor": 1,
-            "mobile": False,
-            "screenWidth": 1366,
-            "screenHeight": 768,
-            "screenOrientation": {"type": "landscapePrimary", "angle": 0}
-        }
+        device_metrics=build_bootstrap_device_metrics(),
+
     )
+
 
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
