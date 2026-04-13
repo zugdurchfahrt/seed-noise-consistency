@@ -443,7 +443,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         allowCreate: false,
         configurable: !!wdDesc.configurable,
         enumerable: !!wdDesc.enumerable,
-        getImpl: function getWebdriverImpl() { return Reflect.apply(wdDesc.get, this, []); },
+        getImpl: function getWebdriverImpl() { return false; },
         validThis: __isNavigatorThis,
         invalidThis: 'native'
       };
