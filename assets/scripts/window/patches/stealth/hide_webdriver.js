@@ -71,10 +71,10 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
     ? __envProfileState.profile
     : null;
-  const __hideWebdriverState = (__stateRoot.__HIDE_WEBDRIVER__ && typeof __stateRoot.__HIDE_WEBDRIVER__ === 'object')
+  const __hideWebdriverRoot = (__stateRoot.__HIDE_WEBDRIVER__ && typeof __stateRoot.__HIDE_WEBDRIVER__ === 'object')
     ? __stateRoot.__HIDE_WEBDRIVER__
     : null;
-  if (!__hideWebdriverState) {
+  if (!__hideWebdriverRoot) {
     degrade('hide_webdriver:module_state_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext.state.__HIDE_WEBDRIVER__ missing'), {
       level: 'warn',
       stage: 'preflight',
@@ -85,6 +85,23 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     });
     return;
   }
+  const __hideWebdriverState = (__hideWebdriverRoot.__STATE__ && typeof __hideWebdriverRoot.__STATE__ === 'object')
+    ? __hideWebdriverRoot.__STATE__
+    : null;
+  if (!__hideWebdriverState) {
+    degrade('hide_webdriver:module_state_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__ missing'), {
+      level: 'warn',
+      stage: 'preflight',
+      key: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__',
+      message: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__ missing',
+      type: __typePipeline,
+      data: { outcome: 'skip', reason: 'module_state_missing', missing: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__' }
+    });
+    return;
+  }
+  if (__hideWebdriverState.ready !== true) __hideWebdriverState.ready = false;
+  if (!Object.prototype.hasOwnProperty.call(__hideWebdriverState, 'descriptorOwner')) __hideWebdriverState.descriptorOwner = null;
+  if (!Object.prototype.hasOwnProperty.call(__hideWebdriverState, 'descriptorShape')) __hideWebdriverState.descriptorShape = null;
 
   const Core = window && window.Core;
   if (!Core || typeof Core.applyTargets !== 'function' || typeof Core.registerPatchedTarget !== 'function') {
@@ -398,6 +415,16 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       const wdHasValue = !!wdDesc && Object.prototype.hasOwnProperty.call(wdDesc, 'value');
       const wdHasGetter = !!wdDesc && typeof wdDesc.get === 'function';
       const wdHasSetter = !!wdDesc && typeof wdDesc.set === 'function';
+      __hideWebdriverState.descriptorOwner = (wdOwner && wdOwner.constructor && wdOwner.constructor.name)
+        ? wdOwner.constructor.name + '.prototype'
+        : null;
+      __hideWebdriverState.descriptorShape = {
+        configurable: !!wdDesc.configurable,
+        enumerable: !!wdDesc.enumerable,
+        hasGetter: wdHasGetter,
+        hasSetter: wdHasSetter,
+        hasValue: wdHasValue
+      };
       if (wdHasValue || !wdHasGetter || wdHasSetter) {
         const e = new TypeError('[HideWebdriverPatchModule] webdriver descriptor shape mismatch');
         degrade('hide_webdriver:webdriver_descriptor_shape_mismatch', e, {
@@ -466,6 +493,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         }
         return;
       }
+      __hideWebdriverState.ready = true;
     }
   } catch (e) {
     const stage = (e && typeof e === 'object' && typeof e.__stage === 'string') ? e.__stage : 'apply';

@@ -224,6 +224,16 @@ if (!hideWebdriverRoot) {
   __defineHiddenValue__(stateRoot, '__HIDE_WEBDRIVER__', hideWebdriverRoot);
 }
 
+let hideWebdriverState = (hideWebdriverRoot.__STATE__ && typeof hideWebdriverRoot.__STATE__ === 'object')
+  ? hideWebdriverRoot.__STATE__
+  : null;
+if (!hideWebdriverState) {
+  hideWebdriverState = __defineHiddenValue__(hideWebdriverRoot, '__STATE__', Object.create(null));
+  if (!hideWebdriverState) throw new Error('[module] CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__ bootstrap failed');
+} else {
+  __defineHiddenValue__(hideWebdriverRoot, '__STATE__', hideWebdriverState);
+}
+
 let wrkRoot = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
   ? stateRoot.__WRK__
   : null;
