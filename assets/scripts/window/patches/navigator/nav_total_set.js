@@ -1369,6 +1369,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const nativePlatformValue = ('platform' in navProto)
       ? __navReadNativeScalarFallback(nativePlatformDesc, navigator, 'platform', 'nav_total_set:platform')
       : undefined;
+    const nativeVendorDesc = __navResolveNativeAccessorDesc('vendor');
+    const nativeVendorValue = ('vendor' in navProto)
+      ? __navReadNativeScalarFallback(nativeVendorDesc, navigator, 'vendor', 'nav_total_set:vendor')
+      : undefined;
+    const nativeProductSubDesc = __navResolveNativeAccessorDesc('productSub');
+    const nativeProductSubValue = ('productSub' in navProto)
+      ? __navReadNativeScalarFallback(nativeProductSubDesc, navigator, 'productSub', 'nav_total_set:productSub')
+      : undefined;
+    const nativeVendorSubDesc = __navResolveNativeAccessorDesc('vendorSub');
+    const nativeVendorSubValue = ('vendorSub' in navProto)
+      ? __navReadNativeScalarFallback(nativeVendorSubDesc, navigator, 'vendorSub', 'nav_total_set:vendorSub')
+      : undefined;
+    const nativeMaxTouchPointsDesc = __navResolveNativeAccessorDesc('maxTouchPoints');
+    const nativeMaxTouchPointsValue = ('maxTouchPoints' in navProto)
+      ? __navReadNativeScalarFallback(nativeMaxTouchPointsDesc, navigator, 'maxTouchPoints', 'nav_total_set:maxTouchPoints')
+      : undefined;
     (function patchStrictScalarAccessorsOnProto(){
       if ('platform' in navProto) {
         if (typeof nativePlatformValue === 'string' && nativePlatformValue === navPlatformOut) {
@@ -1384,16 +1400,68 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           patchStrictScalarAccessor('platform', () => navPlatformOut, 'nav_total_set:platform');
         }
       }
-      patchStrictScalarAccessor('vendor', 'vendor' in navProto ? () => vendor : null, 'nav_total_set:vendor');
+      if ('vendor' in navProto) {
+        if (typeof nativeVendorValue === 'string' && nativeVendorValue === vendor) {
+          __navDiag('info', 'nav_total_set:vendor_native_skip', {
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:vendor',
+            key: 'vendor',
+            message: 'vendor already matches native getter',
+            data: { outcome: 'return', reason: 'native_skip' }
+          });
+        } else {
+          patchStrictScalarAccessor('vendor', () => vendor, 'nav_total_set:vendor');
+        }
+      }
       patchStrictScalarAccessor('appVersion', 'appVersion' in navProto ? () => {
         const pfx = "Mozilla/";
         return (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
           ? userAgent.slice(pfx.length)
           : userAgent;
       } : null, 'nav_total_set:appVersion');
-      patchStrictScalarAccessor('productSub', 'productSub' in navProto ? () => "20030107" : null, 'nav_total_set:productSub');
-      patchStrictScalarAccessor('vendorSub', 'vendorSub' in navProto ? () => "" : null, 'nav_total_set:vendorSub');
-      patchStrictScalarAccessor('maxTouchPoints', 'maxTouchPoints' in navProto ? () => 0 : null, 'nav_total_set:maxTouchPoints');
+      if ('productSub' in navProto) {
+        if (typeof nativeProductSubValue === 'string' && nativeProductSubValue === "20030107") {
+          __navDiag('info', 'nav_total_set:productSub_native_skip', {
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:productSub',
+            key: 'productSub',
+            message: 'productSub already matches native getter',
+            data: { outcome: 'return', reason: 'native_skip' }
+          });
+        } else {
+          patchStrictScalarAccessor('productSub', () => "20030107", 'nav_total_set:productSub');
+        }
+      }
+      if ('vendorSub' in navProto) {
+        if (typeof nativeVendorSubValue === 'string' && nativeVendorSubValue === "") {
+          __navDiag('info', 'nav_total_set:vendorSub_native_skip', {
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:vendorSub',
+            key: 'vendorSub',
+            message: 'vendorSub already matches native getter',
+            data: { outcome: 'return', reason: 'native_skip' }
+          });
+        } else {
+          patchStrictScalarAccessor('vendorSub', () => "", 'nav_total_set:vendorSub');
+        }
+      }
+      if ('maxTouchPoints' in navProto) {
+        if (Number.isInteger(nativeMaxTouchPointsValue) && nativeMaxTouchPointsValue === 0) {
+          __navDiag('info', 'nav_total_set:maxTouchPoints_native_skip', {
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:maxTouchPoints',
+            key: 'maxTouchPoints',
+            message: 'maxTouchPoints already matches native getter',
+            data: { outcome: 'return', reason: 'native_skip' }
+          });
+        } else {
+          patchStrictScalarAccessor('maxTouchPoints', () => 0, 'nav_total_set:maxTouchPoints');
+        }
+      }
     })();
 
     // rest
