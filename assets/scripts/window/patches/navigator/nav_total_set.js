@@ -1360,6 +1360,48 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return Number.isInteger(value) && value > 0;
     }
 
+    function __navTryReadNativeValue(desc, receiver, code, diagTag, key, message) {
+      try {
+        if (desc && typeof desc.get === 'function') {
+          return { ok: true, value: Reflect.apply(desc.get, receiver, []) };
+        }
+        if (desc && Object.prototype.hasOwnProperty.call(desc, 'value')) {
+          return { ok: true, value: desc.value };
+        }
+        return { ok: true, value: undefined };
+      } catch (e) {
+        __navDiagBrowser('warn', code, {
+          stage: 'preflight',
+          type: __navTypeBrowser,
+          diagTag: diagTag,
+          key: key,
+          message: message,
+          data: { outcome: 'skip', reason: 'native_read_failed', action: 'native' }
+        }, e);
+        return { ok: false, value: undefined };
+      }
+    }
+
+    function __navStringArrayEquals(left, right) {
+      if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+      for (let i = 0; i < left.length; i++) {
+        if (typeof left[i] !== 'string' || typeof right[i] !== 'string' || left[i] !== right[i]) return false;
+      }
+      return true;
+    }
+
+    function __navBrandVersionListEquals(left, right) {
+      if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+      for (let i = 0; i < left.length; i++) {
+        const a = left[i];
+        const b = right[i];
+        if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+        if (String(a.brand || '') !== String(b.brand || '')) return false;
+        if (String(a.version || '') !== String(b.version || '')) return false;
+      }
+      return true;
+    }
+
     function __navRunStrictScalarNativeSkipFamily(specs) {
       if (!Array.isArray(specs) || !specs.length) return;
       for (let i = 0; i < specs.length; i++) {
@@ -1439,12 +1481,61 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           skipMessage: 'maxTouchPoints already matches native getter'
         }
       ]);
-      patchStrictScalarAccessor('appVersion', 'appVersion' in navProto ? () => {
+      if ('appVersion' in navProto) {
+        const nativeAppVersionDesc = __navResolveNativeAccessorDesc('appVersion');
         const pfx = "Mozilla/";
-        return (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
+        const appVersionTarget = (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
           ? userAgent.slice(pfx.length)
           : userAgent;
-      } : null, 'nav_total_set:appVersion');
+        if (typeof appVersionTarget === 'string' && appVersionTarget) {
+          const nativeAppVersionRead = __navTryReadNativeValue(
+            nativeAppVersionDesc,
+            navigator,
+            'nav_total_set:appVersion_native_read_failed',
+            'nav_total_set:appVersion',
+            'appVersion',
+            'appVersion native getter read failed on navigator receiver'
+          );
+          if (nativeAppVersionRead.ok) {
+            if (typeof nativeAppVersionRead.value === 'string' && nativeAppVersionRead.value === appVersionTarget) {
+              __navDiag('info', 'nav_total_set:appVersion_native_skip', {
+                stage: 'preflight',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:appVersion',
+                key: 'appVersion',
+                message: 'appVersion already matches native getter',
+                data: { outcome: 'return', reason: 'native_skip' }
+              });
+            } else {
+              __navDiag('warn', 'nav_total_set:appVersion_no_admissible_carrier', {
+                stage: 'preflight',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:appVersion',
+                key: 'appVersion',
+                message: 'appVersion native getter mismatches target and no admissible carrier is proven in current runtime path',
+                data: {
+                  outcome: 'skip',
+                  reason: 'no_admissible_carrier',
+                  policy: 'skip',
+                  action: 'native',
+                  nativeValue: nativeAppVersionRead.value,
+                  targetValue: appVersionTarget
+                }
+              });
+            }
+          }
+        } else {
+          patchStrictScalarAccessor('appVersion', function navAppVersionValue() {
+            __navDiagPipeline('warn', 'nav_total_set:appVersion_invalid_profile', {
+              stage: 'runtime',
+              key: 'appVersion',
+              message: 'invalid appVersion profile value',
+              data: { outcome: 'return', reason: 'invalid_profile_value', value: appVersionTarget }
+            });
+            return __navReadNativeScalarFallback(nativeAppVersionDesc, this, 'appVersion', 'nav_total_set:appVersion');
+          }, 'nav_total_set:appVersion');
+        }
+      }
     })();
 
     // rest
@@ -2107,38 +2198,48 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       });
     } else {
-      const appliedUaData = patchObjectReturnAccessor('userAgentData', function userAgentDataAccessorValue() {
-        return nativeUAD;
-      }, 'nav_total_set:userAgentData');
-      if (appliedUaData) {
-        const uadTag = Object.prototype.toString.call(nativeUAD);
-        if (uadTag === '[object Object]') {
-          __navDiag('warn', 'nav_total_set:userAgentData_tag_suspicious', {
-            stage: 'contract',
-            type: __navTypeBrowser,
+      const nativeUadRead = __navTryReadNativeValue(
+        dUaData,
+        navigator,
+        'nav_total_set:userAgentData_native_read_failed',
+        'nav_total_set:userAgentData',
+        'userAgentData',
+        'userAgentData native getter read failed on navigator receiver'
+      );
+      if (nativeUadRead.ok) {
+        const nativeUadValue = nativeUadRead.value;
+        const nativeUadMatches = !!(
+          nativeUadValue &&
+          nativeUadValue === nativeUAD &&
+          __navBrandVersionListEquals(nativeUadValue.brands, meta.brands) &&
+          nativeUadValue.mobile === meta.mobile &&
+          nativeUadValue.platform === chPlatform
+        );
+        if (nativeUadMatches) {
+          __navDiag('info', 'nav_total_set:userAgentData_native_skip', {
+            stage: 'preflight',
+            type: __navTypePipeline,
             diagTag: 'nav_total_set:userAgentData',
             key: 'userAgentData',
-            message: 'window navigator.userAgentData tag'
+            message: 'userAgentData already matches native getter',
+            data: { outcome: 'return', reason: 'native_skip' }
           });
-        }
-        const uadCtor = Object.getPrototypeOf(nativeUAD) && Object.getPrototypeOf(nativeUAD).constructor;
-        if (!uadCtor || uadCtor.name === 'Object') {
-          __navDiag('warn', 'nav_total_set:userAgentData_proto_suspicious', {
-            stage: 'contract',
-            type: __navTypeBrowser,
+        } else {
+          __navDiag('warn', 'nav_total_set:userAgentData_no_admissible_carrier', {
+            stage: 'preflight',
+            type: __navTypePipeline,
             diagTag: 'nav_total_set:userAgentData',
             key: 'userAgentData',
-            message: 'window navigator.userAgentData proto'
+            message: 'userAgentData native getter mismatches target and no admissible carrier is proven in current runtime path',
+            data: {
+              outcome: 'skip',
+              reason: 'no_admissible_carrier',
+              policy: 'skip',
+              action: 'native',
+              nativeMatchesTarget: nativeUadMatches
+            }
           });
         }
-        __navDiag('info', 'nav_total_set:uaData_toJSON_ok', {
-          stage: 'apply',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:userAgentData',
-          key: 'userAgentData',
-          message: 'userAgentData ready',
-          data: { outcome: 'return', reason: 'ready' }
-        });
       }
     }
     }
@@ -2151,39 +2252,68 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const nativeLanguageDesc = __navResolveNativeAccessorDesc('language');
     const nativeLanguagesDesc = __navResolveNativeAccessorDesc('languages');
 
-    patchStrictScalarAccessor('deviceMemory', 'deviceMemory' in navProto ? function navDeviceMemoryValue() {
-      if (__navIsValidDeviceMemoryValue(mem)) return mem;
-      __navDiagPipeline('warn', 'nav_total_set:deviceMemory_invalid_profile', {
-        stage: 'runtime',
-        key: 'deviceMemory',
-        message: 'invalid deviceMemory profile value',
-        data: { outcome: 'return', reason: 'invalid_profile_value', value: mem }
-      });
-      return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
-    } : null, 'nav_total_set:deviceMemory');
+    if ('deviceMemory' in navProto) {
+      if (__navIsValidDeviceMemoryValue(mem)) {
+        const nativeDeviceMemoryRead = __navTryReadNativeValue(
+          nativeDeviceMemoryDesc,
+          navigator,
+          'nav_total_set:deviceMemory_native_read_failed',
+          'nav_total_set:deviceMemory',
+          'deviceMemory',
+          'deviceMemory native getter read failed on navigator receiver'
+        );
+        if (nativeDeviceMemoryRead.ok) {
+          if (Number(nativeDeviceMemoryRead.value) === Number(mem)) {
+            __navDiag('info', 'nav_total_set:deviceMemory_native_skip', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:deviceMemory',
+              key: 'deviceMemory',
+              message: 'deviceMemory already matches native getter',
+              data: { outcome: 'return', reason: 'native_skip' }
+            });
+          } else {
+            __navDiag('warn', 'nav_total_set:deviceMemory_no_admissible_carrier', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:deviceMemory',
+              key: 'deviceMemory',
+              message: 'deviceMemory native getter mismatches target and no admissible carrier is proven in current runtime path',
+              data: {
+                outcome: 'skip',
+                reason: 'no_admissible_carrier',
+                policy: 'skip',
+                action: 'native',
+                nativeValue: nativeDeviceMemoryRead.value,
+                targetValue: mem
+              }
+            });
+          }
+        }
+      } else {
+        patchStrictScalarAccessor('deviceMemory', function navDeviceMemoryValue() {
+          __navDiagPipeline('warn', 'nav_total_set:deviceMemory_invalid_profile', {
+            stage: 'runtime',
+            key: 'deviceMemory',
+            message: 'invalid deviceMemory profile value',
+            data: { outcome: 'return', reason: 'invalid_profile_value', value: mem }
+          });
+          return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
+        }, 'nav_total_set:deviceMemory');
+      }
+    }
     if ('hardwareConcurrency' in navProto) {
       if (__navIsValidHardwareConcurrencyValue(cpu)) {
-        let nativeHardwareConcurrencyValue;
-        let nativeHardwareConcurrencyReadFailed = false;
-        try {
-          if (nativeHardwareConcurrencyDesc && typeof nativeHardwareConcurrencyDesc.get === 'function') {
-            nativeHardwareConcurrencyValue = Reflect.apply(nativeHardwareConcurrencyDesc.get, navigator, []);
-          } else if (nativeHardwareConcurrencyDesc && Object.prototype.hasOwnProperty.call(nativeHardwareConcurrencyDesc, 'value')) {
-            nativeHardwareConcurrencyValue = nativeHardwareConcurrencyDesc.value;
-          }
-        } catch (eNativeHardwareConcurrencyRead) {
-          nativeHardwareConcurrencyReadFailed = true;
-          __navDiagBrowser('warn', 'nav_total_set:hardwareConcurrency_native_read_failed', {
-            stage: 'preflight',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set:hardwareConcurrency',
-            key: 'hardwareConcurrency',
-            message: 'hardwareConcurrency native getter read failed on navigator receiver',
-            data: { outcome: 'skip', reason: 'native_read_failed', action: 'native' }
-          }, eNativeHardwareConcurrencyRead);
-        }
-        if (!nativeHardwareConcurrencyReadFailed) {
-          if (Number(nativeHardwareConcurrencyValue) === Number(cpu)) {
+        const nativeHardwareConcurrencyRead = __navTryReadNativeValue(
+          nativeHardwareConcurrencyDesc,
+          navigator,
+          'nav_total_set:hardwareConcurrency_native_read_failed',
+          'nav_total_set:hardwareConcurrency',
+          'hardwareConcurrency',
+          'hardwareConcurrency native getter read failed on navigator receiver'
+        );
+        if (nativeHardwareConcurrencyRead.ok) {
+          if (Number(nativeHardwareConcurrencyRead.value) === Number(cpu)) {
             __navDiag('info', 'nav_total_set:hardwareConcurrency_native_skip', {
               stage: 'preflight',
               type: __navTypePipeline,
@@ -2204,7 +2334,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 reason: 'no_admissible_carrier',
                 policy: 'skip',
                 action: 'native',
-                nativeValue: nativeHardwareConcurrencyValue,
+                nativeValue: nativeHardwareConcurrencyRead.value,
                 targetValue: cpu
               }
             });
@@ -2222,44 +2352,122 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }, 'nav_total_set:hardwareConcurrency');
       }
     }
-    patchStrictScalarAccessor('language', 'language' in navProto ? function navLanguageValue() {
+    if ('language' in navProto) {
       const primaryLanguage = __navPrimaryLanguage;
       const normalizedLanguages = __navNormalizedLanguages;
-      if (__navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0]) {
-        return primaryLanguage;
-      }
-      __navDiagPipeline('warn', 'nav_total_set:language_invalid_profile', {
-        stage: 'runtime',
-        key: 'language',
-        message: 'invalid language profile value',
-        data: {
-          outcome: 'return',
-          reason: 'invalid_profile_value',
-          primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
-          normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
+      const validLanguageTarget = __navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0];
+      if (validLanguageTarget) {
+        const nativeLanguageRead = __navTryReadNativeValue(
+          nativeLanguageDesc,
+          navigator,
+          'nav_total_set:language_native_read_failed',
+          'nav_total_set:language',
+          'language',
+          'language native getter read failed on navigator receiver'
+        );
+        if (nativeLanguageRead.ok) {
+          if (typeof nativeLanguageRead.value === 'string' && nativeLanguageRead.value === primaryLanguage) {
+            __navDiag('info', 'nav_total_set:language_native_skip', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:language',
+              key: 'language',
+              message: 'language already matches native getter',
+              data: { outcome: 'return', reason: 'native_skip' }
+            });
+          } else {
+            __navDiag('warn', 'nav_total_set:language_no_admissible_carrier', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:language',
+              key: 'language',
+              message: 'language native getter mismatches target and no admissible carrier is proven in current runtime path',
+              data: {
+                outcome: 'skip',
+                reason: 'no_admissible_carrier',
+                policy: 'skip',
+                action: 'native',
+                nativeValue: nativeLanguageRead.value,
+                targetValue: primaryLanguage
+              }
+            });
+          }
         }
-      });
-      return __navReadNativeScalarFallback(nativeLanguageDesc, this, 'language', 'nav_total_set:language');
-    } : null, 'nav_total_set:language');
-    patchStrictScalarAccessor('languages', 'languages' in navProto ? function navLanguagesValue() {
+      } else {
+        patchStrictScalarAccessor('language', function navLanguageValue() {
+          __navDiagPipeline('warn', 'nav_total_set:language_invalid_profile', {
+            stage: 'runtime',
+            key: 'language',
+            message: 'invalid language profile value',
+            data: {
+              outcome: 'return',
+              reason: 'invalid_profile_value',
+              primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
+              normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
+            }
+          });
+          return __navReadNativeScalarFallback(nativeLanguageDesc, this, 'language', 'nav_total_set:language');
+        }, 'nav_total_set:language');
+      }
+    }
+    if ('languages' in navProto) {
       const primaryLanguage = __navPrimaryLanguage;
       const normalizedLanguages = __navNormalizedLanguages;
-      if (__navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0]) {
-        return normalizedLanguages;
-      }
-      __navDiagPipeline('warn', 'nav_total_set:languages_invalid_profile', {
-        stage: 'runtime',
-        key: 'languages',
-        message: 'invalid languages profile value',
-        data: {
-          outcome: 'return',
-          reason: 'invalid_profile_value',
-          primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
-          normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
+      const validLanguagesTarget = __navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0];
+      if (validLanguagesTarget) {
+        const nativeLanguagesRead = __navTryReadNativeValue(
+          nativeLanguagesDesc,
+          navigator,
+          'nav_total_set:languages_native_read_failed',
+          'nav_total_set:languages',
+          'languages',
+          'languages native getter read failed on navigator receiver'
+        );
+        if (nativeLanguagesRead.ok) {
+          if (__navStringArrayEquals(nativeLanguagesRead.value, normalizedLanguages)) {
+            __navDiag('info', 'nav_total_set:languages_native_skip', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:languages',
+              key: 'languages',
+              message: 'languages already matches native getter',
+              data: { outcome: 'return', reason: 'native_skip' }
+            });
+          } else {
+            __navDiag('warn', 'nav_total_set:languages_no_admissible_carrier', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:languages',
+              key: 'languages',
+              message: 'languages native getter mismatches target and no admissible carrier is proven in current runtime path',
+              data: {
+                outcome: 'skip',
+                reason: 'no_admissible_carrier',
+                policy: 'skip',
+                action: 'native',
+                nativeValue: Array.isArray(nativeLanguagesRead.value) ? nativeLanguagesRead.value.slice(0, 8) : nativeLanguagesRead.value,
+                targetValue: normalizedLanguages.slice(0, 8)
+              }
+            });
+          }
         }
-      });
-      return __navReadNativeScalarFallback(nativeLanguagesDesc, this, 'languages', 'nav_total_set:languages');
-    } : null, 'nav_total_set:languages');
+      } else {
+        patchStrictScalarAccessor('languages', function navLanguagesValue() {
+          __navDiagPipeline('warn', 'nav_total_set:languages_invalid_profile', {
+            stage: 'runtime',
+            key: 'languages',
+            message: 'invalid languages profile value',
+            data: {
+              outcome: 'return',
+              reason: 'invalid_profile_value',
+              primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
+              normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
+            }
+          });
+          return __navReadNativeScalarFallback(nativeLanguagesDesc, this, 'languages', 'nav_total_set:languages');
+        }, 'nav_total_set:languages');
+      }
+    }
 
   
    
@@ -3156,6 +3364,109 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           description: safeString(pl.description),
           mimeTypes: mimeTypes
         });
+      }
+      const nativePluginsDesc = __navResolveNativeAccessorDesc('plugins');
+      const nativeMimeTypesDesc = __navResolveNativeAccessorDesc('mimeTypes');
+      const nativePluginsRead = __navTryReadNativeValue(
+        nativePluginsDesc,
+        navigator,
+        'nav_total_set:plugins_native_read_failed',
+        'nav_total_set:plugins',
+        'plugins',
+        'plugins native getter read failed on navigator receiver'
+      );
+      const nativeMimeTypesRead = __navTryReadNativeValue(
+        nativeMimeTypesDesc,
+        navigator,
+        'nav_total_set:mimeTypes_native_read_failed',
+        'nav_total_set:mimeTypes',
+        'mimeTypes',
+        'mimeTypes native getter read failed on navigator receiver'
+      );
+      function __navPluginsTopLevelParity(nativePluginsValue, nativeMimeTypesValue) {
+        if (!nativePluginsValue || !nativeMimeTypesValue) return false;
+        if (Number(nativePluginsValue.length) !== fakePlugins.length) return false;
+        if (Number(nativeMimeTypesValue.length) !== normalizedMimeCount) return false;
+        let mimeGlobalIndex = 0;
+        for (let i = 0; i < fakePlugins.length; i++) {
+          const expectedPlugin = fakePlugins[i];
+          const nativePlugin = nativePluginsValue[i];
+          if (!nativePlugin) return false;
+          if (String(nativePlugin.name == null ? '' : nativePlugin.name) !== expectedPlugin.name) return false;
+          if (String(nativePlugin.filename == null ? '' : nativePlugin.filename) !== expectedPlugin.filename) return false;
+          if (String(nativePlugin.description == null ? '' : nativePlugin.description) !== expectedPlugin.description) return false;
+          if (Number(nativePlugin.length) !== expectedPlugin.mimeTypes.length) return false;
+          for (let j = 0; j < expectedPlugin.mimeTypes.length; j++) {
+            const expectedMime = expectedPlugin.mimeTypes[j];
+            const nativePluginMime = nativePlugin[j];
+            const nativeMime = nativeMimeTypesValue[mimeGlobalIndex];
+            if (!nativePluginMime || !nativeMime) return false;
+            if (String(nativePluginMime.type == null ? '' : nativePluginMime.type) !== expectedMime.type) return false;
+            if (String(nativePluginMime.suffixes == null ? '' : nativePluginMime.suffixes) !== expectedMime.suffixes) return false;
+            if (String(nativePluginMime.description == null ? '' : nativePluginMime.description) !== expectedMime.description) return false;
+            if (String(nativeMime.type == null ? '' : nativeMime.type) !== expectedMime.type) return false;
+            if (String(nativeMime.suffixes == null ? '' : nativeMime.suffixes) !== expectedMime.suffixes) return false;
+            if (String(nativeMime.description == null ? '' : nativeMime.description) !== expectedMime.description) return false;
+            if (nativeMime.enabledPlugin !== nativePlugin) return false;
+            mimeGlobalIndex += 1;
+          }
+        }
+        return true;
+      }
+      const nativePluginsParity = nativePluginsRead.ok && nativeMimeTypesRead.ok
+        ? __navPluginsTopLevelParity(nativePluginsRead.value, nativeMimeTypesRead.value)
+        : false;
+      if (nativePluginsRead.ok && nativeMimeTypesRead.ok && nativePluginsParity) {
+        __navDiag('info', 'nav_total_set:plugins_native_skip', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:plugins',
+          key: 'plugins',
+          message: 'plugins already matches native getter',
+          data: { outcome: 'return', reason: 'native_skip' }
+        });
+        __navDiag('info', 'nav_total_set:mimeTypes_native_skip', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:mimeTypes',
+          key: 'mimeTypes',
+          message: 'mimeTypes already matches native getter',
+          data: { outcome: 'return', reason: 'native_skip' }
+        });
+        return;
+      }
+      if (nativePluginsRead.ok && nativeMimeTypesRead.ok && !nativePluginsParity) {
+        __navDiag('warn', 'nav_total_set:plugins_no_admissible_carrier', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:plugins',
+          key: 'plugins',
+          message: 'plugins native getter mismatches target and no admissible carrier is proven in current runtime path',
+          data: {
+            outcome: 'skip',
+            reason: 'no_admissible_carrier',
+            policy: 'skip',
+            action: 'native',
+            nativeLength: nativePluginsRead.value && nativePluginsRead.value.length,
+            targetLength: fakePlugins.length
+          }
+        });
+        __navDiag('warn', 'nav_total_set:mimeTypes_no_admissible_carrier', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:mimeTypes',
+          key: 'mimeTypes',
+          message: 'mimeTypes native getter mismatches target and no admissible carrier is proven in current runtime path',
+          data: {
+            outcome: 'skip',
+            reason: 'no_admissible_carrier',
+            policy: 'skip',
+            action: 'native',
+            nativeLength: nativeMimeTypesRead.value && nativeMimeTypesRead.value.length,
+            targetLength: normalizedMimeCount
+          }
+        });
+        return;
       }
 
       const __navPluginArrayMeta = new WeakMap();
