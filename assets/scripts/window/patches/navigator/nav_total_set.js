@@ -1360,108 +1360,91 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return Number.isInteger(value) && value > 0;
     }
 
+    function __navRunStrictScalarNativeSkipFamily(specs) {
+      if (!Array.isArray(specs) || !specs.length) return;
+      for (let i = 0; i < specs.length; i++) {
+        const spec = specs[i];
+        if (!spec || typeof spec.key !== 'string' || !spec.key) continue;
+        if (!(spec.key in navProto)) continue;
+        const diagTag = (typeof spec.diagTag === 'string' && spec.diagTag) ? spec.diagTag : ('nav_total_set:' + spec.key);
+        const nativeDesc = __navResolveNativeAccessorDesc(spec.key);
+        const nativeValue = __navReadNativeScalarFallback(nativeDesc, navigator, spec.key, diagTag);
+        const matchesNative = (typeof spec.matchesNative === 'function') ? spec.matchesNative(nativeValue) : false;
+        if (matchesNative) {
+          __navDiag('info', diagTag + '_native_skip', {
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: diagTag,
+            key: spec.key,
+            message: (typeof spec.skipMessage === 'string' && spec.skipMessage) ? spec.skipMessage : (spec.key + ' already matches native getter'),
+            data: { outcome: 'return', reason: 'native_skip' }
+          });
+          continue;
+        }
+        const getter = (typeof spec.getter === 'function') ? spec.getter : null;
+        patchStrictScalarAccessor(spec.key, getter, diagTag);
+      }
+    }
+
     // Important: like native - not enumerable
     // [REGISTRY] userAgent is handled in `override_ua_data.js` (opt-in gate).
     // Here we keep only strict scalar accessor surfaces on Navigator.prototype.
     const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages']);
     const objectReturnKeys = new Set(['plugins','mimeTypes','userAgentData']);
-    const nativePlatformDesc = __navResolveNativeAccessorDesc('platform');
-    const nativePlatformValue = ('platform' in navProto)
-      ? __navReadNativeScalarFallback(nativePlatformDesc, navigator, 'platform', 'nav_total_set:platform')
-      : undefined;
-    const nativeVendorDesc = __navResolveNativeAccessorDesc('vendor');
-    const nativeVendorValue = ('vendor' in navProto)
-      ? __navReadNativeScalarFallback(nativeVendorDesc, navigator, 'vendor', 'nav_total_set:vendor')
-      : undefined;
-    const nativeProductSubDesc = __navResolveNativeAccessorDesc('productSub');
-    const nativeProductSubValue = ('productSub' in navProto)
-      ? __navReadNativeScalarFallback(nativeProductSubDesc, navigator, 'productSub', 'nav_total_set:productSub')
-      : undefined;
-    const nativeVendorSubDesc = __navResolveNativeAccessorDesc('vendorSub');
-    const nativeVendorSubValue = ('vendorSub' in navProto)
-      ? __navReadNativeScalarFallback(nativeVendorSubDesc, navigator, 'vendorSub', 'nav_total_set:vendorSub')
-      : undefined;
-    const nativeMaxTouchPointsDesc = __navResolveNativeAccessorDesc('maxTouchPoints');
-    const nativeMaxTouchPointsValue = ('maxTouchPoints' in navProto)
-      ? __navReadNativeScalarFallback(nativeMaxTouchPointsDesc, navigator, 'maxTouchPoints', 'nav_total_set:maxTouchPoints')
-      : undefined;
     (function patchStrictScalarAccessorsOnProto(){
-      if ('platform' in navProto) {
-        if (typeof nativePlatformValue === 'string' && nativePlatformValue === navPlatformOut) {
-          __navDiag('info', 'nav_total_set:platform_native_skip', {
-            stage: 'preflight',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:platform',
-            key: 'platform',
-            message: 'platform already matches native getter',
-            data: { outcome: 'return', reason: 'native_skip' }
-          });
-        } else {
-          patchStrictScalarAccessor('platform', () => navPlatformOut, 'nav_total_set:platform');
+      __navRunStrictScalarNativeSkipFamily([
+        {
+          key: 'platform',
+          diagTag: 'nav_total_set:platform',
+          getter: function navPlatformValue() { return navPlatformOut; },
+          matchesNative: function nativePlatformMatches(value) {
+            return typeof value === 'string' && value === navPlatformOut;
+          },
+          skipMessage: 'platform already matches native getter'
+        },
+        {
+          key: 'vendor',
+          diagTag: 'nav_total_set:vendor',
+          getter: function navVendorValue() { return vendor; },
+          matchesNative: function nativeVendorMatches(value) {
+            return typeof value === 'string' && value === vendor;
+          },
+          skipMessage: 'vendor already matches native getter'
+        },
+        {
+          key: 'productSub',
+          diagTag: 'nav_total_set:productSub',
+          getter: function navProductSubValue() { return "20030107"; },
+          matchesNative: function nativeProductSubMatches(value) {
+            return typeof value === 'string' && value === "20030107";
+          },
+          skipMessage: 'productSub already matches native getter'
+        },
+        {
+          key: 'vendorSub',
+          diagTag: 'nav_total_set:vendorSub',
+          getter: function navVendorSubValue() { return ""; },
+          matchesNative: function nativeVendorSubMatches(value) {
+            return typeof value === 'string' && value === "";
+          },
+          skipMessage: 'vendorSub already matches native getter'
+        },
+        {
+          key: 'maxTouchPoints',
+          diagTag: 'nav_total_set:maxTouchPoints',
+          getter: function navMaxTouchPointsValue() { return 0; },
+          matchesNative: function nativeMaxTouchPointsMatches(value) {
+            return Number.isInteger(value) && value === 0;
+          },
+          skipMessage: 'maxTouchPoints already matches native getter'
         }
-      }
-      if ('vendor' in navProto) {
-        if (typeof nativeVendorValue === 'string' && nativeVendorValue === vendor) {
-          __navDiag('info', 'nav_total_set:vendor_native_skip', {
-            stage: 'preflight',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:vendor',
-            key: 'vendor',
-            message: 'vendor already matches native getter',
-            data: { outcome: 'return', reason: 'native_skip' }
-          });
-        } else {
-          patchStrictScalarAccessor('vendor', () => vendor, 'nav_total_set:vendor');
-        }
-      }
+      ]);
       patchStrictScalarAccessor('appVersion', 'appVersion' in navProto ? () => {
         const pfx = "Mozilla/";
         return (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
           ? userAgent.slice(pfx.length)
           : userAgent;
       } : null, 'nav_total_set:appVersion');
-      if ('productSub' in navProto) {
-        if (typeof nativeProductSubValue === 'string' && nativeProductSubValue === "20030107") {
-          __navDiag('info', 'nav_total_set:productSub_native_skip', {
-            stage: 'preflight',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:productSub',
-            key: 'productSub',
-            message: 'productSub already matches native getter',
-            data: { outcome: 'return', reason: 'native_skip' }
-          });
-        } else {
-          patchStrictScalarAccessor('productSub', () => "20030107", 'nav_total_set:productSub');
-        }
-      }
-      if ('vendorSub' in navProto) {
-        if (typeof nativeVendorSubValue === 'string' && nativeVendorSubValue === "") {
-          __navDiag('info', 'nav_total_set:vendorSub_native_skip', {
-            stage: 'preflight',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:vendorSub',
-            key: 'vendorSub',
-            message: 'vendorSub already matches native getter',
-            data: { outcome: 'return', reason: 'native_skip' }
-          });
-        } else {
-          patchStrictScalarAccessor('vendorSub', () => "", 'nav_total_set:vendorSub');
-        }
-      }
-      if ('maxTouchPoints' in navProto) {
-        if (Number.isInteger(nativeMaxTouchPointsValue) && nativeMaxTouchPointsValue === 0) {
-          __navDiag('info', 'nav_total_set:maxTouchPoints_native_skip', {
-            stage: 'preflight',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:maxTouchPoints',
-            key: 'maxTouchPoints',
-            message: 'maxTouchPoints already matches native getter',
-            data: { outcome: 'return', reason: 'native_skip' }
-          });
-        } else {
-          patchStrictScalarAccessor('maxTouchPoints', () => 0, 'nav_total_set:maxTouchPoints');
-        }
-      }
     })();
 
     // rest
