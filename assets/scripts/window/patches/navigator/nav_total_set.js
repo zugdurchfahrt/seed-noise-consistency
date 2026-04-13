@@ -2161,16 +2161,67 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       });
       return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
     } : null, 'nav_total_set:deviceMemory');
-    patchStrictScalarAccessor('hardwareConcurrency', 'hardwareConcurrency' in navProto ? function navHardwareConcurrencyValue() {
-      if (__navIsValidHardwareConcurrencyValue(cpu)) return cpu;
-      __navDiagPipeline('warn', 'nav_total_set:hardwareConcurrency_invalid_profile', {
-        stage: 'runtime',
-        key: 'hardwareConcurrency',
-        message: 'invalid hardwareConcurrency profile value',
-        data: { outcome: 'return', reason: 'invalid_profile_value', value: cpu }
-      });
-      return __navReadNativeScalarFallback(nativeHardwareConcurrencyDesc, this, 'hardwareConcurrency', 'nav_total_set:hardwareConcurrency');
-    } : null, 'nav_total_set:hardwareConcurrency');
+    if ('hardwareConcurrency' in navProto) {
+      if (__navIsValidHardwareConcurrencyValue(cpu)) {
+        let nativeHardwareConcurrencyValue;
+        let nativeHardwareConcurrencyReadFailed = false;
+        try {
+          if (nativeHardwareConcurrencyDesc && typeof nativeHardwareConcurrencyDesc.get === 'function') {
+            nativeHardwareConcurrencyValue = Reflect.apply(nativeHardwareConcurrencyDesc.get, navigator, []);
+          } else if (nativeHardwareConcurrencyDesc && Object.prototype.hasOwnProperty.call(nativeHardwareConcurrencyDesc, 'value')) {
+            nativeHardwareConcurrencyValue = nativeHardwareConcurrencyDesc.value;
+          }
+        } catch (eNativeHardwareConcurrencyRead) {
+          nativeHardwareConcurrencyReadFailed = true;
+          __navDiagBrowser('warn', 'nav_total_set:hardwareConcurrency_native_read_failed', {
+            stage: 'preflight',
+            type: __navTypeBrowser,
+            diagTag: 'nav_total_set:hardwareConcurrency',
+            key: 'hardwareConcurrency',
+            message: 'hardwareConcurrency native getter read failed on navigator receiver',
+            data: { outcome: 'skip', reason: 'native_read_failed', action: 'native' }
+          }, eNativeHardwareConcurrencyRead);
+        }
+        if (!nativeHardwareConcurrencyReadFailed) {
+          if (Number(nativeHardwareConcurrencyValue) === Number(cpu)) {
+            __navDiag('info', 'nav_total_set:hardwareConcurrency_native_skip', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:hardwareConcurrency',
+              key: 'hardwareConcurrency',
+              message: 'hardwareConcurrency already matches native getter',
+              data: { outcome: 'return', reason: 'native_skip' }
+            });
+          } else {
+            __navDiag('warn', 'nav_total_set:hardwareConcurrency_no_admissible_carrier', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:hardwareConcurrency',
+              key: 'hardwareConcurrency',
+              message: 'hardwareConcurrency native getter mismatches target and no admissible carrier is proven in current runtime path',
+              data: {
+                outcome: 'skip',
+                reason: 'no_admissible_carrier',
+                policy: 'skip',
+                action: 'native',
+                nativeValue: nativeHardwareConcurrencyValue,
+                targetValue: cpu
+              }
+            });
+          }
+        }
+      } else {
+        patchStrictScalarAccessor('hardwareConcurrency', function navHardwareConcurrencyValue() {
+          __navDiagPipeline('warn', 'nav_total_set:hardwareConcurrency_invalid_profile', {
+            stage: 'runtime',
+            key: 'hardwareConcurrency',
+            message: 'invalid hardwareConcurrency profile value',
+            data: { outcome: 'return', reason: 'invalid_profile_value', value: cpu }
+          });
+          return __navReadNativeScalarFallback(nativeHardwareConcurrencyDesc, this, 'hardwareConcurrency', 'nav_total_set:hardwareConcurrency');
+        }, 'nav_total_set:hardwareConcurrency');
+      }
+    }
     patchStrictScalarAccessor('language', 'language' in navProto ? function navLanguageValue() {
       const primaryLanguage = __navPrimaryLanguage;
       const normalizedLanguages = __navNormalizedLanguages;
