@@ -622,30 +622,14 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const origGet = desc && desc.get;
 
     if (typeof origGet === 'function') {
-      let wrapped = Object.getOwnPropertyDescriptor(({
-        get [key]() {
-          if (onAccess) onAccess(key, wrapped, this);
-          if (checkThis && !checkThis(this)) {
-            return Reflect.apply(origGet, this, []);
-          }
-          return valueFromGetter(this);
+      let wrapped = null;
+      wrapped = __wrapNativeAccessor(origGet, name, function (target, thisArg, argList) {
+        if (onAccess) onAccess(key, wrapped, thisArg);
+        if (checkThis && !checkThis(thisArg)) {
+          return Reflect.apply(origGet, thisArg, []);
         }
-      }), key).get;
-      try {
-        wrapped = __registerToStringWrapper(wrapped, origGet, name, '__wrapStrictAccessor');
-      } catch (e) {
-        __emit('error', 'core_window:wrapStrictAccessor:mark_failed', {
-          module: 'core',
-          diagTag: 'core_window',
-          surface: 'core',
-          key: key,
-          stage: 'apply',
-          message: '__wrapStrictAccessor mark/bridge registration failed',
-          type: 'browser structure missing data',
-          data: { outcome: 'throw', stx: (e && e.stack) ? String(e.stack) : null }
-        }, e);
-        throw e;
-      }
+        return valueFromGetter(thisArg);
+      });
       return wrapped;
     }
 

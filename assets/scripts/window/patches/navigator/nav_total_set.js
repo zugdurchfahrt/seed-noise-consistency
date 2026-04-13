@@ -1365,8 +1365,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // Here we keep only strict scalar accessor surfaces on Navigator.prototype.
     const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages']);
     const objectReturnKeys = new Set(['plugins','mimeTypes','userAgentData']);
+    const nativePlatformDesc = __navResolveNativeAccessorDesc('platform');
+    const nativePlatformValue = ('platform' in navProto)
+      ? __navReadNativeScalarFallback(nativePlatformDesc, navigator, 'platform', 'nav_total_set:platform')
+      : undefined;
     (function patchStrictScalarAccessorsOnProto(){
-      patchStrictScalarAccessor('platform', 'platform' in navProto ? () => navPlatformOut : null, 'nav_total_set:platform');
+      if ('platform' in navProto) {
+        if (typeof nativePlatformValue === 'string' && nativePlatformValue === navPlatformOut) {
+          __navDiag('info', 'nav_total_set:platform_native_skip', {
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:platform',
+            key: 'platform',
+            message: 'platform already matches native getter',
+            data: { outcome: 'return', reason: 'native_skip' }
+          });
+        } else {
+          patchStrictScalarAccessor('platform', () => navPlatformOut, 'nav_total_set:platform');
+        }
+      }
       patchStrictScalarAccessor('vendor', 'vendor' in navProto ? () => vendor : null, 'nav_total_set:vendor');
       patchStrictScalarAccessor('appVersion', 'appVersion' in navProto ? () => {
         const pfx = "Mozilla/";
