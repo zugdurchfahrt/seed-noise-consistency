@@ -459,23 +459,19 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         }
         return;
       }
-      const wdTarget = {
-        owner: wdOwner,
-        key: 'webdriver',
-        resolve: 'proto_chain',
-        policy: 'strict',
-        wrapLayer: 'strict_accessor_gateway',
-        diagTag: 'hide_webdriver:webdriver',
-        kind: 'accessor',
-        allowCreate: false,
-        configurable: !!wdDesc.configurable,
-        enumerable: !!wdDesc.enumerable,
-        getImpl: function getWebdriverImpl() { return false; },
-        validThis: __isNavigatorThis,
-        invalidThis: 'native'
-      };
-      const applied = applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
-      if (!applied) {
+      let nativeWebdriverValue;
+      try {
+        nativeWebdriverValue = Reflect.apply(wdDesc.get, nav, []);
+      } catch (eNativeRead) {
+        degrade('hide_webdriver:webdriver_native_read_failed', eNativeRead, {
+          level: 'fatal',
+          diagTag: 'hide_webdriver:webdriver',
+          key: 'webdriver',
+          stage: 'preflight',
+          message: 'webdriver native getter read failed on navigator receiver',
+          type: __typeBrowser,
+          data: { outcome: 'skip', reason: 'native_read_failed' }
+        });
         try {
           if (__core && typeof __core.releaseGuardFlag === 'function') {
             __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
@@ -493,7 +489,63 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         }
         return;
       }
-      __hideWebdriverState.ready = true;
+      if (nativeWebdriverValue === false) {
+        __hideWebdriverState.ready = true;
+        degrade('hide_webdriver:webdriver_native_skip', null, {
+          level: 'info',
+          diagTag: 'hide_webdriver:webdriver',
+          key: 'webdriver',
+          stage: 'preflight',
+          message: 'webdriver already matches native getter',
+          type: __typeBrowser,
+          data: { outcome: 'return', reason: 'native_skip' }
+        });
+        try {
+          if (__core && typeof __core.releaseGuardFlag === 'function') {
+            __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
+          }
+        } catch (eRelease) {
+          degrade(__tag + ':guard_release_failed', eRelease, {
+            level: 'warn',
+            diagTag: __tag,
+            key: __flagKey,
+            stage: 'guard',
+            message: 'releaseGuardFlag threw on preflight skip',
+            type: __typePipeline,
+            data: { outcome: 'skip', reason: 'guard_release_failed' }
+          });
+        }
+        return;
+      }
+      degrade('hide_webdriver:webdriver_no_admissible_carrier', null, {
+        level: 'fatal',
+        diagTag: 'hide_webdriver:webdriver',
+        key: 'webdriver',
+        stage: 'preflight',
+        message: 'webdriver native getter mismatches target and no admissible carrier is proven in current runtime path',
+        type: __typeBrowser,
+        data: {
+          outcome: 'skip',
+          reason: 'no_admissible_carrier',
+          nativeValue: nativeWebdriverValue
+        }
+      });
+      try {
+        if (__core && typeof __core.releaseGuardFlag === 'function') {
+          __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
+        }
+      } catch (eRelease) {
+        degrade(__tag + ':guard_release_failed', eRelease, {
+          level: 'warn',
+          diagTag: __tag,
+          key: __flagKey,
+          stage: 'guard',
+          message: 'releaseGuardFlag threw on preflight skip',
+          type: __typePipeline,
+          data: { outcome: 'skip', reason: 'guard_release_failed' }
+        });
+      }
+      return;
     }
   } catch (e) {
     const stage = (e && typeof e === 'object' && typeof e.__stage === 'string') ? e.__stage : 'apply';
