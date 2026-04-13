@@ -2127,6 +2127,11 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
+      __exportWrapFactory('__ensureMarkAsNative', ensureMarkAsNative);
+      __exportWrapFactory('__wrapNativeApply', __wrapNativeApply);
+      __exportWrapFactory('__wrapNativeAccessor', __wrapNativeAccessor);
+      __exportWrapFactory('__wrapStrictAccessor', __wrapStrictAccessor);
+      __exportWrapFactory('__wrapNativeCtor', __wrapNativeCtor);
     } catch (e) {
       diagDegrade('core:installCoreApplyTargets:failed', e);
       throw e;
