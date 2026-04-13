@@ -395,7 +395,43 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         }
         return;
       }
-      const wdIsData = !!wdDesc && Object.prototype.hasOwnProperty.call(wdDesc, 'value') && !wdDesc.get && !wdDesc.set;
+      const wdHasValue = !!wdDesc && Object.prototype.hasOwnProperty.call(wdDesc, 'value');
+      const wdHasGetter = !!wdDesc && typeof wdDesc.get === 'function';
+      const wdHasSetter = !!wdDesc && typeof wdDesc.set === 'function';
+      if (wdHasValue || !wdHasGetter || wdHasSetter) {
+        const e = new TypeError('[HideWebdriverPatchModule] webdriver descriptor shape mismatch');
+        degrade('hide_webdriver:webdriver_descriptor_shape_mismatch', e, {
+          level: 'fatal',
+          diagTag: 'hide_webdriver:webdriver',
+          key: 'webdriver',
+          stage: 'preflight',
+          message: 'webdriver is not readonly accessor-shaped on prototype owner',
+          type: __typeBrowser,
+          data: {
+            outcome: 'skip',
+            reason: 'descriptor_shape_mismatch',
+            hasValue: wdHasValue,
+            hasGetter: wdHasGetter,
+            hasSetter: wdHasSetter
+          }
+        });
+        try {
+          if (__core && typeof __core.releaseGuardFlag === 'function') {
+            __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
+          }
+        } catch (eRelease) {
+          degrade(__tag + ':guard_release_failed', eRelease, {
+            level: 'warn',
+            diagTag: __tag,
+            key: __flagKey,
+            stage: 'guard',
+            message: 'releaseGuardFlag threw on preflight skip',
+            type: __typePipeline,
+            data: { outcome: 'skip', reason: 'guard_release_failed' }
+          });
+        }
+        return;
+      }
       const wdTarget = {
         owner: wdOwner,
         key: 'webdriver',
@@ -407,13 +443,10 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         allowCreate: false,
         configurable: !!wdDesc.configurable,
         enumerable: !!wdDesc.enumerable,
-        getImpl: function getWebdriverImpl() { return false; },
+        getImpl: function getWebdriverImpl() { return Reflect.apply(wdDesc.get, this, []); },
         validThis: __isNavigatorThis,
         invalidThis: 'native'
       };
-      if (wdIsData) {
-        wdTarget.allowShapeChange = true;
-      }
       const applied = applyTargetGroup('hide_webdriver:webdriver', [wdTarget], 'throw');
       if (!applied) {
         try {
