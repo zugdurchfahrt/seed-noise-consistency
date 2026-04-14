@@ -739,7 +739,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       try {
         const packetMeta = (meta && typeof meta === 'object') ? meta : null;
         assert(packetMeta, 'worker_env_snapshot.meta missing');
-        const packet = {
+        __navSetHiddenStateValue(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__', __navCloneStateValue({
           ua: userAgent,
           language: primaryLanguage,
           languages: __navCloneStateValue(normalizedLanguages),
@@ -759,24 +759,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               formFactors: __navCloneStateValue(packetMeta.formFactors)
             }
           }
-        };
-        assert(typeof packet.ua === 'string' && packet.ua, 'worker_env_snapshot.ua missing');
-        assert(typeof packet.language === 'string' && packet.language, 'worker_env_snapshot.language missing');
-        assert(isStringArray(packet.languages, false), 'worker_env_snapshot.languages missing');
-        assert(__navIsValidDeviceMemoryValue(packet.deviceMemory), 'worker_env_snapshot.deviceMemory missing');
-        assert(__navIsValidHardwareConcurrencyValue(packet.hardwareConcurrency), 'worker_env_snapshot.hardwareConcurrency missing');
-        assert(isBrandList(packet.uaData.brands), 'worker_env_snapshot.uaData.brands missing');
-        assert(typeof packet.uaData.mobile === 'boolean', 'worker_env_snapshot.uaData.mobile missing');
-        assert(typeof packet.uaData.platform === 'string' && packet.uaData.platform, 'worker_env_snapshot.uaData.platform missing');
-        assert(typeof packet.uaData.he === 'object' && !!packet.uaData.he, 'worker_env_snapshot.uaData.he missing');
-        assert(typeof packet.uaData.he.architecture === 'string' && packet.uaData.he.architecture, 'worker_env_snapshot.uaData.he.architecture missing');
-        assert(typeof packet.uaData.he.bitness === 'string' && packet.uaData.he.bitness, 'worker_env_snapshot.uaData.he.bitness missing');
-        assert(typeof packet.uaData.he.model === 'string', 'worker_env_snapshot.uaData.he.model missing');
-        assert(typeof packet.uaData.he.platformVersion === 'string' && packet.uaData.he.platformVersion, 'worker_env_snapshot.uaData.he.platformVersion missing');
-        assert(isBrandList(packet.uaData.he.fullVersionList), 'worker_env_snapshot.uaData.he.fullVersionList missing');
-        assert(typeof packet.uaData.he.wow64 === 'boolean', 'worker_env_snapshot.uaData.he.wow64 missing');
-        assert(isStringArray(packet.uaData.he.formFactors, false), 'worker_env_snapshot.uaData.he.formFactors missing');
-        __navSetHiddenStateValue(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__', __navCloneStateValue(packet));
+        }));
+        const workerEnvSnapshot = (__navDataStoreState && __navDataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof __navDataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
+          ? __navDataStoreState.__WORKER_ENV_SNAPSHOT__
+          : null;
+        assert(workerEnvSnapshot && typeof workerEnvSnapshot === 'object', 'worker_env_snapshot missing');
+        assert(typeof workerEnvSnapshot.ua === 'string' && workerEnvSnapshot.ua, 'worker_env_snapshot.ua missing');
+        assert(typeof workerEnvSnapshot.language === 'string' && workerEnvSnapshot.language, 'worker_env_snapshot.language missing');
+        assert(isStringArray(workerEnvSnapshot.languages, false), 'worker_env_snapshot.languages missing');
+        assert(__navIsValidDeviceMemoryValue(workerEnvSnapshot.deviceMemory), 'worker_env_snapshot.deviceMemory missing');
+        assert(__navIsValidHardwareConcurrencyValue(workerEnvSnapshot.hardwareConcurrency), 'worker_env_snapshot.hardwareConcurrency missing');
+        assert(isBrandList(workerEnvSnapshot.uaData.brands), 'worker_env_snapshot.uaData.brands missing');
+        assert(typeof workerEnvSnapshot.uaData.mobile === 'boolean', 'worker_env_snapshot.uaData.mobile missing');
+        assert(typeof workerEnvSnapshot.uaData.platform === 'string' && workerEnvSnapshot.uaData.platform, 'worker_env_snapshot.uaData.platform missing');
+        assert(typeof workerEnvSnapshot.uaData.he === 'object' && !!workerEnvSnapshot.uaData.he, 'worker_env_snapshot.uaData.he missing');
+        assert(typeof workerEnvSnapshot.uaData.he.architecture === 'string' && workerEnvSnapshot.uaData.he.architecture, 'worker_env_snapshot.uaData.he.architecture missing');
+        assert(typeof workerEnvSnapshot.uaData.he.bitness === 'string' && workerEnvSnapshot.uaData.he.bitness, 'worker_env_snapshot.uaData.he.bitness missing');
+        assert(typeof workerEnvSnapshot.uaData.he.model === 'string', 'worker_env_snapshot.uaData.he.model missing');
+        assert(typeof workerEnvSnapshot.uaData.he.platformVersion === 'string' && workerEnvSnapshot.uaData.he.platformVersion, 'worker_env_snapshot.uaData.he.platformVersion missing');
+        assert(isBrandList(workerEnvSnapshot.uaData.he.fullVersionList), 'worker_env_snapshot.uaData.he.fullVersionList missing');
+        assert(typeof workerEnvSnapshot.uaData.he.wow64 === 'boolean', 'worker_env_snapshot.uaData.he.wow64 missing');
+        assert(isStringArray(workerEnvSnapshot.uaData.he.formFactors, false), 'worker_env_snapshot.uaData.he.formFactors missing');
       } catch (e) {
         try {
           const own = Object.getOwnPropertyDescriptor(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__');
@@ -2273,21 +2276,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               data: { outcome: 'return', reason: 'native_skip' }
             });
           } else {
-            __navDiag('warn', 'nav_total_set:deviceMemory_no_admissible_carrier', {
-              stage: 'preflight',
+            __navDiag('info', 'nav_total_set:deviceMemory_public_commit', {
+              stage: 'apply',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:deviceMemory',
               key: 'deviceMemory',
-              message: 'deviceMemory native getter mismatches target and no admissible carrier is proven in current runtime path',
+              message: 'deviceMemory native getter mismatches target; committing target to public navigator',
               data: {
-                outcome: 'skip',
-                reason: 'no_admissible_carrier',
-                policy: 'skip',
-                action: 'native',
+                outcome: 'apply',
+                reason: 'target_mismatch_commit',
                 nativeValue: nativeDeviceMemoryRead.value,
                 targetValue: mem
               }
             });
+            patchStrictScalarAccessor('deviceMemory', function navDeviceMemoryCommittedValue() {
+              return mem;
+            }, 'nav_total_set:deviceMemory');
           }
         }
       } else {
@@ -2323,21 +2327,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               data: { outcome: 'return', reason: 'native_skip' }
             });
           } else {
-            __navDiag('warn', 'nav_total_set:hardwareConcurrency_no_admissible_carrier', {
-              stage: 'preflight',
+            __navDiag('info', 'nav_total_set:hardwareConcurrency_public_commit', {
+              stage: 'apply',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:hardwareConcurrency',
               key: 'hardwareConcurrency',
-              message: 'hardwareConcurrency native getter mismatches target and no admissible carrier is proven in current runtime path',
+              message: 'hardwareConcurrency native getter mismatches target; committing target to public navigator',
               data: {
-                outcome: 'skip',
-                reason: 'no_admissible_carrier',
-                policy: 'skip',
-                action: 'native',
+                outcome: 'apply',
+                reason: 'target_mismatch_commit',
                 nativeValue: nativeHardwareConcurrencyRead.value,
                 targetValue: cpu
               }
             });
+            patchStrictScalarAccessor('hardwareConcurrency', function navHardwareConcurrencyCommittedValue() {
+              return cpu;
+            }, 'nav_total_set:hardwareConcurrency');
           }
         }
       } else {
@@ -2373,26 +2378,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               diagTag: 'nav_total_set:language',
               key: 'language',
               message: 'language already matches native getter',
-              data: { outcome: 'return', reason: 'native_skip' }
-            });
-          } else {
-            __navDiag('warn', 'nav_total_set:language_no_admissible_carrier', {
-              stage: 'preflight',
-              type: __navTypePipeline,
-              diagTag: 'nav_total_set:language',
-              key: 'language',
-              message: 'language native getter mismatches target and no admissible carrier is proven in current runtime path',
-              data: {
-                outcome: 'skip',
-                reason: 'no_admissible_carrier',
-                policy: 'skip',
-                action: 'native',
-                nativeValue: nativeLanguageRead.value,
-                targetValue: primaryLanguage
-              }
-            });
+                data: { outcome: 'return', reason: 'native_skip' }
+              });
+            } else {
+              __navDiag('info', 'nav_total_set:language_public_commit', {
+                stage: 'apply',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:language',
+                key: 'language',
+                message: 'language native getter mismatches target; committing target to public navigator',
+                data: {
+                  outcome: 'apply',
+                  reason: 'target_mismatch_commit',
+                  nativeValue: nativeLanguageRead.value,
+                  targetValue: primaryLanguage
+                }
+              });
+              patchStrictScalarAccessor('language', function navLanguageCommittedValue() {
+                return primaryLanguage;
+              }, 'nav_total_set:language');
+            }
           }
-        }
       } else {
         patchStrictScalarAccessor('language', function navLanguageValue() {
           __navDiagPipeline('warn', 'nav_total_set:language_invalid_profile', {
@@ -2431,26 +2437,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               diagTag: 'nav_total_set:languages',
               key: 'languages',
               message: 'languages already matches native getter',
-              data: { outcome: 'return', reason: 'native_skip' }
-            });
-          } else {
-            __navDiag('warn', 'nav_total_set:languages_no_admissible_carrier', {
-              stage: 'preflight',
-              type: __navTypePipeline,
-              diagTag: 'nav_total_set:languages',
-              key: 'languages',
-              message: 'languages native getter mismatches target and no admissible carrier is proven in current runtime path',
-              data: {
-                outcome: 'skip',
-                reason: 'no_admissible_carrier',
-                policy: 'skip',
-                action: 'native',
-                nativeValue: Array.isArray(nativeLanguagesRead.value) ? nativeLanguagesRead.value.slice(0, 8) : nativeLanguagesRead.value,
-                targetValue: normalizedLanguages.slice(0, 8)
-              }
-            });
+                data: { outcome: 'return', reason: 'native_skip' }
+              });
+            } else {
+              __navDiag('info', 'nav_total_set:languages_public_commit', {
+                stage: 'apply',
+                type: __navTypePipeline,
+                diagTag: 'nav_total_set:languages',
+                key: 'languages',
+                message: 'languages native getter mismatches target; committing target to public navigator',
+                data: {
+                  outcome: 'apply',
+                  reason: 'target_mismatch_commit',
+                  nativeValue: Array.isArray(nativeLanguagesRead.value) ? nativeLanguagesRead.value.slice(0, 8) : nativeLanguagesRead.value,
+                  targetValue: normalizedLanguages.slice(0, 8)
+                }
+              });
+              patchObjectReturnAccessor('languages', function navLanguagesCommittedValue() {
+                return normalizedLanguages;
+              }, 'nav_total_set:languages');
+            }
           }
-        }
       } else {
         patchStrictScalarAccessor('languages', function navLanguagesValue() {
           __navDiagPipeline('warn', 'nav_total_set:languages_invalid_profile', {

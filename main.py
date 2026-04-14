@@ -672,6 +672,21 @@ def init_driver(
             enumerable: false
         }}
     }});
+    // Languages stable final setting (moved here to guarantee availability before nav_total_set.js)
+    // FrozenArray semantics (minimal approximation): freeze the array
+    if (Array.isArray(window.__normalizedLanguages)) {{
+        Object.freeze(window.__normalizedLanguages);
+    }}
+    // fail-fast: type and consistency checks
+    if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
+        throw new Error('THW: __primaryLanguage invalid');
+    }}
+    if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
+        throw new Error('THW: __normalizedLanguages invalid');
+    }}
+    if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
+        throw new Error('THW: language != languages[0]');
+    }}
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
     
@@ -679,11 +694,11 @@ def init_driver(
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+
     inject_uach_strip_window(driver, user_agent)
 
     # Connect page_js (core + targets + wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-
     # =========================
     # [CH] Setting up Client hints (CDP-only) + __HEADERS__ (JS, NEW DOCUMENT)
     #  No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
@@ -825,7 +840,7 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         
         device_metrics = build_device_metrics(profile)
         driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
-
+     
         # ----------------------- Regional Cookies setup--------------------------------
         google_url = f"https://www.google.{domain}" if language != "en" else "https://www.google.com"
         youtube_url = f"https://www.youtube.{domain}" if language != "en" else "https://www.youtube.com"

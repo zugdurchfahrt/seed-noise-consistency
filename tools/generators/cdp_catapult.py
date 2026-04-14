@@ -402,12 +402,12 @@ def get_ws_url():
 
 def run():
     """
-    Lightweight SW/page injector loop:
+    Lightweight SW injector loop:
     - connects to CDP
-    - auto-attaches to service_worker/page targets with waitForDebuggerOnStart=true
+    - auto-attaches to service_worker targets with waitForDebuggerOnStart=true
     - uses "flatten" protocol (required for browser-level auto-attach)
-    - resumes non-service_worker/page targets immediately
-    - for service_worker/page targets: Runtime.enable + Runtime.evaluate(prelude) + sanity + (optional) resume
+    - resumes non-service_worker targets immediately
+    - for service_worker targets: Runtime.enable + Runtime.evaluate(prelude) + sanity + (optional) resume
     """
     global _RUNNING, _SW_WS, _SW_STOPPING
     if _RUNNING:
@@ -506,33 +506,12 @@ def run():
         try:
             send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
             logger.info(
-                "SW inject: resumed %s targetId=%s reason=%s",
-                meta.get("type"),
+                "SW inject: resumed service_worker targetId=%s reason=%s",
                 meta.get("targetId"),
                 why,
             )
         except Exception as e:
             _fatal(ws, "sw resume failed", e)
-
-    def _soft_skip_page_session(ws, sessionId, why, err=None):
-        meta = session_targets.get(sessionId) or pending_sw_resume.get(sessionId) or {}
-        try:
-            _resume_sw_session(ws, sessionId, why)
-        except Exception:
-            pass
-        if err is not None:
-            logger.warning(
-                "SW inject: page experimental path skipped targetId=%s reason=%s err=%r",
-                meta.get("targetId"),
-                why,
-                err,
-            )
-        else:
-            logger.warning(
-                "SW inject: page experimental path skipped targetId=%s reason=%s",
-                meta.get("targetId"),
-                why,
-            )
 
     def send(ws, method, params=None, tag=None):
         msg_id["v"] += 1
@@ -567,19 +546,16 @@ def run():
 
         params = {
             "autoAttach": True,
-            # Pause target before client code so prelude lands before navigator reads.
+            # Pause SW before client code so prelude lands before navigator reads.
             "waitForDebuggerOnStart": True,
             # Required for browser-level auto-attach.
             "flatten": True,
-            "filter": [
-                {"type": "service_worker", "exclude": False},
-                {"type": "page", "exclude": False},
-            ],
+            "filter": [{"type": "service_worker", "exclude": False}],
         }
 
         # важно: ставим tag, иначе обработка ошибки фильтра не сработает
         send(ws, "Target.setAutoAttach", params, tag="autoattach_sw_only")
-        logger.info("SW inject: enabled (autoAttach) filter=service_worker,page")
+        logger.info("SW inject: enabled (autoAttach) filter=service_worker")
 
        
     def on_message(ws, message):
@@ -591,8 +567,6 @@ def run():
         if "id" in msg:
             mid = msg.get("id")
             sid = msg.get("sessionId")
-            target_info = session_targets.get(sid) or {}
-            target_type = target_info.get("type")
             tag = None
             if sid:
                 tag = pending_sess.pop((sid, mid), None)
@@ -604,9 +578,6 @@ def run():
             # Session-level response error handling (flatten protocol).
             if sid and msg.get("error"):
                 if tag in ("Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
-                    if target_type == "page":
-                        _soft_skip_page_session(ws, sid, "prelude_error", msg.get("error"))
-                        return
                     _resume_sw_session(ws, sid, "prelude_error")
                 if tag == "Runtime.addBinding:sw_diag":
                     logger.warning(
@@ -624,14 +595,11 @@ def run():
                 exc = res.get("exceptionDetails")
                 if exc:
                     if tag in ("Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
-                        if target_type == "page":
-                            _soft_skip_page_session(ws, sid, "prelude_exception", exc)
-                            return
                         _resume_sw_session(ws, sid, "prelude_exception")
                     _fatal(ws, "sw prelude Runtime.evaluate exceptionDetails", exc)
                     return
                 if tag == "Runtime.evaluate:sw_prelude":
-                    logger.info("SW inject: prelude applied (%s branch)", target_type or "unknown")
+                    logger.info("SW inject: prelude applied (UAD branch)")
                     if not sanity_expr:
                         _resume_sw_session(ws, sid, "prelude_applied")
                 if tag == "Runtime.evaluate:sw_sanity":
@@ -649,68 +617,41 @@ def run():
                             _fatal(ws, "sw sanity: bad result type", out)
                             return
                         if out.get("language") != exp["language"] or list(out.get("languages") or []) != list(exp["languages"]):
-                            if target_type == "page":
-                                _soft_skip_page_session(ws, sid, "sanity_language_mismatch", {"expected": exp, "got": out})
-                                return
                             _resume_sw_session(ws, sid, "sanity_language_mismatch")
                             _fatal(ws, "sw sanity: language mismatch", {"expected": exp, "got": out})
                             return
                         if int(out.get("hardwareConcurrency") or 0) != int(exp["hardwareConcurrency"]):
-                            if target_type == "page":
-                                _soft_skip_page_session(ws, sid, "sanity_hardware_mismatch", {"expected": exp, "got": out})
-                                return
                             _resume_sw_session(ws, sid, "sanity_hardware_mismatch")
                             _fatal(ws, "sw sanity: hardwareConcurrency mismatch", {"expected": exp, "got": out})
                             return
                         if float(out.get("deviceMemory") or 0.0) != float(exp["deviceMemory"]):
-                            if target_type == "page":
-                                _soft_skip_page_session(ws, sid, "sanity_device_memory_mismatch", {"expected": exp, "got": out})
-                                return
                             _resume_sw_session(ws, sid, "sanity_device_memory_mismatch")
                             _fatal(ws, "sw sanity: deviceMemory mismatch", {"expected": exp, "got": out})
                             return
                         uad = out.get("uad") or {}
                         if not isinstance(uad, dict):
-                            if target_type == "page":
-                                _soft_skip_page_session(ws, sid, "sanity_uad_bad_result", {"expected": exp, "got": out})
-                                return
                             _resume_sw_session(ws, sid, "sanity_uad_bad_result")
                             _fatal(ws, "sw sanity: uad bad result type", {"expected": exp, "got": out})
                             return
                         if uad.get("platform") != exp["uad"].get("platform"):
-                            if target_type == "page":
-                                _soft_skip_page_session(ws, sid, "sanity_uad_platform_mismatch", {"expected": exp, "got": out})
-                                return
                             _resume_sw_session(ws, sid, "sanity_uad_platform_mismatch")
                             _fatal(ws, "sw sanity: uad platform mismatch", {"expected": exp, "got": out})
                             return
                         if uad.get("mobile") != exp["uad"].get("mobile"):
-                            if target_type == "page":
-                                _soft_skip_page_session(ws, sid, "sanity_uad_mobile_mismatch", {"expected": exp, "got": out})
-                                return
                             _resume_sw_session(ws, sid, "sanity_uad_mobile_mismatch")
                             _fatal(ws, "sw sanity: uad mobile mismatch", {"expected": exp, "got": out})
                             return
                         if list(uad.get("brands") or []) != list(exp["uad"].get("brands") or []):
-                            if target_type == "page":
-                                _soft_skip_page_session(ws, sid, "sanity_uad_brands_mismatch", {"expected": exp, "got": out})
-                                return
                             _resume_sw_session(ws, sid, "sanity_uad_brands_mismatch")
                             _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
                             return
                         if list(uad.get("heFullVersionList") or []) != list(exp["uad"].get("fullVersionList") or []):
-                            if target_type == "page":
-                                _soft_skip_page_session(ws, sid, "sanity_uad_he_full_version_mismatch", {"expected": exp, "got": out})
-                                return
                             _resume_sw_session(ws, sid, "sanity_uad_he_full_version_mismatch")
                             _fatal(ws, "sw sanity: uad high entropy fullVersionList mismatch", {"expected": exp, "got": out})
                             return
                         logger.info("SW inject: sanity OK target values match profile")
                         _resume_sw_session(ws, sid, "sanity_ok")
                     except Exception as e:
-                        if target_type == "page":
-                            _soft_skip_page_session(ws, sid, "sanity_parse_failed", e)
-                            return
                         _resume_sw_session(ws, sid, "sanity_parse_failed")
                         _fatal(ws, "sw sanity: parse/compare failed", e)
             return
@@ -756,13 +697,13 @@ def run():
         if not sessionId or not tid:
             return
 
-        # Hard isolation: this module must never touch non service_worker/page targets.
-        if ttype not in ("service_worker", "page"):
-            _patch_skipped(f"non service_worker/page target attached: {ttype}")
+        # Hard isolation: this module must never touch non-SW targets.
+        if ttype != "service_worker":
+            _patch_skipped(f"non-sw target attached: {ttype}")
             try:
                 send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
             except Exception as e:
-                _fatal(ws, "resume non service_worker/page target failed", e)
+                _fatal(ws, "resume non-sw target failed", e)
             return
 
 
@@ -771,19 +712,18 @@ def run():
             return
 
         injected.add(tid)
-        session_targets[sessionId] = {"targetId": tid, "url": turl, "type": ttype}
+        session_targets[sessionId] = {"targetId": tid, "url": turl}
         if do_prelude and do_resume:
-            pending_sw_resume[sessionId] = {"targetId": tid, "url": turl, "type": ttype}
-        logger.info("SW inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
+            pending_sw_resume[sessionId] = {"targetId": tid, "url": turl}
+        logger.info("SW inject: attached service_worker targetId=%s sessionId=%s url=%r", tid, sessionId, turl)
 
         if do_prelude:
             try:
-                logger.info("SW inject: injecting prelude+sanity type=%s targetId=%s sessionId=%s", ttype, tid, sessionId)
+                logger.info("SW inject: injecting prelude+sanity targetId=%s sessionId=%s", tid, sessionId)
                 send_sess(ws, sessionId, "Runtime.enable")
-                if ttype == "service_worker":
-                    send_sess(ws, sessionId, "Runtime.addBinding", {
-                        "name": _SW_DIAG_BINDING
-                    })
+                send_sess(ws, sessionId, "Runtime.addBinding", {
+                    "name": _SW_DIAG_BINDING
+                })
                 send_sess(ws, sessionId, "Runtime.evaluate", {
                     "expression": sw_prelude,
                     "awaitPromise": True

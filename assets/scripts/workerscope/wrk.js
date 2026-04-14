@@ -442,7 +442,7 @@ function EnvBus(G){
       : null;
     return stateRoot;
   }
-  function __requireWorkerEnvPacket() {
+  function __requireWorkerEnvSnapshot() {
     const stateRoot = __resolveCanvasPatchStateRoot();
     const navModuleState = (stateRoot && stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
       ? stateRoot.__NAV_TOTAL_SET__
@@ -450,11 +450,11 @@ function EnvBus(G){
     const dataStoreState = (navModuleState && navModuleState.__DATA_STORE_STATE__ && typeof navModuleState.__DATA_STORE_STATE__ === 'object')
       ? navModuleState.__DATA_STORE_STATE__
       : null;
-    const packet = (dataStoreState && dataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
+    const workerEnvSnapshot = (dataStoreState && dataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
       ? dataStoreState.__WORKER_ENV_SNAPSHOT__
       : null;
-    if (!packet) throw new Error('EnvBus: __WORKER_ENV_SNAPSHOT__ missing');
-    const out = __cloneEnvValue(packet);
+    if (!workerEnvSnapshot) throw new Error('EnvBus: __WORKER_ENV_SNAPSHOT__ missing');
+    const out = __cloneEnvValue(workerEnvSnapshot);
     const isStringArray = (value, allowEmpty) => {
       if (!Array.isArray(value)) return false;
       if (!allowEmpty && !value.length) return false;
@@ -473,23 +473,23 @@ function EnvBus(G){
       }
       return true;
     };
-    if (typeof out.ua !== 'string' || !out.ua) throw new Error('EnvBus: worker packet ua missing');
-    if (typeof out.language !== 'string' || !out.language) throw new Error('EnvBus: worker packet language missing');
-    if (!isStringArray(out.languages, false)) throw new Error('EnvBus: worker packet languages missing');
-    if (!Number.isFinite(Number(out.deviceMemory))) throw new Error('EnvBus: worker packet deviceMemory missing');
-    if (!Number.isFinite(Number(out.hardwareConcurrency))) throw new Error('EnvBus: worker packet hardwareConcurrency missing');
-    if (!out.uaData || typeof out.uaData !== 'object') throw new Error('EnvBus: worker packet uaData missing');
-    if (!isBrandList(out.uaData.brands)) throw new Error('EnvBus: worker packet uaData.brands missing');
-    if (typeof out.uaData.mobile !== 'boolean') throw new Error('EnvBus: worker packet uaData.mobile missing');
-    if (typeof out.uaData.platform !== 'string' || !out.uaData.platform) throw new Error('EnvBus: worker packet uaData.platform missing');
-    if (!out.uaData.he || typeof out.uaData.he !== 'object') throw new Error('EnvBus: worker packet uaData.he missing');
-    if (typeof out.uaData.he.architecture !== 'string' || !out.uaData.he.architecture) throw new Error('EnvBus: worker packet uaData.he.architecture missing');
-    if (typeof out.uaData.he.bitness !== 'string' || !out.uaData.he.bitness) throw new Error('EnvBus: worker packet uaData.he.bitness missing');
-    if (typeof out.uaData.he.model !== 'string') throw new Error('EnvBus: worker packet uaData.he.model missing');
-    if (typeof out.uaData.he.platformVersion !== 'string' || !out.uaData.he.platformVersion) throw new Error('EnvBus: worker packet uaData.he.platformVersion missing');
-    if (!isBrandList(out.uaData.he.fullVersionList)) throw new Error('EnvBus: worker packet uaData.he.fullVersionList missing');
-    if (typeof out.uaData.he.wow64 !== 'boolean') throw new Error('EnvBus: worker packet uaData.he.wow64 missing');
-    if (!isStringArray(out.uaData.he.formFactors, false)) throw new Error('EnvBus: worker packet uaData.he.formFactors missing');
+    if (typeof out.ua !== 'string' || !out.ua) throw new Error('EnvBus: worker env snapshot ua missing');
+    if (typeof out.language !== 'string' || !out.language) throw new Error('EnvBus: worker env snapshot language missing');
+    if (!isStringArray(out.languages, false)) throw new Error('EnvBus: worker env snapshot languages missing');
+    if (!Number.isFinite(Number(out.deviceMemory))) throw new Error('EnvBus: worker env snapshot deviceMemory missing');
+    if (!Number.isFinite(Number(out.hardwareConcurrency))) throw new Error('EnvBus: worker env snapshot hardwareConcurrency missing');
+    if (!out.uaData || typeof out.uaData !== 'object') throw new Error('EnvBus: worker env snapshot uaData missing');
+    if (!isBrandList(out.uaData.brands)) throw new Error('EnvBus: worker env snapshot uaData.brands missing');
+    if (typeof out.uaData.mobile !== 'boolean') throw new Error('EnvBus: worker env snapshot uaData.mobile missing');
+    if (typeof out.uaData.platform !== 'string' || !out.uaData.platform) throw new Error('EnvBus: worker env snapshot uaData.platform missing');
+    if (!out.uaData.he || typeof out.uaData.he !== 'object') throw new Error('EnvBus: worker env snapshot uaData.he missing');
+    if (typeof out.uaData.he.architecture !== 'string' || !out.uaData.he.architecture) throw new Error('EnvBus: worker env snapshot uaData.he.architecture missing');
+    if (typeof out.uaData.he.bitness !== 'string' || !out.uaData.he.bitness) throw new Error('EnvBus: worker env snapshot uaData.he.bitness missing');
+    if (typeof out.uaData.he.model !== 'string') throw new Error('EnvBus: worker env snapshot uaData.he.model missing');
+    if (typeof out.uaData.he.platformVersion !== 'string' || !out.uaData.he.platformVersion) throw new Error('EnvBus: worker env snapshot uaData.he.platformVersion missing');
+    if (!isBrandList(out.uaData.he.fullVersionList)) throw new Error('EnvBus: worker env snapshot uaData.he.fullVersionList missing');
+    if (typeof out.uaData.he.wow64 !== 'boolean') throw new Error('EnvBus: worker env snapshot uaData.he.wow64 missing');
+    if (!isStringArray(out.uaData.he.formFactors, false)) throw new Error('EnvBus: worker env snapshot uaData.he.formFactors missing');
     return out;
   }
   function __cloneFontsFamilySnapshotForWorker__(familySnapshot) {
@@ -635,15 +635,15 @@ function EnvBus(G){
     };
   }
   function envSnapshot(){
-    const packet = __requireWorkerEnvPacket();
+    const workerEnvSnapshot = __requireWorkerEnvSnapshot();
     const stateRoot = __resolveCanvasPatchStateRoot();
-    const langs = packet.languages.slice();
-    const lang = packet.language;
-    const ua = packet.ua;
+    const langs = workerEnvSnapshot.languages.slice();
+    const lang = workerEnvSnapshot.language;
+    const ua = workerEnvSnapshot.ua;
     const dpr      = __envDpr;
     if (!dpr) throw new Error('EnvBus: __DPR missing');
-    const cpu = Number(packet.hardwareConcurrency);
-    const mem = Number(packet.deviceMemory);
+    const cpu = Number(workerEnvSnapshot.hardwareConcurrency);
+    const mem = Number(workerEnvSnapshot.deviceMemory);
     const timeZone = __envTimeZone;
     if (!timeZone) throw new Error('EnvBus: state.__GEO_STATE__.timezone missing');
     const webglVendor = __envWebGLVendor;
@@ -656,8 +656,8 @@ function EnvBus(G){
     if (typeof webglUnmaskedRenderer !== 'string' || !webglUnmaskedRenderer) throw new Error('EnvBus: __WEBGL_UNMASKED_RENDERER__ missing');
     const webglCapabilities = __collectWindowWebGLCapabilities();
 
-    const uaData = __cloneEnvValue(packet.uaData);
-    const he = __cloneEnvValue(packet.uaData.he);
+    const uaData = __cloneEnvValue(workerEnvSnapshot.uaData);
+    const he = __cloneEnvValue(workerEnvSnapshot.uaData.he);
     uaData.he = he;
     const screenRoot = (stateRoot && stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
       ? stateRoot.__SCREEN__
@@ -2735,7 +2735,7 @@ function ServiceWorkerOverride(G){
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
       : ['architecture','bitness','model','platformVersion','fullVersionList','formFactors','wow64'];
-    const packet = (() => {
+    const workerEnvSnapshot = (() => {
       const lastSnap = __wrkRuntimeGet__('lastSnap');
       if (lastSnap && typeof lastSnap === 'object') return lastSnap;
       const workerPatchApi = __requireWorkerPatchApi__('worker patch hooks runtime api not ready', 'preflight');
@@ -2744,8 +2744,8 @@ function ServiceWorkerOverride(G){
       }
       return EnvBus(G).envSnapshot();
     })();
-    const heSource = (packet && packet.uaData && packet.uaData.he && typeof packet.uaData.he === 'object')
-      ? packet.uaData.he
+    const heSource = (workerEnvSnapshot && workerEnvSnapshot.uaData && workerEnvSnapshot.uaData.he && typeof workerEnvSnapshot.uaData.he === 'object')
+      ? workerEnvSnapshot.uaData.he
       : null;
     if (!heSource) throw new Error('[WorkerInit] high entropy missing');
     const he = {};
