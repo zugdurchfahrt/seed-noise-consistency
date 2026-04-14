@@ -207,7 +207,7 @@
       ? seedEnsureDesc.value
       : (runtimeRoot && typeof runtimeRoot.__ensureMarkAsNative === 'function'
           ? runtimeRoot.__ensureMarkAsNative
-          : (typeof self.__ensureMarkAsNative === 'function' ? self.__ensureMarkAsNative : null));
+          : null);
 
     if (!seedEnsure) {
       const e = new Error('UACHPatch: __ensureMarkAsNative missing');
@@ -858,7 +858,7 @@
 
     const wrapStrictAccessor = (runtimeRoot && typeof runtimeRoot.__wrapStrictAccessor === 'function')
       ? runtimeRoot.__wrapStrictAccessor
-      : ((typeof self.__wrapStrictAccessor === 'function') ? self.__wrapStrictAccessor : null);
+      : null;
     if (typeof wrapStrictAccessor !== 'function') {
       throw new Error('UACHPatch: worker native accessor bridge missing');
     }

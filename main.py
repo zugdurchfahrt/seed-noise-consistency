@@ -592,7 +592,36 @@ def init_driver(
             writable: true,
             configurable: true,
             enumerable: false
+       }},
+        __primaryLanguage: {{
+            value: {json.dumps(profile['language'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
         }},
+        __normalizedLanguages: {{
+            value: {json.dumps(profile['languages'], ensure_ascii=False)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }}
+    }});
+    // Languages stable final setting (moved here to guarantee availability before nav_total_set.js)
+    // FrozenArray semantics (minimal approximation): freeze the array
+    if (Array.isArray(window.__normalizedLanguages)) {{
+        Object.freeze(window.__normalizedLanguages);
+    }}
+    // fail-fast: type and consistency checks
+    if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
+        throw new Error('THW: __primaryLanguage invalid');
+    }}
+    if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
+        throw new Error('THW: __normalizedLanguages invalid');
+    }}
+    if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
+        throw new Error('THW: language != languages[0]');
+    }}
+    Object.defineProperties(window, {{
         __cpu: {{
             value: {json.dumps(hardware_concurrency_value)},
             writable: true,
@@ -659,42 +688,30 @@ def init_driver(
             configurable: true,
             enumerable: false
         }},
-        __primaryLanguage: {{
-            value: {json.dumps(profile['language'], ensure_ascii=False)},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
-        __normalizedLanguages: {{
-            value: {json.dumps(profile['languages'], ensure_ascii=False)},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }}
     }});
-    // Languages stable final setting (moved here to guarantee availability before nav_total_set.js)
-    // FrozenArray semantics (minimal approximation): freeze the array
-    if (Array.isArray(window.__normalizedLanguages)) {{
-        Object.freeze(window.__normalizedLanguages);
-    }}
-    // fail-fast: type and consistency checks
-    if (typeof window.__primaryLanguage !== 'string' || !window.__primaryLanguage) {{
-        throw new Error('THW: __primaryLanguage invalid');
-    }}
-    if (!Array.isArray(window.__normalizedLanguages) || window.__normalizedLanguages.length === 0) {{
-        throw new Error('THW: __normalizedLanguages invalid');
-    }}
-    if (window.__normalizedLanguages[0] !== window.__primaryLanguage) {{
-        throw new Error('THW: language != languages[0]');
-    }}
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
-    
+       
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-
+    
+    # try:
+    #     driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
+    #     logger.info("Direct page-side locale override applied: %s", language)
+    # except Exception as e:
+    #     logger.warning("Direct page-side locale override failed: %s", e)
+    # try:
+    #     driver.execute_cdp_cmd(
+    #         "Emulation.setHardwareConcurrencyOverride",
+    #         {"hardwareConcurrency": int(hardware_concurrency_value)},
+    #     )
+    #     logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
+    # except Exception as e:
+    #     logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
+    
+    
     inject_uach_strip_window(driver, user_agent)
 
     # Connect page_js (core + targets + wrk.js and so on)
@@ -840,7 +857,7 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         
         device_metrics = build_device_metrics(profile)
         driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
-     
+
         # ----------------------- Regional Cookies setup--------------------------------
         google_url = f"https://www.google.{domain}" if language != "en" else "https://www.google.com"
         youtube_url = f"https://www.youtube.{domain}" if language != "en" else "https://www.youtube.com"
