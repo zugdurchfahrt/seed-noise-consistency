@@ -351,21 +351,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }, err);
   }
 
-  function __requireMarkAsNative(key, wrapperName) {
-    const ensure = (typeof ensureMarkAsNative === 'function') ? ensureMarkAsNative : null;
-    const m = ensure ? ensure() : null;
-    if (typeof m !== 'function') {
-      const e = new Error('[CoreWindow] markAsNative missing');
-      __throwWrapFactoryPreflight(
-        `core_window:${wrapperName}:mark_missing`,
-        key,
-        `${wrapperName}: markAsNative missing`,
-        e
-      );
-    }
-    return m;
-  }
-
   function __resolveWrappedBridgeTarget(nativeFn, wrapperName) {
     let bridgeTarget = (nativeFn && typeof nativeFn.__coreBridgeTarget__ === 'function')
       ? nativeFn.__coreBridgeTarget__
@@ -386,30 +371,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     return bridgeTarget;
   }
 
-  function __exportWrapFactory(exportName, exportValue) {
-    const hasOwnExport = Object.prototype.hasOwnProperty.call(window, exportName);
-    if (!hasOwnExport || typeof window[exportName] !== 'function') {
-      if (hasOwnExport && typeof window[exportName] !== 'function') {
-        __emit('warn', 'core_window:export_conflict', {
-          module: 'core',
-          diagTag: 'core_window',
-          surface: 'core',
-          key: exportName,
-          stage: 'contract',
-          message: 'export conflict: existing own property is not a function; overwriting',
-          type: 'contract violation',
-          data: { outcome: 'return', typeof: typeof window[exportName] }
-        }, null);
-      }
-      safeDefine(window, exportName, {
-        value: exportValue,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    }
-  }
-
   function __wrapNativeApply(nativeFn, name, applyImpl) {
     if (typeof nativeFn !== 'function') {
       const e = new TypeError('[CoreWindow] __wrapNativeApply: nativeFn must be function');
@@ -423,7 +384,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const e = new TypeError('[CoreWindow] __wrapNativeApply: applyImpl must be function');
       __throwWrapFactoryPreflight('core_window:wrapNativeApply:bad_applyImpl', name, '__wrapNativeApply: applyImpl must be function', e);
     }
-    __requireMarkAsNative(name || (nativeFn && nativeFn.name) || null, 'wrapNativeApply');
     const wrapped = new Proxy(nativeFn, {
       apply(target, thisArg, argList) {
         try {
@@ -474,7 +434,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
       const e = new TypeError('[CoreWindow] __wrapNativeCtor: argsImpl must be function');
       __throwWrapFactoryPreflight('core_window:wrapNativeCtor:bad_argsImpl', name || '__wrapNativeCtor', '__wrapNativeCtor: argsImpl must be function', e);
     }
-    __requireMarkAsNative(name || (nativeFn && nativeFn.name) || '__wrapNativeCtor', 'wrapNativeCtor');
     const wrapped = new Proxy(nativeFn, {
       apply(target, thisArg, argList) {
         let nextArgs;
@@ -1258,7 +1217,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         return planItem;
       }
 
-      function patchAccessor(planItem, t, desc, markAsNative, fail) {
+      function patchAccessor(planItem, t, desc, fail) {
         if (!desc && !planItem.allowCreate) {
           const e = new Error('[Core.applyTargets] descriptor missing');
           return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -1434,7 +1393,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         return planItem;
       }
 
-      function patchMethod(planItem, t, desc, markAsNative, fail) {
+      function patchMethod(planItem, t, desc, fail) {
         if (!desc) {
           const e = new Error('[Core.applyTargets] descriptor missing');
           return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -1559,7 +1518,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         return planItem;
       }
 
-      function patchPromiseMethod(planItem, t, desc, markAsNative, fail) {
+      function patchPromiseMethod(planItem, t, desc, fail) {
         if (!desc) {
           const e = new Error('[Core.applyTargets] descriptor missing');
           return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
@@ -1878,7 +1837,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         planned.reason = null;
         if (!list.length) return planned;
 
-        const markAsNative = ensureMarkAsNative();
         const seenOwners = new WeakMap();
         const failDedupe = new Set();
 
@@ -1961,11 +1919,11 @@ const CoreWindowModule = function CoreWindowModule(window) {
           if (kind === 'data') {
             if (patchDataProp(planItem, t, desc, fail) === planned) return planned;
           } else if (kind === 'accessor') {
-            if (patchAccessor(planItem, t, desc, markAsNative, fail) === planned) return planned;
+            if (patchAccessor(planItem, t, desc, fail) === planned) return planned;
           } else if (kind === 'method') {
-            if (patchMethod(planItem, t, desc, markAsNative, fail) === planned) return planned;
+            if (patchMethod(planItem, t, desc, fail) === planned) return planned;
           } else {
-            if (patchPromiseMethod(planItem, t, desc, markAsNative, fail) === planned) return planned;
+            if (patchPromiseMethod(planItem, t, desc, fail) === planned) return planned;
           }
           planned.push(planItem);
         }
@@ -2127,11 +2085,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      __exportWrapFactory('__ensureMarkAsNative', ensureMarkAsNative);
-      __exportWrapFactory('__wrapNativeApply', __wrapNativeApply);
-      __exportWrapFactory('__wrapNativeAccessor', __wrapNativeAccessor);
-      __exportWrapFactory('__wrapStrictAccessor', __wrapStrictAccessor);
-      __exportWrapFactory('__wrapNativeCtor', __wrapNativeCtor);
     } catch (e) {
       diagDegrade('core:installCoreApplyTargets:failed', e);
       throw e;

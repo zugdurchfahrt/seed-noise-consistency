@@ -29,9 +29,26 @@
     __trackDeleteOwnIfConfigurable(G, __swDiagBindingName);
   }
 
-  const __swWrapNativeApply = (typeof G.__wrapNativeApply === 'function')
-    ? G.__wrapNativeApply
-    : null;
+  function __resolveWorkerBridgeRuntime() {
+    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+      ? G.CanvasPatchContext
+      : null;
+    const stateRoot = (C && C.state && typeof C.state === 'object')
+      ? C.state
+      : null;
+    const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+      ? stateRoot.__WRK__
+      : null;
+    const runtimeRoot = (wrkState && wrkState.runtime && typeof wrkState.runtime === 'object')
+      ? wrkState.runtime
+      : null;
+    return runtimeRoot;
+  }
+
+  const __swRuntimeRoot = __resolveWorkerBridgeRuntime();
+  const __swWrapNativeApply = (__swRuntimeRoot && typeof __swRuntimeRoot.__wrapNativeApply === 'function')
+    ? __swRuntimeRoot.__wrapNativeApply
+    : ((typeof G.__wrapNativeApply === 'function') ? G.__wrapNativeApply : null);
 
   function __relaySWDiag(level, code, ctx, err) {
     try {
@@ -163,9 +180,9 @@
     }
   }
 
-  const __swWrapStrictAccessor = (typeof G.__wrapStrictAccessor === 'function')
-    ? G.__wrapStrictAccessor
-    : null;
+  const __swWrapStrictAccessor = (__swRuntimeRoot && typeof __swRuntimeRoot.__wrapStrictAccessor === 'function')
+    ? __swRuntimeRoot.__wrapStrictAccessor
+    : ((typeof G.__wrapStrictAccessor === 'function') ? G.__wrapStrictAccessor : null);
 
   function __dropBridgeExport(key) {
     try {

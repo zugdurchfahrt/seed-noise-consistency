@@ -318,21 +318,6 @@
       throw err;
     }
 
-    function __requireMarkAsNative(key, wrapperName) {
-      const ensure = (typeof ensureMarkAsNative === 'function') ? ensureMarkAsNative : null;
-      const markAsNative = ensure ? ensure() : null;
-      if (typeof markAsNative !== 'function') {
-        const e = new Error('[WrkBridge] markAsNative missing');
-        __throwWrapFactoryPreflight(
-          'wrk:' + wrapperName + ':mark_missing',
-          key,
-          wrapperName + ': markAsNative missing',
-          e
-        );
-      }
-      return markAsNative;
-    }
-
     function __resolveWrappedBridgeTarget(nativeFn, wrapperName) {
       let bridgeTarget = (nativeFn && typeof nativeFn.__coreBridgeTarget__ === 'function')
         ? nativeFn.__coreBridgeTarget__
@@ -412,27 +397,6 @@
       }
     }
 
-      function __exportWrapFactory(exportName, exportValue) {
-        const hasOwnExport = Object.prototype.hasOwnProperty.call(self, exportName);
-        if (!hasOwnExport || typeof self[exportName] !== 'function') {
-          if (hasOwnExport && typeof self[exportName] !== 'function') {
-            __wrkDiag('warn', 'wrk:export_conflict', {
-              stage: 'contract',
-              key: exportName,
-              message: 'export conflict: existing own property is not a function; overwriting',
-              type: 'contract violation',
-              data: { outcome: 'return', typeof: typeof self[exportName] }
-            }, null);
-          }
-          Object.defineProperty(self, exportName, {
-            value: exportValue,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-        }
-      }
-
     function __wrapNativeApply(nativeFn, name, applyImpl) {
       if (typeof nativeFn !== 'function') {
         const e = new TypeError('[WrkBridge] __wrapNativeApply: nativeFn must be function');
@@ -446,7 +410,6 @@
         const e = new TypeError('[WrkBridge] __wrapNativeApply: applyImpl must be function');
         __throwWrapFactoryPreflight('wrk:wrapNativeApply:bad_applyImpl', name, '__wrapNativeApply: applyImpl must be function', e);
       }
-      __requireMarkAsNative(name || (nativeFn && nativeFn.name) || null, 'wrapNativeApply');
       const wrapped = new Proxy(nativeFn, {
         apply(target, thisArg, argList) {
           try {
@@ -503,7 +466,6 @@
         const e = new TypeError('[WrkBridge] __wrapNativeCtor: argsImpl must be function');
         __throwWrapFactoryPreflight('wrk:wrapNativeCtor:bad_argsImpl', name || '__wrapNativeCtor', '__wrapNativeCtor: argsImpl must be function', e);
       }
-      __requireMarkAsNative(name || (nativeFn && nativeFn.name) || '__wrapNativeCtor', 'wrapNativeCtor');
       const wrapped = new Proxy(nativeFn, {
         apply(target, thisArg, argList) {
           let nextArgs;
@@ -638,19 +600,16 @@
       );
     }
 
-      if (typeof self.__ensureMarkAsNative !== 'function') {
-        Object.defineProperty(self, '__ensureMarkAsNative', {
-          value: ensureMarkAsNative,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
+      if (!__wrkRuntimeRoot || typeof __wrkRuntimeRoot !== 'object') {
+        throw new Error('UACHPatch: CanvasPatchContext.state.__WRK__.runtime missing');
       }
+      __setHiddenValue(__wrkRuntimeRoot, '__ensureMarkAsNative', ensureMarkAsNative);
+      __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeApply', __wrapNativeApply);
+      __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeAccessor', __wrapNativeAccessor);
+      __setHiddenValue(__wrkRuntimeRoot, '__wrapStrictAccessor', __wrapStrictAccessor);
+      __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeCtor', __wrapNativeCtor);
 
-      const ensure = (typeof self.__ensureMarkAsNative === 'function')
-        ? self.__ensureMarkAsNative
-        : ensureMarkAsNative;
-      const markAsNative = ensure();
+      const markAsNative = ensureMarkAsNative();
       if (typeof markAsNative !== 'function') {
         throw new Error('UACHPatch: markAsNative seed missing');
       }
@@ -671,10 +630,6 @@
       }
       toStringProxyTargetMap.delete(seedProbe);
       toStringOverrideMap.delete(seedProbe);
-      __exportWrapFactory('__wrapNativeApply', __wrapNativeApply);
-      __exportWrapFactory('__wrapNativeAccessor', __wrapNativeAccessor);
-      __exportWrapFactory('__wrapStrictAccessor', __wrapStrictAccessor);
-      __exportWrapFactory('__wrapNativeCtor', __wrapNativeCtor);
     } catch (e) {
       self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);
       throw e;

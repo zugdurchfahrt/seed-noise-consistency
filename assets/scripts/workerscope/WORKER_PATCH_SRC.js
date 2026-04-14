@@ -199,10 +199,15 @@
       throw e;
     }
     // --- seed __ensureMarkAsNative must exist (delivered by bootstrap) ---
-    const seedEnsureDesc = Object.getOwnPropertyDescriptor(self, '__ensureMarkAsNative');
+    const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
+    const seedEnsureDesc = runtimeRoot
+      ? Object.getOwnPropertyDescriptor(runtimeRoot, '__ensureMarkAsNative')
+      : null;
     const seedEnsure = (seedEnsureDesc && typeof seedEnsureDesc.value === 'function')
       ? seedEnsureDesc.value
-      : (typeof self.__ensureMarkAsNative === 'function' ? self.__ensureMarkAsNative : null);
+      : (runtimeRoot && typeof runtimeRoot.__ensureMarkAsNative === 'function'
+          ? runtimeRoot.__ensureMarkAsNative
+          : (typeof self.__ensureMarkAsNative === 'function' ? self.__ensureMarkAsNative : null));
 
     if (!seedEnsure) {
       const e = new Error('UACHPatch: __ensureMarkAsNative missing');
@@ -851,7 +856,9 @@
       value: getHighEntropyValues
     });
 
-    const wrapStrictAccessor = (typeof self.__wrapStrictAccessor === 'function') ? self.__wrapStrictAccessor : null;
+    const wrapStrictAccessor = (runtimeRoot && typeof runtimeRoot.__wrapStrictAccessor === 'function')
+      ? runtimeRoot.__wrapStrictAccessor
+      : ((typeof self.__wrapStrictAccessor === 'function') ? self.__wrapStrictAccessor : null);
     if (typeof wrapStrictAccessor !== 'function') {
       throw new Error('UACHPatch: worker native accessor bridge missing');
     }
