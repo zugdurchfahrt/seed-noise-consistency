@@ -48,7 +48,7 @@
   const __swRuntimeRoot = __resolveWorkerBridgeRuntime();
   const __swWrapNativeApply = (__swRuntimeRoot && typeof __swRuntimeRoot.__wrapNativeApply === 'function')
     ? __swRuntimeRoot.__wrapNativeApply
-    : ((typeof G.__wrapNativeApply === 'function') ? G.__wrapNativeApply : null);
+    : null;
 
   function __relaySWDiag(level, code, ctx, err) {
     try {
@@ -182,7 +182,7 @@
 
   const __swWrapStrictAccessor = (__swRuntimeRoot && typeof __swRuntimeRoot.__wrapStrictAccessor === 'function')
     ? __swRuntimeRoot.__wrapStrictAccessor
-    : ((typeof G.__wrapStrictAccessor === 'function') ? G.__wrapStrictAccessor : null);
+    : null;
 
   function __dropBridgeExport(key) {
     try {
