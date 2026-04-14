@@ -2276,22 +2276,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               data: { outcome: 'return', reason: 'native_skip' }
             });
           } else {
-            __navDiag('info', 'nav_total_set:deviceMemory_public_commit', {
-              stage: 'apply',
+            __navDiag('warn', 'nav_total_set:deviceMemory_no_admissible_carrier', {
+              stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:deviceMemory',
               key: 'deviceMemory',
-              message: 'deviceMemory native getter mismatches target; committing target to public navigator',
+              message: 'deviceMemory native getter mismatches target and no admissible carrier is proven in current runtime path',
               data: {
-                outcome: 'apply',
-                reason: 'target_mismatch_commit',
+                outcome: 'skip',
+                reason: 'no_admissible_carrier',
+                policy: 'skip',
+                action: 'native',
                 nativeValue: nativeDeviceMemoryRead.value,
                 targetValue: mem
               }
             });
-            patchStrictScalarAccessor('deviceMemory', function navDeviceMemoryCommittedValue() {
-              return mem;
-            }, 'nav_total_set:deviceMemory');
           }
         }
       } else {
@@ -2327,22 +2326,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               data: { outcome: 'return', reason: 'native_skip' }
             });
           } else {
-            __navDiag('info', 'nav_total_set:hardwareConcurrency_public_commit', {
-              stage: 'apply',
+            __navDiag('warn', 'nav_total_set:hardwareConcurrency_no_admissible_carrier', {
+              stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:hardwareConcurrency',
               key: 'hardwareConcurrency',
-              message: 'hardwareConcurrency native getter mismatches target; committing target to public navigator',
+              message: 'hardwareConcurrency native getter mismatches target and no admissible carrier is proven in current runtime path',
               data: {
-                outcome: 'apply',
-                reason: 'target_mismatch_commit',
+                outcome: 'skip',
+                reason: 'no_admissible_carrier',
+                policy: 'skip',
+                action: 'native',
                 nativeValue: nativeHardwareConcurrencyRead.value,
                 targetValue: cpu
               }
             });
-            patchStrictScalarAccessor('hardwareConcurrency', function navHardwareConcurrencyCommittedValue() {
-              return cpu;
-            }, 'nav_total_set:hardwareConcurrency');
           }
         }
       } else {
@@ -2381,22 +2379,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 data: { outcome: 'return', reason: 'native_skip' }
               });
             } else {
-              __navDiag('info', 'nav_total_set:language_public_commit', {
-                stage: 'apply',
+              __navDiag('warn', 'nav_total_set:language_no_admissible_carrier', {
+                stage: 'preflight',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:language',
                 key: 'language',
-                message: 'language native getter mismatches target; committing target to public navigator',
+                message: 'language native getter mismatches target and no admissible carrier is proven in current runtime path',
                 data: {
-                  outcome: 'apply',
-                  reason: 'target_mismatch_commit',
+                  outcome: 'skip',
+                  reason: 'no_admissible_carrier',
+                  policy: 'skip',
+                  action: 'native',
                   nativeValue: nativeLanguageRead.value,
                   targetValue: primaryLanguage
                 }
               });
-              patchStrictScalarAccessor('language', function navLanguageCommittedValue() {
-                return primaryLanguage;
-              }, 'nav_total_set:language');
             }
           }
       } else {
@@ -2440,22 +2437,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 data: { outcome: 'return', reason: 'native_skip' }
               });
             } else {
-              __navDiag('info', 'nav_total_set:languages_public_commit', {
-                stage: 'apply',
+              __navDiag('warn', 'nav_total_set:languages_no_admissible_carrier', {
+                stage: 'preflight',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:languages',
                 key: 'languages',
-                message: 'languages native getter mismatches target; committing target to public navigator',
+                message: 'languages native getter mismatches target and no admissible carrier is proven in current runtime path',
                 data: {
-                  outcome: 'apply',
-                  reason: 'target_mismatch_commit',
+                  outcome: 'skip',
+                  reason: 'no_admissible_carrier',
+                  policy: 'skip',
+                  action: 'native',
                   nativeValue: Array.isArray(nativeLanguagesRead.value) ? nativeLanguagesRead.value.slice(0, 8) : nativeLanguagesRead.value,
                   targetValue: normalizedLanguages.slice(0, 8)
                 }
               });
-              patchObjectReturnAccessor('languages', function navLanguagesCommittedValue() {
-                return normalizedLanguages;
-              }, 'nav_total_set:languages');
             }
           }
       } else {
