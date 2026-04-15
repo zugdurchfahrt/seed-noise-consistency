@@ -228,6 +228,17 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
 
 
+def get_device_info(driver):
+    try:
+        device_memory_value = driver.execute_script("return navigator.deviceMemory;")
+        hardware_concurrency_value = driver.execute_script("return navigator.hardwareConcurrency;")
+        logger.info(f"Полученные значения: device_memory_value={device_memory_value}, hardware_concurrency_value={hardware_concurrency_value}")
+    except Exception as e:
+        logger.info(f"Ошибка при получении значений: {e}")
+    
+
+
+
 def build_bootstrap_device_metrics():
     width = 1366
     height = 768
@@ -352,7 +363,6 @@ def init_driver(
         device_metrics=build_bootstrap_device_metrics(),
 
     )
-
 
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
@@ -698,123 +708,21 @@ def init_driver(
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-    
-   
-    
-
-    # hardware_js = f"""
-    # (() => {{
-    #     const navProto = Navigator.prototype;
       
-    #     const safeDefineAcc = (target, key, getter, {{ enumerable = false, configurable = true }} = {{}}) => {{
-    #         Object.defineProperty(target, key, {{
-    #             get: getter,
-    #             configurable,
-    #             enumerable
-    #         }});
-    #     }};
-    #     const redefineAcc = (target, key, getter, {{ enumerable = false }} = {{}}) => {{
-    #         const d = Object.getOwnPropertyDescriptor(target, key);
-    #         Object.defineProperty(target, key, {{
-    #             get: getter,
-    #             configurable: d ? d.configurable : true,
-    #             enumerable: d ? d.enumerable : enumerable
-    #         }});
-    #     }};
-    #     const patch = (key, getter) => {{
-    #         const has = !!Object.getOwnPropertyDescriptor(navProto, key);
-    #         (has ? redefineAcc : safeDefineAcc)(navProto, key, getter, {{ enumerable: false }});
-    #     }};
-    #     const bridgeGetter = (key, readValue) => {{
-    #         const d = Object.getOwnPropertyDescriptor(navProto, key);
-    #         const nativeGet = d && typeof d.get === 'function' ? d.get : null;
-    #         return function() {{
-    #             if (nativeGet) Reflect.apply(nativeGet, this, []);
-    #             return readValue();
-    #         }};
-    #     }};
-
-    #     patch('deviceMemory', bridgeGetter('deviceMemory', () => {{
-    #         return env && env.mem != null ? env.mem : {json.dumps(expected_client_hints["deviceMemory"])};
-    #     }}));
-    #     patch('hardwareConcurrency', bridgeGetter('hardwareConcurrency', () => {{
-    #         return env && env.cpu != null ? env.cpu : {json.dumps(expected_client_hints["hardwareConcurrency"])};
-    #     }}));
-    #     console.log('[✔] hardware prototype-owner override applied');
-    # }})();
-    # """
-    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": hardware_js})
-
-    
-    
-
-    # lang_js = f"""
-    # (() => {{
-    #     const navProto = Navigator.prototype;
-    #     const langState = () => {{
-    #         const C = window.CanvasPatchContext;
-    #         const S = C && typeof C === 'object' ? C.state : null;
-    #         return S && typeof S === 'object' ? S.__LANG_STATE__ : null;
-    #     }};
-    #     const safeDefineAcc = (target, key, getter, {{ enumerable = false, configurable = true }} = {{}}) => {{
-    #         Object.defineProperty(target, key, {{
-    #             get: getter,
-    #             configurable,
-    #             enumerable
-    #         }});
-    #     }};
-    #     const redefineAcc = (target, key, getter, {{ enumerable = false }} = {{}}) => {{
-    #         const d = Object.getOwnPropertyDescriptor(target, key);
-    #         Object.defineProperty(target, key, {{
-    #             get: getter,
-    #             configurable: d ? d.configurable : true,
-    #             enumerable: d ? d.enumerable : enumerable
-    #         }});
-    #     }};
-    #     const patch = (key, getter) => {{
-    #         const has = !!Object.getOwnPropertyDescriptor(navProto, key);
-    #         (has ? redefineAcc : safeDefineAcc)(navProto, key, getter, {{ enumerable: false }});
-    #     }};
-    #     const bridgeGetter = (key, readValue) => {{
-    #         const d = Object.getOwnPropertyDescriptor(navProto, key);
-    #         const nativeGet = d && typeof d.get === 'function' ? d.get : null;
-    #         return function() {{
-    #             if (nativeGet) Reflect.apply(nativeGet, this, []);
-    #             return readValue();
-    #         }};
-    #     }};
-
-    #     patch('language', bridgeGetter('language', () => {{
-    #         const lang = langState();
-    #         return lang && typeof lang.primaryLanguage === 'string' ? lang.primaryLanguage : window.__primaryLanguage;
-    #     }}));
-    #     patch('languages', bridgeGetter('languages', () => {{
-    #         const lang = langState();
-    #         return lang && Array.isArray(lang.normalizedLanguages) ? lang.normalizedLanguages : window.__normalizedLanguages;
-    #     }}));
-    #     console.log('[✔] language prototype-owner override applied');
-    # }})();
-    # """
-    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": lang_js})
-
- 
-    
-    
-
-    
-    # try:
-    #     driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
-    #     logger.info("Direct page-side locale override applied: %s", language)
-    # except Exception as e:
-    #     logger.warning("Direct page-side locale override failed: %s", e)
-    # try:
-    #     driver.execute_cdp_cmd(
-    #         "Emulation.setHardwareConcurrencyOverride",
-    #         {"hardwareConcurrency": int(hardware_concurrency_value)},
-    #     )
-    #     logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
-    # except Exception as e:
-    #     logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
+       
+    try:
+        driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
+        logger.info("Direct page-side locale override applied: %s", language)
+    except Exception as e:
+        logger.warning("Direct page-side locale override failed: %s", e)
+    try:
+        driver.execute_cdp_cmd(
+            "Emulation.setHardwareConcurrencyOverride",
+            {"hardwareConcurrency": int(hardware_concurrency_value)},
+        )
+        logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
+    except Exception as e:
+        logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
     
     
     inject_uach_strip_window(driver, user_agent)
@@ -893,7 +801,7 @@ def init_driver(
     #     blocked_headers=[]
     # )
 
-    logger.info("All fingerprint stealth  patches successfully injected into new document")
+    logger.info("All fingerlogger.info stealth  patches successfully injected into new document")
     logger.info("WebDriver launched successfully")
     return driver
 # ----------------------- Bound zone is over beyond this line-----------------------
@@ -923,8 +831,12 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         latitude = country_data["latitude"]
         longitude = country_data["longitude"]
         domain = country_data["domain"]
-        language = primary_language
-        normalized_languages = normalized_languages
+        language = profile["language"]     # строка "da-DK"
+        normalized_languages = profile["languages"]
+        
+        
+        
+
         # ----------------------- Regional setting setup--------------------------------
 
         # # Timezone override
@@ -1386,11 +1298,49 @@ def main():
                 needs_reapply = True
             if needs_reapply:
                 apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+        
                 inject_uach_strip_window(driver, user_agent)
                 logger.info("UA data re-applied via CDP (mismatch detected)")
+        
+        
+                
+        get_device_info(driver)
+        logger.info("Получение значений deviceMemory и hardwareConcurrency...")
+        
+        
+        language_data_exists = driver.execute_script(
+        "return typeof navigator.language !== 'undefined'"
+        )
+        logger.info("🧪 navigator.language существует?", language_data_exists)
+        
+        if language_data_exists:
+            lang_data = driver.execute_script(
+                "return JSON.stringify(navigator.language)"
+            )
+            logger.info("🧬 navigator.language (как JSON):", lang_data)
+        else:
+            logger.info("⚠️ navigator.language отсутствует или не подменён")
+        languages_data_exists = driver.execute_script(
+            "return typeof navigator.languages !== 'undefined'"
+        )
+        logger.info("🧪 navigator.languages существует?", languages_data_exists)
+        if languages_data_exists:
+            langs_data = driver.execute_script(
+                "return JSON.stringify(navigator.languages)"
+            )
+            logger.info("🧬 navigator.languages (как JSON):", langs_data)
+        else:
+            logger.info("⚠️ navigator.languages отсутствует или не подменён")
+    
+
+
+        
+
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
+                
+      
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/")
 
