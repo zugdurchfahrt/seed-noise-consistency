@@ -226,21 +226,15 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
             if rid:
                 driver.execute_cdp_cmd("Fetch.continueRequest", {"requestId": rid})
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
-    
-    
+
+
 def get_device_info(driver):
     try:
         device_memory_value = driver.execute_script("return navigator.deviceMemory;")
         hardware_concurrency_value = driver.execute_script("return navigator.hardwareConcurrency;")
-        logger.info(
-            f"Полученные значения: device_memory_value={device_memory_value}, "
-            f"hardware_concurrency_value={hardware_concurrency_value}"
-        )
-        return device_memory_value, hardware_concurrency_value
+        logger.info(f"Полученные значения: device_memory_value={device_memory_value}, hardware_concurrency_value={hardware_concurrency_value}")
     except Exception as e:
         logger.info(f"Ошибка при получении значений: {e}")
-        return None, None
-
 
 
 
@@ -714,11 +708,7 @@ def init_driver(
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-       
-      
-
-          
-     
+    
     try:
         driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
         logger.info("Direct page-side locale override applied: %s", language)
@@ -733,10 +723,6 @@ def init_driver(
     except Exception as e:
         logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
     
-    
-    device_memory_value, hardware_concurrency_value = get_device_info(driver)
-
-        
     
     inject_uach_strip_window(driver, user_agent)
 
@@ -880,12 +866,6 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
             driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": timegeo_js})
         _inject_time_machine(driver)
 
-        
-        
-        
-        
-       
-        
         
         device_metrics = build_device_metrics(profile)
         driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
@@ -1116,6 +1096,7 @@ def main():
         device_memory_value, hardware_concurrency_value = choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac)
         # -----------------------  navigator.plugins source profile (mimeTypes are derived in JS) -----------------------
         plugins_final = build_plugins_profile(browser_choice, rng=plugins_rng, strict=False)
+
         # ----------------------- mediaDevices.enumerateDevices -----------------------
         audioinput = profile_rng.choice(data["audioinput"])['name']
         videoinput = profile_rng.choice(data["videoinput"])['name']
@@ -1198,30 +1179,11 @@ def main():
             "accept_language": build_accept_language(languages),
         }
 
-       
-    
-        try:
-            driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
-            logger.info("Direct page-side locale override applied: %s", language)
-        except Exception as e:
-            logger.warning("Direct page-side locale override failed: %s", e)
-        try:
-            driver.execute_cdp_cmd(
-                "Emulation.setHardwareConcurrencyOverride",
-                {"hardwareConcurrency": int(hardware_concurrency_value)},
-            )
-            logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
-        except Exception as e:
-            logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
-
-
-       
         if profile["platform"]  == "Win32":
             generated_platform = "Windows"
         elif profile["platform"]  == "MacIntel":
             generated_platform = "macOS"
-            
-        
+
         generated_platform_version = profile["platform_version"]
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
         profile["browser_brand"] = browser_brand
@@ -1229,8 +1191,6 @@ def main():
         expected_client_hints = build_expected_client_hints(
             profile, generated_platform, browser_brand, major_version, browser_version
         )
-        
-        
         # ----------------------- Python final logging  -----------------------
         logger.info(f"profile['user_agent'] = {profile.get('user_agent')}")
         logger.info(f"profile: {profile}")
@@ -1287,38 +1247,6 @@ def main():
             profile["plugins"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"],
             global_seed,
         )
-       
-       
-        try:
-            driver.execute_cdp_cmd(
-                "Network.setUserAgentOverride",
-                {
-                    "userAgent": profile["user_agent"],
-                    "acceptLanguage": profile["accept_language"],
-                    "platform": expected_client_hints["platform"],
-                    "userAgentMetadata": {
-                        "platform": expected_client_hints["platform"],
-                        "brands": expected_client_hints["brands"],
-                        "mobile": expected_client_hints["mobile"],
-                        "architecture": expected_client_hints["architecture"],
-                        "bitness": expected_client_hints["bitness"],
-                        "model": expected_client_hints["model"],
-                        "platformVersion": expected_client_hints["platformVersion"],
-                        "fullVersionList": expected_client_hints["fullVersionList"],
-                        "deviceMemory": expected_client_hints["deviceMemory"],
-                        "hardwareConcurrency": expected_client_hints["hardwareConcurrency"],
-                        "wow64": expected_client_hints["wow64"],
-                        "formFactors": expected_client_hints["formFactors"],
-                    }
-                }
-            )
-            logger.info("Explicit Network.setUserAgentOverride re-applied via CDP")
-        except Exception as e:
-            logger.warning("Explicit Network.setUserAgentOverride failed: %s", e)
-       
-       
-       
-        
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
             override_js = Path(SCRIPTS_PATCHES_NAV / "override_ua_data.js").read_text(encoding="utf-8")
@@ -1331,36 +1259,46 @@ def main():
         
         elif browser_brand == "Firefox":
             logger.info("UA data submitted via CDP for Firefox/Safari")
-        apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-        # try:
-        #     driver.execute_cdp_cmd(
-        #         "Network.setUserAgentOverride",
-        #         {
-        #             "userAgent": profile["user_agent"],
-        #             "acceptLanguage": profile["accept_language"],
-        #             "platform": expected_client_hints["platform"],
-        #             "userAgentMetadata": {
-        #                 "platform": expected_client_hints["platform"],
-        #                 "brands": expected_client_hints["brands"],
-        #                 "mobile": expected_client_hints["mobile"],
-        #                 "architecture": expected_client_hints["architecture"],
-        #                 "bitness": expected_client_hints["bitness"],
-        #                 "model": expected_client_hints["model"],
-        #                 "platformVersion": expected_client_hints["platformVersion"],
-        #                 "fullVersionList": expected_client_hints["fullVersionList"],
-        #                 "deviceMemory": expected_client_hints["deviceMemory"],
-        #                 "hardwareConcurrency": expected_client_hints["hardwareConcurrency"],
-        #                 "wow64": expected_client_hints["wow64"],
-        #                 "formFactors": expected_client_hints["formFactors"],
-        #             }
-        #         }
-        #     )
-        #     logger.info("Explicit Network.setUserAgentOverride re-applied via CDP")
-        # except Exception as e:
-        #     logger.warning("Explicit Network.setUserAgentOverride failed: %s", e)
-        device_memory_value, hardware_concurrency_value = get_device_info(driver)
-        inject_uach_strip_window(driver, user_agent)
-        logger.info("UA data re-applied via CDP (unconditional repeat apply)")
+        else:
+            needs_reapply = False
+            try:
+                current_ua = driver.execute_script("return navigator.userAgent")
+                if current_ua != profile["user_agent"]:
+                    needs_reapply = True
+                else:
+                    current_uad = driver.execute_script(
+                        "const uad = navigator.userAgentData;"
+                        "if (!uad) return null;"
+                        "const brands = Array.isArray(uad.brands) ? "
+                        "uad.brands.map(b => ({brand: b.brand, version: String(b.version)})) : null;"
+                        "return { brands, platform: uad.platform, mobile: uad.mobile };"
+                    )
+                    if current_uad:
+                        exp_brands = expected_client_hints.get("brands") or []
+                        exp_norm = sorted(
+                            [(str(b.get("brand")), str(b.get("version"))) for b in exp_brands if isinstance(b, dict)]
+                        )
+                        cur_brands = current_uad.get("brands") or []
+                        cur_norm = sorted(
+                            [(str(b.get("brand")), str(b.get("version"))) for b in cur_brands if isinstance(b, dict)]
+                        )
+                        if (
+                            exp_norm != cur_norm
+                            or current_uad.get("platform") != expected_client_hints.get("platform")
+                            or current_uad.get("mobile") != expected_client_hints.get("mobile")
+                        ):
+                            needs_reapply = True
+            except Exception as e:
+                logger.warning("UA override reapply check failed: %s", e)
+                needs_reapply = True
+            if needs_reapply:
+                apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+                
+            get_device_info(driver)
+                
+                
+            inject_uach_strip_window(driver, user_agent)
+            logger.info("UA data re-applied via CDP (mismatch detected)")
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
