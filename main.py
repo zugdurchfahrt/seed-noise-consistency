@@ -235,7 +235,6 @@ def get_device_info(driver):
         logger.info(f"Полученные значения: device_memory_value={device_memory_value}, hardware_concurrency_value={hardware_concurrency_value}")
     except Exception as e:
         logger.info(f"Ошибка при получении значений: {e}")
-    
 
 
 
@@ -363,6 +362,7 @@ def init_driver(
         device_metrics=build_bootstrap_device_metrics(),
 
     )
+
 
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
@@ -708,8 +708,7 @@ def init_driver(
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-      
-       
+    
     try:
         driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
         logger.info("Direct page-side locale override applied: %s", language)
@@ -801,7 +800,7 @@ def init_driver(
     #     blocked_headers=[]
     # )
 
-    logger.info("All fingerlogger.info stealth  patches successfully injected into new document")
+    logger.info("All fingerprint stealth  patches successfully injected into new document")
     logger.info("WebDriver launched successfully")
     return driver
 # ----------------------- Bound zone is over beyond this line-----------------------
@@ -831,12 +830,8 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         latitude = country_data["latitude"]
         longitude = country_data["longitude"]
         domain = country_data["domain"]
-        language = profile["language"]     # строка "da-DK"
-        normalized_languages = profile["languages"]
-        
-        
-        
-
+        language = primary_language
+        normalized_languages = normalized_languages
         # ----------------------- Regional setting setup--------------------------------
 
         # # Timezone override
@@ -1298,49 +1293,21 @@ def main():
                 needs_reapply = True
             if needs_reapply:
                 apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
-        
+                
+                get_device_info(driver)
+                
+                
                 inject_uach_strip_window(driver, user_agent)
                 logger.info("UA data re-applied via CDP (mismatch detected)")
-        
-        
-                
-        get_device_info(driver)
-        logger.info("Получение значений deviceMemory и hardwareConcurrency...")
-        
-        
-        language_data_exists = driver.execute_script(
-        "return typeof navigator.language !== 'undefined'"
-        )
-        logger.info("🧪 navigator.language существует?", language_data_exists)
-        
-        if language_data_exists:
-            lang_data = driver.execute_script(
-                "return JSON.stringify(navigator.language)"
-            )
-            logger.info("🧬 navigator.language (как JSON):", lang_data)
-        else:
-            logger.info("⚠️ navigator.language отсутствует или не подменён")
-        languages_data_exists = driver.execute_script(
-            "return typeof navigator.languages !== 'undefined'"
-        )
-        logger.info("🧪 navigator.languages существует?", languages_data_exists)
-        if languages_data_exists:
-            langs_data = driver.execute_script(
-                "return JSON.stringify(navigator.languages)"
-            )
-            logger.info("🧬 navigator.languages (как JSON):", langs_data)
-        else:
-            logger.info("⚠️ navigator.languages отсутствует или не подменён")
-    
-
-
-        
-
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
-                
+        
+        
+        
       
+        
+        
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/")
 
