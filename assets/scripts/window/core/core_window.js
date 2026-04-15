@@ -245,39 +245,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     };
   }
 
-  function resolveNativeLabel(func) {
-    if (typeof func !== 'function') return null;
-    if (toStringOverrideMap.has(func)) {
-      const ownLabel = toStringOverrideMap.get(func);
-      if (typeof ownLabel === 'string' && ownLabel) return ownLabel;
-    }
-    let cur = func;
-    const seen = new WeakSet();
-    while (typeof cur === 'function') {
-      if (seen.has(cur)) {
-        __emit('warn', 'core_window:toString_bridge_cycle', {
-          module: 'core',
-          diagTag: 'core_window',
-          surface: 'core',
-          key: 'Function.prototype.toString',
-          stage: 'runtime',
-          message: 'toString bridge cycle detected during label resolution',
-          type: 'contract violation',
-          data: { outcome: 'return' }
-        }, new Error('[CoreWindow] toString bridge cycle'));
-        return null;
-      }
-      seen.add(cur);
-      const next = toStringProxyTargetMap.get(cur);
-      if (typeof next !== 'function') break;
-      cur = next;
-      if (toStringOverrideMap.has(cur)) {
-        const nextLabel = toStringOverrideMap.get(cur);
-        if (typeof nextLabel === 'string' && nextLabel) return nextLabel;
-      }
-    }
-    return null;
-  }
 
   function __registerToStringWrapper(wrapped, nativeFn, wrappedName, wrapperName) {
     const bridgeTarget = __resolveWrappedBridgeTarget(nativeFn, wrapperName);
