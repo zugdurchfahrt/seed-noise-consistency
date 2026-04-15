@@ -483,7 +483,19 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
       patchIntlCtorDefaultLocales("ListFormat");
       patchIntlCtorDefaultLocales("PluralRules");
       patchIntlCtorDefaultLocales("RelativeTimeFormat");
-      patchIntlCtorDefaultLocales("DisplayNames");
+      if (Intl && typeof Intl.DisplayNames === "function") {
+        diagPipeline("info", "tz:DisplayNames:ctor_native_passthrough", {
+          key: "DisplayNames",
+          stage: "apply",
+          message: "Intl.DisplayNames left native; mandatory options keep constructor on native path",
+          data: {
+            outcome: "return",
+            reason: "mandatory_options_native_ctor_path",
+            timezone: timezone,
+            locale: spoofedLocale
+          }
+        }, null);
+      }
 
       function patchIntlResolvedOptions(proto, fields) {
         const origResolvedOptions = proto.resolvedOptions;

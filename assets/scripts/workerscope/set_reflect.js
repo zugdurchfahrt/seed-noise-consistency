@@ -609,27 +609,6 @@
       __setHiddenValue(__wrkRuntimeRoot, '__wrapStrictAccessor', __wrapStrictAccessor);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeCtor', __wrapNativeCtor);
 
-      const markAsNative = ensureMarkAsNative();
-      if (typeof markAsNative !== 'function') {
-        throw new Error('UACHPatch: markAsNative seed missing');
-      }
-      const seedProbe = function seedProbe(){};
-      Object.defineProperty(seedProbe, '__coreBridgeTarget__', {
-        value: nativeToString,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      const seedProbeSource = Reflect.apply(nativeToString, seedProbe, []);
-      markAsNative(seedProbe, 'toString');
-      if (typeof toStringOverrideMap.get(seedProbe) === 'string') {
-        throw new Error('UACHPatch: source-text toString probe must stay unlabeled');
-      }
-      if (Reflect.apply(Function.prototype.toString, seedProbe, []) !== seedProbeSource) {
-        throw new Error('UACHPatch: source-text toString probe forwarding mismatch');
-      }
-      toStringProxyTargetMap.delete(seedProbe);
-      toStringOverrideMap.delete(seedProbe);
     } catch (e) {
       self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);
       throw e;

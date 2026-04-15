@@ -1481,10 +1481,157 @@ const __probeRun = async function(){
   }
 
   async function __probeRunWorkerScopeAudit() {
+    function runWindowSeedProbeAudit() {
+      try {
+        const core = globalThis && globalThis.Core && typeof globalThis.Core === "object"
+          ? globalThis.Core
+          : null;
+        const ensureMarkAsNative = core && typeof core.__ensureMarkAsNative === "function"
+          ? core.__ensureMarkAsNative
+          : null;
+        const internal = core && core.__internal && typeof core.__internal === "object"
+          ? core.__internal
+          : null;
+        const state = internal && internal.coreToStringState && internal.coreToStringState.__CORE_TOSTRING_STATE__ === true
+          ? internal.coreToStringState
+          : null;
+        if (typeof ensureMarkAsNative !== "function") {
+          throw new Error("Core.__ensureMarkAsNative missing");
+        }
+        if (!state || typeof state.nativeToString !== "function" || !(state.overrideMap instanceof WeakMap) || !(state.proxyTargetMap instanceof WeakMap)) {
+          throw new Error("Core.__internal.coreToStringState missing");
+        }
+        const markAsNative = ensureMarkAsNative();
+        if (typeof markAsNative !== "function") {
+          throw new Error("markAsNative seed missing");
+        }
+        const toStringOverrideMap = state.overrideMap;
+        const toStringProxyTargetMap = state.proxyTargetMap;
+        const nativeToString = state.nativeToString;
+        const seedProbe = function seedProbe(){};
+        Object.defineProperty(seedProbe, "__coreBridgeTarget__", {
+          value: nativeToString,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        const seedProbeSource = Reflect.apply(nativeToString, seedProbe, []);
+        let leakedLabel = false;
+        let actualSource = null;
+        try {
+          markAsNative(seedProbe, "toString");
+          leakedLabel = typeof toStringOverrideMap.get(seedProbe) === "string";
+          actualSource = Reflect.apply(Function.prototype.toString, seedProbe, []);
+        } finally {
+          toStringProxyTargetMap.delete(seedProbe);
+          toStringOverrideMap.delete(seedProbe);
+        }
+        if (leakedLabel) {
+          throw new Error("source-text toString probe must stay unlabeled");
+        }
+        if (actualSource !== seedProbeSource) {
+          throw new Error("source-text toString probe forwarding mismatch");
+        }
+        return {
+          ok: true,
+          labelLeaked: false,
+          forwardingMatch: true
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: errorShape(error)
+        };
+      }
+    }
+
     const windowValues = await __probeCollectCanonicalScopeValues("WindowScope", nav);
+    const windowSeedProbeAudit = runWindowSeedProbeAudit();
+    const workerSeedProbeAuditSource = String.raw`
+      function __probeRunWorkerSeedProbeAudit__() {
+        const shapeError = function(error) {
+          return {
+            name: error && error.name ? String(error.name) : "Error",
+            message: error && error.message ? String(error.message) : String(error),
+            stack: error && error.stack ? String(error.stack) : null
+          };
+        };
+        try {
+          const ctx = self && self.CanvasPatchContext && typeof self.CanvasPatchContext === "object"
+            ? self.CanvasPatchContext
+            : null;
+          const stateRoot = ctx && ctx.state && typeof ctx.state === "object"
+            ? ctx.state
+            : null;
+          const wrkState = stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === "object"
+            ? stateRoot.__WRK__
+            : null;
+          const runtime = wrkState && wrkState.runtime && typeof wrkState.runtime === "object"
+            ? wrkState.runtime
+            : null;
+          if (!runtime) {
+            throw new Error("CanvasPatchContext.state.__WRK__.runtime missing");
+          }
+          const ensureMarkAsNative = typeof runtime.__ensureMarkAsNative === "function"
+            ? runtime.__ensureMarkAsNative
+            : null;
+          const state = runtime.__CORE_TOSTRING_STATE__ && runtime.__CORE_TOSTRING_STATE__.__CORE_TOSTRING_STATE__ === true
+            ? runtime.__CORE_TOSTRING_STATE__
+            : null;
+          if (typeof ensureMarkAsNative !== "function") {
+            throw new Error("CanvasPatchContext.state.__WRK__.runtime.__ensureMarkAsNative missing");
+          }
+          if (!state || typeof state.nativeToString !== "function" || !(state.overrideMap instanceof WeakMap) || !(state.proxyTargetMap instanceof WeakMap)) {
+            throw new Error("CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__ missing");
+          }
+          const markAsNative = ensureMarkAsNative();
+          if (typeof markAsNative !== "function") {
+            throw new Error("markAsNative seed missing");
+          }
+          const toStringOverrideMap = state.overrideMap;
+          const toStringProxyTargetMap = state.proxyTargetMap;
+          const nativeToString = state.nativeToString;
+          const seedProbe = function seedProbe(){};
+          Object.defineProperty(seedProbe, "__coreBridgeTarget__", {
+            value: nativeToString,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          const seedProbeSource = Reflect.apply(nativeToString, seedProbe, []);
+          let leakedLabel = false;
+          let actualSource = null;
+          try {
+            markAsNative(seedProbe, "toString");
+            leakedLabel = typeof toStringOverrideMap.get(seedProbe) === "string";
+            actualSource = Reflect.apply(Function.prototype.toString, seedProbe, []);
+          } finally {
+            toStringProxyTargetMap.delete(seedProbe);
+            toStringOverrideMap.delete(seedProbe);
+          }
+          if (leakedLabel) {
+            throw new Error("source-text toString probe must stay unlabeled");
+          }
+          if (actualSource !== seedProbeSource) {
+            throw new Error("source-text toString probe forwarding mismatch");
+          }
+          return {
+            ok: true,
+            labelLeaked: false,
+            forwardingMatch: true
+          };
+        } catch (error) {
+          return {
+            ok: false,
+            error: shapeError(error)
+          };
+        }
+      }
+    `;
     const dedicatedSource = `
       (async function(){
         "use strict";
+        ${workerSeedProbeAuditSource}
         async function collect() {
           const nav = self.navigator;
           if (!nav) throw new Error("navigator missing");
@@ -1497,6 +1644,7 @@ const __probeRun = async function(){
             languages: Array.isArray(nav.languages) ? Array.prototype.slice.call(nav.languages) : nav.languages,
             deviceMemory: nav.deviceMemory,
             hardwareConcurrency: nav.hardwareConcurrency,
+            seedProbeAudit: __probeRunWorkerSeedProbeAudit__(),
             uaData: {
               brands: Array.isArray(uaData.brands) ? JSON.parse(JSON.stringify(uaData.brands)) : uaData.brands,
               mobile: uaData.mobile,
@@ -1523,6 +1671,7 @@ const __probeRun = async function(){
     `;
     const sharedSource = `
       "use strict";
+      ${workerSeedProbeAuditSource}
       async function __probeCollectSharedValues__() {
         const nav = self.navigator;
         if (!nav) throw new Error("navigator missing");
@@ -1535,6 +1684,7 @@ const __probeRun = async function(){
           languages: Array.isArray(nav.languages) ? Array.prototype.slice.call(nav.languages) : nav.languages,
           deviceMemory: nav.deviceMemory,
           hardwareConcurrency: nav.hardwareConcurrency,
+          seedProbeAudit: __probeRunWorkerSeedProbeAudit__(),
           uaData: {
             brands: Array.isArray(uaData.brands) ? JSON.parse(JSON.stringify(uaData.brands)) : uaData.brands,
             mobile: uaData.mobile,
@@ -1612,7 +1762,7 @@ const __probeRun = async function(){
           const onMessage = (ev) => {
             cleanupListeners();
             const data = ev && ev.data;
-            if (data && data.ok) return resolve(data.values);
+            if (data && data.ok) return resolve(data);
             reject(data && data.error ? new Error(String(data.error.message || data.error.name || "worker error")) : new Error("worker error"));
           };
           const onError = (ev) => {
@@ -1628,7 +1778,12 @@ const __probeRun = async function(){
         });
       })(), { check: "worker_scope_audit", phase: "DedicatedWorker", method: "Worker" });
       const dedicated = dedicatedWait.ok
-        ? { ok: true, values: dedicatedWait.value, comparisons: __probeCompareScopeValues(windowValues, dedicatedWait.value, "DedicatedWorker", "single") }
+        ? {
+            ok: true,
+            values: dedicatedWait.value && dedicatedWait.value.values ? dedicatedWait.value.values : null,
+            seedProbeAudit: dedicatedWait.value && dedicatedWait.value.values ? dedicatedWait.value.values.seedProbeAudit : null,
+            comparisons: __probeCompareScopeValues(windowValues, dedicatedWait.value && dedicatedWait.value.values ? dedicatedWait.value.values : null, "DedicatedWorker", "single")
+          }
         : { ok: false, error: errorShape(dedicatedWait.error), comparisons: [] };
 
       const sharedCollect = async () => {
@@ -1641,7 +1796,7 @@ const __probeRun = async function(){
           const onMessage = (ev) => {
             cleanupListeners();
             const data = ev && ev.data;
-            if (data && data.ok) return resolve(data.values);
+            if (data && data.ok) return resolve(data);
             reject(data && data.error ? new Error(String(data.error.message || data.error.name || "shared worker error")) : new Error("shared worker error"));
           };
           const onError = (ev) => {
@@ -1673,10 +1828,20 @@ const __probeRun = async function(){
 
       const shared = {
         first: sharedFirstWait.ok
-          ? { ok: true, values: sharedFirstWait.value, comparisons: __probeCompareScopeValues(windowValues, sharedFirstWait.value, "SharedWorker", "first") }
+          ? {
+              ok: true,
+              values: sharedFirstWait.value && sharedFirstWait.value.values ? sharedFirstWait.value.values : null,
+              seedProbeAudit: sharedFirstWait.value && sharedFirstWait.value.values ? sharedFirstWait.value.values.seedProbeAudit : null,
+              comparisons: __probeCompareScopeValues(windowValues, sharedFirstWait.value && sharedFirstWait.value.values ? sharedFirstWait.value.values : null, "SharedWorker", "first")
+            }
           : { ok: false, error: errorShape(sharedFirstWait.error), comparisons: [] },
         second: sharedSecondWait.ok
-          ? { ok: true, values: sharedSecondWait.value, comparisons: __probeCompareScopeValues(windowValues, sharedSecondWait.value, "SharedWorker", "reuse") }
+          ? {
+              ok: true,
+              values: sharedSecondWait.value && sharedSecondWait.value.values ? sharedSecondWait.value.values : null,
+              seedProbeAudit: sharedSecondWait.value && sharedSecondWait.value.values ? sharedSecondWait.value.values.seedProbeAudit : null,
+              comparisons: __probeCompareScopeValues(windowValues, sharedSecondWait.value && sharedSecondWait.value.values ? sharedSecondWait.value.values : null, "SharedWorker", "reuse")
+            }
           : { ok: false, error: errorShape(sharedSecondWait.error), comparisons: [] }
       };
       const sharedView = shared.first.ok
@@ -1689,6 +1854,28 @@ const __probeRun = async function(){
         : { ok: false, error: serviceWorkerSlot.error, comparisons: [] };
 
       const comparisonRows = [];
+      const pushSeedProbeAuditComparison = (scope, variant, audit, fallbackError) => {
+        const actual = audit && typeof audit === "object"
+          ? (audit.ok === true ? {
+              ok: true,
+              labelLeaked: audit.labelLeaked === true,
+              forwardingMatch: audit.forwardingMatch === true
+            } : (audit.error || audit))
+          : (fallbackError || null);
+        comparisonRows.push({
+          scope: scope,
+          variant: variant,
+          field: "Function.prototype.toString.seedProbeAudit",
+          match: !!(audit && audit.ok === true),
+          expected: {
+            ok: true,
+            labelLeaked: false,
+            forwardingMatch: true
+          },
+          actual: actual
+        });
+      };
+      pushSeedProbeAuditComparison("WindowScope", "active", windowSeedProbeAudit, null);
       if (!dedicated.ok) {
         comparisonRows.push({
           scope: "DedicatedWorker",
@@ -1699,6 +1886,7 @@ const __probeRun = async function(){
           actual: dedicated.error
         });
       }
+      pushSeedProbeAuditComparison("DedicatedWorker", "single", dedicated.seedProbeAudit, dedicated.error);
       Array.prototype.push.apply(comparisonRows, dedicated.comparisons);
       if (!shared.first.ok) {
         comparisonRows.push({
@@ -1710,6 +1898,7 @@ const __probeRun = async function(){
           actual: shared.first.error
         });
       }
+      pushSeedProbeAuditComparison("SharedWorker", "first", shared.first.seedProbeAudit, shared.first.error);
       if (!shared.second.ok) {
         comparisonRows.push({
           scope: "SharedWorker",
@@ -1720,6 +1909,7 @@ const __probeRun = async function(){
           actual: shared.second.error
         });
       }
+      pushSeedProbeAuditComparison("SharedWorker", "reuse", shared.second.seedProbeAudit, shared.second.error);
       Array.prototype.push.apply(comparisonRows, shared.first.comparisons);
       Array.prototype.push.apply(comparisonRows, shared.second.comparisons);
       const reuseMatch = (shared.first.ok && shared.second.ok)
@@ -1780,6 +1970,17 @@ const __probeRun = async function(){
           ServiceWorker: serviceWorker.ok ? printable(getter(serviceWorker.values)) : printable(serviceWorker.error)
         });
       }
+      rows.push({
+        parameter: "Function.prototype.toString.seedProbeAudit",
+        Window: windowSeedProbeAudit.ok ? "ok" : printable(windowSeedProbeAudit.error),
+        DedicatedWorker: dedicated.ok
+          ? ((dedicated.seedProbeAudit && dedicated.seedProbeAudit.ok) ? "ok" : printable(dedicated.seedProbeAudit && dedicated.seedProbeAudit.error ? dedicated.seedProbeAudit.error : dedicated.seedProbeAudit))
+          : printable(dedicated.error),
+        SharedWorker: sharedView.ok
+          ? ((shared.first.seedProbeAudit && shared.first.seedProbeAudit.ok) ? "ok" : printable(shared.first.seedProbeAudit && shared.first.seedProbeAudit.error ? shared.first.seedProbeAudit.error : shared.first.seedProbeAudit))
+          : printable(shared.first.error),
+        ServiceWorker: "not_observed"
+      });
 
       __probeConsoleCall("group", "[probe] worker scope audit");
       __probeConsoleCall("table", rows);
@@ -1791,6 +1992,19 @@ const __probeRun = async function(){
         dedicated,
         shared,
         serviceWorker,
+        seedProbeAudit: {
+          window: windowSeedProbeAudit,
+          dedicated: dedicated.seedProbeAudit || { ok: false, error: dedicated.error || null },
+          shared: {
+            first: shared.first.seedProbeAudit || { ok: false, error: shared.first.error || null },
+            second: shared.second.seedProbeAudit || { ok: false, error: shared.second.error || null }
+          },
+          serviceWorker: {
+            ok: null,
+            skipped: true,
+            reason: "not_observed_via_worker_scope_audit"
+          }
+        },
         comparisons: comparisonRows,
         rows
       };

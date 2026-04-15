@@ -82,6 +82,9 @@ from tools.tools_runtime.helpers import (
 from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
+
+# Please be aware that ths function calling Proxy_Mechanics_Registry is temporarily disabled.
+# Do not consider it as proof.
 # from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
 
 # ----------------------- LOGGING SETUP -----------------------
@@ -93,8 +96,6 @@ setup_logger(child_levels={
     "brandmauer": logging.INFO,
 })
 
-# ----------------------- RNG POOLS -----------------------                                                                                                                                                                                                                                                                                            # ----------------------- GLOBAL VARIABLES -----------------------
-country_data = None
 
 # ----------------------- RNG POOLS -----------------------
 def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
@@ -116,8 +117,7 @@ def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
         "headers": _rng_for("headers"),
         "vpn": _rng_for("vpn"),
     }
-
-# rand_met does not receive global_seed directly.
+# ----------------------- RNG POOLS FOR FONT GENERATION -----------------------
 # main injects one rand_met-specific derivative, and rand_met derives
 # its internal manifest/meta/cache branches from that single seam.
 #
@@ -129,6 +129,8 @@ def _derive_rand_met_seed_material(global_seed: str, label: str) -> str:
     material = f"__RAND_SEED_POOL__|{label}|{global_seed}".encode("utf-8")
     return hashlib.sha256(material).hexdigest()
 
+# ----------------------- PIPELINE INIT ЫABILISATION -----------------------                                                                                                                                                                                                                                                                                            # ----------------------- GLOBAL VARIABLES -----------------------
+country_data = None
 # ----------------------- PROFILE FUNCTION -----------------------
 def get_random_profile(country_data, platform):
     return {}
@@ -697,6 +699,109 @@ def init_driver(
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
     
+   
+    
+
+    # hardware_js = f"""
+    # (() => {{
+    #     const navProto = Navigator.prototype;
+      
+    #     const safeDefineAcc = (target, key, getter, {{ enumerable = false, configurable = true }} = {{}}) => {{
+    #         Object.defineProperty(target, key, {{
+    #             get: getter,
+    #             configurable,
+    #             enumerable
+    #         }});
+    #     }};
+    #     const redefineAcc = (target, key, getter, {{ enumerable = false }} = {{}}) => {{
+    #         const d = Object.getOwnPropertyDescriptor(target, key);
+    #         Object.defineProperty(target, key, {{
+    #             get: getter,
+    #             configurable: d ? d.configurable : true,
+    #             enumerable: d ? d.enumerable : enumerable
+    #         }});
+    #     }};
+    #     const patch = (key, getter) => {{
+    #         const has = !!Object.getOwnPropertyDescriptor(navProto, key);
+    #         (has ? redefineAcc : safeDefineAcc)(navProto, key, getter, {{ enumerable: false }});
+    #     }};
+    #     const bridgeGetter = (key, readValue) => {{
+    #         const d = Object.getOwnPropertyDescriptor(navProto, key);
+    #         const nativeGet = d && typeof d.get === 'function' ? d.get : null;
+    #         return function() {{
+    #             if (nativeGet) Reflect.apply(nativeGet, this, []);
+    #             return readValue();
+    #         }};
+    #     }};
+
+    #     patch('deviceMemory', bridgeGetter('deviceMemory', () => {{
+    #         return env && env.mem != null ? env.mem : {json.dumps(expected_client_hints["deviceMemory"])};
+    #     }}));
+    #     patch('hardwareConcurrency', bridgeGetter('hardwareConcurrency', () => {{
+    #         return env && env.cpu != null ? env.cpu : {json.dumps(expected_client_hints["hardwareConcurrency"])};
+    #     }}));
+    #     console.log('[✔] hardware prototype-owner override applied');
+    # }})();
+    # """
+    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": hardware_js})
+
+    
+    
+
+    # lang_js = f"""
+    # (() => {{
+    #     const navProto = Navigator.prototype;
+    #     const langState = () => {{
+    #         const C = window.CanvasPatchContext;
+    #         const S = C && typeof C === 'object' ? C.state : null;
+    #         return S && typeof S === 'object' ? S.__LANG_STATE__ : null;
+    #     }};
+    #     const safeDefineAcc = (target, key, getter, {{ enumerable = false, configurable = true }} = {{}}) => {{
+    #         Object.defineProperty(target, key, {{
+    #             get: getter,
+    #             configurable,
+    #             enumerable
+    #         }});
+    #     }};
+    #     const redefineAcc = (target, key, getter, {{ enumerable = false }} = {{}}) => {{
+    #         const d = Object.getOwnPropertyDescriptor(target, key);
+    #         Object.defineProperty(target, key, {{
+    #             get: getter,
+    #             configurable: d ? d.configurable : true,
+    #             enumerable: d ? d.enumerable : enumerable
+    #         }});
+    #     }};
+    #     const patch = (key, getter) => {{
+    #         const has = !!Object.getOwnPropertyDescriptor(navProto, key);
+    #         (has ? redefineAcc : safeDefineAcc)(navProto, key, getter, {{ enumerable: false }});
+    #     }};
+    #     const bridgeGetter = (key, readValue) => {{
+    #         const d = Object.getOwnPropertyDescriptor(navProto, key);
+    #         const nativeGet = d && typeof d.get === 'function' ? d.get : null;
+    #         return function() {{
+    #             if (nativeGet) Reflect.apply(nativeGet, this, []);
+    #             return readValue();
+    #         }};
+    #     }};
+
+    #     patch('language', bridgeGetter('language', () => {{
+    #         const lang = langState();
+    #         return lang && typeof lang.primaryLanguage === 'string' ? lang.primaryLanguage : window.__primaryLanguage;
+    #     }}));
+    #     patch('languages', bridgeGetter('languages', () => {{
+    #         const lang = langState();
+    #         return lang && Array.isArray(lang.normalizedLanguages) ? lang.normalizedLanguages : window.__normalizedLanguages;
+    #     }}));
+    #     console.log('[✔] language prototype-owner override applied');
+    # }})();
+    # """
+    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": lang_js})
+
+ 
+    
+    
+
+    
     # try:
     #     driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
     #     logger.info("Direct page-side locale override applied: %s", language)
@@ -898,7 +1003,11 @@ def main():
     vpn_rng = seed_int["vpn"]
     vpn_utils_module.random = vpn_rng
     client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
-    # enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer"))
+    
+    # Please be aware that ths function calling Proxy_Mechanics_Registry is temporarily disabled.
+    # Do not consider it as proof.
+    # enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer")) 
+    
     try:
         json_path = str(PROFILE_DATA_SRC/ "profile.json")
         if os.path.exists(json_path):
@@ -1070,7 +1179,7 @@ def main():
         vendor_value = "" if "Firefox" in user_agent else "Apple Computer, Inc." if "Safari" in user_agent and "Chrome" not in user_agent and "Edg/" not in user_agent else "Google Inc."
         # ---------- navigator.language и navigator.languages  ----------
         language, languages = normalize_languages(country_data["languages"])
-        # -------- navigator.deviceMemory и navigator.hardwareConcurrency-------------------
+         # -------- navigator.deviceMemory и navigator.hardwareConcurrency-------------------
         # deviceMemory — real values, identical for win/mac
         mem_mac = [(8, 55), (4, 35), (2, 7), (1, 3)]
         mem_win = [(8, 55), (4, 35), (2, 7), (1, 3)]
@@ -1078,7 +1187,6 @@ def main():
         cpu_mac = [(4, 20), (8, 50), (10, 20), (12, 10)]
         cpu_win = [(2, 10), (4, 40), (6, 20), (8, 20), (12, 10)]
         device_memory_value, hardware_concurrency_value = choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac)
-
         # -----------------------  navigator.plugins source profile (mimeTypes are derived in JS) -----------------------
         plugins_final = build_plugins_profile(browser_choice, rng=plugins_rng, strict=False)
 
