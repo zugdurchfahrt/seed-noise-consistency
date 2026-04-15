@@ -66,9 +66,11 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
 
     Rules:
     - The first entry element is the primary language (we leave it as is in terms of meaning).
-    - If the primary has a region (for example, `es-ES`) - we add the base (`es`).
     - We add the rest of the entries in the order they appear, canonizing the register.
-    - For tags with a region, we also add their base (if it is not the base of the primary).
+    - No synthetic base-language expansion is performed here. This function returns
+      the canonical seed list for navigator.language/navigator.languages.
+    - Header-specific fallback expansion, if needed, is handled separately by the
+      Accept-Language builder.
     Returns: `(language, languages)`.
     """
     items = [t for t in (base_languages or []) if t]
@@ -79,6 +81,9 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
     # We canonize all input
     canon = [_canonical_bcp47(x) for x in items]
     canon = [x for x in canon if x]  # We discard empty after canonization
+    if not canon:
+        logger.warning("[LANG] Canonicalized base_languages are empty: %r", base_languages)
+        return "en-GB", ["en-GB"]
 
     language = canon[0]
     result: List[str] = []
@@ -313,6 +318,8 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand):
             "Network.setUserAgentOverride",
             {
                 "userAgent": profile["user_agent"],
+                "acceptLanguage": profile.get("accept_language"),
+                "platform": expected_client_hints["platform"],
                 "userAgentMetadata": metadata
             }
         )

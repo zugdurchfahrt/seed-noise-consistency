@@ -233,9 +233,31 @@ def get_device_info(driver):
         device_memory_value = driver.execute_script("return navigator.deviceMemory;")
         hardware_concurrency_value = driver.execute_script("return navigator.hardwareConcurrency;")
         logger.info(f"Полученные значения: device_memory_value={device_memory_value}, hardware_concurrency_value={hardware_concurrency_value}")
+        return device_memory_value, hardware_concurrency_value
     except Exception as e:
         logger.info(f"Ошибка при получении значений: {e}")
+        return None, None
 
+
+def log_post_apply_language_state(driver, label="post-apply"):
+    try:
+        language_exists = driver.execute_script("return typeof navigator.language !== 'undefined'")
+        logger.info("navigator.language существует? [%s] %s", label, language_exists)
+        if language_exists:
+            lang_data = driver.execute_script("return JSON.stringify(navigator.language)")
+            logger.info("navigator.language (как JSON) [%s]: %s", label, lang_data)
+        else:
+            logger.info("navigator.language отсутствует или не подменён [%s]", label)
+
+        languages_exists = driver.execute_script("return typeof navigator.languages !== 'undefined'")
+        logger.info("navigator.languages существует? [%s] %s", label, languages_exists)
+        if languages_exists:
+            langs_data = driver.execute_script("return JSON.stringify(navigator.languages)")
+            logger.info("navigator.languages (как JSON) [%s]: %s", label, langs_data)
+        else:
+            logger.info("navigator.languages отсутствует или не подменён [%s]", label)
+    except Exception as e:
+        logger.info("Ошибка при post-apply проверке navigator.language/languages [%s]: %s", label, e)
 
 
 def build_bootstrap_device_metrics():
@@ -1310,6 +1332,7 @@ def main():
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/")
+        log_post_apply_language_state(driver, "after_navigation")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

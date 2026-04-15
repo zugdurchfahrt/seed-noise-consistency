@@ -158,7 +158,12 @@ class VPNClient:
         return {'post_vpn_ip': self.post_ip}
     
     def get_details(self):
-        """Step 4: Request for the full json from the API and the forming country_data"""
+        """Step 4: Request the full json from the API and form country_data.
+
+        `country_data["languages"]` remains a raw locale seed list here.
+        Final canonicalization/base-language expansion is performed later by
+        helpers.normalize_languages().
+        """
         post_ip = self.post_ip
 
         response = requests.get(f"http://ip-api.com/json/{post_ip}", timeout=5, proxies={'http': None, 'https': None})
@@ -338,6 +343,10 @@ def get_language_for_timezone(timezone, return_country=False):
     Contract:
     return_country=True  → (country, languages, domain, offset_minutes)
     return_country=False → (languages, domain)
+
+    `languages` here is a raw seed list for the locale pipeline.
+    Final canonicalization and base-language expansion happen later in
+    helpers.normalize_languages().
     """
     
     language_map = {
@@ -429,4 +438,3 @@ def get_language_for_timezone(timezone, return_country=False):
     if return_country:
         return country, languages, domain, offset_minutes
     return languages, domain
-
