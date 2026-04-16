@@ -1257,6 +1257,8 @@
         action: 'native',
         data: { outcome: 'skip', reason: 'native_passthrough_unresolved' }
       }, null);
+      // LEGACY synthetic rollback for worker scope:
+      // def(proto, 'deviceMemory', getDeviceMemory, true);
     }
 
     const getHardwareConcurrency = function getHardwareConcurrency(){

@@ -988,6 +988,11 @@
         value: swDeviceMemoryValue
       }
     }, null);
+    // LEGACY synthetic rollback for service worker scope:
+    // 1) in the preflight block above, keep `let swDeviceMemoryValue = Number(dm);`
+    //    and do not replace it with native `nav.deviceMemory`
+    // 2) restore the accessor mutation below:
+    // defAcc('deviceMemory', function() { return Number(dm); });
 
     if (nav.languages[0] !== nav.language) {
       __fail('sw_prelude:language_contract_mismatch', {

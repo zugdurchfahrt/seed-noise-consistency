@@ -2292,6 +2292,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'deviceMemory patch disabled; keep native getter path',
         data: { outcome: 'skip', reason: 'native_passthrough', action: 'native' }
       });
+      // LEGACY synthetic rollback for window scope:
+      // patchStrictScalarAccessor('deviceMemory', function navDeviceMemoryValue() {
+      //   if (!__navIsValidDeviceMemoryValue(mem)) {
+      //     __navDiagPipeline('warn', 'nav_total_set:deviceMemory_invalid_profile', {
+      //       stage: 'runtime',
+      //       key: 'deviceMemory',
+      //       message: 'invalid deviceMemory profile value',
+      //       data: { outcome: 'return', reason: 'invalid_profile_value', value: mem }
+      //     });
+      //     return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
+      //   }
+      //   return Number(mem);
+      // }, 'nav_total_set:deviceMemory');
     }
     if ('hardwareConcurrency' in navProto) {
       if (__navIsValidHardwareConcurrencyValue(cpu)) {

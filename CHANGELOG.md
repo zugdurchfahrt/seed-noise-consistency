@@ -1,5 +1,15 @@
 # Changelog
 
+16.04.2026
+
+- `deviceMemory`: aligned the public behavior across `window`, `WorkerNavigator`, and `ServiceWorkerGlobalScope` with  `navigator.deviceMemory` variable nativet regime.
+- As dedicated dynamic native overrid  for `navigator.deviceMemory` does not exist,  project-side accessor mutation on the active path switched to `ReduceDeviceMemory` privded by Chromium developers,  so constant native value 8 flows natively without replacing the public getter, regadlesss the exact RAM anount you posess.
+- Preserved the original synthetic rollback path next to the active code in the same three local scope points:
+  - `window` in `nav_total_set.js`
+  - `worker` in `WORKER_PATCH_SRC.js`
+  - `service worker` in `sw_prelude.js`
+- Added a browser-native `ReduceDeviceMemory` launch path and synchronized the existing mirrors from the early native `navigator.deviceMemory` read instead of pre-injecting a synthetic value first.
+
 03.04.2026
 
 - `clientCode`: [] on `ServiceWorkerGlobalScope`
