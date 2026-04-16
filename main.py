@@ -228,36 +228,7 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
 
 
-def get_device_info(driver):
-    try:
-        device_memory_value = driver.execute_script("return navigator.deviceMemory;")
-        hardware_concurrency_value = driver.execute_script("return navigator.hardwareConcurrency;")
-        logger.info(f"Полученные значения: device_memory_value={device_memory_value}, hardware_concurrency_value={hardware_concurrency_value}")
-        return device_memory_value, hardware_concurrency_value
-    except Exception as e:
-        logger.info(f"Ошибка при получении значений: {e}")
-        return None, None
 
-
-def log_post_apply_language_state(driver, label="post-apply"):
-    try:
-        language_exists = driver.execute_script("return typeof navigator.language !== 'undefined'")
-        logger.info("navigator.language существует? [%s] %s", label, language_exists)
-        if language_exists:
-            lang_data = driver.execute_script("return JSON.stringify(navigator.language)")
-            logger.info("navigator.language (как JSON) [%s]: %s", label, lang_data)
-        else:
-            logger.info("navigator.language отсутствует или не подменён [%s]", label)
-
-        languages_exists = driver.execute_script("return typeof navigator.languages !== 'undefined'")
-        logger.info("navigator.languages существует? [%s] %s", label, languages_exists)
-        if languages_exists:
-            langs_data = driver.execute_script("return JSON.stringify(navigator.languages)")
-            logger.info("navigator.languages (как JSON) [%s]: %s", label, langs_data)
-        else:
-            logger.info("navigator.languages отсутствует или не подменён [%s]", label)
-    except Exception as e:
-        logger.info("Ошибка при post-apply проверке navigator.language/languages [%s]: %s", label, e)
 
 
 def build_bootstrap_device_metrics():
@@ -1258,7 +1229,7 @@ def main():
 
         # if not wait_for_port("127.0.0.1", 8080):
         #     raise RuntimeError("mitmproxy not launched")
-
+       
         driver = init_driver(
             profile, country_data, profile["platform"], profile["user_agent"],
             profile["screen_width"], profile["screen_height"], profile["webgl_vendor"], profile["webgl_renderer"],
@@ -1269,6 +1240,7 @@ def main():
             profile["plugins"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"],
             global_seed,
         )
+
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
             override_js = Path(SCRIPTS_PATCHES_NAV / "override_ua_data.js").read_text(encoding="utf-8")
@@ -1295,6 +1267,10 @@ def main():
                         "uad.brands.map(b => ({brand: b.brand, version: String(b.version)})) : null;"
                         "return { brands, platform: uad.platform, mobile: uad.mobile };"
                     )
+                    
+                    
+
+                    
                     if current_uad:
                         exp_brands = expected_client_hints.get("brands") or []
                         exp_norm = sorted(
@@ -1316,23 +1292,22 @@ def main():
             if needs_reapply:
                 apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
                 
-            get_device_info(driver)
+        
                 
                 
             inject_uach_strip_window(driver, user_agent)
             logger.info("UA data re-applied via CDP (mismatch detected)")
         # ----------------------- Call local setting def  -----------------------
+        
         configure_profile(driver, profile["language"], profile["languages"], country_data)
         
-        
-        
+         
         
       
         
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/")
-        log_post_apply_language_state(driver, "after_navigation")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

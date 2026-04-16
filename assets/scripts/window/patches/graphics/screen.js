@@ -221,8 +221,20 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenCanvasState = (__screenCanvasModuleState && __screenCanvasModuleState.__STATE__ && typeof __screenCanvasModuleState.__STATE__ === 'object')
     ? __screenCanvasModuleState.__STATE__
     : null;
-  const __moduleRollbackStack = [];
-  const __screenAppliedGroups = Object.create(null);
+  if (!(__screenState.__RUNTIME_STATE__ && typeof __screenState.__RUNTIME_STATE__ === 'object')) {
+    Object.defineProperty(__screenState, '__RUNTIME_STATE__', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  const __screenRuntimeState = __screenState.__RUNTIME_STATE__;
+  __screenRuntimeState.rollbackStack = [];
+  __screenRuntimeState.appliedGroups = Object.create(null);
+  __screenRuntimeState.mqlMatches = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  const __moduleRollbackStack = __screenRuntimeState.rollbackStack;
+  const __screenAppliedGroups = __screenRuntimeState.appliedGroups;
 
   const SCREEN_WIDTH  = Number(__screenMetricsState.width);
   const SCREEN_HEIGHT = Number(__screenMetricsState.height);
@@ -645,7 +657,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     return true;
   }
 
-  const mqlMatches = new WeakMap();
+  const mqlMatches = __screenRuntimeState.mqlMatches || new WeakMap();
   const mqlProto = (typeof MediaQueryList !== 'undefined' && MediaQueryList.prototype) ? MediaQueryList.prototype : null;
   const mqlMatchesDesc = mqlProto ? Object.getOwnPropertyDescriptor(mqlProto, 'matches') : null;
   const mqlOrigMatchesGet = (mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function') ? mqlMatchesDesc.get : null;
@@ -681,7 +693,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   
 
-  const __screenGroupModes = {
+  const __screenGroupModes = __screenRuntimeState.groupModes = {
     displayMode: 'pending',
     displayReason: 'pending',
     displayDetails: [],
@@ -711,11 +723,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const visualViewportProto = visualViewportObj && Object.getPrototypeOf(visualViewportObj);
   const mmTarget = chooseTarget(window, windowProto, 'matchMedia');
   const mmDesc = mmTarget ? Object.getOwnPropertyDescriptor(mmTarget, 'matchMedia') : null;
+  const mmOrig = (mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')
+    ? mmDesc.value
+    : null;
   const mqlMatchesTarget = mqlProto ? chooseTarget(mqlProto, Object.getPrototypeOf(mqlProto), 'matches') : null;
   let __screenMatchMediaThisCheckDiagSent = false;
   const isWindowThis = (self) => {
     try {
-      return self === window || (typeof Window === 'function' && self instanceof Window);
+      return self === window;
     } catch (e) {
       if (!__screenMatchMediaThisCheckDiagSent) {
         __screenMatchMediaThisCheckDiagSent = true;
@@ -731,24 +746,30 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       return false;
     }
   };
-  const isMatchMediaThis = (self) => (self === undefined) || isWindowThis(self);
+  const isMatchMediaThis = (self) => (self == null) || isWindowThis(self);
   const matchMediaResolve = (mmTarget === window) ? 'own' : 'proto_chain';
   const matchMediaInvoke = function matchMediaInvoke(target, thisArg, argList) {
     const queryRaw = (argList && argList.length) ? argList[0] : undefined;
     if (!isMatchMediaThis(thisArg)) return Reflect.apply(target, thisArg, argList);
-    const effectiveThis = (thisArg === undefined) ? window : thisArg;
+    const effectiveThis = (thisArg == null) ? window : thisArg;
     const query = String(queryRaw);
-    let matches = true;
-    const hasMediaPrefix = /\b(all|screen|print)\b/i.test(query);
-    const hasMediaExpr = /\([^)]+\)/.test(query);
-    const isTrashQuery = (typeof queryRaw !== 'string') || (query.length > 1024) || /[\u0000-\u001F]/.test(query) || (!hasMediaPrefix && !hasMediaExpr);
-    if (isTrashQuery) matches = false;
     const q = query.toLowerCase().replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').replace(/\s*:\s*/g, ':');
     let touched = false;
+    let matches = true;
     const deviceW = q.match(/\(device-width:\s*(\d+)px\)/);
     if (deviceW) { touched = true; matches = matches && SCREEN_WIDTH === parseInt(deviceW[1], 10); }
     const deviceH = q.match(/\(device-height:\s*(\d+)px\)/);
     if (deviceH) { touched = true; matches = matches && SCREEN_HEIGHT === parseInt(deviceH[1], 10); }
+    const deviceAspectRatio = q.match(/\(device-aspect-ratio:\s*(\d+)\/(\d+)\)/);
+    if (deviceAspectRatio && typeof SCREEN_WIDTH === 'number' && typeof SCREEN_HEIGHT === 'number') {
+      touched = true;
+      const wInt = parseInt(deviceAspectRatio[1], 10);
+      const hInt = parseInt(deviceAspectRatio[2], 10);
+      matches = matches && (SCREEN_WIDTH * hInt === SCREEN_HEIGHT * wInt);
+    } else if (deviceAspectRatio) {
+      touched = true;
+      matches = false;
+    }
     const exactW = q.match(/\(width:\s*(\d+)px\)/);
     if (exactW) { touched = true; matches = matches && viewportExpected.innerWidth === parseInt(exactW[1], 10); }
     const exactH = q.match(/\(height:\s*(\d+)px\)/);
@@ -802,10 +823,15 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       const dpi = 96 * DPR;
       matches = matches && dpi === parseInt(resolution[1], 10);
     }
+    const displayMode = q.match(/\(display-mode:\s*([^)]+)\)/);
+    if (displayMode) {
+      touched = true;
+      matches = matches && displayMode[1] === 'browser';
+    }
     const mql = Reflect.apply(target, effectiveThis, [query]);
     if (mql && (typeof mql === 'object' || typeof mql === 'function')) {
       try {
-        if (touched || isTrashQuery) mqlMatches.set(mql, matches);
+        if (touched) mqlMatches.set(mql, matches);
       } catch (e) {
         __screenDiag('warn', 'screen:mql_matches_cache_set_failed', {
           stage: 'runtime',
@@ -823,6 +849,19 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const list = Array.isArray(args) ? args : [];
     return matchMediaInvoke(orig, this, list);
   };
+  function __screenReadMqlMatchesValue(mql) {
+    if (mqlMatches && typeof mqlMatches.has === 'function' && mqlMatches.has(mql)) {
+      return mqlMatches.get(mql);
+    }
+    if (typeof mqlOrigMatchesGet === 'function') {
+      return Reflect.apply(mqlOrigMatchesGet, mql, []);
+    }
+    throw new Error('MediaQueryList.matches getter missing');
+  }
+  function __screenInvokeInternalMatchMedia(query) {
+    if (typeof mmOrig !== 'function') throw new Error('matchMedia descriptor missing');
+    return matchMediaInvoke(mmOrig, window, [query]);
+  }
   const expectedOrientationType = ORIENTATION_DOM;
   const expectedOrientationMedia = ORIENTATION_MEDIA;
   const screenExpected = {
@@ -1002,7 +1041,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     for (let i = ZERO; i < list.length; i++) {
       const entry = list[i];
       try {
-        rows.push({ key: entry.key, query: entry.query, matches: !!window.matchMedia(entry.query).matches, readFailed: false });
+        const mql = __screenInvokeInternalMatchMedia(entry.query);
+        rows.push({ key: entry.key, query: entry.query, matches: !!__screenReadMqlMatchesValue(mql), readFailed: false });
       } catch (e) {
         rows.push({ key: entry.key, query: entry.query, matches: null, readFailed: true, readError: (e && e.message) ? String(e.message) : 'matchMedia_failed' });
       }
