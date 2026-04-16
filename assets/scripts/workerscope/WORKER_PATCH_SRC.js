@@ -1218,11 +1218,21 @@
     try {
       const nativeDeviceMemoryResolved = readWorkerNavigatorNativeValue('deviceMemory');
       const nativeDeviceMemory = Number(nativeDeviceMemoryResolved.value);
-      const snapDeviceMemory = Number(cache.snap.deviceMemory);
-      if (Number.isFinite(nativeDeviceMemory) && Number.isFinite(snapDeviceMemory) && Object.is(nativeDeviceMemory, snapDeviceMemory)) {
+      if (Number.isFinite(nativeDeviceMemory)) {
+        cache.snap.deviceMemory = nativeDeviceMemory;
         __workerNavigatorPatchedOwners__['deviceMemory'] = nativeDeviceMemoryResolved.owner;
-        __workerNavigatorDescriptorModes__['deviceMemory'] = 'native_skip';
+        __workerNavigatorDescriptorModes__['deviceMemory'] = 'native_passthrough';
         __patchDeviceMemory = false;
+        emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:native_passthrough', {
+          type: 'browser structure missing data',
+          stage: 'preflight',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'WorkerNavigator',
+          key: 'deviceMemory',
+          policy: 'skip',
+          action: 'native',
+          data: { outcome: 'skip', reason: 'native_passthrough', nativeValue: nativeDeviceMemory }
+        });
       }
     } catch (e) {
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
@@ -1237,7 +1247,16 @@
       }, e);
     }
     if (__patchDeviceMemory) {
-      def(proto, 'deviceMemory', getDeviceMemory, true);
+      emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:native_passthrough_unresolved', {
+        type: 'browser structure missing data',
+        stage: 'preflight',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'deviceMemory',
+        policy: 'skip',
+        action: 'native',
+        data: { outcome: 'skip', reason: 'native_passthrough_unresolved' }
+      }, null);
     }
 
     const getHardwareConcurrency = function getHardwareConcurrency(){

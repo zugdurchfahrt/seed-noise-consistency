@@ -532,6 +532,51 @@
       }, new Error('SW navigator proto missing'));
     }
 
+    let swDeviceMemoryValue = Number(dm);
+    try {
+      const nativeDeviceMemory = Number(nav.deviceMemory);
+      if (Number.isFinite(nativeDeviceMemory) && nativeDeviceMemory > 0) {
+        swDeviceMemoryValue = nativeDeviceMemory;
+        __swDiag('info', 'sw_prelude:deviceMemory_native_passthrough', {
+          stage: 'preflight',
+          key: 'deviceMemory',
+          message: 'service worker deviceMemory kept on native getter path',
+          type: 'browser structure missing data',
+          data: {
+            outcome: 'skip',
+            reason: 'native_passthrough',
+            nativeValue: nativeDeviceMemory,
+            profileValue: Number(dm)
+          }
+        }, null);
+      } else {
+        __swDiag('warn', 'sw_prelude:deviceMemory_native_invalid', {
+          stage: 'preflight',
+          key: 'deviceMemory',
+          message: 'service worker native deviceMemory is invalid; keep mirror seed only',
+          type: 'browser structure missing data',
+          data: {
+            outcome: 'skip',
+            reason: 'native_invalid',
+            nativeValue: nativeDeviceMemory,
+            profileValue: Number(dm)
+          }
+        }, null);
+      }
+    } catch (e) {
+      __swDiag('warn', 'sw_prelude:deviceMemory_native_read_failed', {
+        stage: 'preflight',
+        key: 'deviceMemory',
+        message: 'service worker native deviceMemory read failed; keep mirror seed only',
+        type: 'browser structure missing data',
+        data: {
+          outcome: 'skip',
+          reason: 'native_read_failed',
+          profileValue: Number(dm)
+        }
+      }, e);
+    }
+
     const uad = nav.userAgentData;
     if (!uad) {
       __fail('sw_prelude:uadata_missing', {
@@ -876,7 +921,7 @@
         platform: platformValue,
         platformVersion: meta.platformVersion,
         fullVersionList: deep(meta.fullVersionList),
-        deviceMemory: Number(dm),
+        deviceMemory: swDeviceMemoryValue,
         hardwareConcurrency: Number(hc),
         wow64: meta.wow64,
         formFactors: meta.formFactors
@@ -932,7 +977,17 @@
     defAcc('language', function() { return primary; });
     defAcc('languages', function() { return langs; });
     defAcc('hardwareConcurrency', function() { return Number(hc); });
-    defAcc('deviceMemory', function() { return Number(dm); });
+    __swDiag('info', 'sw_prelude:deviceMemory_accessor_native_passthrough', {
+      stage: 'apply',
+      key: 'deviceMemory',
+      message: 'service worker deviceMemory accessor left native',
+      type: 'browser structure missing data',
+      data: {
+        outcome: 'skip',
+        reason: 'native_passthrough',
+        value: swDeviceMemoryValue
+      }
+    }, null);
 
     if (nav.languages[0] !== nav.language) {
       __fail('sw_prelude:language_contract_mismatch', {

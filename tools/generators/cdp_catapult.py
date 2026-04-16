@@ -625,9 +625,11 @@ def run():
                             _fatal(ws, "sw sanity: hardwareConcurrency mismatch", {"expected": exp, "got": out})
                             return
                         if float(out.get("deviceMemory") or 0.0) != float(exp["deviceMemory"]):
-                            _resume_sw_session(ws, sid, "sanity_device_memory_mismatch")
-                            _fatal(ws, "sw sanity: deviceMemory mismatch", {"expected": exp, "got": out})
-                            return
+                            logger.warning(
+                                "SW inject: deviceMemory sanity mismatch; prefer native worker value expected=%s got=%s",
+                                exp.get("deviceMemory"),
+                                out.get("deviceMemory"),
+                            )
                         uad = out.get("uad") or {}
                         if not isinstance(uad, dict):
                             _resume_sw_session(ws, sid, "sanity_uad_bad_result")

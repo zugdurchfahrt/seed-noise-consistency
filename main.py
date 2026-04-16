@@ -266,6 +266,7 @@ def init_driver(
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
     chrome_options.add_argument(f"--user-agent={user_agent}")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument("--enable-features=ReduceDeviceMemory")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
     vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
@@ -294,6 +295,7 @@ def init_driver(
         port=chrome_debug_port,
     )
     logger.info("Initiating Webdriver...")
+
 
     def _get_cdp_port(driver, user_data_dir):
         # 1) самый надёжный вариант: debuggerAddress от chromedriver

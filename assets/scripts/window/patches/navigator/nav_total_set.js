@@ -2284,54 +2284,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const nativeLanguagesDesc = __navResolveNativeAccessorDesc('languages');
 
     if ('deviceMemory' in navProto) {
-      if (__navIsValidDeviceMemoryValue(mem)) {
-        const nativeDeviceMemoryRead = __navTryReadNativeValue(
-          nativeDeviceMemoryDesc,
-          navigator,
-          'nav_total_set:deviceMemory_native_read_failed',
-          'nav_total_set:deviceMemory',
-          'deviceMemory',
-          'deviceMemory native getter read failed on navigator receiver'
-        );
-        if (nativeDeviceMemoryRead.ok) {
-          if (Number(nativeDeviceMemoryRead.value) === Number(mem)) {
-            __navDiag('info', 'nav_total_set:deviceMemory_native_skip', {
-              stage: 'preflight',
-              type: __navTypePipeline,
-              diagTag: 'nav_total_set:deviceMemory',
-              key: 'deviceMemory',
-              message: 'deviceMemory already matches native getter',
-              data: { outcome: 'return', reason: 'native_skip' }
-            });
-          } else {
-            __navDiag('warn', 'nav_total_set:deviceMemory_no_admissible_carrier', {
-              stage: 'preflight',
-              type: __navTypePipeline,
-              diagTag: 'nav_total_set:deviceMemory',
-              key: 'deviceMemory',
-              message: 'deviceMemory native getter mismatches target and no admissible carrier is proven in current runtime path',
-              data: {
-                outcome: 'skip',
-                reason: 'no_admissible_carrier',
-                policy: 'skip',
-                action: 'native',
-                nativeValue: nativeDeviceMemoryRead.value,
-                targetValue: mem
-              }
-            });
-          }
-        }
-      } else {
-        patchStrictScalarAccessor('deviceMemory', function navDeviceMemoryValue() {
-          __navDiagPipeline('warn', 'nav_total_set:deviceMemory_invalid_profile', {
-            stage: 'runtime',
-            key: 'deviceMemory',
-            message: 'invalid deviceMemory profile value',
-            data: { outcome: 'return', reason: 'invalid_profile_value', value: mem }
-          });
-          return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
-        }, 'nav_total_set:deviceMemory');
-      }
+      __navDiag('info', 'nav_total_set:deviceMemory_native_passthrough', {
+        stage: 'preflight',
+        type: __navTypePipeline,
+        diagTag: 'nav_total_set:deviceMemory',
+        key: 'deviceMemory',
+        message: 'deviceMemory patch disabled; keep native getter path',
+        data: { outcome: 'skip', reason: 'native_passthrough', action: 'native' }
+      });
     }
     if ('hardwareConcurrency' in navProto) {
       if (__navIsValidHardwareConcurrencyValue(cpu)) {
