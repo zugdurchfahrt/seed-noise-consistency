@@ -1426,6 +1426,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           });
           continue;
         }
+        if (spec && spec.mismatchAction === 'skip') {
+          __navDiag('warn', diagTag + '_native_mismatch_skip', {
+            stage: 'preflight',
+            type: __navTypePipeline,
+            diagTag: diagTag,
+            key: spec.key,
+            message: (typeof spec.mismatchMessage === 'string' && spec.mismatchMessage)
+              ? spec.mismatchMessage
+              : (spec.key + ' native getter mismatches target; keep native path and classify as value mismatch'),
+            data: {
+              outcome: 'skip',
+              reason: 'native_mismatch_skip',
+              action: 'native',
+              nativeValue: nativeValue
+            }
+          });
+          continue;
+        }
         const getter = (typeof spec.getter === 'function') ? spec.getter : null;
         patchStrictScalarAccessor(spec.key, getter, diagTag);
       }
@@ -1445,7 +1463,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           matchesNative: function nativePlatformMatches(value) {
             return typeof value === 'string' && value === navPlatformOut;
           },
-          skipMessage: 'platform already matches native getter'
+          skipMessage: 'platform already matches native getter',
+          mismatchAction: 'skip',
+          mismatchMessage: 'platform native getter mismatches target; keep native getter and treat as value-path inconsistency'
         },
         {
           key: 'vendor',
@@ -1454,7 +1474,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           matchesNative: function nativeVendorMatches(value) {
             return typeof value === 'string' && value === vendor;
           },
-          skipMessage: 'vendor already matches native getter'
+          skipMessage: 'vendor already matches native getter',
+          mismatchAction: 'skip',
+          mismatchMessage: 'vendor native getter mismatches target; keep native getter and treat as value-path inconsistency'
         },
         {
           key: 'productSub',
@@ -1463,7 +1485,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           matchesNative: function nativeProductSubMatches(value) {
             return typeof value === 'string' && value === "20030107";
           },
-          skipMessage: 'productSub already matches native getter'
+          skipMessage: 'productSub already matches native getter',
+          mismatchAction: 'skip',
+          mismatchMessage: 'productSub native getter mismatches target; keep native getter and treat as value-path inconsistency'
         },
         {
           key: 'vendorSub',
@@ -1472,7 +1496,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           matchesNative: function nativeVendorSubMatches(value) {
             return typeof value === 'string' && value === "";
           },
-          skipMessage: 'vendorSub already matches native getter'
+          skipMessage: 'vendorSub already matches native getter',
+          mismatchAction: 'skip',
+          mismatchMessage: 'vendorSub native getter mismatches target; keep native getter and treat as value-path inconsistency'
         },
         {
           key: 'maxTouchPoints',
@@ -1481,7 +1507,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           matchesNative: function nativeMaxTouchPointsMatches(value) {
             return Number.isInteger(value) && value === 0;
           },
-          skipMessage: 'maxTouchPoints already matches native getter'
+          skipMessage: 'maxTouchPoints already matches native getter',
+          mismatchAction: 'skip',
+          mismatchMessage: 'maxTouchPoints native getter mismatches target; keep native getter and treat as value-path inconsistency'
         }
       ]);
       if ('appVersion' in navProto) {
