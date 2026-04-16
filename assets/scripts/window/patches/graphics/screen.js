@@ -230,9 +230,30 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     });
   }
   const __screenRuntimeState = __screenState.__RUNTIME_STATE__;
-  __screenRuntimeState.rollbackStack = [];
-  __screenRuntimeState.appliedGroups = Object.create(null);
-  __screenRuntimeState.mqlMatches = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  if (!Object.prototype.hasOwnProperty.call(__screenRuntimeState, 'rollbackStack')) {
+    Object.defineProperty(__screenRuntimeState, 'rollbackStack', {
+      value: [],
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(__screenRuntimeState, 'appliedGroups')) {
+    Object.defineProperty(__screenRuntimeState, 'appliedGroups', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(__screenRuntimeState, 'mqlMatches')) {
+    Object.defineProperty(__screenRuntimeState, 'mqlMatches', {
+      value: (typeof WeakMap === 'function') ? new WeakMap() : null,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
   const __moduleRollbackStack = __screenRuntimeState.rollbackStack;
   const __screenAppliedGroups = __screenRuntimeState.appliedGroups;
 
@@ -775,19 +796,19 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const exactH = q.match(/\(height:\s*(\d+)px\)/);
     if (exactH) { touched = true; matches = matches && viewportExpected.innerHeight === parseInt(exactH[1], 10); }
     const maxW = q.match(/\(max-width:\s*(\d+)px\)/);
-    if (maxW) { touched = true; matches = matches && SCREEN_WIDTH <= parseInt(maxW[1], 10); }
+    if (maxW) { touched = true; matches = matches && viewportExpected.innerWidth <= parseInt(maxW[1], 10); }
     const minW = q.match(/\(min-width:\s*(\d+)px\)/);
-    if (minW) { touched = true; matches = matches && SCREEN_WIDTH >= parseInt(minW[1], 10); }
+    if (minW) { touched = true; matches = matches && viewportExpected.innerWidth >= parseInt(minW[1], 10); }
     const maxH = q.match(/\(max-height:\s*(\d+)px\)/);
-    if (maxH) { touched = true; matches = matches && SCREEN_HEIGHT <= parseInt(maxH[1], 10); }
+    if (maxH) { touched = true; matches = matches && viewportExpected.innerHeight <= parseInt(maxH[1], 10); }
     const minH = q.match(/\(min-height:\s*(\d+)px\)/);
-    if (minH) { touched = true; matches = matches && SCREEN_HEIGHT >= parseInt(minH[1], 10); }
+    if (minH) { touched = true; matches = matches && viewportExpected.innerHeight >= parseInt(minH[1], 10); }
     const aspectRatio = q.match(/\(aspect-ratio:\s*(\d+)\/(\d+)\)/);
-    if (aspectRatio && typeof SCREEN_WIDTH === 'number' && typeof SCREEN_HEIGHT === 'number') {
+    if (aspectRatio && typeof viewportExpected.innerWidth === 'number' && typeof viewportExpected.innerHeight === 'number') {
       touched = true;
       const wInt = parseInt(aspectRatio[1], 10);
       const hInt = parseInt(aspectRatio[2], 10);
-      matches = matches && (SCREEN_WIDTH * hInt === SCREEN_HEIGHT * wInt);
+      matches = matches && (viewportExpected.innerWidth * hInt === viewportExpected.innerHeight * wInt);
     } else if (aspectRatio) {
       touched = true;
       matches = false;
@@ -797,14 +818,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       touched = true;
       const wInt = parseInt(maxAspectRatio[1], 10);
       const hInt = parseInt(maxAspectRatio[2], 10);
-      matches = matches && (SCREEN_WIDTH * hInt <= SCREEN_HEIGHT * wInt);
+      matches = matches && (viewportExpected.innerWidth * hInt <= viewportExpected.innerHeight * wInt);
     }
     const minAspectRatio = q.match(/\(min-aspect-ratio:\s*(\d+)\/(\d+)\)/);
     if (minAspectRatio) {
       touched = true;
       const wInt = parseInt(minAspectRatio[1], 10);
       const hInt = parseInt(minAspectRatio[2], 10);
-      matches = matches && (SCREEN_WIDTH * hInt >= SCREEN_HEIGHT * wInt);
+      matches = matches && (viewportExpected.innerWidth * hInt >= viewportExpected.innerHeight * wInt);
     }
     const orientation = q.match(/\(orientation:\s*(portrait|landscape)\)/);
     if (orientation) {
@@ -995,6 +1016,64 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     return String(Math.round(width / divisor)) + '/' + String(Math.round(height / divisor));
   }
   const expectedDeviceAspectText = __screenAspectText(SCREEN_WIDTH, SCREEN_HEIGHT);
+  function __screenClassifyMediaQueryRows(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const out = [];
+    for (let i = ZERO; i < list.length; i++) {
+      const row = list[i];
+      if (!row || typeof row !== 'object') continue;
+      const mandatory = row.mandatory !== false;
+      out.push({
+        key: row.key,
+        query: row.query,
+        matches: row.matches,
+        readFailed: !!row.readFailed,
+        readError: row.readError,
+        mandatory: mandatory
+      });
+    }
+    return out;
+  }
+  function __screenHasMandatoryQueryMismatch(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    for (let i = ZERO; i < list.length; i++) {
+      const row = list[i];
+      if (!row || row.mandatory === false) continue;
+      if (row.readFailed || row.matches !== true) return true;
+    }
+    return false;
+  }
+  function __screenAppendMandatoryQueryMismatches(rows, mismatches, prefix) {
+    const list = Array.isArray(rows) ? rows : [];
+    const target = Array.isArray(mismatches) ? mismatches : [];
+    const normalizedPrefix = (typeof prefix === 'string' && prefix) ? prefix : 'matchMedia.';
+    for (let i = ZERO; i < list.length; i++) {
+      const row = list[i];
+      if (!row || row.mandatory === false) continue;
+      if (row.readFailed || row.matches !== true) {
+        target.push({
+          key: normalizedPrefix + row.key,
+          expected: true,
+          actual: row.matches,
+          readFailed: !!row.readFailed
+        });
+      }
+    }
+    return target;
+  }
+  function __screenAppendMandatoryQueryReasons(rows, reasons, prefix) {
+    const list = Array.isArray(rows) ? rows : [];
+    const target = Array.isArray(reasons) ? reasons : [];
+    const normalizedPrefix = (typeof prefix === 'string' && prefix) ? prefix : 'matchMedia.';
+    for (let i = ZERO; i < list.length; i++) {
+      const row = list[i];
+      if (!row || row.mandatory === false) continue;
+      if (row.readFailed || row.matches !== true) {
+        target.push(normalizedPrefix + row.key + ':' + (row.readFailed ? row.readError : 'unexpected_false'));
+      }
+    }
+    return target;
+  }
   function __screenBuildAccessorTarget(owner, proto, key, valueFactory, groupTag, options) {
     const opts = options || {};
     const target = chooseTarget(owner, proto, key);
@@ -1042,25 +1121,39 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       const entry = list[i];
       try {
         const mql = __screenInvokeInternalMatchMedia(entry.query);
-        rows.push({ key: entry.key, query: entry.query, matches: !!__screenReadMqlMatchesValue(mql), readFailed: false });
+        rows.push({
+          key: entry.key,
+          query: entry.query,
+          matches: !!__screenReadMqlMatchesValue(mql),
+          readFailed: false,
+          mandatory: entry.mandatory !== false
+        });
       } catch (e) {
-        rows.push({ key: entry.key, query: entry.query, matches: null, readFailed: true, readError: (e && e.message) ? String(e.message) : 'matchMedia_failed' });
+        rows.push({
+          key: entry.key,
+          query: entry.query,
+          matches: null,
+          readFailed: true,
+          readError: (e && e.message) ? String(e.message) : 'matchMedia_failed',
+          mandatory: entry.mandatory !== false
+        });
       }
     }
-    return rows;
+    return __screenClassifyMediaQueryRows(rows);
   }
   function __screenCollectDisplayQueries() {
     return __screenCollectMediaQueries([
       { key: 'device', query: '(device-width: ' + String(SCREEN_WIDTH) + 'px) and (device-height: ' + String(SCREEN_HEIGHT) + 'px)' },
       { key: 'deviceAspectRatio', query: '(device-aspect-ratio: ' + expectedDeviceAspectText + ')' },
       { key: 'orientation', query: '(orientation: ' + expectedOrientationMedia + ')' },
-      { key: 'displayMode', query: '(display-mode: browser)' }
+      { key: 'displayMode', query: '(display-mode: browser)', mandatory: false }
     ]);
   }
   function __screenCollectViewportQueries() {
+    const expectedViewportAspectText = __screenAspectText(viewportExpected.innerWidth, viewportExpected.innerHeight);
     return __screenCollectMediaQueries([
       { key: 'viewport', query: '(width: ' + String(viewportExpected.innerWidth) + 'px) and (height: ' + String(viewportExpected.innerHeight) + 'px)' },
-      { key: 'aspectRatio', query: '(aspect-ratio: ' + expectedDeviceAspectText + ')' }
+      { key: 'aspectRatio', query: '(aspect-ratio: ' + expectedViewportAspectText + ')' }
     ]);
   }
   function __screenDisplaySnapshot() {
@@ -1129,12 +1222,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (!Object.is(snapshot.orientation.angle, orientationExpected.angle)) {
       mismatches.push({ key: 'screen.orientation.angle', expected: orientationExpected.angle, actual: snapshot.orientation.angle });
     }
-    for (let i = ZERO; i < snapshot.mediaQueries.length; i++) {
-      const row = snapshot.mediaQueries[i];
-      if (row.readFailed || row.matches !== true) {
-        mismatches.push({ key: 'matchMedia.' + row.key, expected: true, actual: row.matches, readFailed: !!row.readFailed });
-      }
-    }
+    __screenAppendMandatoryQueryMismatches(snapshot.mediaQueries, mismatches, 'matchMedia.');
     return { ok: mismatches.length === ZERO, snapshot: snapshot, mismatches: mismatches };
   }
   function __screenCheckViewportCoherence() {
@@ -1156,12 +1244,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (snapshot.divClientHeight !== null && !Object.is(snapshot.divClientHeight, viewportExpected.innerHeight)) {
       mismatches.push({ key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.clientHeight', expected: viewportExpected.innerHeight, actual: snapshot.divClientHeight });
     }
-    for (let i = ZERO; i < snapshot.mediaQueries.length; i++) {
-      const row = snapshot.mediaQueries[i];
-      if (row.readFailed || row.matches !== true) {
-        mismatches.push({ key: 'matchMedia.' + row.key, expected: true, actual: row.matches, readFailed: !!row.readFailed });
-      }
-    }
+    __screenAppendMandatoryQueryMismatches(snapshot.mediaQueries, mismatches, 'matchMedia.');
     if (enforceVisualViewport && snapshot.visualViewport) {
       if (!Object.is(snapshot.visualViewport.height, viewportExpected.visualViewportHeight)) mismatches.push({ key: 'visualViewport.height', expected: viewportExpected.visualViewportHeight, actual: snapshot.visualViewport.height });
       if (!Object.is(snapshot.visualViewport.offsetLeft, viewportExpected.visualViewportOffsetLeft)) mismatches.push({ key: 'visualViewport.offsetLeft', expected: viewportExpected.visualViewportOffsetLeft, actual: snapshot.visualViewport.offsetLeft });
@@ -1262,15 +1345,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
   }
   let needsMqlCoordination = false;
-  for (let i = ZERO; i < displayObserved.mediaQueries.length; i++) {
-    const row = displayObserved.mediaQueries[i];
-    if (row.readFailed) {
-      needsMqlCoordination = true;
-      displayReasons.push('matchMedia.' + row.key + ':' + row.readError);
-    } else if (row.matches !== true) {
-      needsMqlCoordination = true;
-    }
-  }
+  needsMqlCoordination = __screenHasMandatoryQueryMismatch(displayObserved.mediaQueries);
+  __screenAppendMandatoryQueryReasons(displayObserved.mediaQueries, displayReasons, 'matchMedia.');
   if (displayTargets.length || needsMqlCoordination) {
     if (!mqlMatchesTarget) {
       displayReasons.push('matchMedia.matches:descriptor_missing');
@@ -1632,14 +1708,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
     const runtimeViewportQueries = __screenCollectViewportQueries();
-    let needsViewportQueryCoordination = false;
-    for (let i = ZERO; i < runtimeViewportQueries.length; i++) {
-      const row = runtimeViewportQueries[i];
-      if (row.readFailed || row.matches !== true) {
-        needsViewportQueryCoordination = true;
-        break;
-      }
-    }
+    let needsViewportQueryCoordination = __screenHasMandatoryQueryMismatch(runtimeViewportQueries);
     if (needsViewportQueryCoordination) {
       const matchMediaRegistered = !!(coreIsTargetRegistered && mmTarget && coreIsTargetRegistered(mmTarget, 'matchMedia'));
       const mqlMatchesRegistered = !!(coreIsTargetRegistered && mqlProto && coreIsTargetRegistered(mqlProto, 'matches'));
@@ -1684,11 +1753,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         });
       }
       if (matchMediaRegistered && mqlMatchesRegistered) {
-        for (let i = ZERO; i < runtimeViewportQueries.length; i++) {
-          const row = runtimeViewportQueries[i];
-          if (!row.readFailed && row.matches === true) continue;
-          localReasons.push('matchMedia.' + row.key + ':' + (row.readFailed ? row.readError : 'unexpected_false'));
-        }
+        __screenAppendMandatoryQueryReasons(runtimeViewportQueries, localReasons, 'matchMedia.');
       }
     }
     if (visualViewportObj && visualViewportProto) {
