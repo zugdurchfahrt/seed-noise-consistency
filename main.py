@@ -369,12 +369,7 @@ def init_driver(
         "unmaskedVendor": profile["webgl_unmasked_vendor"],
         "unmaskedRenderer": profile["webgl_unmasked_renderer"],
     }
-    cdp.enable_sw_language_inject(
-        language,
-        normalized_languages,
-        hardware_concurrency_value,
-        device_memory_value,
-    )
+    cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
       
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
     sw_thread.start()
@@ -653,13 +648,13 @@ def init_driver(
             enumerable: false
         }},
         __STORAGE_QUOTA_MB: {{
-            value: {json.dumps(profile.get("storageQuotaMb", 120))},
+            value: {json.dumps(profile["storageQuotaMb"]) if "storageQuotaMb" in profile else "undefined"},
             writable: true,
             configurable: true,
             enumerable: false
         }},
         __STORAGE_USED_PCT: {{
-            value: {json.dumps(profile.get("storageUsedPct", 3))},
+            value: {json.dumps(profile["storageUsedPct"]) if "storageUsedPct" in profile else "undefined"},
             writable: true,
             configurable: true,
             enumerable: false
