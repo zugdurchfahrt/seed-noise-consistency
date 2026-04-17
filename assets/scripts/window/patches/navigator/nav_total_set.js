@@ -574,6 +574,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         return false;
       }
     };
+    function __navLooksDomPlatform(value) {
+      return value === 'Win32' || value === 'MacIntel';
+    }
+    function __navLooksUaPlatform(value) {
+      return value === 'Windows' || value === 'macOS';
+    }
+    function __navPlatformPairMatches(domPlatform, osPlatform) {
+      return (domPlatform === 'Win32' && osPlatform === 'Windows')
+        || (domPlatform === 'MacIntel' && osPlatform === 'macOS');
+    }
     // guards (inputs must be present)
     if (!uaPlatform) {
       __navDiag('error', 'nav_total_set:ua_platform_missing', {
@@ -597,6 +607,47 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         data: { outcome: 'skip', reason: 'missing_nav_platform' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'nav_platform_missing');
+      return;
+    }
+    if (!__navLooksUaPlatform(uaPlatform)) {
+      __navDiag('error', 'nav_total_set:ua_platform_invalid', {
+        stage: 'preflight',
+        type: __navTypePipeline,
+        diagTag: 'nav_total_set',
+        key: 'userAgentData.platform',
+        message: 'PLATFORM.uaPlatform invalid; expected UA/OS platform string',
+        data: { outcome: 'skip', reason: 'invalid_ua_platform', uaPlatform: uaPlatform }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'ua_platform_invalid');
+      return;
+    }
+    if (!__navLooksDomPlatform(navPlat)) {
+      __navDiag('error', 'nav_total_set:nav_platform_invalid', {
+        stage: 'preflight',
+        type: __navTypePipeline,
+        diagTag: 'nav_total_set',
+        key: 'platform',
+        message: 'PLATFORM.domPlatform invalid; expected DOM platform string',
+        data: { outcome: 'skip', reason: 'invalid_nav_platform', domPlatform: navPlat }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'nav_platform_invalid');
+      return;
+    }
+    if (!__navPlatformPairMatches(navPlat, uaPlatform)) {
+      __navDiag('error', 'nav_total_set:platform_pair_invalid', {
+        stage: 'preflight',
+        type: __navTypePipeline,
+        diagTag: 'nav_total_set',
+        key: 'platform',
+        message: 'PLATFORM.domPlatform and PLATFORM.uaPlatform mismatch',
+        data: {
+          outcome: 'skip',
+          reason: 'platform_pair_invalid',
+          domPlatform: navPlat,
+          uaPlatform: uaPlatform
+        }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'platform_pair_invalid');
       return;
     }
     if (!(typeof platformVersion === 'string' && platformVersion)) {
@@ -1433,7 +1484,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           matchesNative: function nativePlatformMatches(value) {
             return typeof value === 'string' && value === navPlatformOut;
           },
-          skipMessage: 'platform already matches native getter'
+          skipMessage: 'platform already matches native getter',
+          mismatchAction: 'skip',
+          mismatchMessage: 'platform native getter mismatches target; keep native getter and treat as value-path inconsistency'
         },
         {
           key: 'vendor',
