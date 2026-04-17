@@ -530,10 +530,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
     return __wrapNativeApply(origGetOrSet, name, applyImpl);
   }
 
-  function __wrapStrictAccessor(key, getter, desc, validThis, options) {
+  function __wrapAccessorGateway(key, getter, desc, validThis, options) {
     if (typeof key !== 'string' || !key) {
-      const e = new TypeError('[CoreWindow] __wrapStrictAccessor: key must be non-empty string');
-      __throwWrapFactoryPreflight('core_window:wrapStrictAccessor:bad_key', null, '__wrapStrictAccessor: key must be non-empty string', e);
+      const e = new TypeError('[CoreWindow] __wrapAccessorGateway: key must be non-empty string');
+      __throwWrapFactoryPreflight('core_window:wrapAccessorGateway:bad_key', null, '__wrapAccessorGateway: key must be non-empty string', e);
     }
     const opts = options || {};
     const onAccess = (typeof opts.onAccess === 'function') ? opts.onAccess : null;
@@ -559,13 +559,55 @@ const CoreWindowModule = function CoreWindowModule(window) {
       return wrapped;
     }
 
-    const e = new Error('[CoreWindow] __wrapStrictAccessor: synthetic strict accessor path forbidden without native getter');
+    const e = new Error('[CoreWindow] __wrapAccessorGateway: synthetic accessor gateway path forbidden without native getter');
     __throwWrapFactoryPreflight(
-      'core_window:wrapStrictAccessor:synthetic_path_forbidden',
+      'core_window:wrapAccessorGateway:synthetic_path_forbidden',
       key,
-      '__wrapStrictAccessor: synthetic strict accessor path forbidden without native getter',
+      '__wrapAccessorGateway: synthetic accessor gateway path forbidden without native getter',
       e
     );
+  }
+
+  function __wrapStrictScalarAccessorGateway(key, getter, desc, validThis, options) {
+    if (typeof key !== 'string' || !key) {
+      const e = new TypeError('[CoreWindow] __wrapStrictScalarAccessorGateway: key must be non-empty string');
+      __throwWrapFactoryPreflight('core_window:wrapStrictScalarAccessorGateway:bad_key', null, '__wrapStrictScalarAccessorGateway: key must be non-empty string', e);
+    }
+    const opts = options || {};
+    const onAccess = (typeof opts.onAccess === 'function') ? opts.onAccess : null;
+    const name = (typeof opts.name === 'string' && opts.name) ? opts.name : `get ${key}`;
+    const isData = !!desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
+    if (isData) return getter;
+
+    const valueFromGetter = function (thisArg) {
+      return (typeof getter === 'function') ? getter.call(thisArg) : getter;
+    };
+    const checkThis = (typeof validThis === 'function') ? validThis : null;
+    const origGet = desc && desc.get;
+
+    if (typeof origGet === 'function') {
+      let wrapped = null;
+      wrapped = __wrapNativeAccessor(origGet, name, function (target, thisArg, argList) {
+        if (onAccess) onAccess(key, wrapped, thisArg);
+        if (checkThis && !checkThis(thisArg)) {
+          return Reflect.apply(origGet, thisArg, []);
+        }
+        return valueFromGetter(thisArg);
+      });
+      return wrapped;
+    }
+
+    const e = new Error('[CoreWindow] __wrapStrictScalarAccessorGateway: synthetic strict accessor path forbidden without native getter');
+    __throwWrapFactoryPreflight(
+      'core_window:wrapStrictScalarAccessorGateway:synthetic_path_forbidden',
+      key,
+      '__wrapStrictScalarAccessorGateway: synthetic strict accessor path forbidden without native getter',
+      e
+    );
+  }
+
+  function __wrapStrictAccessor(key, getter, desc, validThis, options) {
+    return __wrapStrictScalarAccessorGateway(key, getter, desc, validThis, options);
   }
 
   {
@@ -1073,8 +1115,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const useObjectReturnGateway = isObjectReturnGatewayWrapLayer(wrapLayer);
         const useMaterializedAccessorGateway = isMaterializedAccessorGatewayWrapLayer(wrapLayer);
 
-        if (useStrictScalarAccessorGateway || useObjectReturnGateway || (useMaterializedAccessorGateway && typeof origGet === 'function')) {
-          const wrappedStrictLikeGet = __wrapStrictAccessor(key, getter, desc, checkThis, {
+        if (useStrictScalarAccessorGateway) {
+          const wrappedStrictLikeGet = __wrapStrictScalarAccessorGateway(key, getter, desc, checkThis, {
+            name: 'get ' + key,
+            wrapLayer: wrapLayer
+          });
+          knownWrapped.add(wrappedStrictLikeGet);
+          return wrappedStrictLikeGet;
+        }
+
+        if (useObjectReturnGateway || (useMaterializedAccessorGateway && typeof origGet === 'function')) {
+          const wrappedStrictLikeGet = __wrapAccessorGateway(key, getter, desc, checkThis, {
             name: 'get ' + key,
             wrapLayer: wrapLayer
           });
@@ -2036,6 +2087,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
       });
       safeDefine(Core, '__wrapStrictAccessor', {
         value: __wrapStrictAccessor,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__wrapAccessorGateway', {
+        value: __wrapAccessorGateway,
         writable: true,
         configurable: true,
         enumerable: false

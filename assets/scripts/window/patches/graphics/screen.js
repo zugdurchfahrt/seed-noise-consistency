@@ -683,25 +683,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const mqlMatchesDesc = mqlProto ? Object.getOwnPropertyDescriptor(mqlProto, 'matches') : null;
   const mqlOrigMatchesGet = (mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function') ? mqlMatchesDesc.get : null;
   if (mqlProto) {
-    if (mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function' && mqlMatchesDesc.configurable && typeof mqlOrigMatchesGet === 'function') {
-      applyCoreTargetsGroup('screen:mql_matches', [{
-        owner: mqlProto,
-        key: 'matches',
-        kind: 'accessor',
-        wrapLayer: 'strict_accessor_gateway',
-        resolve: 'proto_chain',
-        policy: 'strict',
-        diagTag: 'screen:mql_matches',
-        validThis(self) {
-          return receiverMatchesTarget(mqlProto, self);
-        },
-        invalidThis: 'native',
-        getImpl() {
-          if (mqlMatches.has(this)) return mqlMatches.get(this);
-          return Reflect.apply(mqlOrigMatchesGet, this, []);
-        }
-      }], 'strict');
-    } else if (!(mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function')) {
+    if (!(mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function')) {
       __screenDiag('warn', 'screen:mql_matches_descriptor_missing', {
         stage: 'preflight',
         type: __screenTypeBrowser,
@@ -747,7 +729,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const mmOrig = (mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')
     ? mmDesc.value
     : null;
-  const mqlMatchesTarget = mqlProto ? chooseTarget(mqlProto, Object.getPrototypeOf(mqlProto), 'matches') : null;
   let __screenMatchMediaThisCheckDiagSent = false;
   const isWindowThis = (self) => {
     try {
@@ -1347,11 +1328,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   let needsMqlCoordination = false;
   needsMqlCoordination = __screenHasMandatoryQueryMismatch(displayObserved.mediaQueries);
   __screenAppendMandatoryQueryReasons(displayObserved.mediaQueries, displayReasons, 'matchMedia.');
-  if (displayTargets.length || needsMqlCoordination) {
-    if (!mqlMatchesTarget) {
-      displayReasons.push('matchMedia.matches:descriptor_missing');
-    }
-  }
   const windowKeys = ['innerWidth', 'innerHeight'];
   for (let i = ZERO; i < windowKeys.length; i++) {
     const key = windowKeys[i];
@@ -1711,7 +1687,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     let needsViewportQueryCoordination = __screenHasMandatoryQueryMismatch(runtimeViewportQueries);
     if (needsViewportQueryCoordination) {
       const matchMediaRegistered = !!(coreIsTargetRegistered && mmTarget && coreIsTargetRegistered(mmTarget, 'matchMedia'));
-      const mqlMatchesRegistered = !!(coreIsTargetRegistered && mqlProto && coreIsTargetRegistered(mqlProto, 'matches'));
       if (!(mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')) {
         localReasons.push('matchMedia:descriptor_invalid');
       } else if (!matchMediaRegistered) {
@@ -1731,28 +1706,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
       if (!(mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function')) {
         localReasons.push('matchMedia.matches:descriptor_missing');
-      } else if (!mqlMatchesDesc.configurable && !mqlMatchesRegistered) {
-        localReasons.push('matchMedia.matches:non_configurable');
-      } else if (!mqlMatchesRegistered && typeof mqlOrigMatchesGet === 'function') {
-        localTargets.push({
-          owner: mqlProto,
-          key: 'matches',
-          kind: 'accessor',
-          wrapLayer: 'strict_accessor_gateway',
-          resolve: 'proto_chain',
-          policy: 'strict',
-          diagTag: 'screen:viewport_group:mql_matches',
-          validThis(self) {
-            return receiverMatchesTarget(mqlProto, self);
-          },
-          invalidThis: 'native',
-          getImpl() {
-            if (mqlMatches.has(this)) return mqlMatches.get(this);
-            return Reflect.apply(mqlOrigMatchesGet, this, []);
-          }
-        });
-      }
-      if (matchMediaRegistered && mqlMatchesRegistered) {
+      } else if (matchMediaRegistered) {
+        localReasons.push('matchMedia.matches:native_public_only');
         __screenAppendMandatoryQueryReasons(runtimeViewportQueries, localReasons, 'matchMedia.');
       }
     }
