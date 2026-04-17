@@ -28,6 +28,7 @@ def build_device_metrics(profile: dict) -> dict:
         "screenOrientation": {"type": otype, "angle": 0},
     }
 
+
 def _canonical_bcp47(tag: str) -> str:
     """Leads a linguistic tag to the canonical appearance BCP47 by register.
     As browsers return `es-ES`, not `es-es`.
@@ -284,7 +285,7 @@ def format_full_version_list(full_version_list):
     )
 
 # ===== Override the User-Agent and User-Agent Metadata=====
-def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand):
+def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, navigator_platform):
     """
     Overrides the User-Agent and User-Agent Metadata for the Chromium browsers driver using Chrome DevTools Protocol (CDP).
     Args:
@@ -293,11 +294,14 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand):
         expected_client_hints (dict): A dictionary of client hints to construct the UserAgentMetadata, including keys such as
             'platform', 'brands', 'mobile', 'architecture', 'bitness', 'model', 'platformVersion',
             'fullVersionList', 'deviceMemory', 'hardwareConcurrency', 'wow64', and 'formFactors'.
-    browser_brand (str): The browser brand name (e.g., "chrome", "edge") to determine if the override should be applied.
+        browser_brand (str): The browser brand name (e.g., "chrome", "edge") to determine if the override should be applied.
+        navigator_platform (str): DOM-form platform for the top-level CDP navigator.platform slot.
     Side Effects:
         Modifies the browser's user agent and user agent metadata via CDP if the browser brand is supported.
     It may be utilised as a backup option in the event that the driver is set to 'None', or to guarantee additional parameter alterations. This is not obligatory. Logs an informational message upon successful override.
     """
+    if navigator_platform not in ("Win32", "MacIntel"):
+        raise ValueError(f"apply_ua_overrides: invalid navigator_platform {navigator_platform!r}")
     # 1)Collecting a metadata dictionary for UserAgentMetadata from current client hints
     metadata = {
         "platform":            expected_client_hints["platform"],
@@ -319,7 +323,7 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand):
             {
                 "userAgent": profile["user_agent"],
                 "acceptLanguage": profile.get("accept_language"),
-                "platform": expected_client_hints["platform"],
+                "platform": navigator_platform,
                 "userAgentMetadata": metadata
             }
         )

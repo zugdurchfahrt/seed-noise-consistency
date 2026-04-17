@@ -1484,7 +1484,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           matchesNative: function nativePlatformMatches(value) {
             return typeof value === 'string' && value === navPlatformOut;
           },
-          skipMessage: 'platform already matches native getter'
+          skipMessage: 'platform already matches native getter',
+          mismatchAction: 'skip',
+          mismatchMessage: 'platform native getter mismatches target; keep native getter and treat as value-path inconsistency'
         },
         {
           key: 'vendor',

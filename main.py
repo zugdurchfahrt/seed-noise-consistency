@@ -523,7 +523,7 @@ def init_driver(
             enumerable: false
         }},
         __NAV_PLATFORM__: {{
-            value: {json.dumps(profile['platform'], ensure_ascii=False)},
+            value: {json.dumps(platform, ensure_ascii=False)},
             writable: true,
             configurable: true,
             enumerable: false
@@ -698,11 +698,11 @@ def init_driver(
     }});
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
-       
+
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
-    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, platform)
     
     try:
         driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
@@ -745,8 +745,8 @@ def init_driver(
             # Main client hints
             # "Accept": str(expected_client_hints["accept"]),
             "Accept-Language": build_accept_language(profile.get("languages") or [profile.get("language")]),
-            "Sec-CH-Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
-            "Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
+            "Sec-CH-Device-Memory": str( profile["deviceMemory"]),
+            "Device-Memory": str(profile["deviceMemory"]),
             # "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
             # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
             # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
@@ -1292,7 +1292,7 @@ def main():
                 logger.warning("UA override reapply check failed: %s", e)
                 needs_reapply = True
             if needs_reapply:
-                apply_ua_overrides(driver, profile, expected_client_hints, browser_brand)
+                apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, profile["platform"])
                 
         
                 
