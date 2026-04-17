@@ -125,6 +125,9 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   const __envProfileState = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
     ? __stateRoot.__ENV_PROFILE__
     : null;
+  const __envPlatformState = (__envProfileState && __envProfileState.__PLATFORM__ && typeof __envProfileState.__PLATFORM__ === 'object')
+    ? __envProfileState.__PLATFORM__
+    : null;
   const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
     ? __envProfileState.profile
     : null;
@@ -210,8 +213,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   __fontsState.familySnapshot = __fontFamilySnapshot;
 
   const Core = window && window.Core;
-  const __fontNavPlatform = (__envProfileState && typeof __envProfileState.navPlat === 'string' && __envProfileState.navPlat)
-    ? __envProfileState.navPlat
+  const __fontDomPlatform = (__envPlatformState && typeof __envPlatformState.domPlatform === 'string' && __envPlatformState.domPlatform)
+    ? __envPlatformState.domPlatform
     : null;
   if (!Core) {
     __fontDiagPipeline('warn', 'fonts:core_missing', {
@@ -617,7 +620,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }
 
   function getPlatformScopedFontConfigs(winArg) {
-    const domPlat = __fontNavPlatform;
+    const domPlat = __fontDomPlatform;
     const cfgs = __getFontsConfigArray();
     const hasPlatformDom = cfgs.some(f => f && typeof f.platform_dom === 'string');
     const filteredCfgs = (domPlat && hasPlatformDom) ? cfgs.filter(f => f && f.platform_dom === domPlat) : cfgs;
@@ -1294,14 +1297,14 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }], 'skip');
 })();
 
-  const domPlat = __fontNavPlatform;
+  const domPlat = __fontDomPlatform;
   if (!domPlat) {
     // preflight soft-skip: keep awaitFontsReady as native document.fonts.ready where possible
     __fontDiagPipeline('warn', 'fonts:nav_platform_missing', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: 'CanvasPatchContext.state.__ENV_PROFILE__.navPlat',
-      message: 'CanvasPatchContext.state.__ENV_PROFILE__.navPlat missing (skip font patch)',
+      key: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform',
+      message: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform missing (skip font patch)',
       data: { outcome: 'skip', reason: 'missing_nav_platform' }
     }, null);
     try {
@@ -1345,13 +1348,13 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     // в worker’е документа нет — выходим
     if (typeof document === 'undefined') return;
 
-    const domPlat = __fontNavPlatform;
+    const domPlat = __fontDomPlatform;
     if (!domPlat) {
       __fontDiagPipeline('warn', 'fonts:dom_override_nav_platform_missing', {
         stage: 'preflight',
         diagTag: 'fonts',
-        key: 'CanvasPatchContext.state.__ENV_PROFILE__.navPlat',
-        message: 'CanvasPatchContext.state.__ENV_PROFILE__.navPlat missing (skip dom override)',
+        key: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform',
+        message: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform missing (skip dom override)',
         data: { outcome: 'skip', reason: 'missing_nav_platform' }
       }, null);
       return;

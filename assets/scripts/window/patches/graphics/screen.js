@@ -137,11 +137,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
-  const __screenEnvProfile = (__screenStateRoot.__ENV_PROFILE__ && typeof __screenStateRoot.__ENV_PROFILE__ === 'object')
+  const __envProfileState = (__screenStateRoot.__ENV_PROFILE__ && typeof __screenStateRoot.__ENV_PROFILE__ === 'object')
     ? __screenStateRoot.__ENV_PROFILE__
     : null;
-  const __screenProfile = (__screenEnvProfile && __screenEnvProfile.profile && typeof __screenEnvProfile.profile === 'object')
-    ? __screenEnvProfile.profile
+  const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
+    ? __envProfileState.profile
     : null;
   let __screenState = (__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')
     ? __screenStateRoot.__SCREEN__
@@ -472,7 +472,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
     try {
-      plans = __coreApplyTargets(targets, __screenProfile, []);
+      plans = __coreApplyTargets(targets, __profile, []);
     } catch (e) {
       __screenDiag('error', groupTag + ':preflight_failed', {
         stage: 'preflight',

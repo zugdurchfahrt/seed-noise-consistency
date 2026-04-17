@@ -139,7 +139,12 @@ def _log_sw_relay_diag(session_id: str, target_id: str, payload):
 
 
 
-def enable_sw_language_inject(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float):
+def enable_sw_language_inject(
+    language: str,
+    normalized_languages: list[str],
+    hardware_concurrency: int,
+    device_memory: float,
+):
     """
     Enable ServiceWorker injection for navigator.language / navigator.languages.
     Call this BEFORE starting run().

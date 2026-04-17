@@ -15,6 +15,48 @@ if (!W || (typeof W !== 'object' && typeof W !== 'function')) {
   throw new Error('[module] window missing');
 }
 
+const __bootstrapSeedKeys__ = [
+  '__GLOBAL_SEED',
+  '__EXPECTED_CLIENT_HINTS',
+  '__FULL_VERSION_LIST',
+  '__NAV_PLATFORM__',
+  '__UA_PLATFORM__',
+  '__UA_PLATFORM_VERSION',
+  '__USER_AGENT',
+  '__VENDOR',
+  '__LATITUDE__',
+  '__LONGITUDE__',
+  '__TIMEZONE__',
+  '__OFFSET_MINUTES__',
+  '__WIDTH',
+  '__HEIGHT',
+  '__COLOR_DEPTH',
+  '__DPR',
+  '__primaryLanguage',
+  '__normalizedLanguages',
+  '__cpu',
+  '__memory',
+  '__STORAGE_QUOTA_MB',
+  '__STORAGE_USED_PCT',
+  '__WEBGL_RENDERER__',
+  '__WEBGL_VENDOR__',
+  '__WEBGL_UNMASKED_VENDOR__',
+  '__WEBGL_UNMASKED_RENDERER__',
+  '__GPU_TYPE__',
+  '__GPU_ARCHITECTURE__',
+  '__GPU_VENDOR__',
+  '__WEBGPU_DEVICE__',
+  '__NAV_PATCH_STRICT__',
+  '__NAV_PATCH_DEBUG__',
+  '__DEVICES_LABELS',
+  '__PLUGIN_PROFILES__'
+];
+
+const __bootstrapInputs__ = Object.create(null);
+for (const key of __bootstrapSeedKeys__) {
+  __bootstrapInputs__[key] = W[key];
+}
+
 function __defineHiddenValue__(obj, key, value) {
   const d = Object.getOwnPropertyDescriptor(obj, key);
   if (d && d.configurable === false) return null;
@@ -455,6 +497,28 @@ function __ensureEnvProfileState__() {
   return state;
 }
 
+function __ensureEnvPlatformState__(envProfileState) {
+  const owner = (envProfileState && typeof envProfileState === 'object')
+    ? envProfileState
+    : __ensureEnvProfileState__();
+  let state = (owner.__PLATFORM__ && typeof owner.__PLATFORM__ === 'object')
+    ? owner.__PLATFORM__
+    : null;
+  if (!state) {
+    state = Object.create(null);
+    state.domPlatform = null;
+    state.uaPlatform = null;
+    state.platformVersion = null;
+    Object.defineProperty(owner, '__PLATFORM__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  return state;
+}
+
 function __emitBootstrapTransferDiag__(level, code, key, message, reason, err, extraData) {
   const data = { outcome: 'skip', reason: reason };
   if (extraData && typeof extraData === 'object') {
@@ -481,6 +545,7 @@ function __ensureBootstrapTransitStatus__() {
   __defineHiddenValue__(C, '__bootstrapTransitStatus__', status);
   if (!status.geo || typeof status.geo !== 'object') status.geo = Object.create(null);
   if (!status.lang || typeof status.lang !== 'object') status.lang = Object.create(null);
+  if (!status.platform || typeof status.platform !== 'object') status.platform = Object.create(null);
   if (!status.retention || typeof status.retention !== 'object') status.retention = Object.create(null);
   return status;
 }
@@ -501,12 +566,16 @@ function __setBootstrapTransferStatus__(slot, ready, reason, extraData) {
 const __geoTransitState__ = __ensureGeoTransitState__();
 const __langTransitState__ = __ensureLangTransitState__();
 const __envProfileState__ = __ensureEnvProfileState__();
-const __bootstrapLatitude__ = W.__LATITUDE__;
-const __bootstrapLongitude__ = W.__LONGITUDE__;
-const __bootstrapTimezone__ = W.__TIMEZONE__;
-const __bootstrapOffsetMinutes__ = W.__OFFSET_MINUTES__;
-const __bootstrapPrimaryLanguage__ = W.__primaryLanguage;
-const __bootstrapNormalizedLanguages__ = W.__normalizedLanguages;
+const __envPlatformState__ = __ensureEnvPlatformState__(__envProfileState__);
+const __bootstrapLatitude__ = __bootstrapInputs__.__LATITUDE__;
+const __bootstrapLongitude__ = __bootstrapInputs__.__LONGITUDE__;
+const __bootstrapTimezone__ = __bootstrapInputs__.__TIMEZONE__;
+const __bootstrapOffsetMinutes__ = __bootstrapInputs__.__OFFSET_MINUTES__;
+const __bootstrapPrimaryLanguage__ = __bootstrapInputs__.__primaryLanguage;
+const __bootstrapNormalizedLanguages__ = __bootstrapInputs__.__normalizedLanguages;
+const __bootstrapDomPlatform__ = __bootstrapInputs__.__NAV_PLATFORM__;
+const __bootstrapUaPlatform__ = __bootstrapInputs__.__UA_PLATFORM__;
+const __bootstrapPlatformVersion__ = __bootstrapInputs__.__UA_PLATFORM_VERSION;
 const __geoMissingKeys__ = [];
 if (!__isFiniteNumber__(__bootstrapLatitude__)) __geoMissingKeys__.push('__LATITUDE__');
 if (!__isFiniteNumber__(__bootstrapLongitude__)) __geoMissingKeys__.push('__LONGITUDE__');
@@ -562,41 +631,60 @@ if (__langMissingKeys__.length === 0) {
   );
 }
 
-__envProfileState__.meta = __cloneProfileValue__(W.__EXPECTED_CLIENT_HINTS || {});
-__envProfileState__.navPlat = W.__NAV_PLATFORM__;
-__envProfileState__.uaPlatform = W.__UA_PLATFORM__;
-__envProfileState__.uaPlatformVersion = W.__UA_PLATFORM_VERSION;
-__envProfileState__.userAgent = W.__USER_AGENT;
-__envProfileState__.vendor = W.__VENDOR;
-__envProfileState__.mem = Number(W.__memory);
-__envProfileState__.cpu = Number(W.__cpu);
-__envProfileState__.devicesLabels = __cloneProfileValue__(W.__DEVICES_LABELS);
+const __platformMissingKeys__ = [];
+if (!(typeof __bootstrapDomPlatform__ === 'string' && __bootstrapDomPlatform__)) __platformMissingKeys__.push('__NAV_PLATFORM__');
+if (!(typeof __bootstrapUaPlatform__ === 'string' && __bootstrapUaPlatform__)) __platformMissingKeys__.push('__UA_PLATFORM__');
+if (!(typeof __bootstrapPlatformVersion__ === 'string' && __bootstrapPlatformVersion__)) __platformMissingKeys__.push('__UA_PLATFORM_VERSION');
+if (__platformMissingKeys__.length === 0) {
+  __envPlatformState__.domPlatform = __bootstrapDomPlatform__;
+  __envPlatformState__.uaPlatform = __bootstrapUaPlatform__;
+  __envPlatformState__.platformVersion = __bootstrapPlatformVersion__;
+  __setBootstrapTransferStatus__('platform', true, 'owner_ready', { source: 'window_transit' });
+} else {
+  __setBootstrapTransferStatus__('platform', false, 'bootstrap_input_incomplete', { missingKeys: __platformMissingKeys__.slice() });
+  __emitBootstrapTransferDiag__(
+    'warn',
+    'bootstrap_hide:platform_transfer_incomplete',
+    'state.__ENV_PROFILE__.__PLATFORM__',
+    'platform owner-transfer incomplete',
+    'bootstrap_input_incomplete',
+    null,
+    { missingKeys: __platformMissingKeys__.slice() }
+  );
+}
 
-screenState.dpr = Number(W.__DPR);
-screenState.width = Number(W.__WIDTH ?? (W.screen && W.screen.width));
-screenState.height = Number(W.__HEIGHT ?? (W.screen && W.screen.height));
-screenState.colorDepth = Number(W.__COLOR_DEPTH);
+__envProfileState__.meta = __cloneProfileValue__(__bootstrapInputs__.__EXPECTED_CLIENT_HINTS || {});
+__envProfileState__.userAgent = __bootstrapInputs__.__USER_AGENT;
+__envProfileState__.vendor = __bootstrapInputs__.__VENDOR;
+__envProfileState__.mem = Number(__bootstrapInputs__.__memory);
+__envProfileState__.cpu = Number(__bootstrapInputs__.__cpu);
+__envProfileState__.devicesLabels = __cloneProfileValue__(__bootstrapInputs__.__DEVICES_LABELS);
+
+screenState.dpr = Number(__bootstrapInputs__.__DPR);
+screenState.width = Number(__bootstrapInputs__.__WIDTH ?? (W.screen && W.screen.width));
+screenState.height = Number(__bootstrapInputs__.__HEIGHT ?? (W.screen && W.screen.height));
+screenState.colorDepth = Number(__bootstrapInputs__.__COLOR_DEPTH);
 screenState.orientationDom = ((screenState.height >= screenState.width))
   ? 'portrait-primary'
   : 'landscape-primary';
 
-__envProfileState__.webglRenderer = W.__WEBGL_RENDERER__;
-__envProfileState__.webglVendor = W.__WEBGL_VENDOR__;
-__envProfileState__.webglUnmaskedVendor = W.__WEBGL_UNMASKED_VENDOR__;
-__envProfileState__.webglUnmaskedRenderer = W.__WEBGL_UNMASKED_RENDERER__;
-__envProfileState__.gpuType = W.__GPU_TYPE__;
-__envProfileState__.gpuArchitecture = W.__GPU_ARCHITECTURE__;
-__envProfileState__.gpuVendor = W.__GPU_VENDOR__;
-__envProfileState__.webgpuDevice = W.__WEBGPU_DEVICE__;
+__envProfileState__.webglRenderer = __bootstrapInputs__.__WEBGL_RENDERER__;
+__envProfileState__.webglVendor = __bootstrapInputs__.__WEBGL_VENDOR__;
+__envProfileState__.webglUnmaskedVendor = __bootstrapInputs__.__WEBGL_UNMASKED_VENDOR__;
+__envProfileState__.webglUnmaskedRenderer = __bootstrapInputs__.__WEBGL_UNMASKED_RENDERER__;
+__envProfileState__.gpuType = __bootstrapInputs__.__GPU_TYPE__;
+__envProfileState__.gpuArchitecture = __bootstrapInputs__.__GPU_ARCHITECTURE__;
+__envProfileState__.gpuVendor = __bootstrapInputs__.__GPU_VENDOR__;
+__envProfileState__.webgpuDevice = __bootstrapInputs__.__WEBGPU_DEVICE__;
 __envProfileState__.profile = (__envProfileState__.profile && typeof __envProfileState__.profile === 'object')
   ? __envProfileState__.profile
   : Object.create(null);
-__envProfileState__.strict = (W.__NAV_PATCH_STRICT__ !== undefined) ? !!W.__NAV_PATCH_STRICT__ : true;
-__envProfileState__.debug = !!W.__NAV_PATCH_DEBUG__;
-__envProfileState__.fullVersionList = __cloneProfileValue__(W.__FULL_VERSION_LIST);
-__envProfileState__.storageQuotaMb = W.__STORAGE_QUOTA_MB;
-__envProfileState__.storageUsedPct = W.__STORAGE_USED_PCT;
-__envProfileState__.pluginProfiles = __cloneProfileValue__(Array.isArray(W.__PLUGIN_PROFILES__) ? W.__PLUGIN_PROFILES__ : []);
+__envProfileState__.strict = (__bootstrapInputs__.__NAV_PATCH_STRICT__ !== undefined) ? !!__bootstrapInputs__.__NAV_PATCH_STRICT__ : true;
+__envProfileState__.debug = !!__bootstrapInputs__.__NAV_PATCH_DEBUG__;
+__envProfileState__.fullVersionList = __cloneProfileValue__(__bootstrapInputs__.__FULL_VERSION_LIST);
+__envProfileState__.storageQuotaMb = __bootstrapInputs__.__STORAGE_QUOTA_MB;
+__envProfileState__.storageUsedPct = __bootstrapInputs__.__STORAGE_USED_PCT;
+__envProfileState__.pluginProfiles = __cloneProfileValue__(Array.isArray(__bootstrapInputs__.__PLUGIN_PROFILES__) ? __bootstrapInputs__.__PLUGIN_PROFILES__ : []);
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
   return __bootstrapHideEmit__(level, code, {
     diagTag: 'bootstrap_hide',
@@ -625,6 +713,14 @@ function __langTransitOwnerReady__() {
     Array.isArray(state.normalizedLanguages) &&
     state.normalizedLanguages.length > 0 &&
     state.normalizedLanguages[0] === state.primaryLanguage;
+}
+
+function __platformTransitOwnerReady__() {
+  const state = __ensureEnvPlatformState__(__envProfileState__);
+  return !!state &&
+    typeof state.domPlatform === 'string' && !!state.domPlatform &&
+    typeof state.uaPlatform === 'string' && !!state.uaPlatform &&
+    typeof state.platformVersion === 'string' && !!state.platformVersion;
 }
 
 function __workerTransitSnapshotReady__() {
@@ -672,6 +768,16 @@ function __getBootstrapSanitizeGate__(key) {
     };
   }
   if (
+    key === '__NAV_PLATFORM__' ||
+    key === '__UA_PLATFORM__' ||
+    key === '__UA_PLATFORM_VERSION'
+  ) {
+    return {
+      ready: __platformTransitOwnerReady__(),
+      reason: 'platform_owner_not_ready'
+    };
+  }
+  if (
     key === '__EXPECTED_CLIENT_HINTS' ||
     key === '__USER_AGENT' ||
     key === '__VENDOR' ||
@@ -691,37 +797,7 @@ function __getBootstrapSanitizeGate__(key) {
 }
 
 function __sanitizeBootstrapEnvSurface__(win) {
-  const keys = [
-    '__GLOBAL_SEED',
-    '__EXPECTED_CLIENT_HINTS',
-    '__NAV_PLATFORM__',
-    '__UA_PLATFORM__',
-    '__UA_PLATFORM_VERSION',
-    '__USER_AGENT',
-    '__VENDOR',
-    '__LATITUDE__',
-    '__LONGITUDE__',
-    '__TIMEZONE__',
-    '__OFFSET_MINUTES__',
-    '__WIDTH',
-    '__HEIGHT',
-    '__COLOR_DEPTH',
-    '__DPR',
-    '__primaryLanguage',
-    '__normalizedLanguages',
-    '__cpu',
-    '__memory',
-    '__WEBGL_RENDERER__',
-    '__WEBGL_VENDOR__',
-    '__WEBGL_UNMASKED_VENDOR__',
-    '__WEBGL_UNMASKED_RENDERER__',
-    '__GPU_TYPE__',
-    '__GPU_ARCHITECTURE__',
-    '__GPU_VENDOR__',
-    '__WEBGPU_DEVICE__',
-    '__DEVICES_LABELS',
-    '__PLUGIN_PROFILES__'
-  ];
+  const keys = __bootstrapSeedKeys__.slice();
   for (const key of keys) {
     const gate = __getBootstrapSanitizeGate__(key);
     if (!gate.ready) {

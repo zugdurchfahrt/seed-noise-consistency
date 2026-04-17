@@ -608,6 +608,7 @@
         data: { outcome: 'throw', reason: 'uadata_platform_missing' }
       }, new Error('SW uaData.platform missing'));
     }
+    const platformVersionValue = meta.platformVersion;
     if (!Array.isArray(meta.brands) || !meta.brands.length) {
       __fail('sw_prelude:uadata_brands_missing', {
         stage: 'preflight',
@@ -919,7 +920,7 @@
         brands: brandsValue,
         mobile: mobileValue,
         platform: platformValue,
-        platformVersion: meta.platformVersion,
+        platformVersion: platformVersionValue,
         fullVersionList: deep(meta.fullVersionList),
         deviceMemory: swDeviceMemoryValue,
         hardwareConcurrency: Number(hc),

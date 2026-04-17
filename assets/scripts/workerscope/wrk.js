@@ -671,6 +671,21 @@ function EnvBus(G){
     if (!envProfile || typeof envProfile !== 'object') {
       throw new Error('EnvBus: __ENV_PROFILE__ missing');
     }
+    const envPlatform = (envProfile.__PLATFORM__ && typeof envProfile.__PLATFORM__ === 'object')
+      ? envProfile.__PLATFORM__
+      : null;
+    if (!envPlatform || typeof envPlatform !== 'object') {
+      throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__ missing');
+    }
+    if (typeof envPlatform.domPlatform !== 'string' || !envPlatform.domPlatform) {
+      throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__.domPlatform missing');
+    }
+    if (typeof envPlatform.uaPlatform !== 'string' || !envPlatform.uaPlatform) {
+      throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__.uaPlatform missing');
+    }
+    if (typeof envPlatform.platformVersion !== 'string' || !envPlatform.platformVersion) {
+      throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__.platformVersion missing');
+    }
     if (!screenState || typeof screenState !== 'object') {
       throw new Error('EnvBus: __SCREEN__.__STATE__ missing');
     }

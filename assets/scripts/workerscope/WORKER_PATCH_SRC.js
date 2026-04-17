@@ -169,6 +169,10 @@
       if (!Number.isFinite(Number(s.envProfile.width))) throw new Error('UACHPatch: bad envProfile.width');
       if (!Number.isFinite(Number(s.envProfile.height))) throw new Error('UACHPatch: bad envProfile.height');
       if (!Number.isFinite(Number(s.envProfile.dpr)) || Number(s.envProfile.dpr) <= 0) throw new Error('UACHPatch: bad envProfile.dpr');
+      if (!s.envProfile.__PLATFORM__ || typeof s.envProfile.__PLATFORM__ !== 'object') throw new Error('UACHPatch: missing envProfile.__PLATFORM__');
+      if (typeof s.envProfile.__PLATFORM__.domPlatform !== 'string' || !s.envProfile.__PLATFORM__.domPlatform) throw new Error('UACHPatch: bad envProfile.__PLATFORM__.domPlatform');
+      if (typeof s.envProfile.__PLATFORM__.uaPlatform !== 'string' || !s.envProfile.__PLATFORM__.uaPlatform) throw new Error('UACHPatch: bad envProfile.__PLATFORM__.uaPlatform');
+      if (typeof s.envProfile.__PLATFORM__.platformVersion !== 'string' || !s.envProfile.__PLATFORM__.platformVersion) throw new Error('UACHPatch: bad envProfile.__PLATFORM__.platformVersion');
       const he = (s.uaData && s.uaData.he) || s.highEntropy;
       if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
       for (const k of HE_KEYS) {
@@ -180,6 +184,17 @@
         if (Array.isArray(v) && !v.length) throw new Error(`UACHPatch: bad highEntropy.${k}`);
       }
       return s;
+    };
+    const requirePlatformTransit = (snap, where) => {
+      const source = requireSnap(snap, where);
+      const envProfile = source && source.envProfile && typeof source.envProfile === 'object'
+        ? source.envProfile
+        : null;
+      const envPlatform = envProfile && envProfile.__PLATFORM__ && typeof envProfile.__PLATFORM__ === 'object'
+        ? envProfile.__PLATFORM__
+        : null;
+      if (!envPlatform) throw new Error('UACHPatch: missing envProfile.__PLATFORM__');
+      return envPlatform;
     };
     cache.snap = requireSnap(self.__lastSnap__, 'init');
 
@@ -577,12 +592,8 @@
                         }
                         try {
                           if (!cache.snap) throw new Error('UACHPatch: no snap');
-                          const le = cache.snap.uaData;
-                          if (!le) throw new Error('UACHPatch: missing userAgentData');
-                          if (typeof le.platform !== 'string' || !le.platform) {
-                            throw new Error('worker_patch_src: uaData.platform missing');
-                          }
-                          return le.platform;
+                          const envPlatform = requirePlatformTransit(cache.snap, 'uadata.platform');
+                          return envPlatform.uaPlatform;
                         } catch (e) {
                           emitDegrade('warn', 'worker_patch_src:uadata:getter_native_fallback', {
                             stage: 'runtime',
@@ -780,17 +791,18 @@
           if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
           const src = (le.he && typeof le.he === 'object') ? le.he : s.highEntropy;
           if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
+          const envPlatform = requirePlatformTransit(s, 'uadata.getHighEntropyValues');
           const fullVersionList = (src.fullVersionList != null)
             ? src.fullVersionList
             : ((le.he && le.he.fullVersionList != null) ? le.he.fullVersionList : undefined);
           const map = {
             brands: le.brands,
             mobile: le.mobile,
-            platform: le.platform,
+            platform: envPlatform.uaPlatform,
             architecture: src.architecture,
             bitness: src.bitness,
             model: src.model,
-            platformVersion: src.platformVersion,
+            platformVersion: envPlatform.platformVersion,
             fullVersionList: fullVersionList,
             wow64: src.wow64,
             formFactors: src.formFactors
@@ -2032,12 +2044,13 @@
         { actual: sanityUAD.mobile, expected: cache.snap.uaData.mobile }
       );
     }
-    if (sanityUAD.platform !== cache.snap.uaData.platform) {
+    const expectedPlatformTransit = requirePlatformTransit(cache.snap, 'sanity.userAgentData.platform');
+    if (sanityUAD.platform !== expectedPlatformTransit.uaPlatform) {
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'userAgentData.platform',
         'UACHPatch: platform mismatch',
-        { actual: sanityUAD.platform, expected: cache.snap.uaData.platform }
+        { actual: sanityUAD.platform, expected: expectedPlatformTransit.uaPlatform }
       );
     }
     let directFullVersionListAvailable = false;
@@ -2067,6 +2080,7 @@
     }
     try {
       const expectedHe = cache.snap.uaData && cache.snap.uaData.he ? cache.snap.uaData.he : null;
+      const expectedPlatformTransitHe = requirePlatformTransit(cache.snap, 'sanity.userAgentData.getHighEntropyValues');
       const sanityHePromise = sanityUAD.getHighEntropyValues(['platformVersion','fullVersionList','architecture','bitness','model','wow64','formFactors']);
       if (!sanityHePromise || typeof sanityHePromise.then !== 'function') {
         failWorkerNavigatorSanity(
@@ -2095,7 +2109,7 @@
           formFactors: sanityHe && sanityHe.formFactors
         };
         const expectedHeProjection = {
-          platformVersion: expectedHe.platformVersion,
+          platformVersion: expectedPlatformTransitHe.platformVersion,
           fullVersionList: expectedHe.fullVersionList,
           architecture: expectedHe.architecture,
           bitness: expectedHe.bitness,
