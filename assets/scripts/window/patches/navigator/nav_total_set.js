@@ -310,7 +310,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // ——— A. Input/meta ———
     const meta          = (__envProfileState.meta && typeof __envProfileState.meta === 'object') ? __envProfileState.meta : {};
     const navPlat       = __envProfileState.navPlat;     // 'Win32' | 'MacIntel'
-    const gen           = __envProfileState.generatedPlatform; // "Windows" | "macOS"
+    const uaPlatform    = __envProfileState.uaPlatform; // "Windows" | "macOS"
     const userAgent     = __envProfileState.userAgent;
     const vendor        = __envProfileState.vendor;
     const mem           = Number(__envProfileState.mem);
@@ -566,16 +566,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const looksDom = (v) => v === 'Win32' || v === 'MacIntel';
 
     // guards (inputs must be present)
-    if (!gen) {
-      __navDiag('error', 'nav_total_set:generated_platform_missing', {
+    if (!uaPlatform) {
+      __navDiag('error', 'nav_total_set:ua_platform_missing', {
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'platform',
-        message: 'GENERATED_PLATFORM missing',
-        data: { outcome: 'skip', reason: 'missing_generated_platform' }
+        message: 'UA_PLATFORM missing',
+        data: { outcome: 'skip', reason: 'missing_ua_platform' }
       });
-      __navReleaseEntryGuard(true, 'preflight', 'generated_platform_missing');
+      __navReleaseEntryGuard(true, 'preflight', 'ua_platform_missing');
       return;
     }
     if (!navPlat) {
@@ -592,7 +592,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     // normalize/validate CH.platform (must be OS-string)
-    let chPlatform = meta.platform || gen;
+    let chPlatform = meta.platform || uaPlatform;
     if (looksDom(chPlatform)) {
       const normalized = asOS(chPlatform);
       if (STRICT) {
@@ -618,9 +618,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
     }
 
-    const expectedNavPlat = asDom(gen);
+    const expectedNavPlat = asDom(uaPlatform);
     if (navPlat !== expectedNavPlat) {
-      const msg = `NAV_PLATFORM__ (${navPlat}) inconsistent with ${gen} (expected ${expectedNavPlat})`;
+      const msg = `NAV_PLATFORM__ (${navPlat}) inconsistent with ${uaPlatform} (expected ${expectedNavPlat})`;
       if (STRICT) {
         __navDiag('error', 'nav_total_set:nav_platform_inconsistent', {
           stage: 'preflight',
@@ -628,7 +628,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           diagTag: 'nav_total_set',
           key: 'platform',
           message: msg,
-          data: { outcome: 'skip', reason: 'nav_platform_inconsistent', navPlat, generatedPlatform: gen, expectedNavPlat }
+          data: { outcome: 'skip', reason: 'nav_platform_inconsistent', navPlat, uaPlatform, expectedNavPlat }
         });
         __navReleaseEntryGuard(true, 'preflight', 'nav_platform_inconsistent');
         return;
@@ -639,7 +639,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           diagTag: 'nav_total_set',
           key: 'platform',
           message: msg,
-          data: { navPlat, generatedPlatform: gen, expectedNavPlat }
+          data: { navPlat, uaPlatform, expectedNavPlat }
         });
       }
     }
@@ -737,8 +737,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         return true;
       }
       try {
-        const packetMeta = (meta && typeof meta === 'object') ? meta : null;
-        assert(packetMeta, 'worker_env_snapshot.meta missing');
+        const workerMeta = (meta && typeof meta === 'object') ? meta : null;
+        assert(workerMeta, 'worker_env_snapshot.meta missing');
         __navSetHiddenStateValue(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__', __navCloneStateValue({
           ua: userAgent,
           language: primaryLanguage,
@@ -746,17 +746,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           deviceMemory: mem,
           hardwareConcurrency: cpu,
           uaData: {
-            brands: __navCloneStateValue(packetMeta.brands),
-            mobile: packetMeta.mobile,
-            platform: packetMeta.platform || gen,
+            brands: __navCloneStateValue(workerMeta.brands),
+            mobile: workerMeta.mobile,
+            platform: workerMeta.platform || uaPlatform,
             he: {
-              architecture: packetMeta.architecture,
-              bitness: packetMeta.bitness,
-              model: packetMeta.model,
-              platformVersion: packetMeta.platformVersion || __envProfileState.generatedPlatformVersion,
-              fullVersionList: __navCloneStateValue(packetMeta.fullVersionList != null ? packetMeta.fullVersionList : fullVersionList),
-              wow64: packetMeta.wow64,
-              formFactors: __navCloneStateValue(packetMeta.formFactors)
+              architecture: workerMeta.architecture,
+              bitness: workerMeta.bitness,
+              model: workerMeta.model,
+              platformVersion: workerMeta.platformVersion || __envProfileState.uaPlatformVersion,
+              fullVersionList: __navCloneStateValue(workerMeta.fullVersionList != null ? workerMeta.fullVersionList : fullVersionList),
+              wow64: workerMeta.wow64,
+              formFactors: __navCloneStateValue(workerMeta.formFactors)
             }
           }
         }));

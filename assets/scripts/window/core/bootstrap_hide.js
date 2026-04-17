@@ -564,8 +564,8 @@ if (__langMissingKeys__.length === 0) {
 
 __envProfileState__.meta = __cloneProfileValue__(W.__EXPECTED_CLIENT_HINTS || {});
 __envProfileState__.navPlat = W.__NAV_PLATFORM__;
-__envProfileState__.generatedPlatform = W.__GENERATED_PLATFORM;
-__envProfileState__.generatedPlatformVersion = W.__GENERATED_PLATFORM_VERSION;
+__envProfileState__.uaPlatform = W.__UA_PLATFORM__;
+__envProfileState__.uaPlatformVersion = W.__UA_PLATFORM_VERSION;
 __envProfileState__.userAgent = W.__USER_AGENT;
 __envProfileState__.vendor = W.__VENDOR;
 __envProfileState__.mem = Number(W.__memory);
@@ -695,8 +695,8 @@ function __sanitizeBootstrapEnvSurface__(win) {
     '__GLOBAL_SEED',
     '__EXPECTED_CLIENT_HINTS',
     '__NAV_PLATFORM__',
-    '__GENERATED_PLATFORM',
-    '__GENERATED_PLATFORM_VERSION',
+    '__UA_PLATFORM__',
+    '__UA_PLATFORM_VERSION',
     '__USER_AGENT',
     '__VENDOR',
     '__LATITUDE__',

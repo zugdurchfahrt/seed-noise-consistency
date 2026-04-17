@@ -249,7 +249,7 @@ def build_bootstrap_device_metrics():
 def init_driver(
     profile, country_data, platform, user_agent, screen_width, screen_height,
     webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
-    devices_conf, generated_platform, generated_platform_version, expected_client_hints,
+    devices_conf, ua_platform, ua_platform_version, expected_client_hints,
     vendor_value, language, normalized_languages, device_memory_value, hardware_concurrency_value,
     device_dpr_value, plugins, gpu_vendor, gpu_architecture, gpu_type, global_seed,
 ):
@@ -528,14 +528,14 @@ def init_driver(
             configurable: true,
             enumerable: false
         }},
-        __GENERATED_PLATFORM: {{
-            value: {json.dumps(generated_platform, ensure_ascii=False)},
+        __UA_PLATFORM__: {{
+            value: {json.dumps(ua_platform, ensure_ascii=False)},
             writable: true,
             configurable: true,
             enumerable: false
         }},
-        __GENERATED_PLATFORM_VERSION: {{
-            value: {json.dumps(generated_platform_version, ensure_ascii=False)},
+        __UA_PLATFORM_VERSION: {{
+            value: {json.dumps(ua_platform_version, ensure_ascii=False)},
             writable: true,
             configurable: true,
             enumerable: false
@@ -1175,16 +1175,16 @@ def main():
         }
 
         if profile["platform"]  == "Win32":
-            generated_platform = "Windows"
+            ua_platform = "Windows"
         elif profile["platform"]  == "MacIntel":
-            generated_platform = "macOS"
+            ua_platform = "macOS"
 
-        generated_platform_version = profile["platform_version"]
+        ua_platform_version = profile["platform_version"]
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
         profile["browser_brand"] = browser_brand
         profile["browser_major_version"] = major_version
         expected_client_hints = build_expected_client_hints(
-            profile, generated_platform, browser_brand, major_version, browser_version
+            profile, ua_platform, browser_brand, major_version, browser_version
         )
         # ----------------------- Python final logging  -----------------------
         logger.info(f"profile['user_agent'] = {profile.get('user_agent')}")
@@ -1236,7 +1236,7 @@ def main():
             profile, country_data, profile["platform"], profile["user_agent"],
             profile["screen_width"], profile["screen_height"], profile["webgl_vendor"], profile["webgl_renderer"],
             profile["webgl_unmasked_vendor"], profile["webgl_unmasked_renderer"],
-            profile["devices_conf"], generated_platform, generated_platform_version,
+            profile["devices_conf"], ua_platform, ua_platform_version,
             expected_client_hints, profile["vendor_value"], profile["language"], profile["languages"],
             profile["deviceMemory"], profile["hardwareConcurrency"], profile["device_dpr_value"],
             profile["plugins"], profile["gpu_vendor"], profile["gpu_architecture"], profile["gpu_type"],

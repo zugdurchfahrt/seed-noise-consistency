@@ -182,12 +182,12 @@ def determine_browser_brand_and_versions(user_agent, profile):
     return browser_brand, major_version, browser_version
 
 # ===Forming expected_client_hints through a single brands-source ===
-def build_expected_client_hints(profile, generated_platform, browser_brand, major_version, browser_version):
+def build_expected_client_hints(profile, ua_platform, browser_brand, major_version, browser_version):
     """
     Builds a dictionary of expected client hints based on the provided profile and browser information.
     Args:
         profile (dict): A dictionary containing user profile information such as platform version, device memory, hardware concurrency, languages, and language.
-        generated_platform (str): The name of the platform (e.g., "Windows", "Linux", "macOS").
+        ua_platform (str): The OS-string platform for UA-CH/User-Agent Data (e.g., "Windows", "Linux", "macOS").
         browser_brand (str): The browser brand (e.g., "Chrome", "Firefox").
         major_version (str): The major version of the browser.
         browser_version (str): The full browser version string.
@@ -198,7 +198,7 @@ def build_expected_client_hints(profile, generated_platform, browser_brand, majo
         browser_brand, major_version, browser_version
     )
     res = {
-        "platform": generated_platform,
+        "platform": ua_platform,
         "brands": brands,
         "mobile": False,
         "architecture": "x86",
