@@ -665,14 +665,17 @@ function EnvBus(G){
     const screenState = (screenRoot && screenRoot.__STATE__ && typeof screenRoot.__STATE__ === 'object')
       ? screenRoot.__STATE__
       : null;
-    const envProfile = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
-      ? __cloneEnvValue(stateRoot.__ENV_PROFILE__)
+    const envProfileSource = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+      ? stateRoot.__ENV_PROFILE__
+      : null;
+    const envProfile = envProfileSource
+      ? __cloneEnvValue(envProfileSource)
       : null;
     if (!envProfile || typeof envProfile !== 'object') {
       throw new Error('EnvBus: __ENV_PROFILE__ missing');
     }
-    const envPlatform = (envProfile.__PLATFORM__ && typeof envProfile.__PLATFORM__ === 'object')
-      ? envProfile.__PLATFORM__
+    const envPlatform = (envProfileSource.__PLATFORM__ && typeof envProfileSource.__PLATFORM__ === 'object')
+      ? envProfileSource.__PLATFORM__
       : null;
     if (!envPlatform || typeof envPlatform !== 'object') {
       throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__ missing');
@@ -686,6 +689,7 @@ function EnvBus(G){
     if (typeof envPlatform.platformVersion !== 'string' || !envPlatform.platformVersion) {
       throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__.platformVersion missing');
     }
+    envProfile.__PLATFORM__ = __cloneEnvValue(envPlatform);
     if (!screenState || typeof screenState !== 'object') {
       throw new Error('EnvBus: __SCREEN__.__STATE__ missing');
     }
