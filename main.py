@@ -522,12 +522,6 @@ def init_driver(
             configurable: true,
             enumerable: false
         }},
-        __FULL_VERSION_LIST: {{
-            value: {json.dumps(expected_client_hints.get("fullVersionList", []), ensure_ascii=False)},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
         __NAV_PLATFORM__: {{
             value: {json.dumps(profile['platform'], ensure_ascii=False)},
             writable: true,
@@ -647,18 +641,6 @@ def init_driver(
             configurable: true,
             enumerable: false
         }},
-        __STORAGE_QUOTA_MB: {{
-            value: {json.dumps(profile["storageQuotaMb"]) if "storageQuotaMb" in profile else "undefined"},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
-        __STORAGE_USED_PCT: {{
-            value: {json.dumps(profile["storageUsedPct"]) if "storageUsedPct" in profile else "undefined"},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
         __WEBGL_RENDERER__: {{
             value: {json.dumps(webgl_renderer, ensure_ascii=False)},
             writable: true,
@@ -697,24 +679,6 @@ def init_driver(
         }},
         __GPU_VENDOR__: {{
             value: {json.dumps(gpu_vendor, ensure_ascii=False)},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
-        __WEBGPU_DEVICE__: {{
-            value: {json.dumps(profile["webgpuDevice"], ensure_ascii=False) if "webgpuDevice" in profile else "undefined"},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
-        __NAV_PATCH_STRICT__: {{
-            value: {str(bool(profile.get("navPatchStrict", True))).lower()},
-            writable: true,
-            configurable: true,
-            enumerable: false
-        }},
-        __NAV_PATCH_DEBUG__: {{
-            value: {str(bool(profile.get("navPatchDebug", False))).lower()},
             writable: true,
             configurable: true,
             enumerable: false
