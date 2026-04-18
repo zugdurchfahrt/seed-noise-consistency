@@ -83,17 +83,13 @@ from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
 from tools.tools_runtime.headers_adapter import build_accept_language
 
-# Please be aware that ths function calling Proxy_Mechanics_Registry is temporarily disabled.
-# Do not consider it as proof.
-# from tools.tools_native_check.core_bridge_firewall import enforce_core_bridge_firewall
-
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
     "vpn_utils": logging.DEBUG,
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
-    "brandmauer": logging.INFO,
+    # "brandmauer": logging.INFO,
 })
 
 
@@ -906,10 +902,6 @@ def main():
     vpn_utils_module.random = vpn_rng
     client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
     
-    # Please be aware that ths function calling Proxy_Mechanics_Registry is temporarily disabled.
-    # Do not consider it as proof.
-    # enforce_core_bridge_firewall(PROJECT_ROOT, logger=logger.getChild("brandmauer")) 
-    
     try:
         json_path = str(PROFILE_DATA_SRC/ "profile.json")
         if os.path.exists(json_path):
@@ -1309,7 +1301,7 @@ def main():
         
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/fonts.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
