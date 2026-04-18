@@ -27,6 +27,7 @@ VERSION_BY_FAMILY_PATH  = PROFILE_DATA_SOURCE / 'FONTS_VERSION_BY_FAMILY_JSON.js
 GENERATORS          = TOOLS / 'generators'
 TEMPLATES           = ASSETS / 'templates'
 MANIFEST_PATH       = ASSETS/ 'Manifest' / 'fonts-manifest.json'
+SELECTION_AUDIT_PATH= ASSETS/ 'Manifest' / 'fonts-selection-audit.json'
 PATCH_OUT           = ASSETS/ 'JS_fonts_patch' / 'font_patch.generated.js'
 FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
@@ -193,6 +194,16 @@ def _cache_namespace_token() -> str:
     return _derive_local_material("cache_namespace")
 
 
+def _font_experiment_level() -> int:
+    raw = str(os.environ.get("FONTS_EXPERIMENT_LEVEL", "0") or "0").strip()
+    try:
+        level = int(raw)
+    except ValueError:
+        logger.warning(f"[fonts] invalid FONTS_EXPERIMENT_LEVEL={raw!r}; fallback to 0")
+        return 0
+    return max(0, level)
+
+
 def _meta_rng() -> random.Random:
     if _META_RNG is None:
         raise RuntimeError("[fonts] META_RNG is required (not initialized)")
@@ -243,6 +254,85 @@ def _family_mapping_value(path: pathlib.Path, cache_name: str, family: str) -> s
 def _normalize_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", (value or "").strip())
 
+
+
+def _normalize_optional_text(value) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value_norm = _normalize_whitespace(value)
+    return value_norm or None
+
+
+def _compose_full_name(family: str, subfamily: str) -> str:
+    family_norm = _normalize_whitespace(family)
+    subfamily_norm = _normalize_whitespace(subfamily)
+    return f"{family_norm} {subfamily_norm}".strip()
+
+
+def _compose_postscript_name(family: str, subfamily: str) -> str:
+    family_norm = _normalize_whitespace(family)
+    subfamily_norm = _normalize_whitespace(subfamily)
+    return f"{family_norm}-{subfamily_norm}".replace(" ", "").strip("-")
+
+
+def _read_source_font_identity(target_dir: pathlib.Path, fname: str) -> dict[str, str]:
+    orig_family, orig_subfamily = get_font_compare(target_dir / fname)
+    return {
+        "orig_family": _normalize_optional_text(orig_family) or "",
+        "orig_subfamily": _normalize_optional_text(orig_subfamily) or "",
+    }
+
+
+def _collect_source_font_identity_map(target_dir: pathlib.Path, names: list[str]) -> dict[str, dict[str, str]]:
+    out = {}
+    for fname in names:
+        out[fname] = _read_source_font_identity(target_dir, fname)
+    return out
+
+
+def _select_source_family_diverse_names(platform: str, names: list[str], count: int, source_meta_map: dict[str, dict[str, str]]) -> list[str]:
+    if count <= 0 or not names:
+        return []
+
+    bucketed = defaultdict(list)
+    for fname in sorted(names):
+        source_meta = source_meta_map.get(fname) or {}
+        family_key = source_meta.get("orig_family") or "__missing_source_family__"
+        bucketed[family_key].append(fname)
+
+    group_keys = sorted(
+        bucketed.keys(),
+        key=lambda family_key: _derive_local_material("exp2_source_family_group", platform, family_key),
+    )
+
+    selected = []
+    selected_set = set()
+    for family_key in group_keys:
+        items = sorted(
+            bucketed[family_key],
+            key=lambda fname: _derive_local_material("exp2_source_family_head", platform, family_key, fname),
+        )
+        if not items:
+            continue
+        picked = items[0]
+        selected.append(picked)
+        selected_set.add(picked)
+        if len(selected) >= count:
+            return sorted(selected)
+
+    leftovers = []
+    for family_key in group_keys:
+        items = sorted(
+            bucketed[family_key],
+            key=lambda fname: _derive_local_material("exp2_source_family_tail", platform, family_key, fname),
+        )
+        for fname in items:
+            if fname in selected_set:
+                continue
+            leftovers.append(fname)
+
+    selected.extend(leftovers[: max(0, count - len(selected))])
+    return sorted(selected)
 
 
 def _derive_css_family(family: str, fallback: str) -> str:
@@ -659,8 +749,8 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     family = rng.choice(family_names)
     subfamily = rng.choice(subfamilies)
     unique_id = f"{family[:2]}-{random_string(12)}"
-    full_name = f"{family} {subfamily}".strip()
-    ps_name = f"{family}-{subfamily}".replace(" ", "")
+    full_name = _compose_full_name(family, subfamily)
+    ps_name = _compose_postscript_name(family, subfamily)
     fallback_designer = rng.choice(designers)
     fallback_license_desc = rng.choice(licenses)
     version = f"Version {rng.randint(1,5)}.{rng.randint(0,9999)}"
@@ -792,14 +882,21 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         return []
 
     # Stabilized derivation from the injected rand_met module derivative.
-    _seed_parts = _manifest_seed_parts(platform, all_names)
+    sorted_all_names = sorted(all_names)
+    _seed_parts = _manifest_seed_parts(platform, sorted_all_names)
     _rng = _derive_local_rng("manifest_rng", *_seed_parts)
+    experiment_level = _font_experiment_level()
+    if experiment_level >= 3:
+        logger.info("[fonts][exp3] resolved_family prefers readable source family when available")
+    source_identity_map = {}
 
 
     # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
     MIN_N = int(os.environ.get("FONTS_MIN_N", "35"))
     MAX_N = int(os.environ.get("FONTS_MAX_N", "37"))
     max_n = len(all_names)
+    selection_strategy = "seeded_random"
+    selection_audit_records = []
 
     if max_n == 0:
         logger.warning(f"[Fonts] No files passed filters ({max_n}) for MIN_N={MIN_N} — manifest will be empty")
@@ -807,11 +904,54 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     else:
         hi = min(MAX_N, max_n)
         lo = 1 if max_n < MIN_N else MIN_N
-        N = _rng.randint(lo, hi)
+        if experiment_level >= 1:
+            N = hi
+            logger.info(f"[fonts][exp1] fixed fingerprint selection size enabled: N={N} (MIN_N={MIN_N}, MAX_N={MAX_N}, max_n={max_n})")
+        else:
+            N = _rng.randint(lo, hi)
         if N < MIN_N:
             logger.warning(f"[Fonts] Only {max_n} files available < MIN_N={MIN_N} — using N={N}")
-        fingerprint_names = _rng.sample(sorted(all_names), k=N)
+        if experiment_level >= 2:
+            source_identity_map = _collect_source_font_identity_map(target_dir, sorted_all_names)
+            fingerprint_names = _select_source_family_diverse_names(platform, sorted_all_names, N, source_identity_map)
+            selection_strategy = "source_family_diverse"
+            diverse_source_families = {
+                (source_identity_map.get(fname) or {}).get("orig_family") or "__missing_source_family__"
+                for fname in fingerprint_names
+            }
+            logger.info(
+                f"[fonts][exp2] source-family-diverse selection enabled: selected={len(fingerprint_names)} "
+                f"unique_source_families={len(diverse_source_families)}"
+            )
+        else:
+            fingerprint_names = _rng.sample(sorted_all_names, k=N)
         fingerprint_names.sort()  # fix the order in the manifest
+
+    if experiment_level >= 1:
+        if not source_identity_map:
+            source_identity_map = _collect_source_font_identity_map(target_dir, fingerprint_names)
+        selection_audit_records = [
+            {
+                "name": fname,
+                "orig_family": (source_identity_map.get(fname) or {}).get("orig_family", ""),
+                "orig_subfamily": (source_identity_map.get(fname) or {}).get("orig_subfamily", ""),
+            }
+            for fname in fingerprint_names
+        ]
+        selection_audit_payload = {
+            "platform": platform,
+            "experiment_level": experiment_level,
+            "selection_strategy": selection_strategy,
+            "requested_min_n": MIN_N,
+            "requested_max_n": MAX_N,
+            "selected_count": len(fingerprint_names),
+            "fingerprint_names": [row["name"] for row in selection_audit_records],
+            "selected_fonts": selection_audit_records,
+        }
+        os.makedirs(SELECTION_AUDIT_PATH.parent, exist_ok=True)
+        with open(SELECTION_AUDIT_PATH, "w", encoding="utf-8") as audit_f:
+            json.dump(selection_audit_payload, audit_f, ensure_ascii=False, indent=2)
+        logger.info(f"[fonts][exp1] selection audit generated: {SELECTION_AUDIT_PATH.name} ({len(selection_audit_records)} fonts)")
         
     # === Step 4: collect temp_configs for Jinja ===
     max_family_repeats = 4
@@ -838,23 +978,33 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 logger.warning(f"[fonts] Пропуск {fname}: пустой data URL")
                 continue
 
-            file_path = target_dir / fname
             name_no_ext = pathlib.Path(fname).stem
-            orig_family, orig_subfamily = get_font_compare(file_path)
+            source_identity = source_identity_map.get(fname)
+            if source_identity is None:
+                source_identity = _read_source_font_identity(target_dir, fname)
+                source_identity_map[fname] = source_identity
+            orig_family = source_identity.get("orig_family") or None
+            orig_subfamily = source_identity.get("orig_subfamily") or None
 
             # deterministic generation of metadata (seed is already fixed above)
             meta_values = generate_font_metadata(platform, subfamilies_src)
             family     = meta_values.get(1, fname)
             subfamily  = meta_values.get(2, "")
-            full_name  = meta_values.get(4, "")
-            postscript = meta_values.get(6, "")
-            platform_name_bank = SYS_FONTS_MAC if platform == "MacIntel" else SYS_FONTS_WIN
-            resolved_family = (
-                orig_family
-                if isinstance(orig_family, str) and orig_family in platform_name_bank
-                else family
-            )
-            
+            resolved_source_family = _normalize_optional_text(orig_family)
+            if experiment_level >= 3:
+                resolved_family = resolved_source_family or family
+                full_name = _compose_full_name(resolved_family, subfamily)
+                postscript = _compose_postscript_name(resolved_family, subfamily)
+            else:
+                full_name  = meta_values.get(4, "")
+                postscript = meta_values.get(6, "")
+                platform_name_bank = SYS_FONTS_MAC if platform == "MacIntel" else SYS_FONTS_WIN
+                resolved_family = (
+                    resolved_source_family
+                    if resolved_source_family in platform_name_bank
+                    else family
+                )
+             
             #limits families dups and removes duplicates
         # Dedup: drop duplicates; do not mutate/tag font fields.
             uniq_triple = (resolved_family, full_name, postscript)
@@ -877,13 +1027,15 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 "md5": rec.get("md5", ""),
                 "family": resolved_family,
                 "cssFamily": _derive_css_family(resolved_family, name_no_ext),
+                "source_family": orig_family or "",
+                "source_subfamily": orig_subfamily or "",
                 "subfamily": subfamily,
                 "weight": weight,
                 "style": style,
                 "unique_id": meta_values.get(3, ""),
-                "full_name": meta_values.get(4, ""),
+                "full_name": full_name,
                 "version": meta_values.get(5, ""),
-                "postscript_name": meta_values.get(6, ""),
+                "postscript_name": postscript,
                 "designer": meta_values.get(9, ""),
                 "license": meta_values.get(13, ""),
                 "platform_id": PLATFORM_ID_MAP[platform][0],
@@ -936,6 +1088,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "name": c["name"],
             "family": c["family"],
             "cssFamily": c.get("cssFamily") or c.get("family"),
+            "source_family": c.get("source_family", ""),
+            "source_subfamily": c.get("source_subfamily", ""),
             "subfamily": c.get("subfamily", ""),
             "weight": c.get("weight", "normal"),
             "style": c.get("style", "normal"),
