@@ -1,21 +1,19 @@
 const FontPatchModule = function FontPatchModule(window) {
-const G = (typeof globalThis !== 'undefined' && globalThis)
+const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       || (typeof self       !== 'undefined' && self)
       || (typeof window     !== 'undefined' && window)
       || (typeof global     !== 'undefined' && global)
       || {};
-
-  if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
-    // если модуль оказался в worker-среде и его вызвали как FontPatchModule(window) где window=undefined
-    window = G;
-  }
+  const __fontRealmRoot = (window && (typeof window === 'object' || typeof window === 'function'))
+    ? window
+    : __fontRealmBootstrap;
 
   const __fontTypePipeline = 'pipeline missing data';
   const __fontTypeBrowser = 'browser structure missing data';
   function __fontDiag(level, code, extra, err) {
     try {
-      const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-        ? window.CanvasPatchContext.__logger
+      const __loggerRoot = (__fontRealmRoot && __fontRealmRoot.CanvasPatchContext && __fontRealmRoot.CanvasPatchContext.__logger && typeof __fontRealmRoot.CanvasPatchContext.__logger === 'object')
+        ? __fontRealmRoot.CanvasPatchContext.__logger
         : null;
       const D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
       const emitCode = String(code || 'fonts');
@@ -110,7 +108,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     };
   }
 
-  const C = window.CanvasPatchContext;
+  const C = (__fontRealmRoot && __fontRealmRoot.CanvasPatchContext) || null;
   if (!C) {
     __fontDiagPipeline('warn', 'fonts:canvas_patch_context_missing', {
       stage: 'preflight',
@@ -212,10 +210,31 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   }
   __fontsState.familySnapshot = __fontFamilySnapshot;
 
-  const Core = window && window.Core;
+  const Core = (__fontRealmRoot && __fontRealmRoot.Core) || null;
+  const __fontDocument = (__fontRealmRoot && __fontRealmRoot.document && typeof __fontRealmRoot.document === 'object')
+    ? __fontRealmRoot.document
+    : null;
+  const __fontFallbackFontFaceSet = (__fontRealmRoot && __fontRealmRoot.fonts)
+    ? __fontRealmRoot.fonts
+    : null;
+  const __fontFontFaceSet = (__fontDocument && __fontDocument.fonts)
+    ? __fontDocument.fonts
+    : __fontFallbackFontFaceSet;
+  const __fontEventTarget = (__fontRealmRoot && typeof __fontRealmRoot.dispatchEvent === 'function')
+    ? __fontRealmRoot
+    : null;
   const __fontDomPlatform = (__envPlatformState && typeof __envPlatformState.domPlatform === 'string' && __envPlatformState.domPlatform)
     ? __envPlatformState.domPlatform
     : null;
+  if (__fontDocument && __fontFallbackFontFaceSet && __fontDocument.fonts && __fontDocument.fonts !== __fontFallbackFontFaceSet) {
+    __fontDiagPipeline('warn', 'fonts:document_fontfaceset_anchor_mismatch', {
+      stage: 'preflight',
+      diagTag: 'fonts',
+      key: 'document.fonts',
+      message: 'document.fonts and realm fonts fallback resolved to different anchors',
+      data: { outcome: 'skip', reason: 'document_fontfaceset_anchor_mismatch' }
+    }, null);
+  }
   if (!Core) {
     __fontDiagPipeline('warn', 'fonts:core_missing', {
       stage: 'preflight',
@@ -538,7 +557,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
   // expose awaitFontsReady only in internal fonts state
   (function exposeFontsReady(){
-    const hasDocFonts = (typeof document === 'object' && document && document.fonts && document.fonts.ready);
+    const hasDocFonts = !!(__fontDocument && __fontFontFaceSet && __fontFontFaceSet.ready);
 
     if (hasDocFonts) {
       if (!__fontsState.awaitReady || typeof __fontsState.awaitReady.then !== 'function' || __fontsState.awaitReadyStatus !== 'pending') {
@@ -548,8 +567,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       }
       return;
     }
-    if (window.fonts && window.fonts.ready && typeof window.fonts.ready.then === 'function') {
-      __setFontsAwaitState(window.fonts.ready, 'native', null, null);
+    if (__fontFontFaceSet && __fontFontFaceSet.ready && typeof __fontFontFaceSet.ready.then === 'function') {
+      __setFontsAwaitState(__fontFontFaceSet.ready, 'native', null, null);
     } else {
       __setFontsAwaitState(Promise.resolve(), 'native', null, null);
     }
@@ -580,11 +599,10 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 (() => {
   'use strict';
 
-  // Глобал рантайма
-  const G = (typeof globalThis !== "undefined" ? globalThis : self);
+  const __fontRuntimeRoot = __fontRealmRoot;
 
   // FontFaceSet в текущем окружении (window/worker)
-  const FFS = (G.document && G.document.fonts) || G.fonts || null;
+  const FFS = __fontFontFaceSet;
   if (!FFS) {
     __fontDiagPipeline('warn', 'fonts:ffs_missing', {
       stage: 'preflight',
@@ -956,7 +974,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       .filter(Boolean);
   }
 
-  const NativeFontFace = (G && typeof G.FontFace === 'function') ? G.FontFace : null;
+  const NativeFontFace = (__fontRuntimeRoot && typeof __fontRuntimeRoot.FontFace === 'function') ? __fontRuntimeRoot.FontFace : null;
   if (!NativeFontFace) {
     __fontDiagPipeline('warn', 'fonts:fontface_missing', {
       stage: 'preflight',
@@ -1072,15 +1090,39 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       }, e);
     }
     if (WrappedFontFace) {
+      let __fontFaceOwner = null;
+      try {
+        const __fontFaceResolved = Core.resolveDescriptor(__fontRuntimeRoot, 'FontFace', { mode: 'own' });
+        __fontFaceOwner = (__fontFaceResolved && __fontFaceResolved.owner) ? __fontFaceResolved.owner : null;
+      } catch (e) {
+        __fontDiagBrowser('warn', 'fonts:fontface:resolve_owner_failed', {
+          stage: 'preflight',
+          diagTag: 'fonts:fontface',
+          key: 'FontFace',
+          message: 'FontFace owner resolution failed',
+          data: { outcome: 'skip', reason: 'resolve_owner_failed' }
+        }, e);
+      }
+      if (!__fontFaceOwner) {
+        __fontDiagPipeline('warn', 'fonts:fontface:owner_missing', {
+          stage: 'preflight',
+          diagTag: 'fonts:fontface',
+          key: 'FontFace',
+          message: 'FontFace resolved owner missing',
+          data: { outcome: 'skip', reason: 'resolved_owner_missing' }
+        }, null);
+      } else {
       applyTargetGroup('fonts:data:fontface', [{
-        owner: G,
+        owner: __fontFaceOwner,
         key: 'FontFace',
         kind: 'data',
         wrapLayer: 'descriptor_only',
+        resolve: 'own',
         value: WrappedFontFace,
         policy: 'skip',
         diagTag: 'fonts:data:fontface'
       }], 'skip');
+      }
     }
   }
 
@@ -1131,8 +1173,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   let FFS_BOOT_MS   = 180;
   let FFS_LIM_BOOT  = 96;
 
-  const now = (G.performance && typeof G.performance.now === 'function')
-    ? () => G.performance.now.call(G.performance)
+  const now = (__fontRuntimeRoot.performance && typeof __fontRuntimeRoot.performance.now === 'function')
+    ? () => __fontRuntimeRoot.performance.now.call(__fontRuntimeRoot.performance)
     : () => Date.now();
 
   const T0 = now();
@@ -1308,8 +1350,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       data: { outcome: 'skip', reason: 'missing_nav_platform' }
     }, null);
     try {
-      if (typeof document === 'object' && document && document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
-        __setFontsAwaitState(document.fonts.ready, 'native', null, null);
+      if (__fontFontFaceSet && __fontFontFaceSet.ready && typeof __fontFontFaceSet.ready.then === 'function') {
+        __setFontsAwaitState(__fontFontFaceSet.ready, 'native', null, null);
       }
     } catch (eRestore) {
       degrade('fonts:await_ready_restore_failed', eRestore);
@@ -1346,7 +1388,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
   // --- DOM override for quick macOS check (optional, debugging) ---
   (function () {
     // в worker’е документа нет — выходим
-    if (typeof document === 'undefined') return;
+    if (!__fontDocument) return;
 
     const domPlat = __fontDomPlatform;
     if (!domPlat) {
@@ -1384,15 +1426,15 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
       const testFamCss = JSON.stringify(String(testFam));
 
       // idempotent: не плодим несколько <style id="force-font-override">
-      let el = document.getElementById('force-font-override');
+      let el = __fontDocument.getElementById('force-font-override');
       if (!el) {
-        el = document.createElement('style');
+        el = __fontDocument.createElement('style');
         el.id = 'force-font-override';
         // вставляем в head, если он уже есть; иначе — в documentElement/body
         const parent =
-          document.head ||
-          document.documentElement ||
-          document.body;
+          __fontDocument.head ||
+          __fontDocument.documentElement ||
+          __fontDocument.body;
         if (!parent) {
           // если DOM ещё не готов (редкий случай), оставим через RAF следующему тику
           requestAnimationFrame(run);
@@ -1416,8 +1458,8 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
 
     // дождаться готовности DOM, чтобы не ловить appendChild на null
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', run, { once: true });
+    if (__fontDocument.readyState === 'loading') {
+      __fontDocument.addEventListener('DOMContentLoaded', run, { once: true });
     } else {
       run();
     }
@@ -1425,7 +1467,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
 
   // ===  window branch (DOM exist here) ====
-  if (typeof document === 'object' && document) {
+  if (__fontDocument && __fontFontFaceSet && typeof __fontFontFaceSet.add === 'function') {
     Promise.allSettled(
       fonts.map((f) => {
         try {
@@ -1451,7 +1493,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
           return ff.load().then((loaded) => {
             try {
-              document.fonts.add(loaded);
+              __fontFontFaceSet.add(loaded);
             } catch (eAdd) {
               __fontDiagBrowser('warn', 'fonts:document_fonts_add_failed', {
                 stage: 'runtime',
@@ -1481,7 +1523,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
 
       // strict settle: wait for native document.fonts.ready + double RAF before exposing fontsready
       return Promise.resolve()
-        .then(() => (document.fonts && document.fonts.ready) || Promise.resolve())
+        .then(() => (__fontFontFaceSet && __fontFontFaceSet.ready) || Promise.resolve())
         .then(() => __doubleRafBarrier())
         .then(() => {
           if (failed > 0) {
@@ -1510,7 +1552,7 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
           __setFontsRuntimeState(true, null);
           __settleAwaitFontsReady('resolved');
           try {
-            if (window.dispatchEvent) window.dispatchEvent(new Event('fontsready'));
+            if (__fontEventTarget) __fontEventTarget.dispatchEvent(new Event('fontsready'));
           } catch (eEvt) {
             degrade('fonts:event:dispatch_failed', eEvt);
           }
@@ -1561,16 +1603,16 @@ const G = (typeof globalThis !== 'undefined' && globalThis)
     }
     const tagId = 'font-patch-styles';
     const apply = () => {
-      let styleEl = document.getElementById(tagId) || document.createElement('style');
+      let styleEl = __fontDocument.getElementById(tagId) || __fontDocument.createElement('style');
       styleEl.id = tagId;
-      (document.head || document.documentElement || document.body).appendChild(styleEl);
+      (__fontDocument.head || __fontDocument.documentElement || __fontDocument.body).appendChild(styleEl);
       styleEl.textContent = css;
     };
 
     // НОВОЕ: не ждём строго DOMContentLoaded — пробуем как только появляется контейнер
-    if (document.readyState === 'loading') {
+    if (__fontDocument.readyState === 'loading') {
       const tryApply = () => {
-        if (document.head || document.documentElement || document.body) apply();
+        if (__fontDocument.head || __fontDocument.documentElement || __fontDocument.body) apply();
         else requestAnimationFrame(tryApply);
       };
       tryApply();
