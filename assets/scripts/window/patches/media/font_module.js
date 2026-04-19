@@ -657,6 +657,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       parts.push([
         normalizeFamilyName(cfg.cssFamily || ''),
         normalizeFamilyName(cfg.family || ''),
+        normalizeFamilyName(cfg.full_name || ''),
+        normalizeFamilyName(cfg.postscript_name || ''),
         (typeof cfg.platform_dom === 'string') ? cfg.platform_dom : '',
         (typeof cfg.style === 'string') ? cfg.style.toLowerCase() : '',
         (typeof cfg.weight === 'string') ? cfg.weight.toLowerCase() : ''
@@ -679,7 +681,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     const scoped = getPlatformScopedFontConfigs();
     __fontFamilySnapshot.allowedFamilies = new Set(
       scoped.cfgs
-        .flatMap(f => [f && f.cssFamily, f && f.family].filter(Boolean))
+        .flatMap(f => [f && f.cssFamily, f && f.family, f && f.full_name, f && f.postscript_name].filter(Boolean))
         .map(normalizeFamilyName)
         .filter(Boolean)
     );
@@ -840,7 +842,11 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     if (!fam) return null;
     const cfgs = getRuntimeFontConfigs();
     if (!cfgs.length) return null;
-    const familyMatches = cfgs.filter(cfg => normalizeFamilyName(cfg && (cfg.cssFamily || cfg.family)) === fam);
+    let familyMatches = cfgs.filter(cfg => (
+      normalizeFamilyName(cfg && (cfg.cssFamily || cfg.family)) === fam ||
+      normalizeFamilyName(cfg && cfg.full_name) === fam ||
+      normalizeFamilyName(cfg && cfg.postscript_name) === fam
+    ));
     if (!familyMatches.length) return null;
     const desc = (descriptors && typeof descriptors === 'object') ? descriptors : null;
     const style = desc && typeof desc.style === 'string' ? desc.style.toLowerCase() : 'normal';

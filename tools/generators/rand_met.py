@@ -40,8 +40,7 @@ SYS_FONTS_WIN = [
     'Liberation Sans','Liberation Serif','Ebrima','Fixedsys','Ink Free',
     'Gabriola','Franklin Gothic Medium','Gadugi','Lucida Console','Lucida Sans Unicode',
     'Malgun Gothic','Modern','Roboto','Montserrat','MS Sans Serif','MS Serif','msgothic','Palatino Linotype',
-    'Symbol','Roman','Sans Serif Collection','Script','Sitka','Sylfaen','System', 'Terminal','Tinos',
-    'Webdings'
+    'Symbol','Roman','Sans Serif Collection','Script','Sitka','Sylfaen','System','Terminal','Tinos','Webdings'
 ]
   
     
@@ -732,21 +731,97 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
 
     # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
-    MIN_N = int(os.environ.get("FONTS_MIN_N", "35"))
-    MAX_N = int(os.environ.get("FONTS_MAX_N", "37"))
+    MIN_N = int(os.environ.get("FONTS_MIN_N", "43"))
+    MAX_N = int(os.environ.get("FONTS_MAX_N", "45"))
     max_n = len(all_names)
+    source_identity_map = {}
 
     if max_n == 0:
         logger.warning(f"[Fonts] No files passed filters ({max_n}) for MIN_N={MIN_N} — manifest will be empty")
         fingerprint_names = []
     else:
-        hi = min(MAX_N, max_n)
-        lo = 1 if max_n < MIN_N else MIN_N
-        N = _rng.randint(lo, hi)
+        fixed_n = MAX_N
+        hi = min(fixed_n, max_n)
+        lo = 1 if max_n < fixed_n else fixed_n
+        N = hi
         if N < MIN_N:
             logger.warning(f"[Fonts] Only {max_n} files available < MIN_N={MIN_N} — using N={N}")
-        fingerprint_names = _rng.sample(sorted(all_names), k=N)
+        sorted_names = sorted(all_names)
+        for fname in sorted_names:
+            file_path = target_dir / fname
+            detected_weight = "normal"
+            detected_style = "normal"
+            try:
+                font = TTFont(file_path)
+                family_name = font['name'].getName(1, 3, 1)
+                subfamily_name = font['name'].getName(2, 3, 1)
+                full_name = font['name'].getName(4, 3, 1)
+                postscript_name = font['name'].getName(6, 3, 1)
+                orig_family = family_name.toUnicode() if family_name else ''
+                orig_subfamily = subfamily_name.toUnicode() if subfamily_name else ''
+                orig_full_name = full_name.toUnicode() if full_name else ''
+                orig_postscript_name = postscript_name.toUnicode() if postscript_name else ''
+                source_subfamily_norm = _normalize_whitespace(orig_subfamily).lower() if isinstance(orig_subfamily, str) and orig_subfamily.strip() else ""
+
+                weight_class = getattr(font["OS/2"], "usWeightClass", None) if "OS/2" in font else None
+                if any(k in source_subfamily_norm for k in ("bold", "black", "heavy", "semibold", "demibold", "extrabold", "ultrabold")):
+                    detected_weight = "bold"
+                elif isinstance(weight_class, int):
+                    detected_weight = "bold" if weight_class >= 600 else "normal"
+
+                fs_selection = getattr(font["OS/2"], "fsSelection", 0) if "OS/2" in font else 0
+                italic_angle = getattr(font["post"], "italicAngle", 0) if "post" in font else 0
+                if "italic" in source_subfamily_norm:
+                    detected_style = "italic"
+                elif "oblique" in source_subfamily_norm:
+                    detected_style = "oblique"
+                elif (isinstance(fs_selection, int) and (fs_selection & 0x01)) or (isinstance(italic_angle, (int, float)) and italic_angle != 0):
+                    detected_style = "italic"
+            except Exception as e:
+                logger.warning(f"Ошибка чтения метаданных {file_path}: {e}")
+                orig_family, orig_subfamily, orig_full_name, orig_postscript_name = (None, None, None, None)
+
+            source_identity_map[fname] = {
+                "orig_family": _normalize_whitespace(orig_family) if isinstance(orig_family, str) and orig_family.strip() else "",
+                "orig_subfamily": _normalize_whitespace(orig_subfamily) if isinstance(orig_subfamily, str) and orig_subfamily.strip() else "",
+                "orig_full_name": _normalize_whitespace(orig_full_name) if isinstance(orig_full_name, str) and orig_full_name.strip() else "",
+                "orig_postscript_name": _normalize_whitespace(orig_postscript_name) if isinstance(orig_postscript_name, str) and orig_postscript_name.strip() else "",
+                "detected_weight": detected_weight,
+                "detected_style": detected_style,
+            }
+
+        family_groups = defaultdict(list)
+        for fname in sorted_names:
+            source_meta = source_identity_map.get(fname) or {}
+            family_key = source_meta.get("orig_family") or "__missing_source_family__"
+            family_groups[family_key].append(fname)
+
+        fingerprint_names = []
+        picked_names = set()
+        family_keys = list(sorted(family_groups.keys()))
+        family_keys = _rng.sample(family_keys, k=len(family_keys))
+
+        for family_key in family_keys:
+            group_names = list(sorted(family_groups[family_key]))
+            group_names = _rng.sample(group_names, k=len(group_names))
+            picked = group_names[0]
+            fingerprint_names.append(picked)
+            picked_names.add(picked)
+            if len(fingerprint_names) >= N:
+                break
+
+        if len(fingerprint_names) < N:
+            leftovers = [fname for fname in sorted_names if fname not in picked_names]
+            leftovers = _rng.sample(leftovers, k=len(leftovers))
+            fingerprint_names.extend(leftovers[: max(0, N - len(fingerprint_names))])
+
         fingerprint_names.sort()  # fix the order in the manifest
+        for fname in fingerprint_names:
+            source_meta = source_identity_map.get(fname) or {}
+            logger.info(
+                f"[fonts] fingerprint selected {fname}: "
+                f"src=({source_meta.get('orig_family') or '-'}/{source_meta.get('orig_subfamily') or '-'})"
+            )
         
     # === Step 4: collect temp_configs for Jinja ===
     max_family_repeats = 4
@@ -773,16 +848,16 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 logger.warning(f"[fonts] Пропуск {fname}: пустой data URL")
                 continue
 
-            file_path = target_dir / fname
             name_no_ext = pathlib.Path(fname).stem
-            orig_family, orig_subfamily = get_font_compare(file_path)
+            source_meta = source_identity_map.get(fname) or {}
+            orig_family = source_meta.get("orig_family") or None
+            orig_subfamily = source_meta.get("orig_subfamily") or None
+            orig_full_name = source_meta.get("orig_full_name") or ""
+            orig_postscript_name = source_meta.get("orig_postscript_name") or ""
 
             # deterministic generation of metadata (seed is already fixed above)
             meta_values = generate_font_metadata(platform, subfamilies_src)
             family     = meta_values.get(1, fname)
-            subfamily  = meta_values.get(2, "")
-            full_name  = meta_values.get(4, "")
-            postscript = meta_values.get(6, "")
             platform_name_bank = SYS_FONTS_MAC if platform == "MacIntel" else SYS_FONTS_WIN
             resolved_family = (
                 orig_family
@@ -792,7 +867,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             
             #limits families dups and removes duplicates
         # Dedup: drop duplicates; do not mutate/tag font fields.
-            uniq_triple = (resolved_family, full_name, postscript)
+            uniq_triple = (resolved_family, orig_full_name, orig_postscript_name)
             if uniq_triple in used_families:
                 skip_stats["duplicate_uniq_triple"] += 1
                 logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
@@ -802,23 +877,35 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 logger.debug(f"[fonts] Step4 skip {fname}: family_repeat_limit family={resolved_family} limit={max_family_repeats}")
                 continue
 
-            _sf = (subfamily or "").lower()
-            weight = "bold" if any(k in _sf for k in ("bold","black","heavy","semibold","demibold","extrabold","ultrabold")) else "normal"
-            style  = "italic" if ("italic" in _sf or "oblique" in _sf) else "normal"
+            _sf = (orig_subfamily or "").lower()
+            weight = source_meta.get("detected_weight") or "normal"
+            if weight == "normal" and any(k in _sf for k in ("bold","black","heavy","semibold","demibold","extrabold","ultrabold")):
+                weight = "bold"
+            style = source_meta.get("detected_style") or "normal"
+            if style == "normal":
+                if "italic" in _sf:
+                    style = "italic"
+                elif "oblique" in _sf:
+                    style = "oblique"
+            css_family = _derive_css_family(resolved_family, name_no_ext)
 
             cfg = {
                 "name": name_no_ext,
                 "url": data_url,
                 "md5": rec.get("md5", ""),
                 "family": resolved_family,
-                "cssFamily": _derive_css_family(resolved_family, name_no_ext),
-                "subfamily": subfamily,
+                "cssFamily": css_family,
+                "source_family": orig_family or "",
+                "source_subfamily": orig_subfamily or "",
+                "source_full_name": orig_full_name,
+                "source_postscript_name": orig_postscript_name,
+                "subfamily": orig_subfamily or "",
                 "weight": weight,
                 "style": style,
                 "unique_id": meta_values.get(3, ""),
-                "full_name": meta_values.get(4, ""),
+                "full_name": orig_full_name,
                 "version": meta_values.get(5, ""),
-                "postscript_name": meta_values.get(6, ""),
+                "postscript_name": orig_postscript_name,
                 "designer": meta_values.get(9, ""),
                 "license": meta_values.get(13, ""),
                 "platform_id": PLATFORM_ID_MAP[platform][0],
@@ -830,7 +917,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
             logger.debug(
                 f"[CFG Font] {fname}: src=({orig_family or '-'}/{orig_subfamily or '-'}) → "
-                f"dst=({resolved_family}/{subfamily})"
+                f"dst=({resolved_family}/{style},{weight})"
             )
     finally:
         _META_RNG = _prev_meta_rng
@@ -840,6 +927,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "name": c["name"],
             "family": c["family"],
             "cssFamily": c.get("cssFamily") or c.get("family"),
+            "full_name": c.get("full_name", ""),
+            "postscript_name": c.get("postscript_name", ""),
             "platform_id": c["platform_id"],
             "platform_dom": c.get("platform_dom"),
             "weight": c.get("weight", "normal"),
@@ -854,6 +943,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "name": meta["name"],
             "family": meta["family"],
             "cssFamily": meta["cssFamily"],  # runtime CSS family (prefer generated cssFamily)
+            "full_name": meta.get("full_name", ""),
+            "postscript_name": meta.get("postscript_name", ""),
             "url": c["url"],
             "platform_id": meta["platform_id"],
             "platform_dom": meta["platform_dom"],
@@ -871,13 +962,14 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "name": c["name"],
             "family": c["family"],
             "cssFamily": c.get("cssFamily") or c.get("family"),
-            "subfamily": c.get("subfamily", ""),
+            "source_family": c.get("source_family", ""),
+            "source_subfamily": c.get("source_subfamily", ""),
+            "source_full_name": c.get("source_full_name", ""),
+            "source_postscript_name": c.get("source_postscript_name", ""),
             "weight": c.get("weight", "normal"),
             "style": c.get("style", "normal"),
             "unique_id": c.get("unique_id", ""),
-            "full_name": c.get("full_name", ""),
             "version": c.get("version", ""),
-            "postscript_name": c.get("postscript_name", ""),
             "designer": c.get("designer", ""),
             "license": c.get("license", ""),
             "platform_id": c.get("platform_id", ""),
