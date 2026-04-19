@@ -1262,9 +1262,7 @@ def main():
                         "return { brands, platform: uad.platform, mobile: uad.mobile };"
                     )
                     
-                    
-
-                    
+                                        
                     if current_uad:
                         exp_brands = expected_client_hints.get("brands") or []
                         exp_norm = sorted(
@@ -1285,23 +1283,18 @@ def main():
                 needs_reapply = True
             if needs_reapply:
                 apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, profile["platform"])
-                
-        
-                
-                
+                      
+                                
             inject_uach_strip_window(driver, user_agent)
             logger.info("UA data re-applied via CDP (mismatch detected)")
         # ----------------------- Call local setting def  -----------------------
         
         configure_profile(driver, profile["language"], profile["languages"], country_data)
-        
-         
-        
-      
-        
+            
+             
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/fonts.html")
+        driver.get("https://browserleaks.com/fonts")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
