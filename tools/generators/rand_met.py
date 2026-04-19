@@ -220,6 +220,14 @@ def _normalize_subfamily_value(value: str) -> str:
     cleaned = _normalize_whitespace(re.sub(r"[^A-Za-z0-9 _-]", "", s0))
     return cleaned or default_sub
 
+def _derive_full_name(family: str, subfamily: str) -> str:
+    family = _normalize_whitespace(family)
+    subfamily = _normalize_whitespace(subfamily)
+    if not family:
+        return subfamily or ""
+    if not subfamily or subfamily == "Regular":
+        return family
+    return f"{family} {subfamily}"
 
 
 
@@ -612,7 +620,7 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     family = rng.choice(family_names)
     subfamily = _normalize_subfamily_value(rng.choice(subfamilies))
     unique_id = f"{family[:2]}-{random_string(12)}"
-    full_name = f"{family} {subfamily}".strip()
+    full_name = _derive_full_name(family, subfamily)
     ps_name = _normalize_postscript_name(f"{family}-{subfamily}")
     fallback_designer = rng.choice(designers)
     fallback_license_desc = rng.choice(licenses)
