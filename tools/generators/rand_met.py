@@ -30,29 +30,41 @@ MANIFEST_PATH       = ASSETS/ 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS/ 'JS_fonts_patch' / 'font_patch.generated.js'
 FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
-# ----------------------- UTILS -----------------------
+
+# ----------------------- DICTIONARIES -----------------------
 SYS_FONTS_WIN = [
-    'Aptos','Segoe UI','Arial','Calibri','Verdana','Tahoma','Candara','Trebuchet MS',
-    'Bahnschrift','Times New Roman','Georgia','Cambria','Constantia','Consolas','Courier',
-    'Courier New','Cascadia Code','Comic Sans MS','Impact','Segoe Print','Segoe Script',
-    'Cascadia Mono','Corbel','DejaVu Sans','DejaVu Sans Mono','Nirmala UI','MV Boli','Myanmar Text',
-    'DejaVu Serif','Gentium','Inter','Liberation Mono','Liberation Sans','Liberation Serif',
-    'Ebrima','Fixedsys','Ink Free','Gabriola','Franklin Gothic Medium','Gadugi','Lucida Console','Lucida Sans Unicode',
-    'Malgun Gothic','Modern','Roboto','Montserrat','MS Sans Serif','MS Serif','msgothic','Palatino Linotype',
-    'Symbol','Roman','Sans Serif Collection','Script','Sitka','Sylfaen','System','Terminal','Tinos','Webdings','Wingdings',
-    'YuGothB','YuGothL','YuGothM','YuGothR']
- 
-    
+    'Aptos', 'Segoe UI', 'Arial', 'Calibri', 'Verdana', 'Tahoma', 'Candara', 'Trebuchet MS',
+    'Bahnschrift', 'Times New Roman', 'Georgia', 'Cambria', 'Constantia', 'Consolas', 'Courier',
+    'Courier New', 'Cascadia Code', 'Comic Sans MS', 'Impact', 'Segoe Print', 'Segoe Script',
+    'Cascadia Mono', 'Corbel', 'DejaVu Sans', 'DejaVu Sans Mono', 'Nirmala UI', 'MV Boli', 'Myanmar Text',
+    'DejaVu Serif', 'Gentium', 'Inter', 'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
+    'Ebrima', 'Fixedsys', 'Ink Free', 'Gabriola', 'Franklin Gothic Medium', 'Gadugi', 'Lucida Console', 'Lucida Sans Unicode',
+    'Malgun Gothic', 'Modern', 'Roboto', 'Montserrat', 'MS Sans Serif', 'MS Serif', 'MS Gothic', 'Palatino Linotype',
+    'Symbol', 'Roman', 'Sans Serif Collection', 'Script', 'Sitka', 'Sylfaen', 'System', 'Terminal', 'Tinos', 'Webdings', 'Wingdings',
+    'Yu Gothic', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic UI'
+]
+
 SYS_FONTS_MAC = [
-        'Helvetica','Geneva','Lucida Grande','Palatino','Menlo','Monaco',
-        'Gill Sans','Avenir','Baskerville','Didot','Futura','Optima',
-        'American Typewriter','Hoefler Text','Courier','Arial','Verdana',
-        'Trebuchet MS','Comic Sans MS','Georgia']
+    'Helvetica', 'Geneva', 'Lucida Grande', 'Palatino', 'Menlo', 'Monaco',
+    'Gill Sans', 'Avenir', 'Baskerville', 'Didot', 'Futura', 'Optima',
+    'American Typewriter', 'Hoefler Text', 'Courier', 'Arial', 'Verdana',
+    'Trebuchet MS', 'Comic Sans MS', 'Georgia'
+]
 
 SUBFAMILIES = [
-    'Thin','ExtraLight','Light','Regular','Medium','SemiLight','SemiBold',
-    'Bold','ExtraBold','Black','Italic','Oblique','Bold Italic','Bold Oblique',
-    'Condensed','SemiCondensed']
+    'Thin', 'ExtraLight', 'Light', 'Light Italic',
+    'Regular', 'Medium',
+    'SemiLight', 'SemiLight Italic',
+    'SemiBold', 'SemiBold Italic',
+    'Bold', 'Bold Italic',
+    'ExtraBold',
+    'Black', 'Black Italic',
+    'Italic', 'Oblique', 'Bold Oblique',
+    'Condensed', 'SemiCondensed'
+]
+
+
+
 
 PLATFORM_ID_MAP = {
     "Win32": (3, 1, 1033),
@@ -65,8 +77,7 @@ ACCEPT_EXTS = {".woff2", ".woff", ".ttf", ".otf"}
 ICON_KEYWORDS = {
     "emoji", "emojis", "awesome", "material", "fontello",
     "ionicons", "bootstrap-icons", "octicons", "simpleicons", "remixicon",
-    "feather", "weather", "dingbat", "dingbats",
-     "seguiemj", "seguiemoji", "segoe ui emoji"
+    "feather", "weather", "dingbat", "dingbats", "seguiemj", "seguiemoji", "segoe ui emoji"
 }
 
 PUA_RANGES = [
@@ -119,6 +130,9 @@ def _meta_rng() -> random.Random:
     return _META_RNG
 
 
+def _normalize_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip())
+
 
 
 def _load_family_mapping(path: pathlib.Path, cache_name: str) -> dict:
@@ -160,8 +174,52 @@ def _family_mapping_value(path: pathlib.Path, cache_name: str, family: str) -> s
 
 
 
-def _normalize_whitespace(value: str) -> str:
-    return re.sub(r"\s+", " ", (value or "").strip())
+
+def _normalize_postscript_name(value: str) -> str:
+    s = str(value or "")
+    if not s:
+        return ""
+    s = re.sub(r"\bBold[\s_]+Italic\b", "BoldItalic", s, flags=re.IGNORECASE)
+    s = re.sub(r"[\s_]+", "", s)
+    s = re.sub(r"[^A-Za-z0-9-]", "", s)
+    s = re.sub(r"-{2,}", "-", s).strip("-")
+    return s
+
+
+
+def _normalize_subfamily_value(value: str) -> str:
+    """
+    Canonicalize any incoming subfamily string to the project's known set.
+    Empty values degrade to Regular; unknown values stay cleaned.
+    """
+    default_sub = "Regular" if "Regular" in SUBFAMILIES else (SUBFAMILIES[0] if SUBFAMILIES else "")
+    s0 = _normalize_whitespace(value)
+    if not s0:
+        return default_sub
+    key = _normalize_whitespace(s0.lower().replace("-", " ").replace("_", " "))
+    compact = re.sub(r"[\s_-]+", "", key)
+
+    for item in SUBFAMILIES:
+        if not isinstance(item, str):
+            continue
+        item_norm = _normalize_whitespace(item)
+        if item_norm.casefold() == s0.casefold():
+            return item
+        item_key = _normalize_whitespace(item.lower().replace("-", " ").replace("_", " "))
+        item_compact = re.sub(r"[\s_-]+", "", item_key)
+        if compact == item_compact:
+            return item
+
+    if compact in {"regular", "normal", "roman", "book"} and "Regular" in SUBFAMILIES:
+        return "Regular"
+    if compact == "hairline" and "Thin" in SUBFAMILIES:
+        return "Thin"
+    if compact == "heavy" and "Black" in SUBFAMILIES:
+        return "Black"
+
+    cleaned = _normalize_whitespace(re.sub(r"[^A-Za-z0-9 _-]", "", s0))
+    return cleaned or default_sub
+
 
 
 
@@ -357,6 +415,7 @@ def random_string(length=12):
     return ''.join(rng.choice(alphabet) for _ in range(length))
 
 
+
 def _normalize_subfamilies(src):
     """
     forms a sourcesubfamilies as the list of strings.
@@ -364,22 +423,61 @@ def _normalize_subfamilies(src):
     Empty/incorrect source -> Return of globalSUBFAMILIES.
     """
     try:
+        allowed = {re.sub(r"\s+", " ", s.strip().lower()): s for s in SUBFAMILIES}
+        allowed_compact = {re.sub(r"[\s_-]+", "", k): v for k, v in allowed.items()}
+        aliases = {
+            "regular": "Regular",
+            "italic": "Italic",
+            "bold": "Bold",
+            "bolditalic": "Bold Italic",
+            "Semilight": "Semilight",
+            "Semilightitalic": "Semilight Italic",
+            "semibold": "SemiBold",
+            "semibolditalic": "SemiBold Italic",
+            "light": "Light",
+            "lightitalic": "Light Italic",
+            "black": "Black",
+            "blackitalic": "Black Italic",
+        }
+
+        def _canon(v):
+            if not isinstance(v, str):
+                return None
+            norm = re.sub(r"\s+", " ", v.strip())
+            if not norm:
+                return None
+            lk = norm.lower()
+            if lk in allowed:
+                return allowed[lk]
+            compact = re.sub(r"[\s_-]+", "", lk)
+            if compact in aliases:
+                return aliases[compact]
+            return allowed_compact.get(compact)
+
+        raw = []
         if isinstance(src, (list, tuple, set)):
-            out = [s.strip() for s in src if isinstance(s, str) and s.strip()]
-            return sorted(set(out)) or SUBFAMILIES
-        if isinstance(src, dict):
-            out = []
+            raw.extend(src)
+        elif isinstance(src, dict):
             for k, v in src.items():
-                if isinstance(k, str) and k.strip():
-                    out.append(k.strip())
-                if isinstance(v, str) and v.strip():
-                    out.append(v.strip())
-                elif isinstance(v, (list, tuple, set)):
-                    out.extend([s.strip() for s in v if isinstance(s, str) and s.strip()])
-            return sorted(set(out)) or SUBFAMILIES
-    except Exception as e:
-        logger.warning(f"[fonts] subfamilies normalization failed (type={type(src).__name__}) ({e})")
+                raw.append(k)
+                if isinstance(v, (list, tuple, set)):
+                    raw.extend(v)
+                else:
+                    raw.append(v)
+        else:
+            return SUBFAMILIES
+
+        canon = [c for c in (_canon(v) for v in raw) if c]
+        if not canon:
+            return SUBFAMILIES
+
+        canon_set = set(canon)
+        return [s for s in SUBFAMILIES if s in canon_set] or SUBFAMILIES
+    except Exception:
+        pass
     return SUBFAMILIES
+
+
 
 def get_font_compare(woff2_path):
     try:
@@ -483,81 +581,16 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     Returns the dictionary like {1: family, 2: subfamily, 3: unique_id, 4: full_name, 5: version, 6: ps_name, 9: designer, 13: license_desc}
     """
     common_families = [
-    'Aptos',
-    'Arial',
-    'Bahnschrift',
-    'Calibri',
-    'Cambria',
-    'Candara',
-    'Cascadia Code',
-    'Cascadia Mono',
-    'Comic Sans MS',
-    'Consolas',
-    'Constantia',
-    'Corbel',
-    'Courier',
-    'Courier New',
-    'DejaVu Sans',
-    'DejaVu Sans Mono',
-    'DejaVu Serif',
-    'Ebrima',
-    'Fixedsys',
-    'Franklin Gothic Medium',
-    'Gabriola',
-    'Gadugi',
-    'Gentium',
-    'Georgia',
-    'Impact',
-    'Ink Free',
-    'Inter',
-    'Javanese Text',
-    'Leelawadee UI',
-    'Liberation Mono',
-    'Liberation Sans',
-    'Liberation Serif',
-    'Lucida Console',
-    'Lucida Sans Unicode',
-    'Malgun Gothic',
-    'Microsoft Himalaya',
-    'Microsoft New Tai Lue',
-    'Microsoft PhagsPa',
-    'Microsoft Tai Le',
-    'Microsoft Yi Baiti',
-    'mingliub',
-    'Modern',
-    'Mongolian Baiti',
-    'Montserrat',
-    'MS Sans Serif',
-    'MS Serif',
-    'msgothic',
-    'MV Boli',
-    'Myanmar Text',
-    'Nirmala UI',
-    'Palatino Linotype',
-    'Roboto',
-    'Roman',
-    'Sans Serif Collection',
-    'Script',
-    'Segoe UI',
-    'simsun',
-    'SimSun-ExtB',
-    'SimSun-ExtG',
-    'Sitka',
-    'Sylfaen',
-    'Symbol',
-    'System',
-    'Tahoma',
-    'Terminal',
-    'Times New Roman',
-    'Tinos',
-    'Trebuchet MS',
-    'Verdana',
-    'Webdings',
-    'Wingdings',
-    'YuGothB',
-    'YuGothL',
-    'YuGothM',
-    'YuGothR'
+        'Aptos', 'Arial', 'Bahnschrift', 'Calibri', 'Cambria', 'Candara', 'Cascadia Code', 'Cascadia Mono',
+        'Comic Sans MS', 'Consolas', 'Constantia', 'Corbel', 'Courier', 'Courier New', 'DejaVu Sans', 'DejaVu Sans Mono',
+        'DejaVu Serif', 'Ebrima', 'Fixedsys', 'Franklin Gothic Medium', 'Gabriola', 'Gadugi', 'Gentium', 'Georgia',
+        'Impact', 'Ink Free', 'Inter', 'Javanese Text', 'Leelawadee UI', 'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
+        'Lucida Console', 'Lucida Sans Unicode', 'Malgun Gothic', 'Microsoft Himalaya', 'Microsoft New Tai Lue', 'Microsoft PhagsPa',
+        'Microsoft Tai Le', 'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Modern', 'Mongolian Baiti', 'Montserrat', 'MS Sans Serif', 'MS Serif',
+        'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection',
+        'Script', 'Segoe UI', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol',
+        'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Webdings',
+        'Wingdings', 'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic'
     ]
 
     if platform == "MacIntel":
@@ -577,10 +610,10 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
 
     rng = _meta_rng()
     family = rng.choice(family_names)
-    subfamily = rng.choice(subfamilies)
+    subfamily = _normalize_subfamily_value(rng.choice(subfamilies))
     unique_id = f"{family[:2]}-{random_string(12)}"
     full_name = f"{family} {subfamily}".strip()
-    ps_name = f"{family}-{subfamily}".replace(" ", "")
+    ps_name = _normalize_postscript_name(f"{family}-{subfamily}")
     fallback_designer = rng.choice(designers)
     fallback_license_desc = rng.choice(licenses)
     version = f"Version {rng.randint(1,5)}.{rng.randint(0,9999)}"
