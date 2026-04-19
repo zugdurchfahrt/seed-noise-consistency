@@ -43,6 +43,30 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
   window = G;
 }
 
+const __canvasDocument = (G && G.document && typeof G.document === 'object') ? G.document : null;
+function __canvasCanCreateElements() {
+  return !!(__canvasDocument && typeof __canvasDocument.createElement === 'function');
+}
+function __canvasCreateElement(localName) {
+  if (!__canvasCanCreateElements()) return null;
+  return __canvasDocument.createElement(localName);
+}
+function __canvasCreateCanvas(width, height) {
+  const canvas = __canvasCreateElement('canvas');
+  if (!canvas) return null;
+  if (Number.isFinite(width) && width >= 0) canvas.width = width;
+  if (Number.isFinite(height) && height >= 0) canvas.height = height;
+  return canvas;
+}
+function __canvasCreateDomHostElements() {
+  const host = __canvasCreateElement('div');
+  const canvas = __canvasCreateCanvas();
+  return {
+    host,
+    canvas,
+    ok: !!(host && canvas)
+  };
+}
 const C  = G.CanvasPatchContext;
 const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 const __canvasStateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
@@ -137,16 +161,15 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS__.__STATE__ is undefined — module registration is not available');
   }
 
-  // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
+  // Native default ctx2d font (MDN/Chromium-consistent). Read shared CanvasPatchContext slot; local compute is fallback-only.
   const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
     try {
       const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string') ? __canvasState.defaultCtx2dFont : '';
       if (cached && cached.trim()) return cached.trim();
 
-      const doc = G && G.document;
       let canvas = null;
-      if (doc && typeof doc.createElement === 'function') {
-        canvas = doc.createElement('canvas');
+      if (__canvasCanCreateElements()) {
+        canvas = __canvasCreateCanvas();
       } else if (typeof G.OffscreenCanvas === 'function') {
         canvas = new G.OffscreenCanvas(1, 1);
       } else {
@@ -155,22 +178,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       const ctx = (canvas && typeof canvas.getContext === 'function') ? canvas.getContext('2d') : null;
       const font = (ctx && typeof ctx.font === 'string' && ctx.font.trim()) ? ctx.font.trim() : '';
       if (!font) throw new Error('[CanvasPatch] default ctx2d.font missing/invalid');
-
-      if (!__defineHidden__(
-        __canvasState,
-        'defaultCtx2dFont',
-        font,
-        'canvas:ctx2d:guard:default_font_define_failed',
-        'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
-        'default font defineProperty failed; fallback assign used'
-      )) {
-        emitCanvasDiag('warn', 'canvas:ctx2d:guard:default_font_assign_failed', null, {
-          stage: 'guard',
-          key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
-          type: 'browser structure missing data',
-          message: 'default font fallback assign failed'
-        });
-      }
       return font;
     } catch (e) {
       emitCanvasDiag('warn', 'canvas:ctx2d:guard:default_font_compute_failed', e, {
@@ -223,10 +230,10 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   function _ensureDomOnce() {
     if (__canvasState.domReady) return;
 
-    const doc = G && G.document;
+    const doc = __canvasDocument;
     const docReadyState = (doc && typeof doc.readyState === 'string') ? doc.readyState : null;
-    if (!doc || (!doc.body && !doc.documentElement) || typeof doc.createElement !== 'function') {
-      const domDeferred = !!(doc && typeof doc.createElement === 'function' && docReadyState === 'loading');
+    if (!doc || (!doc.body && !doc.documentElement) || !__canvasCanCreateElements()) {
+      const domDeferred = !!(__canvasCanCreateElements() && docReadyState === 'loading');
       emitCanvasDiag(domDeferred ? 'info' : 'warn', domDeferred ? 'canvas:init:preflight:dom_deferred' : 'canvas:init:preflight:dom_unavailable', null, {
         stage: 'preflight',
         key: 'document',
@@ -240,7 +247,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
           hasDocument: !!doc,
           hasDocumentElement: !!(doc && doc.documentElement),
           hasBody: !!(doc && doc.body),
-          hasCreateElement: !!(doc && typeof doc.createElement === 'function'),
+          hasCreateElement: __canvasCanCreateElements(),
           documentReadyState: docReadyState
         }
       });
@@ -287,8 +294,24 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
       });
       return;
     }
-    const div = doc.createElement('div');
-    const canvas = doc.createElement('canvas');
+    const domFactory = __canvasCreateDomHostElements();
+    const div = domFactory.host;
+    const canvas = domFactory.canvas;
+    if (!domFactory.ok) {
+      emitCanvasDiag('warn', 'canvas:init:preflight:dom_element_create_failed', null, {
+        stage: 'preflight',
+        key: 'document.createElement',
+        type: 'browser structure missing data',
+        message: 'document.createElement failed for DOM canvas host init',
+        data: {
+          outcome: 'skip',
+          reason: 'dom_element_create_failed',
+          hasHost: !!div,
+          hasCanvas: !!canvas
+        }
+      });
+      return;
+    }
     const baseCanvasWidth = Number(canvas.width);
     const baseCanvasHeight = Number(canvas.height);
     if (
@@ -421,7 +444,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const hasCanvasHost = !!(__canvasState && __canvasState.domCanvasHost);
     const hasOffscreen = !!(__canvasState && __canvasState.offscreenCanvas);
     const domReady = !!(__canvasState && __canvasState.domReady === true);
-    const documentReadyState = (G.document && typeof G.document.readyState === 'string') ? G.document.readyState : null;
+    const documentReadyState = (__canvasDocument && typeof __canvasDocument.readyState === 'string') ? __canvasDocument.readyState : null;
     if (domReady && hasCanvas && hasCanvasHost) {
       emitCanvasDiag('info', 'canvas:init:apply:real_init', null, {
         stage: 'apply',
@@ -452,10 +475,21 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     });
   }
 
-  if (typeof G.document !== 'undefined') {
+  if (__canvasDocument) {
     realInit();
-    if (!__canvasState.domReady && G.document.readyState === 'loading') {
-      G.document.addEventListener('DOMContentLoaded', realInit, { once: true });
+    if (!__canvasState.domReady && __canvasDocument.readyState === 'loading' && __canvasState.__REAL_INIT_DOM_DEFERRED__ !== true) {
+      __defineHidden__(
+        __canvasState,
+        '__REAL_INIT_DOM_DEFERRED__',
+        true,
+        'canvas:init:apply:real_init_deferred_flag_define_failed',
+        'CanvasPatchContext.state.__CANVAS__.__STATE__.__REAL_INIT_DOM_DEFERRED__',
+        'realInit deferred flag defineProperty failed; fallback assign used'
+      );
+      __canvasDocument.addEventListener('DOMContentLoaded', () => {
+        __canvasState.__REAL_INIT_DOM_DEFERRED__ = false;
+        realInit();
+      }, { once: true });
     }
   }
  
@@ -490,34 +524,6 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
 
   function q256(v){ return Math.round(v * 256) / 256; }
-
-  // function makeCanvas(w, h) {
-  //   // быстрая нормализация размеров
-  //   w = w | 0; h = h | 0; if (w <= 0 || h <= 0) return null;
-
-  //   // 1) предпочитаем OffscreenCanvas, если доступен
-  //   if (typeof OffscreenCanvas !== 'undefined') {
-  //     try { return new OffscreenCanvas(w, h); } catch (e) {
-  //       emitCanvasDiag('warn', 'canvas:makeCanvas:apply:offscreen_construct_failed', e, {
-  //         stage: 'apply',
-  //         key: 'OffscreenCanvas',
-  //         type: 'browser structure missing data'
-  //       });
-  //     }
-  //   if (typeof document !== 'undefined') { const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
-  //   }
-    
-  //   // 2) фолбэк: DOM <canvas>
-  //   if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
-  //     const c = document.createElement('canvas');
-  //     c.width = w; c.height = h;
-  //     return c;
-  //   }
-
-  //   // 3) среда без обоих вариантов
-  //   return null;
-  // }
-
 
 
 
@@ -687,135 +693,141 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // - Exports masters: `applyFillTextHook` / `applyStrokeTextHook` (via final export section)
   
   // NOTE: This block must not replace `window.CanvasPatchHooks` identity.
-  // let applyFillTextHook, applyStrokeTextHook;
+  let applyFillTextHook, applyStrokeTextHook;
 
-  // (function patchFontSizeScalingHooks(){
-  //   if (window.__PATCH_FONT_SCALE_HOOKS__) return;
-  //   window.__PATCH_FONT_SCALE_HOOKS__ = true;
+  (function patchFontSizeScalingHooks(){
+    if (__canvasState.__PATCH_FONT_SCALE_HOOKS__) return;
+    __canvasState.__PATCH_FONT_SCALE_HOOKS__ = true;
 
-  //   const Hooks = (window.CanvasPatchHooks ||= {});
+    // ——— helpers ———
+    // Разбор font-шортхенда: "... 16px/normal Arial"
+    function parseFontShorthand(font) {
+      const m = String(font).match(
+        /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
+      );
+      if (!m) {
+        return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
+      }
+      return {
+        style:   m[1] || 'normal',
+        variant: m[2] || 'normal',
+        weight:  m[3] || 'normal',
+        sizePx:  parseFloat(m[4]),
+        line:    m[5],
+        family:  m[6]
+      };
+    }
 
-  //   // ——— helpers ———
-  //   // Разбор font-шортхенда: "... 16px/normal Arial"
-  //   function parseFontShorthand(font) {
-  //     const m = String(font || '').match(
-  //       /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
-  //     );
-  //     if (!m) {
-  //       return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
-  //     }
-  //     return {
-  //       style:   m[1] || 'normal',
-  //       variant: m[2] || 'normal',
-  //       weight:  m[3] || 'normal',
-  //       sizePx:  parseFloat(m[4]),
-  //       line:    m[5],
-  //       family:  m[6]
-  //     };
-  //   }
+    function buildFont(f) {
+      if (!f || typeof f !== 'object') {
+        throw new Error('[CanvasPatch] buildFont: invalid font object');
+      }
+      const parts = [];
+      if (f.style && f.style !== 'normal') parts.push(String(f.style));
+      if (f.variant && f.variant !== 'normal') parts.push(String(f.variant));
+      if (f.weight && f.weight !== 'normal') parts.push(String(f.weight));
 
-  //   function buildFont(f) {
-  //     if (!f || typeof f !== 'object') {
-  //       throw new Error('[CanvasPatch] buildFont: invalid font object');
-  //     }
-  //     const parts = [];
-  //     if (f.style && f.style !== 'normal') parts.push(String(f.style));
-  //     if (f.variant && f.variant !== 'normal') parts.push(String(f.variant));
-  //     if (f.weight && f.weight !== 'normal') parts.push(String(f.weight));
+      const sizePx = f.sizePx;
+      if (!(typeof sizePx === 'number' && isFinite(sizePx) && sizePx > 0)) {
+        throw new Error('[CanvasPatch] buildFont: invalid sizePx');
+      }
+      const sizePart = `${sizePx}px` + (f.line ? `/${String(f.line)}` : '');
+      parts.push(sizePart);
 
-  //     const sizePx = f.sizePx;
-  //     if (!(typeof sizePx === 'number' && isFinite(sizePx) && sizePx > 0)) {
-  //       throw new Error('[CanvasPatch] buildFont: invalid sizePx');
-  //     }
-  //     const sizePart = `${sizePx}px` + (f.line ? `/${String(f.line)}` : '');
-  //     parts.push(sizePart);
+      const family = (typeof f.family === 'string') ? f.family.trim() : '';
+      if (!family) {
+        throw new Error('[CanvasPatch] buildFont: missing family');
+      }
+      parts.push(family);
 
-  //     const family = (typeof f.family === 'string') ? f.family.trim() : '';
-  //     if (!family) {
-  //       throw new Error('[CanvasPatch] buildFont: missing family');
-  //     }
-  //     parts.push(family);
+      return parts.join(' ');
+    }
 
-  //     return parts.join(' ');
-  //   }
+    // Масштаб под текст: локальная деривация из текущего ctx.font и существующего __CNV_CFG__.
+    function getScaleForText(ctx, text) {
+      const fontStr = String(ctx && ctx.font);
+      try {
+        const parsed = parseFontShorthand(fontStr);
+        const sizePx = (parsed && typeof parsed.sizePx === 'number' && isFinite(parsed.sizePx) && parsed.sizePx > 0)
+          ? parsed.sizePx
+          : 16;
+        const ampPx = Math.max(
+          Math.abs(Number(__CNV_CFG__ && __CNV_CFG__.dxPx)),
+          Math.abs(Number(__CNV_CFG__ && __CNV_CFG__.dyPx))
+        );
+        if (!(ampPx > 0)) {
+          return { sx: 1, sy: 1 };
+        }
+        const delta = stableNoiseFromString(`font-scale|${fontStr}`, -(ampPx / sizePx), (ampPx / sizePx));
+        const s = Math.max(0.001, 1 + delta);
+        return { sx: s, sy: s };
+      } catch (e) {
+        emitCanvasDiag('warn', 'canvas:font_scale:runtime:local_derivation_failed', e, {
+          stage: 'runtime',
+          key: 'ctx.font/__CNV_CFG__'
+        });
+      }
+      return { sx: 1, sy: 1 };
+    }
 
-  //   // Масштаб под текст: сперва managed fonts config slot, фолбэк — __FONT_SCALE__
-  //   function getScaleForText(ctx, text) {
-  //     try {
-  //       const font = String(ctx && ctx.font || '');
-  //       const cfg = getManagedFontConfig(font);
-  //       if (cfg) {
-  //         const sx = Number.isFinite(cfg.scaleX) ? cfg.scaleX : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
-  //         const sy = Number.isFinite(cfg.scaleY) ? cfg.scaleY : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
-  //         return { sx, sy };
-  //       }
-  //     } catch (e) {
-  //       emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
-  //         stage: 'runtime',
-  //         key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs'
-  //       });
-  //     }
-  //     return { sx: 1, sy: 1 };
-  //   }
+    // ——— master for fillText: consistent render ———
+    applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
+      const { sx, sy } = getScaleForText(this, text);
+      if (sx===1 && sy===1) {
+        return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+      }
+      // Isotropic — temporarily scale font.sizePx (faster)
+      if (Math.abs(sx - sy) < 1e-6) {
+        const prev = this.font;
+        try {
+          const f = parseFontShorthand(prev);
+          f.sizePx *= sx;
+          this.font = buildFont(f);
+          return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+        } finally {
+          this.font = prev;
+        }
+      }
+      // Anisotropic — matrix scale + coordinate/width compensation
+      this.save();
+      try {
+        this.scale(sx, sy);
+        return (maxWidth!=null)
+          ? origFillText(text, x/sx, y/sy, maxWidth/sx)
+          : origFillText(text, x/sx, y/sy);
+      } finally {
+        this.restore();
+      }
+    };
 
-  //   // ——— master for fillText: consistent render ———
-  //   applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
-  //     const { sx, sy } = getScaleForText(this, text);
-  //     if (sx===1 && sy===1) {
-  //       return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
-  //     }
-  //     // Isotropic — temporarily scale font.sizePx (faster)
-  //     if (Math.abs(sx - sy) < 1e-6) {
-  //       const prev = this.font || '';
-  //       try {
-  //         const f = parseFontShorthand(prev);
-  //         f.sizePx *= sx;
-  //         this.font = buildFont(f);
-  //         return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
-  //       } finally {
-  //         this.font = prev;
-  //       }
-  //     }
-  //     // Anisotropic — matrix scale + coordinate/width compensation
-  //     this.save();
-  //     try {
-  //       this.scale(sx, sy);
-  //       return (maxWidth!=null)
-  //         ? origFillText(text, x/sx, y/sy, maxWidth/sx)
-  //         : origFillText(text, x/sx, y/sy);
-  //     } finally {
-  //       this.restore();
-  //     }
-  //   };
-
-  //   // ——— master for strokeText: same as above ———
-  //   applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
-  //     const { sx, sy } = getScaleForText(this, text);
-  //     if (sx===1 && sy===1) {
-  //       return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
-  //     }
-  //     if (Math.abs(sx - sy) < 1e-6) {
-  //       const prev = this.font || '';
-  //       try {
-  //         const f = parseFontShorthand(prev);
-  //         f.sizePx *= sx;
-  //         this.font = buildFont(f);
-  //         return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
-  //       } finally {
-  //         this.font = prev;
-  //       }
-  //     }
-  //     this.save();
-  //     try {
-  //       this.scale(sx, sy);
-  //       return (maxWidth!=null)
-  //         ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
-  //         : origStrokeText(text, x/sx, y/sy);
-  //     } finally {
-  //       this.restore();
-  //     }
-  //   };
-  // })();
+    // ——— master for strokeText: same as above ———
+    applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
+      const { sx, sy } = getScaleForText(this, text);
+      if (sx===1 && sy===1) {
+        return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+      }
+      if (Math.abs(sx - sy) < 1e-6) {
+        const prev = this.font;
+        try {
+          const f = parseFontShorthand(prev);
+          f.sizePx *= sx;
+          this.font = buildFont(f);
+          return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+        } finally {
+          this.font = prev;
+        }
+      }
+      this.save();
+      try {
+        this.scale(sx, sy);
+        return (maxWidth!=null)
+          ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
+          : origStrokeText(text, x/sx, y/sy);
+      } finally {
+        this.restore();
+      }
+    };
+  })();
 
 
 
@@ -951,6 +963,6 @@ __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
 // __CanvasPatchHooks__.addCanvasNoise = addCanvasNoise;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
 
-// if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
-// if (typeof applyStrokeTextHook === 'function') __CanvasPatchHooks__.applyStrokeTextHook = applyStrokeTextHook;
+if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
+if (typeof applyStrokeTextHook === 'function') __CanvasPatchHooks__.applyStrokeTextHook = applyStrokeTextHook;
 }

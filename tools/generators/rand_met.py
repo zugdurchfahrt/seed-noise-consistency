@@ -39,7 +39,7 @@ SYS_FONTS_WIN = [
     'Cascadia Mono', 'Corbel', 'DejaVu Sans', 'DejaVu Sans Mono', 'Nirmala UI', 'MV Boli', 'Myanmar Text',
     'DejaVu Serif', 'Gentium', 'Inter', 'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
     'Ebrima', 'Fixedsys', 'Ink Free', 'Gabriola', 'Franklin Gothic Medium', 'Gadugi', 'Lucida Console', 'Lucida Sans Unicode',
-    'Malgun Gothic', 'Modern', 'Roboto', 'Montserrat', 'MS Sans Serif', 'MS Serif', 'MS Gothic', 'Palatino Linotype',
+    'Malgun Gothic', 'Modern', 'Roboto', 'Montserrat', 'MS Sans Serif', 'MS Serif', 'MS Gothic', 'Palatino',
     'Symbol', 'Roman', 'Sans Serif Collection', 'Script', 'Sitka', 'Sylfaen', 'System', 'Terminal', 'Tinos', 'Webdings', 'Wingdings',
     'Yu Gothic', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic UI'
 ]
@@ -589,15 +589,15 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     Returns the dictionary like {1: family, 2: subfamily, 3: unique_id, 4: full_name, 5: version, 6: ps_name, 9: designer, 13: license_desc}
     """
     common_families = [
-        'Aptos', 'Arial', 'Bahnschrift', 'Calibri', 'Cambria', 'Candara', 'Cascadia Code', 'Cascadia Mono',
+        'Aptos', 'Arial', 'Bahnschrift', 'Calibri', 'Cambria', 'Candara', 'Cascadia Code', 'Cascadia Mono', 'News Gothic MT',
         'Comic Sans MS', 'Consolas', 'Constantia', 'Corbel', 'Courier', 'Courier New', 'DejaVu Sans', 'DejaVu Sans Mono',
-        'DejaVu Serif', 'Ebrima', 'Fixedsys', 'Franklin Gothic Medium', 'Gabriola', 'Gadugi', 'Gentium', 'Georgia',
+        'DejaVu Serif', 'Ebrima', 'Fixedsys', 'Franklin Gothic Medium', 'Gabriola', 'Gadugi', 'Gentium', 'Georgia', 'Lucida Console',
         'Impact', 'Ink Free', 'Inter', 'Javanese Text', 'Leelawadee UI', 'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
         'Lucida Console', 'Lucida Sans Unicode', 'Malgun Gothic', 'Microsoft Himalaya', 'Microsoft New Tai Lue', 'Microsoft PhagsPa',
         'Microsoft Tai Le', 'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Modern', 'Mongolian Baiti', 'Montserrat', 'MS Sans Serif', 'MS Serif',
-        'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection',
-        'Script', 'Segoe UI', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol',
-        'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Webdings',
+        'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection', 'Bookman Old Style', 'Arno Pro',
+        'Script', 'Segoe UI', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol', 'Bodoni MT', 'Niagara Solid'
+        'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Webdings', 'Century Gothic',
         'Wingdings', 'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic'
     ]
 
@@ -758,8 +758,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
 
     # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
-    MIN_N = int(os.environ.get("FONTS_MIN_N", "43"))
-    MAX_N = int(os.environ.get("FONTS_MAX_N", "45"))
+    MIN_N = int(os.environ.get("FONTS_MIN_N", "44"))
+    MAX_N = int(os.environ.get("FONTS_MAX_N", "47"))
     max_n = len(all_names)
 
     if max_n == 0:
