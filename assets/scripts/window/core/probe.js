@@ -14,6 +14,15 @@ const __probeRun = async function(){
 
 
   const W = (typeof window !== "undefined") ? window : null;
+  const __probeCoreInternal = (W && W.Core && W.Core.__internal && typeof W.Core.__internal === "object")
+    ? W.Core.__internal
+    : null;
+  const __probeCoreToStringState = (__probeCoreInternal && __probeCoreInternal.coreToStringState && typeof __probeCoreInternal.coreToStringState === "object")
+    ? __probeCoreInternal.coreToStringState
+    : null;
+  const __probeProxyTargetMap = (__probeCoreToStringState && __probeCoreToStringState.proxyTargetMap instanceof WeakMap)
+    ? __probeCoreToStringState.proxyTargetMap
+    : null;
   const __probeLoggerRoot = (W && W.CanvasPatchContext && W.CanvasPatchContext.__logger && typeof W.CanvasPatchContext.__logger === "object")
     ? W.CanvasPatchContext.__logger
     : null;
@@ -101,9 +110,9 @@ const __probeRun = async function(){
   }
 
   globalThis.__PROBE_FLAGS__ = {
-    workerScopeAudit: false,
-    brandCheck: false,
-    receiverChecks: false
+    workerScopeAudit: true,
+    brandCheck: true,
+    receiverChecks: true
   };
   function __probeNum(v, fallback) {
     const n = Number(v);
@@ -865,6 +874,12 @@ const __probeRun = async function(){
     "language",
     "languages"
   ];
+  const WORKER_ACCESSOR_OBSERVABILITY_TARGET_KEYS = [
+    "hardwareConcurrency",
+    "language",
+    "languages",
+    "userAgentData"
+  ];
 
   function errorToString(error) {
     if (!error) return null;
@@ -916,6 +931,172 @@ const __probeRun = async function(){
     if (typeof desc.get === "function" || typeof desc.set === "function") return "accessor";
     if (Object.prototype.hasOwnProperty.call(desc, "value")) return "data";
     return "unknown";
+  }
+
+  function __probeFindDescriptor(root, key) {
+    let current = root;
+    while (current) {
+      let desc = null;
+      try {
+        desc = Object.getOwnPropertyDescriptor(current, key) || null;
+      } catch (_) {
+        desc = null;
+      }
+      if (desc) return { owner: current, desc };
+      try {
+        current = Object.getPrototypeOf(current);
+      } catch (_) {
+        current = null;
+      }
+    }
+    return { owner: null, desc: null };
+  }
+
+  function __probeBridgeKind(fn, proxyTargetMap) {
+    if (typeof fn !== "function") return "not_function";
+    if (!(proxyTargetMap instanceof WeakMap)) return "native_or_untracked";
+    try {
+      const target = proxyTargetMap.get(fn);
+      if (typeof target === "function" && target !== fn) return "proxy_carrier";
+    } catch (_) {}
+    return "native_or_untracked";
+  }
+
+  function __probeCompactError(error) {
+    if (!error) return null;
+    return {
+      name: error && error.name ? String(error.name) : "Error",
+      message: error && error.message ? String(error.message) : String(error)
+    };
+  }
+
+  function __probeSafeCall(fn, finalizer) {
+    try {
+      return { ok: true, value: fn() };
+    } catch (error) {
+      return { ok: false, error };
+    } finally {
+      try {
+        if (typeof finalizer === "function") finalizer();
+      } catch (_) {}
+    }
+  }
+
+  function __probeCollectAccessorObservabilityRows(specs, proxyTargetMap) {
+    const list = Array.isArray(specs) ? specs : [];
+    return list.map((spec) => {
+      const key = spec && spec.key ? String(spec.key) : "unknown";
+      const property = (spec && typeof spec.property === "string" && spec.property) ? spec.property : key;
+      const mode = (spec && typeof spec.mode === "string" && spec.mode) ? spec.mode : "accessor";
+      const receiver = spec ? spec.receiver : null;
+      const root = spec ? spec.root : null;
+      const resolved = __probeFindDescriptor(root, property);
+      const desc = resolved.desc;
+      const callable = mode === "method"
+        ? (desc && typeof desc.value === "function" ? desc.value : null)
+        : (desc && typeof desc.get === "function" ? desc.get : null);
+      const good = callable
+        ? __probeSafeCall(() => Reflect.apply(callable, receiver, []))
+        : { ok: false, error: new Error(mode === "method" ? "method missing" : "getter missing") };
+      const bad = callable
+        ? __probeSafeCall(() => Reflect.apply(callable, {}, []))
+        : { ok: false, error: new Error(mode === "method" ? "method missing" : "getter missing") };
+      const text = callable
+        ? __probeSafeCall(() => Function.prototype.toString.call(callable))
+        : { ok: false, error: new Error(mode === "method" ? "method missing" : "getter missing") };
+      const nativeProto = callable
+        ? __probeSafeCall(() => Object.getPrototypeOf(callable)).value
+        : null;
+      const objectCreateToString = callable
+        ? __probeSafeCall(() => Object.create(callable).toString())
+        : { ok: false, error: new Error(mode === "method" ? "method missing" : "getter missing") };
+      const setProtoRecursion = callable
+        ? __probeSafeCall(
+            () => Object.setPrototypeOf(callable, Object.create(callable)).toString(),
+            () => {
+              try {
+                if (nativeProto) Object.setPrototypeOf(callable, nativeProto);
+              } catch (_) {}
+            }
+          )
+        : { ok: false, error: new Error(mode === "method" ? "method missing" : "getter missing") };
+
+      return {
+        key,
+        descriptorOwner: __probeDescribeProtoNode(resolved.owner),
+        descriptorShape: desc ? {
+          configurable: !!desc.configurable,
+          enumerable: !!desc.enumerable,
+          hasGetter: typeof desc.get === "function",
+          hasSetter: typeof desc.set === "function",
+          hasValue: Object.prototype.hasOwnProperty.call(desc, "value")
+        } : null,
+        accessorVsData: __probeAccessorVsData(desc),
+        hasOwnOnNavigator: !!(receiver && Object.prototype.hasOwnProperty.call(receiver, property)),
+        getterKind: __probeBridgeKind(callable, proxyTargetMap),
+        toString: text.ok ? String(text.value) : null,
+        toStringHasNativeCode: text.ok && typeof text.value === "string" ? text.value.indexOf("[native code]") !== -1 : false,
+        goodValue: good.ok ? toPrintable(good.value) : null,
+        goodError: good.ok ? null : __probeCompactError(good.error),
+        badError: bad.ok ? null : __probeCompactError(bad.error),
+        objectCreateToStringError: objectCreateToString.ok ? null : __probeCompactError(objectCreateToString.error),
+        setProtoRecursionError: setProtoRecursion.ok ? null : __probeCompactError(setProtoRecursion.error)
+      };
+    });
+  }
+
+  function __probeCompareAccessorObservability(windowRows, actualRows, scope, variant) {
+    const expectedIndex = new Map();
+    for (const row of Array.isArray(windowRows) ? windowRows : []) {
+      if (!row || typeof row.key !== "string") continue;
+      expectedIndex.set(row.key, row);
+    }
+    return (Array.isArray(actualRows) ? actualRows : []).map((actual) => {
+      const expected = expectedIndex.get(actual.key) || null;
+      const badErrorMatch = __probeStableStringify(expected ? expected.badError : null) === __probeStableStringify(actual.badError);
+      const objectCreateMatch = __probeStableStringify(expected ? expected.objectCreateToStringError : null) === __probeStableStringify(actual.objectCreateToStringError);
+      const setProtoMatch = __probeStableStringify(expected ? expected.setProtoRecursionError : null) === __probeStableStringify(actual.setProtoRecursionError);
+      const descriptorOwnerMatch = !!expected && expected.descriptorOwner === actual.descriptorOwner;
+      const descriptorShapeMatch = __probeStableStringify(expected ? expected.descriptorShape : null) === __probeStableStringify(actual.descriptorShape);
+      const getterKindMatch = !!expected && expected.getterKind === actual.getterKind;
+      const toStringNativeMatch = !!expected && expected.toStringHasNativeCode === actual.toStringHasNativeCode;
+      const hasOwnMatch = !!expected && expected.hasOwnOnNavigator === actual.hasOwnOnNavigator;
+      const match = !!expected && descriptorOwnerMatch && descriptorShapeMatch && getterKindMatch && toStringNativeMatch && badErrorMatch && objectCreateMatch && setProtoMatch && hasOwnMatch;
+      return {
+        scope,
+        variant: variant || null,
+        key: actual.key,
+        match,
+        descriptorOwnerMatch,
+        descriptorShapeMatch,
+        getterKindMatch,
+        toStringNativeMatch,
+        badErrorMatch,
+        objectCreateToStringErrorMatch: objectCreateMatch,
+        setProtoRecursionErrorMatch: setProtoMatch,
+        hasOwnOnNavigatorMatch: hasOwnMatch,
+        expected: expected ? {
+          descriptorOwner: expected.descriptorOwner,
+          descriptorShape: expected.descriptorShape,
+          getterKind: expected.getterKind,
+          toStringHasNativeCode: expected.toStringHasNativeCode,
+          badError: expected.badError,
+          objectCreateToStringError: expected.objectCreateToStringError,
+          setProtoRecursionError: expected.setProtoRecursionError,
+          hasOwnOnNavigator: expected.hasOwnOnNavigator
+        } : null,
+        actual: {
+          descriptorOwner: actual.descriptorOwner,
+          descriptorShape: actual.descriptorShape,
+          getterKind: actual.getterKind,
+          toStringHasNativeCode: actual.toStringHasNativeCode,
+          badError: actual.badError,
+          objectCreateToStringError: actual.objectCreateToStringError,
+          setProtoRecursionError: actual.setProtoRecursionError,
+          hasOwnOnNavigator: actual.hasOwnOnNavigator
+        }
+      };
+    });
   }
 
   function __probeInspectApiControlTarget(spec, overrides) {
@@ -2007,6 +2188,335 @@ const __probeRun = async function(){
         },
         comparisons: comparisonRows,
         rows
+      };
+    } finally {
+      while (cleanup.length) {
+        const fn = cleanup.pop();
+        try { fn(); } catch (_) {}
+      }
+      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {}
+      try { URL.revokeObjectURL(sharedURL); } catch (_) {}
+    }
+  }
+
+  async function __probeRunWorkerAccessorObservabilityAudit() {
+    const windowSpecs = WORKER_ACCESSOR_OBSERVABILITY_TARGET_KEYS.map((key) => ({
+      key,
+      root: Object.getPrototypeOf(nav),
+      receiver: nav,
+      mode: "accessor"
+    }));
+    const windowRows = __probeCollectAccessorObservabilityRows(windowSpecs, __probeProxyTargetMap);
+    const workerKeysJson = JSON.stringify(WORKER_ACCESSOR_OBSERVABILITY_TARGET_KEYS);
+    const workerScript = `
+      function __probeWorkerErrorShape__(error) {
+        if (!error) return null;
+        return {
+          name: error && error.name ? String(error.name) : "Error",
+          message: error && error.message ? String(error.message) : String(error)
+        };
+      }
+      function __probeWorkerDescribeProtoNode__(node) {
+        if (node == null) return "null";
+        try {
+          const ctor = node && node.constructor;
+          const ctorName = (typeof ctor === "function" && ctor.name) ? String(ctor.name) : "";
+          if (ctorName) return ctorName + ".prototype";
+        } catch (_) {}
+        try {
+          return Object.prototype.toString.call(node);
+        } catch (_) {
+          return "[prototype unreadable]";
+        }
+      }
+      function __probeWorkerFindDescriptor__(root, key) {
+        let current = root;
+        while (current) {
+          let desc = null;
+          try {
+            desc = Object.getOwnPropertyDescriptor(current, key) || null;
+          } catch (_) {
+            desc = null;
+          }
+          if (desc) return { owner: current, desc: desc };
+          try {
+            current = Object.getPrototypeOf(current);
+          } catch (_) {
+            current = null;
+          }
+        }
+        return { owner: null, desc: null };
+      }
+      function __probeWorkerAccessorVsData__(desc) {
+        if (!desc) return null;
+        if (typeof desc.get === "function" || typeof desc.set === "function") return "accessor";
+        if (Object.prototype.hasOwnProperty.call(desc, "value")) return "data";
+        return "unknown";
+      }
+      function __probeWorkerBridgeKind__(fn, proxyTargetMap) {
+        if (typeof fn !== "function") return "not_function";
+        if (!(proxyTargetMap instanceof WeakMap)) return "native_or_untracked";
+        try {
+          const target = proxyTargetMap.get(fn);
+          if (typeof target === "function" && target !== fn) return "proxy_carrier";
+        } catch (_) {}
+        return "native_or_untracked";
+      }
+      function __probeWorkerSafeCall__(fn, finalizer) {
+        try {
+          return { ok: true, value: fn() };
+        } catch (error) {
+          return { ok: false, error: error };
+        } finally {
+          try {
+            if (typeof finalizer === "function") finalizer();
+          } catch (_) {}
+        }
+      }
+      function __probeWorkerResolveProxyTargetMap__() {
+        try {
+          const ctx = self && self.CanvasPatchContext && typeof self.CanvasPatchContext === "object"
+            ? self.CanvasPatchContext
+            : null;
+          const stateRoot = ctx && ctx.state && typeof ctx.state === "object"
+            ? ctx.state
+            : null;
+          const wrkState = stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === "object"
+            ? stateRoot.__WRK__
+            : null;
+          const runtime = wrkState && wrkState.runtime && typeof wrkState.runtime === "object"
+            ? wrkState.runtime
+            : null;
+          const state = runtime && runtime.__CORE_TOSTRING_STATE__ && runtime.__CORE_TOSTRING_STATE__.__CORE_TOSTRING_STATE__ === true
+            ? runtime.__CORE_TOSTRING_STATE__
+            : null;
+          return (state && state.proxyTargetMap instanceof WeakMap) ? state.proxyTargetMap : null;
+        } catch (_) {
+          return null;
+        }
+      }
+      function __probeWorkerCollectAccessorRows__() {
+        const nav = self.navigator;
+        const root = nav ? Object.getPrototypeOf(nav) : null;
+        const proxyTargetMap = __probeWorkerResolveProxyTargetMap__();
+        const keys = ${workerKeysJson};
+        return keys.map(function(key) {
+          const resolved = __probeWorkerFindDescriptor__(root, key);
+          const desc = resolved.desc;
+          const callable = desc && typeof desc.get === "function" ? desc.get : null;
+          const good = callable
+            ? __probeWorkerSafeCall__(function() { return Reflect.apply(callable, nav, []); })
+            : { ok: false, error: new Error("getter missing") };
+          const bad = callable
+            ? __probeWorkerSafeCall__(function() { return Reflect.apply(callable, {}, []); })
+            : { ok: false, error: new Error("getter missing") };
+          const text = callable
+            ? __probeWorkerSafeCall__(function() { return Function.prototype.toString.call(callable); })
+            : { ok: false, error: new Error("getter missing") };
+          const nativeProto = callable
+            ? __probeWorkerSafeCall__(function() { return Object.getPrototypeOf(callable); }).value
+            : null;
+          const objectCreateToString = callable
+            ? __probeWorkerSafeCall__(function() { return Object.create(callable).toString(); })
+            : { ok: false, error: new Error("getter missing") };
+          const setProtoRecursion = callable
+            ? __probeWorkerSafeCall__(
+                function() { return Object.setPrototypeOf(callable, Object.create(callable)).toString(); },
+                function() {
+                  try {
+                    if (nativeProto) Object.setPrototypeOf(callable, nativeProto);
+                  } catch (_) {}
+                }
+              )
+            : { ok: false, error: new Error("getter missing") };
+          return {
+            key: key,
+            descriptorOwner: __probeWorkerDescribeProtoNode__(resolved.owner),
+            descriptorShape: desc ? {
+              configurable: !!desc.configurable,
+              enumerable: !!desc.enumerable,
+              hasGetter: typeof desc.get === "function",
+              hasSetter: typeof desc.set === "function",
+              hasValue: Object.prototype.hasOwnProperty.call(desc, "value")
+            } : null,
+            accessorVsData: __probeWorkerAccessorVsData__(desc),
+            hasOwnOnNavigator: !!(nav && Object.prototype.hasOwnProperty.call(nav, key)),
+            getterKind: __probeWorkerBridgeKind__(callable, proxyTargetMap),
+            toString: text.ok ? String(text.value) : null,
+            toStringHasNativeCode: text.ok && typeof text.value === "string" ? text.value.indexOf("[native code]") !== -1 : false,
+            goodError: good.ok ? null : __probeWorkerErrorShape__(good.error),
+            badError: bad.ok ? null : __probeWorkerErrorShape__(bad.error),
+            objectCreateToStringError: objectCreateToString.ok ? null : __probeWorkerErrorShape__(objectCreateToString.error),
+            setProtoRecursionError: setProtoRecursion.ok ? null : __probeWorkerErrorShape__(setProtoRecursion.error)
+          };
+        });
+      }
+    `;
+    const dedicatedSource = `
+      "use strict";
+      ${workerScript}
+      (function() {
+        try {
+          self.postMessage({ ok: true, rows: __probeWorkerCollectAccessorRows__() });
+        } catch (error) {
+          self.postMessage({
+            ok: false,
+            error: {
+              name: error && error.name ? String(error.name) : "Error",
+              message: error && error.message ? String(error.message) : String(error),
+              stack: error && error.stack ? String(error.stack) : null
+            }
+          });
+        }
+      })();
+    `;
+    const sharedSource = `
+      "use strict";
+      ${workerScript}
+      self.onconnect = function(ev) {
+        const port = ev && ev.ports && ev.ports[0];
+        if (!port) return;
+        try {
+          port.postMessage({ ok: true, rows: __probeWorkerCollectAccessorRows__() });
+        } catch (error) {
+          port.postMessage({
+            ok: false,
+            error: {
+              name: error && error.name ? String(error.name) : "Error",
+              message: error && error.message ? String(error.message) : String(error),
+              stack: error && error.stack ? String(error.stack) : null
+            }
+          });
+        }
+      };
+    `;
+    const dedicatedURL = URL.createObjectURL(new Blob([dedicatedSource], { type: "text/javascript" }));
+    const sharedURL = URL.createObjectURL(new Blob([sharedSource], { type: "text/javascript" }));
+    const sharedName = `probe-observability-shared-${Date.now()}`;
+    const cleanup = [];
+    try {
+      const collectDedicated = await __probeAwaitWithinBudget((async () => {
+        const worker = new Worker(dedicatedURL);
+        cleanup.push(() => { try { worker.terminate(); } catch (_) {} });
+        return await new Promise((resolve, reject) => {
+          const onMessage = (ev) => {
+            cleanupListeners();
+            const data = ev && ev.data;
+            if (data && data.ok) return resolve(data.rows);
+            reject(data && data.error ? new Error(String(data.error.message || data.error.name || "worker error")) : new Error("worker error"));
+          };
+          const onError = (ev) => {
+            cleanupListeners();
+            reject(new Error(ev && ev.message ? String(ev.message) : "worker message error"));
+          };
+          const cleanupListeners = () => {
+            worker.removeEventListener("message", onMessage);
+            worker.removeEventListener("error", onError);
+          };
+          worker.addEventListener("message", onMessage);
+          worker.addEventListener("error", onError);
+        });
+      })(), { check: "worker_accessor_observability", phase: "DedicatedWorker", method: "Worker" });
+      const collectShared = await __probeAwaitWithinBudget((async () => {
+        const shared = new SharedWorker(sharedURL, { name: sharedName, type: "module" });
+        const port = shared.port;
+        cleanup.push(() => {
+          try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
+        });
+        return await new Promise((resolve, reject) => {
+          const onMessage = (ev) => {
+            cleanupListeners();
+            const data = ev && ev.data;
+            if (data && data.ok) return resolve(data.rows);
+            reject(data && data.error ? new Error(String(data.error.message || data.error.name || "shared worker error")) : new Error("shared worker error"));
+          };
+          const onError = (ev) => {
+            cleanupListeners();
+            reject(new Error(ev && ev.message ? String(ev.message) : "shared worker message error"));
+          };
+          const cleanupListeners = () => {
+            port.removeEventListener("message", onMessage);
+            port.removeEventListener("messageerror", onError);
+          };
+          port.addEventListener("message", onMessage);
+          port.addEventListener("messageerror", onError);
+          if (typeof port.start === "function") port.start();
+        });
+      })(), {
+        check: "worker_accessor_observability",
+        phase: "SharedWorker",
+        method: "SharedWorker",
+        timeoutMs: __PROBE_TIMEOUTS.sharedWorkerMs
+      });
+      const dedicated = collectDedicated.ok
+        ? {
+            ok: true,
+            rows: Array.isArray(collectDedicated.value) ? collectDedicated.value : [],
+            comparisons: __probeCompareAccessorObservability(windowRows, Array.isArray(collectDedicated.value) ? collectDedicated.value : [], "DedicatedWorker", "single")
+          }
+        : { ok: false, error: errorShape(collectDedicated.error), rows: [], comparisons: [] };
+      const shared = collectShared.ok
+        ? {
+            ok: true,
+            rows: Array.isArray(collectShared.value) ? collectShared.value : [],
+            comparisons: __probeCompareAccessorObservability(windowRows, Array.isArray(collectShared.value) ? collectShared.value : [], "SharedWorker", "single")
+          }
+        : { ok: false, error: errorShape(collectShared.error), rows: [], comparisons: [] };
+      const summaryRows = [];
+      for (const base of windowRows) {
+        summaryRows.push({
+          scope: "WindowScope",
+          variant: "active",
+          key: base.key,
+          getterKind: base.getterKind,
+          toStringHasNativeCode: base.toStringHasNativeCode,
+          badError: base.badError ? `${base.badError.name}: ${base.badError.message}` : null,
+          objectCreateToStringError: base.objectCreateToStringError ? `${base.objectCreateToStringError.name}: ${base.objectCreateToStringError.message}` : null,
+          setProtoRecursionError: base.setProtoRecursionError ? `${base.setProtoRecursionError.name}: ${base.setProtoRecursionError.message}` : null
+        });
+      }
+      for (const cmp of dedicated.comparisons) {
+        summaryRows.push({
+          scope: cmp.scope,
+          variant: cmp.variant,
+          key: cmp.key,
+          match: cmp.match,
+          getterKind: cmp.actual ? cmp.actual.getterKind : null,
+          toStringHasNativeCode: cmp.actual ? cmp.actual.toStringHasNativeCode : null,
+          badError: cmp.actual && cmp.actual.badError ? `${cmp.actual.badError.name}: ${cmp.actual.badError.message}` : null,
+          objectCreateToStringError: cmp.actual && cmp.actual.objectCreateToStringError ? `${cmp.actual.objectCreateToStringError.name}: ${cmp.actual.objectCreateToStringError.message}` : null,
+          setProtoRecursionError: cmp.actual && cmp.actual.setProtoRecursionError ? `${cmp.actual.setProtoRecursionError.name}: ${cmp.actual.setProtoRecursionError.message}` : null
+        });
+      }
+      for (const cmp of shared.comparisons) {
+        summaryRows.push({
+          scope: cmp.scope,
+          variant: cmp.variant,
+          key: cmp.key,
+          match: cmp.match,
+          getterKind: cmp.actual ? cmp.actual.getterKind : null,
+          toStringHasNativeCode: cmp.actual ? cmp.actual.toStringHasNativeCode : null,
+          badError: cmp.actual && cmp.actual.badError ? `${cmp.actual.badError.name}: ${cmp.actual.badError.message}` : null,
+          objectCreateToStringError: cmp.actual && cmp.actual.objectCreateToStringError ? `${cmp.actual.objectCreateToStringError.name}: ${cmp.actual.objectCreateToStringError.message}` : null,
+          setProtoRecursionError: cmp.actual && cmp.actual.setProtoRecursionError ? `${cmp.actual.setProtoRecursionError.name}: ${cmp.actual.setProtoRecursionError.message}` : null
+        });
+      }
+      __probeConsoleCall("group", "[probe] worker accessor observability");
+      __probeConsoleCall("table", summaryRows);
+      __probeConsoleCall("groupEnd");
+      return {
+        ok: dedicated.ok === true && shared.ok === true
+          && dedicated.comparisons.every((row) => row && row.match === true)
+          && shared.comparisons.every((row) => row && row.match === true),
+        window: windowRows,
+        dedicated,
+        shared,
+        serviceWorker: {
+          ok: null,
+          skipped: true,
+          reason: "not_collected_in_worker_accessor_observability"
+        },
+        rows: summaryRows
       };
     } finally {
       while (cleanup.length) {
@@ -4026,6 +4536,24 @@ function printToStringCrossRealmChecks() {
   if (__PROBE_ENABLE_WORKER_SCOPE_AUDIT__ && !workerScopeWait.ok && workerScopeWait.timedOut) {
     __probeLogAsyncTimeout(workerScopeMeta, workerScopeWait.elapsedMs, workerScopeWait.timeoutMs, workerScopeWait.error);
   }
+  const workerAccessorObservabilityMeta = { check: "__PROBE__", phase: "build", method: "__probeRunWorkerAccessorObservabilityAudit" };
+  const workerAccessorObservabilityWait = __PROBE_ENABLE_WORKER_SCOPE_AUDIT__
+    ? await __probeObserveAsync(__probeRunWorkerAccessorObservabilityAudit())
+    : {
+        ok: true,
+        value: {
+          ok: true,
+          rows: [],
+          skipped: true,
+          reason: "disabled_by_probe_flags"
+        },
+        timedOut: false,
+        elapsedMs: 0,
+        timeoutMs: 0
+      };
+  if (__PROBE_ENABLE_WORKER_SCOPE_AUDIT__ && !workerAccessorObservabilityWait.ok && workerAccessorObservabilityWait.timedOut) {
+    __probeLogAsyncTimeout(workerAccessorObservabilityMeta, workerAccessorObservabilityWait.elapsedMs, workerAccessorObservabilityWait.timeoutMs, workerAccessorObservabilityWait.error);
+  }
   const apiControlMeta = { check: "__PROBE__", phase: "build", method: "printApiControlList" };
   const apiControlWait = await __probeObserveAsync(printApiControlList());
   if (!apiControlWait.ok && apiControlWait.timedOut) {
@@ -4103,6 +4631,18 @@ function printToStringCrossRealmChecks() {
       error: errorShape(workerScopeWait.error),
       watchdogState: workerScopeWait.timedOut ? "timed_out" : "rejected"
     },
+    workerAccessorObservability: workerAccessorObservabilityWait.ok ? workerAccessorObservabilityWait.value : {
+      ok: false,
+      rows: [{
+        scope: "worker_accessor_observability",
+        variant: null,
+        key: "__probeRunWorkerAccessorObservabilityAudit",
+        match: false,
+        error: errorShape(workerAccessorObservabilityWait.error)
+      }],
+      error: errorShape(workerAccessorObservabilityWait.error),
+      watchdogState: workerAccessorObservabilityWait.timedOut ? "timed_out" : "rejected"
+    },
     degrade: printLastDegradeEvents(),
     moduleCheck: printModuleCheck(),
     watchdog: {
@@ -4131,6 +4671,13 @@ function printToStringCrossRealmChecks() {
           : "disabled",
         elapsedMs: workerScopeWait.elapsedMs,
         timeoutMs: workerScopeWait.timeoutMs
+      },
+      workerAccessorObservability: {
+        state: __PROBE_ENABLE_WORKER_SCOPE_AUDIT__
+          ? (workerAccessorObservabilityWait.ok ? "resolved" : (workerAccessorObservabilityWait.timedOut ? "timed_out" : "rejected"))
+          : "disabled",
+        elapsedMs: workerAccessorObservabilityWait.elapsedMs,
+        timeoutMs: workerAccessorObservabilityWait.timeoutMs
       }
     }
   };
@@ -4177,6 +4724,7 @@ function printToStringCrossRealmChecks() {
     result.ok = !!(
       (result.receiverChecks ? result.receiverChecks.ok !== false : true) &&
       (result.workerScopeAudit ? result.workerScopeAudit.ok !== false : true) &&
+      (result.workerAccessorObservability ? result.workerAccessorObservability.ok !== false : true) &&
       (result.audioOwnProperty ? result.audioOwnProperty.ok !== false : true) &&
       (result.prototypeInvariants ? result.prototypeInvariants.ok !== false : true) &&
       (result.toStringCrossRealm ? result.toStringCrossRealm.ok !== false : true) &&
@@ -4184,6 +4732,21 @@ function printToStringCrossRealmChecks() {
       (result.degradeOk !== false) &&
       (result.moduleCheckOk !== false)
     );
+  } catch (_) {}
+
+  try {
+    const observabilityRows = (result.workerAccessorObservability && Array.isArray(result.workerAccessorObservability.rows))
+      ? result.workerAccessorObservability.rows
+      : [];
+    const observabilityBad = __probeCountWhere(observabilityRows, (row) => row && row.match === false);
+    __probeReport("worker_accessor_observability", {
+      status: observabilityBad ? "mismatch" : "ok",
+      rows: observabilityRows,
+      summary: {
+        total: observabilityRows.length,
+        bad: observabilityBad
+      }
+    });
   } catch (_) {}
 
   try {
@@ -4297,6 +4860,7 @@ function __probeDownloadHtmlReport(result) {
   const degradeRows = result && result.degrade && result.degrade.rows;
   const toStringCrossRows = result && result.toStringCrossRealm && result.toStringCrossRealm.rows;
   const receiverRows = result && result.receiverChecks && result.receiverChecks.rows;
+  const workerAccessorObservabilityRows = result && result.workerAccessorObservability && result.workerAccessorObservability.rows;
   const audioOwnRows = result && result.audioOwnProperty && result.audioOwnProperty.rows;
   const protoInvRows = result && result.prototypeInvariants && result.prototypeInvariants.rows;
   const descriptorExpectRows = result && result.descriptorExpectations && Array.isArray(result.descriptorExpectations.rows)
@@ -4370,6 +4934,11 @@ function __probeDownloadHtmlReport(result) {
   <section>
     <h2>Receiver/Illegal invocation checks</h2>
     ${__probeTableHtml(receiverRows)}
+  </section>
+
+  <section>
+    <h2>Worker accessor observability</h2>
+    ${__probeTableHtml(workerAccessorObservabilityRows)}
   </section>
 
   <section>
