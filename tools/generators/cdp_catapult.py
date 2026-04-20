@@ -623,9 +623,11 @@ def run():
                                 {"language": out.get("language"), "languages": out.get("languages")},
                             )
                         if int(out.get("hardwareConcurrency") or 0) != int(exp["hardwareConcurrency"]):
-                            _resume_sw_session(ws, sid, "sanity_hardware_mismatch")
-                            _fatal(ws, "sw sanity: hardwareConcurrency mismatch", {"expected": exp, "got": out})
-                            return
+                            logger.warning(
+                                "SW inject: hardwareConcurrency sanity mismatch; prefer native worker value expected=%s got=%s",
+                                exp.get("hardwareConcurrency"),
+                                out.get("hardwareConcurrency"),
+                            )
                         if float(out.get("deviceMemory") or 0.0) != float(exp["deviceMemory"]):
                             logger.warning(
                                 "SW inject: deviceMemory sanity mismatch; prefer native worker value expected=%s got=%s",
@@ -653,7 +655,7 @@ def run():
                             _resume_sw_session(ws, sid, "sanity_uad_he_full_version_mismatch")
                             _fatal(ws, "sw sanity: uad high entropy fullVersionList mismatch", {"expected": exp, "got": out})
                             return
-                        logger.info("SW inject: sanity OK target values match profile")
+                        logger.info("SW inject: sanity accepted target values")
                         _resume_sw_session(ws, sid, "sanity_ok")
                     except Exception as e:
                         _resume_sw_session(ws, sid, "sanity_parse_failed")

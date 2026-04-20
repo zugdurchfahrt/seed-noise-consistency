@@ -724,110 +724,29 @@
       }, e);
     }
 
-    try {
-      const nativeHardwareRead = __readNativeWorkerNavigatorValue('hardwareConcurrency');
-      const nativeHardwareConcurrency = Number(nativeHardwareRead.value);
-      if (Number.isFinite(nativeHardwareConcurrency) && nativeHardwareConcurrency > 0) {
-        if (Object.is(nativeHardwareConcurrency, Number(hc))) {
-          swHardwareConcurrencyValue = nativeHardwareConcurrency;
-          swPatchHardwareConcurrency = false;
-          __swDiag('info', 'sw_prelude:hardwareConcurrency_native_passthrough', {
-            stage: 'preflight',
-            key: 'hardwareConcurrency',
-            message: 'service worker hardwareConcurrency kept on native getter path',
-            type: 'browser structure missing data',
-            data: {
-              outcome: 'skip',
-              reason: 'native_passthrough',
-              nativeValue: nativeHardwareConcurrency,
-              profileValue: Number(hc)
-            }
-          }, null);
-        } else {
-          __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_mismatch', {
-            stage: 'preflight',
-            key: 'hardwareConcurrency',
-            message: 'service worker native hardwareConcurrency mismatches contract target; install strict accessor patch',
-            type: 'browser structure missing data',
-            data: {
-              outcome: 'patch',
-              reason: 'native_mismatch',
-              nativeValue: nativeHardwareConcurrency,
-              profileValue: Number(hc)
-            }
-          }, null);
-        }
-      } else {
-        __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_invalid', {
-          stage: 'preflight',
-          key: 'hardwareConcurrency',
-          message: 'service worker native hardwareConcurrency is invalid; keep mirror seed only',
-          type: 'browser structure missing data',
-          data: {
-            outcome: 'skip',
-            reason: 'native_invalid',
-            nativeValue: nativeHardwareConcurrency,
-            profileValue: Number(hc)
-          }
-        }, null);
+    __swDiag('info', 'sw_prelude:hardwareConcurrency_native_read_disabled', {
+      stage: 'preflight',
+      key: 'hardwareConcurrency',
+      message: 'service worker native hardwareConcurrency adoption disabled; keep mirror seed only',
+      type: 'browser structure missing data',
+      data: {
+        outcome: 'skip',
+        reason: 'native_read_disabled',
+        profileValue: Number(hc)
       }
-    } catch (e) {
-      __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_read_failed', {
-        stage: 'preflight',
-        key: 'hardwareConcurrency',
-        message: 'service worker native hardwareConcurrency read failed; keep mirror seed only',
-        type: 'browser structure missing data',
-        data: {
-          outcome: 'skip',
-          reason: 'native_read_failed',
-          profileValue: Number(hc)
-        }
-      }, e);
-    }
+    }, null);
 
-    try {
-      const nativeDeviceMemory = Number(nav.deviceMemory);
-      if (Number.isFinite(nativeDeviceMemory) && nativeDeviceMemory > 0) {
-        swDeviceMemoryValue = nativeDeviceMemory;
-        __swDiag('info', 'sw_prelude:deviceMemory_native_passthrough', {
-          stage: 'preflight',
-          key: 'deviceMemory',
-          message: 'service worker deviceMemory kept on native getter path',
-          type: 'browser structure missing data',
-          data: {
-            outcome: 'skip',
-            reason: 'native_passthrough',
-            nativeValue: nativeDeviceMemory,
-            profileValue: Number(dm)
-          }
-        }, null);
-      } else {
-        __swDiag('warn', 'sw_prelude:deviceMemory_native_invalid', {
-          stage: 'preflight',
-          key: 'deviceMemory',
-          message: 'service worker native deviceMemory is invalid; keep mirror seed only',
-          type: 'browser structure missing data',
-          data: {
-            outcome: 'skip',
-            reason: 'native_invalid',
-            nativeValue: nativeDeviceMemory,
-            profileValue: Number(dm)
-          }
-        }, null);
+    __swDiag('info', 'sw_prelude:deviceMemory_native_read_disabled', {
+      stage: 'preflight',
+      key: 'deviceMemory',
+      message: 'service worker native deviceMemory adoption disabled; keep mirror seed only',
+      type: 'browser structure missing data',
+      data: {
+        outcome: 'skip',
+        reason: 'native_read_disabled',
+        profileValue: Number(dm)
       }
-    } catch (e) {
-      __swDiag('warn', 'sw_prelude:deviceMemory_native_read_failed', {
-        stage: 'preflight',
-        key: 'deviceMemory',
-        message: 'service worker native deviceMemory read failed; keep mirror seed only',
-        type: 'browser structure missing data',
-        data: {
-          outcome: 'skip',
-          reason: 'native_read_failed',
-          profileValue: Number(dm)
-        }
-      }, e);
-    }
+    }, null);
 
     const uad = nav.userAgentData;
     if (!uad) {
