@@ -161,7 +161,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS__.__STATE__ is undefined — module registration is not available');
   }
 
-  // Native default ctx2d font (MDN/Chromium-consistent). Read shared CanvasPatchContext slot; local compute is fallback-only.
+  // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
   const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
     try {
       const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string') ? __canvasState.defaultCtx2dFont : '';
@@ -693,141 +693,135 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
   // - Exports masters: `applyFillTextHook` / `applyStrokeTextHook` (via final export section)
   
   // NOTE: This block must not replace `window.CanvasPatchHooks` identity.
-  let applyFillTextHook, applyStrokeTextHook;
+  // let applyFillTextHook, applyStrokeTextHook;
 
-  (function patchFontSizeScalingHooks(){
-    if (__canvasState.__PATCH_FONT_SCALE_HOOKS__) return;
-    __canvasState.__PATCH_FONT_SCALE_HOOKS__ = true;
+  // (function patchFontSizeScalingHooks(){
+  //   if (window.__PATCH_FONT_SCALE_HOOKS__) return;
+  //   window.__PATCH_FONT_SCALE_HOOKS__ = true;
 
-    // ——— helpers ———
-    // Разбор font-шортхенда: "... 16px/normal Arial"
-    function parseFontShorthand(font) {
-      const m = String(font).match(
-        /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
-      );
-      if (!m) {
-        return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
-      }
-      return {
-        style:   m[1] || 'normal',
-        variant: m[2] || 'normal',
-        weight:  m[3] || 'normal',
-        sizePx:  parseFloat(m[4]),
-        line:    m[5],
-        family:  m[6]
-      };
-    }
+  //   const Hooks = (window.CanvasPatchHooks ||= {});
 
-    function buildFont(f) {
-      if (!f || typeof f !== 'object') {
-        throw new Error('[CanvasPatch] buildFont: invalid font object');
-      }
-      const parts = [];
-      if (f.style && f.style !== 'normal') parts.push(String(f.style));
-      if (f.variant && f.variant !== 'normal') parts.push(String(f.variant));
-      if (f.weight && f.weight !== 'normal') parts.push(String(f.weight));
+  //   // ——— helpers ———
+  //   // Разбор font-шортхенда: "... 16px/normal Arial"
+  //   function parseFontShorthand(font) {
+  //     const m = String(font || '').match(
+  //       /^(?:(italic|oblique|normal)\s+)?(?:(small-caps)\s+)?(?:(bold|bolder|lighter|\d{3}|normal)\s+)?(\d+(?:\.\d+)?)px(?:\/([^\s]+))?\s+(.+)$/i
+  //     );
+  //     if (!m) {
+  //       return { style:'normal', variant:'normal', weight:'normal', sizePx:16, line:undefined, family:'sans-serif' };
+  //     }
+  //     return {
+  //       style:   m[1] || 'normal',
+  //       variant: m[2] || 'normal',
+  //       weight:  m[3] || 'normal',
+  //       sizePx:  parseFloat(m[4]),
+  //       line:    m[5],
+  //       family:  m[6]
+  //     };
+  //   }
 
-      const sizePx = f.sizePx;
-      if (!(typeof sizePx === 'number' && isFinite(sizePx) && sizePx > 0)) {
-        throw new Error('[CanvasPatch] buildFont: invalid sizePx');
-      }
-      const sizePart = `${sizePx}px` + (f.line ? `/${String(f.line)}` : '');
-      parts.push(sizePart);
+  //   function buildFont(f) {
+  //     if (!f || typeof f !== 'object') {
+  //       throw new Error('[CanvasPatch] buildFont: invalid font object');
+  //     }
+  //     const parts = [];
+  //     if (f.style && f.style !== 'normal') parts.push(String(f.style));
+  //     if (f.variant && f.variant !== 'normal') parts.push(String(f.variant));
+  //     if (f.weight && f.weight !== 'normal') parts.push(String(f.weight));
 
-      const family = (typeof f.family === 'string') ? f.family.trim() : '';
-      if (!family) {
-        throw new Error('[CanvasPatch] buildFont: missing family');
-      }
-      parts.push(family);
+  //     const sizePx = f.sizePx;
+  //     if (!(typeof sizePx === 'number' && isFinite(sizePx) && sizePx > 0)) {
+  //       throw new Error('[CanvasPatch] buildFont: invalid sizePx');
+  //     }
+  //     const sizePart = `${sizePx}px` + (f.line ? `/${String(f.line)}` : '');
+  //     parts.push(sizePart);
 
-      return parts.join(' ');
-    }
+  //     const family = (typeof f.family === 'string') ? f.family.trim() : '';
+  //     if (!family) {
+  //       throw new Error('[CanvasPatch] buildFont: missing family');
+  //     }
+  //     parts.push(family);
 
-    // Масштаб под текст: локальная деривация из текущего ctx.font и существующего __CNV_CFG__.
-    function getScaleForText(ctx, text) {
-      const fontStr = String(ctx && ctx.font);
-      try {
-        const parsed = parseFontShorthand(fontStr);
-        const sizePx = (parsed && typeof parsed.sizePx === 'number' && isFinite(parsed.sizePx) && parsed.sizePx > 0)
-          ? parsed.sizePx
-          : 16;
-        const ampPx = Math.max(
-          Math.abs(Number(__CNV_CFG__ && __CNV_CFG__.dxPx)),
-          Math.abs(Number(__CNV_CFG__ && __CNV_CFG__.dyPx))
-        );
-        if (!(ampPx > 0)) {
-          return { sx: 1, sy: 1 };
-        }
-        const delta = stableNoiseFromString(`font-scale|${fontStr}`, -(ampPx / sizePx), (ampPx / sizePx));
-        const s = Math.max(0.001, 1 + delta);
-        return { sx: s, sy: s };
-      } catch (e) {
-        emitCanvasDiag('warn', 'canvas:font_scale:runtime:local_derivation_failed', e, {
-          stage: 'runtime',
-          key: 'ctx.font/__CNV_CFG__'
-        });
-      }
-      return { sx: 1, sy: 1 };
-    }
+  //     return parts.join(' ');
+  //   }
 
-    // ——— master for fillText: consistent render ———
-    applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
-      const { sx, sy } = getScaleForText(this, text);
-      if (sx===1 && sy===1) {
-        return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
-      }
-      // Isotropic — temporarily scale font.sizePx (faster)
-      if (Math.abs(sx - sy) < 1e-6) {
-        const prev = this.font;
-        try {
-          const f = parseFontShorthand(prev);
-          f.sizePx *= sx;
-          this.font = buildFont(f);
-          return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
-        } finally {
-          this.font = prev;
-        }
-      }
-      // Anisotropic — matrix scale + coordinate/width compensation
-      this.save();
-      try {
-        this.scale(sx, sy);
-        return (maxWidth!=null)
-          ? origFillText(text, x/sx, y/sy, maxWidth/sx)
-          : origFillText(text, x/sx, y/sy);
-      } finally {
-        this.restore();
-      }
-    };
+  //   // Масштаб под текст: сперва managed fonts config slot, фолбэк — __FONT_SCALE__
+  //   function getScaleForText(ctx, text) {
+  //     try {
+  //       const font = String(ctx && ctx.font || '');
+  //       const cfg = getManagedFontConfig(font);
+  //       if (cfg) {
+  //         const sx = Number.isFinite(cfg.scaleX) ? cfg.scaleX : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
+  //         const sy = Number.isFinite(cfg.scaleY) ? cfg.scaleY : (Number.isFinite(cfg.scale) ? cfg.scale : 1);
+  //         return { sx, sy };
+  //       }
+  //     } catch (e) {
+  //       emitCanvasDiag('warn', 'canvas:font_scale:runtime:config_read_failed', e, {
+  //         stage: 'runtime',
+  //         key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs'
+  //       });
+  //     }
+  //     return { sx: 1, sy: 1 };
+  //   }
 
-    // ——— master for strokeText: same as above ———
-    applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
-      const { sx, sy } = getScaleForText(this, text);
-      if (sx===1 && sy===1) {
-        return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
-      }
-      if (Math.abs(sx - sy) < 1e-6) {
-        const prev = this.font;
-        try {
-          const f = parseFontShorthand(prev);
-          f.sizePx *= sx;
-          this.font = buildFont(f);
-          return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
-        } finally {
-          this.font = prev;
-        }
-      }
-      this.save();
-      try {
-        this.scale(sx, sy);
-        return (maxWidth!=null)
-          ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
-          : origStrokeText(text, x/sx, y/sy);
-      } finally {
-        this.restore();
-      }
-    };
-  })();
+  //   // ——— master for fillText: consistent render ———
+  //   applyFillTextHook = function(origFillText, text, x, y, maxWidth) {
+  //     const { sx, sy } = getScaleForText(this, text);
+  //     if (sx===1 && sy===1) {
+  //       return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+  //     }
+  //     // Isotropic — temporarily scale font.sizePx (faster)
+  //     if (Math.abs(sx - sy) < 1e-6) {
+  //       const prev = this.font || '';
+  //       try {
+  //         const f = parseFontShorthand(prev);
+  //         f.sizePx *= sx;
+  //         this.font = buildFont(f);
+  //         return (maxWidth!=null) ? origFillText(text, x, y, maxWidth) : origFillText(text, x, y);
+  //       } finally {
+  //         this.font = prev;
+  //       }
+  //     }
+  //     // Anisotropic — matrix scale + coordinate/width compensation
+  //     this.save();
+  //     try {
+  //       this.scale(sx, sy);
+  //       return (maxWidth!=null)
+  //         ? origFillText(text, x/sx, y/sy, maxWidth/sx)
+  //         : origFillText(text, x/sx, y/sy);
+  //     } finally {
+  //       this.restore();
+  //     }
+  //   };
+
+  //   // ——— master for strokeText: same as above ———
+  //   applyStrokeTextHook = function(origStrokeText, text, x, y, maxWidth) {
+  //     const { sx, sy } = getScaleForText(this, text);
+  //     if (sx===1 && sy===1) {
+  //       return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+  //     }
+  //     if (Math.abs(sx - sy) < 1e-6) {
+  //       const prev = this.font || '';
+  //       try {
+  //         const f = parseFontShorthand(prev);
+  //         f.sizePx *= sx;
+  //         this.font = buildFont(f);
+  //         return (maxWidth!=null) ? origStrokeText(text, x, y, maxWidth) : origStrokeText(text, x, y);
+  //       } finally {
+  //         this.font = prev;
+  //       }
+  //     }
+  //     this.save();
+  //     try {
+  //       this.scale(sx, sy);
+  //       return (maxWidth!=null)
+  //         ? origStrokeText(text, x/sx, y/sy, maxWidth/sx)
+  //         : origStrokeText(text, x/sx, y/sy);
+  //     } finally {
+  //       this.restore();
+  //     }
+  //   };
+  // })();
 
 
 
@@ -963,6 +957,6 @@ __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
 // __CanvasPatchHooks__.addCanvasNoise = addCanvasNoise;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
 
-if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
-if (typeof applyStrokeTextHook === 'function') __CanvasPatchHooks__.applyStrokeTextHook = applyStrokeTextHook;
+// if (typeof applyFillTextHook === 'function') __CanvasPatchHooks__.applyFillTextHook = applyFillTextHook;
+// if (typeof applyStrokeTextHook === 'function') __CanvasPatchHooks__.applyStrokeTextHook = applyStrokeTextHook;
 }

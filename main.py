@@ -913,7 +913,7 @@ def main():
         # logger.info("preparation completed")
         # client.connect()
         client._kill_old_processes()
-        client._clean_directories()
+        # client._clean_directories()
         client.post()
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()
@@ -1294,7 +1294,7 @@ def main():
              
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/fonts.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
