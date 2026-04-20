@@ -1354,11 +1354,11 @@
       const nativeHardwareConcurrency = Number(nativeHardwareConcurrencyResolved.value);
       if (Number.isFinite(nativeHardwareConcurrency) && nativeHardwareConcurrency > 0) {
         const profileHardwareConcurrency = Number(cache.snap.hardwareConcurrency);
-        cache.snap.hardwareConcurrency = nativeHardwareConcurrency;
-        __workerNavigatorPatchedOwners__['hardwareConcurrency'] = nativeHardwareConcurrencyResolved.owner;
-        __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_passthrough';
-        __patchHardwareConcurrency = false;
         if (Object.is(nativeHardwareConcurrency, profileHardwareConcurrency)) {
+          cache.snap.hardwareConcurrency = nativeHardwareConcurrency;
+          __workerNavigatorPatchedOwners__['hardwareConcurrency'] = nativeHardwareConcurrencyResolved.owner;
+          __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_passthrough';
+          __patchHardwareConcurrency = false;
           emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:native_passthrough', {
             type: 'browser structure missing data',
             stage: 'preflight',
@@ -1376,17 +1376,17 @@
             }
           }, null);
         } else {
-          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:native_value_adopted', {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:native_mismatch', {
             type: 'browser structure missing data',
             stage: 'preflight',
             module: 'WORKER_PATCH_SRC',
             surface: 'WorkerNavigator',
             key: 'hardwareConcurrency',
-            policy: 'skip',
-            action: 'native',
+            policy: 'patch',
+            action: 'patch',
             data: {
-              outcome: 'skip',
-              reason: 'native_value_adopted',
+              outcome: 'patch',
+              reason: 'native_mismatch',
               nativeValue: nativeHardwareConcurrency,
               profileValue: profileHardwareConcurrency,
               scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null

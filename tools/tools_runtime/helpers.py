@@ -13,6 +13,7 @@ def build_device_metrics(profile: dict) -> dict:
     """
     w   = int(profile["screen_width"])
     h   = int(profile["screen_height"])
+    # hcv = int (profile["hardwareConcurrency"])
     dpr = float(profile.get("device_dpr_value", 1))
 
     # OS/CDP (camelCase)
@@ -22,6 +23,7 @@ def build_device_metrics(profile: dict) -> dict:
         "width": w,
         "height": h,
         "deviceScaleFactor": dpr,
+        # "hardware_concurrency_value": hcv,
         "mobile": False,
         "screenWidth": w,
         "screenHeight": h,

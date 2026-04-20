@@ -254,8 +254,27 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       enumerable: false
     });
   }
+  if (!Object.prototype.hasOwnProperty.call(__screenRuntimeState, 'viewportMetrics')) {
+    Object.defineProperty(__screenRuntimeState, 'viewportMetrics', {
+      value: Object.create(null),
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
   const __moduleRollbackStack = __screenRuntimeState.rollbackStack;
   const __screenAppliedGroups = __screenRuntimeState.appliedGroups;
+  const __screenViewportMetrics = (__screenRuntimeState.viewportMetrics && typeof __screenRuntimeState.viewportMetrics === 'object')
+    ? __screenRuntimeState.viewportMetrics
+    : Object.create(null);
+  if (__screenRuntimeState.viewportMetrics !== __screenViewportMetrics) {
+    Object.defineProperty(__screenRuntimeState, 'viewportMetrics', {
+      value: __screenViewportMetrics,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
 
   const SCREEN_WIDTH  = Number(__screenMetricsState.width);
   const SCREEN_HEIGHT = Number(__screenMetricsState.height);
@@ -888,6 +907,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     visualViewportPageTop: ZERO,
     visualViewportScale: ONE
   };
+  __screenViewportMetrics.width = viewportExpected.innerWidth;
+  __screenViewportMetrics.height = viewportExpected.innerHeight;
+  __screenViewportMetrics.scale = viewportExpected.visualViewportScale;
+  __screenViewportMetrics.owner = 'screen';
+  __screenViewportMetrics.source = 'screen_expected';
   function __screenSetGroupOutcome(groupName, mode, reason) {
     if (groupName === 'display') {
       __screenGroupModes.displayMode = mode;

@@ -339,7 +339,7 @@ def init_driver(
             "longitude": longitude,
             "accuracy": accuracy,
         })
-
+        
         # 3. Device Metrics (screen scales, including navigator.mobile)
         if device_metrics:
             driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
@@ -353,6 +353,19 @@ def init_driver(
         device_metrics=build_bootstrap_device_metrics(),
 
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     # --- Initial fonts patch ---
@@ -695,16 +708,7 @@ def init_driver(
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
 
-    # ---  CDP PROCESSING STAGE---
-    # --- patch userAgent and userAgentMetadata via CDP ---
-    browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
-    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, platform)
-    
-    try:
-        driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
-        logger.info("Direct page-side locale override applied: %s", language)
-    except Exception as e:
-        logger.warning("Direct page-side locale override failed: %s", e)
+
     try:
         driver.execute_cdp_cmd(
             "Emulation.setHardwareConcurrencyOverride",
@@ -713,7 +717,24 @@ def init_driver(
         logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
     except Exception as e:
         logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
+
+
+
+
+    try:
+        driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
+        logger.info("Direct page-side locale override applied: %s", language)
+    except Exception as e:
+        logger.warning("Direct page-side locale override failed: %s", e)
+
+
+
+    # ---  CDP PROCESSING STAGE---
+    # --- patch userAgent and userAgentMetadata via CDP ---
+    browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
+    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, platform)
     
+
     
     inject_uach_strip_window(driver, user_agent)
 
@@ -1090,8 +1111,32 @@ def main():
         audiooutput = profile_rng.choice(data["headphone"])['name']
         devices_conf = {"audioinput": audioinput, "videoinput": videoinput, "audiooutput": audiooutput}
 
-
         # ----------------------------Setting up GPU and Screen -----------------------
+        # gpu = profile_rng.choice(data["GPU"])
+        # gpu_architecture = str(gpu.get("architecture", "")).strip()
+        # gpu_type = str(gpu.get("type", ""))
+        # gpu_name = gpu["name"]
+        # gpu_code = gpu["prod_code"]
+
+        # screen_res = profile_rng.choice(gpu["resolution"])
+        # if not isinstance(screen_res, str) or not re.fullmatch(r"[1-9]\d{2,4}x[1-9]\d{2,4}", screen_res):
+        #     raise ValueError(f"invalid screen resolution from GPU dictionary: {screen_res!r}")
+        # screen_width, screen_height = map(int, screen_res.split("x", 1))
+
+        # # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
+        # dpr_map = {
+        #     "1920x1080": 1.0,
+        #     "2560x1440": 1.25,
+        #     "3840x2160": 2.0,
+        # }
+        # device_dpr_value = dpr_map.get(screen_res)
+        # if device_dpr_value is None:
+        #     raise ValueError(f"unknown screen resolution: {screen_res!r}")
+
+
+
+
+        # # ----------------------------Setting up GPU and Screen -----------------------
         gpu = profile_rng.choice(data["GPU"])
         gpu_architecture = str(gpu.get("architecture", "")).strip()
         gpu_type = str(gpu.get("type", ""))
@@ -1302,7 +1347,7 @@ def main():
              
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
