@@ -913,7 +913,7 @@ def main():
         # logger.info("preparation completed")
         # client.connect()
         client._kill_old_processes()
-        # client._clean_directories()
+        client._clean_directories()
         client.post()
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()

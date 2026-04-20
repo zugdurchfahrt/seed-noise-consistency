@@ -58,10 +58,6 @@ def _canonical_bcp47(tag: str) -> str:
     return "-".join([lang, *rest])
 
 
-def _base(lang_tag: str) -> str:
-    return (lang_tag or "").split("-", 1)[0]
-
-
 def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
     """Normalizes primary language and list `navigator.languages`.
 
@@ -70,8 +66,8 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
     - We add the rest of the entries in the order they appear, canonizing the register.
     - No synthetic base-language expansion is performed here. This function returns
       the canonical seed list for navigator.language/navigator.languages.
-    - Header-specific fallback expansion, if needed, is handled separately by the
-      Accept-Language builder.
+    - Accept-Language is derived separately from the canonical profile list and may
+      be tuned independently for browser-specific network behavior.
     Returns: `(language, languages)`.
     """
     items = [t for t in (base_languages or []) if t]

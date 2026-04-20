@@ -1142,10 +1142,47 @@
     let __patchLanguage = true;
     try {
       const nativeLanguageResolved = readWorkerNavigatorNativeValue('language');
-      if (nativeLanguageResolved.value === cache.snap.language) {
-        __workerNavigatorPatchedOwners__['language'] = nativeLanguageResolved.owner;
-        __workerNavigatorDescriptorModes__['language'] = 'native_skip';
-        __patchLanguage = false;
+      const nativeLanguage = nativeLanguageResolved.value;
+      if (typeof nativeLanguage === 'string' && nativeLanguage.trim() !== '') {
+        const profileLanguage = cache.snap.language;
+        if (nativeLanguage === profileLanguage) {
+          __workerNavigatorPatchedOwners__['language'] = nativeLanguageResolved.owner;
+          __workerNavigatorDescriptorModes__['language'] = 'native_passthrough';
+          __patchLanguage = false;
+          emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:native_passthrough', {
+            type: 'browser structure missing data',
+            stage: 'preflight',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'WorkerNavigator',
+            key: 'language',
+            policy: 'skip',
+            action: 'native',
+            data: {
+              outcome: 'skip',
+              reason: 'native_passthrough',
+              nativeValue: nativeLanguage,
+              profileValue: profileLanguage,
+              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            }
+          }, null);
+        } else {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:native_mismatch', {
+            type: 'browser structure missing data',
+            stage: 'preflight',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'WorkerNavigator',
+            key: 'language',
+            policy: 'patch',
+            action: 'patch',
+            data: {
+              outcome: 'patch',
+              reason: 'native_mismatch',
+              nativeValue: nativeLanguage,
+              profileValue: profileLanguage,
+              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            }
+          }, null);
+        }
       }
     } catch (e) {
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
@@ -1194,14 +1231,48 @@
     try {
       const nativeLanguagesResolved = readWorkerNavigatorNativeValue('languages');
       const nativeLanguages = nativeLanguagesResolved.value;
-      const snapLanguages = cache.snap.languages;
       if (Array.isArray(nativeLanguages)
-          && Array.isArray(snapLanguages)
-          && nativeLanguages.length === snapLanguages.length
-          && nativeLanguages.every(function(value, index) { return value === snapLanguages[index]; })) {
-        __workerNavigatorPatchedOwners__['languages'] = nativeLanguagesResolved.owner;
-        __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
-        __patchLanguages = false;
+          && nativeLanguages.length > 0
+          && nativeLanguages.every(function(value) { return typeof value === 'string' && value.trim() !== ''; })) {
+        const profileLanguages = Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages;
+        if (sameJson(nativeLanguages, profileLanguages)) {
+          __workerNavigatorPatchedOwners__['languages'] = nativeLanguagesResolved.owner;
+          __workerNavigatorDescriptorModes__['languages'] = 'native_passthrough';
+          __patchLanguages = false;
+          emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:native_passthrough', {
+            type: 'browser structure missing data',
+            stage: 'preflight',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'WorkerNavigator',
+            key: 'languages',
+            policy: 'skip',
+            action: 'native',
+            data: {
+              outcome: 'skip',
+              reason: 'native_passthrough',
+              nativeValue: nativeLanguages.slice(),
+              profileValue: profileLanguages,
+              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            }
+          }, null);
+        } else {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:native_mismatch', {
+            type: 'browser structure missing data',
+            stage: 'preflight',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'WorkerNavigator',
+            key: 'languages',
+            policy: 'patch',
+            action: 'patch',
+            data: {
+              outcome: 'patch',
+              reason: 'native_mismatch',
+              nativeValue: nativeLanguages.slice(),
+              profileValue: profileLanguages,
+              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            }
+          }, null);
+        }
       }
     } catch (e) {
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
@@ -1269,8 +1340,6 @@
         action: 'native',
         data: { outcome: 'skip', reason: 'native_passthrough_unresolved' }
       }, null);
-      // LEGACY synthetic rollback for worker scope:
-      // def(proto, 'deviceMemory', getDeviceMemory, true);
     }
 
     const getHardwareConcurrency = function getHardwareConcurrency(){
@@ -1283,11 +1352,46 @@
     try {
       const nativeHardwareConcurrencyResolved = readWorkerNavigatorNativeValue('hardwareConcurrency');
       const nativeHardwareConcurrency = Number(nativeHardwareConcurrencyResolved.value);
-      const snapHardwareConcurrency = Number(cache.snap.hardwareConcurrency);
-      if (Number.isFinite(nativeHardwareConcurrency) && Number.isFinite(snapHardwareConcurrency) && Object.is(nativeHardwareConcurrency, snapHardwareConcurrency)) {
-        __workerNavigatorPatchedOwners__['hardwareConcurrency'] = nativeHardwareConcurrencyResolved.owner;
-        __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
-        __patchHardwareConcurrency = false;
+      if (Number.isFinite(nativeHardwareConcurrency) && nativeHardwareConcurrency > 0) {
+        const profileHardwareConcurrency = cache.snap.hardwareConcurrency;
+        if (Object.is(nativeHardwareConcurrency, Number(profileHardwareConcurrency))) {
+          __workerNavigatorPatchedOwners__['hardwareConcurrency'] = nativeHardwareConcurrencyResolved.owner;
+          __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_passthrough';
+          __patchHardwareConcurrency = false;
+          emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:native_passthrough', {
+            type: 'browser structure missing data',
+            stage: 'preflight',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'WorkerNavigator',
+            key: 'hardwareConcurrency',
+            policy: 'skip',
+            action: 'native',
+            data: {
+              outcome: 'skip',
+              reason: 'native_passthrough',
+              nativeValue: nativeHardwareConcurrency,
+              profileValue: profileHardwareConcurrency,
+              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            }
+          }, null);
+        } else {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:native_mismatch', {
+            type: 'browser structure missing data',
+            stage: 'preflight',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'WorkerNavigator',
+            key: 'hardwareConcurrency',
+            policy: 'patch',
+            action: 'patch',
+            data: {
+              outcome: 'patch',
+              reason: 'native_mismatch',
+              nativeValue: nativeHardwareConcurrency,
+              profileValue: profileHardwareConcurrency,
+              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            }
+          }, null);
+        }
       }
     } catch (e) {
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {

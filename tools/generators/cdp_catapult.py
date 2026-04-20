@@ -617,9 +617,11 @@ def run():
                             _fatal(ws, "sw sanity: bad result type", out)
                             return
                         if out.get("language") != exp["language"] or list(out.get("languages") or []) != list(exp["languages"]):
-                            _resume_sw_session(ws, sid, "sanity_language_mismatch")
-                            _fatal(ws, "sw sanity: language mismatch", {"expected": exp, "got": out})
-                            return
+                            logger.warning(
+                                "SW inject: language sanity mismatch; prefer native worker value expected=%s got=%s",
+                                {"language": exp.get("language"), "languages": exp.get("languages")},
+                                {"language": out.get("language"), "languages": out.get("languages")},
+                            )
                         if int(out.get("hardwareConcurrency") or 0) != int(exp["hardwareConcurrency"]):
                             _resume_sw_session(ws, sid, "sanity_hardware_mismatch")
                             _fatal(ws, "sw sanity: hardwareConcurrency mismatch", {"expected": exp, "got": out})

@@ -34,12 +34,35 @@ DYNAMIC_OVERRIDES = [
     "Device-Memory"
 ]
 # ===== Accept-Language HEADER =====
+def _ordered_accept_language_entries(languages):
+    """
+    Build Accept-Language from the canonical profile list.
+
+    Default behavior keeps the profile ordering/cardinality intact, aside from
+    duplicate/empty filtering. Browser-specific experiments such as synthetic
+    fallback tags should be enabled explicitly, not by default.
+    """
+    ordered = []
+    seen = set()
+    for raw in (languages or []):
+        if not isinstance(raw, str):
+            continue
+        lang = raw.strip()
+        if not lang or lang in seen:
+            continue
+        ordered.append(lang)
+        seen.add(lang)
+    if ordered:
+        return ordered
+    return ["en-GB"]
+
+
 def build_accept_language(languages):
     """
     Формирует строку Accept-Language с q-метками, как делает Chrome/Edge/Firefox.
     """
     parts = []
-    for i, lang in enumerate(languages):
+    for i, lang in enumerate(_ordered_accept_language_entries(languages)):
         if i == 0:
             parts.append(lang)
         else:
@@ -81,7 +104,7 @@ def generate_accept_header(browser_brand: str, major_version: int, kind: str = "
 
 # ===== OUTBOUND CLNIENT HINTS  HEADERS HANDLING=====
 def outbound_headers_forge(profile, expected_client_hints, user_agent):
-    # Построим Accept-Language один раз из профиля (совпадает с navigator.languages)
+    # Build Accept-Language once from the canonical profile seed.
     langs = profile.get("languages") or expected_client_hints.get("languages") or [expected_client_hints.get("language")]
     al = profile.get("accept_language") or build_accept_language(langs)
     is_safari = "Safari" in user_agent and "Chrome" not in user_agent and "Edg/" not in user_agent
@@ -105,7 +128,8 @@ def outbound_headers_forge(profile, expected_client_hints, user_agent):
         "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
         "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
         "Sec-CH-Save-Data": "?0",
-        "Sec-CH-Lang": ", ".join(expected_client_hints.get("languages", [expected_client_hints.get("language")])),
+        # Optional non-standard compatibility knob:
+        # "Sec-CH-Lang": ", ".join(expected_client_hints.get("languages", [expected_client_hints.get("language")])),
         # Extended client hints
         "Sec-CH-UA-Platform-Version": f'"{expected_client_hints["platformVersion"]}"',
         "Sec-CH-UA-Full-Version-List": expected_client_hints["sec_ch_ua_full_version_list"],
@@ -131,6 +155,3 @@ def import_headers(headers, keys, flow):
         v = headers.get(k)
         if v:
             flow.request.headers[k] = v
-
-
-
