@@ -745,8 +745,6 @@ def init_driver(
     )
 
     
-    inject_uach_strip_window(driver, user_agent)
-
     # Connect page_js (core + targets + wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     # =========================
@@ -1312,49 +1310,49 @@ def main():
                 "Page.addScriptToEvaluateOnNewDocument",
                 {"source": override_js}
             )
+            inject_uach_strip_window(driver, user_agent)
         
         elif browser_brand == "Firefox":
             logger.info("UA data submitted via CDP for Firefox/Safari")
         else:
-            needs_reapply = False
-            try:
-                current_ua = driver.execute_script("return navigator.userAgent")
-                if current_ua != profile["user_agent"]:
-                    needs_reapply = True
-                else:
-                    current_uad = driver.execute_script(
-                        "const uad = navigator.userAgentData;"
-                        "if (!uad) return null;"
-                        "const brands = Array.isArray(uad.brands) ? "
-                        "uad.brands.map(b => ({brand: b.brand, version: String(b.version)})) : null;"
-                        "return { brands, platform: uad.platform, mobile: uad.mobile };"
-                    )
-                    
-                                        
-                    if current_uad:
-                        exp_brands = expected_client_hints.get("brands") or []
-                        exp_norm = sorted(
-                            [(str(b.get("brand")), str(b.get("version"))) for b in exp_brands if isinstance(b, dict)]
-                        )
-                        cur_brands = current_uad.get("brands") or []
-                        cur_norm = sorted(
-                            [(str(b.get("brand")), str(b.get("version"))) for b in cur_brands if isinstance(b, dict)]
-                        )
-                        if (
-                            exp_norm != cur_norm
-                            or current_uad.get("platform") != expected_client_hints.get("platform")
-                            or current_uad.get("mobile") != expected_client_hints.get("mobile")
-                        ):
-                            needs_reapply = True
-            except Exception as e:
-                logger.warning("UA override reapply check failed: %s", e)
-                needs_reapply = True
-            if needs_reapply:
-                apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, profile["platform"])
-                      
-                                
-            inject_uach_strip_window(driver, user_agent)
-            logger.info("UA data re-applied via CDP (mismatch detected)")
+            # Legacy Chromium reapply corridor disabled: fall through directly to configure_profile().
+            # needs_reapply = False
+            # try:
+            #     current_ua = driver.execute_script("return navigator.userAgent")
+            #     if current_ua != profile["user_agent"]:
+            #         needs_reapply = True
+            #     else:
+            #         current_uad = driver.execute_script(
+            #             "const uad = navigator.userAgentData;"
+            #             "if (!uad) return null;"
+            #             "const brands = Array.isArray(uad.brands) ? "
+            #             "uad.brands.map(b => ({brand: b.brand, version: String(b.version)})) : null;"
+            #             "return { brands, platform: uad.platform, mobile: uad.mobile };"
+            #         )
+            #
+            #         if current_uad:
+            #             exp_brands = expected_client_hints.get("brands") or []
+            #             exp_norm = sorted(
+            #                 [(str(b.get("brand")), str(b.get("version"))) for b in exp_brands if isinstance(b, dict)]
+            #             )
+            #             cur_brands = current_uad.get("brands") or []
+            #             cur_norm = sorted(
+            #                 [(str(b.get("brand")), str(b.get("version"))) for b in cur_brands if isinstance(b, dict)]
+            #             )
+            #             if (
+            #                 exp_norm != cur_norm
+            #                 or current_uad.get("platform") != expected_client_hints.get("platform")
+            #                 or current_uad.get("mobile") != expected_client_hints.get("mobile")
+            #             ):
+            #                 needs_reapply = True
+            # except Exception as e:
+            #     logger.warning("UA override reapply check failed: %s", e)
+            #     needs_reapply = True
+            # if needs_reapply:
+            #     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, profile["platform"])
+            #
+            # logger.info("UA data re-applied via CDP (mismatch detected)")
+            pass
         # ----------------------- Call local setting def  -----------------------
         
         configure_profile(driver, profile["language"], profile["languages"], country_data)
