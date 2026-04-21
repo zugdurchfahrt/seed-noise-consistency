@@ -235,6 +235,26 @@ const __probeRun = async function(){
     }, err || null);
   }
 
+  // Manual probe runs create live audio objects; close/disconnect them before returning.
+  function __probeCleanupAudioObjects(audioCtx, analyser) {
+    try {
+      if (analyser && typeof analyser.disconnect === "function") analyser.disconnect();
+    } catch (_) {}
+    try {
+      if (audioCtx && typeof audioCtx.close === "function") {
+        const closeResult = audioCtx.close();
+        if (closeResult && typeof closeResult.catch === "function") closeResult.catch(function() {});
+        return;
+      }
+    } catch (_) {}
+    try {
+      if (audioCtx && typeof audioCtx.suspend === "function") {
+        const suspendResult = audioCtx.suspend();
+        if (suspendResult && typeof suspendResult.catch === "function") suspendResult.catch(function() {});
+      }
+    } catch (_) {}
+  }
+
 
 
 
@@ -2960,6 +2980,8 @@ const __probeRun = async function(){
 
   async function printReceiverChecks() {
     const rows = [];
+    let audioCtx = null;
+    let analyser = null;
 
     function isPromiseLike(v) {
       return !!v && (typeof v === "object" || typeof v === "function") && typeof v.then === "function";
@@ -3424,7 +3446,6 @@ const __probeRun = async function(){
       const AudioCtxCtor = (typeof AudioContext === "function")
         ? AudioContext
         : (typeof webkitAudioContext === "function" ? webkitAudioContext : null);
-      let audioCtx = null;
       try {
         audioCtx = AudioCtxCtor ? new AudioCtxCtor() : null;
       } catch (e) {
@@ -3463,7 +3484,6 @@ const __probeRun = async function(){
         createBufferArgs || []
       );
 
-      let analyser = null;
       if (audioCtx && typeof audioCtx.createAnalyser === "function") {
         try {
           analyser = Reflect.apply(audioCtx.createAnalyser, audioCtx, []);
@@ -3559,6 +3579,8 @@ const __probeRun = async function(){
         badError: null,
         match: false
       });
+    } finally {
+      __probeCleanupAudioObjects(audioCtx, analyser);
     }
 
     const ok = rows.every((r) => r.match === true || r.match === null);
@@ -3663,6 +3685,8 @@ const __probeRun = async function(){
           note: "probe internal error"
         }, e);
       }
+    } finally {
+      __probeCleanupAudioObjects(audioCtx, analyser);
     }
 
     const ok = rows.every((r) => r.match === true || r.match === null);
@@ -3683,6 +3707,8 @@ const __probeRun = async function(){
 
   function printPrototypeInvariantChecks() {
     const rows = [];
+    let audioCtx = null;
+    let analyser = null;
 
     function push(check, expected, actual, match, error) {
       rows.push({
@@ -3744,7 +3770,6 @@ const __probeRun = async function(){
       const AudioCtxCtor = (typeof AudioContext === "function")
         ? AudioContext
         : (typeof webkitAudioContext === "function" ? webkitAudioContext : null);
-      let audioCtx = null;
       try {
         audioCtx = AudioCtxCtor ? new AudioCtxCtor() : null;
       } catch (e) {
@@ -3753,7 +3778,6 @@ const __probeRun = async function(){
       tryInstanceof("proto: audioContext instanceof AudioContext", audioCtx, AudioCtxCtor);
       tryProto("proto: audioContext proto check", audioCtx, AudioCtxCtor ? AudioCtxCtor.prototype : null);
 
-      let analyser = null;
       if (audioCtx && typeof audioCtx.createAnalyser === "function") {
         try {
           analyser = Reflect.apply(audioCtx.createAnalyser, audioCtx, []);
@@ -3774,6 +3798,8 @@ const __probeRun = async function(){
       tryProto("proto: Object.getPrototypeOf(Function.prototype.toString) === Function.prototype", Function.prototype.toString, Function.prototype);
     } catch (e) {
       push("proto: internal probe error", "no throw", "threw", false, e);
+    } finally {
+      __probeCleanupAudioObjects(audioCtx, analyser);
     }
 
     const ok = rows.every((r) => r.match === true || r.match === null);

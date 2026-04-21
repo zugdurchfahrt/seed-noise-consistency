@@ -81,7 +81,6 @@ from tools.tools_runtime.helpers import (
 )
 from tools.tools_infra.vpn_utils import VPNClient
 from tools.tools_infra.overseer import logger, setup_logger
-from tools.tools_runtime.headers_adapter import build_accept_language
 
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
@@ -752,7 +751,7 @@ def init_driver(
     # --- [CH/02] build safelisted_headers (minimal set) ---
     if is_firefox or is_safari:
         safelisted_headers = {
-            "Accept-Language": build_accept_language(profile.get("languages") or [profile.get("language")]),
+            "Accept-Language": str(profile.get("accept_language") or ""),
             "Sec-CH-UA": "",
             # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
             # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
@@ -761,9 +760,10 @@ def init_driver(
         safelisted_headers = {
             # Main client hints
             # "Accept": str(expected_client_hints["accept"]),
-            "Accept-Language": build_accept_language(profile.get("languages") or [profile.get("language")]),
-            "Sec-CH-Device-Memory": str( profile["deviceMemory"]),
-            "Device-Memory": str(profile["deviceMemory"]),
+            "Accept-Language": str(profile.get("accept_language") or ""),
+            "Sec-CH-Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
+            "Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
+            # "Device-Memory": str(profile["deviceMemory"]),
             # "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
             # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
             # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
@@ -1216,7 +1216,7 @@ def main():
             "deviceMemory": device_memory_value,
             "hardwareConcurrency": hardware_concurrency_value,
             "plugins": plugins_final,
-            "accept_language": build_accept_language(languages),
+            "accept_language": None,
         }
 
         if profile["platform"]  == "Win32":
@@ -1228,6 +1228,11 @@ def main():
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
         profile["browser_brand"] = browser_brand
         profile["browser_major_version"] = major_version
+        profile["accept_language"] = headers_adapter_module.derive_accept_language(
+            profile,
+            user_agent=user_agent,
+            browser_brand=browser_brand,
+        )
         expected_client_hints = build_expected_client_hints(
             profile, ua_platform, browser_brand, major_version, browser_version
         )

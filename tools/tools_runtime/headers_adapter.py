@@ -34,35 +34,70 @@ DYNAMIC_OVERRIDES = [
     "Device-Memory"
 ]
 # ===== Accept-Language HEADER =====
-def _ordered_accept_language_entries(languages):
+def _accept_language_family(browser_brand: str | None = None, user_agent: str | None = None) -> str:
+    brand = (browser_brand or "").strip().lower()
+    ua = (user_agent or "").strip().lower()
+    if "edg" in brand or "edge" in brand or "edg/" in ua:
+        return "chromium"
+    if "chrome" in brand or "chromium" in brand:
+        return "chromium"
+    if "safari" in brand or ("safari" in ua and "chrome" not in ua and "chromium" not in ua and "edg/" not in ua):
+        return "safari"
+    if "firefox" in brand or "firefox" in ua:
+        return "firefox"
+    return "chromium"
+
+
+def _language_only_fallback(tag: str) -> str | None:
+    if not isinstance(tag, str):
+        return None
+    parts = [p for p in tag.strip().split("-") if p]
+    if len(parts) < 2:
+        return None
+    base = parts[0].lower()
+    return base or None
+
+
+def _ordered_accept_language_entries(languages, browser_brand: str | None = None, user_agent: str | None = None):
     """
     Build Accept-Language from the canonical profile list.
 
-    Default behavior keeps the profile ordering/cardinality intact, aside from
-    duplicate/empty filtering. Browser-specific experiments such as synthetic
-    fallback tags should be enabled explicitly, not by default.
+    Chromium/Safari network behavior may add language-only fallback tags after
+    specific locale entries. navigator.languages remains untouched and is
+    normalized separately.
     """
+    family = _accept_language_family(browser_brand=browser_brand, user_agent=user_agent)
     ordered = []
     seen = set()
+
+    def _append(lang: str) -> None:
+        if not lang or lang in seen:
+            return
+        ordered.append(lang)
+        seen.add(lang)
+
     for raw in (languages or []):
         if not isinstance(raw, str):
             continue
         lang = raw.strip()
-        if not lang or lang in seen:
+        if not lang:
             continue
-        ordered.append(lang)
-        seen.add(lang)
+        _append(lang)
+        if family in ("chromium", "safari"):
+            fallback = _language_only_fallback(lang)
+            if fallback:
+                _append(fallback)
     if ordered:
         return ordered
     return ["en-GB"]
 
 
-def build_accept_language(languages):
+def build_accept_language(languages, browser_brand: str | None = None, user_agent: str | None = None):
     """
     Формирует строку Accept-Language с q-метками, как делает Chrome/Edge/Firefox.
     """
     parts = []
-    for i, lang in enumerate(_ordered_accept_language_entries(languages)):
+    for i, lang in enumerate(_ordered_accept_language_entries(languages, browser_brand=browser_brand, user_agent=user_agent)):
         if i == 0:
             parts.append(lang)
         else:
@@ -71,6 +106,16 @@ def build_accept_language(languages):
                 break
             parts.append(f"{lang};q={q:.1f}")
     return ",".join(parts)
+
+
+def derive_accept_language(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):
+    return build_accept_language(
+        ((profile or {}).get("languages")
+         or ((expected_client_hints or {}).get("languages") if isinstance(expected_client_hints, dict) else None)
+         or [((expected_client_hints or {}).get("language") if isinstance(expected_client_hints, dict) else None)]),
+        browser_brand=(browser_brand or ((profile or {}).get("browser_brand") if isinstance(profile, dict) else None)),
+        user_agent=(user_agent or ((profile or {}).get("user_agent") if isinstance(profile, dict) else None)),
+    )
 
 # ===== Accept-HEADER FORGE=====
 def _brand_key(browser_brand: str) -> str:
@@ -105,8 +150,12 @@ def generate_accept_header(browser_brand: str, major_version: int, kind: str = "
 # ===== OUTBOUND CLNIENT HINTS  HEADERS HANDLING=====
 def outbound_headers_forge(profile, expected_client_hints, user_agent):
     # Build Accept-Language once from the canonical profile seed.
-    langs = profile.get("languages") or expected_client_hints.get("languages") or [expected_client_hints.get("language")]
-    al = profile.get("accept_language") or build_accept_language(langs)
+    al = profile.get("accept_language") or derive_accept_language(
+        profile,
+        expected_client_hints=expected_client_hints,
+        user_agent=user_agent,
+        browser_brand=profile.get("browser_brand"),
+    )
     is_safari = "Safari" in user_agent and "Chrome" not in user_agent and "Edg/" not in user_agent
     is_firefox = "Firefox" in user_agent and "Chrome" not in user_agent and "Edg/" not in user_agent
 
