@@ -183,6 +183,9 @@
   const __swWrapStrictAccessor = (__swRuntimeRoot && typeof __swRuntimeRoot.__wrapStrictAccessor === 'function')
     ? __swRuntimeRoot.__wrapStrictAccessor
     : null;
+  const __swApplyAccessorTargets = (__swRuntimeRoot && typeof __swRuntimeRoot.__applyAccessorTargets === 'function')
+    ? __swRuntimeRoot.__applyAccessorTargets
+    : null;
 
   function __dropBridgeExport(key) {
     try {
@@ -195,6 +198,7 @@
   __dropBridgeExport('__wrapNativeApply');
   __dropBridgeExport('__wrapNativeAccessor');
   __dropBridgeExport('__wrapStrictAccessor');
+  __dropBridgeExport('__applyAccessorTargets');
   __dropBridgeExport('__wrapNativeCtor');
   __dropBridgeExport('__CORE_TOSTRING_STATE__');
 
@@ -347,6 +351,15 @@
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'wrap_strict_accessor_missing' }
       }, new Error('SW strict accessor bridge missing'));
+    }
+    if (typeof __swApplyAccessorTargets !== 'function') {
+      __fail('sw_prelude:apply_accessor_targets_missing', {
+        stage: 'preflight',
+        key: '__applyAccessorTargets',
+        message: 'service worker accessor target executor missing',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'apply_accessor_targets_missing' }
+      }, new Error('SW accessor target executor missing'));
     }
 
     try {
@@ -940,8 +953,26 @@
               ? uadGetterInfo.desc.get
               : null)));
 
-    function defAcc(key, getter) {
+    function applyServiceWorkerNavigatorAccessorTarget(key, getter, diagTag) {
+      if (typeof getter !== 'function') {
+        __fail('sw_prelude:get_impl_missing', {
+          stage: 'preflight',
+          key,
+          message: 'service worker accessor getImpl missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'get_impl_missing' }
+        }, new Error('SW ' + key + ' getter implementation missing'));
+      }
       const resolved = __resolveDescriptor(proto, key);
+      if (!resolved.owner || !resolved.desc) {
+        __fail('sw_prelude:descriptor_missing', {
+          stage: 'preflight',
+          key,
+          message: 'service worker descriptor missing',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'descriptor_missing' }
+        }, new Error('SW ' + key + ' descriptor missing'));
+      }
       if (resolved.desc && resolved.desc.configurable === false) {
         __fail('sw_prelude:descriptor_nonconfigurable', {
           stage: 'preflight',
@@ -951,74 +982,67 @@
           data: { outcome: 'throw', reason: 'descriptor_nonconfigurable' }
         }, new Error('SW ' + key + ' non-configurable'));
       }
-      const owner = resolved.owner || proto;
-      let origGet = resolved.desc && (typeof resolved.desc.get === 'function') ? resolved.desc.get : null;
-      if (!origGet && resolved.desc
-        && Object.prototype.hasOwnProperty.call(resolved.desc, 'value')
-        && !resolved.desc.get
-        && !resolved.desc.set) {
-        const nativeValue = resolved.desc.value;
-        origGet = function nativeDataGetterFallback() { return nativeValue; };
+      if (typeof resolved.desc.get !== 'function' || Object.prototype.hasOwnProperty.call(resolved.desc, 'value')) {
+        __fail('sw_prelude:native_accessor_getter_missing', {
+          stage: 'preflight',
+          key,
+          message: 'service worker native accessor getter missing',
+          type: 'contract violation',
+          data: {
+            outcome: 'throw',
+            reason: 'native_accessor_getter_missing',
+            hasValue: Object.prototype.hasOwnProperty.call(resolved.desc, 'value'),
+            hasGetter: typeof resolved.desc.get === 'function'
+          }
+        }, new Error('SW ' + key + ' native accessor getter missing'));
       }
-      const guardedGet = function guardedServiceWorkerNavigatorAccessor() {
-        const recv = this;
-        if (recv === nav) {
-          try {
-            return getter.call(recv);
-          } catch (e) {
-            __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
-              stage: 'runtime',
-              key,
-              message: 'service worker getter runtime failed',
-              type: 'browser structure missing data',
-              data: { outcome: 'skip', reason: 'getter_runtime_failed' }
-            }, e);
-            throw e;
-          }
+      const groupTag = (typeof diagTag === 'string' && diagTag) ? diagTag : ('sw_prelude:' + key);
+      const applied = __swApplyAccessorTargets(groupTag, [{
+        owner: resolved.owner,
+        key,
+        kind: 'accessor',
+        wrapLayer: 'strict_accessor_gateway',
+        resolve: 'proto_chain',
+        policy: 'strict',
+        diagTag: groupTag,
+        configurable: !!resolved.desc.configurable,
+        enumerable: !!resolved.desc.enumerable,
+        validThis: function(recv) {
+          return recv === nav;
+        },
+        invalidThis: 'native',
+        defineProperty: __trackDefineProperty,
+        getImpl: function serviceWorkerNavigatorAccessorGet() {
+          return getter.call(this);
         }
-        if (typeof origGet === 'function') {
-          try {
-            return Reflect.apply(origGet, recv, []);
-          } catch (e) {
-            __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker getter illegal invocation', e);
-            throw e;
-          }
-        }
-        return undefined;
-      };
-      const sourceDesc = resolved.desc && typeof resolved.desc === 'object'
-        ? {
-            configurable: !!resolved.desc.configurable,
-            enumerable: !!resolved.desc.enumerable,
-            get: origGet,
-            set: resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'set') ? resolved.desc.set : undefined
-          }
-        : {
-            configurable: true,
-            enumerable: false,
-            get: origGet,
-            set: undefined
-          };
-      const bridgedGet = (typeof origGet === 'function')
-        ? __swWrapStrictAccessor(key, guardedGet, sourceDesc, function(recv) {
-            return recv === nav;
-          }, {
-            name: 'get ' + key
-          })
-        : guardedGet;
-      __trackDefineProperty(owner, key, {
-        get: bridgedGet,
-        configurable: resolved.desc ? !!resolved.desc.configurable : true,
-        enumerable: resolved.desc ? !!resolved.desc.enumerable : false,
-        set: resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'set') ? resolved.desc.set : undefined
-      });
+      }], 'strict');
+      if (applied !== 1) {
+        __fail('sw_prelude:accessor_target_apply_failed', {
+          stage: 'apply',
+          key,
+          message: 'service worker accessor target apply failed',
+          type: 'apply_failed',
+          data: { outcome: 'throw', reason: 'accessor_target_apply_failed' }
+        }, new Error('SW ' + key + ' accessor target apply failed'));
+      }
     }
 
     function guardedUadGetter(key, value, sourceDesc) {
       const origGet = sourceDesc && typeof sourceDesc.get === 'function' ? sourceDesc.get : null;
-      const origValue = sourceDesc && Object.prototype.hasOwnProperty.call(sourceDesc, 'value')
-        ? sourceDesc.value
-        : undefined;
+      if (typeof origGet !== 'function') {
+        __fail('sw_prelude:uadata_native_accessor_getter_missing', {
+          stage: 'preflight',
+          key,
+          message: 'service worker uaData native accessor getter missing',
+          type: 'contract violation',
+          data: {
+            outcome: 'throw',
+            reason: 'uadata_native_accessor_getter_missing',
+            hasValue: !!(sourceDesc && Object.prototype.hasOwnProperty.call(sourceDesc, 'value')),
+            hasGetter: false
+          }
+        }, new Error('SW uaData ' + key + ' native accessor getter missing'));
+      }
       const guardedGet = function guardedServiceWorkerUadAccessor() {
         const recv = this;
         if (isUadThis(recv)) return value;
@@ -1030,10 +1054,7 @@
             throw e;
           }
         }
-        if (origValue !== undefined) return origValue;
-        return undefined;
       };
-      if (typeof origGet !== 'function') return guardedGet;
       return __swWrapStrictAccessor(key, guardedGet, {
         configurable: !!sourceDesc.configurable,
         enumerable: !!sourceDesc.enumerable,
@@ -1093,11 +1114,21 @@
     }
 
     if (dFull) {
-      __trackDefineProperty(uadProto, 'fullVersionList', {
-        get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull),
-        enumerable: !!dFull.enumerable,
-        configurable: !!dFull.configurable
-      });
+      if (Object.prototype.hasOwnProperty.call(dFull, 'value') && !dFull.get && !dFull.set) {
+        __trackDefineProperty(uadProto, 'fullVersionList', {
+          value: deep(meta.fullVersionList),
+          writable: !!dFull.writable,
+          enumerable: !!dFull.enumerable,
+          configurable: !!dFull.configurable
+        });
+      } else {
+        __trackDefineProperty(uadProto, 'fullVersionList', {
+          get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull),
+          set: dFull.set,
+          enumerable: !!dFull.enumerable,
+          configurable: !!dFull.configurable
+        });
+      }
     }
 
     const getHighEntropyValues = __swWrapNativeApply(origGHEV, 'getHighEntropyValues', function(target, thisArg, argList) {
@@ -1185,7 +1216,7 @@
       data: { outcome: 'skip', reason: 'native_skip' }
     }, null);
     if (swPatchLanguage) {
-      defAcc('language', function() { return swPrimaryValue; });
+      applyServiceWorkerNavigatorAccessorTarget('language', function() { return swPrimaryValue; }, 'sw_prelude:language');
     } else {
       __swDiag('info', 'sw_prelude:language_accessor_native_skip', {
         stage: 'apply',
@@ -1196,7 +1227,7 @@
       }, null);
     }
     if (swPatchLanguages) {
-      defAcc('languages', function() { return swLanguagesValue; });
+      applyServiceWorkerNavigatorAccessorTarget('languages', function() { return swLanguagesValue; }, 'sw_prelude:languages');
     } else {
       __swDiag('info', 'sw_prelude:languages_accessor_native_skip', {
         stage: 'apply',
@@ -1207,7 +1238,7 @@
       }, null);
     }
     if (swPatchHardwareConcurrency) {
-      defAcc('hardwareConcurrency', function() { return Number(swHardwareConcurrencyValue); });
+      applyServiceWorkerNavigatorAccessorTarget('hardwareConcurrency', function() { return Number(swHardwareConcurrencyValue); }, 'sw_prelude:hardwareConcurrency');
     } else {
       __swDiag('info', 'sw_prelude:hardwareConcurrency_accessor_native_skip', {
         stage: 'apply',

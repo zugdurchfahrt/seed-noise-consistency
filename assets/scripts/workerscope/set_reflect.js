@@ -571,7 +571,15 @@
       const onAccess = (typeof opts.onAccess === 'function') ? opts.onAccess : null;
       const name = (typeof opts.name === 'string' && opts.name) ? opts.name : ('get ' + key);
       const isData = !!desc && Object.prototype.hasOwnProperty.call(desc, 'value') && !desc.get && !desc.set;
-      if (isData) return getter;
+      if (isData) {
+        const e = new Error('[WrkBridge] __wrapStrictAccessor: data descriptor cannot back strict accessor gateway');
+        __throwWrapFactoryPreflight(
+          'wrk:wrapStrictAccessor:data_descriptor_forbidden',
+          key,
+          '__wrapStrictAccessor: data descriptor cannot back strict accessor gateway',
+          e
+        );
+      }
 
       const valueFromGetter = function(thisArg) {
         return (typeof getter === 'function') ? getter.call(thisArg) : getter;
@@ -600,6 +608,120 @@
       );
     }
 
+    function __applyAccessorTargets(groupTag, targets, policy) {
+      const list = Array.isArray(targets) ? targets : [];
+      const strictPolicy = policy === 'strict' || policy === 'throw';
+      let applied = 0;
+
+      function fail(code, key, message, error, data) {
+        const err = error || new Error(message || '[WrkBridge] accessor target failed');
+        __wrkDiag(strictPolicy ? 'error' : 'warn', code, {
+          stage: 'apply',
+          key: (typeof key === 'string' && key) ? key : '__applyAccessorTargets',
+          message: message || '__applyAccessorTargets failed',
+          type: 'contract violation',
+          data: Object.assign({ outcome: strictPolicy ? 'throw' : 'skip' }, data || {})
+        }, err);
+        if (strictPolicy) throw err;
+        return false;
+      }
+
+      for (let i = 0; i < list.length; i += 1) {
+        const target = list[i];
+        const key = target && typeof target.key === 'string' ? target.key : '';
+        const diagTag = target && typeof target.diagTag === 'string' && target.diagTag
+          ? target.diagTag
+          : ((typeof groupTag === 'string' && groupTag) ? groupTag : 'wrk:applyAccessorTargets');
+        const owner = target ? target.owner : null;
+        const defineProperty = target && typeof target.defineProperty === 'function'
+          ? target.defineProperty
+          : Object.defineProperty;
+
+        if (!key) {
+          fail(diagTag + ':bad_key', key, '__applyAccessorTargets target key missing', new TypeError('accessor target key missing'), { reason: 'bad_key' });
+          continue;
+        }
+        if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
+          fail(diagTag + ':owner_missing', key, '__applyAccessorTargets target owner missing', new TypeError('accessor target owner missing'), { reason: 'owner_missing' });
+          continue;
+        }
+        if (target.kind !== 'accessor') {
+          fail(diagTag + ':kind_invalid', key, '__applyAccessorTargets target kind must be accessor', new TypeError('accessor target kind invalid'), { reason: 'kind_invalid', kind: target.kind });
+          continue;
+        }
+        if (target.wrapLayer !== 'strict_accessor_gateway') {
+          fail(diagTag + ':wrap_layer_invalid', key, '__applyAccessorTargets requires strict_accessor_gateway', new TypeError('accessor target wrapLayer invalid'), { reason: 'wrap_layer_invalid', wrapLayer: target.wrapLayer || null });
+          continue;
+        }
+        let desc = null;
+        try {
+          desc = Object.getOwnPropertyDescriptor(owner, key) || null;
+        } catch (e) {
+          fail(diagTag + ':descriptor_read_failed', key, '__applyAccessorTargets descriptor read failed', e, { reason: 'descriptor_read_failed' });
+          continue;
+        }
+        if (!desc) {
+          fail(diagTag + ':descriptor_missing', key, '__applyAccessorTargets native descriptor missing', new Error('native descriptor missing for ' + key), { reason: 'descriptor_missing' });
+          continue;
+        }
+        if (desc.configurable === false) {
+          fail(diagTag + ':descriptor_nonconfigurable', key, '__applyAccessorTargets descriptor non-configurable', new Error('non-configurable descriptor for ' + key), { reason: 'descriptor_nonconfigurable' });
+          continue;
+        }
+        if (Object.prototype.hasOwnProperty.call(desc, 'value') || typeof desc.get !== 'function') {
+          fail(diagTag + ':native_getter_missing', key, '__applyAccessorTargets requires native accessor getter', new Error('native accessor getter missing for ' + key), {
+            reason: 'native_getter_missing',
+            hasValue: Object.prototype.hasOwnProperty.call(desc, 'value'),
+            hasGetter: typeof desc.get === 'function'
+          });
+          continue;
+        }
+        if (typeof target.getImpl !== 'function') {
+          fail(diagTag + ':get_impl_missing', key, '__applyAccessorTargets getImpl missing', new TypeError('getImpl missing for ' + key), { reason: 'get_impl_missing' });
+          continue;
+        }
+        if (typeof target.setImpl === 'function') {
+          fail(diagTag + ':set_impl_forbidden', key, '__applyAccessorTargets setImpl is not supported for strict accessors', new TypeError('setImpl forbidden for ' + key), { reason: 'set_impl_forbidden' });
+          continue;
+        }
+
+        const origGet = desc.get;
+        const validThis = typeof target.validThis === 'function' ? target.validThis : null;
+        const computedGetter = function workerAccessorTargetGet() {
+          return target.getImpl.call(this, origGet);
+        };
+        let bridgedGet = null;
+        try {
+          bridgedGet = __wrapStrictAccessor(key, computedGetter, {
+            configurable: !!desc.configurable,
+            enumerable: !!desc.enumerable,
+            get: origGet,
+            set: Object.prototype.hasOwnProperty.call(desc, 'set') ? desc.set : undefined
+          }, validThis, {
+            name: 'get ' + key,
+            wrapLayer: 'strict_accessor_gateway'
+          });
+        } catch (e) {
+          fail(diagTag + ':wrap_failed', key, '__applyAccessorTargets native accessor wrap failed', e, { reason: 'wrap_failed' });
+          continue;
+        }
+        try {
+          defineProperty(owner, key, {
+            configurable: !!desc.configurable,
+            enumerable: !!desc.enumerable,
+            get: bridgedGet,
+            set: Object.prototype.hasOwnProperty.call(desc, 'set') ? desc.set : undefined
+          });
+        } catch (e) {
+          fail(diagTag + ':define_failed', key, '__applyAccessorTargets define failed', e, { reason: 'define_failed' });
+          continue;
+        }
+        applied += 1;
+      }
+
+      return applied;
+    }
+
       if (!__wrkRuntimeRoot || typeof __wrkRuntimeRoot !== 'object') {
         throw new Error('UACHPatch: CanvasPatchContext.state.__WRK__.runtime missing');
       }
@@ -607,6 +729,7 @@
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeApply', __wrapNativeApply);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeAccessor', __wrapNativeAccessor);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapStrictAccessor', __wrapStrictAccessor);
+      __setHiddenValue(__wrkRuntimeRoot, '__applyAccessorTargets', __applyAccessorTargets);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeCtor', __wrapNativeCtor);
 
     } catch (e) {

@@ -868,119 +868,56 @@
       value: getHighEntropyValues
     });
 
-    const wrapStrictAccessor = (runtimeRoot && typeof runtimeRoot.__wrapStrictAccessor === 'function')
-      ? runtimeRoot.__wrapStrictAccessor
+    const applyAccessorTargets = (runtimeRoot && typeof runtimeRoot.__applyAccessorTargets === 'function')
+      ? runtimeRoot.__applyAccessorTargets
       : null;
-    if (typeof wrapStrictAccessor !== 'function') {
-      throw new Error('UACHPatch: worker native accessor bridge missing');
+    if (typeof applyAccessorTargets !== 'function') {
+      throw new Error('UACHPatch: worker accessor target executor missing');
     }
     const languagesCache = {
       values: null,
       frozen: null
     };
 
-    const makeGuardedGetter = (k, owner, patchedGet, origGet, desc) => {
-      if (typeof origGet !== 'function') {
-        throw new Error(`UACHPatch: ${k} native getter missing`);
-      }
-      const guardedPatchedGet = function() {
-        try {
-          return Reflect.apply(patchedGet, this, []);
-        } catch (e) {
-          emitDegrade('warn', 'worker_patch_src:getter_native_fallback', {
-            stage: 'runtime',
-            surface: 'WorkerNavigator',
-            key: k,
-            message: 'worker navigator getter fallback to native',
-            type: 'pipeline missing data',
-            data: { outcome: 'skip', reason: 'getter_native_fallback' }
-          }, e);
-          return Reflect.apply(origGet, this, []);
-        }
-      };
-      const sourceDesc = desc && typeof desc === 'object'
-        ? {
-            configurable: !!desc.configurable,
-            enumerable: !!desc.enumerable,
-            get: origGet,
-            set: undefined
-          }
-        : {
-            configurable: true,
-            enumerable: true,
-            get: origGet,
-            set: undefined
-          };
-      return wrapStrictAccessor(k, guardedPatchedGet, sourceDesc, function(recv) {
-        return recv === nav;
-      }, {
-        name: `get ${k}`
-      });
-    };
-
-    const def = (obj, k, getter, enumerable = true) => {
-      // По методологии: не молчим, если некуда ставить
+    const applyWorkerNavigatorAccessorTarget = (k, getter, diagTag) => {
       if (!nav) throw new Error(`UACHPatch: cannot define ${k} (no navigator)`);
-      const targetOwner = (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype) || obj || null;
-      if (!targetOwner) {
-        throw new Error(`UACHPatch: cannot define ${k} (no WorkerNavigator.prototype)`);
+      if (typeof getter !== 'function') {
+        throw new Error(`UACHPatch: ${k} getter implementation missing`);
       }
-      const resolveNativeGetter = (desc, where) => {
-        if (desc && typeof desc.get === 'function') return desc.get;
-        const isData = !!desc
-          && Object.prototype.hasOwnProperty.call(desc, 'value')
-          && !desc.get
-          && !desc.set;
-        if (isData) {
-          const nativeValue = desc.value;
-          return function nativeDataGetterFallback() { return nativeValue; };
-        }
-        throw new Error(`UACHPatch: ${k} missing native getter on ${where}`);
-      };
-
-      // Patch the actual native owner on the proto-chain. Forcing a new own
-      // property on WorkerNavigator.prototype leaks through own-property checks.
-      let d = null;
-      let resolvedOwner = null;
-      for (let o = targetOwner; o; o = Object.getPrototypeOf(o)) {
-        try { d = Object.getOwnPropertyDescriptor(o, k) || null; }
-        catch (e) {
-          d = null;
-          emitDegrade('warn', 'worker_patch_src:descriptor:get_failed', {
-            type: 'browser structure missing data',
-            stage: 'runtime',
-            module: 'WORKER_PATCH_SRC',
-            surface: 'descriptor',
-            key: String(k || ''),
-            policy: 'skip',
-            action: 'native',
-            data: { outcome: 'skip', reason: 'get_own_property_descriptor_failed' }
-          }, e);
-        }
-        if (d) {
-          resolvedOwner = o;
-          break;
-        }
-      }
-      if (!d) {
-        throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
+      const resolved = resolveWorkerNavigatorNativeDescriptor(k);
+      const d = resolved.desc;
+      if (!d || typeof d.get !== 'function' || Object.prototype.hasOwnProperty.call(d, 'value')) {
+        throw new Error(`UACHPatch: ${k} native accessor getter missing`);
       }
       if (d.configurable === false) {
         throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
       }
-      const protoOrigGet = resolveNativeGetter(d, 'proto-chain');
-      const patchOwner = resolvedOwner || targetOwner;
-      const protoGuardedGet = makeGuardedGetter(k, patchOwner, getter, protoOrigGet, d);
-      trackedDefineProperty(patchOwner, k, {
-        configurable: d ? !!d.configurable : true,
-        enumerable: d ? !!d.enumerable : !!enumerable,
-        get: protoGuardedGet,
-        set: undefined
-      });
-      __workerNavigatorPatchedOwners__[k] = patchOwner;
+      const groupTag = (typeof diagTag === 'string' && diagTag) ? diagTag : `worker_patch_src:${k}`;
+      const applied = applyAccessorTargets(groupTag, [{
+        owner: resolved.owner,
+        key: k,
+        kind: 'accessor',
+        wrapLayer: 'strict_accessor_gateway',
+        resolve: 'proto_chain',
+        policy: 'strict',
+        diagTag: groupTag,
+        configurable: !!d.configurable,
+        enumerable: !!d.enumerable,
+        validThis: function(recv) {
+          return recv === nav;
+        },
+        invalidThis: 'native',
+        defineProperty: trackedDefineProperty,
+        getImpl: function workerNavigatorAccessorGet() {
+          return getter.call(this);
+        }
+      }], 'strict');
+      if (applied !== 1) {
+        throw new Error(`UACHPatch: ${k} accessor target apply failed`);
+      }
+      __workerNavigatorPatchedOwners__[k] = resolved.owner;
       __workerNavigatorDescriptorModes__[k] = 'patched';
-      return;
-
+      return true;
     };
 
     const resolveWorkerNavigatorNativeDescriptor = (k) => {
@@ -1180,7 +1117,7 @@
       }, e);
     }
     if (__patchLanguage) {
-      def(proto,'language', getLanguage, true);
+      applyWorkerNavigatorAccessorTarget('language', getLanguage, 'worker_patch_src:language');
     }
 
     const getLanguages = function getLanguages(){
@@ -1253,7 +1190,7 @@
       }, e);
     }
     if (__patchLanguages) {
-      def(proto,'languages', getLanguages, true);
+      applyWorkerNavigatorAccessorTarget('languages', getLanguages, 'worker_patch_src:languages');
     }
 
 
@@ -1355,7 +1292,7 @@
       }, e);
     }
     if (__patchHardwareConcurrency) {
-      def(proto, 'hardwareConcurrency', getHardwareConcurrency, true);
+      applyWorkerNavigatorAccessorTarget('hardwareConcurrency', getHardwareConcurrency, 'worker_patch_src:hardwareConcurrency');
     }
     assertWorkerNavigatorDescriptor('userAgentData');
     assertWorkerNavigatorDescriptor('language');

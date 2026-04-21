@@ -249,3 +249,4 @@ tools/tools_native_check/__init__.py
 assets/generated_fonts/Win32/fonts_index.json
 assets/generated_fonts/Win32/fonts_index.json
 assets/generated_fonts/Win32/fonts_index.json
+accessor_scalar_smoke.html
