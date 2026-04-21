@@ -373,16 +373,19 @@ def init_driver(
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
       
-    cdp.SW_META = expected_client_hints
-    cdp.SW_WEBGL = {
-        "vendor": profile["webgl_vendor"],
-        "renderer": profile["webgl_renderer"],
-        "unmaskedVendor": profile["webgl_unmasked_vendor"],
-        "unmaskedRenderer": profile["webgl_unmasked_renderer"],
-    }
-   
-
-    cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
+    cdp.enable_sw_env_inject(
+        language=language,
+        normalized_languages=normalized_languages,
+        hardware_concurrency=hardware_concurrency_value,
+        device_memory=device_memory_value,
+        meta=expected_client_hints,
+        webgl={
+            "vendor": profile["webgl_vendor"],
+            "renderer": profile["webgl_renderer"],
+            "unmaskedVendor": profile["webgl_unmasked_vendor"],
+            "unmaskedRenderer": profile["webgl_unmasked_renderer"],
+        },
+    )
       
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
     sw_thread.start()
@@ -1276,7 +1279,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

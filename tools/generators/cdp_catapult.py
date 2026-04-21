@@ -26,6 +26,7 @@ SW_HC = None
 SW_DM = None
 SW_META = None
 SW_WEBGL = None
+SW_ENV = None
 # --- Dedicated/Shared Worker CDP_GLOBAL_SEED injector (WorkerGlobalScope) ---
 WORKER_SEED_INJECT_ENABLED = True
 CDP_GLOBAL_SEED = None
@@ -139,14 +140,22 @@ def _log_sw_relay_diag(session_id: str, target_id: str, payload):
 
 
 
-def enable_sw_language_inject(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float):
+def enable_sw_env_inject(
+    *,
+    language: str,
+    normalized_languages: list[str],
+    hardware_concurrency: int,
+    device_memory: float,
+    meta: dict,
+    webgl: dict,
+):
     """
-    Enable ServiceWorker injection for navigator.language / navigator.languages.
+    Enable ServiceWorker env injection.
     Call this BEFORE starting run().
 
     No logging, no writers, no Debugger/Network hooks.
     """
-    global SW_INJECT_ENABLED, SW_PRIMARY, SW_LANGS, SW_HC, SW_DM
+    global SW_INJECT_ENABLED, SW_PRIMARY, SW_LANGS, SW_HC, SW_DM, SW_META, SW_WEBGL, SW_ENV
     if not isinstance(language, str) or not language.strip():
         raise ValueError("SW inject: language must be non-empty str")
     if not isinstance(normalized_languages, list) or not normalized_languages:
@@ -154,16 +163,53 @@ def enable_sw_language_inject(language: str, normalized_languages: list[str], ha
     for x in normalized_languages:
         if not isinstance(x, str) or not x.strip():
             raise ValueError("SW inject: bad languages entry")
-    
-    SW_PRIMARY = language
-    SW_LANGS = normalized_languages
     if not isinstance(hardware_concurrency, (int, float)) or hardware_concurrency <= 0:
         raise ValueError("SW inject: hardware_concurrency must be positive number")
-    SW_HC = int(hardware_concurrency)
     if not isinstance(device_memory, (int, float)) or device_memory <= 0:
         raise ValueError("SW inject: device_memory must be positive number")
+    if not isinstance(meta, dict) or not meta:
+        raise ValueError("SW inject: expected_client_hints missing")
+    if not isinstance(webgl, dict) or not webgl:
+        raise ValueError("SW inject: webgl snapshot missing")
+    for key in ("vendor", "renderer", "unmaskedVendor", "unmaskedRenderer"):
+        value = webgl.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"SW inject: bad webgl.{key}")
+
+    SW_PRIMARY = language
+    SW_LANGS = normalized_languages[:]
+    SW_HC = int(hardware_concurrency)
     SW_DM = float(device_memory)
+    SW_META = dict(meta)
+    SW_WEBGL = {
+        "vendor": webgl["vendor"],
+        "renderer": webgl["renderer"],
+        "unmaskedVendor": webgl["unmaskedVendor"],
+        "unmaskedRenderer": webgl["unmaskedRenderer"],
+    }
+    SW_ENV = {
+        "primary": SW_PRIMARY,
+        "langs": SW_LANGS[:],
+        "hc": SW_HC,
+        "dm": SW_DM,
+        "meta": dict(SW_META),
+        "webgl": dict(SW_WEBGL),
+    }
     SW_INJECT_ENABLED = True
+
+
+def enable_sw_language_inject(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float):
+    """
+    Legacy wrapper kept for older callsites.
+    """
+    return enable_sw_env_inject(
+        language=language,
+        normalized_languages=normalized_languages,
+        hardware_concurrency=hardware_concurrency,
+        device_memory=device_memory,
+        meta=SW_META if isinstance(SW_META, dict) else {},
+        webgl=SW_WEBGL if isinstance(SW_WEBGL, dict) else {},
+    )
 
 
 def enable_worker_seed_inject(global_seed: str):
@@ -226,13 +272,17 @@ def _stop_injectors_atexit():
 atexit.register(_stop_injectors_atexit)
 
 
-def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_concurrency: int, device_memory: float) -> str:
-    if not isinstance(SW_META, dict) or not SW_META:
+def _build_sw_prelude(sw_env: dict) -> str:
+    if not isinstance(sw_env, dict) or not sw_env:
+        raise ValueError("SW inject: env missing")
+    meta = sw_env.get("meta")
+    webgl = sw_env.get("webgl")
+    if not isinstance(meta, dict) or not meta:
         raise ValueError("SW inject: expected_client_hints missing")
-    if not isinstance(SW_WEBGL, dict) or not SW_WEBGL:
+    if not isinstance(webgl, dict) or not webgl:
         raise ValueError("SW inject: webgl snapshot missing")
     for key in ("vendor", "renderer", "unmaskedVendor", "unmaskedRenderer"):
-        value = SW_WEBGL.get(key)
+        value = webgl.get(key)
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"SW inject: bad webgl.{key}")
 
@@ -251,12 +301,12 @@ def _build_sw_prelude(language: str, normalized_languages: list[str], hardware_c
   const G = globalThis;
   const hasOwn = Object.prototype.hasOwnProperty;
   const nextEnv = {{
-    primary: {json.dumps(language, ensure_ascii=False)},
-    langs: {json.dumps(normalized_languages, ensure_ascii=False)},
-    hc: {json.dumps(hardware_concurrency)},
-    dm: {json.dumps(device_memory)},
-    meta: {json.dumps(SW_META, ensure_ascii=False)},
-    webgl: {json.dumps(SW_WEBGL, ensure_ascii=False)}
+    primary: {json.dumps(sw_env.get("primary"), ensure_ascii=False)},
+    langs: {json.dumps(sw_env.get("langs"), ensure_ascii=False)},
+    hc: {json.dumps(sw_env.get("hc"))},
+    dm: {json.dumps(sw_env.get("dm"))},
+    meta: {json.dumps(meta, ensure_ascii=False)},
+    webgl: {json.dumps(webgl, ensure_ascii=False)}
   }};
   function defineHidden(obj, key, value) {{
     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) {{
@@ -437,7 +487,7 @@ def run():
     injected = set()   # targetId set
     sw_prelude = None
     if do_prelude:
-        sw_prelude = _build_sw_prelude(SW_PRIMARY, SW_LANGS, SW_HC, SW_DM)
+        sw_prelude = _build_sw_prelude(SW_ENV)
 
     # Post-inject sanity probe (read back values in the SW context).
     sanity_expr = None
@@ -606,11 +656,11 @@ def run():
                     try:
                         out = (res.get("result") or {}).get("value")
                         exp = {
-                            "language": SW_PRIMARY,
-                            "languages": SW_LANGS,
-                            "hardwareConcurrency": SW_HC,
-                            "deviceMemory": SW_DM,
-                            "uad": SW_META,
+                            "language": SW_ENV.get("primary") if isinstance(SW_ENV, dict) else SW_PRIMARY,
+                            "languages": SW_ENV.get("langs") if isinstance(SW_ENV, dict) else SW_LANGS,
+                            "hardwareConcurrency": SW_ENV.get("hc") if isinstance(SW_ENV, dict) else SW_HC,
+                            "deviceMemory": SW_ENV.get("dm") if isinstance(SW_ENV, dict) else SW_DM,
+                            "uad": SW_ENV.get("meta") if isinstance(SW_ENV, dict) else SW_META,
                         }
                         if not isinstance(out, dict):
                             _resume_sw_session(ws, sid, "sanity_bad_result")

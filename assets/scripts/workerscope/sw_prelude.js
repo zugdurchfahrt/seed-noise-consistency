@@ -584,32 +584,15 @@
       const nativeLanguageRead = __readNativeWorkerNavigatorValue('language');
       if (typeof nativeLanguageRead.value === 'string' && nativeLanguageRead.value.trim() !== '') {
         if (nativeLanguageRead.value === primary) {
-          swPrimaryValue = nativeLanguageRead.value;
-          if (!__isNonEmptyStringArray(swLanguagesValue)) {
-            swLanguagesValue = [swPrimaryValue];
-          }
           swPatchLanguage = false;
-          __swDiag('info', 'sw_prelude:language_native_passthrough', {
+          __swDiag('info', 'sw_prelude:language_native_skip', {
             stage: 'preflight',
             key: 'language',
-            message: 'service worker language kept on native getter path',
+            message: 'service worker language already matches native getter',
             type: 'browser structure missing data',
             data: {
-              outcome: 'skip',
-              reason: 'native_passthrough',
-              nativeValue: nativeLanguageRead.value,
-              profileValue: primary
-            }
-          }, null);
-        } else {
-          __swDiag('warn', 'sw_prelude:language_native_mismatch', {
-            stage: 'preflight',
-            key: 'language',
-            message: 'service worker native language mismatches contract target; install strict accessor patch',
-            type: 'browser structure missing data',
-            data: {
-              outcome: 'patch',
-              reason: 'native_mismatch',
+              outcome: 'return',
+              reason: 'native_skip',
               nativeValue: nativeLanguageRead.value,
               profileValue: primary
             }
@@ -647,31 +630,16 @@
       const nativeLanguagesRead = __readNativeWorkerNavigatorValue('languages');
       if (__isNonEmptyStringArray(nativeLanguagesRead.value)) {
         if (__stringArraysEqual(nativeLanguagesRead.value, Array.isArray(langs) ? langs : [])) {
-          swLanguagesValue = nativeLanguagesRead.value.slice();
-          swPrimaryValue = swLanguagesValue[0];
           swPatchLanguages = false;
           swPatchLanguage = false;
-          __swDiag('info', 'sw_prelude:languages_native_passthrough', {
+          __swDiag('info', 'sw_prelude:languages_native_skip', {
             stage: 'preflight',
             key: 'languages',
-            message: 'service worker languages kept on native getter path',
+            message: 'service worker languages already matches native getter',
             type: 'browser structure missing data',
             data: {
-              outcome: 'skip',
-              reason: 'native_passthrough',
-              nativeValue: nativeLanguagesRead.value.slice(),
-              profileValue: Array.isArray(langs) ? langs.slice() : langs
-            }
-          }, null);
-        } else {
-          __swDiag('warn', 'sw_prelude:languages_native_mismatch', {
-            stage: 'preflight',
-            key: 'languages',
-            message: 'service worker native languages mismatch contract target; install strict accessor patch',
-            type: 'browser structure missing data',
-            data: {
-              outcome: 'patch',
-              reason: 'native_mismatch',
+              outcome: 'return',
+              reason: 'native_skip',
               nativeValue: nativeLanguagesRead.value.slice(),
               profileValue: Array.isArray(langs) ? langs.slice() : langs
             }
@@ -724,17 +692,52 @@
       }, e);
     }
 
-    __swDiag('info', 'sw_prelude:hardwareConcurrency_native_read_disabled', {
-      stage: 'preflight',
-      key: 'hardwareConcurrency',
-      message: 'service worker native hardwareConcurrency adoption disabled; keep mirror seed only',
-      type: 'browser structure missing data',
-      data: {
-        outcome: 'skip',
-        reason: 'native_read_disabled',
-        profileValue: Number(hc)
+    try {
+      const nativeHardwareConcurrencyRead = __readNativeWorkerNavigatorValue('hardwareConcurrency');
+      const nativeHardwareConcurrency = Number(nativeHardwareConcurrencyRead.value);
+      if (Number.isFinite(nativeHardwareConcurrency) && nativeHardwareConcurrency > 0) {
+        if (Object.is(nativeHardwareConcurrency, Number(hc))) {
+          swPatchHardwareConcurrency = false;
+          __swDiag('info', 'sw_prelude:hardwareConcurrency_native_skip', {
+            stage: 'preflight',
+            key: 'hardwareConcurrency',
+            message: 'service worker hardwareConcurrency already matches native getter',
+            type: 'browser structure missing data',
+            data: {
+              outcome: 'return',
+              reason: 'native_skip',
+              nativeValue: nativeHardwareConcurrency,
+              profileValue: Number(hc)
+            }
+          }, null);
+        }
+      } else {
+        __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_invalid', {
+          stage: 'preflight',
+          key: 'hardwareConcurrency',
+          message: 'service worker native hardwareConcurrency is invalid; keep mirror seed only',
+          type: 'browser structure missing data',
+          data: {
+            outcome: 'skip',
+            reason: 'native_invalid',
+            nativeValue: nativeHardwareConcurrencyRead.value,
+            profileValue: Number(hc)
+          }
+        }, null);
       }
-    }, null);
+    } catch (e) {
+      __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_read_failed', {
+        stage: 'preflight',
+        key: 'hardwareConcurrency',
+        message: 'service worker native hardwareConcurrency read failed; keep mirror seed only',
+        type: 'browser structure missing data',
+        data: {
+          outcome: 'skip',
+          reason: 'native_read_failed',
+          profileValue: Number(hc)
+        }
+      }, e);
+    }
 
     __swDiag('info', 'sw_prelude:deviceMemory_native_read_disabled', {
       stage: 'preflight',
@@ -768,6 +771,27 @@
         data: { outcome: 'throw', reason: 'uadata_proto_missing' }
       }, new Error('SW uaData proto missing'));
     }
+    function __dropUadOwnIfConfigurable(key) {
+      const ownDesc = Object.getOwnPropertyDescriptor(uad, key);
+      if (!ownDesc) return;
+      if (ownDesc.configurable !== true) {
+        __fail('sw_prelude:uadata_own_descriptor_nonconfigurable', {
+          stage: 'preflight',
+          key,
+          message: 'service worker uaData own descriptor non-configurable',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'uadata_own_descriptor_nonconfigurable' }
+        }, new Error('SW uaData own ' + key + ' non-configurable'));
+      }
+      delete uad[key];
+      __applied.push({ obj: uad, key, hadOwn: true, prevDesc: ownDesc });
+    }
+    __dropUadOwnIfConfigurable('brands');
+    __dropUadOwnIfConfigurable('mobile');
+    __dropUadOwnIfConfigurable('platform');
+    __dropUadOwnIfConfigurable('fullVersionList');
+    __dropUadOwnIfConfigurable('getHighEntropyValues');
+    __dropUadOwnIfConfigurable('toJSON');
 
     const chPlatform = meta.platform;
     if (typeof chPlatform !== 'string' || !chPlatform) {
@@ -828,9 +852,9 @@
       }, new Error('SW userAgentData non-configurable'));
     }
 
-    const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands') || Object.getOwnPropertyDescriptor(uad, 'brands');
-    const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile') || Object.getOwnPropertyDescriptor(uad, 'mobile');
-    const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform') || Object.getOwnPropertyDescriptor(uad, 'platform');
+    const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
+    const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
+    const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
     if (!dBrands || !dMobile || !dPlatform) {
       __fail('sw_prelude:uadata_leaf_descriptor_missing', {
         stage: 'preflight',
@@ -850,9 +874,7 @@
       }, new Error('SW uaData non-configurable'));
     }
 
-    const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList')
-      || Object.getOwnPropertyDescriptor(uad, 'fullVersionList')
-      || null;
+    const dFull = Object.getOwnPropertyDescriptor(uadProto, 'fullVersionList') || null;
     if (dFull && dFull.configurable === false) {
       __fail('sw_prelude:full_version_list_nonconfigurable', {
         stage: 'preflight',
@@ -891,7 +913,21 @@
     const brandsValue = deep(meta.brands);
     const mobileValue = meta.mobile;
     const platformValue = chPlatform;
-    const isUadThis = recv => (recv === uad);
+    const isUadThis = recv => {
+      if (recv === uad) return true;
+      if (!recv || (typeof recv !== 'object' && typeof recv !== 'function')) return false;
+      try {
+        let cur = recv;
+        for (let i = 0; i < 8; i += 1) {
+          cur = Object.getPrototypeOf(cur);
+          if (!cur) return false;
+          if (cur === uadProto) return true;
+        }
+      } catch (_) {
+        return false;
+      }
+      return false;
+    };
     const uadAccessorBridgeGet = (dFull && typeof dFull.get === 'function')
       ? dFull.get
       : ((typeof dBrands.get === 'function')
@@ -924,36 +960,32 @@
         const nativeValue = resolved.desc.value;
         origGet = function nativeDataGetterFallback() { return nativeValue; };
       }
-      const guardedGet = Object.getOwnPropertyDescriptor(({
-        get [key]() {
-          const recv = this;
-          if (recv === nav) {
-            try {
-              return getter.call(recv);
-            } catch (e) {
-              __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
-                stage: 'runtime',
-                key,
-                message: 'service worker getter runtime failed',
-                type: 'browser structure missing data',
-                data: { outcome: 'skip', reason: 'getter_runtime_failed' }
-              }, e);
-              // Disabled temporarily: valid SW profile reads must come only from hidden bootstrap SW env.
-              // if (typeof origGet === 'function') return Reflect.apply(origGet, recv, []);
-              throw e;
-            }
+      const guardedGet = function guardedServiceWorkerNavigatorAccessor() {
+        const recv = this;
+        if (recv === nav) {
+          try {
+            return getter.call(recv);
+          } catch (e) {
+            __swDiag('warn', 'sw_prelude:getter_runtime_failed', {
+              stage: 'runtime',
+              key,
+              message: 'service worker getter runtime failed',
+              type: 'browser structure missing data',
+              data: { outcome: 'skip', reason: 'getter_runtime_failed' }
+            }, e);
+            throw e;
           }
-          if (typeof origGet === 'function') {
-            try {
-              return Reflect.apply(origGet, recv, []);
-            } catch (e) {
-              __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker getter illegal invocation', e);
-              throw e;
-            }
-          }
-          return undefined;
         }
-      }), key).get;
+        if (typeof origGet === 'function') {
+          try {
+            return Reflect.apply(origGet, recv, []);
+          } catch (e) {
+            __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker getter illegal invocation', e);
+            throw e;
+          }
+        }
+        return undefined;
+      };
       const sourceDesc = resolved.desc && typeof resolved.desc === 'object'
         ? {
             configurable: !!resolved.desc.configurable,
@@ -982,27 +1014,29 @@
       });
     }
 
-    function guardedUadGetter(key, value, origGet, origValue) {
-      const guardedGet = Object.getOwnPropertyDescriptor(({
-        get [key]() {
-          const recv = this;
-          if (isUadThis(recv)) return value;
-          if (typeof origGet === 'function') {
-            try {
-              return Reflect.apply(origGet, recv, []);
-            } catch (e) {
-              __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker uaData illegal invocation', e);
-              throw e;
-            }
+    function guardedUadGetter(key, value, sourceDesc) {
+      const origGet = sourceDesc && typeof sourceDesc.get === 'function' ? sourceDesc.get : null;
+      const origValue = sourceDesc && Object.prototype.hasOwnProperty.call(sourceDesc, 'value')
+        ? sourceDesc.value
+        : undefined;
+      const guardedGet = function guardedServiceWorkerUadAccessor() {
+        const recv = this;
+        if (isUadThis(recv)) return value;
+        if (typeof origGet === 'function') {
+          try {
+            return Reflect.apply(origGet, recv, []);
+          } catch (e) {
+            __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker uaData illegal invocation', e);
+            throw e;
           }
-          if (origValue !== undefined) return origValue;
-          return undefined;
         }
-      }), key).get;
+        if (origValue !== undefined) return origValue;
+        return undefined;
+      };
       if (typeof origGet !== 'function') return guardedGet;
       return __swWrapStrictAccessor(key, guardedGet, {
-        configurable: true,
-        enumerable: false,
+        configurable: !!sourceDesc.configurable,
+        enumerable: !!sourceDesc.enumerable,
         get: origGet,
         set: undefined
       }, function(recv) {
@@ -1021,7 +1055,7 @@
       });
     } else {
       __trackDefineProperty(uadProto, 'brands', {
-        get: guardedUadGetter('brands', brandsValue, dBrands.get, dBrands.value),
+        get: guardedUadGetter('brands', brandsValue, dBrands),
         set: dBrands.set,
         configurable: !!dBrands.configurable,
         enumerable: !!dBrands.enumerable
@@ -1036,7 +1070,7 @@
       });
     } else {
       __trackDefineProperty(uadProto, 'mobile', {
-        get: guardedUadGetter('mobile', mobileValue, dMobile.get, dMobile.value),
+        get: guardedUadGetter('mobile', mobileValue, dMobile),
         set: dMobile.set,
         configurable: !!dMobile.configurable,
         enumerable: !!dMobile.enumerable
@@ -1051,7 +1085,7 @@
       });
     } else {
       __trackDefineProperty(uadProto, 'platform', {
-        get: guardedUadGetter('platform', platformValue, dPlatform.get, dPlatform.value),
+        get: guardedUadGetter('platform', platformValue, dPlatform),
         set: dPlatform.set,
         configurable: !!dPlatform.configurable,
         enumerable: !!dPlatform.enumerable
@@ -1060,7 +1094,7 @@
 
     if (dFull) {
       __trackDefineProperty(uadProto, 'fullVersionList', {
-        get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull.get, dFull.value),
+        get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull),
         enumerable: !!dFull.enumerable,
         configurable: !!dFull.configurable
       });
@@ -1077,11 +1111,11 @@
         }
       }
       if (!Array.isArray(keys)) {
-        return Reflect.apply(origGHEV, this, [keys]);
+        return Reflect.apply(target, thisArg, [keys]);
       }
       for (const hint of keys) {
         if (typeof hint !== 'string' || !hint) {
-          return Reflect.apply(origGHEV, this, [keys]);
+          return Reflect.apply(target, thisArg, [keys]);
         }
       }
       const map = {
@@ -1118,7 +1152,6 @@
       }
       return Promise.resolve(result);
     });
-    __trackDeleteOwnIfConfigurable(uad, 'getHighEntropyValues');
     __trackDefineProperty(uadProto, 'getHighEntropyValues', {
       value: getHighEntropyValues,
       configurable: !!ghevDesc.configurable,
@@ -1126,18 +1159,17 @@
       writable: Object.prototype.hasOwnProperty.call(ghevDesc, 'writable') ? ghevDesc.writable : true
     });
 
-    const toJSON = function() {
-      if (!isUadThis(this)) {
+    const toJSON = __swWrapNativeApply(origToJSON, 'toJSON', function(target, thisArg, argList) {
+      if (!isUadThis(thisArg)) {
         try {
-          return Reflect.apply(origToJSON, this, []);
+          return Reflect.apply(target, thisArg, argList || []);
         } catch (e) {
           __reportNativeThrow('sw_prelude:illegal_invocation', 'toJSON', 'service worker toJSON illegal invocation', e);
           throw e;
         }
       }
-      return { platform: this.platform, brands: this.brands, mobile: this.mobile };
-    };
-    __trackDeleteOwnIfConfigurable(uad, 'toJSON');
+      return { platform: thisArg.platform, brands: thisArg.brands, mobile: thisArg.mobile };
+    });
     __trackDefineProperty(uadProto, 'toJSON', {
       value: toJSON,
       configurable: !!toJsonDesc.configurable,
@@ -1145,38 +1177,44 @@
       writable: Object.prototype.hasOwnProperty.call(toJsonDesc, 'writable') ? toJsonDesc.writable : true
     });
 
-    defAcc('userAgentData', function() { return uad; });
+    __swDiag('info', 'sw_prelude:userAgentData_accessor_native_skip', {
+      stage: 'apply',
+      key: 'userAgentData',
+      message: 'service worker userAgentData accessor left native',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'native_skip' }
+    }, null);
     if (swPatchLanguage) {
       defAcc('language', function() { return swPrimaryValue; });
     } else {
-      __swDiag('info', 'sw_prelude:language_accessor_native_passthrough', {
+      __swDiag('info', 'sw_prelude:language_accessor_native_skip', {
         stage: 'apply',
         key: 'language',
         message: 'service worker language accessor left native',
         type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'native_passthrough', value: swPrimaryValue }
+        data: { outcome: 'skip', reason: 'native_skip', value: swPrimaryValue }
       }, null);
     }
     if (swPatchLanguages) {
       defAcc('languages', function() { return swLanguagesValue; });
     } else {
-      __swDiag('info', 'sw_prelude:languages_accessor_native_passthrough', {
+      __swDiag('info', 'sw_prelude:languages_accessor_native_skip', {
         stage: 'apply',
         key: 'languages',
         message: 'service worker languages accessor left native',
         type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'native_passthrough', value: swLanguagesValue.slice() }
+        data: { outcome: 'skip', reason: 'native_skip', value: swLanguagesValue.slice() }
       }, null);
     }
     if (swPatchHardwareConcurrency) {
       defAcc('hardwareConcurrency', function() { return Number(swHardwareConcurrencyValue); });
     } else {
-      __swDiag('info', 'sw_prelude:hardwareConcurrency_accessor_native_passthrough', {
+      __swDiag('info', 'sw_prelude:hardwareConcurrency_accessor_native_skip', {
         stage: 'apply',
         key: 'hardwareConcurrency',
         message: 'service worker hardwareConcurrency accessor left native',
         type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'native_passthrough', value: Number(swHardwareConcurrencyValue) }
+        data: { outcome: 'skip', reason: 'native_skip', value: Number(swHardwareConcurrencyValue) }
       }, null);
     }
     __swDiag('info', 'sw_prelude:deviceMemory_accessor_native_passthrough', {
