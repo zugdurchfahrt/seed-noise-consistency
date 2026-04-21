@@ -13,7 +13,6 @@ def build_device_metrics(profile: dict) -> dict:
     """
     w   = int(profile["screen_width"])
     h   = int(profile["screen_height"])
-    # hcv = int (profile["hardwareConcurrency"])
     dpr = float(profile.get("device_dpr_value", 1))
 
     # OS/CDP (camelCase)
@@ -23,7 +22,6 @@ def build_device_metrics(profile: dict) -> dict:
         "width": w,
         "height": h,
         "deviceScaleFactor": dpr,
-        # "hardware_concurrency_value": hcv,
         "mobile": False,
         "screenWidth": w,
         "screenHeight": h,
@@ -320,7 +318,7 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, na
             "Network.setUserAgentOverride",
             {
                 "userAgent": profile["user_agent"],
-                "acceptLanguage": profile.get("accept_language"),
+                "acceptLanguage": profile.get("language"),
                 "platform": navigator_platform,
                 "userAgentMetadata": metadata
             }

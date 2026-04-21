@@ -342,6 +342,22 @@ def init_driver(
         # 3. Device Metrics (screen scales, including navigator.mobile)
         if device_metrics:
             driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
+
+    def apply_page_locale_and_hardware_overrides(driver, language, hardware_concurrency_value):
+        try:
+            driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
+            logger.info("Direct page-side locale override applied: %s", language)
+        except Exception as e:
+            logger.warning("Direct page-side locale override failed: %s", e)
+        try:
+            driver.execute_cdp_cmd(
+                "Emulation.setHardwareConcurrencyOverride",
+                {"hardwareConcurrency": int(hardware_concurrency_value)},
+            )
+            logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
+        except Exception as e:
+            logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
+
     setup_engine(
         driver,
         timezone="Arctic/Longyearbyen",
@@ -353,19 +369,11 @@ def init_driver(
 
     )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    apply_page_locale_and_hardware_overrides(
+        driver,
+        language=language,
+        hardware_concurrency_value=hardware_concurrency_value,
+    )
 
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
@@ -377,6 +385,16 @@ def init_driver(
         "unmaskedVendor": profile["webgl_unmasked_vendor"],
         "unmaskedRenderer": profile["webgl_unmasked_renderer"],
     }
+   
+   
+   
+   
+   
+
+   
+   
+   
+    
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
       
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
@@ -708,23 +726,11 @@ def init_driver(
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
 
 
-    try:
-        driver.execute_cdp_cmd(
-            "Emulation.setHardwareConcurrencyOverride",
-            {"hardwareConcurrency": int(hardware_concurrency_value)},
-        )
-        logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
-    except Exception as e:
-        logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
 
 
 
 
-    try:
-        driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
-        logger.info("Direct page-side locale override applied: %s", language)
-    except Exception as e:
-        logger.warning("Direct page-side locale override failed: %s", e)
+
 
 
 
@@ -732,7 +738,11 @@ def init_driver(
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, platform)
-    
+    apply_page_locale_and_hardware_overrides(
+        driver,
+        language=language,
+        hardware_concurrency_value=hardware_concurrency_value,
+    )
 
     
     inject_uach_strip_window(driver, user_agent)
@@ -1352,7 +1362,7 @@ def main():
              
         
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
