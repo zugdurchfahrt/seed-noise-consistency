@@ -88,7 +88,6 @@ setup_logger(child_levels={
     "vpn_utils": logging.DEBUG,
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
-    # "brandmauer": logging.INFO,
 })
 
 
@@ -221,10 +220,6 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
             if rid:
                 driver.execute_cdp_cmd("Fetch.continueRequest", {"requestId": rid})
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
-
-
-
-
 
 def build_bootstrap_device_metrics():
     width = 1366
@@ -386,15 +381,7 @@ def init_driver(
         "unmaskedRenderer": profile["webgl_unmasked_renderer"],
     }
    
-   
-   
-   
-   
 
-   
-   
-   
-    
     cdp.enable_sw_language_inject(language, normalized_languages, hardware_concurrency_value, device_memory_value)
       
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
@@ -726,14 +713,6 @@ def init_driver(
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
 
 
-
-
-
-
-
-
-
-
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
@@ -854,7 +833,7 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         normalized_languages = normalized_languages
         # ----------------------- Regional setting setup--------------------------------
 
-        # # Timezone override
+        # Timezone override
         driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": timezone})
         logger.info(f"[profile] Setting timezone: {timezone}, {offset_minutes}")
 
@@ -944,6 +923,7 @@ def main():
         client._kill_old_processes()
         client._clean_directories()
         client.post()
+        
         # -------- Getting country_data from VPN module -------------------
         data = client.get_details()
         country_data = data["country_data"]
@@ -1120,31 +1100,6 @@ def main():
         devices_conf = {"audioinput": audioinput, "videoinput": videoinput, "audiooutput": audiooutput}
 
         # ----------------------------Setting up GPU and Screen -----------------------
-        # gpu = profile_rng.choice(data["GPU"])
-        # gpu_architecture = str(gpu.get("architecture", "")).strip()
-        # gpu_type = str(gpu.get("type", ""))
-        # gpu_name = gpu["name"]
-        # gpu_code = gpu["prod_code"]
-
-        # screen_res = profile_rng.choice(gpu["resolution"])
-        # if not isinstance(screen_res, str) or not re.fullmatch(r"[1-9]\d{2,4}x[1-9]\d{2,4}", screen_res):
-        #     raise ValueError(f"invalid screen resolution from GPU dictionary: {screen_res!r}")
-        # screen_width, screen_height = map(int, screen_res.split("x", 1))
-
-        # # ----------------------- devicespixelratio AKA deviceScaleFactor(CDP)  -----------------------
-        # dpr_map = {
-        #     "1920x1080": 1.0,
-        #     "2560x1440": 1.25,
-        #     "3840x2160": 2.0,
-        # }
-        # device_dpr_value = dpr_map.get(screen_res)
-        # if device_dpr_value is None:
-        #     raise ValueError(f"unknown screen resolution: {screen_res!r}")
-
-
-
-
-        # # ----------------------------Setting up GPU and Screen -----------------------
         gpu = profile_rng.choice(data["GPU"])
         gpu_architecture = str(gpu.get("architecture", "")).strip()
         gpu_type = str(gpu.get("type", ""))
@@ -1315,50 +1270,11 @@ def main():
         elif browser_brand == "Firefox":
             logger.info("UA data submitted via CDP for Firefox/Safari")
         else:
-            # Legacy Chromium reapply corridor disabled: fall through directly to configure_profile().
-            # needs_reapply = False
-            # try:
-            #     current_ua = driver.execute_script("return navigator.userAgent")
-            #     if current_ua != profile["user_agent"]:
-            #         needs_reapply = True
-            #     else:
-            #         current_uad = driver.execute_script(
-            #             "const uad = navigator.userAgentData;"
-            #             "if (!uad) return null;"
-            #             "const brands = Array.isArray(uad.brands) ? "
-            #             "uad.brands.map(b => ({brand: b.brand, version: String(b.version)})) : null;"
-            #             "return { brands, platform: uad.platform, mobile: uad.mobile };"
-            #         )
-            #
-            #         if current_uad:
-            #             exp_brands = expected_client_hints.get("brands") or []
-            #             exp_norm = sorted(
-            #                 [(str(b.get("brand")), str(b.get("version"))) for b in exp_brands if isinstance(b, dict)]
-            #             )
-            #             cur_brands = current_uad.get("brands") or []
-            #             cur_norm = sorted(
-            #                 [(str(b.get("brand")), str(b.get("version"))) for b in cur_brands if isinstance(b, dict)]
-            #             )
-            #             if (
-            #                 exp_norm != cur_norm
-            #                 or current_uad.get("platform") != expected_client_hints.get("platform")
-            #                 or current_uad.get("mobile") != expected_client_hints.get("mobile")
-            #             ):
-            #                 needs_reapply = True
-            # except Exception as e:
-            #     logger.warning("UA override reapply check failed: %s", e)
-            #     needs_reapply = True
-            # if needs_reapply:
-            #     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, profile["platform"])
-            #
-            # logger.info("UA data re-applied via CDP (mismatch detected)")
+
             pass
         # ----------------------- Call local setting def  -----------------------
-        
         configure_profile(driver, profile["language"], profile["languages"], country_data)
-            
-             
-        
+      
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
         driver.get("https://abrahamjuliot.github.io/creepjs/")
 
