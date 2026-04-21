@@ -3438,10 +3438,37 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
         return true;
       }
-      const nativePluginsParity = nativePluginsRead.ok && nativeMimeTypesRead.ok
+      function __navPluginsIdentityGraphParity(nativePluginsValue, nativeMimeTypesValue) {
+        let mimeGlobalIndex = 0;
+        for (let i = 0; i < fakePlugins.length; i++) {
+          const expectedPlugin = fakePlugins[i];
+          const nativePlugin = nativePluginsValue[i];
+          if (!nativePlugin) return false;
+          if (typeof nativePluginsValue.item === 'function' && nativePluginsValue.item(i) !== nativePlugin) return false;
+          if (nativePlugin.name && typeof nativePluginsValue.namedItem === 'function' && nativePluginsValue.namedItem(nativePlugin.name) !== nativePlugin) return false;
+          for (let j = 0; j < expectedPlugin.mimeTypes.length; j++) {
+            const expectedMime = expectedPlugin.mimeTypes[j];
+            const nativePluginMime = nativePlugin[j];
+            const nativeMime = nativeMimeTypesValue[mimeGlobalIndex];
+            if (!nativePluginMime || !nativeMime) return false;
+            if (nativePluginMime !== nativeMime) return false;
+            if (typeof nativePlugin.item === 'function' && nativePlugin.item(j) !== nativeMime) return false;
+            if (expectedMime.type && typeof nativePlugin.namedItem === 'function' && nativePlugin.namedItem(expectedMime.type) !== nativeMime) return false;
+            if (typeof nativeMimeTypesValue.item === 'function' && nativeMimeTypesValue.item(mimeGlobalIndex) !== nativeMime) return false;
+            if (expectedMime.type && typeof nativeMimeTypesValue.namedItem === 'function' && nativeMimeTypesValue.namedItem(expectedMime.type) !== nativeMime) return false;
+            if (nativeMime.enabledPlugin !== nativePlugin) return false;
+            mimeGlobalIndex += 1;
+          }
+        }
+        return true;
+      }
+      const nativePluginsTopLevelParity = nativePluginsRead.ok && nativeMimeTypesRead.ok
         ? __navPluginsTopLevelParity(nativePluginsRead.value, nativeMimeTypesRead.value)
         : false;
-      if (nativePluginsRead.ok && nativeMimeTypesRead.ok && nativePluginsParity) {
+      const nativePluginsIdentityParity = nativePluginsTopLevelParity
+        ? __navPluginsIdentityGraphParity(nativePluginsRead.value, nativeMimeTypesRead.value)
+        : false;
+      if (nativePluginsRead.ok && nativeMimeTypesRead.ok && nativePluginsTopLevelParity && nativePluginsIdentityParity) {
         __navDiag('info', 'nav_total_set:plugins_native_skip', {
           stage: 'preflight',
           type: __navTypePipeline,
@@ -3460,18 +3487,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
         return;
       }
-      if (nativePluginsRead.ok && nativeMimeTypesRead.ok && !nativePluginsParity) {
+      if (nativePluginsRead.ok && nativeMimeTypesRead.ok && nativePluginsTopLevelParity && !nativePluginsIdentityParity) {
+        __navDiag('warn', 'nav_total_set:plugins_identity_graph_mismatch', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:plugins',
+          key: 'plugins',
+          message: 'plugins/mimeTypes native scalar parity passed but identity graph is not linked',
+          data: { outcome: 'patch', reason: 'identity_graph_mismatch' }
+        });
+      }
+      if (nativePluginsRead.ok && nativeMimeTypesRead.ok && !nativePluginsTopLevelParity) {
         __navDiag('warn', 'nav_total_set:plugins_no_admissible_carrier', {
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:plugins',
           key: 'plugins',
-          message: 'plugins native getter mismatches target and no admissible carrier is proven in current runtime path',
+          message: 'plugins native getter mismatches target; synthetic graph path required',
           data: {
-            outcome: 'skip',
-            reason: 'no_admissible_carrier',
-            policy: 'skip',
-            action: 'native',
+            outcome: 'patch',
+            reason: 'native_target_mismatch',
+            policy: 'patch',
+            action: 'synthetic_graph',
             nativeLength: nativePluginsRead.value && nativePluginsRead.value.length,
             targetLength: fakePlugins.length
           }
@@ -3481,17 +3518,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           type: __navTypePipeline,
           diagTag: 'nav_total_set:mimeTypes',
           key: 'mimeTypes',
-          message: 'mimeTypes native getter mismatches target and no admissible carrier is proven in current runtime path',
+          message: 'mimeTypes native getter mismatches target; synthetic graph path required',
           data: {
-            outcome: 'skip',
-            reason: 'no_admissible_carrier',
-            policy: 'skip',
-            action: 'native',
+            outcome: 'patch',
+            reason: 'native_target_mismatch',
+            policy: 'patch',
+            action: 'synthetic_graph',
             nativeLength: nativeMimeTypesRead.value && nativeMimeTypesRead.value.length,
             targetLength: normalizedMimeCount
           }
         });
-        return;
       }
 
       const __navPluginArrayMeta = new WeakMap();
@@ -3943,6 +3979,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             }
             if (firstPlugin && firstMime.enabledPlugin !== firstPlugin) {
               throw __navPluginsError('postcheck_failed', 'MimeType.enabledPlugin linkage mismatch');
+            }
+          }
+          if (firstPlugin && firstMime) {
+            if (typeof pluginArrayA.item !== 'function' || pluginArrayA.item(0) !== firstPlugin) {
+              throw __navPluginsError('postcheck_failed', 'PluginArray.item linkage mismatch');
+            }
+            if (firstPlugin.name && (typeof pluginArrayA.namedItem !== 'function' || pluginArrayA.namedItem(firstPlugin.name) !== firstPlugin)) {
+              throw __navPluginsError('postcheck_failed', 'PluginArray.namedItem linkage mismatch');
+            }
+            if (typeof mimeArrayA.item !== 'function' || mimeArrayA.item(0) !== firstMime) {
+              throw __navPluginsError('postcheck_failed', 'MimeTypeArray.item linkage mismatch');
+            }
+            if (firstMime.type && (typeof mimeArrayA.namedItem !== 'function' || mimeArrayA.namedItem(firstMime.type) !== firstMime)) {
+              throw __navPluginsError('postcheck_failed', 'MimeTypeArray.namedItem linkage mismatch');
+            }
+            if (typeof firstPlugin.item !== 'function' || firstPlugin.item(0) !== firstMime) {
+              throw __navPluginsError('postcheck_failed', 'Plugin.item linkage mismatch');
+            }
+            if (firstMime.type && (typeof firstPlugin.namedItem !== 'function' || firstPlugin.namedItem(firstMime.type) !== firstMime)) {
+              throw __navPluginsError('postcheck_failed', 'Plugin.namedItem linkage mismatch');
             }
           }
         }
