@@ -874,11 +874,6 @@
     if (typeof applyAccessorTargets !== 'function') {
       throw new Error('UACHPatch: worker accessor target executor missing');
     }
-    const languagesCache = {
-      values: null,
-      frozen: null
-    };
-
     const applyWorkerNavigatorAccessorTarget = (k, getter, diagTag) => {
       if (!nav) throw new Error(`UACHPatch: cannot define ${k} (no navigator)`);
       if (typeof getter !== 'function') {
@@ -989,6 +984,20 @@
         return false;
       }
     };
+    const canonicalizeLanguageListForCompare = (value) => {
+      if (!Array.isArray(value)) return null;
+      const out = [];
+      const seen = new Set();
+      for (let i = 0; i < value.length; i += 1) {
+        const entry = value[i];
+        if (typeof entry !== 'string' || entry.trim() === '') return null;
+        if (!seen.has(entry)) {
+          seen.add(entry);
+          out.push(entry);
+        }
+      }
+      return out;
+    };
     const assertWorkerNavigatorDescriptor = (k) => {
       const mode = __workerNavigatorDescriptorModes__[k] || null;
       const owner = __workerNavigatorPatchedOwners__[k]
@@ -1066,17 +1075,25 @@
     };
 
 
-    const getLanguage = function getLanguage(){
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
-      if (typeof cache.snap.language !== 'string' || cache.snap.language.trim() === '') throw new Error('UACHPatch: bad language');
-      return cache.snap.language;
-    };
     {
       const resolvedUserAgentData = resolveWorkerNavigatorNativeDescriptor('userAgentData');
       __workerNavigatorPatchedOwners__['userAgentData'] = resolvedUserAgentData.owner;
       __workerNavigatorDescriptorModes__['userAgentData'] = 'native_skip';
     }
+    const getLanguage = function getLanguage(){
+      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      if (typeof cache.snap.language !== 'string' || cache.snap.language.trim() === '') {
+        throw new Error('UACHPatch: bad language');
+      }
+      return cache.snap.language;
+    };
+    const getLanguages = function getLanguages(){
+      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      if (!Array.isArray(cache.snap.languages)) throw new Error('UACHPatch: bad languages');
+      return cache.snap.languages.slice();
+    };
     let __patchLanguage = true;
+    let __patchLanguages = true;
     try {
       const nativeLanguageResolved = readWorkerNavigatorNativeValue('language');
       const nativeLanguage = nativeLanguageResolved.value;
@@ -1102,6 +1119,23 @@
               scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
             }
           }, null);
+        } else {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:native_profile_mismatch_patch_accessor', {
+            type: 'browser structure missing data',
+            stage: 'preflight',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'WorkerNavigator',
+            key: 'language',
+            policy: 'strict',
+            action: 'patch',
+            data: {
+              outcome: 'patch',
+              reason: 'native_profile_mismatch_patch_accessor',
+              nativeValue: nativeLanguage,
+              profileValue: profileLanguage,
+              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            }
+          }, null);
         }
       }
     } catch (e) {
@@ -1116,38 +1150,6 @@
         data: { outcome: 'skip', reason: 'native_compare_failed' }
       }, e);
     }
-    if (__patchLanguage) {
-      applyWorkerNavigatorAccessorTarget('language', getLanguage, 'worker_patch_src:language');
-    }
-
-    const getLanguages = function getLanguages(){
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
-      if (!Array.isArray(cache.snap.languages)) throw new Error('UACHPatch: bad languages');
-      const currentValues = cache.snap.languages;
-      const cachedValues = languagesCache.values;
-      if (Array.isArray(cachedValues)
-          && cachedValues.length === currentValues.length
-          && cachedValues.every(function(value, index) { return value === currentValues[index]; })
-          && Array.isArray(languagesCache.frozen)) {
-        return languagesCache.frozen;
-      }
-      const out = currentValues.slice();
-      try { Object.freeze(out); } catch(e) {
-        emitDegrade('warn', 'worker_patch_src:languages:freeze_failed', {
-          type: 'browser structure missing data',
-          stage: 'runtime',
-          module: 'WORKER_PATCH_SRC',
-          surface: 'WorkerNavigator.languages',
-          key: 'Object.freeze',
-          policy: 'skip',
-          action: 'native'
-        }, e);
-      }
-      languagesCache.values = out.slice();
-      languagesCache.frozen = out;
-      return out;
-    };
-    let __patchLanguages = true;
     try {
       const nativeLanguagesResolved = readWorkerNavigatorNativeValue('languages');
       const nativeLanguages = nativeLanguagesResolved.value;
@@ -1175,6 +1177,49 @@
               scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
             }
           }, null);
+        } else {
+          const nativeCanonical = canonicalizeLanguageListForCompare(nativeLanguages);
+          const profileCanonical = canonicalizeLanguageListForCompare(profileLanguages);
+          if (nativeCanonical && profileCanonical && sameJson(nativeCanonical, profileCanonical)) {
+            __workerNavigatorPatchedOwners__['languages'] = nativeLanguagesResolved.owner;
+            __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
+            __patchLanguages = false;
+            emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:profile_languages_canonicalized', {
+              type: 'browser structure missing data',
+              stage: 'preflight',
+              module: 'WORKER_PATCH_SRC',
+              surface: 'WorkerNavigator',
+              key: 'languages',
+              policy: 'skip',
+              action: 'native',
+              data: {
+                outcome: 'skip',
+                reason: 'profile_languages_canonicalized',
+                nativeValue: nativeLanguages.slice(),
+                profileValue: Array.isArray(profileLanguages) ? profileLanguages.slice() : profileLanguages,
+                canonicalNativeValue: nativeCanonical,
+                canonicalProfileValue: profileCanonical,
+                scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+              }
+            }, null);
+          } else {
+            emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:native_profile_mismatch_patch_accessor', {
+              type: 'browser structure missing data',
+              stage: 'preflight',
+              module: 'WORKER_PATCH_SRC',
+              surface: 'WorkerNavigator',
+              key: 'languages',
+              policy: 'strict',
+              action: 'patch',
+              data: {
+                outcome: 'patch',
+                reason: 'native_profile_mismatch_patch_accessor',
+                nativeValue: nativeLanguages.slice(),
+                profileValue: Array.isArray(profileLanguages) ? profileLanguages.slice() : profileLanguages,
+                scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+              }
+            }, null);
+          }
         }
       }
     } catch (e) {
@@ -1188,9 +1233,6 @@
         action: 'native',
         data: { outcome: 'skip', reason: 'native_compare_failed' }
       }, e);
-    }
-    if (__patchLanguages) {
-      applyWorkerNavigatorAccessorTarget('languages', getLanguages, 'worker_patch_src:languages');
     }
 
 
@@ -1293,6 +1335,12 @@
     }
     if (__patchHardwareConcurrency) {
       applyWorkerNavigatorAccessorTarget('hardwareConcurrency', getHardwareConcurrency, 'worker_patch_src:hardwareConcurrency');
+    }
+    if (__patchLanguage) {
+      applyWorkerNavigatorAccessorTarget('language', getLanguage, 'worker_patch_src:language');
+    }
+    if (__patchLanguages) {
+      applyWorkerNavigatorAccessorTarget('languages', getLanguages, 'worker_patch_src:languages');
     }
     assertWorkerNavigatorDescriptor('userAgentData');
     assertWorkerNavigatorDescriptor('language');
@@ -1985,13 +2033,35 @@
         { actual: sanity.language, expected: cache.snap.language }
       );
     }
-    if (!Array.isArray(sanity.languages) || sanity.languages.join(',') !== cache.snap.languages.join(',')) {
-      failWorkerNavigatorSanity(
-        'worker_patch_src:workernavigator:sanity:mismatch',
-        'languages',
-        'UACHPatch: languages mismatch',
-        { actual: sanity.languages, expected: cache.snap.languages }
-      );
+    const sanityLanguagesCanonical = canonicalizeLanguageListForCompare(sanity.languages);
+    const snapLanguagesCanonical = canonicalizeLanguageListForCompare(cache.snap.languages);
+    if (!sameJson(sanity.languages, cache.snap.languages)) {
+      if (sanityLanguagesCanonical && snapLanguagesCanonical && sameJson(sanityLanguagesCanonical, snapLanguagesCanonical)) {
+        emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:profile_languages_canonicalized', {
+          type: 'browser structure missing data',
+          stage: 'sanity',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'WorkerNavigator',
+          key: 'languages',
+          policy: 'skip',
+          action: 'native',
+          data: {
+            outcome: 'skip',
+            reason: 'profile_languages_canonicalized',
+            nativeValue: Array.isArray(sanity.languages) ? sanity.languages.slice() : sanity.languages,
+            profileValue: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages,
+            canonicalNativeValue: sanityLanguagesCanonical,
+            canonicalProfileValue: snapLanguagesCanonical
+          }
+        }, null);
+      } else {
+        failWorkerNavigatorSanity(
+          'worker_patch_src:workernavigator:sanity:mismatch',
+          'languages',
+          'UACHPatch: languages mismatch',
+          { actual: sanity.languages, expected: cache.snap.languages }
+        );
+      }
     }
     if (Number(sanity.deviceMemory) !== Number(cache.snap.deviceMemory)) {
       failWorkerNavigatorSanity(

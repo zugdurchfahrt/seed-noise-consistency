@@ -585,6 +585,21 @@
       return true;
     }
 
+    function __canonicalizeLanguageListForCompare(value) {
+      if (!Array.isArray(value)) return null;
+      const out = [];
+      const seen = new Set();
+      for (let i = 0; i < value.length; i += 1) {
+        const entry = value[i];
+        if (typeof entry !== 'string' || entry.trim() === '') return null;
+        if (!seen.has(entry)) {
+          seen.add(entry);
+          out.push(entry);
+        }
+      }
+      return out;
+    }
+
     let swPrimaryValue = primary;
     let swLanguagesValue = Array.isArray(langs) ? langs.slice() : [];
     let swHardwareConcurrencyValue = Number(hc);
@@ -606,6 +621,19 @@
             data: {
               outcome: 'return',
               reason: 'native_skip',
+              nativeValue: nativeLanguageRead.value,
+              profileValue: primary
+            }
+          }, null);
+        } else {
+          __swDiag('warn', 'sw_prelude:language_native_profile_mismatch_patch_accessor', {
+            stage: 'preflight',
+            key: 'language',
+            message: 'service worker language differs from profile; patch accessor',
+            type: 'browser structure missing data',
+            data: {
+              outcome: 'patch',
+              reason: 'native_profile_mismatch_patch_accessor',
               nativeValue: nativeLanguageRead.value,
               profileValue: primary
             }
@@ -644,7 +672,6 @@
       if (__isNonEmptyStringArray(nativeLanguagesRead.value)) {
         if (__stringArraysEqual(nativeLanguagesRead.value, Array.isArray(langs) ? langs : [])) {
           swPatchLanguages = false;
-          swPatchLanguage = false;
           __swDiag('info', 'sw_prelude:languages_native_skip', {
             stage: 'preflight',
             key: 'languages',
@@ -657,6 +684,39 @@
               profileValue: Array.isArray(langs) ? langs.slice() : langs
             }
           }, null);
+        } else {
+          const nativeCanonical = __canonicalizeLanguageListForCompare(nativeLanguagesRead.value);
+          const profileCanonical = __canonicalizeLanguageListForCompare(Array.isArray(langs) ? langs : []);
+          if (nativeCanonical && profileCanonical && __stringArraysEqual(nativeCanonical, profileCanonical)) {
+            swPatchLanguages = false;
+            __swDiag('info', 'sw_prelude:languages_profile_languages_canonicalized', {
+              stage: 'preflight',
+              key: 'languages',
+              message: 'service worker profile languages duplicate-only mismatch canonicalized; native getter kept',
+              type: 'browser structure missing data',
+              data: {
+                outcome: 'skip',
+                reason: 'profile_languages_canonicalized',
+                nativeValue: nativeLanguagesRead.value.slice(),
+                profileValue: Array.isArray(langs) ? langs.slice() : langs,
+                canonicalNativeValue: nativeCanonical,
+                canonicalProfileValue: profileCanonical
+              }
+            }, null);
+          } else {
+            __swDiag('warn', 'sw_prelude:languages_native_profile_mismatch_patch_accessor', {
+              stage: 'preflight',
+              key: 'languages',
+              message: 'service worker languages differ from profile; patch accessor',
+              type: 'browser structure missing data',
+              data: {
+                outcome: 'patch',
+                reason: 'native_profile_mismatch_patch_accessor',
+                nativeValue: nativeLanguagesRead.value.slice(),
+                profileValue: Array.isArray(langs) ? langs.slice() : langs
+              }
+            }, null);
+          }
         }
       } else {
         __swDiag('warn', 'sw_prelude:languages_native_invalid', {
@@ -1227,7 +1287,7 @@
       }, null);
     }
     if (swPatchLanguages) {
-      applyServiceWorkerNavigatorAccessorTarget('languages', function() { return swLanguagesValue; }, 'sw_prelude:languages');
+      applyServiceWorkerNavigatorAccessorTarget('languages', function() { return swLanguagesValue.slice(); }, 'sw_prelude:languages');
     } else {
       __swDiag('info', 'sw_prelude:languages_accessor_native_skip', {
         stage: 'apply',

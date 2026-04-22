@@ -212,6 +212,20 @@ def enable_sw_language_inject(language: str, normalized_languages: list[str], ha
     )
 
 
+def _canonicalize_language_list_for_compare(value):
+    if not isinstance(value, list):
+        return None
+    out = []
+    seen = set()
+    for entry in value:
+        if not isinstance(entry, str) or not entry.strip():
+            return None
+        if entry not in seen:
+            seen.add(entry)
+            out.append(entry)
+    return out
+
+
 def enable_worker_seed_inject(global_seed: str):
     """
     Enable Dedicated/Shared worker injection for CDP_GLOBAL_SEED.
@@ -666,12 +680,35 @@ def run():
                             _resume_sw_session(ws, sid, "sanity_bad_result")
                             _fatal(ws, "sw sanity: bad result type", out)
                             return
-                        if out.get("language") != exp["language"] or list(out.get("languages") or []) != list(exp["languages"]):
-                            logger.warning(
-                                "SW inject: language sanity mismatch; prefer native worker value expected=%s got=%s",
-                                {"language": exp.get("language"), "languages": exp.get("languages")},
-                                {"language": out.get("language"), "languages": out.get("languages")},
+                        got_languages = list(out.get("languages") or [])
+                        exp_languages = list(exp["languages"] or [])
+                        got_languages_canonical = _canonicalize_language_list_for_compare(got_languages)
+                        exp_languages_canonical = _canonicalize_language_list_for_compare(exp_languages)
+                        language_mismatch = out.get("language") != exp["language"]
+                        languages_exact_mismatch = got_languages != exp_languages
+                        languages_duplicate_only = (
+                            languages_exact_mismatch
+                            and got_languages_canonical is not None
+                            and exp_languages_canonical is not None
+                            and got_languages_canonical == exp_languages_canonical
+                        )
+                        if languages_duplicate_only:
+                            logger.info(
+                                "SW inject: language sanity duplicate-only languages canonicalized expected=%s got=%s",
+                                {"language": exp.get("language"), "languages": exp_languages},
+                                {"language": out.get("language"), "languages": got_languages},
                             )
+                        if language_mismatch or (languages_exact_mismatch and not languages_duplicate_only):
+                            _resume_sw_session(ws, sid, "sanity_language_mismatch")
+                            _fatal(
+                                ws,
+                                "sw sanity: language mismatch",
+                                {
+                                    "expected": {"language": exp.get("language"), "languages": exp_languages},
+                                    "got": {"language": out.get("language"), "languages": got_languages},
+                                },
+                            )
+                            return
                         if int(out.get("hardwareConcurrency") or 0) != int(exp["hardwareConcurrency"]):
                             logger.warning(
                                 "SW inject: hardwareConcurrency sanity mismatch; prefer native worker value expected=%s got=%s",
