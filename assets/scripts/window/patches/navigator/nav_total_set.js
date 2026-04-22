@@ -2419,24 +2419,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               message: 'language already matches native getter',
                 data: { outcome: 'return', reason: 'getter_value_match' }
               });
-            } else {
-              __navDiag('info', 'nav_total_set:language_getter_value_mismatch', {
-                stage: 'preflight',
-                type: __navTypePipeline,
-                diagTag: 'nav_total_set:language',
-                key: 'language',
-                message: 'language native getter value differs from profile value; native getter kept',
-                data: {
-                  outcome: 'skip',
-                  reason: 'getter_value_mismatch',
-                  policy: 'skip',
-                  action: 'keep_native_getter',
-                  nativeValue: nativeLanguageRead.value,
-                  profileValue: primaryLanguage
-                }
-              });
-            }
+          } else {
+            __navDiag('info', 'nav_total_set:language_getter_value_mismatch', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:language',
+              key: 'language',
+              message: 'language native getter value differs from profile value; native getter kept',
+              data: {
+                outcome: 'skip',
+                reason: 'getter_value_mismatch',
+                policy: 'skip',
+                action: 'keep_native_getter',
+                nativeValue: nativeLanguageRead.value,
+                profileValue: primaryLanguage
+              }
+            });
           }
+        }
       } else {
         patchStrictScalarAccessor('language', function navLanguageValue() {
           __navDiagPipeline('warn', 'nav_total_set:language_invalid_profile', {
@@ -2477,24 +2477,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               message: 'languages already matches native getter',
                 data: { outcome: 'return', reason: 'getter_value_match' }
               });
-            } else {
-              __navDiag('info', 'nav_total_set:languages_getter_value_mismatch', {
-                stage: 'preflight',
-                type: __navTypePipeline,
-                diagTag: 'nav_total_set:languages',
-                key: 'languages',
-                message: 'languages native getter value differs from profile value; native getter kept',
-                data: {
-                  outcome: 'skip',
-                  reason: 'getter_value_mismatch',
-                  policy: 'skip',
-                  action: 'keep_native_getter',
-                  nativeValue: Array.isArray(nativeLanguagesRead.value) ? nativeLanguagesRead.value.slice(0, 8) : nativeLanguagesRead.value,
-                  profileValue: normalizedLanguages.slice(0, 8)
-                }
-              });
-            }
+          } else {
+            __navDiag('info', 'nav_total_set:languages_getter_value_mismatch', {
+              stage: 'preflight',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set:languages',
+              key: 'languages',
+              message: 'languages native getter value differs from profile value; native getter kept',
+              data: {
+                outcome: 'skip',
+                reason: 'getter_value_mismatch',
+                policy: 'skip',
+                action: 'keep_native_getter',
+                nativeValue: Array.isArray(nativeLanguagesRead.value) ? nativeLanguagesRead.value.slice(0, 8) : nativeLanguagesRead.value,
+                profileValue: normalizedLanguages.slice(0, 8)
+              }
+            });
           }
+        }
       } else {
         patchStrictScalarAccessor('languages', function navLanguagesValue() {
           __navDiagPipeline('warn', 'nav_total_set:languages_invalid_profile', {
