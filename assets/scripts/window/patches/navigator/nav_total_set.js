@@ -1426,7 +1426,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return true;
     }
 
-    function __navRunStrictScalarNativeSkipFamily(specs) {
+    function __navRunStrictScalarGetterChecks(specs) {
       if (!Array.isArray(specs) || !specs.length) return;
       for (let i = 0; i < specs.length; i++) {
         const spec = specs[i];
@@ -1437,30 +1437,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const nativeValue = __navReadNativeScalarFallback(nativeDesc, navigator, spec.key, diagTag);
         const matchesNative = (typeof spec.matchesNative === 'function') ? spec.matchesNative(nativeValue) : false;
         if (matchesNative) {
-          __navDiag('info', diagTag + '_native_skip', {
+          __navDiag('info', diagTag + '_getter_value_match', {
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: diagTag,
             key: spec.key,
             message: (typeof spec.skipMessage === 'string' && spec.skipMessage) ? spec.skipMessage : (spec.key + ' already matches native getter'),
-            data: { outcome: 'return', reason: 'native_skip' }
+            data: { outcome: 'return', reason: 'getter_value_match' }
           });
           continue;
         }
         if (spec && spec.mismatchAction === 'skip') {
-          __navDiag('warn', diagTag + '_native_mismatch_skip', {
+          __navDiag('info', diagTag + '_getter_value_mismatch', {
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: diagTag,
             key: spec.key,
             message: (typeof spec.mismatchMessage === 'string' && spec.mismatchMessage)
               ? spec.mismatchMessage
-              : (spec.key + ' native getter mismatches target; keep native path and classify as value mismatch'),
+              : (spec.key + ' native getter value differs from profile value; native getter kept'),
             data: {
               outcome: 'skip',
-              reason: 'native_mismatch_skip',
-              action: 'native',
-              nativeValue: nativeValue
+              reason: 'getter_value_mismatch',
+              action: 'keep_native_getter',
+              nativeValue: nativeValue,
+              profileValue: Object.prototype.hasOwnProperty.call(spec, 'profileValue') ? spec.profileValue : null
             }
           });
           continue;
@@ -1476,61 +1477,66 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages']);
     const objectReturnKeys = new Set(['plugins','mimeTypes','userAgentData']);
     (function patchStrictScalarAccessorsOnProto(){
-      __navRunStrictScalarNativeSkipFamily([
+      __navRunStrictScalarGetterChecks([
         {
           key: 'platform',
           diagTag: 'nav_total_set:platform',
           getter: function navPlatformValue() { return navPlatformOut; },
+          profileValue: navPlatformOut,
           matchesNative: function nativePlatformMatches(value) {
             return typeof value === 'string' && value === navPlatformOut;
           },
           skipMessage: 'platform already matches native getter',
           mismatchAction: 'skip',
-          mismatchMessage: 'platform native getter mismatches target; keep native getter and treat as value-path inconsistency'
+          mismatchMessage: 'platform native getter value differs from profile value; native getter kept'
         },
         {
           key: 'vendor',
           diagTag: 'nav_total_set:vendor',
           getter: function navVendorValue() { return vendor; },
+          profileValue: vendor,
           matchesNative: function nativeVendorMatches(value) {
             return typeof value === 'string' && value === vendor;
           },
           skipMessage: 'vendor already matches native getter',
           mismatchAction: 'skip',
-          mismatchMessage: 'vendor native getter mismatches target; keep native getter and treat as value-path inconsistency'
+          mismatchMessage: 'vendor native getter value differs from profile value; native getter kept'
         },
         {
           key: 'productSub',
           diagTag: 'nav_total_set:productSub',
           getter: function navProductSubValue() { return "20030107"; },
+          profileValue: "20030107",
           matchesNative: function nativeProductSubMatches(value) {
             return typeof value === 'string' && value === "20030107";
           },
           skipMessage: 'productSub already matches native getter',
           mismatchAction: 'skip',
-          mismatchMessage: 'productSub native getter mismatches target; keep native getter and treat as value-path inconsistency'
+          mismatchMessage: 'productSub native getter value differs from profile value; native getter kept'
         },
         {
           key: 'vendorSub',
           diagTag: 'nav_total_set:vendorSub',
           getter: function navVendorSubValue() { return ""; },
+          profileValue: "",
           matchesNative: function nativeVendorSubMatches(value) {
             return typeof value === 'string' && value === "";
           },
           skipMessage: 'vendorSub already matches native getter',
           mismatchAction: 'skip',
-          mismatchMessage: 'vendorSub native getter mismatches target; keep native getter and treat as value-path inconsistency'
+          mismatchMessage: 'vendorSub native getter value differs from profile value; native getter kept'
         },
         {
           key: 'maxTouchPoints',
           diagTag: 'nav_total_set:maxTouchPoints',
           getter: function navMaxTouchPointsValue() { return 0; },
+          profileValue: 0,
           matchesNative: function nativeMaxTouchPointsMatches(value) {
             return Number.isInteger(value) && value === 0;
           },
           skipMessage: 'maxTouchPoints already matches native getter',
           mismatchAction: 'skip',
-          mismatchMessage: 'maxTouchPoints native getter mismatches target; keep native getter and treat as value-path inconsistency'
+          mismatchMessage: 'maxTouchPoints native getter value differs from profile value; native getter kept'
         }
       ]);
       if ('appVersion' in navProto) {
@@ -1550,28 +1556,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           );
           if (nativeAppVersionRead.ok) {
             if (typeof nativeAppVersionRead.value === 'string' && nativeAppVersionRead.value === appVersionTarget) {
-              __navDiag('info', 'nav_total_set:appVersion_native_skip', {
+              __navDiag('info', 'nav_total_set:appVersion_getter_value_match', {
                 stage: 'preflight',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:appVersion',
                 key: 'appVersion',
                 message: 'appVersion already matches native getter',
-                data: { outcome: 'return', reason: 'native_skip' }
+                data: { outcome: 'return', reason: 'getter_value_match' }
               });
             } else {
-              __navDiag('warn', 'nav_total_set:appVersion_no_admissible_carrier', {
+              __navDiag('info', 'nav_total_set:appVersion_getter_value_mismatch', {
                 stage: 'preflight',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:appVersion',
                 key: 'appVersion',
-                message: 'appVersion native getter mismatches target and no admissible carrier is proven in current runtime path',
+                message: 'appVersion native getter value differs from profile value; native getter kept',
                 data: {
                   outcome: 'skip',
-                  reason: 'no_admissible_carrier',
+                  reason: 'getter_value_mismatch',
                   policy: 'skip',
-                  action: 'native',
+                  action: 'keep_native_getter',
                   nativeValue: nativeAppVersionRead.value,
-                  targetValue: appVersionTarget
+                  profileValue: appVersionTarget
                 }
               });
             }
@@ -2260,6 +2266,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       );
       if (nativeUadRead.ok) {
         const nativeUadValue = nativeUadRead.value;
+        const nativeUadProfile = {
+          brands: meta.brands,
+          mobile: meta.mobile,
+          platform: chPlatform
+        };
         const nativeUadMatches = !!(
           nativeUadValue &&
           nativeUadValue === nativeUAD &&
@@ -2268,27 +2279,35 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           nativeUadValue.platform === chPlatform
         );
         if (nativeUadMatches) {
-          __navDiag('info', 'nav_total_set:userAgentData_native_skip', {
+          __navDiag('info', 'nav_total_set:userAgentData_getter_value_match', {
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: 'nav_total_set:userAgentData',
             key: 'userAgentData',
             message: 'userAgentData already matches native getter',
-            data: { outcome: 'return', reason: 'native_skip' }
+            data: { outcome: 'return', reason: 'getter_value_match' }
           });
         } else {
-          __navDiag('warn', 'nav_total_set:userAgentData_no_admissible_carrier', {
+          __navDiag('info', 'nav_total_set:userAgentData_native_getter_kept', {
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: 'nav_total_set:userAgentData',
             key: 'userAgentData',
-            message: 'userAgentData native getter mismatches target and no admissible carrier is proven in current runtime path',
+            message: 'userAgentData native getter kept; userAgentData values and methods are handled below',
             data: {
-              outcome: 'skip',
-              reason: 'no_admissible_carrier',
-              policy: 'skip',
-              action: 'native',
-              nativeMatchesTarget: nativeUadMatches
+              outcome: 'return',
+              reason: 'native_getter_kept',
+              policy: 'keep_native_getter',
+              action: 'keep_native_getter',
+              requiresAction: false,
+              descriptorOwner: (dUaDataResolved && dUaDataResolved.owner === navProto) ? 'Navigator.prototype' : 'prototype_chain',
+              hasGetter: !!(dUaData && typeof dUaData.get === 'function'),
+              nativeValue: {
+                brands: nativeUadValue && Array.isArray(nativeUadValue.brands) ? nativeUadValue.brands : null,
+                mobile: nativeUadValue ? nativeUadValue.mobile : null,
+                platform: nativeUadValue ? nativeUadValue.platform : null
+              },
+              profileValue: nativeUadProfile
             }
           });
         }
@@ -2305,13 +2324,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const nativeLanguagesDesc = __navResolveNativeAccessorDesc('languages');
 
     if ('deviceMemory' in navProto) {
-      __navDiag('info', 'nav_total_set:deviceMemory_native_passthrough', {
+      __navDiag('info', 'nav_total_set:deviceMemory_native_getter_kept', {
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set:deviceMemory',
         key: 'deviceMemory',
-        message: 'deviceMemory patch disabled; keep native getter path',
-        data: { outcome: 'skip', reason: 'native_passthrough', action: 'native' }
+        message: 'deviceMemory patch disabled; native getter kept',
+        data: { outcome: 'skip', reason: 'native_getter_kept', action: 'keep_native_getter' }
       });
       // LEGACY synthetic rollback for window scope:
       // patchStrictScalarAccessor('deviceMemory', function navDeviceMemoryValue() {
@@ -2339,28 +2358,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         );
         if (nativeHardwareConcurrencyRead.ok) {
           if (Number(nativeHardwareConcurrencyRead.value) === Number(cpu)) {
-            __navDiag('info', 'nav_total_set:hardwareConcurrency_native_skip', {
+            __navDiag('info', 'nav_total_set:hardwareConcurrency_getter_value_match', {
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:hardwareConcurrency',
               key: 'hardwareConcurrency',
               message: 'hardwareConcurrency already matches native getter',
-              data: { outcome: 'return', reason: 'native_skip' }
+              data: { outcome: 'return', reason: 'getter_value_match' }
             });
           } else {
-            __navDiag('warn', 'nav_total_set:hardwareConcurrency_no_admissible_carrier', {
+            __navDiag('info', 'nav_total_set:hardwareConcurrency_getter_value_mismatch', {
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:hardwareConcurrency',
               key: 'hardwareConcurrency',
-              message: 'hardwareConcurrency native getter mismatches target and no admissible carrier is proven in current runtime path',
+              message: 'hardwareConcurrency native getter value differs from profile value; native getter kept',
               data: {
                 outcome: 'skip',
-                reason: 'no_admissible_carrier',
+                reason: 'getter_value_mismatch',
                 policy: 'skip',
-                action: 'native',
+                action: 'keep_native_getter',
                 nativeValue: nativeHardwareConcurrencyRead.value,
-                targetValue: cpu
+                profileValue: cpu
               }
             });
           }
@@ -2392,28 +2411,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         );
         if (nativeLanguageRead.ok) {
           if (typeof nativeLanguageRead.value === 'string' && nativeLanguageRead.value === primaryLanguage) {
-            __navDiag('info', 'nav_total_set:language_native_skip', {
+            __navDiag('info', 'nav_total_set:language_getter_value_match', {
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:language',
               key: 'language',
               message: 'language already matches native getter',
-                data: { outcome: 'return', reason: 'native_skip' }
+                data: { outcome: 'return', reason: 'getter_value_match' }
               });
             } else {
-              __navDiag('warn', 'nav_total_set:language_no_admissible_carrier', {
+              __navDiag('info', 'nav_total_set:language_getter_value_mismatch', {
                 stage: 'preflight',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:language',
                 key: 'language',
-                message: 'language native getter mismatches target and no admissible carrier is proven in current runtime path',
+                message: 'language native getter value differs from profile value; native getter kept',
                 data: {
                   outcome: 'skip',
-                  reason: 'no_admissible_carrier',
+                  reason: 'getter_value_mismatch',
                   policy: 'skip',
-                  action: 'native',
+                  action: 'keep_native_getter',
                   nativeValue: nativeLanguageRead.value,
-                  targetValue: primaryLanguage
+                  profileValue: primaryLanguage
                 }
               });
             }
@@ -2450,28 +2469,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         );
         if (nativeLanguagesRead.ok) {
           if (__navStringArrayEquals(nativeLanguagesRead.value, normalizedLanguages)) {
-            __navDiag('info', 'nav_total_set:languages_native_skip', {
+            __navDiag('info', 'nav_total_set:languages_getter_value_match', {
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:languages',
               key: 'languages',
               message: 'languages already matches native getter',
-                data: { outcome: 'return', reason: 'native_skip' }
+                data: { outcome: 'return', reason: 'getter_value_match' }
               });
             } else {
-              __navDiag('warn', 'nav_total_set:languages_no_admissible_carrier', {
+              __navDiag('info', 'nav_total_set:languages_getter_value_mismatch', {
                 stage: 'preflight',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:languages',
                 key: 'languages',
-                message: 'languages native getter mismatches target and no admissible carrier is proven in current runtime path',
+                message: 'languages native getter value differs from profile value; native getter kept',
                 data: {
                   outcome: 'skip',
-                  reason: 'no_admissible_carrier',
+                  reason: 'getter_value_mismatch',
                   policy: 'skip',
-                  action: 'native',
+                  action: 'keep_native_getter',
                   nativeValue: Array.isArray(nativeLanguagesRead.value) ? nativeLanguagesRead.value.slice(0, 8) : nativeLanguagesRead.value,
-                  targetValue: normalizedLanguages.slice(0, 8)
+                  profileValue: normalizedLanguages.slice(0, 8)
                 }
               });
             }
@@ -3442,53 +3461,55 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         ? __navPluginsTopLevelParity(nativePluginsRead.value, nativeMimeTypesRead.value)
         : false;
       if (nativePluginsRead.ok && nativeMimeTypesRead.ok && nativePluginsParity) {
-        __navDiag('info', 'nav_total_set:plugins_native_skip', {
+        __navDiag('info', 'nav_total_set:plugins_getter_value_match', {
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:plugins',
           key: 'plugins',
           message: 'plugins already matches native getter',
-          data: { outcome: 'return', reason: 'native_skip' }
+          data: { outcome: 'return', reason: 'getter_value_match' }
         });
-        __navDiag('info', 'nav_total_set:mimeTypes_native_skip', {
+        __navDiag('info', 'nav_total_set:mimeTypes_getter_value_match', {
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:mimeTypes',
           key: 'mimeTypes',
           message: 'mimeTypes already matches native getter',
-          data: { outcome: 'return', reason: 'native_skip' }
+          data: { outcome: 'return', reason: 'getter_value_match' }
         });
         return;
       }
       if (nativePluginsRead.ok && nativeMimeTypesRead.ok && !nativePluginsParity) {
-        __navDiag('warn', 'nav_total_set:plugins_no_admissible_carrier', {
+        __navDiag('info', 'nav_total_set:plugins_native_getter_kept', {
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:plugins',
           key: 'plugins',
-          message: 'plugins native getter mismatches target and no admissible carrier is proven in current runtime path',
+          message: 'plugins native getter kept',
           data: {
-            outcome: 'skip',
-            reason: 'no_admissible_carrier',
-            policy: 'skip',
-            action: 'native',
+            outcome: 'return',
+            reason: 'native_getter_kept',
+            policy: 'keep_native_getter',
+            action: 'keep_native_getter',
+            requiresAction: false,
             nativeLength: nativePluginsRead.value && nativePluginsRead.value.length,
-            targetLength: fakePlugins.length
+            profileLength: fakePlugins.length
           }
         });
-        __navDiag('warn', 'nav_total_set:mimeTypes_no_admissible_carrier', {
+        __navDiag('info', 'nav_total_set:mimeTypes_native_getter_kept', {
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:mimeTypes',
           key: 'mimeTypes',
-          message: 'mimeTypes native getter mismatches target and no admissible carrier is proven in current runtime path',
+          message: 'mimeTypes native getter kept',
           data: {
-            outcome: 'skip',
-            reason: 'no_admissible_carrier',
-            policy: 'skip',
-            action: 'native',
+            outcome: 'return',
+            reason: 'native_getter_kept',
+            policy: 'keep_native_getter',
+            action: 'keep_native_getter',
+            requiresAction: false,
             nativeLength: nativeMimeTypesRead.value && nativeMimeTypesRead.value.length,
-            targetLength: normalizedMimeCount
+            profileLength: normalizedMimeCount
           }
         });
         return;

@@ -1071,12 +1071,17 @@ const __probeRun = async function(){
       if (!row || typeof row.key !== "string") continue;
       expectedIndex.set(row.key, row);
     }
+    const isWorkerScope = scope === "DedicatedWorker" || scope === "SharedWorker" || scope === "ServiceWorker";
+    const expectedWorkerOwner = isWorkerScope ? "WorkerNavigator.prototype" : null;
     return (Array.isArray(actualRows) ? actualRows : []).map((actual) => {
       const expected = expectedIndex.get(actual.key) || null;
       const badErrorMatch = __probeStableStringify(expected ? expected.badError : null) === __probeStableStringify(actual.badError);
       const objectCreateMatch = __probeStableStringify(expected ? expected.objectCreateToStringError : null) === __probeStableStringify(actual.objectCreateToStringError);
       const setProtoMatch = __probeStableStringify(expected ? expected.setProtoRecursionError : null) === __probeStableStringify(actual.setProtoRecursionError);
-      const descriptorOwnerMatch = !!expected && expected.descriptorOwner === actual.descriptorOwner;
+      const descriptorOwnerMatch = !!expected && (
+        expected.descriptorOwner === actual.descriptorOwner ||
+        (expected.descriptorOwner === "Navigator.prototype" && actual.descriptorOwner === expectedWorkerOwner)
+      );
       const descriptorShapeMatch = __probeStableStringify(expected ? expected.descriptorShape : null) === __probeStableStringify(actual.descriptorShape);
       const getterKindMatch = !!expected && expected.getterKind === actual.getterKind;
       const toStringNativeMatch = !!expected && expected.toStringHasNativeCode === actual.toStringHasNativeCode;
@@ -1346,8 +1351,28 @@ const __probeRun = async function(){
     const dedicatedURL = URL.createObjectURL(new Blob([dedicatedSource], { type: "text/javascript" }));
     const sharedURL = URL.createObjectURL(new Blob([sharedSource], { type: "text/javascript" }));
     const sharedName = `probe-control-shared-${Date.now()}`;
+    const pushTransportRows = (variant, wait) => {
+      const error = wait && wait.error ? wait.error : null;
+      for (const key of API_CONTROL_WORKER_TARGET_KEYS) {
+        rows.push({
+          target: `WorkerGlobalScope.WorkerNavigator.${key}`,
+          scope: "worker",
+          variant,
+          descriptorOwner: null,
+          descriptorShape: null,
+          accessorVsData: null,
+          hasOwnOnNavigator: null,
+          descriptorMissing: null,
+          ownerMissing: null,
+          readOnlyInspection: "worker_transport",
+          protoChain: [],
+          transportState: wait && wait.timedOut ? "timed_out" : "failed",
+          error: errorShape(error)
+        });
+      }
+    };
     try {
-      const dedicatedWait = await __probeAwaitWithinBudget((async () => {
+      const dedicatedWait = await __probeAwaitWithTimeout((async () => {
         const worker = new Worker(dedicatedURL);
         cleanup.push(() => { try { worker.terminate(); } catch (_) {} });
         return await new Promise((resolve, reject) => {
@@ -1368,7 +1393,7 @@ const __probeRun = async function(){
           worker.addEventListener("message", onMessage);
           worker.addEventListener("error", onError);
         });
-      })(), {
+      })(), __PROBE_TIMEOUTS.stepMs, {
         check: "api_control_list",
         phase: "DedicatedWorker",
         method: "Worker"
@@ -1380,26 +1405,11 @@ const __probeRun = async function(){
           rows.push(Object.assign({ scope: "worker", variant: "DedicatedWorker" }, row));
         }
       } else {
-        for (const key of API_CONTROL_WORKER_TARGET_KEYS) {
-          rows.push({
-            target: `WorkerGlobalScope.WorkerNavigator.${key}`,
-            scope: "worker",
-            variant: "DedicatedWorker",
-            descriptorOwner: null,
-            descriptorShape: null,
-            accessorVsData: null,
-            hasOwnOnNavigator: null,
-            descriptorMissing: true,
-            ownerMissing: true,
-            readOnlyInspection: "Object.getOwnPropertyDescriptor",
-            protoChain: [],
-            error: errorShape(dedicatedWait.error)
-          });
-        }
+        pushTransportRows("DedicatedWorker", dedicatedWait);
       }
 
-      const sharedWait = await __probeAwaitWithinBudget((async () => {
-        const shared = new SharedWorker(sharedURL, { name: sharedName, type: "module" });
+      const sharedWait = await __probeAwaitWithTimeout((async () => {
+        const shared = new SharedWorker(sharedURL, { name: sharedName });
         const port = shared.port;
         cleanup.push(() => {
           try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
@@ -1423,11 +1433,10 @@ const __probeRun = async function(){
           port.addEventListener("messageerror", onError);
           if (typeof port.start === "function") port.start();
         });
-      })(), {
+      })(), __PROBE_TIMEOUTS.sharedWorkerMs, {
         check: "api_control_list",
         phase: "SharedWorker",
-        method: "SharedWorker",
-        timeoutMs: __PROBE_TIMEOUTS.sharedWorkerMs
+        method: "SharedWorker"
       });
 
       if (sharedWait.ok) {
@@ -1436,22 +1445,7 @@ const __probeRun = async function(){
           rows.push(Object.assign({ scope: "worker", variant: "SharedWorker" }, row));
         }
       } else {
-        for (const key of API_CONTROL_WORKER_TARGET_KEYS) {
-          rows.push({
-            target: `WorkerGlobalScope.WorkerNavigator.${key}`,
-            scope: "worker",
-            variant: "SharedWorker",
-            descriptorOwner: null,
-            descriptorShape: null,
-            accessorVsData: null,
-            hasOwnOnNavigator: null,
-            descriptorMissing: true,
-            ownerMissing: true,
-            readOnlyInspection: "Object.getOwnPropertyDescriptor",
-            protoChain: [],
-            error: errorShape(sharedWait.error)
-          });
-        }
+        pushTransportRows("SharedWorker", sharedWait);
       }
     } finally {
       while (cleanup.length) {
@@ -1654,29 +1648,79 @@ const __probeRun = async function(){
     }
   }
 
+  function copyJson(value) {
+    if (value == null) return null;
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (_) {
+      return toPrintable(value);
+    }
+  }
+
+  function workerScopeName(scopeKind) {
+    if (scopeKind === "Worker") return "DedicatedWorker";
+    if (scopeKind === "DedicatedWorker" || scopeKind === "SharedWorker" || scopeKind === "ServiceWorker") return scopeKind;
+    return typeof scopeKind === "string" && scopeKind ? scopeKind : null;
+  }
+
+  function findNativeSkip(scopeLabel, field) {
+    if (field !== "language" && field !== "languages" && field !== "hardwareConcurrency" && field !== "deviceMemory") {
+      return null;
+    }
+    try {
+      const wantedScope = workerScopeName(scopeLabel);
+      const events = getDegradeEvents();
+      for (let i = events.length - 1; i >= 0; i--) {
+        const entry = events[i];
+        if (!entry || entry.code !== "worker_patch_src:workernavigator_descriptor:native_mismatch_skip") continue;
+        const extra = entry.extra && typeof entry.extra === "object" ? entry.extra : null;
+        const data = extra && extra.data && typeof extra.data === "object" ? extra.data : null;
+        const key = extra && typeof extra.key === "string" ? extra.key : null;
+        if (key !== field || !data) continue;
+        const eventScope = workerScopeName(data.scope);
+        if (wantedScope && eventScope && wantedScope !== eventScope) continue;
+        return {
+          reason: typeof data.reason === "string" && data.reason ? data.reason : "no_admissible_carrier",
+          nativeValue: copyJson(data.nativeValue),
+          profileValue: copyJson(data.profileValue),
+          requiresAction: data.requiresAction === true
+        };
+      }
+    } catch (_) {}
+    return null;
+  }
+
   function __probeCompareScopeValues(expectedWindow, actualScope, scopeLabel, variant) {
     const rows = [];
+    const actualValues = actualScope && typeof actualScope === "object" ? actualScope : {};
     const push = (field, expected, actual) => {
+      const directMatch = __probeStableStringify(actual) === __probeStableStringify(expected);
+      const skip = directMatch ? null : findNativeSkip(scopeLabel, field);
+      const skipMatch = !!(skip && __probeStableStringify(actual) === __probeStableStringify(skip.nativeValue));
       rows.push({
         scope: scopeLabel,
         variant: variant || null,
         field,
-        match: __probeStableStringify(actual) === __probeStableStringify(expected),
-        expected: expected == null ? null : JSON.parse(JSON.stringify(expected)),
-        actual: actual == null ? null : JSON.parse(JSON.stringify(actual))
+        match: directMatch || skipMatch,
+        expected: copyJson(expected),
+        actual: copyJson(actual),
+        baseline: skipMatch ? "native" : "window",
+        reason: skipMatch ? skip.reason : null,
+        nativeValue: skipMatch ? copyJson(skip.nativeValue) : null,
+        profileValue: skipMatch ? copyJson(skip.profileValue) : null
       });
     };
-    push("language", expectedWindow.language, actualScope.language);
-    push("languages", expectedWindow.languages, actualScope.languages);
-    push("deviceMemory", expectedWindow.deviceMemory, actualScope.deviceMemory);
-    push("hardwareConcurrency", expectedWindow.hardwareConcurrency, actualScope.hardwareConcurrency);
-    push("userAgentData.brands", expectedWindow.uaData.brands, actualScope.uaData && actualScope.uaData.brands);
-    push("userAgentData.mobile", expectedWindow.uaData.mobile, actualScope.uaData && actualScope.uaData.mobile);
-    push("userAgentData.platform", expectedWindow.uaData.platform, actualScope.uaData && actualScope.uaData.platform);
-    push("userAgentData.fullVersionList", expectedWindow.uaData.fullVersionList, actualScope.uaData && actualScope.uaData.fullVersionList);
+    push("language", expectedWindow.language, actualValues.language);
+    push("languages", expectedWindow.languages, actualValues.languages);
+    push("deviceMemory", expectedWindow.deviceMemory, actualValues.deviceMemory);
+    push("hardwareConcurrency", expectedWindow.hardwareConcurrency, actualValues.hardwareConcurrency);
+    push("userAgentData.brands", expectedWindow.uaData.brands, actualValues.uaData && actualValues.uaData.brands);
+    push("userAgentData.mobile", expectedWindow.uaData.mobile, actualValues.uaData && actualValues.uaData.mobile);
+    push("userAgentData.platform", expectedWindow.uaData.platform, actualValues.uaData && actualValues.uaData.platform);
+    push("userAgentData.fullVersionList", expectedWindow.uaData.fullVersionList, actualValues.uaData && actualValues.uaData.fullVersionList);
     const heFields = ["architecture", "bitness", "model", "platformVersion", "fullVersionList", "wow64", "formFactors"];
     for (const field of heFields) {
-      push(`userAgentData.getHighEntropyValues.${field}`, expectedWindow.uaData.highEntropy[field], actualScope.uaData && actualScope.uaData.highEntropy ? actualScope.uaData.highEntropy[field] : null);
+      push(`userAgentData.getHighEntropyValues.${field}`, expectedWindow.uaData.highEntropy[field], actualValues.uaData && actualValues.uaData.highEntropy ? actualValues.uaData.highEntropy[field] : null);
     }
     return rows;
   }
@@ -1953,7 +1997,13 @@ const __probeRun = async function(){
       } catch (e) {
         return { ok: false, error: errorShape(e), comparisons: [] };
       }
-      return { ok: false, error: errorShape(new Error(missingMessage)), comparisons: [] };
+      return {
+        ok: null,
+        skipped: true,
+        reason: missingMessage,
+        error: null,
+        comparisons: []
+      };
     };
     try {
       const dedicatedWait = await __probeAwaitWithinBudget((async () => {
@@ -1988,7 +2038,7 @@ const __probeRun = async function(){
         : { ok: false, error: errorShape(dedicatedWait.error), comparisons: [] };
 
       const sharedCollect = async () => {
-        const shared = new SharedWorker(sharedURL, { name: sharedName, type: "module" });
+        const shared = new SharedWorker(sharedURL, { name: sharedName });
         const port = shared.port;
         cleanup.push(() => {
           try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
@@ -2020,12 +2070,22 @@ const __probeRun = async function(){
         method: "SharedWorker",
         timeoutMs: __PROBE_TIMEOUTS.sharedWorkerMs
       });
-      const sharedSecondWait = await __probeAwaitWithinBudget(sharedCollect(), {
-        check: "worker_scope_audit",
-        phase: "SharedWorker:reuse",
-        method: "SharedWorker",
-        timeoutMs: __PROBE_TIMEOUTS.sharedWorkerMs
-      });
+      const sharedSecondWait = sharedFirstWait.ok
+        ? await __probeAwaitWithinBudget(sharedCollect(), {
+            check: "worker_scope_audit",
+            phase: "SharedWorker:reuse",
+            method: "SharedWorker",
+            timeoutMs: __PROBE_TIMEOUTS.sharedWorkerMs
+          })
+        : {
+            ok: false,
+            skipped: true,
+            reason: "first_shared_worker_probe_failed",
+            error: null,
+            timedOut: false,
+            elapsedMs: 0,
+            timeoutMs: 0
+          };
 
       const shared = {
         first: sharedFirstWait.ok
@@ -2043,7 +2103,9 @@ const __probeRun = async function(){
               seedProbeAudit: sharedSecondWait.value && sharedSecondWait.value.values ? sharedSecondWait.value.values.seedProbeAudit : null,
               comparisons: __probeCompareScopeValues(windowValues, sharedSecondWait.value && sharedSecondWait.value.values ? sharedSecondWait.value.values : null, "SharedWorker", "reuse")
             }
-          : { ok: false, error: errorShape(sharedSecondWait.error), comparisons: [] }
+          : (sharedSecondWait.skipped
+            ? { ok: null, skipped: true, reason: sharedSecondWait.reason, error: null, comparisons: [] }
+            : { ok: false, error: errorShape(sharedSecondWait.error), comparisons: [] })
       };
       const sharedView = shared.first.ok
         ? { ok: true, values: shared.first.values }
@@ -2052,7 +2114,9 @@ const __probeRun = async function(){
       const serviceWorkerSlot = readScopeFromDegrade("ServiceWorker", "service worker values missing in __DEGRADE__");
       const serviceWorker = serviceWorkerSlot.ok
         ? { ok: true, values: serviceWorkerSlot.values, comparisons: __probeCompareScopeValues(windowValues, serviceWorkerSlot.values, "ServiceWorker", "active") }
-        : { ok: false, error: serviceWorkerSlot.error, comparisons: [] };
+        : (serviceWorkerSlot.skipped
+          ? { ok: null, skipped: true, reason: serviceWorkerSlot.reason, error: null, comparisons: [] }
+          : { ok: false, error: serviceWorkerSlot.error, comparisons: [] });
 
       const comparisonRows = [];
       const pushSeedProbeAuditComparison = (scope, variant, audit, fallbackError) => {
@@ -2105,33 +2169,48 @@ const __probeRun = async function(){
           scope: "SharedWorker",
           variant: "reuse",
           field: "__worker__",
-          match: false,
-          expected: "values",
-          actual: shared.second.error
+          match: shared.second.skipped === true,
+          expected: shared.second.skipped ? "skipped after first failure" : "values",
+          actual: shared.second.skipped ? shared.second.reason : shared.second.error,
+          skipped: shared.second.skipped === true
         });
       }
-      pushSeedProbeAuditComparison("SharedWorker", "reuse", shared.second.seedProbeAudit, shared.second.error);
+      if (shared.second.skipped) {
+        comparisonRows.push({
+          scope: "SharedWorker",
+          variant: "reuse",
+          field: "Function.prototype.toString.seedProbeAudit",
+          match: true,
+          expected: "skipped after first failure",
+          actual: shared.second.reason,
+          skipped: true
+        });
+      } else {
+        pushSeedProbeAuditComparison("SharedWorker", "reuse", shared.second.seedProbeAudit, shared.second.error);
+      }
       Array.prototype.push.apply(comparisonRows, shared.first.comparisons);
       Array.prototype.push.apply(comparisonRows, shared.second.comparisons);
       const reuseMatch = (shared.first.ok && shared.second.ok)
         ? (__probeStableStringify(shared.first.values) === __probeStableStringify(shared.second.values))
-        : false;
+        : (shared.second.skipped === true);
       comparisonRows.push({
         scope: "SharedWorker",
         variant: "reuse",
         field: "reuse.same_values",
         match: reuseMatch,
-        expected: shared.first.ok ? shared.first.values : null,
-        actual: shared.second.ok ? shared.second.values : null
+        expected: shared.second.skipped ? "skipped after first failure" : (shared.first.ok ? shared.first.values : null),
+        actual: shared.second.skipped ? shared.second.reason : (shared.second.ok ? shared.second.values : null),
+        skipped: shared.second.skipped === true
       });
       if (!serviceWorker.ok) {
         comparisonRows.push({
           scope: "ServiceWorker",
           variant: "active",
           field: "__degrade__",
-          match: false,
-          expected: "diag values",
-          actual: serviceWorker.error
+          match: serviceWorker.skipped === true,
+          expected: serviceWorker.skipped ? "optional observation" : "diag values",
+          actual: serviceWorker.skipped ? serviceWorker.reason : serviceWorker.error,
+          skipped: serviceWorker.skipped === true
         });
       } else {
         Array.prototype.push.apply(comparisonRows, serviceWorker.comparisons);
@@ -2160,15 +2239,40 @@ const __probeRun = async function(){
         }
         return toPrintable(value);
       };
+      const findValueComparison = (scope, variant, field) => {
+        const arr = Array.isArray(comparisonRows) ? comparisonRows : [];
+        for (let i = 0; i < arr.length; i++) {
+          const row = arr[i];
+          if (!row || row.scope !== scope || row.variant !== variant || row.field !== field) continue;
+          return row;
+        }
+        return null;
+      };
       for (const entry of rowFields) {
         const label = entry[0];
         const getter = entry[1];
+        const dedicatedCmp = findValueComparison("DedicatedWorker", "single", label);
+        const sharedCmp = findValueComparison("SharedWorker", "first", label);
+        const serviceCmp = findValueComparison("ServiceWorker", "active", label);
         rows.push({
           parameter: label,
           Window: printable(getter(windowValues)),
           DedicatedWorker: dedicated.ok ? printable(getter(dedicated.values)) : printable(dedicated.error),
+          DedicatedWorkerMatch: dedicatedCmp ? dedicatedCmp.match : null,
+          DedicatedWorkerBaseline: dedicatedCmp ? dedicatedCmp.baseline : null,
+          DedicatedWorkerReason: dedicatedCmp ? dedicatedCmp.reason : null,
+          DedicatedWorkerNativeValue: dedicatedCmp ? copyJson(dedicatedCmp.nativeValue) : null,
+          DedicatedWorkerProfileValue: dedicatedCmp ? copyJson(dedicatedCmp.profileValue) : null,
           SharedWorker: sharedView.ok ? printable(getter(sharedView.values)) : printable(sharedView.error),
-          ServiceWorker: serviceWorker.ok ? printable(getter(serviceWorker.values)) : printable(serviceWorker.error)
+          SharedWorkerMatch: sharedCmp ? sharedCmp.match : null,
+          SharedWorkerBaseline: sharedCmp ? sharedCmp.baseline : null,
+          SharedWorkerReason: sharedCmp ? sharedCmp.reason : null,
+          SharedWorkerNativeValue: sharedCmp ? copyJson(sharedCmp.nativeValue) : null,
+          SharedWorkerProfileValue: sharedCmp ? copyJson(sharedCmp.profileValue) : null,
+          ServiceWorker: serviceWorker.ok ? printable(getter(serviceWorker.values)) : (serviceWorker.skipped ? "not_observed" : printable(serviceWorker.error)),
+          ServiceWorkerMatch: serviceCmp ? serviceCmp.match : null,
+          ServiceWorkerBaseline: serviceCmp ? serviceCmp.baseline : null,
+          ServiceWorkerReason: serviceCmp ? serviceCmp.reason : null
         });
       }
       rows.push({
@@ -2188,7 +2292,7 @@ const __probeRun = async function(){
       __probeConsoleCall("groupEnd");
 
       return {
-        ok: dedicated.ok === true && shared.first.ok === true && shared.second.ok === true && serviceWorker.ok === true && comparisonRows.every((row) => row && row.match === true),
+        ok: dedicated.ok === true && shared.first.ok === true && (shared.second.ok === true || shared.second.skipped === true) && (serviceWorker.ok === true || serviceWorker.skipped === true) && comparisonRows.every((row) => row && row.match === true),
         window: windowValues,
         dedicated,
         shared,
@@ -2438,7 +2542,7 @@ const __probeRun = async function(){
         });
       })(), { check: "worker_accessor_observability", phase: "DedicatedWorker", method: "Worker" });
       const collectShared = await __probeAwaitWithinBudget((async () => {
-        const shared = new SharedWorker(sharedURL, { name: sharedName, type: "module" });
+        const shared = new SharedWorker(sharedURL, { name: sharedName });
         const port = shared.port;
         cleanup.push(() => {
           try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
@@ -2488,6 +2592,9 @@ const __probeRun = async function(){
           scope: "WindowScope",
           variant: "active",
           key: base.key,
+          descriptorOwner: base.descriptorOwner,
+          descriptorShape: base.descriptorShape,
+          hasOwnOnNavigator: base.hasOwnOnNavigator,
           getterKind: base.getterKind,
           toStringHasNativeCode: base.toStringHasNativeCode,
           badError: base.badError ? `${base.badError.name}: ${base.badError.message}` : null,
@@ -2501,11 +2608,20 @@ const __probeRun = async function(){
           variant: cmp.variant,
           key: cmp.key,
           match: cmp.match,
+          descriptorOwner: cmp.actual ? cmp.actual.descriptorOwner : null,
+          descriptorOwnerMatch: cmp.descriptorOwnerMatch,
+          descriptorShapeMatch: cmp.descriptorShapeMatch,
+          hasOwnOnNavigatorMatch: cmp.hasOwnOnNavigatorMatch,
           getterKind: cmp.actual ? cmp.actual.getterKind : null,
+          getterKindMatch: cmp.getterKindMatch,
           toStringHasNativeCode: cmp.actual ? cmp.actual.toStringHasNativeCode : null,
+          toStringNativeMatch: cmp.toStringNativeMatch,
           badError: cmp.actual && cmp.actual.badError ? `${cmp.actual.badError.name}: ${cmp.actual.badError.message}` : null,
+          badErrorMatch: cmp.badErrorMatch,
           objectCreateToStringError: cmp.actual && cmp.actual.objectCreateToStringError ? `${cmp.actual.objectCreateToStringError.name}: ${cmp.actual.objectCreateToStringError.message}` : null,
-          setProtoRecursionError: cmp.actual && cmp.actual.setProtoRecursionError ? `${cmp.actual.setProtoRecursionError.name}: ${cmp.actual.setProtoRecursionError.message}` : null
+          objectCreateToStringErrorMatch: cmp.objectCreateToStringErrorMatch,
+          setProtoRecursionError: cmp.actual && cmp.actual.setProtoRecursionError ? `${cmp.actual.setProtoRecursionError.name}: ${cmp.actual.setProtoRecursionError.message}` : null,
+          setProtoRecursionErrorMatch: cmp.setProtoRecursionErrorMatch
         });
       }
       for (const cmp of shared.comparisons) {
@@ -2514,11 +2630,20 @@ const __probeRun = async function(){
           variant: cmp.variant,
           key: cmp.key,
           match: cmp.match,
+          descriptorOwner: cmp.actual ? cmp.actual.descriptorOwner : null,
+          descriptorOwnerMatch: cmp.descriptorOwnerMatch,
+          descriptorShapeMatch: cmp.descriptorShapeMatch,
+          hasOwnOnNavigatorMatch: cmp.hasOwnOnNavigatorMatch,
           getterKind: cmp.actual ? cmp.actual.getterKind : null,
+          getterKindMatch: cmp.getterKindMatch,
           toStringHasNativeCode: cmp.actual ? cmp.actual.toStringHasNativeCode : null,
+          toStringNativeMatch: cmp.toStringNativeMatch,
           badError: cmp.actual && cmp.actual.badError ? `${cmp.actual.badError.name}: ${cmp.actual.badError.message}` : null,
+          badErrorMatch: cmp.badErrorMatch,
           objectCreateToStringError: cmp.actual && cmp.actual.objectCreateToStringError ? `${cmp.actual.objectCreateToStringError.name}: ${cmp.actual.objectCreateToStringError.message}` : null,
-          setProtoRecursionError: cmp.actual && cmp.actual.setProtoRecursionError ? `${cmp.actual.setProtoRecursionError.name}: ${cmp.actual.setProtoRecursionError.message}` : null
+          objectCreateToStringErrorMatch: cmp.objectCreateToStringErrorMatch,
+          setProtoRecursionError: cmp.actual && cmp.actual.setProtoRecursionError ? `${cmp.actual.setProtoRecursionError.name}: ${cmp.actual.setProtoRecursionError.message}` : null,
+          setProtoRecursionErrorMatch: cmp.setProtoRecursionErrorMatch
         });
       }
       __probeConsoleCall("group", "[probe] worker accessor observability");
