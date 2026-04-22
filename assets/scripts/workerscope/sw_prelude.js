@@ -604,36 +604,35 @@
     let swLanguagesValue = Array.isArray(langs) ? langs.slice() : [];
     let swHardwareConcurrencyValue = Number(hc);
     let swDeviceMemoryValue = Number(dm);
-    let swPatchLanguage = true;
-    let swPatchLanguages = true;
     let swPatchHardwareConcurrency = true;
 
     try {
       const nativeLanguageRead = __readNativeWorkerNavigatorValue('language');
       if (typeof nativeLanguageRead.value === 'string' && nativeLanguageRead.value.trim() !== '') {
         if (nativeLanguageRead.value === primary) {
-          swPatchLanguage = false;
-          __swDiag('info', 'sw_prelude:language_native_skip', {
+          __swDiag('info', 'sw_prelude:language_getter_value_match', {
             stage: 'preflight',
             key: 'language',
             message: 'service worker language already matches native getter',
             type: 'browser structure missing data',
             data: {
               outcome: 'return',
-              reason: 'native_skip',
+              reason: 'getter_value_match',
               nativeValue: nativeLanguageRead.value,
               profileValue: primary
             }
           }, null);
         } else {
-          __swDiag('warn', 'sw_prelude:language_native_profile_mismatch_patch_accessor', {
+          __swDiag('warn', 'sw_prelude:language_getter_value_mismatch', {
             stage: 'preflight',
             key: 'language',
-            message: 'service worker language differs from profile; patch accessor',
+            message: 'service worker language native getter value differs from profile value; native getter kept',
             type: 'browser structure missing data',
             data: {
-              outcome: 'patch',
-              reason: 'native_profile_mismatch_patch_accessor',
+              outcome: 'skip',
+              reason: 'getter_value_mismatch',
+              policy: 'skip',
+              action: 'keep_native_getter',
               nativeValue: nativeLanguageRead.value,
               profileValue: primary
             }
@@ -643,7 +642,7 @@
         __swDiag('warn', 'sw_prelude:language_native_invalid', {
           stage: 'preflight',
           key: 'language',
-          message: 'service worker native language is invalid; keep mirror seed only',
+          message: 'service worker native language is invalid; native getter kept',
           type: 'browser structure missing data',
           data: {
             outcome: 'skip',
@@ -657,7 +656,7 @@
       __swDiag('warn', 'sw_prelude:language_native_read_failed', {
         stage: 'preflight',
         key: 'language',
-        message: 'service worker native language read failed; keep mirror seed only',
+        message: 'service worker native language read failed; native getter kept',
         type: 'browser structure missing data',
         data: {
           outcome: 'skip',
@@ -671,15 +670,14 @@
       const nativeLanguagesRead = __readNativeWorkerNavigatorValue('languages');
       if (__isNonEmptyStringArray(nativeLanguagesRead.value)) {
         if (__stringArraysEqual(nativeLanguagesRead.value, Array.isArray(langs) ? langs : [])) {
-          swPatchLanguages = false;
-          __swDiag('info', 'sw_prelude:languages_native_skip', {
+          __swDiag('info', 'sw_prelude:languages_getter_value_match', {
             stage: 'preflight',
             key: 'languages',
             message: 'service worker languages already matches native getter',
             type: 'browser structure missing data',
             data: {
               outcome: 'return',
-              reason: 'native_skip',
+              reason: 'getter_value_match',
               nativeValue: nativeLanguagesRead.value.slice(),
               profileValue: Array.isArray(langs) ? langs.slice() : langs
             }
@@ -688,7 +686,6 @@
           const nativeCanonical = __canonicalizeLanguageListForCompare(nativeLanguagesRead.value);
           const profileCanonical = __canonicalizeLanguageListForCompare(Array.isArray(langs) ? langs : []);
           if (nativeCanonical && profileCanonical && __stringArraysEqual(nativeCanonical, profileCanonical)) {
-            swPatchLanguages = false;
             __swDiag('info', 'sw_prelude:languages_profile_languages_canonicalized', {
               stage: 'preflight',
               key: 'languages',
@@ -704,14 +701,16 @@
               }
             }, null);
           } else {
-            __swDiag('warn', 'sw_prelude:languages_native_profile_mismatch_patch_accessor', {
+            __swDiag('warn', 'sw_prelude:languages_getter_value_mismatch', {
               stage: 'preflight',
               key: 'languages',
-              message: 'service worker languages differ from profile; patch accessor',
+              message: 'service worker languages native getter value differs from profile value; native getter kept',
               type: 'browser structure missing data',
               data: {
-                outcome: 'patch',
-                reason: 'native_profile_mismatch_patch_accessor',
+                outcome: 'skip',
+                reason: 'getter_value_mismatch',
+                policy: 'skip',
+                action: 'keep_native_getter',
                 nativeValue: nativeLanguagesRead.value.slice(),
                 profileValue: Array.isArray(langs) ? langs.slice() : langs
               }
@@ -722,7 +721,7 @@
         __swDiag('warn', 'sw_prelude:languages_native_invalid', {
           stage: 'preflight',
           key: 'languages',
-          message: 'service worker native languages are invalid; keep mirror seed only',
+          message: 'service worker native languages are invalid; native getter kept',
           type: 'browser structure missing data',
           data: {
             outcome: 'skip',
@@ -736,7 +735,7 @@
       __swDiag('warn', 'sw_prelude:languages_native_read_failed', {
         stage: 'preflight',
         key: 'languages',
-        message: 'service worker native languages read failed; keep mirror seed only',
+        message: 'service worker native languages read failed; native getter kept',
         type: 'browser structure missing data',
         data: {
           outcome: 'skip',
@@ -1275,28 +1274,20 @@
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'native_skip' }
     }, null);
-    if (swPatchLanguage) {
-      applyServiceWorkerNavigatorAccessorTarget('language', function() { return swPrimaryValue; }, 'sw_prelude:language');
-    } else {
-      __swDiag('info', 'sw_prelude:language_accessor_native_skip', {
-        stage: 'apply',
-        key: 'language',
-        message: 'service worker language accessor left native',
-        type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'native_skip', value: swPrimaryValue }
-      }, null);
-    }
-    if (swPatchLanguages) {
-      applyServiceWorkerNavigatorAccessorTarget('languages', function() { return swLanguagesValue.slice(); }, 'sw_prelude:languages');
-    } else {
-      __swDiag('info', 'sw_prelude:languages_accessor_native_skip', {
-        stage: 'apply',
-        key: 'languages',
-        message: 'service worker languages accessor left native',
-        type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'native_skip', value: swLanguagesValue.slice() }
-      }, null);
-    }
+    __swDiag('info', 'sw_prelude:language_accessor_native_skip', {
+      stage: 'apply',
+      key: 'language',
+      message: 'service worker language accessor left native',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'native_skip', value: swPrimaryValue }
+    }, null);
+    __swDiag('info', 'sw_prelude:languages_accessor_native_skip', {
+      stage: 'apply',
+      key: 'languages',
+      message: 'service worker languages accessor left native',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'native_skip', value: swLanguagesValue.slice() }
+    }, null);
     if (swPatchHardwareConcurrency) {
       applyServiceWorkerNavigatorAccessorTarget('hardwareConcurrency', function() { return Number(swHardwareConcurrencyValue); }, 'sw_prelude:hardwareConcurrency');
     } else {

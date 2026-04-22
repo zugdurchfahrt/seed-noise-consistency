@@ -286,7 +286,7 @@ def _stop_injectors_atexit():
 atexit.register(_stop_injectors_atexit)
 
 
-def _build_sw_prelude(sw_env: dict) -> str:
+def _build_sw_env_prelude(sw_env: dict) -> str:
     if not isinstance(sw_env, dict) or not sw_env:
         raise ValueError("SW inject: env missing")
     meta = sw_env.get("meta")
@@ -300,16 +300,7 @@ def _build_sw_prelude(sw_env: dict) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"SW inject: bad webgl.{key}")
 
-    prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
-    reflect_path = SCRIPTS_WORKERSCOPE / "set_reflect.js"
-    if not prelude_path.exists():
-        raise FileNotFoundError(prelude_path)
-    if not reflect_path.exists():
-        raise FileNotFoundError(reflect_path)
-
-    sw_prelude_js = prelude_path.read_text("utf-8")
-    sw_reflect_js = reflect_path.read_text("utf-8")
-    sw_env_js = f"""
+    return f"""
 (() => {{
   'use strict';
   const G = globalThis;
@@ -364,8 +355,17 @@ def _build_sw_prelude(sw_env: dict) -> str:
   defineHidden(bootstrapRoot, '__SW_ENV__', nextEnv);
 }})();
 //# sourceURL=sw_prelude_env.js
-"""
-    return (sw_env_js + "\n" + sw_reflect_js + "\n" + sw_prelude_js).strip()
+""".strip()
+
+
+def _build_sw_prelude(sw_env: dict) -> str:
+    if not isinstance(sw_env, dict) or not sw_env:
+        raise ValueError("SW inject: env missing")
+    prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
+    reflect_path = SCRIPTS_WORKERSCOPE / "set_reflect.js"
+    sw_prelude_js = prelude_path.read_text("utf-8")
+    sw_reflect_js = reflect_path.read_text("utf-8")
+    return (sw_reflect_js + "\n" + sw_prelude_js).strip()
 
 
 def _build_worker_seed_prelude(global_seed: str) -> str:
@@ -499,8 +499,42 @@ def run():
 
     msg_id = {"v": 0}
     injected = set()   # targetId set
+    sw_env_prelude = None
     sw_prelude = None
+    sw_expected = None
     if do_prelude:
+        if not isinstance(SW_ENV, dict):
+            _RUNNING = False
+            raise RuntimeError("SW inject: SW_ENV missing")
+        sw_expected = {
+            "language": SW_ENV.get("primary"),
+            "languages": list(SW_ENV.get("langs") or []),
+            "hardwareConcurrency": int(SW_ENV.get("hc")),
+            "deviceMemory": float(SW_ENV.get("dm")),
+            "uad": SW_ENV.get("meta"),
+        }
+        if (
+            isinstance(sw_expected["uad"], dict)
+            and sw_expected["uad"].get("language") is not None
+            and sw_expected["uad"].get("language") != sw_expected["language"]
+        ):
+            _RUNNING = False
+            raise RuntimeError("SW inject: SW_ENV language/meta.language mismatch")
+        if (
+            isinstance(sw_expected["uad"], dict)
+            and sw_expected["uad"].get("languages") is not None
+            and list(sw_expected["uad"].get("languages") or []) != sw_expected["languages"]
+        ):
+            _RUNNING = False
+            raise RuntimeError("SW inject: SW_ENV languages/meta.languages mismatch")
+        if (
+            isinstance(sw_expected["uad"], dict)
+            and sw_expected["uad"].get("hardwareConcurrency") is not None
+            and int(sw_expected["uad"].get("hardwareConcurrency")) != int(sw_expected["hardwareConcurrency"])
+        ):
+            _RUNNING = False
+            raise RuntimeError("SW inject: SW_ENV hardwareConcurrency/meta.hardwareConcurrency mismatch")
+        sw_env_prelude = _build_sw_env_prelude(SW_ENV)
         sw_prelude = _build_sw_prelude(SW_ENV)
 
     # Post-inject sanity probe (read back values in the SW context).
@@ -593,7 +627,9 @@ def run():
             try:
                 if method == "Runtime.evaluate":
                     expr = params.get("expression")
-                    if expr == sw_prelude:
+                    if expr == sw_env_prelude:
+                        tag = "Runtime.evaluate:sw_env_prelude"
+                    elif expr == sw_prelude:
                         tag = "Runtime.evaluate:sw_prelude"
                     elif expr == sanity_expr:
                         tag = "Runtime.evaluate:sw_sanity"
@@ -641,7 +677,7 @@ def run():
                 return
             # Session-level response error handling (flatten protocol).
             if sid and msg.get("error"):
-                if tag in ("Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
+                if tag in ("Runtime.evaluate:sw_env_prelude", "Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
                     _resume_sw_session(ws, sid, "prelude_error")
                 if tag == "Runtime.addBinding:sw_diag":
                     logger.warning(
@@ -654,14 +690,16 @@ def run():
                 _fatal(ws, f"session cmd failed: {tag or 'unknown'}", msg.get("error"))
                 return
             # Runtime.evaluate may include exceptionDetails inside result.
-            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
+            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_env_prelude", "Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
                 res = msg.get("result") or {}
                 exc = res.get("exceptionDetails")
                 if exc:
-                    if tag in ("Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
+                    if tag in ("Runtime.evaluate:sw_env_prelude", "Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
                         _resume_sw_session(ws, sid, "prelude_exception")
                     _fatal(ws, "sw prelude Runtime.evaluate exceptionDetails", exc)
                     return
+                if tag == "Runtime.evaluate:sw_env_prelude":
+                    logger.info("SW inject: env prelude applied target=%r", session_targets.get(sid))
                 if tag == "Runtime.evaluate:sw_prelude":
                     logger.info("SW inject: prelude applied (UAD branch)")
                     if not sanity_expr:
@@ -669,13 +707,7 @@ def run():
                 if tag == "Runtime.evaluate:sw_sanity":
                     try:
                         out = (res.get("result") or {}).get("value")
-                        exp = {
-                            "language": SW_ENV.get("primary") if isinstance(SW_ENV, dict) else SW_PRIMARY,
-                            "languages": SW_ENV.get("langs") if isinstance(SW_ENV, dict) else SW_LANGS,
-                            "hardwareConcurrency": SW_ENV.get("hc") if isinstance(SW_ENV, dict) else SW_HC,
-                            "deviceMemory": SW_ENV.get("dm") if isinstance(SW_ENV, dict) else SW_DM,
-                            "uad": SW_ENV.get("meta") if isinstance(SW_ENV, dict) else SW_META,
-                        }
+                        exp = sw_expected
                         if not isinstance(out, dict):
                             _resume_sw_session(ws, sid, "sanity_bad_result")
                             _fatal(ws, "sw sanity: bad result type", out)
@@ -699,16 +731,11 @@ def run():
                                 {"language": out.get("language"), "languages": got_languages},
                             )
                         if language_mismatch or (languages_exact_mismatch and not languages_duplicate_only):
-                            _resume_sw_session(ws, sid, "sanity_language_mismatch")
-                            _fatal(
-                                ws,
-                                "sw sanity: language mismatch",
-                                {
-                                    "expected": {"language": exp.get("language"), "languages": exp_languages},
-                                    "got": {"language": out.get("language"), "languages": got_languages},
-                                },
+                            logger.warning(
+                                "SW inject: language sanity native/profile mismatch; native getter kept expected=%s got=%s",
+                                {"language": exp.get("language"), "languages": exp_languages},
+                                {"language": out.get("language"), "languages": got_languages},
                             )
-                            return
                         if int(out.get("hardwareConcurrency") or 0) != int(exp["hardwareConcurrency"]):
                             logger.warning(
                                 "SW inject: hardwareConcurrency sanity mismatch; prefer native worker value expected=%s got=%s",
@@ -816,6 +843,10 @@ def run():
                 send_sess(ws, sessionId, "Runtime.enable")
                 send_sess(ws, sessionId, "Runtime.addBinding", {
                     "name": _SW_DIAG_BINDING
+                })
+                send_sess(ws, sessionId, "Runtime.evaluate", {
+                    "expression": sw_env_prelude,
+                    "awaitPromise": True
                 })
                 send_sess(ws, sessionId, "Runtime.evaluate", {
                     "expression": sw_prelude,
