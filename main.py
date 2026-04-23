@@ -221,6 +221,27 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
                 driver.execute_cdp_cmd("Fetch.continueRequest", {"requestId": rid})
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
 
+
+def apply_page_hardware_override(driver, hardware_concurrency_value):
+    try:
+        driver.execute_cdp_cmd(
+            "Emulation.setHardwareConcurrencyOverride",
+            {"hardwareConcurrency": int(hardware_concurrency_value)},
+        )
+        logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
+    except Exception as e:
+        logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
+
+
+def apply_page_locale_override(driver, language):
+    try:
+        driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
+        logger.info("Direct page-side locale override applied: %s", language)
+    except Exception as e:
+        logger.warning("Direct page-side locale override failed: %s", e)
+
+
+
 def build_bootstrap_device_metrics():
     width = 1366
     height = 768
@@ -337,21 +358,13 @@ def init_driver(
         # 3. Device Metrics (screen scales, including navigator.mobile)
         if device_metrics:
             driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
+    
+    apply_page_hardware_override(
+        driver,
+        hardware_concurrency_value=hardware_concurrency_value,
+    )
 
-    def apply_page_locale_and_hardware_overrides(driver, language, hardware_concurrency_value):
-        try:
-            driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
-            logger.info("Direct page-side locale override applied: %s", language)
-        except Exception as e:
-            logger.warning("Direct page-side locale override failed: %s", e)
-        try:
-            driver.execute_cdp_cmd(
-                "Emulation.setHardwareConcurrencyOverride",
-                {"hardwareConcurrency": int(hardware_concurrency_value)},
-            )
-            logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
-        except Exception as e:
-            logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
+
 
     setup_engine(
         driver,
@@ -364,17 +377,9 @@ def init_driver(
 
     )
 
-    apply_page_locale_and_hardware_overrides(
-        driver,
-        language=language,
-        hardware_concurrency_value=hardware_concurrency_value,
-    )
 
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
-      
-
-      
       
     cdp.enable_sw_env_inject(
         language=language,
@@ -388,9 +393,9 @@ def init_driver(
             "unmaskedVendor": profile["webgl_unmasked_vendor"],
             "unmaskedRenderer": profile["webgl_unmasked_renderer"],
         },
+        user_agent=user_agent,
+        navigator_platform=platform,
     )
-        
-      
       
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
     sw_thread.start()
@@ -725,12 +730,11 @@ def init_driver(
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, platform)
-    apply_page_locale_and_hardware_overrides(
+
+    apply_page_locale_override(
         driver,
         language=language,
-        hardware_concurrency_value=hardware_concurrency_value,
     )
-
     
     # Connect page_js (core + targets + wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
@@ -1264,6 +1268,13 @@ def main():
             global_seed,
         )
 
+        apply_page_hardware_override(
+            driver,
+            hardware_concurrency_value=hardware_concurrency_value,
+            )
+
+
+
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
             override_js = Path(SCRIPTS_PATCHES_NAV / "override_ua_data.js").read_text(encoding="utf-8")
@@ -1284,7 +1295,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

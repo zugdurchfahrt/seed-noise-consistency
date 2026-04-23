@@ -605,7 +605,6 @@
     let swHardwareConcurrencyValue = Number(hc);
     let swDeviceMemoryValue = Number(dm);
     let swPatchHardwareConcurrency = true;
-    let swHardwareConcurrencyNativeSkipReason = 'native_profile_mismatch_keep_native_getter';
 
     try {
       const nativeLanguageRead = __readNativeWorkerNavigatorValue('language');
@@ -771,7 +770,6 @@
       if (Number.isFinite(nativeHardwareConcurrency) && nativeHardwareConcurrency > 0) {
         if (Object.is(nativeHardwareConcurrency, Number(hc))) {
           swPatchHardwareConcurrency = false;
-          swHardwareConcurrencyNativeSkipReason = 'native_skip';
           __swDiag('info', 'sw_prelude:hardwareConcurrency_native_skip', {
             stage: 'preflight',
             key: 'hardwareConcurrency',
@@ -784,24 +782,8 @@
               profileValue: Number(hc)
             }
           }, null);
-        } else {
-          __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
-            stage: 'preflight',
-            key: 'hardwareConcurrency',
-            message: 'service worker hardwareConcurrency native/profile mismatch; native getter kept',
-            type: 'browser structure missing data',
-            data: {
-              outcome: 'skip',
-              reason: 'getter_value_mismatch',
-              policy: 'skip',
-              action: 'keep_native_getter',
-              nativeValue: nativeHardwareConcurrency,
-              profileValue: Number(hc)
-            }
-          }, null);
         }
       } else {
-        swHardwareConcurrencyNativeSkipReason = 'native_invalid';
         __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_invalid', {
           stage: 'preflight',
           key: 'hardwareConcurrency',
@@ -816,7 +798,6 @@
         }, null);
       }
     } catch (e) {
-      swHardwareConcurrencyNativeSkipReason = 'native_read_failed';
       __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_read_failed', {
         stage: 'preflight',
         key: 'hardwareConcurrency',
@@ -877,6 +858,13 @@
       delete uad[key];
       __applied.push({ obj: uad, key, hadOwn: true, prevDesc: ownDesc });
     }
+    __dropUadOwnIfConfigurable('brands');
+    __dropUadOwnIfConfigurable('mobile');
+    __dropUadOwnIfConfigurable('platform');
+    __dropUadOwnIfConfigurable('fullVersionList');
+    __dropUadOwnIfConfigurable('getHighEntropyValues');
+    __dropUadOwnIfConfigurable('toJSON');
+
     const chPlatform = meta.platform;
     if (typeof chPlatform !== 'string' || !chPlatform) {
       __fail('sw_prelude:uadata_platform_missing', {
@@ -1098,17 +1086,186 @@
       }
     }
 
-    __swDiag('info', 'sw_prelude:uadata_inner_native_skip', {
-      stage: 'apply',
-      key: 'userAgentData',
-      message: 'service worker NavigatorUAData inner descriptors left native',
-      type: 'browser structure missing data',
-      data: {
-        outcome: 'skip',
-        reason: 'native_skip',
-        keys: ['brands', 'mobile', 'platform', 'fullVersionList', 'getHighEntropyValues', 'toJSON']
+    function guardedUadGetter(key, value, sourceDesc) {
+      const origGet = sourceDesc && typeof sourceDesc.get === 'function' ? sourceDesc.get : null;
+      if (typeof origGet !== 'function') {
+        __fail('sw_prelude:uadata_native_accessor_getter_missing', {
+          stage: 'preflight',
+          key,
+          message: 'service worker uaData native accessor getter missing',
+          type: 'contract violation',
+          data: {
+            outcome: 'throw',
+            reason: 'uadata_native_accessor_getter_missing',
+            hasValue: !!(sourceDesc && Object.prototype.hasOwnProperty.call(sourceDesc, 'value')),
+            hasGetter: false
+          }
+        }, new Error('SW uaData ' + key + ' native accessor getter missing'));
       }
-    }, null);
+      const guardedGet = function guardedServiceWorkerUadAccessor() {
+        const recv = this;
+        if (isUadThis(recv)) return value;
+        if (typeof origGet === 'function') {
+          try {
+            return Reflect.apply(origGet, recv, []);
+          } catch (e) {
+            __reportNativeThrow('sw_prelude:illegal_invocation', key, 'service worker uaData illegal invocation', e);
+            throw e;
+          }
+        }
+      };
+      return __swWrapStrictAccessor(key, guardedGet, {
+        configurable: !!sourceDesc.configurable,
+        enumerable: !!sourceDesc.enumerable,
+        get: origGet,
+        set: undefined
+      }, function(recv) {
+        return isUadThis(recv);
+      }, {
+        name: 'get ' + key
+      });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(dBrands, 'value') && !dBrands.get && !dBrands.set) {
+      __trackDefineProperty(uadProto, 'brands', {
+        value: brandsValue,
+        writable: !!dBrands.writable,
+        configurable: !!dBrands.configurable,
+        enumerable: !!dBrands.enumerable
+      });
+    } else {
+      __trackDefineProperty(uadProto, 'brands', {
+        get: guardedUadGetter('brands', brandsValue, dBrands),
+        set: dBrands.set,
+        configurable: !!dBrands.configurable,
+        enumerable: !!dBrands.enumerable
+      });
+    }
+    if (Object.prototype.hasOwnProperty.call(dMobile, 'value') && !dMobile.get && !dMobile.set) {
+      __trackDefineProperty(uadProto, 'mobile', {
+        value: mobileValue,
+        writable: !!dMobile.writable,
+        configurable: !!dMobile.configurable,
+        enumerable: !!dMobile.enumerable
+      });
+    } else {
+      __trackDefineProperty(uadProto, 'mobile', {
+        get: guardedUadGetter('mobile', mobileValue, dMobile),
+        set: dMobile.set,
+        configurable: !!dMobile.configurable,
+        enumerable: !!dMobile.enumerable
+      });
+    }
+    if (Object.prototype.hasOwnProperty.call(dPlatform, 'value') && !dPlatform.get && !dPlatform.set) {
+      __trackDefineProperty(uadProto, 'platform', {
+        value: platformValue,
+        writable: !!dPlatform.writable,
+        configurable: !!dPlatform.configurable,
+        enumerable: !!dPlatform.enumerable
+      });
+    } else {
+      __trackDefineProperty(uadProto, 'platform', {
+        get: guardedUadGetter('platform', platformValue, dPlatform),
+        set: dPlatform.set,
+        configurable: !!dPlatform.configurable,
+        enumerable: !!dPlatform.enumerable
+      });
+    }
+
+    if (dFull) {
+      if (Object.prototype.hasOwnProperty.call(dFull, 'value') && !dFull.get && !dFull.set) {
+        __trackDefineProperty(uadProto, 'fullVersionList', {
+          value: deep(meta.fullVersionList),
+          writable: !!dFull.writable,
+          enumerable: !!dFull.enumerable,
+          configurable: !!dFull.configurable
+        });
+      } else {
+        __trackDefineProperty(uadProto, 'fullVersionList', {
+          get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull),
+          set: dFull.set,
+          enumerable: !!dFull.enumerable,
+          configurable: !!dFull.configurable
+        });
+      }
+    }
+
+    const getHighEntropyValues = __swWrapNativeApply(origGHEV, 'getHighEntropyValues', function(target, thisArg, argList) {
+      const keys = (argList && argList.length) ? argList[0] : undefined;
+      if (!isUadThis(thisArg)) {
+        try {
+          return Reflect.apply(target, thisArg, [keys]);
+        } catch (e) {
+          __reportNativeThrow('sw_prelude:illegal_invocation', 'getHighEntropyValues', 'service worker getHighEntropyValues illegal invocation', e);
+          throw e;
+        }
+      }
+      if (!Array.isArray(keys)) {
+        return Reflect.apply(target, thisArg, [keys]);
+      }
+      for (const hint of keys) {
+        if (typeof hint !== 'string' || !hint) {
+          return Reflect.apply(target, thisArg, [keys]);
+        }
+      }
+      const map = {
+        architecture: meta.architecture,
+        bitness: meta.bitness,
+        model: meta.model,
+        brands: brandsValue,
+        mobile: mobileValue,
+        platform: platformValue,
+        platformVersion: platformVersionValue,
+        fullVersionList: deep(meta.fullVersionList),
+        deviceMemory: swDeviceMemoryValue,
+        hardwareConcurrency: Number(swHardwareConcurrencyValue),
+        wow64: meta.wow64,
+        formFactors: meta.formFactors
+      };
+      const result = {};
+      for (const hint of keys) {
+        if (!(hint in map)) continue;
+        const val = map[hint];
+        if (val === undefined || val === null || (typeof val === 'string' && !val && hint !== 'model') || (Array.isArray(val) && !val.length)) {
+          __swDiag('error', 'sw_prelude:get_high_entropy_values_contract_missing', {
+            stage: 'runtime',
+            key: hint,
+            message: 'service worker getHighEntropyValues contract value missing',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw', reason: 'get_high_entropy_values_contract_missing' }
+          }, null);
+          // Disabled temporarily: valid SW profile reads must not fall back to native HE data.
+          // return Reflect.apply(origGHEV, this, [keys]);
+          throw new Error('SW getHighEntropyValues contract missing ' + hint);
+        }
+        result[hint] = val;
+      }
+      return Promise.resolve(result);
+    });
+    __trackDefineProperty(uadProto, 'getHighEntropyValues', {
+      value: getHighEntropyValues,
+      configurable: !!ghevDesc.configurable,
+      enumerable: !!ghevDesc.enumerable,
+      writable: Object.prototype.hasOwnProperty.call(ghevDesc, 'writable') ? ghevDesc.writable : true
+    });
+
+    const toJSON = __swWrapNativeApply(origToJSON, 'toJSON', function(target, thisArg, argList) {
+      if (!isUadThis(thisArg)) {
+        try {
+          return Reflect.apply(target, thisArg, argList || []);
+        } catch (e) {
+          __reportNativeThrow('sw_prelude:illegal_invocation', 'toJSON', 'service worker toJSON illegal invocation', e);
+          throw e;
+        }
+      }
+      return { platform: thisArg.platform, brands: thisArg.brands, mobile: thisArg.mobile };
+    });
+    __trackDefineProperty(uadProto, 'toJSON', {
+      value: toJSON,
+      configurable: !!toJsonDesc.configurable,
+      enumerable: !!toJsonDesc.enumerable,
+      writable: Object.prototype.hasOwnProperty.call(toJsonDesc, 'writable') ? toJsonDesc.writable : true
+    });
 
     __swDiag('info', 'sw_prelude:userAgentData_accessor_native_skip', {
       stage: 'apply',
@@ -1131,17 +1288,17 @@
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'native_skip', value: swLanguagesValue.slice() }
     }, null);
-    __swDiag('info', 'sw_prelude:hardwareConcurrency_accessor_native_skip', {
-      stage: 'apply',
-      key: 'hardwareConcurrency',
-      message: 'service worker hardwareConcurrency accessor left native',
-      type: 'browser structure missing data',
-      data: {
-        outcome: 'skip',
-        reason: swPatchHardwareConcurrency ? swHardwareConcurrencyNativeSkipReason : 'native_skip',
-        value: Number(swHardwareConcurrencyValue)
-      }
-    }, null);
+    if (swPatchHardwareConcurrency) {
+      applyServiceWorkerNavigatorAccessorTarget('hardwareConcurrency', function() { return Number(swHardwareConcurrencyValue); }, 'sw_prelude:hardwareConcurrency');
+    } else {
+      __swDiag('info', 'sw_prelude:hardwareConcurrency_accessor_native_skip', {
+        stage: 'apply',
+        key: 'hardwareConcurrency',
+        message: 'service worker hardwareConcurrency accessor left native',
+        type: 'browser structure missing data',
+        data: { outcome: 'skip', reason: 'native_skip', value: Number(swHardwareConcurrencyValue) }
+      }, null);
+    }
     __swDiag('info', 'sw_prelude:deviceMemory_accessor_native_passthrough', {
       stage: 'apply',
       key: 'deviceMemory',
