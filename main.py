@@ -258,7 +258,7 @@ def build_bootstrap_device_metrics():
 
 # ----------------------- function init_driver -----------------------
 def init_driver(
-    profile, country_data, platform, user_agent, screen_width, screen_height,
+    profile, country_data, dom_platform, user_agent, screen_width, screen_height,
     webgl_vendor, webgl_renderer, webgl_unmasked_vendor, webgl_unmasked_renderer,
     devices_conf, ua_platform, ua_platform_version, expected_client_hints,
     vendor_value, language, normalized_languages, device_memory_value, hardware_concurrency_value,
@@ -379,7 +379,7 @@ def init_driver(
 
 
     # --- Initial fonts patch ---
-    rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
+    rand_met_module.generate_font_manifest(MANIFEST_PATH, dom_platform)
       
     cdp.enable_sw_env_inject(
         language=language,
@@ -394,7 +394,7 @@ def init_driver(
             "unmaskedRenderer": profile["webgl_unmasked_renderer"],
         },
         user_agent=user_agent,
-        navigator_platform=platform,
+        navigator_platform=dom_platform,
     )
       
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
@@ -549,7 +549,7 @@ def init_driver(
             enumerable: false
         }},
         __NAV_PLATFORM__: {{
-            value: {json.dumps(platform, ensure_ascii=False)},
+            value: {json.dumps(dom_platform, ensure_ascii=False)},
             writable: true,
             configurable: true,
             enumerable: false
@@ -729,7 +729,7 @@ def init_driver(
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
-    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, platform)
+    apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, dom_platform)
 
     apply_page_locale_override(
         driver,
@@ -1194,10 +1194,13 @@ def main():
             "accept_language": None,
         }
 
-        if profile["platform"]  == "Win32":
+        dom_platform = profile.get("platform")
+        if dom_platform == "Win32":
             ua_platform = "Windows"
-        elif profile["platform"]  == "MacIntel":
+        elif dom_platform == "MacIntel":
             ua_platform = "macOS"
+        else:
+            raise ValueError(f"unsupported DOM platform {dom_platform!r}")
 
         ua_platform_version = profile["platform_version"]
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
@@ -1258,7 +1261,7 @@ def main():
         #     raise RuntimeError("mitmproxy not launched")
        
         driver = init_driver(
-            profile, country_data, profile["platform"], profile["user_agent"],
+            profile, country_data, dom_platform, profile["user_agent"],
             profile["screen_width"], profile["screen_height"], profile["webgl_vendor"], profile["webgl_renderer"],
             profile["webgl_unmasked_vendor"], profile["webgl_unmasked_renderer"],
             profile["devices_conf"], ua_platform, ua_platform_version,
