@@ -9,6 +9,7 @@ import pathlib
 from pathlib import Path
 from websocket import WebSocketApp
 from tools.tools_infra.overseer import logger
+from tools.tools_runtime.headers_adapter import build_accept_language
 
 # Use the project's existing logging pipeline (overseer.setup_logger -> intention_entitled.log).
 logger = logger.getChild("cdp_catapult")
@@ -196,6 +197,7 @@ def enable_sw_env_inject(
     SW_ENV = {
         "primary": SW_PRIMARY,
         "langs": SW_LANGS[:],
+        "acceptLanguage": build_accept_language(SW_LANGS, user_agent=user_agent),
         "hc": SW_HC,
         "dm": SW_DM,
         "meta": dict(SW_META),
@@ -369,7 +371,7 @@ def _build_sw_user_agent_override(sw_env: dict) -> dict:
     if not isinstance(sw_env, dict) or not sw_env:
         raise ValueError("SW inject: env missing")
     user_agent = sw_env.get("userAgent")
-    accept_language = sw_env.get("primary")
+    accept_language = sw_env.get("acceptLanguage")
     navigator_platform = sw_env.get("navigatorPlatform")
     meta = sw_env.get("meta")
     if not isinstance(user_agent, str) or not user_agent.strip():

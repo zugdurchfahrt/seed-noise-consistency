@@ -318,7 +318,7 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, na
             "Network.setUserAgentOverride",
             {
                 "userAgent": profile["user_agent"],
-                "acceptLanguage": profile.get("language"),
+                "acceptLanguage": profile.get("accept_language"),
                 "platform": navigator_platform,
                 "userAgentMetadata": metadata
             }
