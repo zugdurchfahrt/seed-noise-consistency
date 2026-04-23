@@ -1084,16 +1084,15 @@
       const snap = requireSnap(cache.snap, 'getLanguage');
       return String(snap.language);
     };
-    let __patchLanguage = true;
+    let __patchLanguage = false;
     try {
       const nativeLanguageResolved = readWorkerNavigatorNativeValue('language');
       const nativeLanguage = nativeLanguageResolved.value;
       __workerNavigatorPatchedOwners__['language'] = nativeLanguageResolved.owner;
       if (typeof nativeLanguage === 'string' && nativeLanguage.trim() !== '') {
         const profileLanguage = cache.snap.language;
+        __workerNavigatorDescriptorModes__['language'] = 'native_skip';
         if (nativeLanguage === profileLanguage) {
-          __workerNavigatorDescriptorModes__['language'] = 'native_skip';
-          __patchLanguage = false;
           emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:language_getter_value_match', {
             type: 'browser structure missing data',
             stage: 'preflight',
@@ -1117,10 +1116,10 @@
             module: 'WORKER_PATCH_SRC',
             surface: 'WorkerNavigator',
             key: 'language',
-            policy: 'patch',
-            action: 'patch_accessor',
+            policy: 'skip',
+            action: 'keep_native_getter',
             data: {
-              outcome: 'continue',
+              outcome: 'skip',
               reason: 'getter_value_mismatch',
               nativeValue: nativeLanguage,
               profileValue: profileLanguage,
@@ -1128,17 +1127,36 @@
             }
           }, null);
         }
+      } else {
+        __workerNavigatorDescriptorModes__['language'] = 'native_skip';
+        emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:language_native_invalid', {
+          type: 'browser structure missing data',
+          stage: 'preflight',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'WorkerNavigator',
+          key: 'language',
+          policy: 'skip',
+          action: 'keep_native_getter',
+          data: {
+            outcome: 'skip',
+            reason: 'native_invalid',
+            nativeValue: nativeLanguage,
+            profileValue: cache.snap.language,
+            scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+          }
+        }, null);
       }
     } catch (e) {
+      __workerNavigatorDescriptorModes__['language'] = 'native_skip';
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
         type: 'browser structure missing data',
         stage: 'runtime',
         module: 'WORKER_PATCH_SRC',
         surface: 'WorkerNavigator',
         key: 'language',
-        policy: 'patch',
-        action: 'patch_accessor',
-        data: { outcome: 'continue', reason: 'native_compare_failed' }
+        policy: 'skip',
+        action: 'keep_native_getter',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
       }, e);
     }
     if (__patchLanguage) {
@@ -1149,7 +1167,7 @@
       if (!Array.isArray(snap.languages)) throw new Error('UACHPatch: bad languages');
       return snap.languages.slice();
     };
-    let __patchLanguages = true;
+    let __patchLanguages = false;
     try {
       const nativeLanguagesResolved = readWorkerNavigatorNativeValue('languages');
       const nativeLanguages = nativeLanguagesResolved.value;
@@ -1160,7 +1178,6 @@
         const profileLanguages = Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages;
         if (sameJson(nativeLanguages, profileLanguages)) {
           __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
-          __patchLanguages = false;
           emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:languages_getter_value_match', {
             type: 'browser structure missing data',
             stage: 'preflight',
@@ -1182,7 +1199,6 @@
           const profileCanonical = canonicalizeLanguageListForCompare(profileLanguages);
           if (nativeCanonical && profileCanonical && sameJson(nativeCanonical, profileCanonical)) {
             __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
-            __patchLanguages = false;
             emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:profile_languages_canonicalized', {
               type: 'browser structure missing data',
               stage: 'preflight',
@@ -1202,16 +1218,17 @@
               }
             }, null);
           } else {
+            __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
             emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:languages_getter_value_mismatch', {
               type: 'browser structure missing data',
               stage: 'preflight',
               module: 'WORKER_PATCH_SRC',
               surface: 'WorkerNavigator',
               key: 'languages',
-              policy: 'patch',
-              action: 'patch_accessor',
+              policy: 'skip',
+              action: 'keep_native_getter',
               data: {
-                outcome: 'continue',
+                outcome: 'skip',
                 reason: 'getter_value_mismatch',
                 nativeValue: nativeLanguages.slice(),
                 profileValue: Array.isArray(profileLanguages) ? profileLanguages.slice() : profileLanguages,
@@ -1220,17 +1237,36 @@
             }, null);
           }
         }
+      } else {
+        __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
+        emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:languages_native_invalid', {
+          type: 'browser structure missing data',
+          stage: 'preflight',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'WorkerNavigator',
+          key: 'languages',
+          policy: 'skip',
+          action: 'keep_native_getter',
+          data: {
+            outcome: 'skip',
+            reason: 'native_invalid',
+            nativeValue: nativeLanguages,
+            profileValue: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages,
+            scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+          }
+        }, null);
       }
     } catch (e) {
+      __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
         type: 'browser structure missing data',
         stage: 'runtime',
         module: 'WORKER_PATCH_SRC',
         surface: 'WorkerNavigator',
         key: 'languages',
-        policy: 'patch',
-        action: 'patch_accessor',
-        data: { outcome: 'continue', reason: 'native_compare_failed' }
+        policy: 'skip',
+        action: 'keep_native_getter',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
       }, e);
     }
     if (__patchLanguages) {
@@ -2056,12 +2092,21 @@
       hardwareConcurrency: self.navigator && self.navigator.hardwareConcurrency
     };
     if (sanity.language !== cache.snap.language) {
-      failWorkerNavigatorSanity(
-        'worker_patch_src:workernavigator:sanity:mismatch',
-        'language',
-        'UACHPatch: language mismatch',
-        { actual: sanity.language, expected: cache.snap.language }
-      );
+      emitDegrade('warn', 'worker_patch_src:workernavigator:sanity:language_native_profile_mismatch_keep_native_getter', {
+        type: 'browser structure missing data',
+        stage: 'sanity',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'language',
+        policy: 'skip',
+        action: 'keep_native_getter',
+        data: {
+          outcome: 'skip',
+          reason: 'getter_value_mismatch',
+          nativeValue: sanity.language,
+          profileValue: cache.snap.language
+        }
+      }, null);
     }
     const sanityLanguagesCanonical = canonicalizeLanguageListForCompare(sanity.languages);
     const snapLanguagesCanonical = canonicalizeLanguageListForCompare(cache.snap.languages);
@@ -2085,15 +2130,21 @@
           }
         }, null);
       } else {
-        failWorkerNavigatorSanity(
-          'worker_patch_src:workernavigator:sanity:mismatch',
-          'languages',
-          'UACHPatch: languages mismatch',
-          {
-            actual: Array.isArray(sanity.languages) ? sanity.languages.slice() : sanity.languages,
-            expected: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages
+        emitDegrade('warn', 'worker_patch_src:workernavigator:sanity:languages_native_profile_mismatch_keep_native_getter', {
+          type: 'browser structure missing data',
+          stage: 'sanity',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'WorkerNavigator',
+          key: 'languages',
+          policy: 'skip',
+          action: 'keep_native_getter',
+          data: {
+            outcome: 'skip',
+            reason: 'getter_value_mismatch',
+            nativeValue: Array.isArray(sanity.languages) ? sanity.languages.slice() : sanity.languages,
+            profileValue: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages
           }
-        );
+        }, null);
       }
     }
     if (Number(sanity.deviceMemory) !== Number(cache.snap.deviceMemory)) {

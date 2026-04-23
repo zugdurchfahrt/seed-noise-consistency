@@ -968,6 +968,27 @@ def run_worker_seed():
     manual_attach_sent = set()  # targetId set for fallback manual attach
     sess_meta = {}  # sessionId -> {targetId,type,url}
     seed_prelude = _build_worker_seed_prelude(CDP_GLOBAL_SEED)
+    worker_user_agent_override = None
+    worker_language_expected = None
+    worker_languages_expected = None
+    if isinstance(SW_ENV, dict):
+        accept_language_cdp = SW_ENV.get("acceptLanguageCdp")
+        user_agent = SW_ENV.get("userAgent")
+        navigator_platform = SW_ENV.get("navigatorPlatform")
+        if (
+            isinstance(accept_language_cdp, str) and accept_language_cdp.strip()
+            and isinstance(user_agent, str) and user_agent.strip()
+            and isinstance(navigator_platform, str) and navigator_platform.strip()
+        ):
+            worker_user_agent_override = {
+                "userAgent": user_agent,
+                "acceptLanguage": accept_language_cdp,
+                "platform": navigator_platform,
+            }
+        if isinstance(SW_ENV.get("primary"), str) and SW_ENV.get("primary").strip():
+            worker_language_expected = SW_ENV.get("primary")
+        if isinstance(SW_ENV.get("langs"), list):
+            worker_languages_expected = list(SW_ENV.get("langs") or [])
     sanity_expr = (
         "(() => {"
         " const G = globalThis;"
@@ -980,7 +1001,14 @@ def run_worker_seed():
         " } catch (e) {}"
         " let ensureMarkAsNativeType = null;"
         " try { ensureMarkAsNativeType = (typeof G.__ensureMarkAsNative); } catch (e) {}"
-        " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType };"
+        " let language = null;"
+        " let languages = null;"
+        " try {"
+        "   const nav = G.navigator;"
+        "   language = nav && nav.language;"
+        "   languages = nav && nav.languages;"
+        " } catch (e) {}"
+        " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType, language, languages };"
         "})()"
     )
 
@@ -1119,6 +1147,36 @@ def run_worker_seed():
                             turl,
                             len(expected_seed),
                         )
+                        if isinstance(out, dict) and isinstance(worker_language_expected, str) and worker_language_expected:
+                            got_language = out.get("language")
+                            got_languages = list(out.get("languages") or [])
+                            exp_languages = list(worker_languages_expected or [])
+                            got_languages_canonical = _canonicalize_language_list_for_compare(got_languages)
+                            exp_languages_canonical = _canonicalize_language_list_for_compare(exp_languages)
+                            language_mismatch = got_language != worker_language_expected
+                            languages_exact_mismatch = got_languages != exp_languages
+                            languages_duplicate_only = (
+                                languages_exact_mismatch
+                                and got_languages_canonical is not None
+                                and exp_languages_canonical is not None
+                                and got_languages_canonical == exp_languages_canonical
+                            )
+                            if languages_duplicate_only:
+                                logger.info(
+                                    "Worker seed inject: language sanity duplicate-only languages canonicalized type=%s targetId=%s expected=%s got=%s",
+                                    ttype,
+                                    tid,
+                                    {"language": worker_language_expected, "languages": exp_languages},
+                                    {"language": got_language, "languages": got_languages},
+                                )
+                            if language_mismatch or (languages_exact_mismatch and not languages_duplicate_only):
+                                logger.warning(
+                                    "Worker seed inject: language sanity native/profile mismatch; native getter kept type=%s targetId=%s expected=%s got=%s",
+                                    ttype,
+                                    tid,
+                                    {"language": worker_language_expected, "languages": exp_languages},
+                                    {"language": got_language, "languages": got_languages},
+                                )
                     except Exception as e:
                         _fatal(ws, "worker seed sanity: parse/compare failed", e)
             return
@@ -1192,6 +1250,8 @@ def run_worker_seed():
         logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
         try:
             send_sess(ws, sessionId, "Runtime.enable")
+            if worker_user_agent_override is not None:
+                send_sess(ws, sessionId, "Emulation.setUserAgentOverride", worker_user_agent_override)
             send_sess(ws, sessionId, "Runtime.evaluate", {"expression": seed_prelude, "awaitPromise": True})
             send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
         except Exception as e:
