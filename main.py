@@ -277,6 +277,7 @@ def init_driver(
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
     chrome_options.add_argument(f"--user-agent={user_agent}")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument("--disable-features=CanvasNoise")
     chrome_options.add_argument("--enable-features=ReduceDeviceMemory")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
@@ -1271,12 +1272,10 @@ def main():
             global_seed,
         )
 
-        apply_page_hardware_override(
-            driver,
-            hardware_concurrency_value=hardware_concurrency_value,
-            )
-
-
+        # apply_page_hardware_override(
+        #     driver,
+        #     hardware_concurrency_value=hardware_concurrency_value,
+        # )
 
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
