@@ -782,6 +782,21 @@
               profileValue: Number(hc)
             }
           }, null);
+        } else {
+          __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_profile_mismatch_patch_accessor', {
+            stage: 'preflight',
+            key: 'hardwareConcurrency',
+            message: 'service worker hardwareConcurrency native getter value differs from profile value; accessor patch will be applied',
+            type: 'browser structure missing data',
+            data: {
+              outcome: 'continue',
+              reason: 'native_profile_mismatch',
+              policy: 'patch',
+              action: 'patch_accessor',
+              nativeValue: nativeHardwareConcurrency,
+              profileValue: Number(hc)
+            }
+          }, null);
         }
       } else {
         __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_invalid', {

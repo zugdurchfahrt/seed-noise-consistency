@@ -586,11 +586,22 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const origGet = desc && desc.get;
 
     if (typeof origGet === 'function') {
+      let carrierGet = origGet;
+      try {
+        carrierGet = __resolveWrappedBridgeTarget(origGet, '__wrapStrictScalarAccessorGateway');
+      } catch (e) {
+        __throwWrapFactoryPreflight(
+          'core_window:wrapStrictScalarAccessorGateway:bridge_target_failed',
+          key,
+          '__wrapStrictScalarAccessorGateway: bridge target resolve failed',
+          e
+        );
+      }
       let wrapped = null;
-      wrapped = __wrapNativeAccessor(origGet, name, function (target, thisArg, argList) {
+      wrapped = __wrapNativeAccessor(carrierGet, name, function (target, thisArg, argList) {
         if (onAccess) onAccess(key, wrapped, thisArg);
         if (checkThis && !checkThis(thisArg)) {
-          return Reflect.apply(origGet, thisArg, []);
+          return Reflect.apply(target, thisArg, []);
         }
         return valueFromGetter(thisArg);
       });

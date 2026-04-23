@@ -260,16 +260,37 @@ class VPNClient:
 
     def _clean_directories(self):
         """
-        Wipes browser USER_DATA_DIR
+        Cleans browser USER_DATA_DIR contents while preserving selected files.
         """
-        try:
-            shutil.rmtree(USER_DATA_DIR, ignore_errors=True)
-            logger.info("[cleanup] removed dir: %s", USER_DATA_DIR)
-        except Exception as e:
-            logger.debug("[cleanup] skip removing %s: %s", USER_DATA_DIR, e)
+        preserve_names = {"Local State"}
+        removed_count = 0
+        preserved_count = 0
+        failed_count = 0
 
         os.makedirs(USER_DATA_DIR, exist_ok=True)
-        logger.info("[cleanup] created dir: %s", USER_DATA_DIR)
+
+        for entry in USER_DATA_DIR.iterdir():
+            if entry.name in preserve_names:
+                preserved_count += 1
+                continue
+
+            try:
+                if entry.is_dir():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
+                removed_count += 1
+            except Exception as e:
+                failed_count += 1
+                logger.debug("[cleanup] failed to remove %s: %s", entry, e)
+
+        logger.info(
+            "[cleanup] user_data sync: removed=%d preserved=%d failed=%d dir=%s",
+            removed_count,
+            preserved_count,
+            failed_count,
+            USER_DATA_DIR,
+        )
 
 
     def _kill_old_processes(self):
