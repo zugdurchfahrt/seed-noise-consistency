@@ -747,7 +747,7 @@ def init_driver(
     # --- [CH/02] build safelisted_headers (minimal set) ---
     if is_firefox or is_safari:
         safelisted_headers = {
-            "Accept-Language": str(profile.get("accept_language") or ""),
+            "Accept-Language": str(profile.get("accept_language")),
             "Sec-CH-UA": "",
             # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
             # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
@@ -755,8 +755,8 @@ def init_driver(
     else:
         safelisted_headers = {
             # Main client hints
-            # "Accept": str(expected_client_hints["accept"]),
-            "Accept-Language": str(profile.get("accept_language") or ""),
+            "Accept": str(expected_client_hints["accept"]),
+            "Accept-Language": str(profile.get("accept_language")),
             "Sec-CH-Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
             "Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
             # "Device-Memory": str(profile["deviceMemory"]),
@@ -1293,7 +1293,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://amiunique.org/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
