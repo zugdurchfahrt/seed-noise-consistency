@@ -9,7 +9,7 @@ from typing import Dict, Set, Tuple
 from collections import defaultdict
 from typing import Set as _Set
 from fontTools.ttLib import TTFont
-from shutil import copyfile
+from shutil import copyfile, rmtree
 from jinja2 import Environment, FileSystemLoader
 import tempfile
 import base64
@@ -30,6 +30,7 @@ MANIFEST_PATH       = ASSETS/ 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS/ 'JS_fonts_patch' / 'font_patch.generated.js'
 FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
+CACHE_NAMESPACE_LIMIT = 30
 
 # ----------------------- DICTIONARIES -----------------------
 SYS_FONTS_WIN = [
@@ -266,6 +267,19 @@ def _cache_dir_for(platform: str) -> pathlib.Path:
 def _b64_path_for(platform: str, md5: str) -> pathlib.Path:
     return _cache_dir_for(platform) / f"{md5}.b64"
 
+def _cleanup_cache_namespaces(platform: str) -> None:
+    root = get_target_dir_for(platform) / "cache_data"
+    if not root.exists():
+        return
+    current_name = _cache_namespace_token()
+    old = sorted(
+        (p for p in root.iterdir() if p.is_dir() and p.name != current_name and re.fullmatch(r"[0-9a-f]{64}", p.name)),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for victim in old[max(0, CACHE_NAMESPACE_LIMIT - 1):]:
+        rmtree(victim)
+
 def _atomic_write_text(path: pathlib.Path, data: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # base64 ⊂ ASCII → write/read as ascii for consistency
@@ -415,6 +429,7 @@ def ensure_platform_index(platform: str) -> dict:
     # claning orphaned .b64 after the index is actualized
     valid_md5s = {rec.get("md5") for rec in files_map.values() if isinstance(rec, dict) and rec.get("md5")}
     _cleanup_cache(platform, valid_md5s)
+    _cleanup_cache_namespaces(platform)
     return idx
 
 def random_string(length=12):
@@ -947,4 +962,5 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         idx["transport_signature"] = next_transport_signature
         _atomic_write_json(_index_path_for(platform), idx)
 
+    _cleanup_cache_namespaces(platform)
     return temp_configs
