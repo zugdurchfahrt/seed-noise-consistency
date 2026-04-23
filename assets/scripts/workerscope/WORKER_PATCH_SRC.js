@@ -1300,6 +1300,23 @@
               scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
             }
           }, null);
+        } else {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_profile_mismatch_patch_accessor', {
+            type: 'browser structure missing data',
+            stage: 'preflight',
+            module: 'WORKER_PATCH_SRC',
+            surface: 'WorkerNavigator',
+            key: 'hardwareConcurrency',
+            policy: 'patch',
+            action: 'patch_accessor',
+            data: {
+              outcome: 'continue',
+              reason: 'native_profile_mismatch',
+              nativeValue: nativeHardwareConcurrency,
+              profileValue: profileHardwareConcurrency,
+              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            }
+          }, null);
         }
       }
     } catch (e) {

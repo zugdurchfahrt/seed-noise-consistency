@@ -163,10 +163,15 @@ def enable_sw_env_inject(
     for x in normalized_languages:
         if not isinstance(x, str) or not x.strip():
             raise ValueError("SW inject: bad languages entry")
+    
+    SW_PRIMARY = language
+    SW_LANGS = normalized_languages[:]
     if not isinstance(hardware_concurrency, (int, float)) or hardware_concurrency <= 0:
         raise ValueError("SW inject: hardware_concurrency must be positive number")
+    SW_HC = int(hardware_concurrency)
     if not isinstance(device_memory, (int, float)) or device_memory <= 0:
         raise ValueError("SW inject: device_memory must be positive number")
+    SW_DM = float(device_memory)
     if not isinstance(meta, dict) or not meta:
         raise ValueError("SW inject: expected_client_hints missing")
     if not isinstance(webgl, dict) or not webgl:
@@ -175,11 +180,6 @@ def enable_sw_env_inject(
         value = webgl.get(key)
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"SW inject: bad webgl.{key}")
-
-    SW_PRIMARY = language
-    SW_LANGS = normalized_languages[:]
-    SW_HC = int(hardware_concurrency)
-    SW_DM = float(device_memory)
     SW_META = dict(meta)
     SW_WEBGL = {
         "vendor": webgl["vendor"],
@@ -274,9 +274,26 @@ atexit.register(_stop_injectors_atexit)
 
 def _build_sw_prelude(sw_env: dict) -> str:
     if not isinstance(sw_env, dict) or not sw_env:
-        raise ValueError("SW inject: env missing")
+        raise ValueError("SW inject: SW_ENV missing")
+
+    language = sw_env.get("primary")
+    normalized_languages = sw_env.get("langs")
+    hardware_concurrency = sw_env.get("hc")
+    device_memory = sw_env.get("dm")
     meta = sw_env.get("meta")
     webgl = sw_env.get("webgl")
+
+    if not isinstance(language, str) or not language.strip():
+        raise ValueError("SW inject: language must be non-empty str")
+    if not isinstance(normalized_languages, list) or not normalized_languages:
+        raise ValueError("SW inject: normalized_languages must be non-empty list")
+    for value in normalized_languages:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("SW inject: bad languages entry")
+    if not isinstance(hardware_concurrency, (int, float)) or hardware_concurrency <= 0:
+        raise ValueError("SW inject: hardware_concurrency must be positive number")
+    if not isinstance(device_memory, (int, float)) or device_memory <= 0:
+        raise ValueError("SW inject: device_memory must be positive number")
     if not isinstance(meta, dict) or not meta:
         raise ValueError("SW inject: expected_client_hints missing")
     if not isinstance(webgl, dict) or not webgl:
@@ -301,10 +318,10 @@ def _build_sw_prelude(sw_env: dict) -> str:
   const G = globalThis;
   const hasOwn = Object.prototype.hasOwnProperty;
   const nextEnv = {{
-    primary: {json.dumps(sw_env.get("primary"), ensure_ascii=False)},
-    langs: {json.dumps(sw_env.get("langs"), ensure_ascii=False)},
-    hc: {json.dumps(sw_env.get("hc"))},
-    dm: {json.dumps(sw_env.get("dm"))},
+    primary: {json.dumps(language, ensure_ascii=False)},
+    langs: {json.dumps(normalized_languages, ensure_ascii=False)},
+    hc: {json.dumps(hardware_concurrency)},
+    dm: {json.dumps(device_memory)},
     meta: {json.dumps(meta, ensure_ascii=False)},
     webgl: {json.dumps(webgl, ensure_ascii=False)}
   }};

@@ -373,6 +373,9 @@ def init_driver(
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, platform)
       
+
+      
+      
     cdp.enable_sw_env_inject(
         language=language,
         normalized_languages=normalized_languages,
@@ -386,6 +389,8 @@ def init_driver(
             "unmaskedRenderer": profile["webgl_unmasked_renderer"],
         },
     )
+        
+      
       
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
     sw_thread.start()
