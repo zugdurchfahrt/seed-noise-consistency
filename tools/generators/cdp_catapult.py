@@ -969,12 +969,15 @@ def run_worker_seed():
     sess_meta = {}  # sessionId -> {targetId,type,url}
     seed_prelude = _build_worker_seed_prelude(CDP_GLOBAL_SEED)
     worker_user_agent_override = None
+    worker_hardware_concurrency_override = None
     worker_language_expected = None
     worker_languages_expected = None
+    worker_hardware_concurrency_expected = None
     if isinstance(SW_ENV, dict):
         accept_language_cdp = SW_ENV.get("acceptLanguageCdp")
         user_agent = SW_ENV.get("userAgent")
         navigator_platform = SW_ENV.get("navigatorPlatform")
+        hardware_concurrency = SW_ENV.get("hc")
         if (
             isinstance(accept_language_cdp, str) and accept_language_cdp.strip()
             and isinstance(user_agent, str) and user_agent.strip()
@@ -984,6 +987,11 @@ def run_worker_seed():
                 "userAgent": user_agent,
                 "acceptLanguage": accept_language_cdp,
                 "platform": navigator_platform,
+            }
+        if isinstance(hardware_concurrency, (int, float)) and int(hardware_concurrency) > 0:
+            worker_hardware_concurrency_expected = int(hardware_concurrency)
+            worker_hardware_concurrency_override = {
+                "hardwareConcurrency": int(hardware_concurrency),
             }
         if isinstance(SW_ENV.get("primary"), str) and SW_ENV.get("primary").strip():
             worker_language_expected = SW_ENV.get("primary")
@@ -1001,6 +1009,8 @@ def run_worker_seed():
         " } catch (e) {}"
         " let ensureMarkAsNativeType = null;"
         " try { ensureMarkAsNativeType = (typeof G.__ensureMarkAsNative); } catch (e) {}"
+        " let hardwareConcurrency = null;"
+        " try { hardwareConcurrency = Number((G.navigator && G.navigator.hardwareConcurrency)); } catch (e) {}"
         " let language = null;"
         " let languages = null;"
         " try {"
@@ -1008,7 +1018,7 @@ def run_worker_seed():
         "   language = nav && nav.language;"
         "   languages = nav && nav.languages;"
         " } catch (e) {}"
-        " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType, language, languages };"
+        " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType, hardwareConcurrency, language, languages };"
         "})()"
     )
 
@@ -1177,6 +1187,16 @@ def run_worker_seed():
                                     {"language": worker_language_expected, "languages": exp_languages},
                                     {"language": got_language, "languages": got_languages},
                                 )
+                        if isinstance(out, dict) and isinstance(worker_hardware_concurrency_expected, int):
+                            got_hardware_concurrency = int(out.get("hardwareConcurrency") or 0)
+                            if got_hardware_concurrency != int(worker_hardware_concurrency_expected):
+                                logger.warning(
+                                    "Worker seed inject: hardwareConcurrency sanity native/profile mismatch; native getter kept type=%s targetId=%s expected=%s got=%s",
+                                    ttype,
+                                    tid,
+                                    worker_hardware_concurrency_expected,
+                                    got_hardware_concurrency,
+                                )
                     except Exception as e:
                         _fatal(ws, "worker seed sanity: parse/compare failed", e)
             return
@@ -1252,6 +1272,8 @@ def run_worker_seed():
             send_sess(ws, sessionId, "Runtime.enable")
             if worker_user_agent_override is not None:
                 send_sess(ws, sessionId, "Emulation.setUserAgentOverride", worker_user_agent_override)
+            if worker_hardware_concurrency_override is not None:
+                send_sess(ws, sessionId, "Emulation.setHardwareConcurrencyOverride", worker_hardware_concurrency_override)
             send_sess(ws, sessionId, "Runtime.evaluate", {"expression": seed_prelude, "awaitPromise": True})
             send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
         except Exception as e:

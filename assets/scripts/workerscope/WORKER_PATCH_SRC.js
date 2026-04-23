@@ -1331,16 +1331,15 @@
       if (!Number.isFinite(v)) throw new Error('UACHPatch: bad hardwareConcurrency');
       return v;
     };
-    let __patchHardwareConcurrency = true;
+    let __patchHardwareConcurrency = false;
     try {
       const nativeHardwareConcurrencyResolved = readWorkerNavigatorNativeValue('hardwareConcurrency');
       const nativeHardwareConcurrency = Number(nativeHardwareConcurrencyResolved.value);
+      __workerNavigatorPatchedOwners__['hardwareConcurrency'] = nativeHardwareConcurrencyResolved.owner;
       if (Number.isFinite(nativeHardwareConcurrency) && nativeHardwareConcurrency > 0) {
         const profileHardwareConcurrency = Number(cache.snap.hardwareConcurrency);
+        __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
         if (Object.is(nativeHardwareConcurrency, profileHardwareConcurrency)) {
-          __workerNavigatorPatchedOwners__['hardwareConcurrency'] = nativeHardwareConcurrencyResolved.owner;
-          __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
-          __patchHardwareConcurrency = false;
           emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:native_skip', {
             type: 'browser structure missing data',
             stage: 'preflight',
@@ -1358,17 +1357,17 @@
             }
           }, null);
         } else {
-          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_profile_mismatch_patch_accessor', {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
             type: 'browser structure missing data',
             stage: 'preflight',
             module: 'WORKER_PATCH_SRC',
             surface: 'WorkerNavigator',
             key: 'hardwareConcurrency',
-            policy: 'patch',
-            action: 'patch_accessor',
+            policy: 'skip',
+            action: 'keep_native_getter',
             data: {
-              outcome: 'continue',
-              reason: 'native_profile_mismatch',
+              outcome: 'skip',
+              reason: 'getter_value_mismatch',
               nativeValue: nativeHardwareConcurrency,
               profileValue: profileHardwareConcurrency,
               scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
@@ -1376,16 +1375,17 @@
           }, null);
         }
       } else {
-        emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_invalid_patch_accessor', {
+        __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
+        emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_invalid', {
           type: 'browser structure missing data',
           stage: 'preflight',
           module: 'WORKER_PATCH_SRC',
           surface: 'WorkerNavigator',
           key: 'hardwareConcurrency',
-          policy: 'patch',
-          action: 'patch_accessor',
+          policy: 'skip',
+          action: 'keep_native_getter',
           data: {
-            outcome: 'continue',
+            outcome: 'skip',
             reason: 'native_invalid',
             nativeValue: nativeHardwareConcurrencyResolved.value,
             profileValue: Number(cache.snap.hardwareConcurrency),
@@ -1394,15 +1394,16 @@
         }, null);
       }
     } catch (e) {
+      __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
         type: 'browser structure missing data',
         stage: 'runtime',
         module: 'WORKER_PATCH_SRC',
         surface: 'WorkerNavigator',
         key: 'hardwareConcurrency',
-        policy: 'patch',
-        action: 'patch_accessor',
-        data: { outcome: 'continue', reason: 'native_compare_failed' }
+        policy: 'skip',
+        action: 'keep_native_getter',
+        data: { outcome: 'skip', reason: 'native_compare_failed' }
       }, e);
     }
     if (__patchHardwareConcurrency) {
@@ -2156,12 +2157,21 @@
       );
     }
     if (Number(sanity.hardwareConcurrency) !== Number(cache.snap.hardwareConcurrency)) {
-      failWorkerNavigatorSanity(
-        'worker_patch_src:workernavigator:sanity:mismatch',
-        'hardwareConcurrency',
-        'UACHPatch: hardwareConcurrency mismatch',
-        { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
-      );
+      emitDegrade('warn', 'worker_patch_src:workernavigator:sanity:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
+        type: 'browser structure missing data',
+        stage: 'sanity',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'WorkerNavigator',
+        key: 'hardwareConcurrency',
+        policy: 'skip',
+        action: 'keep_native_getter',
+        data: {
+          outcome: 'skip',
+          reason: 'getter_value_mismatch',
+          nativeValue: sanity.hardwareConcurrency,
+          profileValue: cache.snap.hardwareConcurrency
+        }
+      }, null);
     }
     const sanityUAD = self.navigator && self.navigator.userAgentData;
     if (!sanityUAD || typeof sanityUAD !== 'object') {
