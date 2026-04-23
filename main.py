@@ -295,11 +295,8 @@ def init_driver(
     chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
     chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
     chrome_options.add_argument("--remote-allow-origins=*")
-    # chrome_options.add_argument(f"--window-size={screen_width},{screen_height}")
     chrome_options.add_argument("--disable-dev-shm-usage")
     # chrome_options.add_argument("--disable-features=AsyncDNS")
-    # if vscode_cdp_debug and os.getenv("AUTO_OPEN_DEVTOOLS") == "1":
-    #     chrome_options.add_argument("--auto-open-devtools-for-tabs")
     chrome_options.binary_location = CHROME_BINARY
     driver = uc.Chrome(
         driver_executable_path=CHROMEDRIVER_PATH,
@@ -310,7 +307,7 @@ def init_driver(
 
 
     def _get_cdp_port(driver, user_data_dir):
-        # 1) самый надёжный вариант: debuggerAddress от chromedriver
+        # 1) debuggerAddress от chromedriver
         opts = driver.capabilities.get("goog:chromeOptions", {})
         addr = opts.get("debuggerAddress")
         if addr and ":" in addr:
@@ -528,7 +525,6 @@ def init_driver(
             }})(window);
             """,
             # --- self-executing sources after dependencies ---
-           
             Path(SCRIPTS_WORKERSCOPE / "worker_bootstrap.js").read_text("utf-8"),
         ]
         return "\n;\n".join(parts)
