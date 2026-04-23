@@ -313,12 +313,14 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, na
         "wow64":               expected_client_hints["wow64"],
         "formFactors":         expected_client_hints["formFactors"], 
     }
+    language_tags = profile.get("languages")
+    accept_language_cdp = ",".join(language_tags) if isinstance(language_tags, list) and language_tags else profile.get("language")
     if browser_brand.lower() in ("google chrome", "microsoft edge"):
         driver.execute_cdp_cmd(
             "Network.setUserAgentOverride",
             {
                 "userAgent": profile["user_agent"],
-                "acceptLanguage": profile.get("accept_language"),
+                "acceptLanguage": accept_language_cdp,
                 "platform": navigator_platform,
                 "userAgentMetadata": metadata
             }
