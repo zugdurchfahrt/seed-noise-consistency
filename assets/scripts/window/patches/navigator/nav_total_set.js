@@ -2634,34 +2634,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             message: 'mediaDevices.enumerateDevices original missing'
           });
         } else {
-          applyCoreTargetsGroup('nav_total_set:mediaDevices.enumerateDevices', [{
-            owner: mediaOwner,
-            key: 'enumerateDevices',
-            resolve: 'proto_chain',
-            kind: 'promise_method',
-            wrapLayer: 'core_wrapper',
-            invokeClass: 'brand_strict',
-            wrapperClass: 'core_proxy',
-            policy: 'throw',
-          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-          validThis(self) {
-            return self === navigator.mediaDevices;
-          },
-          invalidThis: 'native',
-          invoke(orig, args) {
-              const buildImpl = (__navModuleState && typeof __navModuleState.__ENUMERATE_DEVICES_IMPL__ === 'function')
-                ? __navModuleState.__ENUMERATE_DEVICES_IMPL__
-                : __navBuildEnumerateDevicesPayload;
-              const payload = buildImpl();
-              if (!payload || !Array.isArray(payload.devices)) {
-                return Reflect.apply(orig, this, args || []);
-              }
-              __navLogAccess('mediaDevices.enumerateDevices', null, payload.logExtra || { bucket: 'core_wrapper' });
-              return Promise.resolve(payload.devices);
-          }
-        }], 'throw');
+          __navSetHiddenStateValue(__navModuleState, '__ENUMERATE_DEVICES_SNAPSHOT_GATE__', function enumerateDevicesSnapshotGate() {
+            const buildImpl = (__navModuleState && typeof __navModuleState.__ENUMERATE_DEVICES_IMPL__ === 'function')
+              ? __navModuleState.__ENUMERATE_DEVICES_IMPL__
+              : __navBuildEnumerateDevicesPayload;
+            const payload = buildImpl();
+            if (!payload || !Array.isArray(payload.devices)) {
+              return Reflect.apply(origEnumerateDevices, navigator.mediaDevices, []);
+            }
+            __navLogAccess('mediaDevices.enumerateDevices', null, payload.logExtra || { bucket: 'hidden_snapshot_gate' });
+            return Promise.resolve(payload.devices);
+          });
+          __navDiag('info', 'nav_total_set:mediaDevices_enumerateDevices_native_passthrough', {
+            stage: 'apply',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
+            key: 'mediaDevices.enumerateDevices',
+            message: 'mediaDevices.enumerateDevices left native; synthetic devices moved to hidden gate',
+            data: {
+              outcome: 'return',
+              reason: 'native_passthrough',
+              ownerIsPrototype: mediaOwner !== navigator.mediaDevices
+            }
+          });
+        }
       }
-    }
     }
 
     // ——— J. storage.estimate & webkitTemporaryStorage ———
