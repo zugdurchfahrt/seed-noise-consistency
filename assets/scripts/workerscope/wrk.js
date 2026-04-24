@@ -2167,6 +2167,13 @@ function SafeWorkerOverride(G){
     configurable: true,
     enumerable: false
   });
+  Object.setPrototypeOf(WrappedWorkerRaw, Object.getPrototypeOf(NativeWorker));
+  Object.defineProperty(WrappedWorkerRaw, 'prototype', {
+    value: NativeWorker.prototype,
+    writable: false,
+    configurable: false,
+    enumerable: false
+  });
   const WrappedWorker = mark(WrappedWorkerRaw, 'Worker');
 
   definePatchedValue(G, 'Worker', WrappedWorker, 'Worker');
@@ -2361,6 +2368,13 @@ function SafeSharedWorkerOverride(G){
     value: NativeShared,
     writable: true,
     configurable: true,
+    enumerable: false
+  });
+  Object.setPrototypeOf(WrappedSharedWorkerRaw, Object.getPrototypeOf(NativeShared));
+  Object.defineProperty(WrappedSharedWorkerRaw, 'prototype', {
+    value: NativeShared.prototype,
+    writable: false,
+    configurable: false,
     enumerable: false
   });
   const WrappedSharedWorker = mark(WrappedSharedWorkerRaw, 'SharedWorker');
@@ -2615,8 +2629,8 @@ function ServiceWorkerOverride(G){
     if (!desc || desc.configurable === false || desc.writable === false) {
       throw new Error(`[ServiceWorkerOverride] getRegistrations not configurable: ${JSON.stringify(desc)}`);
     }
-    const WrappedSWGetRegistrationsRaw = async function getRegistrations(){
-      const regs = await Native.getRegistrations.apply(this, arguments);
+    const WrappedSWGetRegistrationsRaw = function getRegistrations(){
+      return Reflect.apply(Native.getRegistrations, this, arguments).then(async function filterServiceWorkerRegistrations(regs) {
       if (!wantFilter()) return regs;
       const out = [];
       for (const r of regs || []) {
@@ -2643,6 +2657,7 @@ function ServiceWorkerOverride(G){
         }
       }
       return out;
+      });
     };
     Object.defineProperty(WrappedSWGetRegistrationsRaw, '__coreBridgeTarget__', {
       value: Native.getRegistrations,
@@ -2670,8 +2685,8 @@ function ServiceWorkerOverride(G){
     if (!desc || desc.configurable === false || desc.writable === false) {
       throw new Error(`[ServiceWorkerOverride] getRegistration not configurable: ${JSON.stringify(desc)}`);
     }
-    const WrappedSWGetRegistrationRaw = async function getRegistration(scope){
-      const r = await Native.getRegistration.apply(this, arguments);
+    const WrappedSWGetRegistrationRaw = function getRegistration(scope){
+      return Reflect.apply(Native.getRegistration, this, arguments).then(async function filterServiceWorkerRegistration(r) {
       if (!r) return wantFake() && wantFilter() ? makeFakeRegistration({ scope }) : r;
       if (!wantFilter()) return r;
 
@@ -2694,6 +2709,7 @@ function ServiceWorkerOverride(G){
         CLEANED.add(sc);
       }
       return wantFake() ? makeFakeRegistration({ scope: sc }, url) : undefined;
+      });
     };
     Object.defineProperty(WrappedSWGetRegistrationRaw, '__coreBridgeTarget__', {
       value: Native.getRegistration,

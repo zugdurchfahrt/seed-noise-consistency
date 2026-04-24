@@ -1174,6 +1174,19 @@ const ContextPatchModule = function ContextPatchModule(window) {
       }
       return instance;
     };
+    Object.defineProperty(WrappedOffscreenCanvasRaw, '__coreBridgeTarget__', {
+      value: NativeOffscreenCanvas,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    Object.setPrototypeOf(WrappedOffscreenCanvasRaw, Object.getPrototypeOf(NativeOffscreenCanvas));
+    Object.defineProperty(WrappedOffscreenCanvasRaw, 'prototype', {
+      value: NativeOffscreenCanvas.prototype,
+      writable: false,
+      configurable: false,
+      enumerable: false
+    });
     const WrappedOffscreenCanvas = registerToStringWrapper(
       WrappedOffscreenCanvasRaw,
       NativeOffscreenCanvas,
@@ -1181,13 +1194,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       'ContextPatch:OffscreenCanvas'
     );
 
-    Object.setPrototypeOf(WrappedOffscreenCanvas, NativeOffscreenCanvas);
-    Object.defineProperty(WrappedOffscreenCanvas, 'prototype', {
-      value: NativeOffscreenCanvas.prototype,
-      writable: false,
-      configurable: false,
-      enumerable: false
-    });
     Object.defineProperty(global, 'OffscreenCanvas', {
       value: WrappedOffscreenCanvas,
       writable: !!ctorDesc.writable,

@@ -197,12 +197,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
     const bridgeLabel = nativeName
       ? `function ${nativeName}() { [native code] }`
       : 'function () { [native code] }';
-    toStringOverrideMap.set(bridgeTarget, bridgeLabel);
-    toStringProxyTargetMap.set(wrapped, bridgeTarget);
-    toStringOverrideMap.set(wrapped, wrappedLabel);
     if (Object.getPrototypeOf(wrapped) !== Object.getPrototypeOf(nativeFn)) {
       throw new Error(`[CoreWindow] ${wrapperName}: function prototype chain mismatch`);
     }
+    toStringOverrideMap.set(bridgeTarget, bridgeLabel);
+    toStringProxyTargetMap.set(wrapped, bridgeTarget);
+    toStringOverrideMap.set(wrapped, wrappedLabel);
     if (toStringOverrideMap.get(bridgeTarget) !== bridgeLabel
         || toStringProxyTargetMap.get(wrapped) !== bridgeTarget
         || toStringOverrideMap.get(wrapped) !== wrappedLabel) {
