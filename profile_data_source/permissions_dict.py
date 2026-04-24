@@ -11,6 +11,8 @@ PERMISSIONS_DICT: Dict[str, List[Dict[str, str]]] = {
     "chromium-media": [
         {"name": "microphone", "cdp": "microphone", "states": ["prompt", "denied"]},
         {"name": "camera", "cdp": "camera", "states": ["prompt", "denied"]},
+        {"name": "notifications", "cdp": "notifications", "states": ["prompt", "denied"]},
+        {"name": "midi", "cdp": "midi", "states": ["prompt", "denied"]},
     ],
 }
 
@@ -26,11 +28,16 @@ def build_permissions_profile(browser_choice: str, *, rng: Optional[random.Rando
     rng = rng or random
     key = permissions_key_for(browser_choice)
     candidates = [dict(p) for p in PERMISSIONS_DICT.get(key, []) if isinstance(p, dict)]
-    count = rng.randint(0, len(candidates))
-    selected = rng.sample(candidates, count) if count else []
-    for item in selected:
-        states = item.get("states")
-        item["state"] = rng.choice(states) if isinstance(states, list) and states else "prompt"
+    selected: List[Dict] = []
+    for candidate in candidates:
+        states = candidate.get("states")
+        state_choices = list(states) if isinstance(states, list) and states else ["prompt"]
+        mode = rng.choice(["omit", *state_choices])
+        if mode == "omit":
+            continue
+        item = dict(candidate)
+        item["state"] = mode
+        selected.append(item)
     profile = {
         "key": key,
         "selected": selected,
@@ -39,7 +46,14 @@ def build_permissions_profile(browser_choice: str, *, rng: Optional[random.Rando
     }
     if strict:
         assert all(p.get("state") in ("prompt", "denied") for p in selected), "permissions profile must not grant access"
-    logger.debug("[permissions.unify] browser=%s key=%s -> %d: %s", browser_choice, key, len(selected), [p.get("name") for p in selected])
+    logger.info(
+        "[permissions.unify] browser=%s key=%s -> %d: %s states=%s",
+        browser_choice,
+        key,
+        len(selected),
+        [p.get("name") for p in selected],
+        profile["states"],
+    )
     return profile
 
 
