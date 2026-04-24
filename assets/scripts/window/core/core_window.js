@@ -178,64 +178,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     throw new Error('[CoreWindow] Function.prototype.toString missing');
   }
 
-  // Compatibility-only label primitive: do not native-label source-text-observable JS functions.
-  function baseMarkAsNative(func, name = "") {
-    if (typeof func !== 'function') return func;
-    try {
-      const hasOwnBridgeTarget = (typeof func.__coreBridgeTarget__ === 'function');
-      if (!hasOwnBridgeTarget) {
-        const bridgeErr = new Error('[CoreWindow] markAsNative requires __coreBridgeTarget__');
-        __emit('error', 'core_window:mark_as_native_bridge_missing', {
-          module: 'core',
-          diagTag: 'core_window',
-          surface: 'core',
-          key: 'Function.prototype.toString',
-          stage: 'preflight',
-          message: 'markAsNative requires __coreBridgeTarget__',
-          type: 'contract_violation',
-          data: { outcome: 'throw' }
-        }, bridgeErr);
-        throw bridgeErr;
-      }
-      const currentSource = Reflect.apply(nativeToString, func, []);
-      if (typeof currentSource === 'string' && currentSource.indexOf('[native code]') === -1) {
-        return func;
-      }
-      const bridgeTarget = __resolveWrappedBridgeTarget(func.__coreBridgeTarget__, 'baseMarkAsNative');
-      const nativeName = name || bridgeTarget.name || func.name || "";
-      const label = nativeName
-        ? `function ${nativeName}() { [native code] }`
-        : 'function () { [native code] }';
-      if (bridgeTarget !== func) {
-        const bridgeLabel = bridgeTarget.name
-          ? `function ${bridgeTarget.name}() { [native code] }`
-          : 'function () { [native code] }';
-        toStringOverrideMap.set(bridgeTarget, bridgeLabel);
-      }
-      toStringOverrideMap.set(func, label);
-    } catch (e) {
-      __emit('error', 'core_window:WeakMap.set', {
-        module: 'core',
-        diagTag: 'core_window',
-        surface: 'core',
-        key: 'Function.prototype.toString',
-        stage: 'apply',
-        message: 'WeakMap.set failed in toString override map',
-        type: 'apply_failed',
-        data: { outcome: 'throw' }
-      }, e);
-      throw e;
-    }
-    return func;
-  }
-
-  let memoMarkAsNative = null;
-  function ensureMarkAsNative() {
-    if (memoMarkAsNative) return memoMarkAsNative;
-    memoMarkAsNative = baseMarkAsNative;
-    return memoMarkAsNative;
-  }
-
   function publishCoreToStringState() {
     return {
       __CORE_TOSTRING_STATE__: true,
@@ -2078,12 +2020,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      safeDefine(Core, '__ensureMarkAsNative', {
-        value: ensureMarkAsNative,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
       safeDefine(Core, '__wrapNativeApply', {
         value: __wrapNativeApply,
         writable: true,
@@ -2104,6 +2040,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
       });
       safeDefine(Core, '__wrapAccessorGateway', {
         value: __wrapAccessorGateway,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+      safeDefine(Core, '__registerToStringWrapper', {
+        value: __registerToStringWrapper,
         writable: true,
         configurable: true,
         enumerable: false

@@ -180,21 +180,20 @@ const WebglPatchModule = function WebglPatchModule(window) {
       throw new Error('WeakMap/WeakSet are required');
     }
 
-    let markNative = null;
+    let registerToStringWrapper = null;
     try {
-      const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function')
-        ? __core.__ensureMarkAsNative
+      const register = (__core && typeof __core.__registerToStringWrapper === 'function')
+        ? __core.__registerToStringWrapper
         : null;
-      const m = ensure ? ensure() : null;
-      if (typeof m !== 'function') {
-        throw new Error('Core.__ensureMarkAsNative missing');
+      if (typeof register !== 'function') {
+        throw new Error('Core.__registerToStringWrapper missing');
       }
-      markNative = m;
+      registerToStringWrapper = register;
     } catch (e) {
-      __webglDiagPipeline('fatal', 'webgl:mark_native_missing', {
+      __webglDiagPipeline('fatal', 'webgl:register_toString_wrapper_missing', {
         stage: 'preflight',
-        key: 'Core.__ensureMarkAsNative',
-        message: 'Core.__ensureMarkAsNative missing',
+        key: 'Core.__registerToStringWrapper',
+        message: 'Core.__registerToStringWrapper missing',
         data: { outcome: 'throw' }
       }, e);
       throw e;
@@ -309,23 +308,21 @@ const WebglPatchModule = function WebglPatchModule(window) {
 
       if (typeof res.getParameter === 'function') {
         const origGetParameter = res.getParameter;
-        // Hybrid routing: normal callable surface stays on named-wrapper path
-        // (markAsNative), without forcing Proxy-based wrapping.
         const wrappedGetParameter = ({ getParameter(pname) {
-          if (pname === this.UNMASKED_VENDOR_WEBGL)
+          if (pname === this.UNMASKED_VENDOR_WEBGL) {
             return __envProfileState.webglUnmaskedVendor;
-          if (pname === this.UNMASKED_RENDERER_WEBGL)
+          }
+          if (pname === this.UNMASKED_RENDERER_WEBGL) {
             return __envProfileState.webglUnmaskedRenderer;
+          }
           return Reflect.apply(origGetParameter, this, [pname]);
         }}).getParameter;
-
-        Object.defineProperty(wrappedGetParameter, '__coreBridgeTarget__', {
-          value: origGetParameter,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        const wrappedGetParameterNative = markNative(wrappedGetParameter, 'getParameter');
+        const wrappedGetParameterNative = registerToStringWrapper(
+          wrappedGetParameter,
+          origGetParameter,
+          'getParameter',
+          'WebGLPatch:getParameter'
+        );
         res.getParameter = wrappedGetParameterNative;
       }
       if (__webglDebugInfoPatched__) {

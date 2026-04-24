@@ -157,24 +157,52 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     releaseEntryGuard(true);
     return;
   }
-  const markNative = (function resolveMarkNative() {
-    const ensure = (Core && typeof Core.__ensureMarkAsNative === 'function')
-      ? Core.__ensureMarkAsNative
+  const bridgeToStringWrapper = (function resolveToStringBridge() {
+    const register = (Core && typeof Core.__registerToStringWrapper === 'function')
+      ? Core.__registerToStringWrapper
       : null;
-    const m = ensure ? ensure() : null;
-    if (typeof m !== 'function') {
-      degrade('fatal', 'webgpu:mark_native_missing', new Error('[WebGPUPatchModule] Core.__ensureMarkAsNative missing'), {
+    const internal = (Core && Core.__internal && typeof Core.__internal === 'object')
+      ? Core.__internal
+      : null;
+    const state = (internal && internal.coreToStringState && internal.coreToStringState.__CORE_TOSTRING_STATE__ === true)
+      ? internal.coreToStringState
+      : null;
+    const overrideMap = state && state.overrideMap instanceof WeakMap ? state.overrideMap : null;
+    const proxyTargetMap = state && state.proxyTargetMap instanceof WeakMap ? state.proxyTargetMap : null;
+    if (!overrideMap || !proxyTargetMap) {
+      degrade('fatal', 'webgpu:toString_bridge_missing', new Error('[WebGPUPatchModule] Core.__internal.coreToStringState missing'), {
         stage: 'preflight',
         type: __webgpuTypePipeline,
-        key: 'Core.__ensureMarkAsNative',
-        message: 'Core.__ensureMarkAsNative missing',
-        data: { outcome: 'skip', reason: 'missing_dep_markAsNative' }
+        key: 'Core.__internal.coreToStringState',
+        message: 'Core.__internal.coreToStringState missing',
+        data: { outcome: 'skip', reason: 'missing_dep_toStringBridge' }
       });
       return null;
     }
-    return m;
+    return function bridgeToStringWrapperImpl(wrapped, nativeFn, wrappedName, wrapperTag) {
+      if (typeof wrapped !== 'function' || typeof nativeFn !== 'function') {
+        throw new TypeError('[WebGPUPatchModule] bridgeToStringWrapper requires functions');
+      }
+      if (typeof register === 'function' && Object.getPrototypeOf(wrapped) === Object.getPrototypeOf(nativeFn)) {
+        return register(wrapped, nativeFn, wrappedName, wrapperTag);
+      }
+      const bridgeTarget = (typeof nativeFn.__coreBridgeTarget__ === 'function')
+        ? nativeFn.__coreBridgeTarget__
+        : nativeFn;
+      const wrappedLabel = wrappedName
+        ? `function ${wrappedName}() { [native code] }`
+        : 'function () { [native code] }';
+      const bridgeName = bridgeTarget.name || '';
+      const bridgeLabel = bridgeName
+        ? `function ${bridgeName}() { [native code] }`
+        : 'function () { [native code] }';
+      overrideMap.set(bridgeTarget, bridgeLabel);
+      proxyTargetMap.set(wrapped, bridgeTarget);
+      overrideMap.set(wrapped, wrappedLabel);
+      return wrapped;
+    };
   })();
-  if (!markNative) {
+  if (!bridgeToStringWrapper) {
     releaseEntryGuard(true);
     return;
   }
@@ -518,13 +546,12 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
                   throw e;
                 }
               };
-              Object.defineProperty(hasRaw, '__coreBridgeTarget__', {
-                value: nativeHas,
-                writable: true,
-                configurable: true,
-                enumerable: false
-              });
-              methodCache.has = markNative(hasRaw, 'has');
+              methodCache.has = bridgeToStringWrapper(
+                hasRaw,
+                nativeHas,
+                'has',
+                'WebGPUPatch:features.has'
+              );
             }
             return methodCache.has;
           }
@@ -533,32 +560,29 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               const nativeForEach = Reflect.get(target, 'forEach', target);
               const forEachRaw = function forEach(cb, thisArg) {
                 if (this !== proxy && this !== target) {
-                  if (typeof nativeForEach === 'function') {
-                    try {
-                      return Reflect.apply(nativeForEach, this, [cb, thisArg]);
-                    } catch (e) {
-                      degrade('warn', 'webgpu:features:forEach_native_throw', e, {
-                        stage: 'runtime',
-                        type: __webgpuTypeBrowser,
-                        diagTag: 'webgpu',
-                        key: 'GPUSupportedFeatures.forEach',
-                        message: 'GPUSupportedFeatures.forEach threw',
-                        data: { outcome: 'throw', reason: 'native_throw' }
-                      });
-                      throw e;
-                    }
+                  try {
+                    return Reflect.apply(nativeForEach, this, [cb, thisArg]);
+                  } catch (e) {
+                    degrade('warn', 'webgpu:features:forEach_native_throw', e, {
+                      stage: 'runtime',
+                      type: __webgpuTypeBrowser,
+                      diagTag: 'webgpu',
+                      key: 'GPUSupportedFeatures.forEach',
+                      message: 'GPUSupportedFeatures.forEach threw',
+                      data: { outcome: 'throw', reason: 'native_throw' }
+                    });
+                    throw e;
                   }
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) cb.call(thisArg, v, v, proxy);
               };
-              Object.defineProperty(forEachRaw, '__coreBridgeTarget__', {
-                value: nativeForEach,
-                writable: true,
-                configurable: true,
-                enumerable: false
-              });
-              methodCache.forEach = markNative(forEachRaw, 'forEach');
+              methodCache.forEach = bridgeToStringWrapper(
+                forEachRaw,
+                nativeForEach,
+                'forEach',
+                'WebGPUPatch:features.forEach'
+              );
             }
             return methodCache.forEach;
           }
@@ -569,32 +593,29 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               const nativeIter = Reflect.get(target, prop, target);
               const iteratorRaw = function* iterator() {
                 if (this !== proxy && this !== target) {
-                  if (typeof nativeIter === 'function') {
-                    try {
-                      return yield* Reflect.apply(nativeIter, this, []);
-                    } catch (e) {
-                      degrade('warn', 'webgpu:features:' + String(name) + '_native_throw', e, {
-                        stage: 'runtime',
-                        type: __webgpuTypeBrowser,
-                        diagTag: 'webgpu',
-                        key: 'GPUSupportedFeatures.' + String(name),
-                        message: 'GPUSupportedFeatures.' + String(name) + ' threw',
-                        data: { outcome: 'throw', reason: 'native_throw' }
-                      });
-                      throw e;
-                    }
+                  try {
+                    return yield* Reflect.apply(nativeIter, this, []);
+                  } catch (e) {
+                    degrade('warn', 'webgpu:features:' + String(name) + '_native_throw', e, {
+                      stage: 'runtime',
+                      type: __webgpuTypeBrowser,
+                      diagTag: 'webgpu',
+                      key: 'GPUSupportedFeatures.' + String(name),
+                      message: 'GPUSupportedFeatures.' + String(name) + ' threw',
+                      data: { outcome: 'throw', reason: 'native_throw' }
+                    });
+                    throw e;
                   }
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) yield v;
               };
-              Object.defineProperty(iteratorRaw, '__coreBridgeTarget__', {
-                value: nativeIter,
-                writable: true,
-                configurable: true,
-                enumerable: false
-              });
-              methodCache[key] = markNative(iteratorRaw, name);
+              methodCache[key] = bridgeToStringWrapper(
+                iteratorRaw,
+                nativeIter,
+                name,
+                'WebGPUPatch:features.' + String(name)
+              );
             }
             return methodCache[key];
           }
@@ -603,32 +624,29 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               const nativeEntries = Reflect.get(target, 'entries', target);
               const entriesRaw = function* entries() {
                 if (this !== proxy && this !== target) {
-                  if (typeof nativeEntries === 'function') {
-                    try {
-                      return yield* Reflect.apply(nativeEntries, this, []);
-                    } catch (e) {
-                      degrade('warn', 'webgpu:features:entries_native_throw', e, {
-                        stage: 'runtime',
-                        type: __webgpuTypeBrowser,
-                        diagTag: 'webgpu',
-                        key: 'GPUSupportedFeatures.entries',
-                        message: 'GPUSupportedFeatures.entries threw',
-                        data: { outcome: 'throw', reason: 'native_throw' }
-                      });
-                      throw e;
-                    }
+                  try {
+                    return yield* Reflect.apply(nativeEntries, this, []);
+                  } catch (e) {
+                    degrade('warn', 'webgpu:features:entries_native_throw', e, {
+                      stage: 'runtime',
+                      type: __webgpuTypeBrowser,
+                      diagTag: 'webgpu',
+                      key: 'GPUSupportedFeatures.entries',
+                      message: 'GPUSupportedFeatures.entries threw',
+                      data: { outcome: 'throw', reason: 'native_throw' }
+                    });
+                    throw e;
                   }
                 }
                 const allowed = __collectAllowedFeatures(target);
                 for (const v of allowed) yield [v, v];
               };
-              Object.defineProperty(entriesRaw, '__coreBridgeTarget__', {
-                value: nativeEntries,
-                writable: true,
-                configurable: true,
-                enumerable: false
-              });
-              methodCache.entries = markNative(entriesRaw, 'entries');
+              methodCache.entries = bridgeToStringWrapper(
+                entriesRaw,
+                nativeEntries,
+                'entries',
+                'WebGPUPatch:features.entries'
+              );
             }
             return methodCache.entries;
           }

@@ -1731,56 +1731,19 @@ const __probeRun = async function(){
         const core = globalThis && globalThis.Core && typeof globalThis.Core === "object"
           ? globalThis.Core
           : null;
-        const ensureMarkAsNative = core && typeof core.__ensureMarkAsNative === "function"
-          ? core.__ensureMarkAsNative
-          : null;
         const internal = core && core.__internal && typeof core.__internal === "object"
           ? core.__internal
           : null;
         const state = internal && internal.coreToStringState && internal.coreToStringState.__CORE_TOSTRING_STATE__ === true
           ? internal.coreToStringState
           : null;
-        if (typeof ensureMarkAsNative !== "function") {
-          throw new Error("Core.__ensureMarkAsNative missing");
-        }
         if (!state || typeof state.nativeToString !== "function" || !(state.overrideMap instanceof WeakMap) || !(state.proxyTargetMap instanceof WeakMap)) {
           throw new Error("Core.__internal.coreToStringState missing");
         }
-        const markAsNative = ensureMarkAsNative();
-        if (typeof markAsNative !== "function") {
-          throw new Error("markAsNative seed missing");
-        }
-        const toStringOverrideMap = state.overrideMap;
-        const toStringProxyTargetMap = state.proxyTargetMap;
-        const nativeToString = state.nativeToString;
-        const seedProbe = function seedProbe(){};
-        Object.defineProperty(seedProbe, "__coreBridgeTarget__", {
-          value: nativeToString,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        const seedProbeSource = Reflect.apply(nativeToString, seedProbe, []);
-        let leakedLabel = false;
-        let actualSource = null;
-        try {
-          markAsNative(seedProbe, "toString");
-          leakedLabel = typeof toStringOverrideMap.get(seedProbe) === "string";
-          actualSource = Reflect.apply(Function.prototype.toString, seedProbe, []);
-        } finally {
-          toStringProxyTargetMap.delete(seedProbe);
-          toStringOverrideMap.delete(seedProbe);
-        }
-        if (leakedLabel) {
-          throw new Error("source-text toString probe must stay unlabeled");
-        }
-        if (actualSource !== seedProbeSource) {
-          throw new Error("source-text toString probe forwarding mismatch");
-        }
         return {
           ok: true,
-          labelLeaked: false,
-          forwardingMatch: true
+          legacyExportPresent: !!(core && Object.prototype.hasOwnProperty.call(core, "__ensureMarkAsNative")),
+          statePresent: true
         };
       } catch (error) {
         return {

@@ -370,12 +370,22 @@ const WrkModule = function WrkModule(window) {
 
   try {
     const mark = (function() {
-      const ensure = (__core && typeof __core.__ensureMarkAsNative === 'function') ? __core.__ensureMarkAsNative : null;
-      const m = ensure ? ensure() : null;
-      if (typeof m !== 'function') {
-        throw new Error('[WrkModule] markAsNative missing');
+      const register = (__core && typeof __core.__registerToStringWrapper === 'function')
+        ? __core.__registerToStringWrapper
+        : null;
+      if (typeof register !== 'function') {
+        throw new Error('[WrkModule] Core.__registerToStringWrapper missing');
       }
-      return m;
+      return function registerNativeSurface(raw, label) {
+        const bridgeTarget = raw && raw.__coreBridgeTarget__;
+        if (typeof raw !== 'function' || typeof bridgeTarget !== 'function') {
+          throw new Error('[WrkModule] bridge target missing');
+        }
+        if (Object.getPrototypeOf(raw) !== Object.getPrototypeOf(bridgeTarget)) {
+          throw new Error('[WrkModule] function prototype chain mismatch');
+        }
+        return register(raw, bridgeTarget, label, 'WrkModule:' + String(label || 'anonymous'));
+      };
     })();
 
     const __hiddenSurfaceState = {

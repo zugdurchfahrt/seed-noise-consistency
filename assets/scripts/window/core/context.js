@@ -272,22 +272,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
   }
 
   const patchedMethods = new WeakSet();
-  const markAsNative = (function() {
-    const core = (global && global.Core && typeof global.Core === 'object')
-      ? global.Core
-      : null;
-    const ensure = core && typeof core.__ensureMarkAsNative === 'function'
-      ? core.__ensureMarkAsNative
-      : null;
-
-    const m = ensure ? ensure() : null;
-    if (typeof m !== 'function') {
-      throw new Error('[ContextPatch] markAsNative missing');
-    }
-    return function(fn, name) {
-      return m(fn, name);
-    };
-  })();
+  const coreWindow = (global && global.Core && typeof global.Core === 'object')
+    ? global.Core
+    : null;
+  const registerToStringWrapper = (coreWindow && typeof coreWindow.__registerToStringWrapper === 'function')
+    ? coreWindow.__registerToStringWrapper
+    : null;
+  if (typeof registerToStringWrapper !== 'function') {
+    throw new Error('[ContextPatch] Core.__registerToStringWrapper missing');
+  }
 
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
@@ -1046,13 +1039,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
     };
 
     const wrappedGetContext = dispatch.bind(null, owner);
-    Object.defineProperty(wrappedGetContext, '__coreBridgeTarget__', {
-      value: orig,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-    const wrapped = markAsNative(wrappedGetContext, 'getContext');
+    const wrapped = registerToStringWrapper(
+      wrappedGetContext,
+      orig,
+      'getContext',
+      'ContextPatch:getContext'
+    );
     if (!defineIssuedMethod(owner, proto, 'getContext', wrapped)) return 0;
     patchedMethods.add(wrapped);
     if (issuedGetContextPatchedOwners) issuedGetContextPatchedOwners.add(owner);
@@ -1099,13 +1091,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
         }
         return el;
       };
-      Object.defineProperty(wrappedCreateElementRaw, '__coreBridgeTarget__', {
-        value: createElementOrig,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      const wrappedCreateElement = markAsNative(wrappedCreateElementRaw, 'createElement');
+      const wrappedCreateElement = registerToStringWrapper(
+        wrappedCreateElementRaw,
+        createElementOrig,
+        'createElement',
+        'ContextPatch:createElement'
+      );
       if (defineIssuedMethod(doc, createElementProto, 'createElement', wrappedCreateElement)) {
         patchedMethods.add(wrappedCreateElement);
         applied++;
@@ -1128,13 +1119,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
         }
         return el;
       };
-      Object.defineProperty(wrappedCreateElementNSRaw, '__coreBridgeTarget__', {
-        value: createElementNSOrig,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      const wrappedCreateElementNS = markAsNative(wrappedCreateElementNSRaw, 'createElementNS');
+      const wrappedCreateElementNS = registerToStringWrapper(
+        wrappedCreateElementNSRaw,
+        createElementNSOrig,
+        'createElementNS',
+        'ContextPatch:createElementNS'
+      );
       if (defineIssuedMethod(doc, createElementNSProto, 'createElementNS', wrappedCreateElementNS)) {
         patchedMethods.add(wrappedCreateElementNS);
         applied++;
@@ -1184,13 +1174,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
       }
       return instance;
     };
-    Object.defineProperty(WrappedOffscreenCanvasRaw, '__coreBridgeTarget__', {
-      value: NativeOffscreenCanvas,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
-    const WrappedOffscreenCanvas = markAsNative(WrappedOffscreenCanvasRaw, 'OffscreenCanvas');
+    const WrappedOffscreenCanvas = registerToStringWrapper(
+      WrappedOffscreenCanvasRaw,
+      NativeOffscreenCanvas,
+      'OffscreenCanvas',
+      'ContextPatch:OffscreenCanvas'
+    );
 
     Object.setPrototypeOf(WrappedOffscreenCanvas, NativeOffscreenCanvas);
     Object.defineProperty(WrappedOffscreenCanvas, 'prototype', {
