@@ -342,9 +342,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     // strictness & diagnostics
     const STRICT        = (__envProfileState.strict !== undefined) ? !!__envProfileState.strict : true;
     const DEBUG         = !!__envProfileState.debug;
-    let mediaDevicesLabelsUnlocked = false;
-    let mediaMicGranted = false;
-    let mediaCameraGranted = false;
     let __navNativePermissionsQuery = null;
     let __navNativePermissionsThis = null;
     let __navPermissionsState = (__navModuleState.__PERMISSIONS_STATE__ && typeof __navModuleState.__PERMISSIONS_STATE__ === 'object')
@@ -360,21 +357,36 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     function __navGetPermissionState(name) {
       return __navNormalizePermissionState(__navPermissionsState ? __navPermissionsState[name] : undefined);
     }
-    function syncMediaLabelsUnlocked() {
-      mediaDevicesLabelsUnlocked = !!(mediaMicGranted || mediaCameraGranted);
-    }
-    function __navApplyPermissionGateState() {
-      mediaMicGranted = (__navGetPermissionState('microphone') === 'granted');
-      mediaCameraGranted = (__navGetPermissionState('camera') === 'granted');
-      syncMediaLabelsUnlocked();
-      __navPermissionsState.mediaMicGranted = mediaMicGranted;
-      __navPermissionsState.mediaCameraGranted = mediaCameraGranted;
-      __navPermissionsState.mediaDevicesLabelsUnlocked = mediaDevicesLabelsUnlocked;
-    }
     function __navSetPermissionState(name, state, source) {
-      if (name !== 'microphone' && name !== 'camera') return;
-      __navPermissionsState[name] = __navNormalizePermissionState(state);
-      __navApplyPermissionGateState();
+      if (typeof name !== 'string' || !name) {
+        __navDiag('error', 'nav_total_set:permission_state_name_invalid', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:permissions.state',
+          key: 'permissions',
+          message: 'permission state name invalid',
+          data: { outcome: 'return', reason: 'permission_state_name_invalid' }
+        });
+        return false;
+      }
+      const normalizedState = __navNormalizePermissionState(state);
+      if ((state !== 'prompt' && state !== 'denied') || (normalizedState !== 'prompt' && normalizedState !== 'denied')) {
+        __navDiag('error', 'nav_total_set:permission_state_forbidden', {
+          stage: 'preflight',
+          type: __navTypePipeline,
+          diagTag: 'nav_total_set:permissions.state',
+          key: `permissions.${name}`,
+          message: 'permission state must stay prompt or denied in profile state',
+          data: {
+            outcome: 'return',
+            reason: 'permission_state_forbidden',
+            permission: name,
+            state: state
+          }
+        });
+        return false;
+      }
+      __navPermissionsState[name] = normalizedState;
       __navDiag('info', 'nav_total_set:permission_state_updated', {
         stage: 'runtime',
         type: __navTypePipeline,
@@ -389,80 +401,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           source: (typeof source === 'string' && source) ? source : 'internal'
         }
       });
+      return true;
     }
-    function __navPermissionIsGranted(name) {
-      return __navGetPermissionState(name) === 'granted';
-    }
-    function __navBuildEnumerateDevicesPayload() {
-      if (!devicesLabels || typeof devicesLabels !== 'object') {
-        __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_missing', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-          key: 'mediaDevices.enumerateDevices',
-          message: 'devices labels missing'
-        });
-        return null;
+    function __navApplyPermissionGateState(source) {
+      const permissionStates = (devicesLabels && typeof devicesLabels === 'object' && devicesLabels.states && typeof devicesLabels.states === 'object')
+        ? devicesLabels.states
+        : null;
+      if (!permissionStates) return true;
+      const names = Object.keys(permissionStates);
+      for (let i = 0; i < names.length; i++) {
+        const name = names[i];
+        if (!__navSetPermissionState(name, permissionStates[name], source || 'profile_state')) return false;
       }
-      if (typeof devicesLabels.audioinput !== 'string'
-        || typeof devicesLabels.videoinput !== 'string'
-        || typeof devicesLabels.audiooutput !== 'string') {
-        __navDiag('error', 'nav_total_set:mediaDevices_devices_labels_invalid', {
-          stage: 'runtime',
-          type: __navTypePipeline,
-          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-          key: 'mediaDevices.enumerateDevices',
-          message: 'devices labels invalid'
-        });
-        return null;
-      }
-      if (typeof R !== 'function') {
-        return null;
-      }
-      const generateHexId = (len = 64) => {
-        let s = '';
-        for (let i = 0; i < len; ++i) s += Math.floor(R() * 16).toString(16);
-        return s;
-      };
-      __navApplyPermissionGateState();
-      const audioUnlocked = __navPermissionIsGranted('microphone');
-      const videoUnlocked = __navPermissionIsGranted('camera');
-      __navQueryNativePermissionState('microphone', function (nativeState) {
-        __navCheckPermissionSemanticMismatch('microphone', nativeState);
-      });
-      __navQueryNativePermissionState('camera', function (nativeState) {
-        __navCheckPermissionSemanticMismatch('camera', nativeState);
-      });
-      const groupId = generateHexId(64);
-      return {
-        logExtra: {
-          bucket: 'hidden_implementation',
-          multimediaDevices: { speakers: 1, micros: 1, webcams: 1 },
-          labelsHidden: !(audioUnlocked || videoUnlocked),
-          audioUnlocked,
-          videoUnlocked
-        },
-        devices: [
-          {
-            kind: 'audioinput',
-            label: audioUnlocked ? devicesLabels.audioinput : '',
-            deviceId: audioUnlocked ? generateHexId(64) : '',
-            groupId: audioUnlocked ? groupId : ''
-          },
-          {
-            kind: 'videoinput',
-            label: videoUnlocked ? devicesLabels.videoinput : '',
-            deviceId: videoUnlocked ? generateHexId(64) : '',
-            groupId: videoUnlocked ? groupId : ''
-          },
-          {
-            kind: 'audiooutput',
-            label: audioUnlocked ? devicesLabels.audiooutput : '',
-            deviceId: audioUnlocked ? generateHexId(64) : '',
-            groupId: audioUnlocked ? generateHexId(64) : ''
-          }
-        ]
-      };
+      return true;
     }
     function __navQueryNativePermissionState(name, onResolved) {
       if (typeof __navNativePermissionsQuery !== 'function' || !__navNativePermissionsThis) return;
@@ -494,14 +445,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }, e);
       });
     }
-    function __navMaybeSeedPermissionStateFromNative(name) {
-      if (Object.prototype.hasOwnProperty.call(__navPermissionsState, name)) return;
-      __navQueryNativePermissionState(name, function (state) {
-        if (state === 'granted' || state === 'denied' || state === 'prompt') {
-          __navSetPermissionState(name, state, 'native_seed');
-        }
-      });
-    }
     function __navCheckPermissionSemanticMismatch(name, nativeState) {
       if (nativeState !== 'granted' && nativeState !== 'denied' && nativeState !== 'prompt') return;
       const internalState = __navGetPermissionState(name);
@@ -521,11 +464,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       });
     }
+    if (!__navApplyPermissionGateState('profile_state')) {
+      __navReleaseEntryGuard(true, 'preflight', 'bad_permissions_profile');
+      return;
+    }
     __navSetHiddenStateValue(__navModuleState, '__GET_PERMISSION_STATE__', __navGetPermissionState);
     __navSetHiddenStateValue(__navModuleState, '__SET_PERMISSION_STATE__', __navSetPermissionState);
-    __navSetHiddenStateValue(__navModuleState, '__ENUMERATE_DEVICES_IMPL__', __navBuildEnumerateDevicesPayload);
-    __navApplyPermissionGateState();
-
     if (!Number.isFinite(dpr) || dpr <= 0) {
       __navDiagPipeline('error', 'nav_total_set:bad_dpr', {
         stage: 'preflight',
@@ -2566,95 +2510,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         } else {
           __navNativePermissionsQuery = origQuery;
           __navNativePermissionsThis = navigator.permissions;
-          __navMaybeSeedPermissionStateFromNative('microphone');
-          __navMaybeSeedPermissionStateFromNative('camera');
+          if (devicesLabels && typeof devicesLabels === 'object' && devicesLabels.states && typeof devicesLabels.states === 'object') {
+            Object.keys(devicesLabels.states).forEach(function probePermissionState(name) {
+              __navQueryNativePermissionState(name, function (nativeState) {
+                __navCheckPermissionSemanticMismatch(name, nativeState);
+              });
+            });
+          }
           __navDiag('info', 'nav_total_set:permissions_query_native_passthrough', {
             stage: 'apply',
             type: __navTypePipeline,
             diagTag: 'nav_total_set:permissions.query',
             key: 'permissions.query',
-            message: 'permissions.query left native; gate state moved to hidden state',
+            message: 'permissions.query left native; permission state is managed by browser context',
             data: {
               outcome: 'return',
               reason: 'native_passthrough',
               ownerIsPrototype: permOwner !== navigator.permissions
-            }
-          });
-        }
-      }
-    }
-
-    // ——— I. mediaDevices.enumerateDevices ———
-    if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
-      const mediaProto = Object.getPrototypeOf(navigator.mediaDevices) || navigator.mediaDevices;
-      const mediaResolved = __navResolveDescriptor
-        ? __navResolveDescriptor(mediaProto, 'enumerateDevices', { mode: 'proto_chain' })
-        : {
-            owner: Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices') ? mediaProto : navigator.mediaDevices,
-            desc: Object.getOwnPropertyDescriptor(mediaProto, 'enumerateDevices')
-              || Object.getOwnPropertyDescriptor(navigator.mediaDevices, 'enumerateDevices')
-              || null
-          };
-      const mediaDesc = mediaResolved ? mediaResolved.desc : null;
-      const mediaOwner = (mediaResolved && mediaResolved.owner) ? mediaResolved.owner : mediaProto;
-      if (!mediaDesc) {
-        __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_descriptor_missing', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-          key: 'mediaDevices.enumerateDevices',
-          message: 'mediaDevices.enumerateDevices descriptor missing'
-        });
-      } else if (!Object.prototype.hasOwnProperty.call(mediaDesc, 'value') || typeof mediaDesc.value !== 'function') {
-        __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_descriptor_kind_mismatch', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-          key: 'mediaDevices.enumerateDevices',
-          message: 'mediaDevices.enumerateDevices is not method-shaped on prototype'
-        });
-      } else if (mediaOwner === navigator.mediaDevices) {
-        __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_owner_mismatch', {
-          stage: 'preflight',
-          type: __navTypeBrowser,
-          diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-          key: 'mediaDevices.enumerateDevices',
-          message: 'mediaDevices.enumerateDevices resolved to instance owner',
-          data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-        });
-      } else {
-        __navRegisterKey('mediaDevices.enumerateDevices');
-        const origEnumerateDevices = mediaDesc.value;
-        if (typeof origEnumerateDevices !== 'function') {
-          __navDiag('error', 'nav_total_set:mediaDevices_enumerateDevices_original_missing', {
-            stage: 'preflight',
-            type: __navTypeBrowser,
-            diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-            key: 'mediaDevices.enumerateDevices',
-            message: 'mediaDevices.enumerateDevices original missing'
-          });
-        } else {
-          __navSetHiddenStateValue(__navModuleState, '__ENUMERATE_DEVICES_SNAPSHOT_GATE__', function enumerateDevicesSnapshotGate() {
-            const buildImpl = (__navModuleState && typeof __navModuleState.__ENUMERATE_DEVICES_IMPL__ === 'function')
-              ? __navModuleState.__ENUMERATE_DEVICES_IMPL__
-              : __navBuildEnumerateDevicesPayload;
-            const payload = buildImpl();
-            if (!payload || !Array.isArray(payload.devices)) {
-              return Reflect.apply(origEnumerateDevices, navigator.mediaDevices, []);
-            }
-            __navLogAccess('mediaDevices.enumerateDevices', null, payload.logExtra || { bucket: 'hidden_snapshot_gate' });
-            return Promise.resolve(payload.devices);
-          });
-          __navDiag('info', 'nav_total_set:mediaDevices_enumerateDevices_native_passthrough', {
-            stage: 'apply',
-            type: __navTypePipeline,
-            diagTag: 'nav_total_set:mediaDevices.enumerateDevices',
-            key: 'mediaDevices.enumerateDevices',
-            message: 'mediaDevices.enumerateDevices left native; synthetic devices moved to hidden gate',
-            data: {
-              outcome: 'return',
-              reason: 'native_passthrough',
-              ownerIsPrototype: mediaOwner !== navigator.mediaDevices
             }
           });
         }

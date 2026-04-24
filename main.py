@@ -69,6 +69,7 @@ import tools.tools_infra.vpn_utils as vpn_utils_module
 
 import tools.generators.rand_met as rand_met_module
 import profile_data_source.plugins_dict as plugins_dict_module
+import profile_data_source.permissions_dict as permissions_dict_module
 from profile_data_source.plugins_dict import build_plugins_profile
 from tools.tools_runtime.helpers import (
     build_device_metrics,
@@ -88,6 +89,7 @@ setup_logger(child_levels={
     "vpn_utils": logging.DEBUG,
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
+    "permissions_dict": logging.INFO,
 })
 
 
@@ -108,6 +110,7 @@ def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
     return {
         "profile": _rng_for("profile"),
         "plugins": _rng_for("plugins"),
+        "permissions": _rng_for("permissions"),
         "headers": _rng_for("headers"),
         "vpn": _rng_for("vpn"),
     }
@@ -374,6 +377,20 @@ def init_driver(
         device_metrics=build_bootstrap_device_metrics(),
 
     )
+
+    permissions_profile = devices_conf if isinstance(devices_conf, dict) else {}
+    for item in permissions_profile.get("cdp", []):
+        permission_name = item.get("permission") if isinstance(item, dict) else None
+        setting = item.get("setting") if isinstance(item, dict) else None
+        if setting == "granted":
+            raise ValueError(f"unsafe permissions profile item: {item!r}")
+        if not permission_name or setting not in {"prompt", "denied"}:
+            raise ValueError(f"invalid permissions profile item: {item!r}")
+        driver.execute_cdp_cmd("Browser.setPermission", {
+            "permission": {"name": permission_name},
+            "setting": setting,
+        })
+        logger.info("[permissions.profile] Browser.setPermission %s=%s", permission_name, setting)
 
 
     # --- Initial fonts patch ---
@@ -940,9 +957,11 @@ def main():
         # -------- Getting PRNG random for each module -------------------
         profile_rng = seed_int["profile"]
         plugins_rng = seed_int["plugins"]
+        permissions_rng = seed_int["permissions"]
         headers_rng = seed_int["headers"]
         helpers_module.random = profile_rng
         plugins_dict_module.random = plugins_rng
+        permissions_dict_module.random = permissions_rng
         rand_met_module.RAND_MET_DERIVATIVE = _derive_rand_met_seed_material(global_seed, "rand_met")
         
         if hasattr(headers_adapter_module, "_pick_nav_template"):
@@ -1102,11 +1121,8 @@ def main():
         # -----------------------  navigator.plugins source profile (mimeTypes are derived in JS) -----------------------
         plugins_final = build_plugins_profile(browser_choice, rng=plugins_rng, strict=False)
 
-        # ----------------------- mediaDevices.enumerateDevices -----------------------
-        audioinput = profile_rng.choice(data["audioinput"])['name']
-        videoinput = profile_rng.choice(data["videoinput"])['name']
-        audiooutput = profile_rng.choice(data["headphone"])['name']
-        devices_conf = {"audioinput": audioinput, "videoinput": videoinput, "audiooutput": audiooutput}
+        # ----------------------- permissions.query / Browser.setPermission source profile -----------------------
+        devices_conf = permissions_dict_module.build_permissions_profile(browser_choice, rng=permissions_rng, strict=True)
 
         # ----------------------------Setting up GPU and Screen -----------------------
         gpu = profile_rng.choice(data["GPU"])
@@ -1268,11 +1284,6 @@ def main():
             global_seed,
         )
 
-        # apply_page_hardware_override(
-        #     driver,
-        #     hardware_concurrency_value=hardware_concurrency_value,
-        # )
-
         # ----------------------- ADDITIONAL CDP REPEAT PATCHING IF NEEDED  -----------------------
         if browser_brand == "Safari":
             override_js = Path(SCRIPTS_PATCHES_NAV / "override_ua_data.js").read_text(encoding="utf-8")
@@ -1293,7 +1304,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/")
+        driver.get("https://www.browserscan.net/media-devices")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
