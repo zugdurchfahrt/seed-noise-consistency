@@ -604,7 +604,7 @@
     let swLanguagesValue = Array.isArray(langs) ? langs.slice() : [];
     let swHardwareConcurrencyValue = Number(hc);
     let swDeviceMemoryValue = Number(dm);
-    let swPatchHardwareConcurrency = true;
+    let swPatchHardwareConcurrency = false;
 
     try {
       const nativeLanguageRead = __readNativeWorkerNavigatorValue('language');
@@ -769,7 +769,6 @@
       const nativeHardwareConcurrency = Number(nativeHardwareConcurrencyRead.value);
       if (Number.isFinite(nativeHardwareConcurrency) && nativeHardwareConcurrency > 0) {
         if (Object.is(nativeHardwareConcurrency, Number(hc))) {
-          swPatchHardwareConcurrency = false;
           __swDiag('info', 'sw_prelude:hardwareConcurrency_native_skip', {
             stage: 'preflight',
             key: 'hardwareConcurrency',
@@ -783,16 +782,16 @@
             }
           }, null);
         } else {
-          __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_profile_mismatch_patch_accessor', {
+          __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
             stage: 'preflight',
             key: 'hardwareConcurrency',
-            message: 'service worker hardwareConcurrency native getter value differs from profile value; accessor patch will be applied',
+            message: 'service worker hardwareConcurrency native getter value differs from profile value; native getter kept',
             type: 'browser structure missing data',
             data: {
-              outcome: 'continue',
-              reason: 'native_profile_mismatch',
-              policy: 'patch',
-              action: 'patch_accessor',
+              outcome: 'skip',
+              reason: 'getter_value_mismatch',
+              policy: 'skip',
+              action: 'keep_native_getter',
               nativeValue: nativeHardwareConcurrency,
               profileValue: Number(hc)
             }
@@ -1303,17 +1302,13 @@
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'native_skip', value: swLanguagesValue.slice() }
     }, null);
-    if (swPatchHardwareConcurrency) {
-      applyServiceWorkerNavigatorAccessorTarget('hardwareConcurrency', function() { return Number(swHardwareConcurrencyValue); }, 'sw_prelude:hardwareConcurrency');
-    } else {
-      __swDiag('info', 'sw_prelude:hardwareConcurrency_accessor_native_skip', {
-        stage: 'apply',
-        key: 'hardwareConcurrency',
-        message: 'service worker hardwareConcurrency accessor left native',
-        type: 'browser structure missing data',
-        data: { outcome: 'skip', reason: 'native_skip', value: Number(swHardwareConcurrencyValue) }
-      }, null);
-    }
+    __swDiag('info', 'sw_prelude:hardwareConcurrency_accessor_native_skip', {
+      stage: 'apply',
+      key: 'hardwareConcurrency',
+      message: 'service worker hardwareConcurrency accessor left native',
+      type: 'browser structure missing data',
+      data: { outcome: 'skip', reason: 'native_skip', value: Number(swHardwareConcurrencyValue) }
+    }, null);
     __swDiag('info', 'sw_prelude:deviceMemory_accessor_native_passthrough', {
       stage: 'apply',
       key: 'deviceMemory',

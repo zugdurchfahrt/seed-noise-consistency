@@ -558,7 +558,14 @@ def run():
             raise RuntimeError("SW inject: SW_ENV hardwareConcurrency/meta.hardwareConcurrency mismatch")
         sw_env_prelude = _build_sw_env_prelude(SW_ENV)
         sw_prelude = _build_sw_prelude(SW_ENV)
-        sw_user_agent_override = _build_sw_user_agent_override(SW_ENV)
+    sw_user_agent_override = _build_sw_user_agent_override(SW_ENV)
+    sw_hardware_concurrency_override = None
+    if isinstance(SW_ENV, dict):
+        sw_hardware_concurrency = SW_ENV.get("hc")
+        if isinstance(sw_hardware_concurrency, (int, float)) and int(sw_hardware_concurrency) > 0:
+            sw_hardware_concurrency_override = {
+                "hardwareConcurrency": int(sw_hardware_concurrency),
+            }
 
     # Post-inject sanity probe (read back values in the SW context).
     sanity_expr = None
@@ -864,6 +871,8 @@ def run():
             try:
                 logger.info("SW inject: injecting prelude+sanity targetId=%s sessionId=%s", tid, sessionId)
                 send_sess(ws, sessionId, "Emulation.setUserAgentOverride", sw_user_agent_override)
+                if sw_hardware_concurrency_override is not None:
+                    send_sess(ws, sessionId, "Emulation.setHardwareConcurrencyOverride", sw_hardware_concurrency_override)
                 send_sess(ws, sessionId, "Runtime.enable")
                 send_sess(ws, sessionId, "Runtime.addBinding", {
                     "name": _SW_DIAG_BINDING
