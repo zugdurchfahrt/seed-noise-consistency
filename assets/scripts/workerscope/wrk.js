@@ -537,16 +537,17 @@ function EnvBus(G){
       ? fontsRoot.__STATE__
       : null;
     if (!fontsState) return null;
+    const awaitReadyStatus = (typeof fontsState.awaitReadyStatus === 'string' && fontsState.awaitReadyStatus)
+      ? fontsState.awaitReadyStatus
+      : null;
     return {
       ready: fontsState.ready === true,
       error: Object.prototype.hasOwnProperty.call(fontsState, 'error')
         ? __cloneEnvValue(fontsState.error)
         : null,
       awaitReady: null,
-      awaitReadyStatus: (typeof fontsState.awaitReadyStatus === 'string' && fontsState.awaitReadyStatus)
-        ? fontsState.awaitReadyStatus
-        : null,
-      awaitReadyPending: !!(fontsState.awaitReady && typeof fontsState.awaitReady.then === 'function'),
+      awaitReadyStatus,
+      awaitReadyPending: awaitReadyStatus === 'pending' && !!(fontsState.awaitReady && typeof fontsState.awaitReady.then === 'function'),
       familySnapshot: __cloneFontsFamilySnapshotForWorker__(fontsState.familySnapshot)
     };
   }
@@ -1799,12 +1800,64 @@ function mkClassicWorkerSource(snapshot, absUrl){
     bc.postMessage({ __ENV_SYNC__: { envSnapshot: snap } });
   }
   const __bridgeEnvBus = EnvBus(global);
+  function __resolveFontsStateForWorkerSync__() {
+    const C = (global && global.CanvasPatchContext && typeof global.CanvasPatchContext === 'object')
+      ? global.CanvasPatchContext
+      : null;
+    const stateRoot = (C && C.state && typeof C.state === 'object')
+      ? C.state
+      : null;
+    const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
+      ? stateRoot.__FONTS__
+      : null;
+    return (fontsRoot && fontsRoot.__STATE__ && typeof fontsRoot.__STATE__ === 'object')
+      ? fontsRoot.__STATE__
+      : null;
+  }
+  function __publishCurrentWorkerSnapshot__(reason) {
+    const snap = requireWorkerSnapshot(__bridgeEnvBus.envSnapshot(), reason);
+    __wrkRuntimeSet__('lastSnap', snap);
+    publishSnapshot(snap);
+    return snap;
+  }
+  function __installFontsSnapshotSync__() {
+    if (__wrkRuntimeGet__('fontsSnapshotSyncInstalled') === true) return;
+    const fontsState = __resolveFontsStateForWorkerSync__();
+    if (!fontsState || typeof fontsState !== 'object') return;
+    __wrkRuntimeSet__('fontsSnapshotSyncInstalled', true);
+    const status = (typeof fontsState.awaitReadyStatus === 'string' && fontsState.awaitReadyStatus)
+      ? fontsState.awaitReadyStatus
+      : null;
+    const readyPromise = (fontsState.awaitReady && typeof fontsState.awaitReady.then === 'function')
+      ? fontsState.awaitReady
+      : null;
+    if (status === 'pending' && readyPromise) {
+      readyPromise.then(() => {
+        __wrkBestEffort('wrk:fonts_snapshot_sync_publish_failed', {
+          stage: 'runtime',
+          key: 'CanvasPatchContext.state.__FONTS__.__STATE__.awaitReady',
+          message: 'worker fonts snapshot sync publish failed',
+          type: 'pipeline missing data',
+          data: { outcome: 'skip', reason: 'fonts_snapshot_sync_publish_failed', source: 'awaitReady:resolved' }
+        }, () => { __publishCurrentWorkerSnapshot__('fonts-ready'); });
+      }, () => {
+        __wrkBestEffort('wrk:fonts_snapshot_sync_publish_failed', {
+          stage: 'runtime',
+          key: 'CanvasPatchContext.state.__FONTS__.__STATE__.awaitReady',
+          message: 'worker fonts snapshot sync publish failed',
+          type: 'pipeline missing data',
+          data: { outcome: 'skip', reason: 'fonts_snapshot_sync_publish_failed', source: 'awaitReady:failed' }
+        }, () => { __publishCurrentWorkerSnapshot__('fonts-failed'); });
+      });
+    }
+  }
   __captureWorkerPatchApi__({
     mkModuleWorkerSource,
     mkClassicWorkerSource,
     publishSnapshot,
     envSnapshot: __bridgeEnvBus.envSnapshot
   });
+  __installFontsSnapshotSync__();
 })(window);
 
 

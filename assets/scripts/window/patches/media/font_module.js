@@ -578,14 +578,16 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     const p = __fontsState.awaitReady;
     if (!p || typeof p.then !== 'function') return false;
     if (__fontsState.awaitReadyStatus && __fontsState.awaitReadyStatus !== 'pending') return false;
-    __fontsState.awaitReadyStatus = state;
-    __refreshFontsEpochState();
     if (state === 'resolved') {
+      __fontsState.awaitReadyStatus = 'resolved';
+      __refreshFontsEpochState();
       if (typeof __fontsState.awaitReadyResolve === 'function') __fontsState.awaitReadyResolve(payload);
       return true;
     }
     if (state === 'rejected') {
-      if (typeof __fontsState.awaitReadyReject === 'function') __fontsState.awaitReadyReject(payload);
+      __fontsState.awaitReadyStatus = 'failed';
+      __refreshFontsEpochState();
+      if (typeof __fontsState.awaitReadyResolve === 'function') __fontsState.awaitReadyResolve(payload);
       return true;
     }
     return false;

@@ -2015,6 +2015,7 @@
         : null;
       if (stateRoot) {
         syncWorkerEnvProfileState(stateRoot);
+        restoreWorkerFontsState(stateRoot);
       }
       // Paradigm: seed is immutable within session.
       const curSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
