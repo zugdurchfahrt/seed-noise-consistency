@@ -13,7 +13,6 @@ PERMISSIONS_DICT: Dict[str, List[Dict[str, str]]] = {
         {"name": "camera", "cdp": "camera", "states": ["prompt", "denied"]},
         {"name": "notifications", "cdp": "notifications", "states": ["prompt", "denied"]},
         {"name": "geolocation", "cdp": "geolocation", "states": ["prompt", "denied"]},
-        {"name": "midi", "cdp": "midi", "states": ["prompt", "denied"]},
     ],
 }
 
