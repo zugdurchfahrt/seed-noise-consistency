@@ -697,6 +697,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         || v === 'strict_accessor_gateway'
         || v === 'object_return_gateway'
         || v === 'materialized_accessor_gateway'
+        || v === 'named_wrapper'
         || v === 'core_wrapper'
       ) return v;
       return null;
@@ -1478,6 +1479,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             });
           } else {
             wrapped = buildMethodWrapperByArity(orig, key, invokeMethodPath);
+            wrapped = __registerToStringWrapper(wrapped, orig, key, 'Core.applyTargets:method');
           }
           knownWrapped.add(wrapped);
         } catch (e) {
@@ -1615,6 +1617,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             });
           } else {
             wrapped = buildPromiseMethodWrapperByArity(orig, key, invokePromisePath);
+            wrapped = __registerToStringWrapper(wrapped, orig, key, 'Core.applyTargets:promise_method');
           }
           knownWrapped.add(wrapped);
         } catch (e) {
@@ -1696,9 +1699,10 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         if (kind === 'method'
             && invokeClass === 'brand_strict'
-            && wrapLayer !== 'core_wrapper') {
+            && wrapLayer !== 'core_wrapper'
+            && wrapLayer !== 'named_wrapper') {
           return { ok: false, reason: 'wrap_layer_unsupported',
-            error: new TypeError('[Core.applyTargets] brand_strict requires core_wrapper wrapLayer'),
+            error: new TypeError('[Core.applyTargets] brand_strict requires core_wrapper or named_wrapper wrapLayer'),
             tag, policy, targetId, key, kind
           };
         }
