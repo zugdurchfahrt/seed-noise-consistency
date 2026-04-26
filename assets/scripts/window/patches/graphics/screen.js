@@ -1429,13 +1429,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = item.expected;
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      if (nativeScreenAccessorsOnly) {
-        hostWindowReasons.push('window.' + key + ':native_profile_mismatch_keep_native_getter');
-      } else {
-        const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, item.expected, 'screen:host_window_group');
-        if (!targetPlan.ok) hostWindowReasons.push('window.' + key + ':' + targetPlan.reason);
-        else hostWindowTargets.push(targetPlan.target);
-      }
+      const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, item.expected, 'screen:host_window_group');
+      if (!targetPlan.ok) hostWindowReasons.push('window.' + key + ':' + targetPlan.reason);
+      else hostWindowTargets.push(targetPlan.target);
     }
   }
   const elementProto = (typeof Element !== 'undefined' && Element && Element.prototype) ? Element.prototype : null;
