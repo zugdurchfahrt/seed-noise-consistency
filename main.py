@@ -252,6 +252,8 @@ def build_bootstrap_device_metrics():
     return {
         "width": width,
         "height": height,
+        "windowBoundsWidth": width,
+        "windowBoundsHeight": height,
         "deviceScaleFactor": dpr,
         "mobile": False,
         "screenWidth": width,
@@ -358,7 +360,22 @@ def init_driver(
         
         # 3. Device Metrics (screen scales, including navigator.mobile)
         if device_metrics:
-            driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
+            emulation_metrics = {key: device_metrics[key] for key in (
+                "width", "height", "deviceScaleFactor", "mobile", "screenWidth", "screenHeight", "screenOrientation"
+            ) if key in device_metrics}
+            driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", emulation_metrics)
+            window_bounds_width = device_metrics.get("windowBoundsWidth")
+            window_bounds_height = device_metrics.get("windowBoundsHeight")
+            if window_bounds_width is not None and window_bounds_height is not None:
+                win = driver.execute_cdp_cmd("Browser.getWindowForTarget", {})
+                driver.execute_cdp_cmd("Browser.setWindowBounds", {
+                    "windowId": win["windowId"],
+                    "bounds": {
+                        "windowState": "normal",
+                        "width": int(window_bounds_width),
+                        "height": int(window_bounds_height),
+                    },
+                })
     
     apply_page_hardware_override(
         driver,
@@ -893,7 +910,22 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
 
         
         device_metrics = build_device_metrics(profile)
-        driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", device_metrics)
+        emulation_metrics = {key: device_metrics[key] for key in (
+            "width", "height", "deviceScaleFactor", "mobile", "screenWidth", "screenHeight", "screenOrientation"
+        ) if key in device_metrics}
+        driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", emulation_metrics)
+        window_bounds_width = device_metrics.get("windowBoundsWidth")
+        window_bounds_height = device_metrics.get("windowBoundsHeight")
+        if window_bounds_width is not None and window_bounds_height is not None:
+            win = driver.execute_cdp_cmd("Browser.getWindowForTarget", {})
+            driver.execute_cdp_cmd("Browser.setWindowBounds", {
+                "windowId": win["windowId"],
+                "bounds": {
+                    "windowState": "normal",
+                    "width": int(window_bounds_width),
+                    "height": int(window_bounds_height),
+                },
+            })
 
         # ----------------------- Regional Cookies setup--------------------------------
         google_url = f"https://www.google.{domain}" if language != "en" else "https://www.google.com"
@@ -1303,7 +1335,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/fonts")
+        driver.get("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

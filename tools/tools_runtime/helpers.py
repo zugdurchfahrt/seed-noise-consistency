@@ -21,6 +21,8 @@ def build_device_metrics(profile: dict) -> dict:
     return {
         "width": w,
         "height": h,
+        "windowBoundsWidth": w,
+        "windowBoundsHeight": h,
         "deviceScaleFactor": dpr,
         "mobile": False,
         "screenWidth": w,
