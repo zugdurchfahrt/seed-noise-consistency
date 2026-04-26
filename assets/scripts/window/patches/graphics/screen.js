@@ -922,11 +922,22 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     availTop: ZERO
   };
   const orientationExpected = { type: expectedOrientationType, angle: ZERO };
+  const cssViewportWidth = Number(window.innerWidth);
+  const cssViewportHeight = Number(window.innerHeight);
+  if (!Number.isFinite(cssViewportWidth) || cssViewportWidth <= ZERO || !Number.isFinite(cssViewportHeight) || cssViewportHeight <= ZERO) {
+    throw new Error('bad css viewport width/height');
+  }
+  const cssVisualViewportWidth = (visualViewportObj && Number.isFinite(Number(visualViewportObj.width)) && Number(visualViewportObj.width) > ZERO)
+    ? Number(visualViewportObj.width)
+    : cssViewportWidth;
+  const cssVisualViewportHeight = (visualViewportObj && Number.isFinite(Number(visualViewportObj.height)) && Number(visualViewportObj.height) > ZERO)
+    ? Number(visualViewportObj.height)
+    : cssViewportHeight;
   const viewportExpected = {
-    innerWidth: SCREEN_WIDTH,
-    innerHeight: SCREEN_HEIGHT,
-    visualViewportWidth: SCREEN_WIDTH,
-    visualViewportHeight: SCREEN_HEIGHT,
+    innerWidth: cssViewportWidth,
+    innerHeight: cssViewportHeight,
+    visualViewportWidth: cssVisualViewportWidth,
+    visualViewportHeight: cssVisualViewportHeight,
     visualViewportOffsetLeft: ZERO,
     visualViewportOffsetTop: ZERO,
     visualViewportPageLeft: ZERO,
@@ -940,7 +951,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   __screenViewportMetrics.height = viewportExpected.innerHeight;
   __screenViewportMetrics.scale = viewportExpected.visualViewportScale;
   __screenViewportMetrics.owner = 'screen';
-  __screenViewportMetrics.source = 'screen_expected';
+  __screenViewportMetrics.source = 'css_viewport_runtime';
   function __screenSetGroupOutcome(groupName, mode, reason) {
     if (groupName === 'display') {
       __screenGroupModes.displayMode = mode;
