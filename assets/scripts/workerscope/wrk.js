@@ -801,7 +801,7 @@ function EnvHubPatchModule(G){
 
 // 3) Установка оверрайдов (Worker/Shared/SW).Используем SafeWorkerOverride.
 function WorkerOverrides_install(G, hub) {
-  const already = G.Worker && (G.Worker.__ENV_WRAPPED__ === true || String(G.Worker).includes('WrappedWorker'));
+  const already = G.Worker && G.Worker.__ENV_WRAPPED__ === true;
   if (!already) SafeWorkerOverride(G);
 
   if (G.SharedWorker) {
@@ -2498,11 +2498,11 @@ function ServiceWorkerOverride(G){
     // Check three methods at once
     const already =
       (typeof fn === 'function' &&
-       (fn.__ENV_WRAPPED__ === true || /\bWrappedServiceWorkerRegister\b/.test(String(fn)))) &&
+       fn.__ENV_WRAPPED__ === true) &&
       (typeof (proto && proto.getRegistrations) === 'function' &&
-       (proto.getRegistrations.__ENV_WRAPPED__ === true || /\bWrappedSWGetRegistrations\b/.test(String(proto.getRegistrations)))) &&
+       proto.getRegistrations.__ENV_WRAPPED__ === true) &&
       (typeof (proto && proto.getRegistration) === 'function' &&
-       (proto.getRegistration.__ENV_WRAPPED__ === true || /\bWrappedSWGetRegistration\b/.test(String(proto.getRegistration))));
+       proto.getRegistration.__ENV_WRAPPED__ === true);
     if (already) {
       if (G.__DEBUG__) {
         __wrkBestEffort('wrk:service_worker_already_mark_failed', {
@@ -2891,7 +2891,7 @@ function ServiceWorkerOverride(G){
     const workerPatchApi = __requireWorkerPatchApi__('worker patch hooks diag runtime api not ready', 'runtime');
     return {
       hasHub:        !!__resolveEnvHub__(),
-      workerWrapped: !!(G.Worker && (G.Worker.__ENV_WRAPPED__ || /WrappedWorker/.test(String(G.Worker)))),
+      workerWrapped: !!(G.Worker && G.Worker.__ENV_WRAPPED__ === true),
       sharedWrapped: !!(G.SharedWorker && G.SharedWorker.__ENV_WRAPPED__),
       swWrapped:     !!__wrkRuntimeGet__('patchedServiceWorker'),
       bridge: {
