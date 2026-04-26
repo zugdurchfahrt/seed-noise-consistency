@@ -171,6 +171,29 @@ def enable_sw_env_inject(
         raise ValueError("SW inject: device_memory must be positive number")
     if not isinstance(meta, dict) or not meta:
         raise ValueError("SW inject: expected_client_hints missing")
+    brands = meta.get("brands")
+    full_version_list = meta.get("fullVersionList")
+    if not isinstance(brands, list) or not brands:
+        raise ValueError("SW inject: expected_client_hints.brands missing")
+    if not isinstance(full_version_list, list) or not full_version_list:
+        raise ValueError("SW inject: expected_client_hints.fullVersionList missing")
+    for key in ("architecture", "bitness", "model", "platform", "platformVersion"):
+        if not isinstance(meta.get(key), str):
+            raise ValueError(f"SW inject: expected_client_hints.{key} missing")
+    if not isinstance(meta.get("mobile"), bool):
+        raise ValueError("SW inject: expected_client_hints.mobile missing")
+    if not isinstance(meta.get("wow64"), bool):
+        raise ValueError("SW inject: expected_client_hints.wow64 missing")
+    if not isinstance(meta.get("formFactors"), list):
+        raise ValueError("SW inject: expected_client_hints.formFactors missing")
+    for list_key, entries in (("brands", brands), ("fullVersionList", full_version_list)):
+        for item in entries:
+            if not isinstance(item, dict):
+                raise ValueError(f"SW inject: expected_client_hints.{list_key} entry invalid")
+            if not isinstance(item.get("brand"), str) or not item.get("brand").strip():
+                raise ValueError(f"SW inject: expected_client_hints.{list_key} brand missing")
+            if not isinstance(item.get("version"), str) or not item.get("version").strip():
+                raise ValueError(f"SW inject: expected_client_hints.{list_key} version missing")
     if not isinstance(webgl, dict) or not webgl:
         raise ValueError("SW inject: webgl snapshot missing")
     for key in ("vendor", "renderer", "unmaskedVendor", "unmaskedRenderer"):
@@ -187,6 +210,20 @@ def enable_sw_env_inject(
     SW_HC = int(hardware_concurrency)
     SW_DM = float(device_memory)
     SW_META = dict(meta)
+    sw_ua_data = {
+        "brands": [dict(item) for item in brands],
+        "mobile": meta["mobile"],
+        "platform": meta["platform"],
+        "he": {
+            "architecture": meta["architecture"],
+            "bitness": meta["bitness"],
+            "model": meta["model"],
+            "platformVersion": meta["platformVersion"],
+            "fullVersionList": [dict(item) for item in full_version_list],
+            "wow64": meta["wow64"],
+            "formFactors": list(meta["formFactors"]),
+        },
+    }
     SW_WEBGL = {
         "vendor": webgl["vendor"],
         "renderer": webgl["renderer"],
@@ -200,6 +237,7 @@ def enable_sw_env_inject(
         "hc": SW_HC,
         "dm": SW_DM,
         "meta": dict(SW_META),
+        "uaData": sw_ua_data,
         "webgl": dict(SW_WEBGL),
         "userAgent": user_agent,
         "navigatorPlatform": navigator_platform,
@@ -286,9 +324,12 @@ def _build_sw_env_prelude(sw_env: dict) -> str:
     if not isinstance(sw_env, dict) or not sw_env:
         raise ValueError("SW inject: env missing")
     meta = sw_env.get("meta")
+    ua_data = sw_env.get("uaData")
     webgl = sw_env.get("webgl")
     if not isinstance(meta, dict) or not meta:
         raise ValueError("SW inject: expected_client_hints missing")
+    if not isinstance(ua_data, dict) or not ua_data:
+        raise ValueError("SW inject: uaData snapshot missing")
     if not isinstance(webgl, dict) or not webgl:
         raise ValueError("SW inject: webgl snapshot missing")
     for key in ("vendor", "renderer", "unmaskedVendor", "unmaskedRenderer"):
@@ -307,6 +348,7 @@ def _build_sw_env_prelude(sw_env: dict) -> str:
     hc: {json.dumps(sw_env.get("hc"))},
     dm: {json.dumps(sw_env.get("dm"))},
     meta: {json.dumps(meta, ensure_ascii=False)},
+    uaData: {json.dumps(ua_data, ensure_ascii=False)},
     webgl: {json.dumps(webgl, ensure_ascii=False)},
     userAgent: {json.dumps(sw_env.get("userAgent"), ensure_ascii=False)},
     navigatorPlatform: {json.dumps(sw_env.get("navigatorPlatform"), ensure_ascii=False)}
@@ -533,29 +575,30 @@ def run():
             "languages": list(SW_ENV.get("langs") or []),
             "hardwareConcurrency": int(SW_ENV.get("hc")),
             "deviceMemory": float(SW_ENV.get("dm")),
-            "uad": SW_ENV.get("meta"),
+            "meta": SW_ENV.get("meta"),
+            "uad": SW_ENV.get("uaData"),
         }
         if (
-            isinstance(sw_expected["uad"], dict)
-            and sw_expected["uad"].get("language") is not None
-            and sw_expected["uad"].get("language") != sw_expected["language"]
+            isinstance(sw_expected["meta"], dict)
+            and sw_expected["meta"].get("language") is not None
+            and sw_expected["meta"].get("language") != sw_expected["language"]
         ):
             _RUNNING = False
-            raise RuntimeError("SW inject: SW_ENV language/meta.language mismatch")
+            raise RuntimeError("SW inject: SW_ENV language mismatch")
         if (
-            isinstance(sw_expected["uad"], dict)
-            and sw_expected["uad"].get("languages") is not None
-            and list(sw_expected["uad"].get("languages") or []) != sw_expected["languages"]
+            isinstance(sw_expected["meta"], dict)
+            and sw_expected["meta"].get("languages") is not None
+            and list(sw_expected["meta"].get("languages") or []) != sw_expected["languages"]
         ):
             _RUNNING = False
-            raise RuntimeError("SW inject: SW_ENV languages/meta.languages mismatch")
+            raise RuntimeError("SW inject: SW_ENV languages mismatch")
         if (
-            isinstance(sw_expected["uad"], dict)
-            and sw_expected["uad"].get("hardwareConcurrency") is not None
-            and int(sw_expected["uad"].get("hardwareConcurrency")) != int(sw_expected["hardwareConcurrency"])
+            isinstance(sw_expected["meta"], dict)
+            and sw_expected["meta"].get("hardwareConcurrency") is not None
+            and int(sw_expected["meta"].get("hardwareConcurrency")) != int(sw_expected["hardwareConcurrency"])
         ):
             _RUNNING = False
-            raise RuntimeError("SW inject: SW_ENV hardwareConcurrency/meta.hardwareConcurrency mismatch")
+            raise RuntimeError("SW inject: SW_ENV hardwareConcurrency mismatch")
         sw_env_prelude = _build_sw_env_prelude(SW_ENV)
         sw_prelude = _build_sw_prelude(SW_ENV)
     sw_user_agent_override = _build_sw_user_agent_override(SW_ENV)
@@ -795,7 +838,8 @@ def run():
                             _resume_sw_session(ws, sid, "sanity_uad_brands_mismatch")
                             _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
                             return
-                        if list(uad.get("heFullVersionList") or []) != list(exp["uad"].get("fullVersionList") or []):
+                        exp_he = exp["uad"].get("he") or {}
+                        if list(uad.get("heFullVersionList") or []) != list(exp_he.get("fullVersionList") or []):
                             _resume_sw_session(ws, sid, "sanity_uad_he_full_version_mismatch")
                             _fatal(ws, "sw sanity: uad high entropy fullVersionList mismatch", {"expected": exp, "got": out})
                             return

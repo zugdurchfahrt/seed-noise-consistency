@@ -1683,6 +1683,33 @@
         const familySnapshot = (snap.familySnapshot && typeof snap.familySnapshot === 'object')
           ? snap.familySnapshot
           : null;
+        const prevAwaitResolve = (fontsState && typeof fontsState.awaitReadyResolve === 'function')
+          ? fontsState.awaitReadyResolve
+          : null;
+        const snapStatus = (typeof snap.awaitReadyStatus === 'string' && snap.awaitReadyStatus)
+          ? snap.awaitReadyStatus
+          : (snap.awaitReadyPending ? 'pending' : (snap.ready === true ? 'resolved' : null));
+        const awaitPayload = {
+          scope: 'worker',
+          source: 'snapshot',
+          ready: snap.ready === true,
+          status: snapStatus,
+          error: Object.prototype.hasOwnProperty.call(snap, 'error') ? snap.error : null
+        };
+        let awaitReadyValue = null;
+        let awaitReadyResolve = null;
+        let awaitReadyReject = null;
+        if (snapStatus === 'pending') {
+          awaitReadyValue = new Promise((resolve, reject) => {
+            awaitReadyResolve = resolve;
+            awaitReadyReject = reject;
+          });
+        } else if (snapStatus) {
+          awaitReadyValue = Promise.resolve(awaitPayload);
+        }
+        if (prevAwaitResolve && snapStatus && snapStatus !== 'pending') {
+          prevAwaitResolve(awaitPayload);
+        }
         trackedDefineProperty(fontsState, 'ready', {
           value: snap.ready === true,
           writable: true,
@@ -1696,27 +1723,25 @@
           enumerable: true
         });
         trackedDefineProperty(fontsState, 'awaitReady', {
-          value: null,
+          value: awaitReadyValue,
           writable: true,
           configurable: true,
           enumerable: true
         });
         trackedDefineProperty(fontsState, 'awaitReadyStatus', {
-          value: (typeof snap.awaitReadyStatus === 'string' && snap.awaitReadyStatus)
-            ? snap.awaitReadyStatus
-            : (snap.awaitReadyPending ? 'pending' : null),
+          value: snapStatus,
           writable: true,
           configurable: true,
           enumerable: true
         });
         trackedDefineProperty(fontsState, 'awaitReadyResolve', {
-          value: null,
+          value: awaitReadyResolve,
           writable: true,
           configurable: true,
           enumerable: true
         });
         trackedDefineProperty(fontsState, 'awaitReadyReject', {
-          value: null,
+          value: awaitReadyReject,
           writable: true,
           configurable: true,
           enumerable: true

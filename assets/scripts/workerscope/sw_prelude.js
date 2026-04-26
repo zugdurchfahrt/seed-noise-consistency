@@ -251,6 +251,10 @@
     const hc = env.hc;
     const dm = env.dm;
     const meta = env.meta;
+    const profileUaData = env.uaData;
+    const profileHighEntropy = profileUaData && typeof profileUaData === 'object' && profileUaData.he && typeof profileUaData.he === 'object'
+      ? profileUaData.he
+      : null;
     const webgl = env.webgl;
 
     if (typeof primary !== 'string' || !primary) {
@@ -297,6 +301,15 @@
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'meta_invalid' }
       }, new Error('SW uaData meta invalid'));
+    }
+    if (!profileUaData || typeof profileUaData !== 'object' || !profileHighEntropy) {
+      __fail('sw_prelude:uadata_snapshot_invalid', {
+        stage: 'preflight',
+        key: 'uaData',
+        message: 'service worker uaData snapshot invalid',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'uadata_snapshot_invalid' }
+      }, new Error('SW uaData snapshot invalid'));
     }
     if (!webgl || typeof webgl !== 'object') {
       __fail('sw_prelude:webgl_env_missing', {
@@ -879,7 +892,7 @@
     __dropUadOwnIfConfigurable('getHighEntropyValues');
     __dropUadOwnIfConfigurable('toJSON');
 
-    const chPlatform = meta.platform;
+    const chPlatform = profileUaData.platform;
     if (typeof chPlatform !== 'string' || !chPlatform) {
       __fail('sw_prelude:uadata_platform_missing', {
         stage: 'preflight',
@@ -889,8 +902,8 @@
         data: { outcome: 'throw', reason: 'uadata_platform_missing' }
       }, new Error('SW uaData.platform missing'));
     }
-    const platformVersionValue = meta.platformVersion;
-    if (!Array.isArray(meta.brands) || !meta.brands.length) {
+    const platformVersionValue = profileHighEntropy.platformVersion;
+    if (!Array.isArray(profileUaData.brands) || !profileUaData.brands.length) {
       __fail('sw_prelude:uadata_brands_missing', {
         stage: 'preflight',
         key: 'brands',
@@ -899,7 +912,7 @@
         data: { outcome: 'throw', reason: 'uadata_brands_missing' }
       }, new Error('SW uaData.brands missing'));
     }
-    if (typeof meta.mobile !== 'boolean') {
+    if (typeof profileUaData.mobile !== 'boolean') {
       __fail('sw_prelude:uadata_mobile_missing', {
         stage: 'preflight',
         key: 'mobile',
@@ -908,7 +921,7 @@
         data: { outcome: 'throw', reason: 'uadata_mobile_missing' }
       }, new Error('SW uaData.mobile missing'));
     }
-    if (!Array.isArray(meta.fullVersionList) || !meta.fullVersionList.length) {
+    if (!Array.isArray(profileHighEntropy.fullVersionList) || !profileHighEntropy.fullVersionList.length) {
       __fail('sw_prelude:uadata_full_version_list_missing', {
         stage: 'preflight',
         key: 'fullVersionList',
@@ -996,9 +1009,10 @@
     const origToJSON = toJsonDesc.value;
 
     const deep = v => v == null ? v : JSON.parse(JSON.stringify(v));
-    const brandsValue = deep(meta.brands);
-    const mobileValue = meta.mobile;
+    const brandsValue = deep(profileUaData.brands);
+    const mobileValue = profileUaData.mobile;
     const platformValue = chPlatform;
+    const fullVersionListValue = deep(profileHighEntropy.fullVersionList);
     const isUadThis = recv => {
       if (recv === uad) return true;
       if (!recv || (typeof recv !== 'object' && typeof recv !== 'function')) return false;
@@ -1189,14 +1203,14 @@
     if (dFull) {
       if (Object.prototype.hasOwnProperty.call(dFull, 'value') && !dFull.get && !dFull.set) {
         __trackDefineProperty(uadProto, 'fullVersionList', {
-          value: deep(meta.fullVersionList),
+          value: fullVersionListValue,
           writable: !!dFull.writable,
           enumerable: !!dFull.enumerable,
           configurable: !!dFull.configurable
         });
       } else {
         __trackDefineProperty(uadProto, 'fullVersionList', {
-          get: guardedUadGetter('fullVersionList', deep(meta.fullVersionList), dFull),
+          get: guardedUadGetter('fullVersionList', fullVersionListValue, dFull),
           set: dFull.set,
           enumerable: !!dFull.enumerable,
           configurable: !!dFull.configurable
@@ -1223,18 +1237,18 @@
         }
       }
       const map = {
-        architecture: meta.architecture,
-        bitness: meta.bitness,
-        model: meta.model,
+        architecture: profileHighEntropy.architecture,
+        bitness: profileHighEntropy.bitness,
+        model: profileHighEntropy.model,
         brands: brandsValue,
         mobile: mobileValue,
         platform: platformValue,
         platformVersion: platformVersionValue,
-        fullVersionList: deep(meta.fullVersionList),
+        fullVersionList: fullVersionListValue,
         deviceMemory: swDeviceMemoryValue,
         hardwareConcurrency: Number(swHardwareConcurrencyValue),
-        wow64: meta.wow64,
-        formFactors: meta.formFactors
+        wow64: profileHighEntropy.wow64,
+        formFactors: profileHighEntropy.formFactors
       };
       const result = {};
       for (const hint of keys) {

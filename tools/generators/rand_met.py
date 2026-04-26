@@ -42,7 +42,7 @@ SYS_FONTS_WIN = [
     'Microsoft Tai Le', 'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Modern', 'Mongolian Baiti', 'Montserrat', 'MS Sans Serif', 'MS Serif',
     'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection', 'Bookman Old Style', 'Arno Pro',
     'Script', 'Segoe UI', 'Segoe Print', 'Segoe Script', 'Segoe UI Symbol', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol', 'Bodoni MT', 'Niagara Solid',
-    'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings', 'Century Gothic',
+    'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings', 'Century Gothic', 'Helvetica Neue',
     'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic']
 
 SYS_FONTS_MAC = [
@@ -262,18 +262,18 @@ def _cache_dir_for(platform: str) -> pathlib.Path:
 def _b64_path_for(platform: str, md5: str) -> pathlib.Path:
     return _cache_dir_for(platform) / f"{md5}.b64"
 
-# def _cleanup_cache_namespaces(platform: str) -> None:
-#     root = get_target_dir_for(platform) / "cache_data"
-#     if not root.exists():
-#         return
-#     current_name = _cache_namespace_token()
-#     old = sorted(
-#         (p for p in root.iterdir() if p.is_dir() and p.name != current_name and re.fullmatch(r"[0-9a-f]{64}", p.name)),
-#         key=lambda p: p.stat().st_mtime,
-#         reverse=True,
-#     )
-#     for victim in old[max(0, CACHE_NAMESPACE_LIMIT - 1):]:
-#         rmtree(victim)
+def _cleanup_cache_namespaces(platform: str) -> None:
+    root = get_target_dir_for(platform) / "cache_data"
+    if not root.exists():
+        return
+    current_name = _cache_namespace_token()
+    old = sorted(
+        (p for p in root.iterdir() if p.is_dir() and p.name != current_name and re.fullmatch(r"[0-9a-f]{64}", p.name)),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for victim in old[max(0, CACHE_NAMESPACE_LIMIT - 1):]:
+        rmtree(victim)
 
 def _atomic_write_text(path: pathlib.Path, data: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -424,7 +424,7 @@ def ensure_platform_index(platform: str) -> dict:
     # claning orphaned .b64 after the index is actualized
     valid_md5s = {rec.get("md5") for rec in files_map.values() if isinstance(rec, dict) and rec.get("md5")}
     _cleanup_cache(platform, valid_md5s)
-    # _cleanup_cache_namespaces(platform)
+    _cleanup_cache_namespaces(platform)
     return idx
 
 def random_string(length=12):
@@ -607,7 +607,7 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     'Microsoft Tai Le', 'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Modern', 'Mongolian Baiti', 'Montserrat', 'MS Sans Serif', 'MS Serif',
     'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection', 'Bookman Old Style', 'Arno Pro',
     'Script', 'Segoe UI', 'Segoe Print', 'Segoe Script', 'Segoe UI Symbol', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol', 'Bodoni MT', 'Niagara Solid',
-    'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings', 'Century Gothic',
+    'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings', 'Century Gothic', 'Helvetica Neue',
     'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic']
 
     if platform == "MacIntel":
