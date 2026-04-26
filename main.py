@@ -367,22 +367,18 @@ def init_driver(
             window_bounds_width = device_metrics.get("windowBoundsWidth")
             window_bounds_height = device_metrics.get("windowBoundsHeight")
             if window_bounds_width is not None and window_bounds_height is not None:
-                try:
-                    win = driver.execute_cdp_cmd("Browser.getWindowForTarget", {})
-                    payload = {
-                        "windowId": win["windowId"],
-                        "bounds": {
-                            "windowState": "normal",
-                            "width": int(window_bounds_width),
-                            "height": int(window_bounds_height),
-                        },
-                    }
-                    logger.info("[windowBounds.bootstrap] Browser.setWindowBounds payload=%r", payload)
-                    driver.execute_cdp_cmd("Browser.setWindowBounds", payload)
-                    actual = driver.execute_cdp_cmd("Browser.getWindowBounds", {"windowId": win["windowId"]})
-                    logger.info("[windowBounds.bootstrap] Browser.getWindowBounds actual=%r", actual)
-                except Exception as e:
-                    logger.warning("[windowBounds.bootstrap] Browser.setWindowBounds failed: %s", e)
+                win = driver.execute_cdp_cmd("Browser.getWindowForTarget", {})
+                logger.info("[windowBounds.bootstrap] request width=%s height=%s", window_bounds_width, window_bounds_height)
+                driver.execute_cdp_cmd("Browser.setWindowBounds", {
+                    "windowId": win["windowId"],
+                    "bounds": {
+                        "windowState": "normal",
+                        "width": int(window_bounds_width),
+                        "height": int(window_bounds_height),
+                    },
+                })
+                actual_bounds = driver.execute_cdp_cmd("Browser.getWindowBounds", {"windowId": win["windowId"]}).get("bounds", {})
+                logger.info("[windowBounds.bootstrap] actual width=%s height=%s", actual_bounds.get("width"), actual_bounds.get("height"))
     
     apply_page_hardware_override(
         driver,
@@ -924,22 +920,18 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
         window_bounds_width = device_metrics.get("windowBoundsWidth")
         window_bounds_height = device_metrics.get("windowBoundsHeight")
         if window_bounds_width is not None and window_bounds_height is not None:
-            try:
-                win = driver.execute_cdp_cmd("Browser.getWindowForTarget", {})
-                payload = {
-                    "windowId": win["windowId"],
-                    "bounds": {
-                        "windowState": "normal",
-                        "width": int(window_bounds_width),
-                        "height": int(window_bounds_height),
-                    },
-                }
-                logger.info("[windowBounds.final] Browser.setWindowBounds payload=%r", payload)
-                driver.execute_cdp_cmd("Browser.setWindowBounds", payload)
-                actual = driver.execute_cdp_cmd("Browser.getWindowBounds", {"windowId": win["windowId"]})
-                logger.info("[windowBounds.final] Browser.getWindowBounds actual=%r", actual)
-            except Exception as e:
-                logger.warning("[windowBounds.final] Browser.setWindowBounds failed: %s", e)
+            win = driver.execute_cdp_cmd("Browser.getWindowForTarget", {})
+            logger.info("[windowBounds.final] request width=%s height=%s", window_bounds_width, window_bounds_height)
+            driver.execute_cdp_cmd("Browser.setWindowBounds", {
+                "windowId": win["windowId"],
+                "bounds": {
+                    "windowState": "normal",
+                    "width": int(window_bounds_width),
+                    "height": int(window_bounds_height),
+                },
+            })
+            actual_bounds = driver.execute_cdp_cmd("Browser.getWindowBounds", {"windowId": win["windowId"]}).get("bounds", {})
+            logger.info("[windowBounds.final] actual width=%s height=%s", actual_bounds.get("width"), actual_bounds.get("height"))
 
         # ----------------------- Regional Cookies setup--------------------------------
         google_url = f"https://www.google.{domain}" if language != "en" else "https://www.google.com"
@@ -1251,7 +1243,6 @@ def main():
             "plugins": plugins_final,
             "accept_language": None,
         }
-
         dom_platform = profile.get("platform")
         if dom_platform == "Win32":
             ua_platform = "Windows"
