@@ -70,15 +70,15 @@ function __canvasCreateDomHostElements() {
 const C  = G.CanvasPatchContext;
 const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
 const __canvasStateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-const __canvasScreenRoot = (__canvasStateRoot && __canvasStateRoot.__SCREEN__ && typeof __canvasStateRoot.__SCREEN__ === 'object')
-  ? __canvasStateRoot.__SCREEN__
+const __canvasEnvProfileState = (__canvasStateRoot && __canvasStateRoot.__ENV_PROFILE__ && typeof __canvasStateRoot.__ENV_PROFILE__ === 'object')
+  ? __canvasStateRoot.__ENV_PROFILE__
   : null;
-const __canvasScreenState = (__canvasScreenRoot && __canvasScreenRoot.__STATE__ && typeof __canvasScreenRoot.__STATE__ === 'object')
-  ? __canvasScreenRoot.__STATE__
+const __canvasEnvScreenState = (__canvasEnvProfileState && __canvasEnvProfileState.__SCREEN__ && typeof __canvasEnvProfileState.__SCREEN__ === 'object')
+  ? __canvasEnvProfileState.__SCREEN__
   : null;
-const __canvasScreenWidth = Number(__canvasScreenState && __canvasScreenState.width);
-const __canvasScreenHeight = Number(__canvasScreenState && __canvasScreenState.height);
-const __canvasDpr = Number(__canvasScreenState && __canvasScreenState.dpr);
+const __canvasScreenWidth = Number(__canvasEnvScreenState && __canvasEnvScreenState.width);
+const __canvasScreenHeight = Number(__canvasEnvScreenState && __canvasEnvScreenState.height);
+const __canvasDpr = Number(__canvasEnvProfileState && __canvasEnvProfileState.dpr);
 if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
   function emitCanvasDiag(level, code, err, extra) {
     const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
@@ -113,7 +113,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     ) {
       emitCanvasDiag('warn', 'canvas:init:preflight:screen_metrics_invalid', null, {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__SCREEN__.__STATE__.width/height/dpr',
+        key: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__.width/height/dpr',
         message: 'screen metrics invalid',
         data: {
           outcome: 'skip',

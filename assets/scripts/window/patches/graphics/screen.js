@@ -140,6 +140,42 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __envProfileState = (__screenStateRoot.__ENV_PROFILE__ && typeof __screenStateRoot.__ENV_PROFILE__ === 'object')
     ? __screenStateRoot.__ENV_PROFILE__
     : null;
+  const __envScreenState = (__envProfileState && __envProfileState.__SCREEN__ && typeof __envProfileState.__SCREEN__ === 'object')
+    ? __envProfileState.__SCREEN__
+    : null;
+  if (!__envScreenState) {
+    __screenDiag('warn', 'screen:env_screen_state_missing', {
+      stage: 'preflight',
+      type: __screenTypePipeline,
+      diagTag: 'screen',
+      key: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__',
+      message: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__ unavailable',
+      data: {
+        outcome: 'skip',
+        reason: 'env_screen_state_missing',
+        missing: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__'
+      }
+    }, new Error('[ScreenPatch] CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__ unavailable'));
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
+      }
+    } catch (releaseErr) {
+      __screenDiag('warn', 'screen:guard_release_failed', {
+        stage: 'preflight',
+        type: __screenTypePipeline,
+        diagTag: 'screen',
+        key: __flagKey,
+        message: 'guard release failed after env screen state missing skip',
+        data: {
+          outcome: 'skip',
+          reason: 'guard_release_failed',
+          substage: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__'
+        }
+      }, releaseErr);
+    }
+    return;
+  }
   const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
     ? __envProfileState.profile
     : null;
@@ -174,42 +210,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           outcome: 'skip',
           reason: 'guard_release_failed',
           substage: 'CanvasPatchContext.state.__SCREEN__'
-        }
-      }, releaseErr);
-    }
-    return;
-  }
-  const __screenMetricsState = (__screenState.__STATE__ && typeof __screenState.__STATE__ === 'object')
-    ? __screenState.__STATE__
-    : null;
-  if (!__screenMetricsState) {
-    __screenDiag('warn', 'screen:screen_metrics_state_missing', {
-      stage: 'preflight',
-      type: __screenTypePipeline,
-      diagTag: 'screen',
-      key: 'CanvasPatchContext.state.__SCREEN__.__STATE__',
-      message: 'CanvasPatchContext.state.__SCREEN__.__STATE__ unavailable',
-      data: {
-        outcome: 'skip',
-        reason: 'screen_metrics_state_missing',
-        missing: 'CanvasPatchContext.state.__SCREEN__.__STATE__'
-      }
-    }, new Error('[ScreenPatch] CanvasPatchContext.state.__SCREEN__.__STATE__ unavailable'));
-    try {
-      if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
-      }
-    } catch (releaseErr) {
-      __screenDiag('warn', 'screen:guard_release_failed', {
-        stage: 'preflight',
-        type: __screenTypePipeline,
-        diagTag: 'screen',
-        key: __flagKey,
-        message: 'guard release failed after screen metrics state missing skip',
-        data: {
-          outcome: 'skip',
-          reason: 'guard_release_failed',
-          substage: 'CanvasPatchContext.state.__SCREEN__.__STATE__'
         }
       }, releaseErr);
     }
@@ -276,12 +276,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     });
   }
 
-  const SCREEN_WIDTH  = Number(__screenMetricsState.width);
-  const SCREEN_HEIGHT = Number(__screenMetricsState.height);
-  const COLOR_DEPTH   = Number(__screenMetricsState.colorDepth);
-  const DPR           = Number(__screenMetricsState.dpr);
-  const ORIENTATION_DOM = (typeof __screenMetricsState.orientationDom === 'string' && __screenMetricsState.orientationDom)
-    ? __screenMetricsState.orientationDom
+  const SCREEN_WIDTH  = Number(__envScreenState.width);
+  const SCREEN_HEIGHT = Number(__envScreenState.height);
+  const COLOR_DEPTH   = Number(__envProfileState.colorDepth);
+  const DPR           = Number(__envProfileState.dpr);
+  const ORIENTATION_DOM = (typeof __envScreenState.orientationDom === 'string' && __envScreenState.orientationDom)
+    ? __envScreenState.orientationDom
     : null;
 
   try {
@@ -922,11 +922,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     availTop: ZERO
   };
   const orientationExpected = { type: expectedOrientationType, angle: ZERO };
-  const cssViewportWidth = Number(window.innerWidth);
-  const cssViewportHeight = Number(window.innerHeight);
-  if (!Number.isFinite(cssViewportWidth) || cssViewportWidth <= ZERO || !Number.isFinite(cssViewportHeight) || cssViewportHeight <= ZERO) {
-    throw new Error('bad css viewport width/height');
-  }
+  const cssViewportWidth = SCREEN_WIDTH;
+  const cssViewportHeight = SCREEN_HEIGHT;
   const cssVisualViewportWidth = (visualViewportObj && Number.isFinite(Number(visualViewportObj.width)) && Number(visualViewportObj.width) > ZERO)
     ? Number(visualViewportObj.width)
     : cssViewportWidth;
@@ -944,6 +941,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     visualViewportPageTop: ZERO,
     visualViewportScale: ONE
   };
+  const nativeScreenAccessorsOnly = true;
   const expectedCssViewportOrientation = (viewportExpected.innerWidth > viewportExpected.innerHeight)
     ? 'landscape'
     : 'portrait';
@@ -1349,9 +1347,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = screenExpected[key];
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      const targetPlan = __screenBuildAccessorTarget(screenObj, screenProto, key, screenExpected[key], 'screen:display_group');
-      if (!targetPlan.ok) displayReasons.push('screen.' + key + ':' + targetPlan.reason);
-      else displayTargets.push(targetPlan.target);
+      if (nativeScreenAccessorsOnly) {
+        displayReasons.push('screen.' + key + ':native_profile_mismatch_keep_native_getter');
+      } else {
+        const targetPlan = __screenBuildAccessorTarget(screenObj, screenProto, key, screenExpected[key], 'screen:display_group');
+        if (!targetPlan.ok) displayReasons.push('screen.' + key + ':' + targetPlan.reason);
+        else displayTargets.push(targetPlan.target);
+      }
     }
   }
   const orientationKeys = Object.keys(orientationExpected);
@@ -1369,9 +1371,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = orientationExpected[key];
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      const targetPlan = __screenBuildAccessorTarget(orientationObj, orientationProto, key, orientationExpected[key], 'screen:display_group');
-      if (!targetPlan.ok) displayReasons.push('screen.orientation.' + key + ':' + targetPlan.reason);
-      else displayTargets.push(targetPlan.target);
+      if (nativeScreenAccessorsOnly) {
+        displayReasons.push('screen.orientation.' + key + ':native_profile_mismatch_keep_native_getter');
+      } else {
+        const targetPlan = __screenBuildAccessorTarget(orientationObj, orientationProto, key, orientationExpected[key], 'screen:display_group');
+        if (!targetPlan.ok) displayReasons.push('screen.orientation.' + key + ':' + targetPlan.reason);
+        else displayTargets.push(targetPlan.target);
+      }
     }
   }
   let needsMqlCoordination = false;
@@ -1395,9 +1401,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = viewportExpected[key];
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, viewportExpected[key], 'screen:viewport_group');
-      if (!targetPlan.ok) viewportReasons.push('window.' + key + ':' + targetPlan.reason);
-      else viewportTargets.push(targetPlan.target);
+      if (nativeScreenAccessorsOnly) {
+        viewportReasons.push('window.' + key + ':native_profile_mismatch_keep_native_getter');
+      } else {
+        const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, viewportExpected[key], 'screen:viewport_group');
+        if (!targetPlan.ok) viewportReasons.push('window.' + key + ':' + targetPlan.reason);
+        else viewportTargets.push(targetPlan.target);
+      }
     }
   }
   const hostWindowMap = [
@@ -1419,9 +1429,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = item.expected;
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, item.expected, 'screen:host_window_group');
-      if (!targetPlan.ok) hostWindowReasons.push('window.' + key + ':' + targetPlan.reason);
-      else hostWindowTargets.push(targetPlan.target);
+      if (nativeScreenAccessorsOnly) {
+        hostWindowReasons.push('window.' + key + ':native_profile_mismatch_keep_native_getter');
+      } else {
+        const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, item.expected, 'screen:host_window_group');
+        if (!targetPlan.ok) hostWindowReasons.push('window.' + key + ':' + targetPlan.reason);
+        else hostWindowTargets.push(targetPlan.target);
+      }
     }
   }
   const elementProto = (typeof Element !== 'undefined' && Element && Element.prototype) ? Element.prototype : null;
@@ -1450,22 +1464,26 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       fact.expected = item.expected;
       fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
       if (!fact.readFailed && !fact.matchesExpected) {
-        const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
-        const targetPlan = __screenBuildAccessorTarget(
-          divRoot,
-          null,
-          item.key,
-          item.expected,
-          'screen:viewport_group:div',
-          {
-            allowCreate: true,
-            invalidThis: 'throw',
-            configurable: protoDesc ? !!protoDesc.configurable : true,
-            enumerable: protoDesc ? !!protoDesc.enumerable : false
-          }
-        );
-        if (!targetPlan.ok) viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + targetPlan.reason);
-        else viewportTargets.push(targetPlan.target);
+        if (nativeScreenAccessorsOnly) {
+          viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':native_profile_mismatch_keep_native_getter');
+        } else {
+          const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
+          const targetPlan = __screenBuildAccessorTarget(
+            divRoot,
+            null,
+            item.key,
+            item.expected,
+            'screen:viewport_group:div',
+            {
+              allowCreate: true,
+              invalidThis: 'throw',
+              configurable: protoDesc ? !!protoDesc.configurable : true,
+              enumerable: protoDesc ? !!protoDesc.enumerable : false
+            }
+          );
+          if (!targetPlan.ok) viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + targetPlan.reason);
+          else viewportTargets.push(targetPlan.target);
+        }
       }
     }
   }
@@ -1493,9 +1511,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       fact.expected = item.expected;
       fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
       if (!fact.readFailed && !fact.matchesExpected) {
-        const targetPlan = __screenBuildAccessorTarget(visualViewportObj, visualViewportProto, item.key, item.expected, 'screen:viewport_group');
-        if (!targetPlan.ok) viewportReasons.push('visualViewport.' + item.key + ':' + targetPlan.reason);
-        else viewportTargets.push(targetPlan.target);
+        if (nativeScreenAccessorsOnly) {
+          viewportReasons.push('visualViewport.' + item.key + ':native_profile_mismatch_keep_native_getter');
+        } else {
+          const targetPlan = __screenBuildAccessorTarget(visualViewportObj, visualViewportProto, item.key, item.expected, 'screen:viewport_group');
+          if (!targetPlan.ok) viewportReasons.push('visualViewport.' + item.key + ':' + targetPlan.reason);
+          else viewportTargets.push(targetPlan.target);
+        }
       }
     }
   }

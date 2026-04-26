@@ -570,7 +570,6 @@ function EnvBus(G){
   const __geoStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__GEO_STATE__ && typeof G.CanvasPatchContext.state.__GEO_STATE__ === 'object')
     ? G.CanvasPatchContext.state.__GEO_STATE__
     : null;
-  const __envDpr = (typeof G.__DPR === 'number' && G.__DPR > 0) ? +G.__DPR : null;
   const __envTimeZone = (__geoStateRoot && typeof __geoStateRoot.timezone === 'string' && __geoStateRoot.timezone)
     ? __geoStateRoot.timezone
     : null;
@@ -651,8 +650,6 @@ function EnvBus(G){
     const langs = workerEnvSnapshot.languages.slice();
     const lang = workerEnvSnapshot.language;
     const ua = workerEnvSnapshot.ua;
-    const dpr      = __envDpr;
-    if (!dpr) throw new Error('EnvBus: __DPR missing');
     const cpu = Number(workerEnvSnapshot.hardwareConcurrency);
     const mem = Number(workerEnvSnapshot.deviceMemory);
     const timeZone = __envTimeZone;
@@ -670,12 +667,6 @@ function EnvBus(G){
     const uaData = __cloneEnvValue(workerEnvSnapshot.uaData);
     const he = __cloneEnvValue(workerEnvSnapshot.uaData.he);
     uaData.he = he;
-    const screenRoot = (stateRoot && stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
-      ? stateRoot.__SCREEN__
-      : null;
-    const screenState = (screenRoot && screenRoot.__STATE__ && typeof screenRoot.__STATE__ === 'object')
-      ? screenRoot.__STATE__
-      : null;
     const envProfileSource = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
       ? stateRoot.__ENV_PROFILE__
       : null;
@@ -701,23 +692,28 @@ function EnvBus(G){
       throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__.platformVersion missing');
     }
     envProfile.__PLATFORM__ = __cloneEnvValue(envPlatform);
-    if (!screenState || typeof screenState !== 'object') {
-      throw new Error('EnvBus: __SCREEN__.__STATE__ missing');
+    const envScreen = (envProfileSource.__SCREEN__ && typeof envProfileSource.__SCREEN__ === 'object')
+      ? envProfileSource.__SCREEN__
+      : null;
+    if (!envScreen || typeof envScreen !== 'object') {
+      throw new Error('EnvBus: __ENV_PROFILE__.__SCREEN__ missing');
     }
-    envProfile.width = Number(screenState.width);
-    envProfile.height = Number(screenState.height);
-    envProfile.dpr = Number(screenState.dpr);
-    envProfile.colorDepth = Number(screenState.colorDepth);
-    envProfile.orientationDom = screenState.orientationDom;
+    envProfile.__SCREEN__ = __cloneEnvValue(envScreen);
+    envProfile.width = Number(envScreen.width);
+    envProfile.height = Number(envScreen.height);
+    envProfile.dpr = Number(envProfileSource.dpr);
+    envProfile.colorDepth = Number(envProfileSource.colorDepth);
+    envProfile.orientationDom = envScreen.orientationDom;
     if (!Number.isFinite(Number(envProfile.width))) {
-      throw new Error('EnvBus: __ENV_PROFILE__.width missing');
+      throw new Error('EnvBus: __ENV_PROFILE__.__SCREEN__.width missing');
     }
     if (!Number.isFinite(Number(envProfile.height))) {
-      throw new Error('EnvBus: __ENV_PROFILE__.height missing');
+      throw new Error('EnvBus: __ENV_PROFILE__.__SCREEN__.height missing');
     }
     if (!Number.isFinite(Number(envProfile.dpr)) || Number(envProfile.dpr) <= 0) {
       throw new Error('EnvBus: __ENV_PROFILE__.dpr missing');
     }
+    const dpr = Number(envProfile.dpr);
     const windowKeys = (() => {
       try {
         const keys = Object.getOwnPropertyNames(G);

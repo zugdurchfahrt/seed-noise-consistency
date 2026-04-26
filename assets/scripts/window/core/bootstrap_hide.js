@@ -206,16 +206,6 @@ if (!screenRoot) {
 } else {
   __defineHiddenValue__(stateRoot, '__SCREEN__', screenRoot);
 }
-let screenState = (screenRoot.__STATE__ && typeof screenRoot.__STATE__ === 'object')
-  ? screenRoot.__STATE__
-  : null;
-if (!screenState) {
-  screenState = __defineHiddenValue__(screenRoot, '__STATE__', Object.create(null));
-  if (!screenState) throw new Error('[module] CanvasPatchContext.state.__SCREEN__.__STATE__ bootstrap failed');
-} else {
-  __defineHiddenValue__(screenRoot, '__STATE__', screenState);
-}
-
 let navRoot = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
   ? stateRoot.__NAV_TOTAL_SET__
   : null;
@@ -519,6 +509,30 @@ function __ensureEnvPlatformState__(envProfileState) {
   return state;
 }
 
+function __ensureEnvScreenState__(envProfileState) {
+  const owner = (envProfileState && typeof envProfileState === 'object')
+    ? envProfileState
+    : __ensureEnvProfileState__();
+  let state = (owner.__SCREEN__ && typeof owner.__SCREEN__ === 'object')
+    ? owner.__SCREEN__
+    : null;
+  if (!state) {
+    state = Object.create(null);
+    state.width = null;
+    state.height = null;
+    state.dpr = null;
+    state.colorDepth = null;
+    state.orientationDom = null;
+    Object.defineProperty(owner, '__SCREEN__', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+  return state;
+}
+
 function __emitBootstrapTransferDiag__(level, code, key, message, reason, err, extraData) {
   const data = { outcome: 'skip', reason: reason };
   if (extraData && typeof extraData === 'object') {
@@ -567,6 +581,7 @@ const __geoTransitState__ = __ensureGeoTransitState__();
 const __langTransitState__ = __ensureLangTransitState__();
 const __envProfileState__ = __ensureEnvProfileState__();
 const __envPlatformState__ = __ensureEnvPlatformState__(__envProfileState__);
+const __envScreenState__ = __ensureEnvScreenState__(__envProfileState__);
 const __bootstrapLatitude__ = __bootstrapInputs__.__LATITUDE__;
 const __bootstrapLongitude__ = __bootstrapInputs__.__LONGITUDE__;
 const __bootstrapTimezone__ = __bootstrapInputs__.__TIMEZONE__;
@@ -576,6 +591,10 @@ const __bootstrapNormalizedLanguages__ = __bootstrapInputs__.__normalizedLanguag
 const __bootstrapDomPlatform__ = __bootstrapInputs__.__NAV_PLATFORM__;
 const __bootstrapUaPlatform__ = __bootstrapInputs__.__UA_PLATFORM__;
 const __bootstrapPlatformVersion__ = __bootstrapInputs__.__UA_PLATFORM_VERSION;
+const __bootstrapScreenWidth__ = Number(__bootstrapInputs__.__WIDTH ?? (W.screen && W.screen.width));
+const __bootstrapScreenHeight__ = Number(__bootstrapInputs__.__HEIGHT ?? (W.screen && W.screen.height));
+const __bootstrapScreenDpr__ = Number(__bootstrapInputs__.__DPR);
+const __bootstrapScreenColorDepth__ = Number(__bootstrapInputs__.__COLOR_DEPTH);
 const __geoMissingKeys__ = [];
 if (!__isFiniteNumber__(__bootstrapLatitude__)) __geoMissingKeys__.push('__LATITUDE__');
 if (!__isFiniteNumber__(__bootstrapLongitude__)) __geoMissingKeys__.push('__LONGITUDE__');
@@ -653,20 +672,39 @@ if (__platformMissingKeys__.length === 0) {
   );
 }
 
+const __screenMissingKeys__ = [];
+if (!__isFiniteNumber__(__bootstrapScreenWidth__)) __screenMissingKeys__.push('__WIDTH');
+if (!__isFiniteNumber__(__bootstrapScreenHeight__)) __screenMissingKeys__.push('__HEIGHT');
+if (!__isFiniteNumber__(__bootstrapScreenDpr__)) __screenMissingKeys__.push('__DPR');
+if (!__isFiniteNumber__(__bootstrapScreenColorDepth__)) __screenMissingKeys__.push('__COLOR_DEPTH');
+if (__screenMissingKeys__.length === 0) {
+  __envScreenState__.width = __bootstrapScreenWidth__;
+  __envScreenState__.height = __bootstrapScreenHeight__;
+  __envScreenState__.dpr = __bootstrapScreenDpr__;
+  __envScreenState__.colorDepth = __bootstrapScreenColorDepth__;
+  __envScreenState__.orientationDom = ((__envScreenState__.height >= __envScreenState__.width))
+    ? 'portrait-primary'
+    : 'landscape-primary';
+  __envProfileState__.dpr = __bootstrapScreenDpr__;
+  __envProfileState__.colorDepth = __bootstrapScreenColorDepth__;
+} else {
+  __emitBootstrapTransferDiag__(
+    'warn',
+    'bootstrap_hide:screen_transfer_incomplete',
+    'state.__ENV_PROFILE__.__SCREEN__',
+    'screen owner-transfer incomplete',
+    'bootstrap_input_incomplete',
+    null,
+    { missingKeys: __screenMissingKeys__.slice() }
+  );
+}
+
 __envProfileState__.meta = __cloneProfileValue__(__bootstrapInputs__.__EXPECTED_CLIENT_HINTS || {});
 __envProfileState__.userAgent = __bootstrapInputs__.__USER_AGENT;
 __envProfileState__.vendor = __bootstrapInputs__.__VENDOR;
 __envProfileState__.mem = Number(__bootstrapInputs__.__memory);
 __envProfileState__.cpu = Number(__bootstrapInputs__.__cpu);
 __envProfileState__.devicesLabels = __cloneProfileValue__(__bootstrapInputs__.__DEVICES_LABELS);
-
-screenState.dpr = Number(__bootstrapInputs__.__DPR);
-screenState.width = Number(__bootstrapInputs__.__WIDTH ?? (W.screen && W.screen.width));
-screenState.height = Number(__bootstrapInputs__.__HEIGHT ?? (W.screen && W.screen.height));
-screenState.colorDepth = Number(__bootstrapInputs__.__COLOR_DEPTH);
-screenState.orientationDom = ((screenState.height >= screenState.width))
-  ? 'portrait-primary'
-  : 'landscape-primary';
 
 __envProfileState__.webglRenderer = __bootstrapInputs__.__WEBGL_RENDERER__;
 __envProfileState__.webglVendor = __bootstrapInputs__.__WEBGL_VENDOR__;
@@ -781,7 +819,6 @@ function __getBootstrapSanitizeGate__(key) {
     key === '__EXPECTED_CLIENT_HINTS' ||
     key === '__USER_AGENT' ||
     key === '__VENDOR' ||
-    key === '__DPR' ||
     key === '__cpu' ||
     key === '__memory'
   ) {

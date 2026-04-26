@@ -1866,16 +1866,6 @@
       if (!seed) {
         throw new Error('UACHPatch: worker canvas seed missing');
       }
-      const snapDpr = Number(cache.snap && cache.snap.dpr);
-      if (Number.isFinite(snapDpr) && snapDpr > 0) {
-        trackedDefineProperty(self, '__DPR', {
-          value: snapDpr,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      }
-
       if (!(stateRoot && typeof stateRoot === 'object')) {
         throw new Error('UACHPatch: CanvasPatchContext.state missing');
       }

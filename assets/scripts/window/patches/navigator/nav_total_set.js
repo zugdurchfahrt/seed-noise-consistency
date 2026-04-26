@@ -275,12 +275,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       typeof __core.__internal === 'object' &&
       __core.__internal.__ACCESSOR_OWNER_FIRST_CAPABLE__ === true
     );
-    const __navScreenState = (__stateRoot && __stateRoot.__SCREEN__ && typeof __stateRoot.__SCREEN__ === 'object')
-      ? __stateRoot.__SCREEN__
-      : null;
-    const __navScreenMetricsState = (__navScreenState && __navScreenState.__STATE__ && typeof __navScreenState.__STATE__ === 'object')
-      ? __navScreenState.__STATE__
-      : null;
     const __navPrimaryLanguage = (__navLangState && typeof __navLangState.primaryLanguage === 'string' && __navLangState.primaryLanguage)
       ? __navLangState.primaryLanguage
       : null;
@@ -329,9 +323,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const vendor        = __envProfileState.vendor;
     const mem           = Number(__envProfileState.mem);
     const cpu           = Number(__envProfileState.cpu);
-    const dpr           = Number(__navScreenMetricsState && __navScreenMetricsState.dpr);
+    const dpr           = Number(__envProfileState.dpr);
     const devicesLabels = __navCloneStateValue(__envProfileState.devicesLabels);
-    const colorDepth    = Number(__navScreenMetricsState && __navScreenMetricsState.colorDepth);
+    const colorDepth    = Number(__envProfileState.colorDepth);
     const fullVersionList = __navCloneStateValue(__envProfileState.fullVersionList);
     const storageQuotaMb = __envProfileState.storageQuotaMb;
     const storageUsedPct = __envProfileState.storageUsedPct;
@@ -615,6 +609,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const highEntropyFullVersionList = (meta && meta.fullVersionList != null)
         ? meta.fullVersionList
         : fullVersionList;
+      let highEntropyUaFullVersion = (meta && typeof meta.uaFullVersion === 'string')
+        ? meta.uaFullVersion
+        : undefined;
+      if (!highEntropyUaFullVersion && Array.isArray(highEntropyFullVersionList)) {
+        for (let i = 0; i < highEntropyFullVersionList.length; i++) {
+          const item = highEntropyFullVersionList[i];
+          if (!item || typeof item !== 'object') continue;
+          const brand = String(item.brand || '');
+          const version = (typeof item.version === 'string') ? item.version : '';
+          if (version && brand !== 'Not)A;Brand' && brand !== 'Not.A/Brand') {
+            highEntropyUaFullVersion = version;
+            break;
+          }
+        }
+      }
       return {
         architecture: meta.architecture,
         bitness: meta.bitness,
@@ -623,6 +632,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         mobile: meta.mobile,
         platform: uaPlatform,
         platformVersion: platformVersion,
+        uaFullVersion: highEntropyUaFullVersion,
         fullVersionList: highEntropyFullVersionList,
         deviceMemory: safeDeviceMemory,
         hardwareConcurrency: safeHardwareConcurrency,
