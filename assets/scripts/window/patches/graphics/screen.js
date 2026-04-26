@@ -283,9 +283,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const ORIENTATION_DOM = (typeof __screenMetricsState.orientationDom === 'string' && __screenMetricsState.orientationDom)
     ? __screenMetricsState.orientationDom
     : null;
-  const ORIENTATION_MEDIA = (ORIENTATION_DOM === 'portrait-primary')
-    ? 'portrait'
-    : ((ORIENTATION_DOM === 'landscape-primary') ? 'landscape' : null);
 
   try {
   if (!Number.isFinite(SCREEN_WIDTH) || !Number.isFinite(SCREEN_HEIGHT)) {
@@ -769,11 +766,44 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   };
   const isMatchMediaThis = (self) => (self == null) || isWindowThis(self);
   const matchMediaResolve = (mmTarget === window) ? 'own' : 'proto_chain';
+  let __screenMqlMediaReadDiagSent = false;
   const matchMediaInvoke = function matchMediaInvoke(target, thisArg, argList) {
-    const queryRaw = (argList && argList.length) ? argList[0] : undefined;
-    if (!isMatchMediaThis(thisArg)) return Reflect.apply(target, thisArg, argList);
+    const list = Array.isArray(argList) ? argList : [];
+    if (!isMatchMediaThis(thisArg)) return Reflect.apply(target, thisArg, list);
     const effectiveThis = (thisArg == null) ? window : thisArg;
-    const query = String(queryRaw);
+    const mql = Reflect.apply(target, effectiveThis, list);
+    if (!(mql && (typeof mql === 'object' || typeof mql === 'function'))) return mql;
+    let query = null;
+    try {
+      query = mql.media;
+    } catch (e) {
+      if (!__screenMqlMediaReadDiagSent) {
+        __screenMqlMediaReadDiagSent = true;
+        __screenDiag('warn', 'screen:mql_media_read_failed', {
+          stage: 'runtime',
+          type: __screenTypeBrowser,
+          diagTag: 'screen:mql_media',
+          key: 'media',
+          message: 'MediaQueryList.media read failed',
+          data: { outcome: 'skip', reason: 'exception', substage: 'mql.media' }
+        }, e);
+      }
+      return mql;
+    }
+    if (typeof query !== 'string') {
+      if (!__screenMqlMediaReadDiagSent) {
+        __screenMqlMediaReadDiagSent = true;
+        __screenDiag('warn', 'screen:mql_media_invalid', {
+          stage: 'runtime',
+          type: __screenTypeBrowser,
+          diagTag: 'screen:mql_media',
+          key: 'media',
+          message: 'MediaQueryList.media is not string',
+          data: { outcome: 'skip', reason: 'invalid_media', substage: 'mql.media' }
+        }, null);
+      }
+      return mql;
+    }
     const q = query.toLowerCase().replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').replace(/\s*:\s*/g, ':');
     let touched = false;
     let matches = true;
@@ -830,7 +860,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const orientation = q.match(/\(orientation:\s*(portrait|landscape)\)/);
     if (orientation) {
       touched = true;
-      const actual = (SCREEN_WIDTH > SCREEN_HEIGHT) ? 'landscape' : 'portrait';
+      const actual = expectedCssViewportOrientation;
       matches = matches && actual === orientation[1];
     }
     const color = q.match(/\(color:\s*(\d+)\)/);
@@ -849,20 +879,17 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       touched = true;
       matches = matches && displayMode[1] === 'browser';
     }
-    const mql = Reflect.apply(target, effectiveThis, [query]);
-    if (mql && (typeof mql === 'object' || typeof mql === 'function')) {
-      try {
-        if (touched) mqlMatches.set(mql, matches);
-      } catch (e) {
-        __screenDiag('warn', 'screen:mql_matches_cache_set_failed', {
-          stage: 'runtime',
-          type: __screenTypeBrowser,
-          diagTag: 'screen:mql_matches',
-          key: 'matches',
-          message: 'MediaQueryList cache set failed',
-          data: { outcome: 'skip', reason: 'exception', substage: 'mqlMatches.set' }
-        }, e);
-      }
+    try {
+      if (touched) mqlMatches.set(mql, matches);
+    } catch (e) {
+      __screenDiag('warn', 'screen:mql_matches_cache_set_failed', {
+        stage: 'runtime',
+        type: __screenTypeBrowser,
+        diagTag: 'screen:mql_matches',
+        key: 'matches',
+        message: 'MediaQueryList cache set failed',
+        data: { outcome: 'skip', reason: 'exception', substage: 'mqlMatches.set' }
+      }, e);
     }
     return mql;
   };
@@ -884,7 +911,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     return matchMediaInvoke(mmOrig, window, [query]);
   }
   const expectedOrientationType = ORIENTATION_DOM;
-  const expectedOrientationMedia = ORIENTATION_MEDIA;
   const screenExpected = {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
@@ -907,6 +933,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     visualViewportPageTop: ZERO,
     visualViewportScale: ONE
   };
+  const expectedCssViewportOrientation = (viewportExpected.innerWidth > viewportExpected.innerHeight)
+    ? 'landscape'
+    : 'portrait';
   __screenViewportMetrics.width = viewportExpected.innerWidth;
   __screenViewportMetrics.height = viewportExpected.innerHeight;
   __screenViewportMetrics.scale = viewportExpected.visualViewportScale;
@@ -1150,7 +1179,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     return __screenCollectMediaQueries([
       { key: 'device', query: '(device-width: ' + String(SCREEN_WIDTH) + 'px) and (device-height: ' + String(SCREEN_HEIGHT) + 'px)' },
       { key: 'deviceAspectRatio', query: '(device-aspect-ratio: ' + expectedDeviceAspectText + ')' },
-      { key: 'orientation', query: '(orientation: ' + expectedOrientationMedia + ')' },
       { key: 'displayMode', query: '(display-mode: browser)', mandatory: false }
     ]);
   }
@@ -1158,7 +1186,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const expectedViewportAspectText = __screenAspectText(viewportExpected.innerWidth, viewportExpected.innerHeight);
     return __screenCollectMediaQueries([
       { key: 'viewport', query: '(width: ' + String(viewportExpected.innerWidth) + 'px) and (height: ' + String(viewportExpected.innerHeight) + 'px)' },
-      { key: 'aspectRatio', query: '(aspect-ratio: ' + expectedViewportAspectText + ')' }
+      { key: 'aspectRatio', query: '(aspect-ratio: ' + expectedViewportAspectText + ')' },
+      { key: 'orientation', query: '(orientation: ' + expectedCssViewportOrientation + ')' }
     ]);
   }
   function __screenDisplaySnapshot() {
@@ -1294,21 +1323,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!(mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')) {
     displayReasons.push('matchMedia:descriptor_invalid');
   }
-  if (mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function') {
-    displayTargets.push({
-      owner: mmTarget,
-      key: 'matchMedia',
-      kind: 'method',
-      wrapLayer: 'named_wrapper',
-      invokeClass: 'brand_strict',
-      resolve: matchMediaResolve,
-      policy: 'strict',
-      diagTag: 'screen:matchMedia',
-      validThis: isMatchMediaThis,
-      invalidThis: 'native',
-      invoke: matchMediaInvokeCore
-    });
-  }
   const screenKeys = Object.keys(screenExpected);
   for (let i = ZERO; i < screenKeys.length; i++) {
     const key = screenKeys[i];
@@ -1351,6 +1365,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   let needsMqlCoordination = false;
   needsMqlCoordination = __screenHasMandatoryQueryMismatch(displayObserved.mediaQueries);
+  if (needsMqlCoordination && mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function') {
+    displayReasons.push('matchMedia:native_public_only');
+  }
   __screenAppendMandatoryQueryReasons(displayObserved.mediaQueries, displayReasons, 'matchMedia.');
   const windowKeys = ['innerWidth', 'innerHeight'];
   for (let i = ZERO; i < windowKeys.length; i++) {
@@ -1710,27 +1727,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const runtimeViewportQueries = __screenCollectViewportQueries();
     let needsViewportQueryCoordination = __screenHasMandatoryQueryMismatch(runtimeViewportQueries);
     if (needsViewportQueryCoordination) {
-      const matchMediaRegistered = !!(coreIsTargetRegistered && mmTarget && coreIsTargetRegistered(mmTarget, 'matchMedia'));
       if (!(mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')) {
         localReasons.push('matchMedia:descriptor_invalid');
-      } else if (!matchMediaRegistered) {
-        localTargets.push({
-          owner: mmTarget,
-          key: 'matchMedia',
-          kind: 'method',
-          wrapLayer: 'named_wrapper',
-          invokeClass: 'brand_strict',
-          resolve: matchMediaResolve,
-          policy: 'strict',
-          diagTag: 'screen:viewport_group:matchMedia',
-          validThis: isMatchMediaThis,
-          invalidThis: 'native',
-          invoke: matchMediaInvokeCore
-        });
       }
       if (!(mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function')) {
         localReasons.push('matchMedia.matches:descriptor_missing');
-      } else if (matchMediaRegistered) {
+      } else {
         localReasons.push('matchMedia.matches:native_public_only');
         __screenAppendMandatoryQueryReasons(runtimeViewportQueries, localReasons, 'matchMedia.');
       }
