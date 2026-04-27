@@ -220,6 +220,44 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'data_store_state_missing');
       return;
     }
+    let __navScalarState = (__navModuleState.__SCALAR_STATE__ && typeof __navModuleState.__SCALAR_STATE__ === 'object')
+      ? __navModuleState.__SCALAR_STATE__
+      : null;
+    if (!__navScalarState) {
+      __navDiagPipeline('warn', 'nav_total_set:scalar_state_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__',
+        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ missing',
+        data: { outcome: 'skip', reason: 'scalar_state_missing' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'scalar_state_missing');
+      return;
+    }
+    if (
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'platform') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'vendor') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'appVersion') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'productSub') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'vendorSub') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'maxTouchPoints') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'deviceMemory') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'hardwareConcurrency') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'language') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'languages') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'buildID') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'globalPrivacyControl') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'oscpu') ||
+      !Object.prototype.hasOwnProperty.call(__navScalarState, 'devicePixelRatio')
+    ) {
+      __navDiagPipeline('warn', 'nav_total_set:scalar_state_slot_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__',
+        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ scalar slot missing',
+        data: { outcome: 'skip', reason: 'scalar_state_slot_missing' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'scalar_state_slot_missing');
+      return;
+    }
     let __navObjectState = (__navModuleState.__OBJECT_STATE__ && typeof __navModuleState.__OBJECT_STATE__ === 'object')
       ? __navModuleState.__OBJECT_STATE__
       : null;
@@ -715,9 +753,33 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     const chPlatform = uaPlatform;
     const navPlatformOut = navPlat;
+    const __navProductSubValue = "20030107";
+    const __navVendorSubValue = "";
+    const __navMaxTouchPointsValue = 0;
+    const __navAppVersionPrefix = "Mozilla/";
+    const __navAppVersionTarget = (typeof userAgent === "string" && userAgent.indexOf(__navAppVersionPrefix) === 0)
+      ? userAgent.slice(__navAppVersionPrefix.length)
+      : userAgent;
+    const __navBuildIDValue = "20230501";
+    const __navGlobalPrivacyControlValue = false;
+    const __navOscpuValue = undefined;
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'platform', navPlatformOut), navPlatformOut)) throw new TypeError('scalar platform hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'vendor', vendor), vendor)) throw new TypeError('scalar vendor hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'appVersion', __navAppVersionTarget), __navAppVersionTarget)) throw new TypeError('scalar appVersion hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'productSub', __navProductSubValue), __navProductSubValue)) throw new TypeError('scalar productSub hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'vendorSub', __navVendorSubValue), __navVendorSubValue)) throw new TypeError('scalar vendorSub hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'maxTouchPoints', __navMaxTouchPointsValue), __navMaxTouchPointsValue)) throw new TypeError('scalar maxTouchPoints hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'deviceMemory', mem), mem)) throw new TypeError('scalar deviceMemory hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'hardwareConcurrency', cpu), cpu)) throw new TypeError('scalar hardwareConcurrency hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'language', __navPrimaryLanguage), __navPrimaryLanguage)) throw new TypeError('scalar language hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'languages', __navNormalizedLanguages), __navNormalizedLanguages)) throw new TypeError('scalar languages hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'buildID', __navBuildIDValue), __navBuildIDValue)) throw new TypeError('scalar buildID hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'globalPrivacyControl', __navGlobalPrivacyControlValue), __navGlobalPrivacyControlValue)) throw new TypeError('scalar globalPrivacyControl hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'oscpu', __navOscpuValue), __navOscpuValue)) throw new TypeError('scalar oscpu hidden slot attach failed');
+    if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'devicePixelRatio', dpr), dpr)) throw new TypeError('scalar devicePixelRatio hidden slot attach failed');
     function __navBuildUserAgentDataHighEntropySource() {
-      const safeDeviceMemory = __navIsValidDeviceMemoryValue(mem) ? mem : undefined;
-      const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(cpu) ? cpu : undefined;
+      const safeDeviceMemory = __navIsValidDeviceMemoryValue(__navScalarState.deviceMemory) ? __navScalarState.deviceMemory : undefined;
+      const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(__navScalarState.hardwareConcurrency) ? __navScalarState.hardwareConcurrency : undefined;
       const highEntropyFullVersionList = (meta && meta.fullVersionList != null)
         ? meta.fullVersionList
         : fullVersionList;
@@ -828,10 +890,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         assert(workerMeta, 'worker_env_snapshot.meta missing');
         const workerEnvSnapshotCandidate = __navCloneStateValue({
           ua: userAgent,
-          language: primaryLanguage,
-          languages: __navCloneStateValue(normalizedLanguages),
-          deviceMemory: mem,
-          hardwareConcurrency: cpu,
+          language: __navScalarState.language,
+          languages: __navCloneStateValue(__navScalarState.languages),
+          deviceMemory: __navScalarState.deviceMemory,
+          hardwareConcurrency: __navScalarState.hardwareConcurrency,
           uaData: {
             brands: __navCloneStateValue(workerMeta.brands),
             mobile: workerMeta.mobile,
@@ -1570,10 +1632,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         {
           key: 'platform',
           diagTag: 'nav_total_set:platform',
-          getter: function navPlatformValue() { return navPlatformOut; },
-          profileValue: navPlatformOut,
+          getter: function navPlatformValue() { return __navScalarState.platform; },
+          profileValue: __navScalarState.platform,
           matchesNative: function nativePlatformMatches(value) {
-            return typeof value === 'string' && value === navPlatformOut;
+            return typeof value === 'string' && value === __navScalarState.platform;
           },
           skipMessage: 'platform already matches native getter',
           mismatchAction: 'skip',
@@ -1582,10 +1644,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         {
           key: 'vendor',
           diagTag: 'nav_total_set:vendor',
-          getter: function navVendorValue() { return vendor; },
-          profileValue: vendor,
+          getter: function navVendorValue() { return __navScalarState.vendor; },
+          profileValue: __navScalarState.vendor,
           matchesNative: function nativeVendorMatches(value) {
-            return typeof value === 'string' && value === vendor;
+            return typeof value === 'string' && value === __navScalarState.vendor;
           },
           skipMessage: 'vendor already matches native getter',
           mismatchAction: 'skip',
@@ -1594,10 +1656,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         {
           key: 'productSub',
           diagTag: 'nav_total_set:productSub',
-          getter: function navProductSubValue() { return "20030107"; },
-          profileValue: "20030107",
+          getter: function navProductSubValue() { return __navScalarState.productSub; },
+          profileValue: __navScalarState.productSub,
           matchesNative: function nativeProductSubMatches(value) {
-            return typeof value === 'string' && value === "20030107";
+            return typeof value === 'string' && value === __navScalarState.productSub;
           },
           skipMessage: 'productSub already matches native getter',
           mismatchAction: 'skip',
@@ -1606,10 +1668,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         {
           key: 'vendorSub',
           diagTag: 'nav_total_set:vendorSub',
-          getter: function navVendorSubValue() { return ""; },
-          profileValue: "",
+          getter: function navVendorSubValue() { return __navScalarState.vendorSub; },
+          profileValue: __navScalarState.vendorSub,
           matchesNative: function nativeVendorSubMatches(value) {
-            return typeof value === 'string' && value === "";
+            return typeof value === 'string' && value === __navScalarState.vendorSub;
           },
           skipMessage: 'vendorSub already matches native getter',
           mismatchAction: 'skip',
@@ -1618,10 +1680,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         {
           key: 'maxTouchPoints',
           diagTag: 'nav_total_set:maxTouchPoints',
-          getter: function navMaxTouchPointsValue() { return 0; },
-          profileValue: 0,
+          getter: function navMaxTouchPointsValue() { return __navScalarState.maxTouchPoints; },
+          profileValue: __navScalarState.maxTouchPoints,
           matchesNative: function nativeMaxTouchPointsMatches(value) {
-            return Number.isInteger(value) && value === 0;
+            return Number.isInteger(value) && value === __navScalarState.maxTouchPoints;
           },
           skipMessage: 'maxTouchPoints already matches native getter',
           mismatchAction: 'skip',
@@ -1630,10 +1692,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ]);
       if ('appVersion' in navProto) {
         const nativeAppVersionDesc = __navResolveNativeAccessorDesc('appVersion');
-        const pfx = "Mozilla/";
-        const appVersionTarget = (typeof userAgent === "string" && userAgent.indexOf(pfx) === 0)
-          ? userAgent.slice(pfx.length)
-          : userAgent;
+        const appVersionTarget = __navScalarState.appVersion;
         if (typeof appVersionTarget === 'string' && appVersionTarget) {
           const nativeAppVersionRead = __navTryReadNativeValue(
             nativeAppVersionDesc,
@@ -1687,8 +1746,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // rest
     const navigatorPatches = [
-      ['buildID',              () => "20230501"],
-      ['globalPrivacyControl', () => false]
+      ['buildID',              () => __navScalarState.buildID],
+      ['globalPrivacyControl', () => __navScalarState.globalPrivacyControl]
     ];
       navigatorPatches.forEach(([prop, getter]) => {
         if (strictScalarKeys.has(prop) || objectReturnKeys.has(prop)) return; 
@@ -1804,7 +1863,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           wrapLayer: 'descriptor_only',
           policy: 'throw',
           diagTag: 'nav_total_set:devicePixelRatio',
-          value: dpr,
+          value: __navScalarState.devicePixelRatio,
           writable: !!dprDesc.writable,
           configurable: !!dprDesc.configurable,
           enumerable: !!dprDesc.enumerable
@@ -1868,7 +1927,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis: validWindowThis,
           invalidThis: dprInvalidThis,
           getImpl: function navDevicePixelRatioValue() {
-            return dpr;
+            return __navScalarState.devicePixelRatio;
           }
         }], 'strict');
       }
@@ -1892,8 +1951,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       // Post-apply invariant: devicePixelRatio must match profile DPR
       try {
         const actual = Number(window.devicePixelRatio);
-        if (!Number.isFinite(actual) || actual !== dpr) {
-          const msg = `devicePixelRatio mismatch (actual=${actual}, expected=${dpr})`;
+        if (!Number.isFinite(actual) || actual !== __navScalarState.devicePixelRatio) {
+          const msg = `devicePixelRatio mismatch (actual=${actual}, expected=${__navScalarState.devicePixelRatio})`;
           if (STRICT) {
             __navDiag('error', 'nav_total_set:dpr_mismatch', {
               stage: 'contract',
@@ -1901,7 +1960,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               diagTag: 'nav_total_set',
               key: 'devicePixelRatio',
               message: msg,
-              data: { outcome: 'throw', reason: 'dpr_mismatch', actual: actual, expected: dpr }
+              data: { outcome: 'throw', reason: 'dpr_mismatch', actual: actual, expected: __navScalarState.devicePixelRatio }
             });
             throw new TypeError(msg);
           }
@@ -1911,7 +1970,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             diagTag: 'nav_total_set',
             key: 'devicePixelRatio',
             message: msg,
-            data: { outcome: 'return', reason: 'dpr_mismatch', actual: actual, expected: dpr }
+            data: { outcome: 'return', reason: 'dpr_mismatch', actual: actual, expected: __navScalarState.devicePixelRatio }
           });
         }
       } catch (e) {
@@ -1929,7 +1988,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // oscpu (только если есть в прототипе)
     if ('oscpu' in navProto) {
-      safeDefineAcc(navProto, 'oscpu', () => undefined);
+      safeDefineAcc(navProto, 'oscpu', () => __navScalarState.oscpu);
     }
     // ——— E. userAgentData (low + high entropy) ———
     if ('userAgentData' in navigator) {
@@ -2436,7 +2495,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       // }, 'nav_total_set:deviceMemory');
     }
     if ('hardwareConcurrency' in navProto) {
-      if (__navIsValidHardwareConcurrencyValue(cpu)) {
+      if (__navIsValidHardwareConcurrencyValue(__navScalarState.hardwareConcurrency)) {
         const nativeHardwareConcurrencyRead = __navTryReadNativeValue(
           nativeHardwareConcurrencyDesc,
           navigator,
@@ -2446,7 +2505,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           'hardwareConcurrency native getter read failed on navigator receiver'
         );
         if (nativeHardwareConcurrencyRead.ok) {
-          if (Number(nativeHardwareConcurrencyRead.value) === Number(cpu)) {
+          if (Number(nativeHardwareConcurrencyRead.value) === Number(__navScalarState.hardwareConcurrency)) {
             __navDiag('info', 'nav_total_set:hardwareConcurrency_getter_value_match', {
               stage: 'preflight',
               type: __navTypePipeline,
@@ -2468,7 +2527,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 policy: 'skip',
                 action: 'keep_native_getter',
                 nativeValue: nativeHardwareConcurrencyRead.value,
-                profileValue: cpu
+                profileValue: __navScalarState.hardwareConcurrency
               }
             });
           }
@@ -2479,15 +2538,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             stage: 'runtime',
             key: 'hardwareConcurrency',
             message: 'invalid hardwareConcurrency profile value',
-            data: { outcome: 'return', reason: 'invalid_profile_value', value: cpu }
+            data: { outcome: 'return', reason: 'invalid_profile_value', value: __navScalarState.hardwareConcurrency }
           });
           return __navReadNativeScalarFallback(nativeHardwareConcurrencyDesc, this, 'hardwareConcurrency', 'nav_total_set:hardwareConcurrency');
         }, 'nav_total_set:hardwareConcurrency');
       }
     }
     if ('language' in navProto) {
-      const primaryLanguage = __navPrimaryLanguage;
-      const normalizedLanguages = __navNormalizedLanguages;
+      const primaryLanguage = __navScalarState.language;
+      const normalizedLanguages = __navScalarState.languages;
       const validLanguageTarget = __navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0];
       if (validLanguageTarget) {
         const nativeLanguageRead = __navTryReadNativeValue(
@@ -2544,8 +2603,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
     }
     if ('languages' in navProto) {
-      const primaryLanguage = __navPrimaryLanguage;
-      const normalizedLanguages = __navNormalizedLanguages;
+      const primaryLanguage = __navScalarState.language;
+      const normalizedLanguages = __navScalarState.languages;
       const validLanguagesTarget = __navIsValidLanguageList(normalizedLanguages) && typeof primaryLanguage === 'string' && primaryLanguage && primaryLanguage === normalizedLanguages[0];
       if (validLanguagesTarget) {
         const nativeLanguagesRead = __navTryReadNativeValue(
@@ -4069,6 +4128,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     }
     } catch (e) {
+      let scalarRollbackErr = null;
+      try {
+        const scalarKeys = Object.getOwnPropertyNames(__navScalarState);
+        for (let i = 0; i < scalarKeys.length; i++) {
+          const key = scalarKeys[i];
+          const desc = Object.getOwnPropertyDescriptor(__navScalarState, key);
+          if (desc && desc.configurable) {
+            delete __navScalarState[key];
+          } else {
+            throw new TypeError('scalar hidden-state reset failed: ' + key);
+          }
+        }
+      } catch (sre) {
+        scalarRollbackErr = sre;
+        __navDiagPipeline('error', 'nav_total_set:scalar_state_reset_failed', {
+          stage: 'rollback',
+          key: null,
+          message: 'scalar hidden-state reset failed',
+          data: { outcome: 'throw', reason: 'scalar_state_reset_failed', sourceReason: 'module_catch' }
+        }, sre);
+      }
       let hiddenRollbackErr = null;
       try {
         __navResetObjectHiddenState('module_catch');
@@ -4081,7 +4161,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       } catch (re) {
         rollbackErr = re;
       }
-      const finalRollbackErr = rollbackErr || hiddenRollbackErr;
+      const finalRollbackErr = rollbackErr || hiddenRollbackErr || scalarRollbackErr;
       __navDiagBrowser('fatal', 'nav_total_set:fatal', {
         stage: 'apply',
         diagTag: 'nav_total_set',
@@ -4092,6 +4172,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           reason: 'fatal',
           rollbackOk: !finalRollbackErr,
           descriptorRollbackOk: !rollbackErr,
+          scalarStateRollbackOk: !scalarRollbackErr,
           objectStateRollbackOk: !hiddenRollbackErr,
           action: 'native'
         }

@@ -236,6 +236,104 @@ if (!navScalarState) {
   __defineHiddenValue__(navRoot, '__SCALAR_STATE__', navScalarState);
 }
 
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'platform')) {
+  __defineHiddenValue__(navScalarState, 'platform', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'platform')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.platform bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'platform', navScalarState.platform);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'vendor')) {
+  __defineHiddenValue__(navScalarState, 'vendor', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'vendor')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.vendor bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'vendor', navScalarState.vendor);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'appVersion')) {
+  __defineHiddenValue__(navScalarState, 'appVersion', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'appVersion')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.appVersion bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'appVersion', navScalarState.appVersion);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'productSub')) {
+  __defineHiddenValue__(navScalarState, 'productSub', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'productSub')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.productSub bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'productSub', navScalarState.productSub);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'vendorSub')) {
+  __defineHiddenValue__(navScalarState, 'vendorSub', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'vendorSub')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.vendorSub bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'vendorSub', navScalarState.vendorSub);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'maxTouchPoints')) {
+  __defineHiddenValue__(navScalarState, 'maxTouchPoints', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'maxTouchPoints')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.maxTouchPoints bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'maxTouchPoints', navScalarState.maxTouchPoints);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'deviceMemory')) {
+  __defineHiddenValue__(navScalarState, 'deviceMemory', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'deviceMemory')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.deviceMemory bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'deviceMemory', navScalarState.deviceMemory);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'hardwareConcurrency')) {
+  __defineHiddenValue__(navScalarState, 'hardwareConcurrency', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'hardwareConcurrency')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.hardwareConcurrency bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'hardwareConcurrency', navScalarState.hardwareConcurrency);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'language')) {
+  __defineHiddenValue__(navScalarState, 'language', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'language')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.language bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'language', navScalarState.language);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'languages')) {
+  __defineHiddenValue__(navScalarState, 'languages', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'languages')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.languages bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'languages', navScalarState.languages);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'buildID')) {
+  __defineHiddenValue__(navScalarState, 'buildID', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'buildID')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.buildID bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'buildID', navScalarState.buildID);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'globalPrivacyControl')) {
+  __defineHiddenValue__(navScalarState, 'globalPrivacyControl', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'globalPrivacyControl')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.globalPrivacyControl bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'globalPrivacyControl', navScalarState.globalPrivacyControl);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'oscpu')) {
+  __defineHiddenValue__(navScalarState, 'oscpu', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'oscpu')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.oscpu bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'oscpu', navScalarState.oscpu);
+}
+
+if (!Object.prototype.hasOwnProperty.call(navScalarState, 'devicePixelRatio')) {
+  __defineHiddenValue__(navScalarState, 'devicePixelRatio', undefined);
+  if (!Object.prototype.hasOwnProperty.call(navScalarState, 'devicePixelRatio')) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.devicePixelRatio bootstrap failed');
+} else {
+  __defineHiddenValue__(navScalarState, 'devicePixelRatio', navScalarState.devicePixelRatio);
+}
+
 let navObjectState = (navRoot.__OBJECT_STATE__ && typeof navRoot.__OBJECT_STATE__ === 'object')
   ? navRoot.__OBJECT_STATE__
   : null;
@@ -942,9 +1040,34 @@ function __platformTransitOwnerReady__() {
 
 function __workerTransitSnapshotReady__() {
   const ready = !!(C && C.__workerEnvSnapshotReady__ === true);
-  __bootstrapTransitStatus__.retention.workerEnvSnapshotReady = ready;
-  __bootstrapTransitStatus__.retention.workerEnvSnapshotStage = ready ? 'ready' : 'pending';
-  return ready;
+  if (ready) {
+    __bootstrapTransitStatus__.retention.workerEnvSnapshotReady = true;
+    __bootstrapTransitStatus__.retention.workerEnvSnapshotStage = 'ready';
+    return true;
+  }
+  const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+  const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object') ? stateRoot.__WRK__ : null;
+  const wrkBootstrap = (wrkState && wrkState.bootstrap && typeof wrkState.bootstrap === 'object') ? wrkState.bootstrap : null;
+  const initStatus = (wrkBootstrap && typeof wrkBootstrap.initStatus === 'string') ? wrkBootstrap.initStatus : null;
+  if (initStatus === 'skipped' || initStatus === 'error') {
+    const prevStage = __bootstrapTransitStatus__.retention.workerEnvSnapshotStage;
+    __bootstrapTransitStatus__.retention.workerEnvSnapshotReady = true;
+    __bootstrapTransitStatus__.retention.workerEnvSnapshotStage = initStatus;
+    if (prevStage !== initStatus) {
+      __emitCleanupDiag__(
+        initStatus === 'error' ? 'error' : 'warn',
+        initStatus === 'error' ? 'bootstrap_hide:cleanup_env_retention_error' : 'bootstrap_hide:cleanup_env_retention_skipped',
+        'workerEnvSnapshot',
+        initStatus === 'error' ? 'worker snapshot retention terminal error; cleanup released' : 'worker snapshot retention skipped; cleanup released',
+        initStatus === 'error' ? 'worker_snapshot_error_terminal' : 'worker_snapshot_skipped',
+        null
+      );
+    }
+    return true;
+  }
+  __bootstrapTransitStatus__.retention.workerEnvSnapshotReady = false;
+  __bootstrapTransitStatus__.retention.workerEnvSnapshotStage = 'pending';
+  return false;
 }
 
 function __ensureBootstrapCleanupState__() {
