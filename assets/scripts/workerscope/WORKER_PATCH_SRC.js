@@ -1340,7 +1340,7 @@
         const profileHardwareConcurrency = Number(cache.snap.hardwareConcurrency);
         __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
         if (Object.is(nativeHardwareConcurrency, profileHardwareConcurrency)) {
-          emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:native_skip', {
+          emitDegrade('info', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_descriptor_match', {
             type: 'browser structure missing data',
             stage: 'preflight',
             module: 'WORKER_PATCH_SRC',
@@ -1350,7 +1350,7 @@
             action: 'native',
             data: {
               outcome: 'return',
-              reason: 'native_skip',
+              reason: 'native_descriptor_match',
               nativeValue: nativeHardwareConcurrency,
               profileValue: profileHardwareConcurrency,
               scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
