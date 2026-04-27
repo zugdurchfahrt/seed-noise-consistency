@@ -424,7 +424,6 @@ def ensure_platform_index(platform: str) -> dict:
     # claning orphaned .b64 after the index is actualized
     valid_md5s = {rec.get("md5") for rec in files_map.values() if isinstance(rec, dict) and rec.get("md5")}
     _cleanup_cache(platform, valid_md5s)
-    _cleanup_cache_namespaces(platform)
     return idx
 
 def random_string(length=12):
@@ -956,5 +955,5 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         idx["transport_signature"] = next_transport_signature
         _atomic_write_json(_index_path_for(platform), idx)
 
-    # _cleanup_cache_namespaces(platform)
+    _cleanup_cache_namespaces(platform)
     return temp_configs
