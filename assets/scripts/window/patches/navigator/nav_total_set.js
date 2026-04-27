@@ -181,8 +181,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       if (!target || (typeof target !== 'object' && typeof target !== 'function')) return value;
       const prev = Object.getOwnPropertyDescriptor(target, key);
       if (prev && prev.configurable === false) {
-        if (Object.prototype.hasOwnProperty.call(prev, 'value')) return prev.value;
-        return value;
+        if (Object.prototype.hasOwnProperty.call(prev, 'value')) {
+          __navDiagPipeline('error', 'nav_total_set:hidden_state_non_configurable_data', {
+            stage: 'apply',
+            key: String(key),
+            message: 'hidden state slot is non-configurable data property',
+            data: { outcome: 'return', reason: 'hidden_state_non_configurable_data' }
+          });
+          return prev.value;
+        }
+        const err = new TypeError('hidden state slot is non-configurable accessor: ' + String(key));
+        __navDiagPipeline('error', 'nav_total_set:hidden_state_non_configurable_accessor', {
+          stage: 'apply',
+          key: String(key),
+          message: err.message,
+          data: { outcome: 'throw', reason: 'hidden_state_non_configurable_accessor' }
+        }, err);
+        throw err;
       }
       Object.defineProperty(target, key, {
         value: value,
@@ -366,6 +381,54 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (STRICT) throw e;
       }
     }
+    let __navResetPluginsHiddenStateRef = null;
+    function __navResetObjectHiddenState(sourceReason) {
+      let resetErr = null;
+      function rememberResetError(code, key, err) {
+        if (!resetErr) resetErr = err;
+        __navDiagPipeline('error', code, {
+          stage: 'rollback',
+          key: key,
+          message: 'object hidden-state reset failed',
+          data: { outcome: 'throw', reason: 'object_state_reset_failed', sourceReason: sourceReason || null }
+        }, err);
+      }
+      try {
+        if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PRODUCER__', null) !== null) throw new TypeError('highEntropy producer reset failed');
+        if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__', null) !== null) throw new TypeError('highEntropy patch builder reset failed');
+        if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__', null) !== null) throw new TypeError('highEntropy postprocess reset failed');
+      } catch (e) {
+        rememberResetError('nav_total_set:object_state_high_entropy_reset_failed', 'userAgentData.highEntropy', e);
+      }
+      try {
+        const keys = Object.getOwnPropertyNames(__navObjectPermissionsState);
+        for (let i = 0; i < keys.length; i++) {
+          const key = keys[i];
+          const desc = Object.getOwnPropertyDescriptor(__navObjectPermissionsState, key);
+          if (desc && desc.configurable) {
+            delete __navObjectPermissionsState[key];
+          } else if (__navSetHiddenStateValue(__navObjectPermissionsState, key, null) !== null) {
+            throw new TypeError('permissions reset failed: ' + key);
+          }
+        }
+      } catch (e) {
+        rememberResetError('nav_total_set:object_state_permissions_reset_failed', 'permissions', e);
+      }
+      try {
+        if (__navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_IMPL__', null) !== null) throw new TypeError('storage estimate impl reset failed');
+        if (__navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_SNAPSHOT_GATE__', null) !== null) throw new TypeError('storage estimate snapshot gate reset failed');
+      } catch (e) {
+        rememberResetError('nav_total_set:object_state_storage_reset_failed', 'storage.estimate', e);
+      }
+      if (typeof __navResetPluginsHiddenStateRef === 'function') {
+        try {
+          __navResetPluginsHiddenStateRef();
+        } catch (e) {
+          rememberResetError('nav_total_set:object_state_plugins_reset_failed', 'plugins', e);
+        }
+      }
+      if (resetErr) throw resetErr;
+    }
 
     try {
     // ---- Hard consistency for platform ----
@@ -511,8 +574,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'bad_permissions_profile');
       return;
     }
-    __navSetHiddenStateValue(__navObjectPermissionsState, '__GET_PERMISSION_STATE__', __navGetPermissionState);
-    __navSetHiddenStateValue(__navObjectPermissionsState, '__SET_PERMISSION_STATE__', __navSetPermissionState);
+    if (__navSetHiddenStateValue(__navObjectPermissionsState, '__GET_PERMISSION_STATE__', __navGetPermissionState) !== __navGetPermissionState) throw new TypeError('permissions get state hidden slot attach failed');
+    if (__navSetHiddenStateValue(__navObjectPermissionsState, '__SET_PERMISSION_STATE__', __navSetPermissionState) !== __navSetPermissionState) throw new TypeError('permissions set state hidden slot attach failed');
     if (!Number.isFinite(dpr) || dpr <= 0) {
       __navDiagPipeline('error', 'nav_total_set:bad_dpr', {
         stage: 'preflight',
@@ -724,9 +787,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       return out;
     }
-    __navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PRODUCER__', __navBuildUserAgentDataHighEntropySource);
-    __navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__', __navBuildUserAgentDataHighEntropyPatch);
-    __navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__', __navPostProcessUserAgentDataHighEntropyResult);
+    if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PRODUCER__', __navBuildUserAgentDataHighEntropySource) !== __navBuildUserAgentDataHighEntropySource) throw new TypeError('highEntropy producer hidden slot attach failed');
+    if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__', __navBuildUserAgentDataHighEntropyPatch) !== __navBuildUserAgentDataHighEntropyPatch) throw new TypeError('highEntropy patch builder hidden slot attach failed');
+    if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__', __navPostProcessUserAgentDataHighEntropyResult) !== __navPostProcessUserAgentDataHighEntropyResult) throw new TypeError('highEntropy postprocess hidden slot attach failed');
     if (!Number.isFinite(colorDepth) || colorDepth <= 0) {
       __navDiag('warn', 'nav_total_set:color_depth_missing', {
         stage: 'preflight',
@@ -763,7 +826,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       try {
         const workerMeta = (meta && typeof meta === 'object') ? meta : null;
         assert(workerMeta, 'worker_env_snapshot.meta missing');
-        __navSetHiddenStateValue(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__', __navCloneStateValue({
+        const workerEnvSnapshotCandidate = __navCloneStateValue({
           ua: userAgent,
           language: primaryLanguage,
           languages: __navCloneStateValue(normalizedLanguages),
@@ -783,7 +846,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               formFactors: __navCloneStateValue(workerMeta.formFactors)
             }
           }
-        }));
+        });
+        if (__navSetHiddenStateValue(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__', workerEnvSnapshotCandidate) !== workerEnvSnapshotCandidate) {
+          throw new TypeError('worker env snapshot hidden slot attach failed');
+        }
         const workerEnvSnapshot = (__navDataStoreState && __navDataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof __navDataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
           ? __navDataStoreState.__WORKER_ENV_SNAPSHOT__
           : null;
@@ -808,7 +874,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         try {
           const own = Object.getOwnPropertyDescriptor(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__');
           if (own && own.configurable) delete __navDataStoreState.__WORKER_ENV_SNAPSHOT__;
-        } catch (_) {}
+          else if (own) {
+            __navDiag('error', 'nav_total_set:worker_env_snapshot_cleanup_failed', {
+              stage: 'rollback',
+              type: __navTypePipeline,
+              diagTag: 'nav_total_set',
+              key: '__WORKER_ENV_SNAPSHOT__',
+              message: 'worker env snapshot cleanup failed',
+              data: { outcome: 'throw', reason: 'worker_env_snapshot_cleanup_non_configurable' }
+            });
+          }
+        } catch (cleanupErr) {
+          __navDiag('error', 'nav_total_set:worker_env_snapshot_cleanup_failed', {
+            stage: 'rollback',
+            type: __navTypePipeline,
+            diagTag: 'nav_total_set',
+            key: '__WORKER_ENV_SNAPSHOT__',
+            message: 'worker env snapshot cleanup failed',
+            data: { outcome: 'throw', reason: 'worker_env_snapshot_cleanup_failed' }
+          }, cleanupErr);
+        }
         __navDiag('error', 'nav_total_set:worker_env_snapshot_invalid', {
           stage: 'apply',
           type: __navTypePipeline,
@@ -817,6 +902,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: 'worker env snapshot invalid',
           data: { outcome: 'throw', reason: 'worker_env_snapshot_invalid' }
         }, e);
+        throw e;
       }
     }
 
@@ -2670,10 +2756,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
              usage: usageBytes
            };
          };
-          __navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_IMPL__', buildStorageEstimateSnapshot);
-          __navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_SNAPSHOT_GATE__', function storageEstimateSnapshotGate() {
-            return Promise.resolve(buildStorageEstimateSnapshot('snapshot_gate'));
-          });
+           if (__navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_IMPL__', buildStorageEstimateSnapshot) !== buildStorageEstimateSnapshot) throw new TypeError('storage estimate impl hidden slot attach failed');
+           const storageEstimateSnapshotGate = function storageEstimateSnapshotGate() {
+             return Promise.resolve(buildStorageEstimateSnapshot('snapshot_gate'));
+           };
+           if (__navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_SNAPSHOT_GATE__', storageEstimateSnapshotGate) !== storageEstimateSnapshotGate) throw new TypeError('storage estimate snapshot gate hidden slot attach failed');
          __navDiag('info', 'nav_total_set:storage_estimate_native_passthrough', {
            surface: 'navigator',
            stage: 'apply',
@@ -3218,27 +3305,28 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       let __navPluginsState = __navObjectPluginsState;
       let __navMimeTypesState = __navObjectMimeTypesState;
       function __navResetPluginsHiddenState() {
-        __navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', false);
-        __navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', false);
-        __navSetHiddenStateValue(__navObjectPluginsPluginRecordsState, '__PLUGIN_META__', null);
-        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ITEM__', null);
-        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_NAMED_ITEM__', null);
-        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', null);
-        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', null);
-        __navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_META__', null);
-        __navSetHiddenStateValue(__navMimeTypesState, '__MIME_OBJECTS_SINGLETON__', null);
-        __navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_SINGLETON__', null);
-        __navSetHiddenStateValue(__navMimeTypesState, '__GET_MIMETYPES_VALUE__', null);
-        __navSetHiddenStateValue(__navMimeTypesState, '__PROTO_METHODS_READY__', false);
-        __navSetHiddenStateValue(__navMimeTypesState, '__PROTO_ACCESSORS_READY__', false);
-        __navSetHiddenStateValue(__navObjectMimeTypesMimeRecordsState, '__MIMETYPE_META__', null);
-        __navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', null);
-        __navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', null);
+        if (__navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', null) !== null) throw new TypeError('plugins normalized profiles reset failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', null) !== null) throw new TypeError('plugins array meta reset failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', null) !== null) throw new TypeError('plugins array singleton reset failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', null) !== null) throw new TypeError('plugins getter reset failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', false) !== false) throw new TypeError('plugins proto methods state reset failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', false) !== false) throw new TypeError('plugins proto accessors state reset failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsPluginRecordsState, '__PLUGIN_META__', null) !== null) throw new TypeError('plugin records meta reset failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ITEM__', null) !== null) throw new TypeError('native plugin item reset failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_NAMED_ITEM__', null) !== null) throw new TypeError('native plugin namedItem reset failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', null) !== null) throw new TypeError('native plugin array item reset failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', null) !== null) throw new TypeError('native plugin array namedItem reset failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_META__', null) !== null) throw new TypeError('mimeTypes array meta reset failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__MIME_OBJECTS_SINGLETON__', null) !== null) throw new TypeError('mime objects singleton reset failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_SINGLETON__', null) !== null) throw new TypeError('mimeTypes array singleton reset failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__GET_MIMETYPES_VALUE__', null) !== null) throw new TypeError('mimeTypes getter reset failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__PROTO_METHODS_READY__', false) !== false) throw new TypeError('mimeTypes proto methods state reset failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__PROTO_ACCESSORS_READY__', false) !== false) throw new TypeError('mimeTypes proto accessors state reset failed');
+        if (__navSetHiddenStateValue(__navObjectMimeTypesMimeRecordsState, '__MIMETYPE_META__', null) !== null) throw new TypeError('mime records meta reset failed');
+        if (__navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', null) !== null) throw new TypeError('native mimeType array item reset failed');
+        if (__navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', null) !== null) throw new TypeError('native mimeType array namedItem reset failed');
       }
+      __navResetPluginsHiddenStateRef = __navResetPluginsHiddenState;
       function __navRollbackPluginsSubgraph(reason, err) {
         let rollbackErr = null;
         for (let i = __navModuleApplied.length - 1; i >= __navPluginsAppliedCheckpoint; i--) {
@@ -3915,26 +4003,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
 
         __navPostcheckPluginsSubgraph();
-        __navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', fakePlugins);
-        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', __navPluginArrayMeta);
-        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', graph.pluginArray);
-        __navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', __navGetPluginsValue);
-        __navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', true);
-        __navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', true);
-        __navSetHiddenStateValue(__navObjectPluginsPluginRecordsState, '__PLUGIN_META__', __navPluginMeta);
-        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ITEM__', __navNativePluginItem);
-        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_NAMED_ITEM__', __navNativePluginNamedItem);
-        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', __navNativePluginArrayItem);
-        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', __navNativePluginArrayNamedItem);
-        __navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_META__', __navMimeTypeArrayMeta);
-        __navSetHiddenStateValue(__navMimeTypesState, '__MIME_OBJECTS_SINGLETON__', graph.mimeList);
-        __navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_SINGLETON__', graph.mimeArray);
-        __navSetHiddenStateValue(__navMimeTypesState, '__GET_MIMETYPES_VALUE__', __navGetMimeTypesValue);
-        __navSetHiddenStateValue(__navMimeTypesState, '__PROTO_METHODS_READY__', true);
-        __navSetHiddenStateValue(__navMimeTypesState, '__PROTO_ACCESSORS_READY__', true);
-        __navSetHiddenStateValue(__navObjectMimeTypesMimeRecordsState, '__MIMETYPE_META__', __navMimeTypeMeta);
-        __navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', __navNativeMimeTypeArrayItem);
-        __navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', __navNativeMimeTypeArrayNamedItem);
+        if (__navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', fakePlugins) !== fakePlugins) throw __navPluginsError('hidden_state_attach_failed', 'plugins normalized profiles hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', __navPluginArrayMeta) !== __navPluginArrayMeta) throw __navPluginsError('hidden_state_attach_failed', 'plugins array meta hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', graph.pluginArray) !== graph.pluginArray) throw __navPluginsError('hidden_state_attach_failed', 'plugins array singleton hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', __navGetPluginsValue) !== __navGetPluginsValue) throw __navPluginsError('hidden_state_attach_failed', 'plugins getter hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', true) !== true) throw __navPluginsError('hidden_state_attach_failed', 'plugins proto methods hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', true) !== true) throw __navPluginsError('hidden_state_attach_failed', 'plugins proto accessors hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsPluginRecordsState, '__PLUGIN_META__', __navPluginMeta) !== __navPluginMeta) throw __navPluginsError('hidden_state_attach_failed', 'plugin records meta hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ITEM__', __navNativePluginItem) !== __navNativePluginItem) throw __navPluginsError('hidden_state_attach_failed', 'native plugin item hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_NAMED_ITEM__', __navNativePluginNamedItem) !== __navNativePluginNamedItem) throw __navPluginsError('hidden_state_attach_failed', 'native plugin namedItem hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', __navNativePluginArrayItem) !== __navNativePluginArrayItem) throw __navPluginsError('hidden_state_attach_failed', 'native plugin array item hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', __navNativePluginArrayNamedItem) !== __navNativePluginArrayNamedItem) throw __navPluginsError('hidden_state_attach_failed', 'native plugin array namedItem hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_META__', __navMimeTypeArrayMeta) !== __navMimeTypeArrayMeta) throw __navPluginsError('hidden_state_attach_failed', 'mimeTypes array meta hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__MIME_OBJECTS_SINGLETON__', graph.mimeList) !== graph.mimeList) throw __navPluginsError('hidden_state_attach_failed', 'mime objects singleton hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_SINGLETON__', graph.mimeArray) !== graph.mimeArray) throw __navPluginsError('hidden_state_attach_failed', 'mimeTypes array singleton hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__GET_MIMETYPES_VALUE__', __navGetMimeTypesValue) !== __navGetMimeTypesValue) throw __navPluginsError('hidden_state_attach_failed', 'mimeTypes getter hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__PROTO_METHODS_READY__', true) !== true) throw __navPluginsError('hidden_state_attach_failed', 'mimeTypes proto methods hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navMimeTypesState, '__PROTO_ACCESSORS_READY__', true) !== true) throw __navPluginsError('hidden_state_attach_failed', 'mimeTypes proto accessors hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navObjectMimeTypesMimeRecordsState, '__MIMETYPE_META__', __navMimeTypeMeta) !== __navMimeTypeMeta) throw __navPluginsError('hidden_state_attach_failed', 'mime records meta hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', __navNativeMimeTypeArrayItem) !== __navNativeMimeTypeArrayItem) throw __navPluginsError('hidden_state_attach_failed', 'native mimeType array item hidden slot attach failed');
+        if (__navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', __navNativeMimeTypeArrayNamedItem) !== __navNativeMimeTypeArrayNamedItem) throw __navPluginsError('hidden_state_attach_failed', 'native mimeType array namedItem hidden slot attach failed');
         __navDiag('info', 'nav_total_set:plugins_ready', {
           stage: 'apply',
           type: __navTypePipeline,
@@ -3981,21 +4069,35 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     }
     } catch (e) {
+      let hiddenRollbackErr = null;
+      try {
+        __navResetObjectHiddenState('module_catch');
+      } catch (hre) {
+        hiddenRollbackErr = hre;
+      }
       let rollbackErr = null;
       try {
         rollbackModuleApplied();
       } catch (re) {
         rollbackErr = re;
       }
+      const finalRollbackErr = rollbackErr || hiddenRollbackErr;
       __navDiagBrowser('fatal', 'nav_total_set:fatal', {
         stage: 'apply',
         diagTag: 'nav_total_set',
         key: null,
         message: 'fatal module error',
-        data: { outcome: 'throw', reason: 'fatal', rollbackOk: !rollbackErr, action: 'native' }
-      }, rollbackErr || e);
-      __navReleaseEntryGuard(!rollbackErr, 'rollback', 'module_catch');
-      throw (rollbackErr || e);
+        data: {
+          outcome: 'throw',
+          reason: 'fatal',
+          rollbackOk: !finalRollbackErr,
+          descriptorRollbackOk: !rollbackErr,
+          objectStateRollbackOk: !hiddenRollbackErr,
+          action: 'native'
+        }
+      }, finalRollbackErr || e);
+      __navReleaseEntryGuard(!finalRollbackErr, 'rollback', 'module_catch');
+      throw (finalRollbackErr || e);
     }
   }
 }
