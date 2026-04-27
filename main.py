@@ -774,13 +774,10 @@ def init_driver(
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
 
-
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, dom_platform)
-
-
 
     
     # Connect page_js (core + targets + wrk.js and so on)
@@ -807,9 +804,8 @@ def init_driver(
             # Main client hints
             # "Accept": str(expected_client_hints["accept"]),
             "Accept-Language": str(profile.get("accept_language")),
-            "Sec-CH-Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
-            "Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
-            # "Device-Memory": str(profile["deviceMemory"]),
+            "Sec-CH-Device-Memory": str(profile["deviceMemory"]),
+            "Device-Memory": str(profile["deviceMemory"]),
             # "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
             # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
             # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
@@ -1343,7 +1339,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/screen.html")
+        driver.get("https://browserleaks.com/client-hints")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

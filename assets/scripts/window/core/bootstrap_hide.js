@@ -245,6 +245,185 @@ if (!navObjectState) {
 } else {
   __defineHiddenValue__(navRoot, '__OBJECT_STATE__', navObjectState);
 }
+let navObjectUserAgentDataState = (navObjectState.userAgentData && typeof navObjectState.userAgentData === 'object')
+  ? navObjectState.userAgentData
+  : null;
+if (!navObjectUserAgentDataState) {
+  navObjectUserAgentDataState = __defineHiddenValue__(navObjectState, 'userAgentData', Object.create(null));
+  if (!navObjectUserAgentDataState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectState, 'userAgentData', navObjectUserAgentDataState);
+}
+
+let navObjectUserAgentDataLowEntropyState = (navObjectUserAgentDataState.lowEntropy && typeof navObjectUserAgentDataState.lowEntropy === 'object')
+  ? navObjectUserAgentDataState.lowEntropy
+  : null;
+if (!navObjectUserAgentDataLowEntropyState) {
+  navObjectUserAgentDataLowEntropyState = __defineHiddenValue__(navObjectUserAgentDataState, 'lowEntropy', Object.create(null));
+  if (!navObjectUserAgentDataLowEntropyState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.lowEntropy bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectUserAgentDataState, 'lowEntropy', navObjectUserAgentDataLowEntropyState);
+}
+
+let navObjectUserAgentDataHighEntropyState = (navObjectUserAgentDataState.highEntropy && typeof navObjectUserAgentDataState.highEntropy === 'object')
+  ? navObjectUserAgentDataState.highEntropy
+  : null;
+if (!navObjectUserAgentDataHighEntropyState) {
+  navObjectUserAgentDataHighEntropyState = __defineHiddenValue__(navObjectUserAgentDataState, 'highEntropy', Object.create(null));
+  if (!navObjectUserAgentDataHighEntropyState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.highEntropy bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectUserAgentDataState, 'highEntropy', navObjectUserAgentDataHighEntropyState);
+}
+
+let navObjectUserAgentDataToJSONState = (navObjectUserAgentDataState.toJSON && typeof navObjectUserAgentDataState.toJSON === 'object')
+  ? navObjectUserAgentDataState.toJSON
+  : null;
+if (!navObjectUserAgentDataToJSONState) {
+  navObjectUserAgentDataToJSONState = __defineHiddenValue__(navObjectUserAgentDataState, 'toJSON', Object.create(null));
+  if (!navObjectUserAgentDataToJSONState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.toJSON bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectUserAgentDataState, 'toJSON', navObjectUserAgentDataToJSONState);
+}
+
+let navObjectPluginsState = (navObjectState.plugins && typeof navObjectState.plugins === 'object')
+  ? navObjectState.plugins
+  : null;
+if (!navObjectPluginsState) {
+  navObjectPluginsState = __defineHiddenValue__(navObjectState, 'plugins', Object.create(null));
+  if (!navObjectPluginsState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectState, 'plugins', navObjectPluginsState);
+}
+
+let navObjectPluginsProtoMethodsState = (navObjectPluginsState.protoMethods && typeof navObjectPluginsState.protoMethods === 'object')
+  ? navObjectPluginsState.protoMethods
+  : null;
+if (!navObjectPluginsProtoMethodsState) {
+  navObjectPluginsProtoMethodsState = __defineHiddenValue__(navObjectPluginsState, 'protoMethods', Object.create(null));
+  if (!navObjectPluginsProtoMethodsState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins.protoMethods bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectPluginsState, 'protoMethods', navObjectPluginsProtoMethodsState);
+}
+
+let navObjectPluginsPluginRecordsState = (navObjectPluginsState.pluginRecords && typeof navObjectPluginsState.pluginRecords === 'object')
+  ? navObjectPluginsState.pluginRecords
+  : null;
+if (!navObjectPluginsPluginRecordsState) {
+  navObjectPluginsPluginRecordsState = __defineHiddenValue__(navObjectPluginsState, 'pluginRecords', Object.create(null));
+  if (!navObjectPluginsPluginRecordsState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins.pluginRecords bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectPluginsState, 'pluginRecords', navObjectPluginsPluginRecordsState);
+}
+
+let navObjectMimeTypesState = (navObjectState.mimeTypes && typeof navObjectState.mimeTypes === 'object')
+  ? navObjectState.mimeTypes
+  : null;
+if (!navObjectMimeTypesState) {
+  navObjectMimeTypesState = __defineHiddenValue__(navObjectState, 'mimeTypes', Object.create(null));
+  if (!navObjectMimeTypesState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectState, 'mimeTypes', navObjectMimeTypesState);
+}
+
+let navObjectMimeTypesProtoMethodsState = (navObjectMimeTypesState.protoMethods && typeof navObjectMimeTypesState.protoMethods === 'object')
+  ? navObjectMimeTypesState.protoMethods
+  : null;
+if (!navObjectMimeTypesProtoMethodsState) {
+  navObjectMimeTypesProtoMethodsState = __defineHiddenValue__(navObjectMimeTypesState, 'protoMethods', Object.create(null));
+  if (!navObjectMimeTypesProtoMethodsState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes.protoMethods bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectMimeTypesState, 'protoMethods', navObjectMimeTypesProtoMethodsState);
+}
+
+let navObjectMimeTypesMimeRecordsState = (navObjectMimeTypesState.mimeRecords && typeof navObjectMimeTypesState.mimeRecords === 'object')
+  ? navObjectMimeTypesState.mimeRecords
+  : null;
+if (!navObjectMimeTypesMimeRecordsState) {
+  navObjectMimeTypesMimeRecordsState = __defineHiddenValue__(navObjectMimeTypesState, 'mimeRecords', Object.create(null));
+  if (!navObjectMimeTypesMimeRecordsState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes.mimeRecords bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectMimeTypesState, 'mimeRecords', navObjectMimeTypesMimeRecordsState);
+}
+
+let navObjectPermissionsState = (navObjectState.permissions && typeof navObjectState.permissions === 'object')
+  ? navObjectState.permissions
+  : null;
+if (!navObjectPermissionsState) {
+  navObjectPermissionsState = __defineHiddenValue__(navObjectState, 'permissions', Object.create(null));
+  if (!navObjectPermissionsState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.permissions bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectState, 'permissions', navObjectPermissionsState);
+}
+
+let navObjectStorageState = (navObjectState.storage && typeof navObjectState.storage === 'object')
+  ? navObjectState.storage
+  : null;
+if (!navObjectStorageState) {
+  navObjectStorageState = __defineHiddenValue__(navObjectState, 'storage', Object.create(null));
+  if (!navObjectStorageState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectState, 'storage', navObjectStorageState);
+}
+
+let navObjectStorageEstimateState = (navObjectStorageState.estimate && typeof navObjectStorageState.estimate === 'object')
+  ? navObjectStorageState.estimate
+  : null;
+if (!navObjectStorageEstimateState) {
+  navObjectStorageEstimateState = __defineHiddenValue__(navObjectStorageState, 'estimate', Object.create(null));
+  if (!navObjectStorageEstimateState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.estimate bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectStorageState, 'estimate', navObjectStorageEstimateState);
+}
+
+let navObjectStorageWebkitTemporaryStorageState = (navObjectStorageState.webkitTemporaryStorage && typeof navObjectStorageState.webkitTemporaryStorage === 'object')
+  ? navObjectStorageState.webkitTemporaryStorage
+  : null;
+if (!navObjectStorageWebkitTemporaryStorageState) {
+  navObjectStorageWebkitTemporaryStorageState = __defineHiddenValue__(navObjectStorageState, 'webkitTemporaryStorage', Object.create(null));
+  if (!navObjectStorageWebkitTemporaryStorageState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.webkitTemporaryStorage bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectStorageState, 'webkitTemporaryStorage', navObjectStorageWebkitTemporaryStorageState);
+}
+
+let navObjectStoragePersistenceState = (navObjectStorageState.persistence && typeof navObjectStorageState.persistence === 'object')
+  ? navObjectStorageState.persistence
+  : null;
+if (!navObjectStoragePersistenceState) {
+  navObjectStoragePersistenceState = __defineHiddenValue__(navObjectStorageState, 'persistence', Object.create(null));
+  if (!navObjectStoragePersistenceState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.persistence bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectStorageState, 'persistence', navObjectStoragePersistenceState);
+}
+
+let navObjectPerformanceState = (navObjectState.performance && typeof navObjectState.performance === 'object')
+  ? navObjectState.performance
+  : null;
+if (!navObjectPerformanceState) {
+  navObjectPerformanceState = __defineHiddenValue__(navObjectState, 'performance', Object.create(null));
+  if (!navObjectPerformanceState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.performance bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectState, 'performance', navObjectPerformanceState);
+}
+
+let navObjectPerformanceMemoryState = (navObjectPerformanceState.memory && typeof navObjectPerformanceState.memory === 'object')
+  ? navObjectPerformanceState.memory
+  : null;
+if (!navObjectPerformanceMemoryState) {
+  navObjectPerformanceMemoryState = __defineHiddenValue__(navObjectPerformanceState, 'memory', Object.create(null));
+  if (!navObjectPerformanceMemoryState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.performance.memory bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectPerformanceState, 'memory', navObjectPerformanceMemoryState);
+}
+
+let navObjectCredentialsState = (navObjectState.credentials && typeof navObjectState.credentials === 'object')
+  ? navObjectState.credentials
+  : null;
+if (!navObjectCredentialsState) {
+  navObjectCredentialsState = __defineHiddenValue__(navObjectState, 'credentials', Object.create(null));
+  if (!navObjectCredentialsState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.credentials bootstrap failed');
+} else {
+  __defineHiddenValue__(navObjectState, 'credentials', navObjectCredentialsState);
+}
 
 let hideWebdriverRoot = (stateRoot.__HIDE_WEBDRIVER__ && typeof stateRoot.__HIDE_WEBDRIVER__ === 'object')
   ? stateRoot.__HIDE_WEBDRIVER__

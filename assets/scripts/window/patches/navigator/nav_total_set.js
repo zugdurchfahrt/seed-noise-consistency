@@ -218,6 +218,61 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'object_state_missing');
       return;
     }
+    const __navObjectUserAgentDataState = (__navObjectState.userAgentData && typeof __navObjectState.userAgentData === 'object')
+      ? __navObjectState.userAgentData
+      : null;
+    const __navObjectUserAgentDataHighEntropyState = (__navObjectUserAgentDataState && __navObjectUserAgentDataState.highEntropy && typeof __navObjectUserAgentDataState.highEntropy === 'object')
+      ? __navObjectUserAgentDataState.highEntropy
+      : null;
+    const __navObjectPermissionsState = (__navObjectState.permissions && typeof __navObjectState.permissions === 'object')
+      ? __navObjectState.permissions
+      : null;
+    const __navObjectStorageState = (__navObjectState.storage && typeof __navObjectState.storage === 'object')
+      ? __navObjectState.storage
+      : null;
+    const __navObjectStorageEstimateState = (__navObjectStorageState && __navObjectStorageState.estimate && typeof __navObjectStorageState.estimate === 'object')
+      ? __navObjectStorageState.estimate
+      : null;
+    const __navObjectPluginsState = (__navObjectState.plugins && typeof __navObjectState.plugins === 'object')
+      ? __navObjectState.plugins
+      : null;
+    const __navObjectPluginsProtoMethodsState = (__navObjectPluginsState && __navObjectPluginsState.protoMethods && typeof __navObjectPluginsState.protoMethods === 'object')
+      ? __navObjectPluginsState.protoMethods
+      : null;
+    const __navObjectPluginsPluginRecordsState = (__navObjectPluginsState && __navObjectPluginsState.pluginRecords && typeof __navObjectPluginsState.pluginRecords === 'object')
+      ? __navObjectPluginsState.pluginRecords
+      : null;
+    const __navObjectMimeTypesState = (__navObjectState.mimeTypes && typeof __navObjectState.mimeTypes === 'object')
+      ? __navObjectState.mimeTypes
+      : null;
+    const __navObjectMimeTypesProtoMethodsState = (__navObjectMimeTypesState && __navObjectMimeTypesState.protoMethods && typeof __navObjectMimeTypesState.protoMethods === 'object')
+      ? __navObjectMimeTypesState.protoMethods
+      : null;
+    const __navObjectMimeTypesMimeRecordsState = (__navObjectMimeTypesState && __navObjectMimeTypesState.mimeRecords && typeof __navObjectMimeTypesState.mimeRecords === 'object')
+      ? __navObjectMimeTypesState.mimeRecords
+      : null;
+    if (
+      !__navObjectUserAgentDataState ||
+      !__navObjectUserAgentDataHighEntropyState ||
+      !__navObjectPermissionsState ||
+      !__navObjectStorageState ||
+      !__navObjectStorageEstimateState ||
+      !__navObjectPluginsState ||
+      !__navObjectPluginsProtoMethodsState ||
+      !__navObjectPluginsPluginRecordsState ||
+      !__navObjectMimeTypesState ||
+      !__navObjectMimeTypesProtoMethodsState ||
+      !__navObjectMimeTypesMimeRecordsState
+    ) {
+      __navDiagPipeline('warn', 'nav_total_set:object_state_nested_missing', {
+        stage: 'preflight',
+        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__',
+        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ nested slot missing',
+        data: { outcome: 'skip', reason: 'object_state_nested_missing' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'object_state_nested_missing');
+      return;
+    }
 
     // basic random from the existing seed initialization
     const __navCoreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
@@ -338,13 +393,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const DEBUG         = !!__envProfileState.debug;
     let __navNativePermissionsQuery = null;
     let __navNativePermissionsThis = null;
-    let __navPermissionsState = (__navModuleState.__PERMISSIONS_STATE__ && typeof __navModuleState.__PERMISSIONS_STATE__ === 'object')
-      ? __navModuleState.__PERMISSIONS_STATE__
-      : null;
-    if (!__navPermissionsState) {
-      __navPermissionsState = Object.create(null);
-      __navSetHiddenStateValue(__navModuleState, '__PERMISSIONS_STATE__', __navPermissionsState);
-    }
+    let __navPermissionsState = __navObjectPermissionsState;
     function __navNormalizePermissionState(state) {
       return (state === 'granted' || state === 'denied' || state === 'prompt') ? state : 'prompt';
     }
@@ -462,8 +511,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'bad_permissions_profile');
       return;
     }
-    __navSetHiddenStateValue(__navModuleState, '__GET_PERMISSION_STATE__', __navGetPermissionState);
-    __navSetHiddenStateValue(__navModuleState, '__SET_PERMISSION_STATE__', __navSetPermissionState);
+    __navSetHiddenStateValue(__navObjectPermissionsState, '__GET_PERMISSION_STATE__', __navGetPermissionState);
+    __navSetHiddenStateValue(__navObjectPermissionsState, '__SET_PERMISSION_STATE__', __navSetPermissionState);
     if (!Number.isFinite(dpr) || dpr <= 0) {
       __navDiagPipeline('error', 'nav_total_set:bad_dpr', {
         stage: 'preflight',
@@ -641,8 +690,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       };
     }
     function __navBuildUserAgentDataHighEntropyPatch(keys) {
-      const producer = (__navObjectState && typeof __navObjectState.__GET_HIGH_ENTROPY_VALUES_PRODUCER__ === 'function')
-        ? __navObjectState.__GET_HIGH_ENTROPY_VALUES_PRODUCER__
+      const producer = (__navObjectUserAgentDataHighEntropyState && typeof __navObjectUserAgentDataHighEntropyState.__GET_HIGH_ENTROPY_VALUES_PRODUCER__ === 'function')
+        ? __navObjectUserAgentDataHighEntropyState.__GET_HIGH_ENTROPY_VALUES_PRODUCER__
         : null;
       if (typeof producer !== 'function') {
         return { ok: false, reason: 'producer_missing', value: null };
@@ -675,9 +724,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       return out;
     }
-    __navSetHiddenStateValue(__navObjectState, '__GET_HIGH_ENTROPY_VALUES_PRODUCER__', __navBuildUserAgentDataHighEntropySource);
-    __navSetHiddenStateValue(__navObjectState, '__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__', __navBuildUserAgentDataHighEntropyPatch);
-    __navSetHiddenStateValue(__navObjectState, '__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__', __navPostProcessUserAgentDataHighEntropyResult);
+    __navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PRODUCER__', __navBuildUserAgentDataHighEntropySource);
+    __navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__', __navBuildUserAgentDataHighEntropyPatch);
+    __navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__', __navPostProcessUserAgentDataHighEntropyResult);
     if (!Number.isFinite(colorDepth) || colorDepth <= 0) {
       __navDiag('warn', 'nav_total_set:color_depth_missing', {
         stage: 'preflight',
@@ -2035,8 +2084,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                // Public API path must not leak service errors; pass-through native behavior.
                return Reflect.apply(orig, this, args || []);
              }
-              const patchBuilder = (__navObjectState && typeof __navObjectState.__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__ === 'function')
-                ? __navObjectState.__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__
+              const patchBuilder = (__navObjectUserAgentDataHighEntropyState && typeof __navObjectUserAgentDataHighEntropyState.__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__ === 'function')
+                ? __navObjectUserAgentDataHighEntropyState.__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__
                 : null;
               if (typeof patchBuilder !== 'function') {
                 __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_patch_builder_missing', {
@@ -2073,8 +2122,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 return nativeOut;
               }
               const result = patchBuild.value || {};
-              const postProcessor = (__navObjectState && typeof __navObjectState.__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__ === 'function')
-                ? __navObjectState.__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__
+              const postProcessor = (__navObjectUserAgentDataHighEntropyState && typeof __navObjectUserAgentDataHighEntropyState.__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__ === 'function')
+                ? __navObjectUserAgentDataHighEntropyState.__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__
                 : null;
               if (typeof postProcessor !== 'function') {
                 __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_postprocessor_missing', {
@@ -2621,10 +2670,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
              usage: usageBytes
            };
          };
-         __navSetHiddenStateValue(__navModuleState, '__STORAGE_ESTIMATE_IMPL__', buildStorageEstimateSnapshot);
-         __navSetHiddenStateValue(__navModuleState, '__STORAGE_ESTIMATE_SNAPSHOT_GATE__', function storageEstimateSnapshotGate() {
-           return Promise.resolve(buildStorageEstimateSnapshot('snapshot_gate'));
-         });
+          __navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_IMPL__', buildStorageEstimateSnapshot);
+          __navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_SNAPSHOT_GATE__', function storageEstimateSnapshotGate() {
+            return Promise.resolve(buildStorageEstimateSnapshot('snapshot_gate'));
+          });
          __navDiag('info', 'nav_total_set:storage_estimate_native_passthrough', {
            surface: 'navigator',
            stage: 'apply',
@@ -3166,32 +3215,29 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         err.__navPluginsReason = reason;
         return err;
       }
-      let __navPluginsState = (__navModuleState.__PLUGINS_STATE__ && typeof __navModuleState.__PLUGINS_STATE__ === 'object')
-        ? __navModuleState.__PLUGINS_STATE__
-        : null;
-      if (!__navPluginsState) {
-        __navPluginsState = Object.create(null);
-        __navSetHiddenStateValue(__navModuleState, '__PLUGINS_STATE__', __navPluginsState);
-      }
+      let __navPluginsState = __navObjectPluginsState;
+      let __navMimeTypesState = __navObjectMimeTypesState;
       function __navResetPluginsHiddenState() {
         __navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', null);
         __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_META__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_META__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_META__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ITEM__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_NAMED_ITEM__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__MIME_OBJECTS_SINGLETON__', null);
         __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_SINGLETON__', null);
         __navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', null);
-        __navSetHiddenStateValue(__navPluginsState, '__GET_MIMETYPES_VALUE__', null);
         __navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', false);
         __navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', false);
+        __navSetHiddenStateValue(__navObjectPluginsPluginRecordsState, '__PLUGIN_META__', null);
+        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ITEM__', null);
+        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_NAMED_ITEM__', null);
+        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', null);
+        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', null);
+        __navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_META__', null);
+        __navSetHiddenStateValue(__navMimeTypesState, '__MIME_OBJECTS_SINGLETON__', null);
+        __navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_SINGLETON__', null);
+        __navSetHiddenStateValue(__navMimeTypesState, '__GET_MIMETYPES_VALUE__', null);
+        __navSetHiddenStateValue(__navMimeTypesState, '__PROTO_METHODS_READY__', false);
+        __navSetHiddenStateValue(__navMimeTypesState, '__PROTO_ACCESSORS_READY__', false);
+        __navSetHiddenStateValue(__navObjectMimeTypesMimeRecordsState, '__MIMETYPE_META__', null);
+        __navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', null);
+        __navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', null);
       }
       function __navRollbackPluginsSubgraph(reason, err) {
         let rollbackErr = null;
@@ -3871,22 +3917,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         __navPostcheckPluginsSubgraph();
         __navSetHiddenStateValue(__navPluginsState, '__NORMALIZED_PLUGIN_PROFILES__', fakePlugins);
         __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_META__', __navPluginArrayMeta);
-        __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_META__', __navPluginMeta);
-        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_META__', __navMimeTypeArrayMeta);
-        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_META__', __navMimeTypeMeta);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ITEM__', __navNativePluginItem);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_NAMED_ITEM__', __navNativePluginNamedItem);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', __navNativePluginArrayItem);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', __navNativePluginArrayNamedItem);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', __navNativeMimeTypeArrayItem);
-        __navSetHiddenStateValue(__navPluginsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', __navNativeMimeTypeArrayNamedItem);
-        __navSetHiddenStateValue(__navPluginsState, '__MIME_OBJECTS_SINGLETON__', graph.mimeList);
         __navSetHiddenStateValue(__navPluginsState, '__PLUGIN_ARRAY_SINGLETON__', graph.pluginArray);
-        __navSetHiddenStateValue(__navPluginsState, '__MIMETYPE_ARRAY_SINGLETON__', graph.mimeArray);
         __navSetHiddenStateValue(__navPluginsState, '__GET_PLUGINS_VALUE__', __navGetPluginsValue);
-        __navSetHiddenStateValue(__navPluginsState, '__GET_MIMETYPES_VALUE__', __navGetMimeTypesValue);
         __navSetHiddenStateValue(__navPluginsState, '__PROTO_METHODS_READY__', true);
         __navSetHiddenStateValue(__navPluginsState, '__PROTO_ACCESSORS_READY__', true);
+        __navSetHiddenStateValue(__navObjectPluginsPluginRecordsState, '__PLUGIN_META__', __navPluginMeta);
+        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ITEM__', __navNativePluginItem);
+        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_NAMED_ITEM__', __navNativePluginNamedItem);
+        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_ITEM__', __navNativePluginArrayItem);
+        __navSetHiddenStateValue(__navObjectPluginsProtoMethodsState, '__NATIVE_PLUGIN_ARRAY_NAMED_ITEM__', __navNativePluginArrayNamedItem);
+        __navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_META__', __navMimeTypeArrayMeta);
+        __navSetHiddenStateValue(__navMimeTypesState, '__MIME_OBJECTS_SINGLETON__', graph.mimeList);
+        __navSetHiddenStateValue(__navMimeTypesState, '__MIMETYPE_ARRAY_SINGLETON__', graph.mimeArray);
+        __navSetHiddenStateValue(__navMimeTypesState, '__GET_MIMETYPES_VALUE__', __navGetMimeTypesValue);
+        __navSetHiddenStateValue(__navMimeTypesState, '__PROTO_METHODS_READY__', true);
+        __navSetHiddenStateValue(__navMimeTypesState, '__PROTO_ACCESSORS_READY__', true);
+        __navSetHiddenStateValue(__navObjectMimeTypesMimeRecordsState, '__MIMETYPE_META__', __navMimeTypeMeta);
+        __navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_ITEM__', __navNativeMimeTypeArrayItem);
+        __navSetHiddenStateValue(__navObjectMimeTypesProtoMethodsState, '__NATIVE_MIMETYPE_ARRAY_NAMED_ITEM__', __navNativeMimeTypeArrayNamedItem);
         __navDiag('info', 'nav_total_set:plugins_ready', {
           stage: 'apply',
           type: __navTypePipeline,
