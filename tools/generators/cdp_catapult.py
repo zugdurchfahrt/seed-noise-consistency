@@ -1,4 +1,4 @@
-# cdp_catapult.py  (SW injector only)
+# cdp_catapult.py  (SW bootstrap + worker seed transport)
 import atexit
 import json
 import time
@@ -18,15 +18,15 @@ PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 SCRIPTS_WORKERSCOPE = PROJECT_ROOT / "assets" / "scripts" / "workerscope"
 PORT = None
-# --- SW prelude injector (ServiceWorkerGlobalScope) ---
-SW_INJECT_ENABLED = True
+# --- SW bootstrap prelude (ServiceWorkerGlobalScope) ---
+SW_BOOTSTRAP_ENABLED = True
 SW_PRIMARY = None
 SW_LANGS = None
 SW_HC = None
 SW_DM = None
 SW_META = None
 SW_WEBGL = None
-SW_ENV = None
+SW_BOOTSTRAP_ENV = None
 # --- Dedicated/Shared Worker CDP_GLOBAL_SEED injector (WorkerGlobalScope) ---
 WORKER_SEED_INJECT_ENABLED = True
 CDP_GLOBAL_SEED = None
@@ -140,7 +140,7 @@ def _log_sw_relay_diag(session_id: str, target_id: str, payload):
 
 
 
-def enable_sw_env_inject(
+def enable_sw_bootstrap_env(
     *,
     language: str,
     normalized_languages: list[str],
@@ -152,58 +152,58 @@ def enable_sw_env_inject(
     navigator_platform: str,
 ):
     """
-    Enable ServiceWorker env injection.
+    Enable ServiceWorker bootstrap env.
     Call this BEFORE starting run().
 
     No logging, no writers, no Debugger/Network hooks.
     """
-    global SW_INJECT_ENABLED, SW_PRIMARY, SW_LANGS, SW_HC, SW_DM, SW_META, SW_WEBGL, SW_ENV
+    global SW_BOOTSTRAP_ENABLED, SW_PRIMARY, SW_LANGS, SW_HC, SW_DM, SW_META, SW_WEBGL, SW_BOOTSTRAP_ENV
     if not isinstance(language, str) or not language.strip():
-        raise ValueError("SW inject: language must be non-empty str")
+        raise ValueError("SW bootstrap: language must be non-empty str")
     if not isinstance(normalized_languages, list) or not normalized_languages:
-        raise ValueError("SW inject: normalized_languages must be non-empty list")
+        raise ValueError("SW bootstrap: normalized_languages must be non-empty list")
     for x in normalized_languages:
         if not isinstance(x, str) or not x.strip():
-            raise ValueError("SW inject: bad languages entry")
+            raise ValueError("SW bootstrap: bad languages entry")
     if not isinstance(hardware_concurrency, (int, float)) or hardware_concurrency <= 0:
-        raise ValueError("SW inject: hardware_concurrency must be positive number")
+        raise ValueError("SW bootstrap: hardware_concurrency must be positive number")
     if not isinstance(device_memory, (int, float)) or device_memory <= 0:
-        raise ValueError("SW inject: device_memory must be positive number")
+        raise ValueError("SW bootstrap: device_memory must be positive number")
     if not isinstance(meta, dict) or not meta:
-        raise ValueError("SW inject: expected_client_hints missing")
+        raise ValueError("SW bootstrap: expected_client_hints missing")
     brands = meta.get("brands")
     full_version_list = meta.get("fullVersionList")
     if not isinstance(brands, list) or not brands:
-        raise ValueError("SW inject: expected_client_hints.brands missing")
+        raise ValueError("SW bootstrap: expected_client_hints.brands missing")
     if not isinstance(full_version_list, list) or not full_version_list:
-        raise ValueError("SW inject: expected_client_hints.fullVersionList missing")
+        raise ValueError("SW bootstrap: expected_client_hints.fullVersionList missing")
     for key in ("architecture", "bitness", "model", "platform", "platformVersion"):
         if not isinstance(meta.get(key), str):
-            raise ValueError(f"SW inject: expected_client_hints.{key} missing")
+            raise ValueError(f"SW bootstrap: expected_client_hints.{key} missing")
     if not isinstance(meta.get("mobile"), bool):
-        raise ValueError("SW inject: expected_client_hints.mobile missing")
+        raise ValueError("SW bootstrap: expected_client_hints.mobile missing")
     if not isinstance(meta.get("wow64"), bool):
-        raise ValueError("SW inject: expected_client_hints.wow64 missing")
+        raise ValueError("SW bootstrap: expected_client_hints.wow64 missing")
     if not isinstance(meta.get("formFactors"), list):
-        raise ValueError("SW inject: expected_client_hints.formFactors missing")
+        raise ValueError("SW bootstrap: expected_client_hints.formFactors missing")
     for list_key, entries in (("brands", brands), ("fullVersionList", full_version_list)):
         for item in entries:
             if not isinstance(item, dict):
-                raise ValueError(f"SW inject: expected_client_hints.{list_key} entry invalid")
+                raise ValueError(f"SW bootstrap: expected_client_hints.{list_key} entry invalid")
             if not isinstance(item.get("brand"), str) or not item.get("brand").strip():
-                raise ValueError(f"SW inject: expected_client_hints.{list_key} brand missing")
+                raise ValueError(f"SW bootstrap: expected_client_hints.{list_key} brand missing")
             if not isinstance(item.get("version"), str) or not item.get("version").strip():
-                raise ValueError(f"SW inject: expected_client_hints.{list_key} version missing")
+                raise ValueError(f"SW bootstrap: expected_client_hints.{list_key} version missing")
     if not isinstance(webgl, dict) or not webgl:
-        raise ValueError("SW inject: webgl snapshot missing")
+        raise ValueError("SW bootstrap: webgl snapshot missing")
     for key in ("vendor", "renderer", "unmaskedVendor", "unmaskedRenderer"):
         value = webgl.get(key)
         if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"SW inject: bad webgl.{key}")
+            raise ValueError(f"SW bootstrap: bad webgl.{key}")
     if not isinstance(user_agent, str) or not user_agent.strip():
-        raise ValueError("SW inject: user_agent must be non-empty str")
+        raise ValueError("SW bootstrap: user_agent must be non-empty str")
     if navigator_platform not in ("Win32", "MacIntel"):
-        raise ValueError(f"SW inject: invalid navigator_platform {navigator_platform!r}")
+        raise ValueError(f"SW bootstrap: invalid navigator_platform {navigator_platform!r}")
 
     SW_PRIMARY = language
     SW_LANGS = normalized_languages[:]
@@ -230,7 +230,7 @@ def enable_sw_env_inject(
         "unmaskedVendor": webgl["unmaskedVendor"],
         "unmaskedRenderer": webgl["unmaskedRenderer"],
     }
-    SW_ENV = {
+    SW_BOOTSTRAP_ENV = {
         "primary": SW_PRIMARY,
         "langs": SW_LANGS[:],
         "acceptLanguageCdp": ",".join(SW_LANGS) if SW_LANGS else SW_PRIMARY,
@@ -242,7 +242,7 @@ def enable_sw_env_inject(
         "userAgent": user_agent,
         "navigatorPlatform": navigator_platform,
     }
-    SW_INJECT_ENABLED = True
+    SW_BOOTSTRAP_ENABLED = True
 
 
 
@@ -320,14 +320,11 @@ def _stop_injectors_atexit():
 atexit.register(_stop_injectors_atexit)
 
 
-def _build_sw_env_prelude(sw_env: dict) -> str:
+def _build_sw_bootstrap_prelude(sw_env: dict) -> str:
     if not isinstance(sw_env, dict) or not sw_env:
         raise ValueError("SW inject: env missing")
-    meta = sw_env.get("meta")
     ua_data = sw_env.get("uaData")
     webgl = sw_env.get("webgl")
-    if not isinstance(meta, dict) or not meta:
-        raise ValueError("SW inject: expected_client_hints missing")
     if not isinstance(ua_data, dict) or not ua_data:
         raise ValueError("SW inject: uaData snapshot missing")
     if not isinstance(webgl, dict) or not webgl:
@@ -336,76 +333,20 @@ def _build_sw_env_prelude(sw_env: dict) -> str:
         value = webgl.get(key)
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"SW inject: bad webgl.{key}")
-
-    return f"""
-(() => {{
-  'use strict';
-  const G = globalThis;
-  const hasOwn = Object.prototype.hasOwnProperty;
-  const nextEnv = {{
-    primary: {json.dumps(sw_env.get("primary"), ensure_ascii=False)},
-    langs: {json.dumps(sw_env.get("langs"), ensure_ascii=False)},
-    hc: {json.dumps(sw_env.get("hc"))},
-    dm: {json.dumps(sw_env.get("dm"))},
-    meta: {json.dumps(meta, ensure_ascii=False)},
-    uaData: {json.dumps(ua_data, ensure_ascii=False)},
-    webgl: {json.dumps(webgl, ensure_ascii=False)},
-    userAgent: {json.dumps(sw_env.get("userAgent"), ensure_ascii=False)},
-    navigatorPlatform: {json.dumps(sw_env.get("navigatorPlatform"), ensure_ascii=False)}
-  }};
-  function defineHidden(obj, key, value) {{
-    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) {{
-      throw new Error('SW inject: hidden owner missing for ' + String(key));
-    }}
-    const desc = Object.getOwnPropertyDescriptor(obj, key);
-    if (desc && desc.configurable === false) {{
-      return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
-    }}
-    Object.defineProperty(obj, key, {{
-      value: value,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    }});
-    return value;
-  }}
-  function ensureHiddenObject(owner, key) {{
-    if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {{
-      throw new Error('SW inject: hidden owner missing for ' + String(key));
-    }}
-    if (hasOwn.call(owner, key) && owner[key] && typeof owner[key] === 'object') {{
-      return owner[key];
-    }}
-    return defineHidden(owner, key, Object.create(null));
-  }}
-  const C = ensureHiddenObject(G, 'CanvasPatchContext');
-  const stateRoot = ensureHiddenObject(C, 'state');
-  const wrkState = ensureHiddenObject(stateRoot, '__WRK__');
-  const bootstrapRoot = ensureHiddenObject(wrkState, 'bootstrap');
-  const prev = Object.getOwnPropertyDescriptor(bootstrapRoot, '__SW_ENV__');
-  if (prev && prev.configurable === false) {{
-    const cur = ('value' in prev) ? prev.value : bootstrapRoot.__SW_ENV__;
-    const curJson = JSON.stringify(cur);
-    const nextJson = JSON.stringify(nextEnv);
-    if (curJson !== nextJson) {{
-      throw new Error('SW inject: CanvasPatchContext.state.__WRK__.bootstrap.__SW_ENV__ non-configurable mismatch');
-    }}
-    return;
-  }}
-  defineHidden(bootstrapRoot, '__SW_ENV__', nextEnv);
-}})();
-//# sourceURL=sw_prelude_env.js
-""".strip()
-
-
-def _build_sw_prelude(sw_env: dict) -> str:
-    if not isinstance(sw_env, dict) or not sw_env:
-        raise ValueError("SW inject: env missing")
     prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
     reflect_path = SCRIPTS_WORKERSCOPE / "set_reflect.js"
+    sw_env_json = json.dumps({
+        "ua": sw_env.get("userAgent"),
+        "language": sw_env.get("primary"),
+        "languages": sw_env.get("langs"),
+        "deviceMemory": sw_env.get("dm"),
+        "hardwareConcurrency": sw_env.get("hc"),
+        "uaData": ua_data,
+        "webgl": webgl,
+    }, ensure_ascii=False)
     sw_prelude_js = prelude_path.read_text("utf-8")
     sw_reflect_js = reflect_path.read_text("utf-8")
-    return (sw_reflect_js + "\n" + sw_prelude_js).strip()
+    return ("const __SW_BOOTSTRAP_ENV__ = " + sw_env_json + ";\n" + sw_reflect_js + "\n" + sw_prelude_js).strip()
 
 
 def _build_sw_user_agent_override(sw_env: dict) -> dict:
@@ -542,7 +483,7 @@ def run():
     _RUNNING = True
     _SW_STOPPING = False
 
-    if not SW_INJECT_ENABLED:
+    if not SW_BOOTSTRAP_ENABLED:
         _RUNNING = False
         logger.error("SW inject: disabled flag encountered (PATCH_SKIPPED)")
         raise RuntimeError("SW inject: disabled")
@@ -557,26 +498,25 @@ def run():
         logger.exception("SW inject: get_ws_url failed (PATCH_SKIPPED)")
         raise ValueError("SW inject: fail") from e
 
-    logger.info("SW inject: CDP websocket starting: %s", ws_url)
+    logger.info("SW bootstrap: CDP websocket starting: %s", ws_url)
     log_cdp_runtime_diag("sw_run_before_ws")
 
     msg_id = {"v": 0}
     injected = set()   # targetId set
-    sw_env_prelude = None
-    sw_prelude = None
+    sw_bootstrap_prelude = None
     sw_user_agent_override = None
     sw_expected = None
     if do_prelude:
-        if not isinstance(SW_ENV, dict):
+        if not isinstance(SW_BOOTSTRAP_ENV, dict):
             _RUNNING = False
-            raise RuntimeError("SW inject: SW_ENV missing")
+            raise RuntimeError("SW bootstrap: SW_BOOTSTRAP_ENV missing")
         sw_expected = {
-            "language": SW_ENV.get("primary"),
-            "languages": list(SW_ENV.get("langs") or []),
-            "hardwareConcurrency": int(SW_ENV.get("hc")),
-            "deviceMemory": float(SW_ENV.get("dm")),
-            "meta": SW_ENV.get("meta"),
-            "uad": SW_ENV.get("uaData"),
+            "language": SW_BOOTSTRAP_ENV.get("primary"),
+            "languages": list(SW_BOOTSTRAP_ENV.get("langs") or []),
+            "hardwareConcurrency": int(SW_BOOTSTRAP_ENV.get("hc")),
+            "deviceMemory": float(SW_BOOTSTRAP_ENV.get("dm")),
+            "meta": SW_BOOTSTRAP_ENV.get("meta"),
+            "uad": SW_BOOTSTRAP_ENV.get("uaData"),
         }
         if (
             isinstance(sw_expected["meta"], dict)
@@ -584,27 +524,26 @@ def run():
             and sw_expected["meta"].get("language") != sw_expected["language"]
         ):
             _RUNNING = False
-            raise RuntimeError("SW inject: SW_ENV language mismatch")
+            raise RuntimeError("SW bootstrap: SW_BOOTSTRAP_ENV language mismatch")
         if (
             isinstance(sw_expected["meta"], dict)
             and sw_expected["meta"].get("languages") is not None
             and list(sw_expected["meta"].get("languages") or []) != sw_expected["languages"]
         ):
             _RUNNING = False
-            raise RuntimeError("SW inject: SW_ENV languages mismatch")
+            raise RuntimeError("SW bootstrap: SW_BOOTSTRAP_ENV languages mismatch")
         if (
             isinstance(sw_expected["meta"], dict)
             and sw_expected["meta"].get("hardwareConcurrency") is not None
             and int(sw_expected["meta"].get("hardwareConcurrency")) != int(sw_expected["hardwareConcurrency"])
         ):
             _RUNNING = False
-            raise RuntimeError("SW inject: SW_ENV hardwareConcurrency mismatch")
-        sw_env_prelude = _build_sw_env_prelude(SW_ENV)
-        sw_prelude = _build_sw_prelude(SW_ENV)
-    sw_user_agent_override = _build_sw_user_agent_override(SW_ENV)
+            raise RuntimeError("SW bootstrap: SW_BOOTSTRAP_ENV hardwareConcurrency mismatch")
+        sw_bootstrap_prelude = _build_sw_bootstrap_prelude(SW_BOOTSTRAP_ENV)
+    sw_user_agent_override = _build_sw_user_agent_override(SW_BOOTSTRAP_ENV)
     sw_hardware_concurrency_override = None
-    if isinstance(SW_ENV, dict):
-        sw_hardware_concurrency = SW_ENV.get("hc")
+    if isinstance(SW_BOOTSTRAP_ENV, dict):
+        sw_hardware_concurrency = SW_BOOTSTRAP_ENV.get("hc")
         if isinstance(sw_hardware_concurrency, (int, float)) and int(sw_hardware_concurrency) > 0:
             sw_hardware_concurrency_override = {
                 "hardwareConcurrency": int(sw_hardware_concurrency),
@@ -700,10 +639,8 @@ def run():
             try:
                 if method == "Runtime.evaluate":
                     expr = params.get("expression")
-                    if expr == sw_env_prelude:
-                        tag = "Runtime.evaluate:sw_env_prelude"
-                    elif expr == sw_prelude:
-                        tag = "Runtime.evaluate:sw_prelude"
+                    if expr == sw_bootstrap_prelude:
+                        tag = "Runtime.evaluate:sw_bootstrap_prelude"
                     elif expr == sanity_expr:
                         tag = "Runtime.evaluate:sw_sanity"
                 elif method == "Runtime.addBinding" and params.get("name") == _SW_DIAG_BINDING:
@@ -728,7 +665,7 @@ def run():
 
         # важно: ставим tag, иначе обработка ошибки фильтра не сработает
         send(ws, "Target.setAutoAttach", params, tag="autoattach_sw_only")
-        logger.info("SW inject: enabled (autoAttach) filter=service_worker")
+        logger.info("SW bootstrap: enabled (autoAttach) filter=service_worker")
 
        
     def on_message(ws, message):
@@ -750,7 +687,7 @@ def run():
                 return
             # Session-level response error handling (flatten protocol).
             if sid and msg.get("error"):
-                if tag in ("Runtime.evaluate:sw_env_prelude", "Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
+                if tag in ("Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity"):
                     _resume_sw_session(ws, sid, "prelude_error")
                 if tag == "Runtime.addBinding:sw_diag":
                     logger.warning(
@@ -763,18 +700,16 @@ def run():
                 _fatal(ws, f"session cmd failed: {tag or 'unknown'}", msg.get("error"))
                 return
             # Runtime.evaluate may include exceptionDetails inside result.
-            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_env_prelude", "Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
+            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity"):
                 res = msg.get("result") or {}
                 exc = res.get("exceptionDetails")
                 if exc:
-                    if tag in ("Runtime.evaluate:sw_env_prelude", "Runtime.evaluate:sw_prelude", "Runtime.evaluate:sw_sanity"):
+                    if tag in ("Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity"):
                         _resume_sw_session(ws, sid, "prelude_exception")
                     _fatal(ws, "sw prelude Runtime.evaluate exceptionDetails", exc)
                     return
-                if tag == "Runtime.evaluate:sw_env_prelude":
-                    logger.info("SW inject: env prelude applied target=%r", session_targets.get(sid))
-                if tag == "Runtime.evaluate:sw_prelude":
-                    logger.info("SW inject: prelude applied (UAD branch)")
+                if tag == "Runtime.evaluate:sw_bootstrap_prelude":
+                    logger.info("SW bootstrap: prelude applied (UAD branch)")
                     if not sanity_expr:
                         _resume_sw_session(ws, sid, "prelude_applied")
                 if tag == "Runtime.evaluate:sw_sanity":
@@ -913,7 +848,7 @@ def run():
 
         if do_prelude:
             try:
-                logger.info("SW inject: injecting prelude+sanity targetId=%s sessionId=%s", tid, sessionId)
+                logger.info("SW bootstrap: injecting prelude+sanity targetId=%s sessionId=%s", tid, sessionId)
                 send_sess(ws, sessionId, "Emulation.setUserAgentOverride", sw_user_agent_override)
                 if sw_hardware_concurrency_override is not None:
                     send_sess(ws, sessionId, "Emulation.setHardwareConcurrencyOverride", sw_hardware_concurrency_override)
@@ -922,11 +857,7 @@ def run():
                     "name": _SW_DIAG_BINDING
                 })
                 send_sess(ws, sessionId, "Runtime.evaluate", {
-                    "expression": sw_env_prelude,
-                    "awaitPromise": True
-                })
-                send_sess(ws, sessionId, "Runtime.evaluate", {
-                    "expression": sw_prelude,
+                    "expression": sw_bootstrap_prelude,
                     "awaitPromise": True
                 })
                 send_sess(ws, sessionId, "Runtime.evaluate", {
@@ -936,7 +867,7 @@ def run():
                 })
             except Exception as e:
                 _resume_sw_session(ws, sessionId, "prelude_send_failed")
-                _fatal(ws, "sw prelude inject failed", e)
+                _fatal(ws, "sw bootstrap prelude inject failed", e)
         else:
             if do_resume:
                 try:
@@ -961,11 +892,11 @@ def run():
         _RUNNING = False
         _SW_WS = None
         if _SW_STOPPING:
-            logger.info("SW inject: websocket closed by stop request code=%r msg=%r", code, msg)
+            logger.info("SW bootstrap: websocket closed by stop request code=%r msg=%r", code, msg)
         elif fatal["disconnect"]:
-            logger.info("SW inject: websocket closed after disconnect code=%r msg=%r", code, msg)
+            logger.info("SW bootstrap: websocket closed after disconnect code=%r msg=%r", code, msg)
         elif code is not None or msg:
-            logger.error("SW inject: websocket closed code=%r msg=%r", code, msg)
+            logger.error("SW bootstrap: websocket closed code=%r msg=%r", code, msg)
         _SW_STOPPING = False
 
     ws = WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close)
@@ -1026,11 +957,11 @@ def run_worker_seed():
     worker_language_expected = None
     worker_languages_expected = None
     worker_hardware_concurrency_expected = None
-    if isinstance(SW_ENV, dict):
-        accept_language_cdp = SW_ENV.get("acceptLanguageCdp")
-        user_agent = SW_ENV.get("userAgent")
-        navigator_platform = SW_ENV.get("navigatorPlatform")
-        hardware_concurrency = SW_ENV.get("hc")
+    if isinstance(SW_BOOTSTRAP_ENV, dict):
+        accept_language_cdp = SW_BOOTSTRAP_ENV.get("acceptLanguageCdp")
+        user_agent = SW_BOOTSTRAP_ENV.get("userAgent")
+        navigator_platform = SW_BOOTSTRAP_ENV.get("navigatorPlatform")
+        hardware_concurrency = SW_BOOTSTRAP_ENV.get("hc")
         if (
             isinstance(accept_language_cdp, str) and accept_language_cdp.strip()
             and isinstance(user_agent, str) and user_agent.strip()
@@ -1046,10 +977,10 @@ def run_worker_seed():
             worker_hardware_concurrency_override = {
                 "hardwareConcurrency": int(hardware_concurrency),
             }
-        if isinstance(SW_ENV.get("primary"), str) and SW_ENV.get("primary").strip():
-            worker_language_expected = SW_ENV.get("primary")
-        if isinstance(SW_ENV.get("langs"), list):
-            worker_languages_expected = list(SW_ENV.get("langs") or [])
+        if isinstance(SW_BOOTSTRAP_ENV.get("primary"), str) and SW_BOOTSTRAP_ENV.get("primary").strip():
+            worker_language_expected = SW_BOOTSTRAP_ENV.get("primary")
+        if isinstance(SW_BOOTSTRAP_ENV.get("langs"), list):
+            worker_languages_expected = list(SW_BOOTSTRAP_ENV.get("langs") or [])
     sanity_expr = (
         "(() => {"
         " const G = globalThis;"

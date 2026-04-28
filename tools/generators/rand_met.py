@@ -30,7 +30,7 @@ MANIFEST_PATH       = ASSETS/ 'Manifest' / 'fonts-manifest.json'
 PATCH_OUT           = ASSETS/ 'JS_fonts_patch' / 'font_patch.generated.js'
 FONTS_SOURCE_DIR    = ASSETS/ 'fonts_raw'
 INDEX_NAME          = "fonts_index.json"
-CACHE_NAMESPACE_LIMIT = 20
+CACHE_NAMESPACE_LIMIT = 10
 
 # ----------------------- DICTIONARIES -----------------------
 SYS_FONTS_WIN = [

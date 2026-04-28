@@ -207,6 +207,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       });
       return value;
     }
+    function __navSetSnapshotField(target, key, value) {
+      if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+        throw new TypeError('worker env snapshot target missing: ' + String(key));
+      }
+      const prev = Object.getOwnPropertyDescriptor(target, key);
+      if (prev && prev.configurable === false) {
+        throw new TypeError('worker env snapshot field non-configurable: ' + String(key));
+      }
+      Object.defineProperty(target, key, {
+        value: value,
+        writable: true,
+        configurable: true,
+        enumerable: true
+      });
+      return value;
+    }
     let __navDataStoreState = (__navModuleState.__DATA_STORE_STATE__ && typeof __navModuleState.__DATA_STORE_STATE__ === 'object')
       ? __navModuleState.__DATA_STORE_STATE__
       : null;
@@ -909,13 +925,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             }
           }
         });
-        if (__navSetHiddenStateValue(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__', workerEnvSnapshotCandidate) !== workerEnvSnapshotCandidate) {
-          throw new TypeError('worker env snapshot hidden slot attach failed');
-        }
         const workerEnvSnapshot = (__navDataStoreState && __navDataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof __navDataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
           ? __navDataStoreState.__WORKER_ENV_SNAPSHOT__
           : null;
         assert(workerEnvSnapshot && typeof workerEnvSnapshot === 'object', 'worker_env_snapshot missing');
+        const workerEnvSnapshotKeys = Object.keys(workerEnvSnapshotCandidate);
+        for (let i = 0; i < workerEnvSnapshotKeys.length; i++) {
+          const key = workerEnvSnapshotKeys[i];
+          __navSetSnapshotField(workerEnvSnapshot, key, workerEnvSnapshotCandidate[key]);
+        }
         assert(typeof workerEnvSnapshot.ua === 'string' && workerEnvSnapshot.ua, 'worker_env_snapshot.ua missing');
         assert(typeof workerEnvSnapshot.language === 'string' && workerEnvSnapshot.language, 'worker_env_snapshot.language missing');
         assert(isStringArray(workerEnvSnapshot.languages, false), 'worker_env_snapshot.languages missing');

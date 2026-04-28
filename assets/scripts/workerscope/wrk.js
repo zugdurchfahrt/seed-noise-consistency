@@ -147,24 +147,27 @@ const WrkModule = function WrkModule(window) {
     return undefined;
   }
 
-  function __ensureScopeWrkRuntimeRoot__(scope) {
+  function __resolveScopeWrkRuntimeRoot__(scope) {
     if (!scope || (typeof scope !== 'object' && typeof scope !== 'function')) return null;
     const C = (scope.CanvasPatchContext && typeof scope.CanvasPatchContext === 'object')
       ? scope.CanvasPatchContext
-      : __setHiddenValue__(scope, 'CanvasPatchContext', Object.create(null));
+      : null;
     if (!C) return null;
     const stateRoot = (C.state && typeof C.state === 'object')
       ? C.state
-      : __setHiddenValue__(C, 'state', Object.create(null));
+      : null;
     if (!stateRoot) return null;
     const wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
       ? stateRoot.__WRK__
-      : __setHiddenValue__(stateRoot, '__WRK__', Object.create(null));
+      : null;
     if (!wrkState) return null;
-    const runtimeRoot = (wrkState.runtime && typeof wrkState.runtime === 'object')
+    return (wrkState.runtime && typeof wrkState.runtime === 'object')
       ? wrkState.runtime
-      : __setHiddenValue__(wrkState, 'runtime', Object.create(null));
-    return runtimeRoot;
+      : null;
+  }
+
+  function __ensureScopeWrkRuntimeRoot__(scope) {
+    return __resolveScopeWrkRuntimeRoot__(scope);
   }
 
   function __captureEnvHub__(hub) {
@@ -500,6 +503,52 @@ function EnvBus(G){
     if (!isBrandList(out.uaData.he.fullVersionList)) throw new Error('EnvBus: worker env snapshot uaData.he.fullVersionList missing');
     if (typeof out.uaData.he.wow64 !== 'boolean') throw new Error('EnvBus: worker env snapshot uaData.he.wow64 missing');
     if (!isStringArray(out.uaData.he.formFactors, false)) throw new Error('EnvBus: worker env snapshot uaData.he.formFactors missing');
+    if (!out.webgl || typeof out.webgl !== 'object') throw new Error('EnvBus: worker env snapshot webgl missing');
+    if (typeof out.webgl.vendor !== 'string' || !out.webgl.vendor) throw new Error('EnvBus: worker env snapshot webgl.vendor missing');
+    if (typeof out.webgl.renderer !== 'string' || !out.webgl.renderer) throw new Error('EnvBus: worker env snapshot webgl.renderer missing');
+    if (typeof out.webgl.unmaskedVendor !== 'string' || !out.webgl.unmaskedVendor) throw new Error('EnvBus: worker env snapshot webgl.unmaskedVendor missing');
+    if (typeof out.webgl.unmaskedRenderer !== 'string' || !out.webgl.unmaskedRenderer) throw new Error('EnvBus: worker env snapshot webgl.unmaskedRenderer missing');
+    if (Object.prototype.hasOwnProperty.call(out.webgl, 'compressedTextureFormats')) {
+      if (!Array.isArray(out.webgl.compressedTextureFormats)) throw new Error('EnvBus: worker env snapshot webgl.compressedTextureFormats invalid');
+      for (let i = 0; i < out.webgl.compressedTextureFormats.length; i++) {
+        if (typeof out.webgl.compressedTextureFormats[i] !== 'number' || !Number.isFinite(out.webgl.compressedTextureFormats[i])) {
+          throw new Error('EnvBus: worker env snapshot webgl.compressedTextureFormats invalid');
+        }
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(out.webgl, 'webglCapabilities')) {
+      const webglCapabilities = out.webgl.webglCapabilities;
+      if (!webglCapabilities || typeof webglCapabilities !== 'object') throw new Error('EnvBus: worker env snapshot webgl.webglCapabilities invalid');
+      if (typeof webglCapabilities.selected !== 'string' || !webglCapabilities.selected) throw new Error('EnvBus: worker env snapshot webgl.webglCapabilities.selected missing');
+      const capabilityKeys = ['webgl2', 'webgl', 'experimentalWebgl'];
+      for (let i = 0; i < capabilityKeys.length; i++) {
+        const capabilityKey = capabilityKeys[i];
+        if (!Object.prototype.hasOwnProperty.call(webglCapabilities, capabilityKey)) continue;
+        const entry = webglCapabilities[capabilityKey];
+        if (!entry || typeof entry !== 'object' || !Array.isArray(entry.compressedTextureFormats)) {
+          throw new Error('EnvBus: worker env snapshot webgl.webglCapabilities.' + capabilityKey + ' invalid');
+        }
+        for (let j = 0; j < entry.compressedTextureFormats.length; j++) {
+          if (typeof entry.compressedTextureFormats[j] !== 'number' || !Number.isFinite(entry.compressedTextureFormats[j])) {
+            throw new Error('EnvBus: worker env snapshot webgl.webglCapabilities.' + capabilityKey + '.compressedTextureFormats invalid');
+          }
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(out.webgl, 'compressedTextureFormats')) {
+        const selectedCapability = webglCapabilities[webglCapabilities.selected];
+        if (!selectedCapability || typeof selectedCapability !== 'object' || !Array.isArray(selectedCapability.compressedTextureFormats)) {
+          throw new Error('EnvBus: worker env snapshot webgl.webglCapabilities.selected entry missing');
+        }
+        if (selectedCapability.compressedTextureFormats.length !== out.webgl.compressedTextureFormats.length) {
+          throw new Error('EnvBus: worker env snapshot webgl.compressedTextureFormats selected mismatch');
+        }
+        for (let i = 0; i < out.webgl.compressedTextureFormats.length; i++) {
+          if (!Object.is(selectedCapability.compressedTextureFormats[i], out.webgl.compressedTextureFormats[i])) {
+            throw new Error('EnvBus: worker env snapshot webgl.compressedTextureFormats selected mismatch');
+          }
+        }
+      }
+    }
     return out;
   }
   function __cloneFontsFamilySnapshotForWorker__(familySnapshot) {
@@ -573,77 +622,6 @@ function EnvBus(G){
   const __envTimeZone = (__geoStateRoot && typeof __geoStateRoot.timezone === 'string' && __geoStateRoot.timezone)
     ? __geoStateRoot.timezone
     : null;
-  const __envWebGLVendor = (typeof G.__WEBGL_VENDOR__ === 'string' && G.__WEBGL_VENDOR__)
-    ? G.__WEBGL_VENDOR__
-    : null;
-  const __envWebGLRenderer = (typeof G.__WEBGL_RENDERER__ === 'string' && G.__WEBGL_RENDERER__)
-    ? G.__WEBGL_RENDERER__
-    : null;
-  const __envWebGLUnmaskedVendor = (typeof G.__WEBGL_UNMASKED_VENDOR__ === 'string' && G.__WEBGL_UNMASKED_VENDOR__)
-    ? G.__WEBGL_UNMASKED_VENDOR__
-    : null;
-  const __envWebGLUnmaskedRenderer = (typeof G.__WEBGL_UNMASKED_RENDERER__ === 'string' && G.__WEBGL_UNMASKED_RENDERER__)
-    ? G.__WEBGL_UNMASKED_RENDERER__
-    : null;
-  function __collectWindowWebGLCapabilities() {
-    let canvas = null;
-    try {
-      if (G.document && typeof G.document.createElement === 'function') {
-        canvas = G.document.createElement('canvas');
-        if (canvas) {
-          canvas.width = 1;
-          canvas.height = 1;
-        }
-      } else if (typeof G.OffscreenCanvas === 'function') {
-        canvas = new G.OffscreenCanvas(1, 1);
-      }
-    } catch (_) {
-      canvas = null;
-    }
-    if (!canvas || typeof canvas.getContext !== 'function') {
-      throw new Error('EnvBus: window webgl canvas missing');
-    }
-    let ctx = null;
-    const contextIds = ['webgl2', 'webgl', 'experimental-webgl'];
-    for (let i = 0; i < contextIds.length; i++) {
-      const contextId = contextIds[i];
-      try {
-        ctx = canvas.getContext(contextId);
-      } catch (_) {
-        ctx = null;
-      }
-      if (ctx) break;
-    }
-    if (!ctx) {
-      throw new Error('EnvBus: window webgl context missing');
-    }
-    let compressedTextureFormats = null;
-    const compressedToken = (typeof ctx.COMPRESSED_TEXTURE_FORMATS === 'number')
-      ? ctx.COMPRESSED_TEXTURE_FORMATS
-      : (((G.WebGLRenderingContext || G.WebGL2RenderingContext) && typeof (G.WebGLRenderingContext || G.WebGL2RenderingContext).COMPRESSED_TEXTURE_FORMATS === 'number')
-        ? (G.WebGLRenderingContext || G.WebGL2RenderingContext).COMPRESSED_TEXTURE_FORMATS
-        : null);
-    if (compressedToken == null) {
-      throw new Error('EnvBus: COMPRESSED_TEXTURE_FORMATS token missing');
-    }
-    try {
-      compressedTextureFormats = (typeof ctx.getParameter === 'function')
-        ? ctx.getParameter(compressedToken)
-        : null;
-    } catch (_) {
-      compressedTextureFormats = null;
-    }
-    if (ArrayBuffer.isView(compressedTextureFormats)) {
-      compressedTextureFormats = Array.prototype.slice.call(compressedTextureFormats);
-    } else if (Array.isArray(compressedTextureFormats)) {
-      compressedTextureFormats = compressedTextureFormats.slice();
-    } else {
-      throw new Error('EnvBus: window webgl compressedTextureFormats missing');
-    }
-    return {
-      compressedTextureFormats
-    };
-  }
   function envSnapshot(){
     const workerEnvSnapshot = __requireWorkerEnvSnapshot();
     const stateRoot = __resolveCanvasPatchStateRoot();
@@ -654,15 +632,7 @@ function EnvBus(G){
     const mem = Number(workerEnvSnapshot.deviceMemory);
     const timeZone = __envTimeZone;
     if (!timeZone) throw new Error('EnvBus: state.__GEO_STATE__.timezone missing');
-    const webglVendor = __envWebGLVendor;
-    const webglRenderer = __envWebGLRenderer;
-    const webglUnmaskedVendor = __envWebGLUnmaskedVendor;
-    const webglUnmaskedRenderer = __envWebGLUnmaskedRenderer;
-    if (typeof webglVendor !== 'string' || !webglVendor) throw new Error('EnvBus: __WEBGL_VENDOR__ missing');
-    if (typeof webglRenderer !== 'string' || !webglRenderer) throw new Error('EnvBus: __WEBGL_RENDERER__ missing');
-    if (typeof webglUnmaskedVendor !== 'string' || !webglUnmaskedVendor) throw new Error('EnvBus: __WEBGL_UNMASKED_VENDOR__ missing');
-    if (typeof webglUnmaskedRenderer !== 'string' || !webglUnmaskedRenderer) throw new Error('EnvBus: __WEBGL_UNMASKED_RENDERER__ missing');
-    const webglCapabilities = __collectWindowWebGLCapabilities();
+    const workerWebgl = workerEnvSnapshot.webgl;
 
     const uaData = __cloneEnvValue(workerEnvSnapshot.uaData);
     const he = __cloneEnvValue(workerEnvSnapshot.uaData.he);
@@ -733,13 +703,7 @@ function EnvBus(G){
       fontsState: __cloneFontsStateForWorker__(),
       fontsConfig: __cloneFontsConfigForWorker__(),
       envProfile,
-      webgl: {
-        vendor: webglVendor,
-        renderer: webglRenderer,
-        unmaskedVendor: webglUnmaskedVendor,
-        unmaskedRenderer: webglUnmaskedRenderer,
-        compressedTextureFormats: webglCapabilities.compressedTextureFormats
-      },
+      webgl: __cloneEnvValue(workerWebgl),
       hardwareConcurrency: cpu,
       deviceMemory: mem,
       windowKeys
@@ -846,8 +810,8 @@ function mkModuleWorkerSource(snapshot, absUrl){
       var __ENV_SHARED_PORTS__ = [];
       var __ENV_CONNECT_Q__ = [];
       var __ENV_CONNECT_BUF__ = true;
-      var __LAST_SNAP__ = null;
-      var __ENV_SNAP_APPLIED__ = null;
+        var __LAST_SNAP__ = null;
+        var __ENV_SNAP_APPLIED__ = null;
       var __serializeDiagErr = function(err){
         if (!err) return null;
         var out = {};
@@ -963,6 +927,20 @@ function mkModuleWorkerSource(snapshot, absUrl){
         });
       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
       try {
+        if (typeof BroadcastChannel === 'function') {
+          var __ENV_SYNC_CHANNEL__ = new BroadcastChannel('__ENV_SYNC__');
+          __ENV_SYNC_CHANNEL__.addEventListener('message', function(msgEv){
+            try {
+              var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
+              var syncSnap = syncPacket && syncPacket.envSnapshot;
+              if (syncSnap && typeof self.__applyEnvSnapshot__ === 'function') {
+                self.__applyEnvSnapshot__(syncSnap);
+              }
+            } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_env_sync' }); }
+          });
+        }
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_channel_install' }); }
+      try {
         // SharedWorker needs port-based signalling; do not rely on onconnect (user code can overwrite it).
         self.addEventListener('connect', function(ev){
           try {
@@ -1066,7 +1044,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
         if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
         if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
         if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
-        if (!Array.isArray(webgl.compressedTextureFormats)) throw new Error('UACHPatch: bad webgl.compressedTextureFormats');
+        if (Object.prototype.hasOwnProperty.call(webgl, 'compressedTextureFormats') && !Array.isArray(webgl.compressedTextureFormats)) {
+          throw new Error('UACHPatch: bad webgl.compressedTextureFormats');
+        }
         return webgl;
       };
       var __installEarlyWorkerWebGLMirror__ = function(){
@@ -1127,7 +1107,9 @@ function mkModuleWorkerSource(snapshot, absUrl){
               }
               if (pname === this.VENDOR || pname === 0x1F00) return live.vendor;
               if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
-              if (pname === this.COMPRESSED_TEXTURE_FORMATS || pname === 0x86A3) return live.compressedTextureFormats.slice();
+              if (Array.isArray(live.compressedTextureFormats) && (pname === this.COMPRESSED_TEXTURE_FORMATS || pname === 0x86A3)) {
+                return live.compressedTextureFormats.slice();
+              }
               return Reflect.apply(nativeGetParameter, this, arguments);
             }
           });
@@ -1311,8 +1293,8 @@ function mkClassicWorkerSource(snapshot, absUrl){
       var __ENV_SHARED_PORTS__ = [];
       var __ENV_CONNECT_Q__ = [];
       var __ENV_CONNECT_BUF__ = true;
-      var __LAST_SNAP__ = null;
-      var __ENV_SNAP_APPLIED__ = null;
+        var __LAST_SNAP__ = null;
+        var __ENV_SNAP_APPLIED__ = null;
       var __serializeDiagErr = function(err){
         if (!err) return null;
         var out = {};
@@ -1428,6 +1410,20 @@ function mkClassicWorkerSource(snapshot, absUrl){
         });
       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
       try {
+        if (typeof BroadcastChannel === 'function') {
+          var __ENV_SYNC_CHANNEL__ = new BroadcastChannel('__ENV_SYNC__');
+          __ENV_SYNC_CHANNEL__.addEventListener('message', function(msgEv){
+            try {
+              var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
+              var syncSnap = syncPacket && syncPacket.envSnapshot;
+              if (syncSnap && typeof self.__applyEnvSnapshot__ === 'function') {
+                self.__applyEnvSnapshot__(syncSnap);
+              }
+            } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_env_sync' }); }
+          });
+        }
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_channel_install' }); }
+      try {
         // SharedWorker needs port-based signalling; do not rely on onconnect (user code can overwrite it).
         self.addEventListener('connect', function(ev){
           try {
@@ -1530,7 +1526,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
         if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
         if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
         if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
-        if (!Array.isArray(webgl.compressedTextureFormats)) throw new Error('UACHPatch: bad webgl.compressedTextureFormats');
+        if (Object.prototype.hasOwnProperty.call(webgl, 'compressedTextureFormats') && !Array.isArray(webgl.compressedTextureFormats)) {
+          throw new Error('UACHPatch: bad webgl.compressedTextureFormats');
+        }
         return webgl;
       };
       var __installEarlyWorkerWebGLMirror__ = function(){
@@ -1591,7 +1589,9 @@ function mkClassicWorkerSource(snapshot, absUrl){
               }
               if (pname === this.VENDOR || pname === 0x1F00) return live.vendor;
               if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
-              if (pname === this.COMPRESSED_TEXTURE_FORMATS || pname === 0x86A3) return live.compressedTextureFormats.slice();
+              if (Array.isArray(live.compressedTextureFormats) && (pname === this.COMPRESSED_TEXTURE_FORMATS || pname === 0x86A3)) {
+                return live.compressedTextureFormats.slice();
+              }
               return Reflect.apply(nativeGetParameter, this, arguments);
             }
           });

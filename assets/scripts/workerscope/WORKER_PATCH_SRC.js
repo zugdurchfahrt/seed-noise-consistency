@@ -1591,6 +1591,61 @@
       const runner = new Function('window', source + '\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
       return runner(self);
     };
+    const cloneWorkerSnapshotValue = value => {
+      if (Array.isArray(value)) {
+        const out = [];
+        for (let i = 0; i < value.length; i++) out.push(cloneWorkerSnapshotValue(value[i]));
+        return out;
+      }
+      if (ArrayBuffer.isView(value)) {
+        return Array.prototype.slice.call(value);
+      }
+      if (value && typeof value === 'object') {
+        const out = Object.create(null);
+        const keys = Object.keys(value);
+        for (let i = 0; i < keys.length; i++) {
+          const key = keys[i];
+          out[key] = cloneWorkerSnapshotValue(value[key]);
+        }
+        return out;
+      }
+      return value;
+    };
+    const syncWorkerEnvSnapshotState = stateRoot => {
+      if (!stateRoot || typeof stateRoot !== 'object') {
+        throw new Error('UACHPatch: CanvasPatchContext.state missing for worker env snapshot sync');
+      }
+      const snap = requireSnap(cache.snap, 'worker_env_snapshot_sync');
+      const navState = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
+        ? stateRoot.__NAV_TOTAL_SET__
+        : null;
+      if (!(navState && typeof navState === 'object')) {
+        throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__ missing');
+      }
+      const dataStoreState = (navState.__DATA_STORE_STATE__ && typeof navState.__DATA_STORE_STATE__ === 'object')
+        ? navState.__DATA_STORE_STATE__
+        : null;
+      if (!(dataStoreState && typeof dataStoreState === 'object')) {
+        throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing');
+      }
+      const workerEnvSnapshot = (dataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
+        ? dataStoreState.__WORKER_ENV_SNAPSHOT__
+        : null;
+      if (!(workerEnvSnapshot && typeof workerEnvSnapshot === 'object')) {
+        throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+      }
+      const prevKeys = Object.keys(workerEnvSnapshot);
+      for (let i = 0; i < prevKeys.length; i++) {
+        delete workerEnvSnapshot[prevKeys[i]];
+      }
+      const snapClone = cloneWorkerSnapshotValue(snap);
+      const nextKeys = Object.keys(snapClone);
+      for (let i = 0; i < nextKeys.length; i++) {
+        const key = nextKeys[i];
+        workerEnvSnapshot[key] = snapClone[key];
+      }
+      return workerEnvSnapshot;
+    };
     const syncWorkerEnvProfileState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
         throw new Error('UACHPatch: CanvasPatchContext.state missing for envProfile sync');
@@ -2028,10 +2083,10 @@
       const stateRoot = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
         ? self.CanvasPatchContext.state
         : null;
-      if (stateRoot) {
-        syncWorkerEnvProfileState(stateRoot);
-        restoreWorkerFontsState(stateRoot);
-      }
+      if (!stateRoot) throw new Error('UACHPatch: CanvasPatchContext.state missing');
+      syncWorkerEnvSnapshotState(stateRoot);
+      syncWorkerEnvProfileState(stateRoot);
+      restoreWorkerFontsState(stateRoot);
       // Paradigm: seed is immutable within session.
       const curSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
       if (prevSeed != null && curSeed != null && prevSeed !== curSeed) {

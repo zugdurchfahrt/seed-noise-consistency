@@ -46,11 +46,11 @@ CHROMEDRIVER_PATH        = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\p
 
 # Только папки. Никаких путей к файлам.
 PY_MODULE_DIRS = [
-    PROJECT_ROOT,
     PROJECT_ROOT / "tools" / "tools_infra",
     PROJECT_ROOT / "tools" / "tools_runtime",
     PROJECT_ROOT / "tools" / "generators",
     PROJECT_ROOT / "profile_data_source",
+    PROJECT_ROOT
 ]
 for d in PY_MODULE_DIRS:
     if not d.exists():
@@ -430,24 +430,29 @@ def init_driver(
 
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, dom_platform)
-      
-    cdp.enable_sw_env_inject(
+    
+    
+    # --- SE CDP-injection ---
+    # ServiceWorker uses its own early bootstrap snapshot, separate from later worker env sync.
+    sw_bootstrap_webgl = {
+        "vendor": profile["webgl_vendor"],
+        "renderer": profile["webgl_renderer"],
+        "unmaskedVendor": profile["webgl_unmasked_vendor"],
+        "unmaskedRenderer": profile["webgl_unmasked_renderer"],
+    }
+
+    cdp.enable_sw_bootstrap_env(
         language=language,
         normalized_languages=normalized_languages,
         hardware_concurrency=hardware_concurrency_value,
         device_memory=device_memory_value,
         meta=expected_client_hints,
-        webgl={
-            "vendor": profile["webgl_vendor"],
-            "renderer": profile["webgl_renderer"],
-            "unmaskedVendor": profile["webgl_unmasked_vendor"],
-            "unmaskedRenderer": profile["webgl_unmasked_renderer"],
-        },
+        webgl=sw_bootstrap_webgl,
         user_agent=user_agent,
         navigator_platform=dom_platform,
     )
       
-    sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_injector")
+    sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_bootstrap")
     sw_thread.start()
     logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")

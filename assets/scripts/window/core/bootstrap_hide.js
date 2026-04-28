@@ -226,6 +226,16 @@ if (!navDataStoreState) {
   __defineHiddenValue__(navRoot, '__DATA_STORE_STATE__', navDataStoreState);
 }
 
+let workerEnvSnapshotState = (navDataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof navDataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
+  ? navDataStoreState.__WORKER_ENV_SNAPSHOT__
+  : null;
+if (!workerEnvSnapshotState) {
+  workerEnvSnapshotState = __defineHiddenValue__(navDataStoreState, '__WORKER_ENV_SNAPSHOT__', Object.create(null));
+  if (!workerEnvSnapshotState) throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ bootstrap failed');
+} else {
+  __defineHiddenValue__(navDataStoreState, '__WORKER_ENV_SNAPSHOT__', workerEnvSnapshotState);
+}
+
 let navScalarState = (navRoot.__SCALAR_STATE__ && typeof navRoot.__SCALAR_STATE__ === 'object')
   ? navRoot.__SCALAR_STATE__
   : null;

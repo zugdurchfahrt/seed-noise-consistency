@@ -46,10 +46,12 @@
   }
 
   const __swRuntimeRoot = __resolveWorkerBridgeRuntime();
+  const __swBootstrapEnvLiteral = (typeof __SW_BOOTSTRAP_ENV__ === 'object' && __SW_BOOTSTRAP_ENV__)
+    ? __SW_BOOTSTRAP_ENV__
+    : null;
   const __swWrapNativeApply = (__swRuntimeRoot && typeof __swRuntimeRoot.__wrapNativeApply === 'function')
     ? __swRuntimeRoot.__wrapNativeApply
     : null;
-
   function __relaySWDiag(level, code, ctx, err) {
     try {
       const reporter = __swDiagReporter;
@@ -215,6 +217,56 @@
     return { owner: null, desc: null };
   }
 
+  function __defineTrackedHiddenValue(obj, key, value) {
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) {
+      throw new Error('SW hidden owner missing for ' + String(key));
+    }
+    const desc = Object.getOwnPropertyDescriptor(obj, key);
+    if (desc && desc.configurable === false) {
+      return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
+    }
+    __trackDefineProperty(obj, key, {
+      value: value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return value;
+  }
+
+  function __ensureSwHiddenObject(owner, key) {
+    if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
+      throw new Error('SW hidden owner missing for ' + String(key));
+    }
+    if (Object.prototype.hasOwnProperty.call(owner, key) && owner[key] && typeof owner[key] === 'object') {
+      return owner[key];
+    }
+    return __defineTrackedHiddenValue(owner, key, Object.create(null));
+  }
+
+  function __ensureSwBootstrapEnv() {
+    if (!__swBootstrapEnvLiteral || typeof __swBootstrapEnvLiteral !== 'object') {
+      throw new Error('SW bootstrap env literal missing');
+    }
+    const C = __ensureSwHiddenObject(G, 'CanvasPatchContext');
+    const stateRoot = __ensureSwHiddenObject(C, 'state');
+    const wrkState = __ensureSwHiddenObject(stateRoot, '__WRK__');
+    const bootstrapRoot = __ensureSwHiddenObject(wrkState, 'bootstrap');
+    const prev = Object.getOwnPropertyDescriptor(bootstrapRoot, '__SW_ENV__');
+    const nextEnv = __cloneSwEnvValue(__swBootstrapEnvLiteral);
+    if (prev && prev.configurable === false) {
+      const cur = ('value' in prev) ? prev.value : bootstrapRoot.__SW_ENV__;
+      const curJson = JSON.stringify(cur);
+      const nextJson = JSON.stringify(nextEnv);
+      if (curJson !== nextJson) {
+        throw new Error('SW bootstrap env non-configurable mismatch');
+      }
+      return cur;
+    }
+    __defineTrackedHiddenValue(bootstrapRoot, '__SW_ENV__', nextEnv);
+    return nextEnv;
+  }
+
   function __resolveSwEnv() {
     const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
       ? G.CanvasPatchContext
@@ -234,7 +286,83 @@
     return ('value' in envDesc) ? envDesc.value : bootstrapRoot.__SW_ENV__;
   }
 
+  function __cloneSwEnvValue(value) {
+    if (Array.isArray(value)) return value.map(__cloneSwEnvValue);
+    if (ArrayBuffer.isView(value)) return Array.prototype.slice.call(value);
+    if (value && typeof value === 'object') {
+      const out = Object.create(null);
+      const keys = Object.keys(value);
+      for (let i = 0; i < keys.length; i += 1) {
+        out[keys[i]] = __cloneSwEnvValue(value[keys[i]]);
+      }
+      return out;
+    }
+    return value;
+  }
+
+  function __resolveCurrentSwWebglSnapshot() {
+    const liveEnv = __resolveSwEnv();
+    if (!liveEnv || typeof liveEnv !== 'object') {
+      throw new Error('SW env missing');
+    }
+    const liveWebgl = liveEnv.webgl;
+    if (!liveWebgl || typeof liveWebgl !== 'object') {
+      throw new Error('SW webgl env missing');
+    }
+    if (typeof liveWebgl.vendor !== 'string' || !liveWebgl.vendor) throw new Error('SW webgl.vendor missing');
+    if (typeof liveWebgl.renderer !== 'string' || !liveWebgl.renderer) throw new Error('SW webgl.renderer missing');
+    if (typeof liveWebgl.unmaskedVendor !== 'string' || !liveWebgl.unmaskedVendor) throw new Error('SW webgl.unmaskedVendor missing');
+    if (typeof liveWebgl.unmaskedRenderer !== 'string' || !liveWebgl.unmaskedRenderer) throw new Error('SW webgl.unmaskedRenderer missing');
+    if (Object.prototype.hasOwnProperty.call(liveWebgl, 'compressedTextureFormats')) {
+      const liveFormats = liveWebgl.compressedTextureFormats;
+      if (!Array.isArray(liveFormats)) throw new Error('SW webgl.compressedTextureFormats invalid');
+      for (let i = 0; i < liveFormats.length; i += 1) {
+        if (typeof liveFormats[i] !== 'number' || !Number.isFinite(liveFormats[i])) {
+          throw new Error('SW webgl.compressedTextureFormats invalid');
+        }
+      }
+    }
+    const liveCapabilities = (liveWebgl.webglCapabilities && typeof liveWebgl.webglCapabilities === 'object')
+      ? liveWebgl.webglCapabilities
+      : null;
+    if (liveCapabilities) {
+      if (typeof liveCapabilities.selected !== 'string' || !liveCapabilities.selected) {
+        throw new Error('SW webgl.webglCapabilities.selected missing');
+      }
+      const capabilityKeys = ['webgl2', 'webgl', 'experimentalWebgl'];
+      for (let i = 0; i < capabilityKeys.length; i += 1) {
+        const capabilityKey = capabilityKeys[i];
+        if (!Object.prototype.hasOwnProperty.call(liveCapabilities, capabilityKey)) continue;
+        const capabilityEntry = liveCapabilities[capabilityKey];
+        if (!capabilityEntry || typeof capabilityEntry !== 'object' || !Array.isArray(capabilityEntry.compressedTextureFormats)) {
+          throw new Error('SW webgl.webglCapabilities.' + capabilityKey + ' invalid');
+        }
+        for (let j = 0; j < capabilityEntry.compressedTextureFormats.length; j += 1) {
+          if (typeof capabilityEntry.compressedTextureFormats[j] !== 'number' || !Number.isFinite(capabilityEntry.compressedTextureFormats[j])) {
+            throw new Error('SW webgl.webglCapabilities.' + capabilityKey + '.compressedTextureFormats invalid');
+          }
+        }
+      }
+      if (Array.isArray(liveWebgl.compressedTextureFormats)) {
+        const selectedCapability = liveCapabilities[liveCapabilities.selected];
+        if (!selectedCapability || typeof selectedCapability !== 'object' || !Array.isArray(selectedCapability.compressedTextureFormats)) {
+          throw new Error('SW webgl.webglCapabilities.selected entry missing');
+        }
+        if (selectedCapability.compressedTextureFormats.length !== liveWebgl.compressedTextureFormats.length) {
+          throw new Error('SW webgl.compressedTextureFormats selected mismatch');
+        }
+        for (let i = 0; i < liveWebgl.compressedTextureFormats.length; i += 1) {
+          if (!Object.is(selectedCapability.compressedTextureFormats[i], liveWebgl.compressedTextureFormats[i])) {
+            throw new Error('SW webgl.compressedTextureFormats selected mismatch');
+          }
+        }
+      }
+    }
+    return liveWebgl;
+  }
+
   try {
+    __ensureSwBootstrapEnv();
     const env = __resolveSwEnv();
     if (!env || typeof env !== 'object') {
       __fail('sw_prelude:env_missing', {
@@ -246,21 +374,38 @@
       }, new Error('SW env missing'));
     }
 
-    const primary = env.primary;
-    const langs = env.langs;
-    const hc = env.hc;
-    const dm = env.dm;
-    const meta = env.meta;
+    const primary = env.language;
+    const langs = env.languages;
+    const hc = env.hardwareConcurrency;
+    const dm = env.deviceMemory;
     const profileUaData = env.uaData;
     const profileHighEntropy = profileUaData && typeof profileUaData === 'object' && profileUaData.he && typeof profileUaData.he === 'object'
       ? profileUaData.he
+      : null;
+    const meta = (profileUaData && typeof profileUaData === 'object' && profileHighEntropy)
+      ? {
+          brands: profileUaData.brands,
+          mobile: profileUaData.mobile,
+          platform: profileUaData.platform,
+          architecture: profileHighEntropy.architecture,
+          bitness: profileHighEntropy.bitness,
+          model: profileHighEntropy.model,
+          platformVersion: profileHighEntropy.platformVersion,
+          fullVersionList: profileHighEntropy.fullVersionList,
+          wow64: profileHighEntropy.wow64,
+          formFactors: profileHighEntropy.formFactors,
+          language: primary,
+          languages: Array.isArray(langs) ? langs.slice() : langs,
+          hardwareConcurrency: Number(hc),
+          deviceMemory: Number(dm)
+        }
       : null;
     const webgl = env.webgl;
 
     if (typeof primary !== 'string' || !primary) {
       __fail('sw_prelude:language_invalid', {
         stage: 'preflight',
-        key: 'primary',
+        key: 'language',
         message: 'service worker language invalid',
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'language_invalid' }
@@ -269,7 +414,7 @@
     if (!Array.isArray(langs) || !langs.length) {
       __fail('sw_prelude:languages_invalid', {
         stage: 'preflight',
-        key: 'langs',
+        key: 'languages',
         message: 'service worker languages invalid',
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'languages_invalid' }
@@ -278,7 +423,7 @@
     if (!Number.isFinite(Number(hc)) || Number(hc) <= 0) {
       __fail('sw_prelude:hardware_concurrency_invalid', {
         stage: 'preflight',
-        key: 'hc',
+        key: 'hardwareConcurrency',
         message: 'service worker hardwareConcurrency invalid',
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'hardware_concurrency_invalid' }
@@ -287,7 +432,7 @@
     if (!Number.isFinite(Number(dm)) || Number(dm) <= 0) {
       __fail('sw_prelude:device_memory_invalid', {
         stage: 'preflight',
-        key: 'dm',
+        key: 'deviceMemory',
         message: 'service worker deviceMemory invalid',
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'device_memory_invalid' }
@@ -355,6 +500,94 @@
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'webgl_unmasked_renderer_missing' }
       }, new Error('SW webgl.unmaskedRenderer missing'));
+    }
+    const compressedTextureFormats = Array.isArray(webgl.compressedTextureFormats)
+      ? webgl.compressedTextureFormats.slice()
+      : null;
+    if (compressedTextureFormats) {
+      for (let i = 0; i < compressedTextureFormats.length; i += 1) {
+        if (typeof compressedTextureFormats[i] !== 'number' || !Number.isFinite(compressedTextureFormats[i])) {
+          __fail('sw_prelude:webgl_compressed_texture_formats_invalid', {
+            stage: 'preflight',
+            key: 'webgl.compressedTextureFormats',
+            message: 'service worker webgl.compressedTextureFormats invalid',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw', reason: 'webgl_compressed_texture_formats_invalid' }
+          }, new Error('SW webgl.compressedTextureFormats invalid'));
+        }
+      }
+    }
+    const webglCapabilities = (webgl.webglCapabilities && typeof webgl.webglCapabilities === 'object')
+      ? webgl.webglCapabilities
+      : null;
+    if (webglCapabilities) {
+      if (typeof webglCapabilities.selected !== 'string' || !webglCapabilities.selected) {
+        __fail('sw_prelude:webgl_capabilities_selected_missing', {
+          stage: 'preflight',
+          key: 'webgl.webglCapabilities.selected',
+          message: 'service worker webgl.webglCapabilities.selected missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'webgl_capabilities_selected_missing' }
+        }, new Error('SW webgl.webglCapabilities.selected missing'));
+      }
+      const capabilityKeys = ['webgl2', 'webgl', 'experimentalWebgl'];
+      for (let i = 0; i < capabilityKeys.length; i += 1) {
+        const capabilityKey = capabilityKeys[i];
+        if (!Object.prototype.hasOwnProperty.call(webglCapabilities, capabilityKey)) continue;
+        const capabilityEntry = webglCapabilities[capabilityKey];
+        if (!capabilityEntry || typeof capabilityEntry !== 'object' || !Array.isArray(capabilityEntry.compressedTextureFormats)) {
+          __fail('sw_prelude:webgl_capabilities_entry_invalid', {
+            stage: 'preflight',
+            key: 'webgl.webglCapabilities.' + capabilityKey,
+            message: 'service worker webgl.webglCapabilities entry invalid',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw', reason: 'webgl_capabilities_entry_invalid' }
+          }, new Error('SW webgl.webglCapabilities.' + capabilityKey + ' invalid'));
+        }
+        for (let j = 0; j < capabilityEntry.compressedTextureFormats.length; j += 1) {
+          if (typeof capabilityEntry.compressedTextureFormats[j] !== 'number' || !Number.isFinite(capabilityEntry.compressedTextureFormats[j])) {
+            __fail('sw_prelude:webgl_capabilities_entry_formats_invalid', {
+              stage: 'preflight',
+              key: 'webgl.webglCapabilities.' + capabilityKey + '.compressedTextureFormats',
+              message: 'service worker webgl.webglCapabilities compressedTextureFormats invalid',
+              type: 'pipeline missing data',
+              data: { outcome: 'throw', reason: 'webgl_capabilities_entry_formats_invalid' }
+            }, new Error('SW webgl.webglCapabilities.' + capabilityKey + '.compressedTextureFormats invalid'));
+          }
+        }
+      }
+    }
+    if (compressedTextureFormats && webglCapabilities) {
+      const selectedCapability = webglCapabilities[webglCapabilities.selected];
+      if (!selectedCapability || typeof selectedCapability !== 'object' || !Array.isArray(selectedCapability.compressedTextureFormats)) {
+        __fail('sw_prelude:webgl_compressed_texture_formats_selected_mismatch', {
+          stage: 'preflight',
+          key: 'webgl.compressedTextureFormats',
+          message: 'service worker webgl.webglCapabilities selected entry missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'webgl_compressed_texture_formats_selected_mismatch' }
+        }, new Error('SW webgl.webglCapabilities.selected entry missing'));
+      }
+      if (selectedCapability.compressedTextureFormats.length !== compressedTextureFormats.length) {
+        __fail('sw_prelude:webgl_compressed_texture_formats_selected_mismatch', {
+          stage: 'preflight',
+          key: 'webgl.compressedTextureFormats',
+          message: 'service worker webgl.compressedTextureFormats selected mismatch',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'webgl_compressed_texture_formats_selected_mismatch' }
+        }, new Error('SW webgl.compressedTextureFormats selected mismatch'));
+      }
+      for (let i = 0; i < compressedTextureFormats.length; i += 1) {
+        if (!Object.is(selectedCapability.compressedTextureFormats[i], compressedTextureFormats[i])) {
+          __fail('sw_prelude:webgl_compressed_texture_formats_selected_mismatch', {
+            stage: 'preflight',
+            key: 'webgl.compressedTextureFormats',
+            message: 'service worker webgl.compressedTextureFormats selected mismatch',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw', reason: 'webgl_compressed_texture_formats_selected_mismatch' }
+          }, new Error('SW webgl.compressedTextureFormats selected mismatch'));
+        }
+      }
     }
     if (typeof __swWrapStrictAccessor !== 'function') {
       __fail('sw_prelude:wrap_strict_accessor_missing', {
@@ -480,24 +713,38 @@
             return Reflect.apply(target, thisArg, argList || []);
           }
           const pname = argList && argList[0];
+          const liveSnapshot = __resolveCurrentSwWebglSnapshot();
+          const liveCompressedTextureFormats = Array.isArray(liveSnapshot.compressedTextureFormats)
+            ? liveSnapshot.compressedTextureFormats
+            : null;
           let dbg = debugInfoCache.has(thisArg) ? debugInfoCache.get(thisArg) : undefined;
           if (dbg === undefined) {
             dbg = null;
             if (typeof origGetExtension === 'function') {
               try {
                 dbg = Reflect.apply(origGetExtension, thisArg, ['WEBGL_debug_renderer_info']);
-              } catch (_) {
+              } catch (e) {
+                __swDiag('warn', 'sw_prelude:webgl_debug_extension_native_throw', {
+                  stage: 'runtime',
+                  key: 'WEBGL_debug_renderer_info',
+                  message: 'service worker WEBGL_debug_renderer_info probe failed',
+                  type: 'browser structure missing data',
+                  data: { outcome: 'throw', reason: 'native_throw' }
+                }, e);
                 dbg = null;
               }
             }
             debugInfoCache.set(thisArg, dbg);
           }
           if (dbg) {
-            if (pname === dbg.UNMASKED_VENDOR_WEBGL) return snapshot.unmaskedVendor;
-            if (pname === dbg.UNMASKED_RENDERER_WEBGL) return snapshot.unmaskedRenderer;
+            if (pname === dbg.UNMASKED_VENDOR_WEBGL) return liveSnapshot.unmaskedVendor;
+            if (pname === dbg.UNMASKED_RENDERER_WEBGL) return liveSnapshot.unmaskedRenderer;
           }
-          if (pname === thisArg.VENDOR || pname === 0x1F00) return snapshot.vendor;
-          if (pname === thisArg.RENDERER || pname === 0x1F01) return snapshot.renderer;
+          if (liveCompressedTextureFormats && (pname === thisArg.COMPRESSED_TEXTURE_FORMATS || pname === 0x86A3)) {
+            return liveCompressedTextureFormats.slice();
+          }
+          if (pname === thisArg.VENDOR || pname === 0x1F00) return liveSnapshot.vendor;
+          if (pname === thisArg.RENDERER || pname === 0x1F01) return liveSnapshot.renderer;
           return Reflect.apply(target, thisArg, argList || []);
         });
         __trackDefineProperty(ctx, 'getParameter', {
@@ -1023,7 +1270,14 @@
           if (!cur) return false;
           if (cur === uadProto) return true;
         }
-      } catch (_) {
+      } catch (e) {
+        __swDiag('warn', 'sw_prelude:uadata_receiver_check_failed', {
+          stage: 'runtime',
+          key: 'userAgentData',
+          message: 'service worker uaData receiver check failed',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'uadata_receiver_check_failed' }
+        }, e);
         return false;
       }
       return false;
