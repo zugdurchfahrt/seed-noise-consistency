@@ -780,22 +780,34 @@ if (typeof ENV_WRK_SRC !== 'string' || !ENV_WRK_SRC) {
   throw new Error('WrkModule: inlineReflect missing');
 }
 
-function mkModuleWorkerSource(snapshot, absUrl){
-  if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkModuleWorkerSource bad snapshot');
-  if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkModuleWorkerSource bad absUrl');
-  const runtime = __requireWorkerPatchRuntime__('workerPatchModule runtime not ready', 'preflight');
-  const patchUrl = runtime && runtime.workerPatchModule;
-  const inlineCoreWindow = runtime && runtime.inlineCoreWindow;
-  const inlinePrng = runtime && runtime.inlinePrng;
-  const inlineCanvasPatch = runtime && runtime.inlineCanvasPatch;
-  const inlineContextPatch = runtime && runtime.inlineContextPatch;
-  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkModuleWorkerSource bad workerPatchModule url');
-  if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkModuleWorkerSource bad inlineCoreWindow');
-  if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkModuleWorkerSource bad inlinePrng');
-  if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkModuleWorkerSource bad inlineCanvasPatch');
-  if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkModuleWorkerSource bad inlineContextPatch');
+function mkWorkerBootstrapCore(opts){
+  if (!opts || typeof opts !== 'object') throw new Error('wrk: mkWorkerBootstrapCore bad opts');
+  const snapshot = opts.snapshot;
+  const absUrl = opts.absUrl;
+  const patchUrl = opts.patchUrl;
+  const inlineCoreWindow = opts.inlineCoreWindow;
+  const inlinePrng = opts.inlinePrng;
+  const inlineCanvasPatch = opts.inlineCanvasPatch;
+  const inlineContextPatch = opts.inlineContextPatch;
+  const patchUrlMissingMessage = opts.patchUrlMissingMessage;
+  const prePatchOwnerSource = typeof opts.prePatchOwnerSource === 'string' ? opts.prePatchOwnerSource : '';
+  const patchLoaderSource = opts.patchLoaderSource;
+  const userLoaderSource = opts.userLoaderSource;
+  const bootstrapSuffixSource = opts.bootstrapSuffixSource;
+  const sourceURL = opts.sourceURL;
+  if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkWorkerBootstrapCore bad snapshot');
+  if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkWorkerBootstrapCore bad absUrl');
+  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkWorkerBootstrapCore bad patchUrl');
+  if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkWorkerBootstrapCore bad inlineCoreWindow');
+  if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkWorkerBootstrapCore bad inlinePrng');
+  if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkWorkerBootstrapCore bad inlineCanvasPatch');
+  if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkWorkerBootstrapCore bad inlineContextPatch');
+  if (typeof patchUrlMissingMessage !== 'string' || !patchUrlMissingMessage) throw new Error('wrk: mkWorkerBootstrapCore bad patchUrlMissingMessage');
+  if (typeof patchLoaderSource !== 'string' || !patchLoaderSource) throw new Error('wrk: mkWorkerBootstrapCore bad patchLoaderSource');
+  if (typeof userLoaderSource !== 'string' || !userLoaderSource) throw new Error('wrk: mkWorkerBootstrapCore bad userLoaderSource');
+  if (typeof bootstrapSuffixSource !== 'string') throw new Error('wrk: mkWorkerBootstrapCore bad bootstrapSuffixSource');
+  if (typeof sourceURL !== 'string' || !sourceURL) throw new Error('wrk: mkWorkerBootstrapCore bad sourceURL');
   const SNAP = JSON.stringify(snapshot);
-  const USER = JSON.stringify(absUrl);
   const PATCH_URL = JSON.stringify(patchUrl);
   const INLINE_CORE_WINDOW = JSON.stringify(inlineCoreWindow);
   const INLINE_PRNG = JSON.stringify(inlinePrng);
@@ -810,8 +822,8 @@ function mkModuleWorkerSource(snapshot, absUrl){
       var __ENV_SHARED_PORTS__ = [];
       var __ENV_CONNECT_Q__ = [];
       var __ENV_CONNECT_BUF__ = true;
-        var __LAST_SNAP__ = null;
-        var __ENV_SNAP_APPLIED__ = null;
+      var __LAST_SNAP__ = null;
+      var __ENV_SNAP_APPLIED__ = null;
       var __serializeDiagErr = function(err){
         if (!err) return null;
         var out = {};
@@ -917,6 +929,15 @@ function mkModuleWorkerSource(snapshot, absUrl){
         if (!sent) {
           try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue' }); }
         }
+      };
+      var __closeBootstrapScope__ = function(){
+        try {
+          if (typeof setTimeout === 'function') {
+            setTimeout(function(){ try { self.close(); } catch(_e) {} });
+          } else {
+            self.close();
+          }
+        } catch(_e) {}
       };
       try {
         Object.defineProperty(self, '__ENV_RELAY_DIAG__', {
@@ -1129,6 +1150,29 @@ function mkModuleWorkerSource(snapshot, absUrl){
           }
         });
       };
+      var __finalizeBootstrapReady__ = function(USER){
+        __ENV_CONNECT_BUF__ = false;
+        try {
+          if (__ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
+            for (const ports of __ENV_CONNECT_Q__) {
+              if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
+                self.dispatchEvent(new MessageEvent('connect', { ports: ports }));
+              } else if (typeof self.onconnect === 'function') {
+                self.onconnect({ ports: ports });
+              }
+            }
+            __ENV_CONNECT_Q__.length = 0;
+          }
+        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
+        __MSG_BUF__ = false;
+        try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
+        try {
+          if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
+            for (const d of __MSG_Q__) self.dispatchEvent(new MessageEvent('message', { data: d }));
+          }
+        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_replay_dispatch' }); }
+        __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER });
+      };
       __installEarlyWorkerWebGLMirror__();
       ${ENV_WRK_SRC}
       (function __installWorkerCanvasSources__(){
@@ -1163,24 +1207,12 @@ function mkModuleWorkerSource(snapshot, absUrl){
         __ensureHiddenValue(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
         __ensureHiddenValue(wrkRuntime, 'inlineContextPatch', ${INLINE_CONTEXT_PATCH});
       })();
-      (function __installWorkerCoreOwners__(){
-        var __runInlineModule__ = function(source, exportName, label) {
-          if (typeof source !== 'string' || !source) throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
-          var runner = new Function('window', source + '\nreturn (typeof ' + exportName + ' === \"function\") ? ' + exportName + '(window) : null;');
-          return runner(self);
-        };
-        __runInlineModule__(${INLINE_CORE_WINDOW}, 'CoreWindowModule', 'inlineCoreWindow');
-        __runInlineModule__(${INLINE_PRNG}, 'RNGsetModule', 'inlinePrng');
-        if (!self.Core || typeof self.Core !== 'object') throw new Error('UACHPatch: worker Core missing after bootstrap owner install');
-        if (!self.Core.__internal || typeof self.Core.__internal !== 'object') throw new Error('UACHPatch: worker Core.__internal missing after bootstrap owner install');
-        if (!self.Core.__internal.prng || typeof self.Core.__internal.prng !== 'object') throw new Error('UACHPatch: worker Core.__internal.prng missing after bootstrap owner install');
-      })();
+${prePatchOwnerSource}
       let __patchOK = false;
       try {
-        // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
         const PATCH_URL = ${PATCH_URL};
-        if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchModule URL');
-        await import(PATCH_URL);
+        if (!PATCH_URL) throw new Error(${JSON.stringify(patchUrlMissingMessage)});
+${patchLoaderSource}
         const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
@@ -1192,7 +1224,6 @@ function mkModuleWorkerSource(snapshot, absUrl){
       }
       if (__patchOK) {
         try {
-          // Применяем снимок СЕЙЧАС, уже через реализацию патча:
           if (!self.__applyEnvSnapshot__ || !__LAST_SNAP__) throw new Error('UACHPatch: snapshot not applied');
           self.__applyEnvSnapshot__(__LAST_SNAP__);
           if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
@@ -1221,46 +1252,64 @@ function mkModuleWorkerSource(snapshot, absUrl){
           throw e;
         }
       }
-      // Только ПОСЛЕ зеркала грузим пользовательский код:
+${userLoaderSource}
+    })()${bootstrapSuffixSource}
+    //# sourceURL=${sourceURL}
+  `;
+}
+
+function mkModuleWorkerSource(snapshot, absUrl){
+  if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkModuleWorkerSource bad snapshot');
+  if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkModuleWorkerSource bad absUrl');
+  const runtime = __requireWorkerPatchRuntime__('workerPatchModule runtime not ready', 'preflight');
+  const patchUrl = runtime && runtime.workerPatchModule;
+  const inlineCoreWindow = runtime && runtime.inlineCoreWindow;
+  const inlinePrng = runtime && runtime.inlinePrng;
+  const inlineCanvasPatch = runtime && runtime.inlineCanvasPatch;
+  const inlineContextPatch = runtime && runtime.inlineContextPatch;
+  if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkModuleWorkerSource bad workerPatchModule url');
+  if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkModuleWorkerSource bad inlineCoreWindow');
+  if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkModuleWorkerSource bad inlinePrng');
+  if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkModuleWorkerSource bad inlineCanvasPatch');
+  if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkModuleWorkerSource bad inlineContextPatch');
+  const USER = JSON.stringify(absUrl);
+  return mkWorkerBootstrapCore({
+    snapshot: snapshot,
+    absUrl: absUrl,
+    patchUrl: patchUrl,
+    inlineCoreWindow: inlineCoreWindow,
+    inlinePrng: inlinePrng,
+    inlineCanvasPatch: inlineCanvasPatch,
+    inlineContextPatch: inlineContextPatch,
+    patchUrlMissingMessage: 'UACHPatch: missing workerPatchModule URL',
+    prePatchOwnerSource: `
+      (function __installWorkerCoreOwners__(){
+        var __runInlineModule__ = function(source, exportName, label) {
+          if (typeof source !== 'string' || !source) throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
+          var runner = new Function('window', source + '\\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
+          return runner(self);
+        };
+        __runInlineModule__(${JSON.stringify(inlineCoreWindow)}, 'CoreWindowModule', 'inlineCoreWindow');
+        __runInlineModule__(${JSON.stringify(inlinePrng)}, 'RNGsetModule', 'inlinePrng');
+        if (!self.Core || typeof self.Core !== 'object') throw new Error('UACHPatch: worker Core missing after bootstrap owner install');
+        if (!self.Core.__internal || typeof self.Core.__internal !== 'object') throw new Error('UACHPatch: worker Core.__internal missing after bootstrap owner install');
+        if (!self.Core.__internal.prng || typeof self.Core.__internal.prng !== 'object') throw new Error('UACHPatch: worker Core.__internal.prng missing after bootstrap owner install');
+      })();`,
+    patchLoaderSource: `
+        await import(PATCH_URL);`,
+    userLoaderSource: `
       const USER = ${USER};
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user module URL');
       await import(USER);
-      __ENV_CONNECT_BUF__ = false;
-      try {
-        if (__ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
-          for (const ports of __ENV_CONNECT_Q__) {
-            if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
-              self.dispatchEvent(new MessageEvent('connect', { ports: ports }));
-            } else if (typeof self.onconnect === 'function') {
-              self.onconnect({ ports: ports });
-            }
-          }
-          __ENV_CONNECT_Q__.length = 0;
-        }
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
-      // Replay any early messages after user code is loaded.
-      __MSG_BUF__ = false;
-      try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
-      try {
-        if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
-          for (const d of __MSG_Q__) self.dispatchEvent(new MessageEvent('message', { data: d }));
-        }
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_replay_dispatch' }); }
-      __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER });
-    })().catch(function(e){
+      __finalizeBootstrapReady__(USER);`,
+    bootstrapSuffixSource: `.catch(function(e){
       // Avoid worker unhandledrejection surface: report via diag channel and terminate to avoid partial state.
       __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
-      try {
-        if (typeof setTimeout === 'function') {
-          setTimeout(function(){ try { self.close(); } catch(_e) {} });
-        } else {
-          self.close();
-        }
-      } catch(_e) {}
+      __closeBootstrapScope__();
     });
-    export {};
-    //# sourceURL=worker_module_bootstrap.js
-  `;
+    export {};`,
+    sourceURL: 'worker_module_bootstrap.js'
+  });
 }
 
 function mkClassicWorkerSource(snapshot, absUrl){
@@ -1277,420 +1326,19 @@ function mkClassicWorkerSource(snapshot, absUrl){
   if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkClassicWorkerSource bad inlinePrng');
   if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkClassicWorkerSource bad inlineCanvasPatch');
   if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkClassicWorkerSource bad inlineContextPatch');
-  const SNAP = JSON.stringify(snapshot);
   const USER = JSON.stringify(absUrl);
-  const PATCH_URL = JSON.stringify(patchUrl);
-  const INLINE_CORE_WINDOW = JSON.stringify(inlineCoreWindow);
-  const INLINE_PRNG = JSON.stringify(inlinePrng);
-  const INLINE_CANVAS_PATCH = JSON.stringify(inlineCanvasPatch);
-  const INLINE_CONTEXT_PATCH = JSON.stringify(inlineContextPatch);
-  return `
-    (async function(){
-      'use strict';
-      Object.defineProperty(self, '__GW_BOOTSTRAP__', { value: true, writable: true, configurable: true, enumerable: false });
-      var __ENV_EMIT_Q__ = [];
-      var __ENV_DIAG_RELAY_ACTIVE__ = false;
-      var __ENV_SHARED_PORTS__ = [];
-      var __ENV_CONNECT_Q__ = [];
-      var __ENV_CONNECT_BUF__ = true;
-        var __LAST_SNAP__ = null;
-        var __ENV_SNAP_APPLIED__ = null;
-      var __serializeDiagErr = function(err){
-        if (!err) return null;
-        var out = {};
-        try { if (typeof err.name === 'string' && err.name) out.name = err.name; } catch(_e) {}
-        try { if (typeof err.message === 'string' && err.message) out.message = err.message; } catch(_e) {}
-        try { if (typeof err.stack === 'string' && err.stack) out.stack = err.stack; } catch(_e) {}
-        if (!Object.keys(out).length) {
-          try { out.message = String(err); } catch(_e) { out.message = 'worker bootstrap relay error'; }
-        }
-        return out;
-      };
-      var __sendRelayMsg = function(msg){
-        var sent = false;
-        try {
-          if (!(typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) && typeof self.postMessage === 'function') {
-            self.postMessage(msg);
-            sent = true;
-          }
-        } catch(_e) {}
-        try {
-          if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
-            for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
-              try { __ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) {}
-            }
-          }
-        } catch(_e) {}
-        if (!sent) {
-          try { __ENV_EMIT_Q__.push(msg); } catch(_e) {}
-        }
-      };
-      var __relayDiag = function(level, code, ctx, err){
-        if (__ENV_DIAG_RELAY_ACTIVE__) return;
-        __ENV_DIAG_RELAY_ACTIVE__ = true;
-        try {
-          var x = (ctx && typeof ctx === 'object') ? ctx : {};
-          __sendRelayMsg({
-            __ENV_DIAG__: {
-              level: (typeof level === 'string' && level) ? level : 'info',
-              code: String(code || 'worker_bootstrap:diag'),
-              ctx: {
-                module: (typeof x.module === 'string' && x.module) ? x.module : 'wrk',
-                diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'wrk',
-                surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'worker_bootstrap',
-                key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-                stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
-                message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'worker bootstrap diag'),
-                data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-                type: (typeof x.type === 'string' && x.type) ? x.type : 'pipeline missing data'
-              },
-              error: __serializeDiagErr(err)
-            }
-          });
-        } finally {
-          __ENV_DIAG_RELAY_ACTIVE__ = false;
-        }
-      };
-      var __emitDiag = function(code, err, extra){
-        var e = (err && typeof err === 'object') ? err : new Error(String(err || code));
-        var ctx = {
-          type: 'pipeline missing data',
-          stage: 'apply',
-          module: 'wrk',
-          diagTag: 'wrk',
-          surface: 'worker_bootstrap',
-          key: '__ENV_BOOTSTRAP_ERROR__',
-          message: 'worker bootstrap emit failed',
-          data: { outcome: 'throw', reason: 'worker_bootstrap_emit_failed' },
-          policy: 'throw',
-          action: 'throw'
-        };
-        try {
-          var d = self && self.__DEGRADE__;
-          if (extra && typeof extra === 'object') {
-            for (var k in extra) {
-              if (Object.prototype.hasOwnProperty.call(extra, k)) ctx[k] = extra[k];
-            }
-          }
-          if (typeof d === 'function') {
-            if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
-            else d(code, e, ctx);
-          }
-        } catch(__diagErr) {
-          try { self.__ENV_DIAG_ERROR__ = String((__diagErr && (__diagErr.stack || __diagErr.message)) || __diagErr); } catch(__diagStoreErr) { self.__ENV_DIAG_STORE_ERROR__ = String((__diagStoreErr && (__diagStoreErr.stack || __diagStoreErr.message)) || __diagStoreErr); }
-        }
-        __relayDiag('error', code, ctx, e);
-      };
-      var __emit = function(msg){
-        var sent = false;
-        try {
-          if (!(typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) && typeof self.postMessage === 'function') {
-            self.postMessage(msg);
-            sent = true;
-          }
-        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
-        try {
-          if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
-            for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
-              try { __ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
-            }
-            sent = true;
-          }
-        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_ports_enumeration' }); }
-        if (!sent) {
-          try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue' }); }
-        }
-      };
-      try {
-        Object.defineProperty(self, '__ENV_RELAY_DIAG__', {
-          value: function(level, code, ctx, err){ __relayDiag(level, code, ctx, err); },
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
-      try {
-        if (typeof BroadcastChannel === 'function') {
-          var __ENV_SYNC_CHANNEL__ = new BroadcastChannel('__ENV_SYNC__');
-          __ENV_SYNC_CHANNEL__.addEventListener('message', function(msgEv){
-            try {
-              var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
-              var syncSnap = syncPacket && syncPacket.envSnapshot;
-              if (syncSnap && typeof self.__applyEnvSnapshot__ === 'function') {
-                self.__applyEnvSnapshot__(syncSnap);
-              }
-            } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_env_sync' }); }
-          });
-        }
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_channel_install' }); }
-      try {
-        // SharedWorker needs port-based signalling; do not rely on onconnect (user code can overwrite it).
-        self.addEventListener('connect', function(ev){
-          try {
-            var ports = ev && ev.ports;
-            var connectPorts = null;
-            if (ports && ports.length) {
-              connectPorts = [];
-              for (var j = 0; j < ports.length; j++) {
-                try { if (typeof ports[j].start === 'function') ports[j].start(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_start' }); }
-                try {
-                  if (typeof ports[j].addEventListener === 'function') {
-                    ports[j].addEventListener('message', function(msgEv){
-                      try {
-                        var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
-                        var syncSnap = syncPacket && syncPacket.envSnapshot;
-                        if (syncSnap && typeof self.__applyEnvSnapshot__ === 'function') {
-                          self.__applyEnvSnapshot__(syncSnap);
-                        }
-                      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_env_sync' }); }
-                    });
-                  }
-                } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_listener_install' }); }
-                __ENV_SHARED_PORTS__.push(ports[j]);
-                connectPorts.push(ports[j]);
-              }
-            }
-            if (__ENV_CONNECT_BUF__ && connectPorts && connectPorts.length) {
-              __ENV_CONNECT_Q__.push(connectPorts);
-            }
-          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_connect_event' }); }
-          try {
-            if (__ENV_EMIT_Q__ && __ENV_EMIT_Q__.length) {
-              var q = __ENV_EMIT_Q__.slice(0);
-              __ENV_EMIT_Q__.length = 0;
-              for (var k = 0; k < q.length; k++) {
-                __emit(q[k]);
-              }
-            }
-          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue_flush' }); }
-        });
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'connect_listener_install' }); }
-      // Buffer early messages sent before user code installs its handler(s).
-      var __MSG_Q__ = [];
-      var __MSG_BUF__ = true;
-      var __onEarlyMsg__ = function(ev){ if (__MSG_BUF__) __MSG_Q__.push(ev && ev.data); };
-      try { self.addEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_install' }); }
-      var __requireSnap = function(s){
-        if (!s || typeof s !== 'object') throw new Error('UACHPatch: no snapshot');
-        if (typeof s.language !== 'string' || !s.language) throw new Error('UACHPatch: bad language');
-        if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
-        if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
-        if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
-        if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
-        const he = (s.uaData && s.uaData.he) || s.highEntropy;
-        if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
-        const KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
-        for (const k of KEYS) {
-          if (!(k in he)) throw new Error('UACHPatch: missing highEntropy.' + k);
-          const v = he[k];
-          if (v === undefined || v === null) throw new Error('UACHPatch: bad highEntropy.' + k);
-          if (Array.isArray(v) && !v.length) throw new Error('UACHPatch: bad highEntropy.' + k);
-        }
-        return s;
-      };
-      Object.defineProperty(self, '__lastSnap__', {
-        value: null,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      var __bootstrapApplyEnvSnapshot__ = function(s){
-        if (__ENV_SNAP_APPLIED__ === s) return;
-        __LAST_SNAP__ = __requireSnap(s);
-        self.__lastSnap__ = __LAST_SNAP__;
-        __ENV_SNAP_APPLIED__ = s;
-      };
-      Object.defineProperty(self, '__applyEnvSnapshot__', {
-        value: function __applyEnvSnapshot__(s){
-          __bootstrapApplyEnvSnapshot__(s);
-        },
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      try {
-        self.__applyEnvSnapshot__(${SNAP});
-      } catch (e) {
-        __LAST_SNAP__ = ${SNAP};
-        self.__lastSnap__ = __LAST_SNAP__;
-        self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
-        __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ });
-        throw e;
-      }
-      var __requireWebGLSnap__ = function(){
-        var snap = __LAST_SNAP__;
-        if (!snap || typeof snap !== 'object') throw new Error('UACHPatch: no snapshot');
-        var webgl = snap.webgl;
-        if (!webgl || typeof webgl !== 'object') throw new Error('UACHPatch: missing webgl');
-        if (typeof webgl.vendor !== 'string' || !webgl.vendor) throw new Error('UACHPatch: bad webgl.vendor');
-        if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
-        if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
-        if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
-        if (Object.prototype.hasOwnProperty.call(webgl, 'compressedTextureFormats') && !Array.isArray(webgl.compressedTextureFormats)) {
-          throw new Error('UACHPatch: bad webgl.compressedTextureFormats');
-        }
-        return webgl;
-      };
-      var __installEarlyWorkerWebGLMirror__ = function(){
-        __requireWebGLSnap__();
-        if (typeof OffscreenCanvas !== 'function' || !OffscreenCanvas.prototype) return;
-        var oscProto = OffscreenCanvas.prototype;
-        var dGetContext = Object.getOwnPropertyDescriptor(oscProto, 'getContext');
-        if (!dGetContext || typeof dGetContext.value !== 'function' || dGetContext.configurable === false) {
-          throw new Error('UACHPatch: OffscreenCanvas.getContext descriptor missing');
-        }
-        var nativeGetContext = dGetContext.value;
-        var patchedContexts = new WeakSet();
-        var debugInfoCache = new WeakMap();
-        var patchContextInstance = function(ctx){
-          if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) return ctx;
-          if (patchedContexts.has(ctx)) return ctx;
-          patchedContexts.add(ctx);
-          var dGetParameter = Object.getOwnPropertyDescriptor(ctx, 'getParameter');
-          var nativeGetParameter = (dGetParameter && typeof dGetParameter.value === 'function')
-            ? dGetParameter.value
-            : (typeof ctx.getParameter === 'function' ? ctx.getParameter : null);
-          if (!nativeGetParameter) throw new Error('UACHPatch: worker WebGL getParameter missing');
-          var dGetExtension = Object.getOwnPropertyDescriptor(ctx, 'getExtension');
-          var nativeGetExtension = (dGetExtension && typeof dGetExtension.value === 'function')
-            ? dGetExtension.value
-            : (typeof ctx.getExtension === 'function' ? ctx.getExtension : null);
-          if (typeof nativeGetExtension === 'function') {
-            Object.defineProperty(ctx, 'getExtension', {
-              configurable: dGetExtension ? !!dGetExtension.configurable : true,
-              enumerable: dGetExtension ? !!dGetExtension.enumerable : false,
-              writable: dGetExtension && Object.prototype.hasOwnProperty.call(dGetExtension, 'writable') ? dGetExtension.writable : true,
-              value: function getExtension(name) {
-                var ext = Reflect.apply(nativeGetExtension, this, arguments);
-                if (name === 'WEBGL_debug_renderer_info') {
-                  debugInfoCache.set(this, ext || null);
-                }
-                return ext;
-              }
-            });
-          }
-          Object.defineProperty(ctx, 'getParameter', {
-            configurable: dGetParameter ? !!dGetParameter.configurable : true,
-            enumerable: dGetParameter ? !!dGetParameter.enumerable : false,
-            writable: dGetParameter && Object.prototype.hasOwnProperty.call(dGetParameter, 'writable') ? dGetParameter.writable : true,
-            value: function getParameter(pname) {
-              var live = __requireWebGLSnap__();
-              var dbg = debugInfoCache.has(this) ? debugInfoCache.get(this) : undefined;
-              if (dbg === undefined) {
-                dbg = null;
-                if (typeof nativeGetExtension === 'function') {
-                  try { dbg = Reflect.apply(nativeGetExtension, this, ['WEBGL_debug_renderer_info']); } catch (_e) { dbg = null; }
-                }
-                debugInfoCache.set(this, dbg);
-              }
-              if (dbg) {
-                if (pname === dbg.UNMASKED_VENDOR_WEBGL) return live.unmaskedVendor;
-                if (pname === dbg.UNMASKED_RENDERER_WEBGL) return live.unmaskedRenderer;
-              }
-              if (pname === this.VENDOR || pname === 0x1F00) return live.vendor;
-              if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
-              if (Array.isArray(live.compressedTextureFormats) && (pname === this.COMPRESSED_TEXTURE_FORMATS || pname === 0x86A3)) {
-                return live.compressedTextureFormats.slice();
-              }
-              return Reflect.apply(nativeGetParameter, this, arguments);
-            }
-          });
-          return ctx;
-        };
-        Object.defineProperty(oscProto, 'getContext', {
-          configurable: !!dGetContext.configurable,
-          enumerable: !!dGetContext.enumerable,
-          writable: dGetContext && Object.prototype.hasOwnProperty.call(dGetContext, 'writable') ? dGetContext.writable : true,
-          value: function getContext(kind) {
-            var res = Reflect.apply(nativeGetContext, this, arguments);
-            if (!res) return res;
-            if (kind === 'webgl' || kind === 'webgl2' || kind === 'experimental-webgl') {
-              return patchContextInstance(res);
-            }
-            return res;
-          }
-        });
-      };
-      __installEarlyWorkerWebGLMirror__();
-      ${ENV_WRK_SRC}
-      (function __installWorkerCanvasSources__(){
-        var __ensureHiddenValue = function(obj, key, value){
-          if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
-          var desc = Object.getOwnPropertyDescriptor(obj, key);
-          if (desc && desc.configurable === false) {
-            return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
-          }
-          Object.defineProperty(obj, key, {
-            value: value,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          return value;
-        };
-        var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-          ? self.CanvasPatchContext
-          : __ensureHiddenValue(self, 'CanvasPatchContext', Object.create(null));
-        var stateRoot = (C.state && typeof C.state === 'object')
-          ? C.state
-          : __ensureHiddenValue(C, 'state', Object.create(null));
-        var wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
-          ? stateRoot.__WRK__
-          : __ensureHiddenValue(stateRoot, '__WRK__', Object.create(null));
-        var wrkRuntime = (wrkState.runtime && typeof wrkState.runtime === 'object')
-          ? wrkState.runtime
-          : __ensureHiddenValue(wrkState, 'runtime', Object.create(null));
-        __ensureHiddenValue(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
-        __ensureHiddenValue(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
-        __ensureHiddenValue(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
-        __ensureHiddenValue(wrkRuntime, 'inlineContextPatch', ${INLINE_CONTEXT_PATCH});
-      })();
-      let __patchOK = false;
-      try {
-        // <<< ВПЕЧАТАННЫЙ URL ПАТЧА >>>
-        const PATCH_URL = ${PATCH_URL};
-        if (!PATCH_URL) throw new Error('UACHPatch: missing workerPatchClassic URL');
-        importScripts(PATCH_URL);
-        const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
-        if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
-        installWorkerUACHMirror();
-        __patchOK = true;
-      } catch (e) {
-        __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
-        self.__ENV_PATCH_ERROR__ = String((e && (e.stack || e.message)) || e);
-        throw e;
-      }
-      if (__patchOK) {
-        try {
-          // Применяем снимок СЕЙЧАС, уже через реализацию патча:
-          if (!self.__applyEnvSnapshot__ || !__LAST_SNAP__) throw new Error('UACHPatch: snapshot not applied');
-          self.__applyEnvSnapshot__(__LAST_SNAP__);
-          if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
-            delete self.__installWorkerUACHMirror__;
-          }
-          if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
-            throw new Error('UACHPatch: __installWorkerUACHMirror__ visible after patch apply');
-          }
-          ['__GW_BOOTSTRAP__','__ENV_RELAY_DIAG__','__applyEnvSnapshot__','__lastSnap__','__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor','__ENV_PATCH_ERROR__','__ENV_PATCH_APPLY_ERROR__','__ENV_SNAP_ERROR__','__ENV_DIAG_ERROR__','__ENV_DIAG_STORE_ERROR__'].forEach(function(key){
-            if (!Object.prototype.hasOwnProperty.call(self, key)) return;
-            try {
-              delete self[key];
-            } catch(_e) {
-              __emitDiag('wrk:worker_bootstrap:apply:cleanup_failed', _e, { transport: 'cleanup_delete', key: key });
-              throw _e;
-            }
-            if (Object.prototype.hasOwnProperty.call(self, key)) {
-              var __cleanupErr = new Error('UACHPatch: ' + key + ' visible after patch apply');
-              __emitDiag('wrk:worker_bootstrap:apply:cleanup_failed', __cleanupErr, { transport: 'cleanup_visible', key: key });
-              throw __cleanupErr;
-            }
-          });
-        } catch (e) {
-          __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
-          self.__ENV_PATCH_APPLY_ERROR__ = String((e && (e.stack || e.message)) || e);
-          throw e;
-        }
-      }
+  return mkWorkerBootstrapCore({
+    snapshot: snapshot,
+    absUrl: absUrl,
+    patchUrl: patchUrl,
+    inlineCoreWindow: inlineCoreWindow,
+    inlinePrng: inlinePrng,
+    inlineCanvasPatch: inlineCanvasPatch,
+    inlineContextPatch: inlineContextPatch,
+    patchUrlMissingMessage: 'UACHPatch: missing workerPatchClassic URL',
+    patchLoaderSource: `
+        importScripts(PATCH_URL);`,
+    userLoaderSource: `
       var __isModuleURL = function(u){
         if (typeof u !== 'string' || !u) return false;
         if (/\\.mjs(?:$|[?#])/i.test(u)) return true;
@@ -1706,84 +1354,28 @@ function mkClassicWorkerSource(snapshot, absUrl){
       if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user script URL');
       if (__isModuleURL(USER)) {
         import(USER).then(function(){
-          __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER });
+          __finalizeBootstrapReady__(USER);
         }, function(e){
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e && (e.stack || e.message)) || e) });
-          try {
-            if (typeof setTimeout === 'function') {
-              setTimeout(function(){ try { self.close(); } catch(_e) {} });
-            } else {
-              self.close();
-            }
-          } catch(_e) {}
+          __closeBootstrapScope__();
         });
         return;
       }
       try {
         importScripts(USER);
       } catch (e) {
-         import(USER).then(function(){
-            __ENV_CONNECT_BUF__ = false;
-            try {
-              if (__ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
-                for (var j = 0; j < __ENV_CONNECT_Q__.length; j++) {
-                  var __portsImport = __ENV_CONNECT_Q__[j];
-                  if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
-                    self.dispatchEvent(new MessageEvent('connect', { ports: __portsImport }));
-                  } else if (typeof self.onconnect === 'function') {
-                    self.onconnect({ ports: __portsImport });
-                  }
-                }
-                __ENV_CONNECT_Q__.length = 0;
-              }
-            } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
-            // Replay any early messages after user code is loaded.
-            __MSG_BUF__ = false;
-           try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
-           try {
-             if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
-               for (var i = 0; i < __MSG_Q__.length; i++) self.dispatchEvent(new MessageEvent('message', { data: __MSG_Q__[i] }));
-             }
-           } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_replay_dispatch' }); }
-           __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER });
+        import(USER).then(function(){
+          __finalizeBootstrapReady__(USER);
         }, function(e2){
           __emit({ __ENV_BOOTSTRAP_ERROR__: String((e2 && (e2.stack || e2.message)) || e2) });
-          try {
-            if (typeof setTimeout === 'function') {
-              setTimeout(function(){ try { self.close(); } catch(_e) {} });
-            } else {
-              self.close();
-            }
-          } catch(_e) {}
+          __closeBootstrapScope__();
         });
         return;
       }
-      __ENV_CONNECT_BUF__ = false;
-      try {
-        if (__ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
-          for (var i = 0; i < __ENV_CONNECT_Q__.length; i++) {
-            var __portsClassic = __ENV_CONNECT_Q__[i];
-            if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
-              self.dispatchEvent(new MessageEvent('connect', { ports: __portsClassic }));
-            } else if (typeof self.onconnect === 'function') {
-              self.onconnect({ ports: __portsClassic });
-            }
-          }
-          __ENV_CONNECT_Q__.length = 0;
-        }
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_connect_replay_call' }); }
-      // Replay any early messages after user code is loaded.
-      __MSG_BUF__ = false;
-      try { self.removeEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_remove' }); }
-      try {
-        if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
-          for (var i = 0; i < __MSG_Q__.length; i++) self.dispatchEvent(new MessageEvent('message', { data: __MSG_Q__[i] }));
-        }
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_replay_dispatch' }); }
-      __emit({ __ENV_PATCH_OK__: __patchOK === true, __ENV_USER_URL_LOADED__: USER });
-    })();
-    //# sourceURL=worker_classic_bootstrap.js
-  `;
+      __finalizeBootstrapReady__(USER);`,
+    bootstrapSuffixSource: `;`,
+    sourceURL: 'worker_classic_bootstrap.js'
+  });
 }
 
 
@@ -2127,13 +1719,11 @@ function SafeWorkerOverride(G){
       const patchOk = data && typeof data === 'object' ? data.__ENV_PATCH_OK__ : null;
       if (patchOk === true && !sawWorkerPatchDiag) {
         sawWorkerPatchDiag = true;
-        __wrkDiag('info', 'worker_patch_src:apply:installed', {
-          stage: 'apply',
-          module: 'WORKER_PATCH_SRC',
-          diagTag: 'worker_patch',
+        __wrkDiag('info', 'wrk:worker_patch_ok_confirmed', {
+          stage: 'runtime',
           surface: 'worker',
-          key: 'installWorkerUACHMirror',
-          message: 'worker patch installed (Worker)',
+          key: '__ENV_PATCH_OK__',
+          message: 'worker patch ok confirmed (Worker)',
           type: 'pipeline missing data',
           data: { outcome: 'return', reason: 'worker_patch_ok_confirmed', scope: 'Worker' }
         }, null);
@@ -2358,13 +1948,11 @@ function SafeSharedWorkerOverride(G){
             internal = true;
             if (!sawSharedWorkerPatchDiag) {
               sawSharedWorkerPatchDiag = true;
-              __wrkDiag('info', 'worker_patch_src:apply:installed', {
-                stage: 'apply',
-                module: 'WORKER_PATCH_SRC',
-                diagTag: 'worker_patch',
+              __wrkDiag('info', 'wrk:shared_worker_patch_ok_confirmed', {
+                stage: 'runtime',
                 surface: 'worker',
-                key: 'installWorkerUACHMirror',
-                message: 'worker patch installed (SharedWorker)',
+                key: '__ENV_PATCH_OK__',
+                message: 'worker patch ok confirmed (SharedWorker)',
                 type: 'pipeline missing data',
                 data: { outcome: 'return', reason: 'worker_patch_ok_confirmed', scope: 'SharedWorker' }
               }, null);
@@ -2993,20 +2581,20 @@ function ServiceWorkerOverride(G){
     }, e);
   }
 
-    __wrkDiag('info', 'wrk:init:return', {
+    __wrkDiag('info', 'wrk:module_init_return', {
       stage: 'apply',
-      key: 'init',
+      key: 'WrkModule',
       message: 'WrkModule initialized',
       type: 'pipeline missing data',
-      data: { outcome: 'return' }
+      data: { outcome: 'return', reason: 'module_init_return' }
     }, null);
   } catch (e) {
-    __wrkDiag('error', 'wrk:fatal', {
+    __wrkDiag('error', 'wrk:module_init_failed', {
       stage: 'apply',
-      key: 'init',
-      message: 'WrkModule fatal',
+      key: 'WrkModule',
+      message: 'WrkModule initialization failed',
       type: 'browser structure missing data',
-      data: { outcome: 'throw', reason: 'fatal', rollbackOk: false }
+      data: { outcome: 'throw', reason: 'module_init_failed', rollbackOk: false }
     }, e);
     __wrkBestEffort('wrk:guard_release_failed', {
       stage: 'guard',

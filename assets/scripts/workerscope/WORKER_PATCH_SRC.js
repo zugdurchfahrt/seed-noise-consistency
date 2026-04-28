@@ -2084,7 +2084,8 @@
         ? self.CanvasPatchContext.state
         : null;
       if (!stateRoot) throw new Error('UACHPatch: CanvasPatchContext.state missing');
-      syncWorkerEnvSnapshotState(stateRoot);
+      // Worker runtime consumes cache.snap; do not rewrite the canonical
+      // __WORKER_ENV_SNAPSHOT__ owner-store from the consumer apply path.
       syncWorkerEnvProfileState(stateRoot);
       restoreWorkerFontsState(stateRoot);
       // Paradigm: seed is immutable within session.

@@ -197,8 +197,8 @@ const LOGGingModule = function LOGGingModule() {
     const __moduleAuditState = {
       timerId: null,
       lastSignalByModule: Object.create(null),
-      armed: false,
-      completed: false
+      lastStatusByModule: Object.create(null),
+      armed: false
     };
 
     // Signature defines what "same event" means for dedup.
@@ -408,6 +408,55 @@ const LOGGingModule = function LOGGingModule() {
       } catch (_) {}
     }
 
+    function isModuleAuditIssueStatus(status) {
+      return status === "apply_only" || status === "warn" || status === "error" || status === "not_emitted" || status === "missing_emitter";
+    }
+
+    function emitModuleAuditResolution(slot, entry, previousStatus) {
+      try {
+        if (!slot || slot.critical !== true) return;
+        if (!previousStatus || !isModuleAuditIssueStatus(previousStatus)) return;
+        const locate = (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
+        const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
+        const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+        const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+        const entryCode = (entry && typeof entry.code === "string") ? entry.code : null;
+        __degradeApi.diag("info", "degrade:module_status", {
+          module: (slot && typeof slot.module === "string" && slot.module) ? slot.module : "set_log",
+          diagTag: "degrade:module_check",
+          surface: (extra && typeof extra.surface === "string" && extra.surface)
+            ? extra.surface
+            : (slot && typeof slot.diagTag === "string" && slot.diagTag ? slot.diagTag : "logger"),
+          key: (extra && (typeof extra.key === "string" || extra.key === null))
+            ? extra.key
+            : (expected && (typeof expected.key === "string" || expected.key === null))
+              ? expected.key
+              : ((slot && typeof slot.module === "string" && slot.module) ? slot.module : null),
+          stage: "audit",
+          message: "module audit recheck ok",
+          type: "pipeline telemetry",
+          data: {
+            outcome: "return",
+            reason: "ok_after_recheck",
+            previousReason: previousStatus,
+            module: slot && slot.module ? slot.module : null,
+            code: entryCode,
+            auditedBy: "set_log",
+            observedStage: extra && typeof extra.stage === "string"
+              ? extra.stage
+              : (expected && typeof expected.stage === "string" ? expected.stage : null),
+            observedKey: extra && (typeof extra.key === "string" || extra.key === null)
+              ? extra.key
+              : (expected && (typeof expected.key === "string" || expected.key === null) ? expected.key : null),
+            observedData: data || (expected && Object.prototype.hasOwnProperty.call(expected, "data") ? expected.data : null),
+            source: slot && slot.source ? slot.source : null,
+            file: locate && typeof locate.file === "string" ? locate.file : null,
+            triggerCode: locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null
+          }
+        }, null);
+      } catch (_) {}
+    }
+
     function runModuleAuditProducer() {
       try {
         const buf = _buf();
@@ -427,6 +476,10 @@ const LOGGingModule = function LOGGingModule() {
           }
           const moduleEvent = modulePickEvent(slot, events);
           const status = moduleEntryStatus(slot, moduleEvent);
+          const previousStatus = Object.prototype.hasOwnProperty.call(__moduleAuditState.lastStatusByModule, slot.module)
+            ? __moduleAuditState.lastStatusByModule[slot.module]
+            : null;
+          __moduleAuditState.lastStatusByModule[slot.module] = status;
           const signalKey = [
             status,
             moduleEvent && typeof moduleEvent.code === "string" ? moduleEvent.code : "",
@@ -434,10 +487,34 @@ const LOGGingModule = function LOGGingModule() {
           ].join("|");
           if (__moduleAuditState.lastSignalByModule[slot.module] === signalKey) continue;
           __moduleAuditState.lastSignalByModule[slot.module] = signalKey;
-          if (status === "apply_only" || status === "warn" || status === "error" || status === "not_emitted" || status === "missing_emitter") {
+          if (isModuleAuditIssueStatus(status)) {
             emitModuleAuditSignal(slot, moduleEvent, status);
+          } else if (status === "ok") {
+            emitModuleAuditResolution(slot, moduleEvent, previousStatus);
           }
         }
+      } catch (_) {}
+    }
+
+    function shouldRescheduleModuleAudit(entry) {
+      try {
+        if (!entry || entry.type !== "degrade") return false;
+        const code = (typeof entry.code === "string") ? entry.code : "";
+        if (!code || code === "degrade:module_status" || code === "degrade:module_result_missing") return false;
+        for (let i = 0; i < LOGGER_MODULE_AUDIT_SLOTS.length; i++) {
+          if (moduleEventMatchesSlot(LOGGER_MODULE_AUDIT_SLOTS[i], entry)) return true;
+        }
+      } catch (_) {}
+      return false;
+    }
+
+    function queueModuleAuditRun() {
+      try {
+        if (__moduleAuditState.timerId != null) return;
+        __moduleAuditState.timerId = global.setTimeout(function() {
+          __moduleAuditState.timerId = null;
+          runModuleAuditProducer();
+        }, 0);
       } catch (_) {}
     }
 
@@ -445,29 +522,20 @@ const LOGGingModule = function LOGGingModule() {
       try {
         if (__moduleAuditState.armed) return;
         __moduleAuditState.armed = true;
-        const queueRun = function() {
-          if (__moduleAuditState.completed === true) return;
-          if (__moduleAuditState.timerId != null) return;
-          __moduleAuditState.timerId = global.setTimeout(function() {
-            __moduleAuditState.timerId = null;
-            __moduleAuditState.completed = true;
-            runModuleAuditProducer();
-          }, 0);
-        };
         const doc = (global.document && typeof global.document === "object") ? global.document : null;
         if (!doc || doc.readyState === "complete") {
-          queueRun();
+          queueModuleAuditRun();
           return;
         }
         if (typeof global.addEventListener === "function") {
-          global.addEventListener("load", queueRun, { once: true });
+          global.addEventListener("load", queueModuleAuditRun, { once: true });
           return;
         }
         if (typeof doc.addEventListener === "function") {
-          doc.addEventListener("DOMContentLoaded", queueRun, { once: true });
+          doc.addEventListener("DOMContentLoaded", queueModuleAuditRun, { once: true });
           return;
         }
-        queueRun();
+        queueModuleAuditRun();
       } catch (_) {}
     }
     scheduleModuleAuditProducer();
@@ -1455,6 +1523,9 @@ const LOGGingModule = function LOGGingModule() {
     function pushEntry(entry) {
       try {
         _buf().push(entry);
+        if (shouldRescheduleModuleAudit(entry)) {
+          queueModuleAuditRun();
+        }
       } catch (e) {
         // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
         // иначе рекурсия по пути ошибок (само-логирование логгера).
