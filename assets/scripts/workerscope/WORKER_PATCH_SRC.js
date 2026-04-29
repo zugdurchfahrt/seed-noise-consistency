@@ -2413,15 +2413,17 @@
       surface: "worker",
       key: "installWorkerUACHMirror",
       stage: "apply",
-      message: "worker patch installed",
+      message: "worker patch applied",
       data: {
+        outcome: "return",
+        reason: "applied",
         core: true,
         mirror: __uachMirrorInstalled__ === true,
         scope: !!self.__SCOPE_CONSISTENCY_PATCHED__
       },
       type: "pipeline missing data"
     };
-    emitDegrade('info', 'worker_patch_src:apply:installed', __workerCtx, null);
+    emitDegrade('info', 'worker_patch_src:applied', __workerCtx, null);
     } catch (e) {
       let rollbackErr = null;
       try {

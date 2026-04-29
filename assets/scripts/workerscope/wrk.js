@@ -2719,12 +2719,12 @@ function ServiceWorkerOverride(G){
     }, e);
   }
 
-    __wrkDiag('info', 'wrk:module_init_return', {
+    __wrkDiag('info', 'wrk:ready', {
       stage: 'apply',
       key: 'WrkModule',
       message: 'WrkModule initialized',
       type: 'pipeline missing data',
-      data: { outcome: 'return', reason: 'module_init_return' }
+      data: { outcome: 'return', reason: 'ready' }
     }, null);
   } catch (e) {
     __wrkDiag('error', 'wrk:module_init_failed', {

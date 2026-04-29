@@ -372,45 +372,45 @@
         if (initPromise && typeof initPromise.then === 'function') {
           initPromise
             .then(() => {
-              __syncWorkerBootstrapState({ initStatus: 'ready', initReason: 'return' });
-              __moduleDiag('info', __MODULE + ':initAll_return', {
+              __syncWorkerBootstrapState({ initStatus: 'ready', initReason: 'ready' });
+              __moduleDiag('info', __MODULE + ':ready', {
                 stage: 'apply',
                 key: 'initAll',
                 message: 'initAll resolved',
                   type: 'pipeline missing data',
-                  data: { outcome: 'return' }
+                  data: { outcome: 'return', reason: 'ready' }
                 }, null);
               })
               .catch((e) => {
-                __syncWorkerBootstrapState({ initStatus: 'error', initReason: 'initAll_failed' });
-                __moduleDiag('error', __MODULE + ':initAll_failed', {
+                __syncWorkerBootstrapState({ initStatus: 'error', initReason: 'ready_failed' });
+                __moduleDiag('error', __MODULE + ':ready_failed', {
                   stage: 'apply',
                   key: 'initAll',
                 message: 'initAll rejected',
                   type: 'browser structure missing data',
-                  data: { outcome: 'throw', reason: 'initAll_failed', rollbackOk: false }
+                  data: { outcome: 'throw', reason: 'ready_failed', rollbackOk: false }
                 }, e);
                 __releaseGuard(__guardToken, false);
               });
           return;
         }
 
-        __syncWorkerBootstrapState({ initStatus: 'ready', initReason: 'return' });
-        __moduleDiag('info', __MODULE + ':initAll_return', {
+        __syncWorkerBootstrapState({ initStatus: 'ready', initReason: 'ready' });
+        __moduleDiag('info', __MODULE + ':ready', {
           stage: 'apply',
           key: 'initAll',
           message: 'initAll completed',
           type: 'pipeline missing data',
-          data: { outcome: 'return' }
+          data: { outcome: 'return', reason: 'ready' }
         }, null);
       } catch (e) {
-        __syncWorkerBootstrapState({ initStatus: 'error', initReason: 'initAll_failed' });
-        __moduleDiag('error', __MODULE + ':initAll_failed', {
+        __syncWorkerBootstrapState({ initStatus: 'error', initReason: 'ready_failed' });
+        __moduleDiag('error', __MODULE + ':ready_failed', {
           stage: 'apply',
           key: 'initAll',
           message: 'initAll threw',
           type: 'browser structure missing data',
-          data: { outcome: 'throw', reason: 'initAll_failed', rollbackOk: false }
+          data: { outcome: 'throw', reason: 'ready_failed', rollbackOk: false }
         }, e);
         __releaseGuard(__guardToken, false);
         throw e;
