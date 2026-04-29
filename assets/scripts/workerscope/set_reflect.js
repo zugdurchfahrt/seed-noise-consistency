@@ -224,89 +224,6 @@
       return nextState;
     }
 
-    // Compatibility-only label primitive: do not native-label source-text-observable JS functions.
-    function baseMarkAsNative(func, name = "") {
-      if (typeof func !== 'function') return func;
-      try {
-        const hasOwnBridgeTarget = (typeof func.__coreBridgeTarget__ === 'function');
-        if (!hasOwnBridgeTarget) {
-          const bridgeErr = new Error('[set_reflect] markAsNative requires __coreBridgeTarget__');
-          __wrkDiag('error', 'wrk:mark_as_native_bridge_missing', {
-            stage: 'preflight',
-            key: 'Function.prototype.toString',
-            message: 'markAsNative requires __coreBridgeTarget__',
-            type: 'contract_violation',
-            data: { outcome: 'throw' }
-          }, bridgeErr);
-          throw bridgeErr;
-        }
-        const currentSource = Reflect.apply(nativeToString, func, []);
-        if (typeof currentSource === 'string' && currentSource.indexOf('[native code]') === -1) {
-          return func;
-        }
-        const bridgeTarget = __resolveWrappedBridgeTarget(func.__coreBridgeTarget__, 'baseMarkAsNative');
-        const nativeName = name || bridgeTarget.name || func.name || "";
-        const label = nativeName
-          ? ('function ' + nativeName + '() { [native code] }')
-          : 'function () { [native code] }';
-        if (bridgeTarget !== func) {
-          const bridgeLabel = bridgeTarget.name
-            ? ('function ' + bridgeTarget.name + '() { [native code] }')
-            : 'function () { [native code] }';
-          toStringOverrideMap.set(bridgeTarget, bridgeLabel);
-        }
-        toStringOverrideMap.set(func, label);
-      } catch (e) {
-        __wrkDiag('error', 'wrk:WeakMap.set', {
-          stage: 'apply',
-          key: 'Function.prototype.toString',
-          message: 'WeakMap.set failed in toString override map',
-          type: 'apply_failed',
-          data: { outcome: 'throw' }
-        }, e);
-        throw e;
-      }
-      return func;
-    }
-
-    let memoMarkAsNative = null;
-    function ensureMarkAsNative() {
-      if (memoMarkAsNative) return memoMarkAsNative;
-      memoMarkAsNative = baseMarkAsNative;
-      return memoMarkAsNative;
-    }
-
-    function resolveNativeLabel(candidate) {
-      if (typeof candidate !== 'function') return null;
-      if (toStringOverrideMap.has(candidate)) {
-        const ownLabel = toStringOverrideMap.get(candidate);
-        if (typeof ownLabel === 'string' && ownLabel) return ownLabel;
-      }
-      let current = candidate;
-      const seen = new WeakSet();
-      while (typeof current === 'function') {
-        if (seen.has(current)) {
-          __wrkDiag('warn', 'wrk:toString_bridge_cycle', {
-            stage: 'runtime',
-            key: 'Function.prototype.toString',
-            message: 'toString bridge cycle detected during label resolution',
-            type: 'contract violation',
-            data: { outcome: 'return' }
-          }, new Error('[WrkBridge] toString bridge cycle'));
-          return null;
-        }
-        seen.add(current);
-        const next = toStringProxyTargetMap.get(current);
-        if (typeof next !== 'function') break;
-        current = next;
-        if (toStringOverrideMap.has(current)) {
-          const nextLabel = toStringOverrideMap.get(current);
-          if (typeof nextLabel === 'string' && nextLabel) return nextLabel;
-        }
-      }
-      return null;
-    }
-
     function __throwWrapFactoryPreflight(code, key, message, err) {
       __wrkDiag('error', code, {
         stage: 'preflight',
@@ -725,12 +642,12 @@
       if (!__wrkRuntimeRoot || typeof __wrkRuntimeRoot !== 'object') {
         throw new Error('UACHPatch: CanvasPatchContext.state.__WRK__.runtime missing');
       }
-      __setHiddenValue(__wrkRuntimeRoot, '__ensureMarkAsNative', ensureMarkAsNative);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeApply', __wrapNativeApply);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeAccessor', __wrapNativeAccessor);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapStrictAccessor', __wrapStrictAccessor);
       __setHiddenValue(__wrkRuntimeRoot, '__applyAccessorTargets', __applyAccessorTargets);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeCtor', __wrapNativeCtor);
+      __setHiddenValue(__wrkRuntimeRoot, '__registerToStringWrapper', __registerToStringWrapper);
 
     } catch (e) {
       self.__ENV_SEED_ERROR__ = String((e && (e.stack || e.message)) || e);

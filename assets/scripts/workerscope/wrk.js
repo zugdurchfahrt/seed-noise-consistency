@@ -825,6 +825,26 @@ function mkWorkerBootstrapCore(opts){
       var __ENV_CONNECT_BUF__ = true;
       var __LAST_SNAP__ = null;
       var __ENV_SNAP_APPLIED__ = null;
+      var __ENV_EXPECTED_WORKER_SCOPE_KIND__ =
+        (typeof self.__EXPECTED_WORKER_SCOPE_KIND__ === 'string' && self.__EXPECTED_WORKER_SCOPE_KIND__)
+          ? self.__EXPECTED_WORKER_SCOPE_KIND__
+          : null;
+      var __isServiceWorkerScope__ = function(){
+        try {
+          return typeof ServiceWorkerGlobalScope === 'function' && self instanceof ServiceWorkerGlobalScope;
+        } catch(_e) {}
+        return false;
+      };
+      var __detectWorkerScopeKind__ = function(){
+        try {
+          if (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) return 'shared';
+        } catch(_e) {}
+        try {
+          if (typeof WorkerGlobalScope === 'function' && self instanceof WorkerGlobalScope) return 'dedicated';
+        } catch(_e) {}
+        return null;
+      };
+      var __ENV_WORKER_SCOPE_KIND__ = __detectWorkerScopeKind__();
       var __serializeDiagErr = function(err){
         if (!err) return null;
         var out = {};
@@ -839,7 +859,7 @@ function mkWorkerBootstrapCore(opts){
       var __sendRelayMsg = function(msg){
         var sent = false;
         try {
-          if (!(typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) && typeof self.postMessage === 'function') {
+          if (__ENV_WORKER_SCOPE_KIND__ !== 'shared' && typeof self.postMessage === 'function') {
             self.postMessage(msg);
             sent = true;
           }
@@ -914,7 +934,7 @@ function mkWorkerBootstrapCore(opts){
       var __emit = function(msg){
         var sent = false;
         try {
-          if (!(typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) && typeof self.postMessage === 'function') {
+          if (__ENV_WORKER_SCOPE_KIND__ !== 'shared' && typeof self.postMessage === 'function') {
             self.postMessage(msg);
             sent = true;
           }
@@ -948,6 +968,49 @@ function mkWorkerBootstrapCore(opts){
           enumerable: false
         });
       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
+      if (__isServiceWorkerScope__()) {
+        __emitDiag('wrk:worker_bootstrap:preflight:service_scope_unsupported', new Error('ServiceWorker scope is unsupported in dedicated/shared bootstrap core'), {
+          stage: 'preflight',
+          key: '__WORKER_SCOPE_KIND__',
+          message: 'service worker must use a separate pipeline lane',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'service_scope_requires_separate_lane' }
+        });
+        throw new Error('WorkerBootstrap: service worker requires separate lane');
+      }
+      if (!__ENV_WORKER_SCOPE_KIND__) {
+        __emitDiag('wrk:worker_bootstrap:preflight:scope_kind_missing', new Error('Worker bootstrap scope kind missing'), {
+          stage: 'preflight',
+          key: '__WORKER_SCOPE_KIND__',
+          message: 'worker bootstrap scope kind missing',
+          type: 'browser structure missing data',
+          data: { outcome: 'throw', reason: 'worker_scope_kind_missing' }
+        });
+        throw new Error('WorkerBootstrap: scope kind missing');
+      }
+      if (__ENV_EXPECTED_WORKER_SCOPE_KIND__ && __ENV_EXPECTED_WORKER_SCOPE_KIND__ !== __ENV_WORKER_SCOPE_KIND__) {
+        __emitDiag('wrk:worker_bootstrap:contract:scope_kind_mismatch', new Error('Worker bootstrap scope kind mismatch'), {
+          stage: 'contract',
+          key: '__EXPECTED_WORKER_SCOPE_KIND__',
+          message: 'worker bootstrap scope kind mismatch',
+          type: 'pipeline missing data',
+          data: {
+            outcome: 'throw',
+            reason: 'worker_scope_kind_mismatch',
+            expected: __ENV_EXPECTED_WORKER_SCOPE_KIND__,
+            actual: __ENV_WORKER_SCOPE_KIND__
+          }
+        });
+        throw new Error('WorkerBootstrap: scope kind mismatch');
+      }
+      try {
+        Object.defineProperty(self, '__WORKER_SCOPE_KIND__', {
+          value: __ENV_WORKER_SCOPE_KIND__,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'scope_kind_define' }); }
       try {
         if (typeof BroadcastChannel === 'function') {
           var __ENV_SYNC_CHANNEL__ = new BroadcastChannel('__ENV_SYNC__');
@@ -966,8 +1029,14 @@ function mkWorkerBootstrapCore(opts){
         // SharedWorker needs port-based signalling; do not rely on onconnect (user code can overwrite it).
         self.addEventListener('connect', function(ev){
           try {
+            if (__ENV_WORKER_SCOPE_KIND__ !== 'shared') {
+              throw new Error('WorkerBootstrap: unexpected connect event outside SharedWorkerGlobalScope');
+            }
             var ports = ev && ev.ports;
             var connectPorts = null;
+            if (!ports || !ports.length) {
+              throw new Error('WorkerBootstrap: shared connect event missing ports');
+            }
             if (ports && ports.length) {
               connectPorts = [];
               for (var j = 0; j < ports.length; j++) {
@@ -1034,10 +1103,55 @@ function mkWorkerBootstrapCore(opts){
         configurable: true,
         enumerable: false
       });
+      var __syncWorkerOwnerSnapshotRoute__ = function(s){
+        var __ensureWorkerOwnerHiddenValue = function(obj, key, value){
+          if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+          var desc = Object.getOwnPropertyDescriptor(obj, key);
+          if (desc && desc.configurable === false) {
+            return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
+          }
+          Object.defineProperty(obj, key, {
+            value: value,
+            writable: true,
+            configurable: true,
+            enumerable: false
+          });
+          return value;
+        };
+        var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+          ? self.CanvasPatchContext
+          : __ensureWorkerOwnerHiddenValue(self, 'CanvasPatchContext', Object.create(null));
+        var stateRoot = (C.state && typeof C.state === 'object')
+          ? C.state
+          : __ensureWorkerOwnerHiddenValue(C, 'state', Object.create(null));
+        var navModuleState = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
+          ? stateRoot.__NAV_TOTAL_SET__
+          : __ensureWorkerOwnerHiddenValue(stateRoot, '__NAV_TOTAL_SET__', Object.create(null));
+        var dataStoreState = (navModuleState.__DATA_STORE_STATE__ && typeof navModuleState.__DATA_STORE_STATE__ === 'object')
+          ? navModuleState.__DATA_STORE_STATE__
+          : __ensureWorkerOwnerHiddenValue(navModuleState, '__DATA_STORE_STATE__', Object.create(null));
+        var workerEnvSnapshot = (dataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
+          ? dataStoreState.__WORKER_ENV_SNAPSHOT__
+          : __ensureWorkerOwnerHiddenValue(dataStoreState, '__WORKER_ENV_SNAPSHOT__', Object.create(null));
+        if (!workerEnvSnapshot || typeof workerEnvSnapshot !== 'object') {
+          throw new Error('UACHPatch: __WORKER_ENV_SNAPSHOT__ owner route missing');
+        }
+        var prevKeys = Object.keys(workerEnvSnapshot);
+        for (var i = 0; i < prevKeys.length; i++) {
+          delete workerEnvSnapshot[prevKeys[i]];
+        }
+        var nextKeys = Object.keys(s);
+        for (var j = 0; j < nextKeys.length; j++) {
+          var key = nextKeys[j];
+          workerEnvSnapshot[key] = s[key];
+        }
+        return workerEnvSnapshot;
+      };
       var __bootstrapApplyEnvSnapshot__ = function(s){
         if (__ENV_SNAP_APPLIED__ === s) return;
         __LAST_SNAP__ = __requireSnap(s);
         self.__lastSnap__ = __LAST_SNAP__;
+        __syncWorkerOwnerSnapshotRoute__(__LAST_SNAP__);
         __ENV_SNAP_APPLIED__ = s;
       };
       Object.defineProperty(self, '__applyEnvSnapshot__', {
@@ -1155,12 +1269,14 @@ function mkWorkerBootstrapCore(opts){
         __ENV_CONNECT_BUF__ = false;
         try {
           if (__ENV_CONNECT_Q__ && __ENV_CONNECT_Q__.length) {
+            if (__ENV_WORKER_SCOPE_KIND__ !== 'shared') {
+              throw new Error('WorkerBootstrap: connect replay is only valid for SharedWorkerGlobalScope');
+            }
+            if (typeof MessageEvent !== 'function' || typeof self.dispatchEvent !== 'function') {
+              throw new Error('WorkerBootstrap: connect replay dispatch unavailable');
+            }
             for (const ports of __ENV_CONNECT_Q__) {
-              if (typeof MessageEvent === 'function' && typeof self.dispatchEvent === 'function') {
-                self.dispatchEvent(new MessageEvent('connect', { ports: ports }));
-              } else if (typeof self.onconnect === 'function') {
-                self.onconnect({ ports: ports });
-              }
+              self.dispatchEvent(new MessageEvent('connect', { ports: ports }));
             }
             __ENV_CONNECT_Q__.length = 0;
           }
@@ -1200,9 +1316,18 @@ function mkWorkerBootstrapCore(opts){
         var wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
           ? stateRoot.__WRK__
           : __ensureHiddenValue(stateRoot, '__WRK__', Object.create(null));
+        var navModuleState = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
+          ? stateRoot.__NAV_TOTAL_SET__
+          : __ensureHiddenValue(stateRoot, '__NAV_TOTAL_SET__', Object.create(null));
+        var dataStoreState = (navModuleState.__DATA_STORE_STATE__ && typeof navModuleState.__DATA_STORE_STATE__ === 'object')
+          ? navModuleState.__DATA_STORE_STATE__
+          : __ensureHiddenValue(navModuleState, '__DATA_STORE_STATE__', Object.create(null));
+        __ensureHiddenValue(dataStoreState, '__WORKER_ENV_SNAPSHOT__', Object.create(null));
         var wrkRuntime = (wrkState.runtime && typeof wrkState.runtime === 'object')
           ? wrkState.runtime
           : __ensureHiddenValue(wrkState, 'runtime', Object.create(null));
+        __ensureHiddenValue(wrkRuntime, 'workerScopeKind', __ENV_WORKER_SCOPE_KIND__);
+        __ensureHiddenValue(wrkRuntime, 'expectedWorkerScopeKind', __ENV_EXPECTED_WORKER_SCOPE_KIND__);
         __ensureHiddenValue(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
         __ensureHiddenValue(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
         __ensureHiddenValue(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
@@ -1653,9 +1778,10 @@ function SafeWorkerOverride(G){
   const userURL = (typeof abs === 'string' && abs.slice(0, 5) === 'blob:' && workerType === 'module')
     ? abs
     : resolveUserScriptURL(G, abs, 'Worker');
-  const src = workerType === 'module'
+  const scopePrelude = `(function(){try{Object.defineProperty(self,'__EXPECTED_WORKER_SCOPE_KIND__',{value:'dedicated',writable:true,configurable:true,enumerable:false});}catch(_e){try{self.__EXPECTED_WORKER_SCOPE_KIND__='dedicated';}catch(__e){}}})();\n`;
+  const src = scopePrelude + (workerType === 'module'
     ? workerPatchApi.mkModuleWorkerSource(snap, userURL)
-    : workerPatchApi.mkClassicWorkerSource(snap, userURL);
+    : workerPatchApi.mkClassicWorkerSource(snap, userURL));
 
   const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
   const w = new NativeWorker(blobURL, { ...(opts), type: workerType });
@@ -1881,9 +2007,10 @@ function SafeSharedWorkerOverride(G){
   const userURL = (typeof abs === 'string' && abs.slice(0, 5) === 'blob:' && workerType === 'module')
     ? abs
     : resolveUserScriptURL(G, abs, 'SharedWorker');
-    const src = (workerType === 'module')
+    const scopePrelude = `(function(){try{Object.defineProperty(self,'__EXPECTED_WORKER_SCOPE_KIND__',{value:'shared',writable:true,configurable:true,enumerable:false});}catch(_e){try{self.__EXPECTED_WORKER_SCOPE_KIND__='shared';}catch(__e){}}})();\n`;
+    const src = scopePrelude + ((workerType === 'module')
       ? workerPatchApi.mkModuleWorkerSource(snap, userURL)
-      : workerPatchApi.mkClassicWorkerSource(snap, userURL);
+      : workerPatchApi.mkClassicWorkerSource(snap, userURL));
 
     const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 
@@ -2041,6 +2168,16 @@ function SafeSharedWorkerOverride(G){
 // ===== ServiceWorker override (allow self/infra; block others; hub-friendly) =====
 function ServiceWorkerOverride(G){
   'use strict';
+  __wrkBestEffort('wrk:service_worker_registration_lane_state_failed', {
+    stage: 'apply',
+    key: 'CanvasPatchContext.state.__WRK__.runtime.serviceWorkerLane',
+    message: 'service worker registration lane state failed',
+    type: 'pipeline missing data',
+    data: { outcome: 'skip', reason: 'service_worker_registration_lane_state_failed' }
+  }, () => {
+    __wrkRuntimeSet__('serviceWorkerLane', 'registration');
+    __wrkRuntimeSet__('serviceWorkerScopeKind', 'service');
+  });
   if (!G || !G.navigator) {
     __wrkDiag('warn', 'wrk:service_worker_navigator_missing', {
       stage: 'preflight',

@@ -82,6 +82,77 @@
         : null;
       return wrkRuntime;
     };
+    const __isWorkerScopeKind__ = (kind) => kind === 'dedicated' || kind === 'shared';
+    const __isServiceWorkerScope__ = () => {
+      try {
+        return typeof ServiceWorkerGlobalScope === 'function' && self instanceof ServiceWorkerGlobalScope;
+      } catch (_e) {}
+      return false;
+    };
+    const __detectWorkerScopeKind__ = () => {
+      try {
+        if (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) return 'shared';
+      } catch (_e) {}
+      try {
+        if (typeof WorkerGlobalScope === 'function' && self instanceof WorkerGlobalScope) return 'dedicated';
+      } catch (_e) {}
+      return null;
+    };
+    const __resolveBootstrapWorkerScopeKind__ = () => {
+      const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
+      const runtimeKind = runtimeRoot && runtimeRoot.workerScopeKind;
+      if (__isWorkerScopeKind__(runtimeKind)) return runtimeKind;
+      throw new Error('UACHPatch: worker scope kind missing');
+    };
+    if (__isServiceWorkerScope__()) {
+      const e = new Error('UACHPatch: service worker requires separate lane');
+      emitDegrade('error', 'worker_patch_src:scope_kind:contract:service_lane_required', {
+        type: 'pipeline missing data',
+        stage: 'contract',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'worker',
+        key: '__WORKER_SCOPE_KIND__',
+        policy: 'throw',
+        action: 'throw',
+        data: { outcome: 'throw', reason: 'service_scope_requires_separate_lane' }
+      }, e);
+      throw e;
+    }
+    const workerScopeKind = __resolveBootstrapWorkerScopeKind__();
+    const actualWorkerScopeKind = __detectWorkerScopeKind__();
+    if (!__isWorkerScopeKind__(actualWorkerScopeKind)) {
+      const e = new Error('UACHPatch: actual worker scope kind missing');
+      emitDegrade('error', 'worker_patch_src:scope_kind:runtime:missing', {
+        type: 'browser structure missing data',
+        stage: 'runtime',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'worker',
+        key: '__WORKER_SCOPE_KIND__',
+        policy: 'throw',
+        action: 'throw',
+        data: { outcome: 'throw', reason: 'worker_scope_kind_missing' }
+      }, e);
+      throw e;
+    }
+    if (workerScopeKind !== actualWorkerScopeKind) {
+      const e = new Error('UACHPatch: worker scope kind mismatch');
+      emitDegrade('error', 'worker_patch_src:scope_kind:contract:mismatch', {
+        type: 'pipeline missing data',
+        stage: 'contract',
+        module: 'WORKER_PATCH_SRC',
+        surface: 'worker',
+        key: '__WORKER_SCOPE_KIND__',
+        policy: 'throw',
+        action: 'throw',
+        data: {
+          outcome: 'throw',
+          reason: 'worker_scope_kind_mismatch',
+          expected: workerScopeKind,
+          actual: actualWorkerScopeKind
+        }
+      }, e);
+      throw e;
+    }
     const __isCoreToStringStateOk__ = (st) => !!(st
       && st.__CORE_TOSTRING_STATE__ === true
       && typeof st.nativeToString === 'function'
@@ -213,25 +284,86 @@
       }, e);
       throw e;
     }
-    // --- seed __ensureMarkAsNative must exist (delivered by bootstrap) ---
     const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
-    const seedEnsureDesc = runtimeRoot
-      ? Object.getOwnPropertyDescriptor(runtimeRoot, '__ensureMarkAsNative')
+    const wrapNativeApplyDesc = runtimeRoot
+      ? Object.getOwnPropertyDescriptor(runtimeRoot, '__wrapNativeApply')
       : null;
-    const seedEnsure = (seedEnsureDesc && typeof seedEnsureDesc.value === 'function')
-      ? seedEnsureDesc.value
-      : (runtimeRoot && typeof runtimeRoot.__ensureMarkAsNative === 'function'
-          ? runtimeRoot.__ensureMarkAsNative
+    const wrapNativeApply = (wrapNativeApplyDesc && typeof wrapNativeApplyDesc.value === 'function')
+      ? wrapNativeApplyDesc.value
+      : (runtimeRoot && typeof runtimeRoot.__wrapNativeApply === 'function'
+          ? runtimeRoot.__wrapNativeApply
           : null);
-
-    if (!seedEnsure) {
-      const e = new Error('UACHPatch: __ensureMarkAsNative missing');
-      emitDegrade('error', 'worker_patch_src:ensure:preflight:missing', {
+    if (typeof wrapNativeApply !== 'function') {
+      const e = new Error('UACHPatch: __wrapNativeApply missing');
+      emitDegrade('error', 'worker_patch_src:wrap_native_apply:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
         module: 'WORKER_PATCH_SRC',
-        surface: '__ensureMarkAsNative',
-        key: '__ensureMarkAsNative',
+        surface: '__wrapNativeApply',
+        key: '__wrapNativeApply',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
+    }
+    const wrapNativeAccessorDesc = runtimeRoot
+      ? Object.getOwnPropertyDescriptor(runtimeRoot, '__wrapNativeAccessor')
+      : null;
+    const wrapNativeAccessor = (wrapNativeAccessorDesc && typeof wrapNativeAccessorDesc.value === 'function')
+      ? wrapNativeAccessorDesc.value
+      : (runtimeRoot && typeof runtimeRoot.__wrapNativeAccessor === 'function'
+          ? runtimeRoot.__wrapNativeAccessor
+          : null);
+    if (typeof wrapNativeAccessor !== 'function') {
+      const e = new Error('UACHPatch: __wrapNativeAccessor missing');
+      emitDegrade('error', 'worker_patch_src:wrap_native_accessor:preflight:missing', {
+        type: 'pipeline missing data',
+        stage: 'preflight',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__wrapNativeAccessor',
+        key: '__wrapNativeAccessor',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
+    }
+    const wrapNativeCtorDesc = runtimeRoot
+      ? Object.getOwnPropertyDescriptor(runtimeRoot, '__wrapNativeCtor')
+      : null;
+    const wrapNativeCtor = (wrapNativeCtorDesc && typeof wrapNativeCtorDesc.value === 'function')
+      ? wrapNativeCtorDesc.value
+      : (runtimeRoot && typeof runtimeRoot.__wrapNativeCtor === 'function'
+          ? runtimeRoot.__wrapNativeCtor
+          : null);
+    if (typeof wrapNativeCtor !== 'function') {
+      const e = new Error('UACHPatch: __wrapNativeCtor missing');
+      emitDegrade('error', 'worker_patch_src:wrap_native_ctor:preflight:missing', {
+        type: 'pipeline missing data',
+        stage: 'preflight',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__wrapNativeCtor',
+        key: '__wrapNativeCtor',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
+    }
+    const applyAccessorTargetsDesc = runtimeRoot
+      ? Object.getOwnPropertyDescriptor(runtimeRoot, '__applyAccessorTargets')
+      : null;
+    const applyAccessorTargets = (applyAccessorTargetsDesc && typeof applyAccessorTargetsDesc.value === 'function')
+      ? applyAccessorTargetsDesc.value
+      : (runtimeRoot && typeof runtimeRoot.__applyAccessorTargets === 'function'
+          ? runtimeRoot.__applyAccessorTargets
+          : null);
+    if (typeof applyAccessorTargets !== 'function') {
+      const e = new Error('UACHPatch: worker accessor target executor missing');
+      emitDegrade('error', 'worker_patch_src:apply_accessor_targets:preflight:missing', {
+        type: 'pipeline missing data',
+        stage: 'preflight',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__applyAccessorTargets',
+        key: '__applyAccessorTargets',
         policy: 'throw',
         action: 'throw'
       }, e);
@@ -275,64 +407,8 @@
       throw e;
     }
 
-    const markAsNative = seedEnsure();
-    if (typeof markAsNative !== 'function') {
-      const e = new Error('UACHPatch: markAsNative seed missing');
-      emitDegrade('error', 'worker_patch_src:ensure:contract:missing_mark', {
-        type: 'pipeline missing data',
-        stage: 'contract',
-        module: 'WORKER_PATCH_SRC',
-        surface: '__ensureMarkAsNative',
-        key: '__ensureMarkAsNative',
-        policy: 'throw',
-        action: 'throw'
-      }, e);
-      throw e;
-    }
-    if (markAsNative !== seedEnsure()) {
-      const e = new Error('UACHPatch: markAsNative seed unstable');
-      emitDegrade('error', 'worker_patch_src:ensure:contract:unstable_mark', {
-        type: 'pipeline missing data',
-        stage: 'contract',
-        module: 'WORKER_PATCH_SRC',
-        surface: '__ensureMarkAsNative',
-        key: '__ensureMarkAsNative',
-        policy: 'throw',
-        action: 'throw'
-      }, e);
-      throw e;
-    }
-
-    // sanity: worker follows window-style nativeization.
-    // markAsNative must not relabel source-text probes; public Function.prototype.toString stays native.
+    // sanity: worker follows window-style native baseline.
     {
-      const st = __resolveCoreToStringState__();
-      const probe = function probe(){};
-      Object.defineProperty(probe, '__coreBridgeTarget__', {
-        value: nativeToString,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      markAsNative(probe, 'toString');
-      const actual = st && st.overrideMap && typeof st.overrideMap.get === 'function'
-        ? st.overrideMap.get(probe)
-        : undefined;
-      if (typeof actual === 'string') {
-        const e = new Error('UACHPatch: source-text toString probe must stay unlabeled');
-        emitDegrade('error', 'worker_patch_src:tostring_state:contract:unexpected_source_label', {
-          type: 'pipeline missing data',
-          stage: 'contract',
-          module: 'WORKER_PATCH_SRC',
-          surface: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
-          key: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
-          policy: 'throw',
-          action: 'throw'
-        }, e);
-        throw e;
-      }
-      if (st && st.overrideMap && typeof st.overrideMap.delete === 'function') st.overrideMap.delete(probe);
-      if (st && st.proxyTargetMap && typeof st.proxyTargetMap.delete === 'function') st.proxyTargetMap.delete(probe);
       const directProbe = function workerPatchDirectProbe(){};
       const expectedNative = Reflect.apply(nativeToString, directProbe, []);
       const actualNative = Reflect.apply(Function.prototype.toString, directProbe, []);
@@ -366,31 +442,26 @@
       : null;
     const dprTarget = dprOwn ? self : (dprProto ? Object.getPrototypeOf(self) : null);
     const dprDesc = dprOwn || dprProto;
-    if (dprDesc && typeof dprDesc.get === 'function') {
-      Object.defineProperty(getDevicePixelRatioRaw, '__coreBridgeTarget__', {
-        value: dprDesc.get,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    }
-    const getDevicePixelRatio = (dprDesc && typeof dprDesc.get === 'function')
-      ? markAsNative(getDevicePixelRatioRaw, 'get devicePixelRatio')
-      : getDevicePixelRatioRaw;
     if (dprTarget && !(dprDesc && dprDesc.configurable === false)) {
       const isData = dprDesc && Object.prototype.hasOwnProperty.call(dprDesc, 'value') && !dprDesc.get && !dprDesc.set;
       if (isData) {
         trackedDefineProperty(dprTarget, 'devicePixelRatio', {
-          value: getDevicePixelRatio(),
+          value: getDevicePixelRatioRaw(),
           writable: !!dprDesc.writable,
           configurable: !!dprDesc.configurable,
           enumerable: !!dprDesc.enumerable
         });
-      } else {
+      } else if (dprDesc && typeof dprDesc.get === 'function') {
+        const wrappedGetDevicePixelRatio = wrapNativeAccessor(dprDesc.get, 'get devicePixelRatio', function(target, thisArg) {
+          if (thisArg !== self) {
+            return Reflect.apply(target, thisArg, []);
+          }
+          return getDevicePixelRatioRaw.call(thisArg);
+        });
         trackedDefineProperty(dprTarget, 'devicePixelRatio', {
           configurable: dprDesc ? !!dprDesc.configurable : true,
           enumerable: dprDesc ? !!dprDesc.enumerable : false,
-          get: getDevicePixelRatio,
+          get: wrappedGetDevicePixelRatio,
           set: dprDesc && dprDesc.set
         });
       }
@@ -423,6 +494,33 @@
     if (!nativeUAD) throw new Error('worker_patch_src: worker navigator.userAgentData missing');
     const uadProto = Object.getPrototypeOf(nativeUAD);
     if (!uadProto) throw new Error('worker_patch_src: worker navigator.userAgentData proto missing');
+    const stateRootForUAD = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
+      ? self.CanvasPatchContext.state
+      : null;
+    if (!stateRootForUAD) throw new Error('UACHPatch: CanvasPatchContext.state missing');
+    const navModuleStateForUAD = (stateRootForUAD.__NAV_TOTAL_SET__ && typeof stateRootForUAD.__NAV_TOTAL_SET__ === 'object')
+      ? stateRootForUAD.__NAV_TOTAL_SET__
+      : null;
+    if (!navModuleStateForUAD) throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__ missing');
+    const dataStoreStateForUAD = (navModuleStateForUAD.__DATA_STORE_STATE__ && typeof navModuleStateForUAD.__DATA_STORE_STATE__ === 'object')
+      ? navModuleStateForUAD.__DATA_STORE_STATE__
+      : null;
+    if (!dataStoreStateForUAD) throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing');
+    const workerEnvSnapshotOwner = (dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__ === 'object')
+      ? dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__
+      : null;
+    if (!workerEnvSnapshotOwner) throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+    const uadState = (workerEnvSnapshotOwner.workerNavigatorUADataState && typeof workerEnvSnapshotOwner.workerNavigatorUADataState === 'object')
+      ? workerEnvSnapshotOwner.workerNavigatorUADataState
+      : Object.create(null);
+    if (uadState !== workerEnvSnapshotOwner.workerNavigatorUADataState) {
+      trackedDefineProperty(workerEnvSnapshotOwner, 'workerNavigatorUADataState', {
+        value: uadState,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
     const dropUadOwnIfConfigurable = (key) => {
       const ownDesc = Object.getOwnPropertyDescriptor(nativeUAD, key);
       if (!ownDesc) return;
@@ -437,21 +535,6 @@
     dropUadOwnIfConfigurable('fullVersionList');
     dropUadOwnIfConfigurable('getHighEntropyValues');
     dropUadOwnIfConfigurable('toJSON');
-    const isUadThis = (recv) => {
-      if (recv === nativeUAD) return true;
-      if (!recv || (typeof recv !== 'object' && typeof recv !== 'function')) return false;
-      try {
-        let cur = recv;
-        for (let i = 0; i < 8; i++) {
-          cur = Object.getPrototypeOf(cur);
-          if (!cur) return false;
-          if (cur === uadProto) return true;
-        }
-        return false;
-      } catch (_) {
-        return false;
-      }
-    };
     const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
     const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
     const dPlatform = Object.getOwnPropertyDescriptor(uadProto, 'platform');
@@ -459,6 +542,53 @@
     const origBrandsGet = dBrands && dBrands.get;
     const origMobileGet = dMobile && dMobile.get;
     const origPlatformGet = dPlatform && dPlatform.get;
+    const uadReceivers = (typeof WeakSet === 'function' && uadState && uadState.receivers instanceof WeakSet)
+      ? uadState.receivers
+      : ((typeof WeakSet === 'function') ? new WeakSet() : null);
+    if (uadState && uadReceivers && uadReceivers !== uadState.receivers) {
+      trackedDefineProperty(uadState, 'receivers', {
+        value: uadReceivers,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    if (uadState && uadState.proto !== uadProto) {
+      trackedDefineProperty(uadState, 'proto', {
+        value: uadProto,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    const rememberUadReceiver = (recv) => {
+      if (!uadReceivers) return recv;
+      if (!recv || (typeof recv !== 'object' && typeof recv !== 'function')) return recv;
+      try { uadReceivers.add(recv); } catch (_e) {}
+      return recv;
+    };
+    rememberUadReceiver(nativeUAD);
+    const validateUadReceiver = (recv) => {
+      if (recv === nativeUAD) return true;
+      if (!recv || (typeof recv !== 'object' && typeof recv !== 'function')) return false;
+      if (uadReceivers && uadReceivers.has(recv)) return true;
+      const validator = (typeof origBrandsGet === 'function')
+        ? origBrandsGet
+        : ((typeof origMobileGet === 'function')
+            ? origMobileGet
+            : ((typeof origPlatformGet === 'function') ? origPlatformGet : null));
+      if (typeof validator !== 'function') return false;
+      Reflect.apply(validator, recv, []);
+      rememberUadReceiver(recv);
+      return true;
+    };
+    const isUadThis = (recv) => {
+      try {
+        return validateUadReceiver(recv);
+      } catch (_e) {
+        return false;
+      }
+    };
     const origBrandsDataValue = (dBrands
       && Object.prototype.hasOwnProperty.call(dBrands, 'value')
       && !dBrands.get
@@ -509,16 +639,13 @@
                           throw e;
                         }
                       };
-    if (typeof origBrandsGet === 'function') {
-      Object.defineProperty(getBrandsRaw, '__coreBridgeTarget__', {
-        value: origBrandsGet,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    }
     const getBrands = (typeof origBrandsGet === 'function')
-      ? markAsNative(getBrandsRaw, 'get brands')
+      ? wrapNativeAccessor(origBrandsGet, 'get brands', function(target, thisArg) {
+          if (!isUadThis(thisArg)) {
+            return Reflect.apply(target, thisArg, []);
+          }
+          return getBrandsRaw.call(thisArg);
+        })
       : getBrandsRaw;
     const getMobileRaw = function getMobile(){
                         if (!isUadThis(this)) {
@@ -559,16 +686,13 @@
                           throw e;
                         }
                       };
-    if (typeof origMobileGet === 'function') {
-      Object.defineProperty(getMobileRaw, '__coreBridgeTarget__', {
-        value: origMobileGet,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    }
     const getMobile = (typeof origMobileGet === 'function')
-      ? markAsNative(getMobileRaw, 'get mobile')
+      ? wrapNativeAccessor(origMobileGet, 'get mobile', function(target, thisArg) {
+          if (!isUadThis(thisArg)) {
+            return Reflect.apply(target, thisArg, []);
+          }
+          return getMobileRaw.call(thisArg);
+        })
       : getMobileRaw;
     const getPlatformRaw = function getPlatform(){
                         if (!isUadThis(this)) {
@@ -607,16 +731,13 @@
                           throw e;
                         }
                       };
-    if (typeof origPlatformGet === 'function') {
-      Object.defineProperty(getPlatformRaw, '__coreBridgeTarget__', {
-        value: origPlatformGet,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    }
     const getPlatform = (typeof origPlatformGet === 'function')
-      ? markAsNative(getPlatformRaw, 'get platform')
+      ? wrapNativeAccessor(origPlatformGet, 'get platform', function(target, thisArg) {
+          if (!isUadThis(thisArg)) {
+            return Reflect.apply(target, thisArg, []);
+          }
+          return getPlatformRaw.call(thisArg);
+        })
       : getPlatformRaw;
     trackedDefineProperties(uadProto, {
       brands:   { get: getBrands, enumerable: !!dBrands.enumerable, configurable: !!dBrands.configurable, set: dBrands.set },
@@ -668,16 +789,13 @@
         throw e;
       }
     };
-    if (typeof origFullGet === 'function') {
-      Object.defineProperty(getFullVersionListRaw, '__coreBridgeTarget__', {
-        value: origFullGet,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    }
     const getFullVersionList = (typeof origFullGet === 'function')
-      ? markAsNative(getFullVersionListRaw, 'get fullVersionList')
+      ? wrapNativeAccessor(origFullGet, 'get fullVersionList', function(target, thisArg) {
+          if (!isUadThis(thisArg)) {
+            return Reflect.apply(target, thisArg, []);
+          }
+          return getFullVersionListRaw.call(thisArg);
+        })
       : getFullVersionListRaw;
     if (dFull) {
       trackedDefineProperty(uadProto, 'fullVersionList', {
@@ -710,16 +828,13 @@
       }
       return {brands:this.brands, mobile:this.mobile, platform:this.platform};
     };
-    if (typeof origToJSON === 'function') {
-      Object.defineProperty(toJSONRaw, '__coreBridgeTarget__', {
-        value: origToJSON,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    }
     const toJSON = (typeof origToJSON === 'function')
-      ? markAsNative(toJSONRaw, 'toJSON')
+      ? wrapNativeApply(origToJSON, 'toJSON', function(target, thisArg) {
+          if (!isUadThis(thisArg)) {
+            return Reflect.apply(target, thisArg, []);
+          }
+          return toJSONRaw.call(thisArg);
+        })
       : toJSONRaw;
     trackedDefineProperty(uadProto, 'toJSON', {
       configurable: dToJSON ? !!dToJSON.configurable : true,
@@ -796,7 +911,7 @@
             ? src.fullVersionList
             : ((le.he && le.he.fullVersionList != null) ? le.he.fullVersionList : undefined);
           const map = {
-            brands: le.brands,
+            brands: toBrands(le.brands),
             mobile: le.mobile,
             platform: envPlatform.uaPlatform,
             architecture: src.architecture,
@@ -850,16 +965,13 @@
           throw e;
         }
       };
-    if (typeof origGHEV === 'function') {
-      Object.defineProperty(getHighEntropyValuesRaw, '__coreBridgeTarget__', {
-        value: origGHEV,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-    }
     const getHighEntropyValues = (typeof origGHEV === 'function')
-      ? markAsNative(getHighEntropyValuesRaw, 'getHighEntropyValues')
+      ? wrapNativeApply(origGHEV, 'getHighEntropyValues', function(target, thisArg, argList) {
+          if (!isUadThis(thisArg)) {
+            return Reflect.apply(target, thisArg, argList || []);
+          }
+          return getHighEntropyValuesRaw.apply(thisArg, argList || []);
+        })
       : getHighEntropyValuesRaw;
     trackedDefineProperty(uadProto, 'getHighEntropyValues', {
       configurable: dGHEV ? !!dGHEV.configurable : true,
@@ -868,12 +980,6 @@
       value: getHighEntropyValues
     });
 
-    const applyAccessorTargets = (runtimeRoot && typeof runtimeRoot.__applyAccessorTargets === 'function')
-      ? runtimeRoot.__applyAccessorTargets
-      : null;
-    if (typeof applyAccessorTargets !== 'function') {
-      throw new Error('UACHPatch: worker accessor target executor missing');
-    }
     const applyWorkerNavigatorAccessorTarget = (k, getter, diagTag) => {
       if (!nav) throw new Error(`UACHPatch: cannot define ${k} (no navigator)`);
       if (typeof getter !== 'function') {
@@ -1474,13 +1580,9 @@
             }
             return ext;
           };
-          Object.defineProperty(wrappedGetExtensionRaw, '__coreBridgeTarget__', {
-            value: origGetExtension,
-            writable: true,
-            configurable: true,
-            enumerable: false
+          const wrappedGetExtension = wrapNativeApply(origGetExtension, 'getExtension', function(target, thisArg, argList) {
+            return wrappedGetExtensionRaw.apply(thisArg, argList || []);
           });
-          const wrappedGetExtension = markAsNative(wrappedGetExtensionRaw, 'getExtension');
           trackedDefineProperty(ctx, 'getExtension', {
             configurable: dGetExtension ? !!dGetExtension.configurable : true,
             enumerable: dGetExtension ? !!dGetExtension.enumerable : false,
@@ -1511,13 +1613,9 @@
           if (pname === this.RENDERER || pname === 0x1F01) return live.renderer;
           return Reflect.apply(origGetParameter, this, arguments);
         };
-        Object.defineProperty(wrappedGetParameterRaw, '__coreBridgeTarget__', {
-          value: origGetParameter,
-          writable: true,
-          configurable: true,
-          enumerable: false
+        const wrappedGetParameter = wrapNativeApply(origGetParameter, 'getParameter', function(target, thisArg, argList) {
+          return wrappedGetParameterRaw.apply(thisArg, argList || []);
         });
-        const wrappedGetParameter = markAsNative(wrappedGetParameterRaw, 'getParameter');
         trackedDefineProperty(ctx, 'getParameter', {
           configurable: dGetParameter ? !!dGetParameter.configurable : true,
           enumerable: dGetParameter ? !!dGetParameter.enumerable : false,
@@ -1535,13 +1633,9 @@
         }
         return res;
       };
-      Object.defineProperty(wrappedGetContextRaw, '__coreBridgeTarget__', {
-        value: nativeGetContext,
-        writable: true,
-        configurable: true,
-        enumerable: false
+      const wrappedGetContext = wrapNativeApply(nativeGetContext, 'getContext', function(target, thisArg, argList) {
+        return wrappedGetContextRaw.apply(thisArg, argList || []);
       });
-      const wrappedGetContext = markAsNative(wrappedGetContextRaw, 'getContext');
       trackedDefineProperty(oscProto, 'getContext', {
         configurable: !!dGetContext.configurable,
         enumerable: !!dGetContext.enumerable,
@@ -2067,7 +2161,10 @@
       const NativeWorker = self.Worker;
       const dWorker = Object.getOwnPropertyDescriptor(self, 'Worker');
       if (!dWorker) throw new Error('UACHPatch: Worker descriptor missing');
-      const WrappedWorkerRaw = function Worker(url, opts){
+      const WrappedWorker = wrapNativeCtor(NativeWorker, 'Worker', function(argList) {
+        const nextArgs = Array.isArray(argList) ? argList : [];
+        const url = nextArgs[0];
+        const opts = nextArgs[1];
         const abs = new URL(url, self.location && self.location.href || undefined).href;
         const workerType = resolveWorkerType(abs, opts);
         const snap = requireSnap(cache.snap, 'nested');
@@ -2077,17 +2174,8 @@
           ? `(async function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
           : `(function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-        // Do not revoke immediately: the worker may still be fetching the bootstrap script.
-        // Early revoke can surface as `importScripts(blob:...) failed to load` in real sites.
-        return new NativeWorker(blobURL, { ...(opts || {}), type: workerType });
-      };
-      Object.defineProperty(WrappedWorkerRaw, '__coreBridgeTarget__', {
-        value: NativeWorker,
-        writable: true,
-        configurable: true,
-        enumerable: false
+        return [blobURL, { ...(opts || {}), type: workerType }];
       });
-      const WrappedWorker = markAsNative(WrappedWorkerRaw, 'Worker');
       trackedDefineProperty(self, 'Worker', {
         configurable: dWorker.configurable,
         enumerable: dWorker.enumerable,
@@ -2199,12 +2287,13 @@
         { actual: sanityUAD, expected: cache.snap.uaData }
       );
     }
-    if (!sameJson(sanityUAD.brands, cache.snap.uaData.brands)) {
+    const expectedBrands = toBrands(cache.snap.uaData.brands);
+    if (!sameJson(sanityUAD.brands, expectedBrands)) {
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'userAgentData.brands',
         'UACHPatch: brands mismatch',
-        { actual: sanityUAD.brands, expected: cache.snap.uaData.brands }
+        { actual: sanityUAD.brands, expected: expectedBrands }
       );
     }
     if (sanityUAD.mobile !== cache.snap.uaData.mobile) {

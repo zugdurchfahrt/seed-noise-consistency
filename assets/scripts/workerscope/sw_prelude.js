@@ -244,6 +244,58 @@
     return __defineTrackedHiddenValue(owner, key, Object.create(null));
   }
 
+  function __isServiceWorkerScope() {
+    try {
+      return typeof ServiceWorkerGlobalScope === 'function' && G instanceof ServiceWorkerGlobalScope;
+    } catch (e) {}
+    return false;
+  }
+
+  function __ensureServiceWorkerLaneState() {
+    if (!__isServiceWorkerScope()) {
+      __fail('sw_prelude:scope_kind_invalid', {
+        stage: 'contract',
+        key: '__WORKER_SCOPE_KIND__',
+        message: 'service worker runtime lane requires ServiceWorkerGlobalScope',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'service_scope_required' }
+      }, new Error('ServiceWorkerGlobalScope required'));
+    }
+    if (__swBootstrapEnvLiteral && typeof __swBootstrapEnvLiteral === 'object') {
+      const scopeKind = __swBootstrapEnvLiteral.scopeKind;
+      const lane = __swBootstrapEnvLiteral.lane;
+      if (scopeKind != null && scopeKind !== 'service') {
+        __fail('sw_prelude:scope_kind_mismatch', {
+          stage: 'contract',
+          key: '__SW_BOOTSTRAP_ENV__.scopeKind',
+          message: 'service worker bootstrap scope kind mismatch',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'service_scope_kind_mismatch', expected: 'service', actual: scopeKind }
+        }, new Error('SW bootstrap scope kind mismatch'));
+      }
+      if (lane != null && lane !== 'runtime') {
+        __fail('sw_prelude:lane_mismatch', {
+          stage: 'contract',
+          key: '__SW_BOOTSTRAP_ENV__.lane',
+          message: 'service worker bootstrap lane mismatch',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'service_lane_mismatch', expected: 'runtime', actual: lane }
+        }, new Error('SW bootstrap lane mismatch'));
+      }
+    }
+    const C = __ensureSwHiddenObject(G, 'CanvasPatchContext');
+    const stateRoot = __ensureSwHiddenObject(C, 'state');
+    const wrkState = __ensureSwHiddenObject(stateRoot, '__WRK__');
+    const bootstrapRoot = __ensureSwHiddenObject(wrkState, 'bootstrap');
+    const runtimeRoot = __ensureSwHiddenObject(wrkState, 'runtime');
+    __defineTrackedHiddenValue(G, '__WORKER_SCOPE_KIND__', 'service');
+    __defineTrackedHiddenValue(runtimeRoot, 'workerScopeKind', 'service');
+    __defineTrackedHiddenValue(runtimeRoot, 'expectedWorkerScopeKind', 'service');
+    __defineTrackedHiddenValue(runtimeRoot, 'serviceWorkerLane', 'runtime');
+    __defineTrackedHiddenValue(bootstrapRoot, 'serviceWorkerLane', 'runtime');
+    return { bootstrapRoot, runtimeRoot };
+  }
+
   function __ensureSwBootstrapEnv() {
     if (!__swBootstrapEnvLiteral || typeof __swBootstrapEnvLiteral !== 'object') {
       throw new Error('SW bootstrap env literal missing');
@@ -362,6 +414,7 @@
   }
 
   try {
+    __ensureServiceWorkerLaneState();
     __ensureSwBootstrapEnv();
     const env = __resolveSwEnv();
     if (!env || typeof env !== 'object') {

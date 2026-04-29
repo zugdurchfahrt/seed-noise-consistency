@@ -336,6 +336,8 @@ def _build_sw_bootstrap_prelude(sw_env: dict) -> str:
     prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
     reflect_path = SCRIPTS_WORKERSCOPE / "set_reflect.js"
     sw_env_json = json.dumps({
+        "scopeKind": "service",
+        "lane": "runtime",
         "ua": sw_env.get("userAgent"),
         "language": sw_env.get("primary"),
         "languages": sw_env.get("langs"),
