@@ -242,17 +242,47 @@ const LOGGingModule = function LOGGingModule() {
       return next <= DIAG_DUP_LIMIT;
     }
 
-    function isSummaryCode(code) {
+    function isReadySummaryCode(code) {
       if (typeof code !== "string" || !code) return false;
       return (
         code.endsWith(":ready") ||
-        code.endsWith(":installed") ||
-        code.endsWith(":applied") ||
-        code.endsWith(":patched") ||
-        code.endsWith(":patches_applied") ||
+        code.endsWith("_ready") ||
         code.endsWith(":whitelist_loaded") ||
-        code.endsWith(":group_applied")
+        code.endsWith("_whitelist_loaded") ||
+        code.endsWith(":group_ready") ||
+        code.endsWith("_group_ready") ||
+        code.endsWith(":installed") ||
+        code.endsWith("_installed")
       );
+    }
+
+    function isAppliedSummaryCode(code) {
+      if (typeof code !== "string" || !code) return false;
+      return (
+        code.endsWith(":applied") ||
+        code.endsWith("_applied") ||
+        code.endsWith(":group_applied") ||
+        code.endsWith("_group_applied") ||
+        code.endsWith(":patched") ||
+        code.endsWith("_patched") ||
+        code.endsWith(":patches_applied") ||
+        code.endsWith("_patches_applied") ||
+        code.endsWith(":real_init") ||
+        code.endsWith("_real_init") ||
+        code.endsWith(":webdriver_native_skip") ||
+        code.endsWith("_native_skip")
+      );
+    }
+
+    function moduleSummaryKind(slot, code) {
+      if (typeof code !== "string" || !code) return null;
+      if (isReadySummaryCode(code)) return "ready";
+      if (isAppliedSummaryCode(code)) return "applied";
+      return null;
+    }
+
+    function isSummaryCode(code, slot) {
+      return moduleSummaryKind(slot || null, code) !== null;
     }
 
     function modulePrefixes(slot) {
@@ -290,19 +320,25 @@ const LOGGingModule = function LOGGingModule() {
 
     function modulePickEvent(slot, events) {
       if (!Array.isArray(events) || !events.length) return null;
-      let fallback = null;
+      let latestIssue = null;
+      let latestSummary = null;
       for (let i = events.length - 1; i >= 0; i--) {
         const entry = events[i];
         const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
         const diagTag = (extra && typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
         const moduleName = (extra && typeof extra.module === "string" && extra.module) ? extra.module : null;
-        if (!fallback) fallback = entry;
-        if ((diagTag && diagTag === slot.diagTag) || (moduleName && moduleName === slot.module)) {
-          if (isSummaryCode(entry.code)) return entry;
-          return entry;
+        const level = (extra && typeof extra.level === "string" && extra.level) ? extra.level : null;
+        const exact = ((diagTag && diagTag === slot.diagTag) || (moduleName && moduleName === slot.module));
+        if (!latestIssue && (level === "fatal" || level === "error" || level === "warn")) {
+          latestIssue = entry;
+          if (exact) return entry;
+        }
+        if (!latestSummary && isSummaryCode(entry.code, slot)) {
+          latestSummary = entry;
+            if (exact && !latestIssue) return entry;
         }
       }
-      return fallback;
+      return latestIssue || latestSummary || null;
     }
 
     function moduleEntryStatus(slot, entry) {
@@ -311,67 +347,40 @@ const LOGGingModule = function LOGGingModule() {
       if (!entry) return (slot && slot.source === "disabled") ? "disabled" : "not_emitted";
       const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
       const level = (extra && typeof extra.level === "string") ? extra.level : null;
-      const stage = (extra && typeof extra.stage === "string") ? extra.stage : null;
       const code = (entry && typeof entry.code === "string") ? entry.code : "";
-      const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
-      const reason = (data && typeof data.reason === "string") ? data.reason : null;
-      const outcome = (data && typeof data.outcome === "string") ? data.outcome : null;
-      const err = entry ? entry.error : null;
-      const errName = (err && typeof err === "object" && typeof err.name === "string")
-        ? err.name
-        : ((typeof err === "string" && err.indexOf("TypeError") >= 0) ? "TypeError" : null);
-      const errMessage = (err && typeof err === "object" && typeof err.message === "string")
-        ? err.message
-        : ((typeof err === "string") ? err : null);
-      const expectedReason = (
-        reason === "native_illegal_invocation"
-        || reason === "illegal_invocation"
-        || reason === "native_throw"
-      );
-      const expectedCode = (
-        code.endsWith("_illegal_invocation")
-        || code.endsWith(":native_throw")
-      );
-      const hasTypeErrorSignal = (
-        errName === "TypeError"
-        || (typeof errMessage === "string" && errMessage.indexOf("TypeError") >= 0)
-        || (typeof errMessage === "string" && errMessage.indexOf("Illegal invocation") >= 0)
-        || (typeof errMessage === "string" && errMessage.indexOf("incompatible receiver") >= 0)
-      );
-      if (
-        (stage === "runtime" || stage === "hook")
-        && hasTypeErrorSignal
-        && (expectedReason || expectedCode)
-        && (outcome === "throw" || outcome == null)
-      ) {
-        return "expected_throw";
-      }
       if (level === "fatal" || level === "error") return "error";
       if (level === "warn") return "warn";
-      if (slot && slot.requiresResultProof === true && isSummaryCode(code)) return "apply_only";
-      return isSummaryCode(code) ? "ok" : "seen";
+      return isSummaryCode(code, slot) ? "ok" : "pending";
     }
     __defineLoggerHiddenValue("__MODULE_DIAG_AUDIT__", Object.freeze({
       isSummaryCode,
+      summaryKind: moduleSummaryKind,
       matchEntry: moduleEventMatchesSlot,
       pickEntry: modulePickEvent,
       entryStatus: moduleEntryStatus
     }), true);
 
+    function isModuleAuditSyntheticCode(code) {
+      return typeof code === "string"
+        && (
+          code.indexOf("degrade:module_status:") === 0
+        );
+    }
+
     function emitModuleAuditSignal(slot, entry, status) {
       try {
         if (!slot || slot.critical !== true) return;
-        if (status !== "apply_only" && status !== "warn" && status !== "error" && status !== "not_emitted" && status !== "missing_emitter") return;
+        if (status !== "warn" && status !== "error" && status !== "not_emitted" && status !== "missing_emitter") return;
         const locate = (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
         const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
         const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
         const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
-        const code = (status === "apply_only")
-          ? "degrade:module_result_missing"
-          : "degrade:module_status";
-        const message = (status === "apply_only")
-          ? "module emitted only apply/install signal; result proof missing"
-          : "module status is not ok";
+        const code = "degrade:module_status:" + String(status);
+        const observedReason = (data && typeof data.reason === "string" && data.reason) ? data.reason : null;
+        const message =
+          "module audit status=" + String(status)
+          + (entry && typeof entry.code === "string" && entry.code ? "; observedCode=" + entry.code : "")
+          + (observedReason ? "; observedReason=" + observedReason : "");
         const entryCode = (entry && typeof entry.code === "string") ? entry.code : null;
         __degradeApi.diag("error", code, {
           module: (slot && typeof slot.module === "string" && slot.module) ? slot.module : "set_log",
@@ -390,6 +399,7 @@ const LOGGingModule = function LOGGingModule() {
           data: {
             outcome: "return",
             reason: status,
+            status: status,
             module: slot && slot.module ? slot.module : null,
             code: entryCode,
             auditedBy: "set_log",
@@ -409,7 +419,7 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     function isModuleAuditIssueStatus(status) {
-      return status === "apply_only" || status === "warn" || status === "error" || status === "not_emitted" || status === "missing_emitter";
+      return status === "warn" || status === "error" || status === "not_emitted" || status === "missing_emitter";
     }
 
     function emitModuleAuditResolution(slot, entry, previousStatus) {
@@ -421,7 +431,7 @@ const LOGGingModule = function LOGGingModule() {
         const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
         const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
         const entryCode = (entry && typeof entry.code === "string") ? entry.code : null;
-        __degradeApi.diag("info", "degrade:module_status", {
+        __degradeApi.diag("info", "degrade:module_status:ok_after_recheck", {
           module: (slot && typeof slot.module === "string" && slot.module) ? slot.module : "set_log",
           diagTag: "degrade:module_check",
           surface: (extra && typeof extra.surface === "string" && extra.surface)
@@ -429,15 +439,17 @@ const LOGGingModule = function LOGGingModule() {
             : (slot && typeof slot.diagTag === "string" && slot.diagTag ? slot.diagTag : "logger"),
           key: (extra && (typeof extra.key === "string" || extra.key === null))
             ? extra.key
-            : (expected && (typeof expected.key === "string" || expected.key === null))
-              ? expected.key
-              : ((slot && typeof slot.module === "string" && slot.module) ? slot.module : null),
+              : (expected && (typeof expected.key === "string" || expected.key === null))
+                ? expected.key
+                : ((slot && typeof slot.module === "string" && slot.module) ? slot.module : null),
           stage: "audit",
-          message: "module audit recheck ok",
+          message: "module audit status=ok_after_recheck; previousStatus=" + String(previousStatus)
+            + (entryCode ? "; observedCode=" + entryCode : ""),
           type: "pipeline telemetry",
           data: {
             outcome: "return",
             reason: "ok_after_recheck",
+            status: "ok_after_recheck",
             previousReason: previousStatus,
             module: slot && slot.module ? slot.module : null,
             code: entryCode,
@@ -464,7 +476,7 @@ const LOGGingModule = function LOGGingModule() {
           ? buf.filter((entry) => {
               if (!entry || entry.type !== "degrade") return false;
               const code = (typeof entry.code === "string") ? entry.code : "";
-              return code !== "degrade:module_status" && code !== "degrade:module_result_missing";
+              return !isModuleAuditSyntheticCode(code);
             })
           : [];
         for (let i = 0; i < LOGGER_MODULE_AUDIT_SLOTS.length; i++) {
@@ -500,7 +512,7 @@ const LOGGingModule = function LOGGingModule() {
       try {
         if (!entry || entry.type !== "degrade") return false;
         const code = (typeof entry.code === "string") ? entry.code : "";
-        if (!code || code === "degrade:module_status" || code === "degrade:module_result_missing") return false;
+        if (!code || isModuleAuditSyntheticCode(code)) return false;
         for (let i = 0; i < LOGGER_MODULE_AUDIT_SLOTS.length; i++) {
           if (moduleEventMatchesSlot(LOGGER_MODULE_AUDIT_SLOTS[i], entry)) return true;
         }
@@ -659,7 +671,7 @@ const LOGGingModule = function LOGGingModule() {
           const entry = arr[i];
           if (!entry || entry.type !== "degrade") continue;
           const code = (typeof entry.code === "string") ? entry.code : "";
-          if (!code || code === "degrade:module_status" || code === "degrade:module_result_missing") continue;
+          if (!code || isModuleAuditSyntheticCode(code)) continue;
           if (code !== triggerCode) continue;
           const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
           const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
@@ -721,7 +733,7 @@ const LOGGingModule = function LOGGingModule() {
       if (
         extra
         && typeof extra === "object"
-        && (codeValue === "degrade:module_status" || codeValue === "degrade:module_result_missing")
+        && isModuleAuditSyntheticCode(codeValue)
         && extra.data
         && typeof extra.data === "object"
       ) {
