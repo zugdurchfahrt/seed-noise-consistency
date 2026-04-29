@@ -185,6 +185,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   function emitWebGLMonitor(entry) {
     try {
+      if (!isWebGLAccessLoggerEnabled()) return;
       const push = (__loggerRoot && typeof __loggerRoot.__pushWebGLMonitor__ === 'function')
         ? __loggerRoot.__pushWebGLMonitor__
         : null;
@@ -199,10 +200,24 @@ const ContextPatchModule = function ContextPatchModule(window) {
         args: Object.prototype.hasOwnProperty.call(x, 'args') ? x.args : [],
         result: Object.prototype.hasOwnProperty.call(x, 'result') ? x.result : null,
         error: Object.prototype.hasOwnProperty.call(x, 'error') ? x.error : null,
-        extra: Object.prototype.hasOwnProperty.call(x, 'extra') ? x.extra : null,
+        extra: Object.assign({
+          loggerGroup: 'WEBGLlogger',
+          loggerChannel: 'monitor'
+        }, (Object.prototype.hasOwnProperty.call(x, 'extra') && x.extra && typeof x.extra === 'object') ? x.extra : null),
         timestamp: new Date().toISOString()
       });
     } catch (_) {}
+  }
+
+  function isWebGLAccessLoggerEnabled() {
+    try {
+      const cfg = (__loggerRoot && __loggerRoot._logConfig && typeof __loggerRoot._logConfig === 'object')
+        ? __loggerRoot._logConfig.WEBGLlogger
+        : null;
+      if (cfg === false) return false;
+      if (cfg && typeof cfg === 'object' && cfg.enabled === false) return false;
+    } catch (_) {}
+    return true;
   }
 
   function shouldLogWebGLAccess(method) {
@@ -245,6 +260,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   function emitWebGLAccess(method, args, result, extra) {
     try {
+      if (!isWebGLAccessLoggerEnabled()) return;
       if (!shouldLogWebGLAccess(method)) return;
       const x = (extra && typeof extra === 'object') ? extra : {};
       const safeArgs = Array.isArray(args) ? args : [];
@@ -258,6 +274,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
           outcome: 'return',
           reason: 'webgl_access',
           extra: {
+            loggerGroup: 'WEBGLlogger',
+            loggerChannel: 'access',
             method: method,
             source: (typeof x.source === 'string' && x.source) ? x.source : 'native',
             hook: (typeof x.hook === 'string' && x.hook) ? x.hook : null,
@@ -880,9 +898,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
                   source: 'issued_override',
                   hook: hook.name || 'anon'
                 });
-                const webglLoggerGate =
-                  !(__loggerRoot && __loggerRoot._logConfig && __loggerRoot._logConfig.WEBGLlogger === false);
-                if ((__loggerRoot && __loggerRoot.__DEBUG__) && webglLoggerGate) {
+                if ((__loggerRoot && __loggerRoot.__DEBUG__) && isWebGLAccessLoggerEnabled()) {
                   if (WEBGL_OVERRIDE_DIAG_LOG) {
                     emitContextDiag('debug', 'context:issued_webgl:hook:override', null, {
                       module: 'webgl',
@@ -891,6 +907,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
                       key: method,
                       message: 'issued webgl override',
                       data: {
+                        loggerGroup: 'WEBGLlogger',
+                        loggerChannel: 'override_diag',
                         hook: hook.name || 'anon',
                         path: 'issued',
                         args: patched,

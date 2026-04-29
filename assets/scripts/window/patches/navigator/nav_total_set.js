@@ -1102,7 +1102,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         validThis: __isNavigatorThis,
         invalidThis: 'native',
         getImpl: function safeDefineAccGetImpl() {
-          __navLogAccess(key, null);
+          const currentDesc = Object.getOwnPropertyDescriptor(target, key);
+          __navLogAccess(key, currentDesc && typeof currentDesc.get === 'function' ? currentDesc.get : null);
           return Reflect.apply(getter, this, []);
         }
         }], 'strict');
@@ -1281,6 +1282,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         for (let i = 0; i < applied.length; i++) {
           const p = applied[i];
           if (typeof p.value === 'function') __navRegisterFn(p.value);
+          if (p.nextDesc && typeof p.nextDesc.value === 'function') __navRegisterFn(p.nextDesc.value);
+          if (p.nextDesc && typeof p.nextDesc.get === 'function') __navRegisterFn(p.nextDesc.get);
+          if (p.nextDesc && typeof p.nextDesc.set === 'function') __navRegisterFn(p.nextDesc.set);
           registerPatchedTarget(p.owner, p.key, groupTag);
           rememberModuleApplied(p);
         }
@@ -1446,7 +1450,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis: __isNavigatorThis,
           invalidThis: 'native',
           getImpl: function navStrictScalarAccessorValue() {
-            __navLogAccess(key, null, { bucket: 'strict_accessor_gateway' });
+            const currentDesc = Object.getOwnPropertyDescriptor(owner, key);
+            __navLogAccess(key, currentDesc && typeof currentDesc.get === 'function' ? currentDesc.get : null, { bucket: 'strict_accessor_gateway' });
             return getter.call(this);
           }
         }], 'strict');
@@ -1499,7 +1504,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis: __isNavigatorThis,
           invalidThis: 'native',
           getImpl: function navObjectReturnAccessorValue() {
-            __navLogAccess(key, null, { bucket: 'object_return_gateway' });
+            const currentDesc = Object.getOwnPropertyDescriptor(owner, key);
+            __navLogAccess(key, currentDesc && typeof currentDesc.get === 'function' ? currentDesc.get : null, { bucket: 'object_return_gateway' });
             return getter.call(this);
           }
         }], 'strict');
@@ -2220,7 +2226,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis: isUadThis,
           invalidThis: 'throw',
           invoke(orig, args) {
-            __navLogAccess('userAgentData.getHighEntropyValues', null);
+            const currentDesc = Object.getOwnPropertyDescriptor(ghevOwner, 'getHighEntropyValues');
+            __navLogAccess('userAgentData.getHighEntropyValues', currentDesc && typeof currentDesc.value === 'function' ? currentDesc.value : null);
             const keys = (args && args.length) ? args[0] : undefined;
             if (!Array.isArray(keys)) {
               __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_keys', {
@@ -2370,7 +2377,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           validThis: isUadThis,
           invalidThis: 'throw',
           invoke(orig, args) {
-            __navLogAccess('userAgentData.toJSON', null);
+            const currentDesc = Object.getOwnPropertyDescriptor(toJsonOwner, 'toJSON');
+            __navLogAccess('userAgentData.toJSON', currentDesc && typeof currentDesc.value === 'function' ? currentDesc.value : null);
             let nativeOut;
             try {
               nativeOut = Reflect.apply(orig, this, args || []);
@@ -2900,7 +2908,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           },
           invalidThis: 'throw',
           invoke(_orig, args) {
-            __navLogAccess('webkitTemporaryStorage.queryUsageAndQuota', null);
+            const currentDesc = Object.getOwnPropertyDescriptor(tmpOwner, 'queryUsageAndQuota');
+            __navLogAccess('webkitTemporaryStorage.queryUsageAndQuota', currentDesc && typeof currentDesc.value === 'function' ? currentDesc.value : null);
             const success = (args && args.length) ? args[0] : undefined;
             const error = (args && args.length > 1) ? args[1] : undefined;
             try {
@@ -2973,7 +2982,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           },
           invalidThis: 'throw',
           invoke(orig, args) {
-            __navLogAccess('storage.persist', null);
+            const currentDesc = Object.getOwnPropertyDescriptor(persistOwner, 'persist');
+            __navLogAccess('storage.persist', currentDesc && typeof currentDesc.value === 'function' ? currentDesc.value : null);
             const out = Reflect.apply(orig, this, args || []);
             return Promise.resolve(out);
           }
@@ -3027,7 +3037,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           },
           invalidThis: 'throw',
           invoke(orig, args) {
-            __navLogAccess('storage.persisted', null);
+            const currentDesc = Object.getOwnPropertyDescriptor(persistedOwner, 'persisted');
+            __navLogAccess('storage.persisted', currentDesc && typeof currentDesc.value === 'function' ? currentDesc.value : null);
             const out = Reflect.apply(orig, this, args || []);
             return Promise.resolve(out);
           }
@@ -3323,7 +3334,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           },
           invalidThis: 'throw',
           invoke(orig, args) {
-            __navLogAccess('credentials.create', null);
+            const currentDesc = Object.getOwnPropertyDescriptor(createOwner, 'create');
+            __navLogAccess('credentials.create', currentDesc && typeof currentDesc.value === 'function' ? currentDesc.value : null);
             const options = (args && args.length) ? args[0] : undefined;
             const isCredThis = (this === navigator.credentials || this === credProto);
             if (!isCredThis) return Reflect.apply(orig, this, args || []);
@@ -3348,7 +3360,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           },
           invalidThis: 'throw',
           invoke(orig, args) {
-            __navLogAccess('credentials.get', null);
+            const currentDesc = Object.getOwnPropertyDescriptor(getOwner, 'get');
+            __navLogAccess('credentials.get', currentDesc && typeof currentDesc.value === 'function' ? currentDesc.value : null);
             const options = (args && args.length) ? args[0] : undefined;
             const isCredThis = (this === navigator.credentials || this === credProto);
             if (!isCredThis) return Reflect.apply(orig, this, args || []);
