@@ -786,6 +786,7 @@ function mkWorkerBootstrapCore(opts){
   const snapshot = opts.snapshot;
   const absUrl = opts.absUrl;
   const patchUrl = opts.patchUrl;
+  const expectedWorkerScopeKind = opts.expectedWorkerScopeKind;
   const inlineCoreWindow = opts.inlineCoreWindow;
   const inlinePrng = opts.inlinePrng;
   const inlineCanvasPatch = opts.inlineCanvasPatch;
@@ -799,6 +800,7 @@ function mkWorkerBootstrapCore(opts){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkWorkerBootstrapCore bad snapshot');
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkWorkerBootstrapCore bad absUrl');
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkWorkerBootstrapCore bad patchUrl');
+  if (expectedWorkerScopeKind !== 'dedicated' && expectedWorkerScopeKind !== 'shared') throw new Error('wrk: mkWorkerBootstrapCore bad expectedWorkerScopeKind');
   if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkWorkerBootstrapCore bad inlineCoreWindow');
   if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkWorkerBootstrapCore bad inlinePrng');
   if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkWorkerBootstrapCore bad inlineCanvasPatch');
@@ -810,6 +812,7 @@ function mkWorkerBootstrapCore(opts){
   if (typeof sourceURL !== 'string' || !sourceURL) throw new Error('wrk: mkWorkerBootstrapCore bad sourceURL');
   const SNAP = JSON.stringify(snapshot);
   const PATCH_URL = JSON.stringify(patchUrl);
+  const EXPECTED_WORKER_SCOPE_KIND = JSON.stringify(expectedWorkerScopeKind);
   const INLINE_CORE_WINDOW = JSON.stringify(inlineCoreWindow);
   const INLINE_PRNG = JSON.stringify(inlinePrng);
   const INLINE_CANVAS_PATCH = JSON.stringify(inlineCanvasPatch);
@@ -826,8 +829,8 @@ function mkWorkerBootstrapCore(opts){
       var __LAST_SNAP__ = null;
       var __ENV_SNAP_APPLIED__ = null;
       var __ENV_EXPECTED_WORKER_SCOPE_KIND__ =
-        (typeof self.__EXPECTED_WORKER_SCOPE_KIND__ === 'string' && self.__EXPECTED_WORKER_SCOPE_KIND__)
-          ? self.__EXPECTED_WORKER_SCOPE_KIND__
+        (typeof ${EXPECTED_WORKER_SCOPE_KIND} === 'string' && ${EXPECTED_WORKER_SCOPE_KIND})
+          ? ${EXPECTED_WORKER_SCOPE_KIND}
           : null;
       var __isServiceWorkerScope__ = function(){
         try {
@@ -1004,14 +1007,6 @@ function mkWorkerBootstrapCore(opts){
         throw new Error('WorkerBootstrap: scope kind mismatch');
       }
       try {
-        Object.defineProperty(self, '__WORKER_SCOPE_KIND__', {
-          value: __ENV_WORKER_SCOPE_KIND__,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'scope_kind_define' }); }
-      try {
         if (typeof BroadcastChannel === 'function') {
           var __ENV_SYNC_CHANNEL__ = new BroadcastChannel('__ENV_SYNC__');
           __ENV_SYNC_CHANNEL__.addEventListener('message', function(msgEv){
@@ -1103,39 +1098,144 @@ function mkWorkerBootstrapCore(opts){
         configurable: true,
         enumerable: false
       });
-      var __syncWorkerOwnerSnapshotRoute__ = function(s){
-        var __ensureWorkerOwnerHiddenValue = function(obj, key, value){
-          if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
-          var desc = Object.getOwnPropertyDescriptor(obj, key);
-          if (desc && desc.configurable === false) {
-            return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
-          }
-          Object.defineProperty(obj, key, {
-            value: value,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          return value;
-        };
+      var __defineWorkerHiddenValue__ = function(obj, key, value){
+        if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+        var desc = Object.getOwnPropertyDescriptor(obj, key);
+        if (desc && desc.configurable === false) {
+          return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
+        }
+        Object.defineProperty(obj, key, {
+          value: value,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+        return value;
+      };
+      var __materializeWorkerOwnerGraph__ = function(){
         var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
           ? self.CanvasPatchContext
-          : __ensureWorkerOwnerHiddenValue(self, 'CanvasPatchContext', Object.create(null));
+          : __defineWorkerHiddenValue__(self, 'CanvasPatchContext', Object.create(null));
         var stateRoot = (C.state && typeof C.state === 'object')
           ? C.state
-          : __ensureWorkerOwnerHiddenValue(C, 'state', Object.create(null));
+          : __defineWorkerHiddenValue__(C, 'state', Object.create(null));
+        var wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+          ? stateRoot.__WRK__
+          : __defineWorkerHiddenValue__(stateRoot, '__WRK__', Object.create(null));
         var navModuleState = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
           ? stateRoot.__NAV_TOTAL_SET__
-          : __ensureWorkerOwnerHiddenValue(stateRoot, '__NAV_TOTAL_SET__', Object.create(null));
+          : __defineWorkerHiddenValue__(stateRoot, '__NAV_TOTAL_SET__', Object.create(null));
         var dataStoreState = (navModuleState.__DATA_STORE_STATE__ && typeof navModuleState.__DATA_STORE_STATE__ === 'object')
           ? navModuleState.__DATA_STORE_STATE__
-          : __ensureWorkerOwnerHiddenValue(navModuleState, '__DATA_STORE_STATE__', Object.create(null));
+          : __defineWorkerHiddenValue__(navModuleState, '__DATA_STORE_STATE__', Object.create(null));
         var workerEnvSnapshot = (dataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
           ? dataStoreState.__WORKER_ENV_SNAPSHOT__
-          : __ensureWorkerOwnerHiddenValue(dataStoreState, '__WORKER_ENV_SNAPSHOT__', Object.create(null));
+          : __defineWorkerHiddenValue__(dataStoreState, '__WORKER_ENV_SNAPSHOT__', Object.create(null));
+        var envProfileRoot = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+          ? stateRoot.__ENV_PROFILE__
+          : __defineWorkerHiddenValue__(stateRoot, '__ENV_PROFILE__', Object.create(null));
+        var fontsRoot = (stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
+          ? stateRoot.__FONTS__
+          : __defineWorkerHiddenValue__(stateRoot, '__FONTS__', Object.create(null));
+        var fontsState = (fontsRoot.__STATE__ && typeof fontsRoot.__STATE__ === 'object')
+          ? fontsRoot.__STATE__
+          : __defineWorkerHiddenValue__(fontsRoot, '__STATE__', {
+              ready: false,
+              error: null,
+              awaitReady: null,
+              awaitReadyStatus: null,
+              awaitReadyResolve: null,
+              awaitReadyReject: null,
+              familySnapshot: {
+                allowedFamilies: null,
+                runtimeFamilies: [],
+                platformDom: null,
+                versionToken: null
+              }
+            });
+        var fontsConfig = (fontsRoot.__CONFIG__ && typeof fontsRoot.__CONFIG__ === 'object')
+          ? fontsRoot.__CONFIG__
+          : __defineWorkerHiddenValue__(fontsRoot, '__CONFIG__', { configs: [] });
+        var canvasRoot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
+          ? stateRoot.__CANVAS__
+          : __defineWorkerHiddenValue__(stateRoot, '__CANVAS__', Object.create(null));
+        var canvasState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+          ? canvasRoot.__STATE__
+          : __defineWorkerHiddenValue__(canvasRoot, '__STATE__', {
+              domReady: false,
+              offscreenReady: false,
+              domCanvas: null,
+              domCanvasHost: null,
+              offscreenCanvas: null,
+              defaultCtx2dFont: ''
+            });
+        var Core = (self.Core && (typeof self.Core === 'object' || typeof self.Core === 'function'))
+          ? self.Core
+          : __defineWorkerHiddenValue__(self, 'Core', Object.create(null));
+        var coreInternal = (Core.__internal && typeof Core.__internal === 'object')
+          ? Core.__internal
+          : __defineWorkerHiddenValue__(Core, '__internal', Object.create(null));
+        var prngRoot = (coreInternal.prng && typeof coreInternal.prng === 'object')
+          ? coreInternal.prng
+          : __defineWorkerHiddenValue__(coreInternal, 'prng', Object.create(null));
+        var wrkRuntime = (wrkState.runtime && typeof wrkState.runtime === 'object')
+          ? wrkState.runtime
+          : __defineWorkerHiddenValue__(wrkState, 'runtime', Object.create(null));
         if (!workerEnvSnapshot || typeof workerEnvSnapshot !== 'object') {
           throw new Error('UACHPatch: __WORKER_ENV_SNAPSHOT__ owner route missing');
         }
+        if (!envProfileRoot || typeof envProfileRoot !== 'object') {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__ENV_PROFILE__ missing');
+        }
+        if (!fontsRoot || typeof fontsRoot !== 'object') {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__ missing');
+        }
+        if (!fontsState || typeof fontsState !== 'object') {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__.__STATE__ missing');
+        }
+        if (!fontsConfig || typeof fontsConfig !== 'object') {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__.__CONFIG__ missing');
+        }
+        if (!canvasRoot || typeof canvasRoot !== 'object') {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__ missing');
+        }
+        if (!canvasState || typeof canvasState !== 'object') {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__.__STATE__ missing');
+        }
+        if (!Core || (typeof Core !== 'object' && typeof Core !== 'function')) {
+          throw new Error('UACHPatch: Core missing');
+        }
+        if (!coreInternal || typeof coreInternal !== 'object') {
+          throw new Error('UACHPatch: Core.__internal missing');
+        }
+        if (!prngRoot || typeof prngRoot !== 'object') {
+          throw new Error('UACHPatch: Core.__internal.prng missing');
+        }
+        if (!wrkRuntime || typeof wrkRuntime !== 'object') {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__WRK__.runtime missing');
+        }
+        return {
+          C: C,
+          stateRoot: stateRoot,
+          wrkState: wrkState,
+          navModuleState: navModuleState,
+          dataStoreState: dataStoreState,
+          workerEnvSnapshot: workerEnvSnapshot,
+          envProfileRoot: envProfileRoot,
+          fontsRoot: fontsRoot,
+          fontsState: fontsState,
+          fontsConfig: fontsConfig,
+          canvasRoot: canvasRoot,
+          canvasState: canvasState,
+          Core: Core,
+          coreInternal: coreInternal,
+          prngRoot: prngRoot,
+          wrkRuntime: wrkRuntime
+        };
+      };
+      var __syncWorkerOwnerSnapshotRoute__ = function(s){
+        var materialized = __materializeWorkerOwnerGraph__();
+        var workerEnvSnapshot = materialized.workerEnvSnapshot;
         var prevKeys = Object.keys(workerEnvSnapshot);
         for (var i = 0; i < prevKeys.length; i++) {
           delete workerEnvSnapshot[prevKeys[i]];
@@ -1293,45 +1393,14 @@ function mkWorkerBootstrapCore(opts){
       __installEarlyWorkerWebGLMirror__();
       ${ENV_WRK_SRC}
       (function __installWorkerCanvasSources__(){
-        var __ensureHiddenValue = function(obj, key, value){
-          if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
-          var desc = Object.getOwnPropertyDescriptor(obj, key);
-          if (desc && desc.configurable === false) {
-            return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
-          }
-          Object.defineProperty(obj, key, {
-            value: value,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          return value;
-        };
-        var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-          ? self.CanvasPatchContext
-          : __ensureHiddenValue(self, 'CanvasPatchContext', Object.create(null));
-        var stateRoot = (C.state && typeof C.state === 'object')
-          ? C.state
-          : __ensureHiddenValue(C, 'state', Object.create(null));
-        var wrkState = (stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
-          ? stateRoot.__WRK__
-          : __ensureHiddenValue(stateRoot, '__WRK__', Object.create(null));
-        var navModuleState = (stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
-          ? stateRoot.__NAV_TOTAL_SET__
-          : __ensureHiddenValue(stateRoot, '__NAV_TOTAL_SET__', Object.create(null));
-        var dataStoreState = (navModuleState.__DATA_STORE_STATE__ && typeof navModuleState.__DATA_STORE_STATE__ === 'object')
-          ? navModuleState.__DATA_STORE_STATE__
-          : __ensureHiddenValue(navModuleState, '__DATA_STORE_STATE__', Object.create(null));
-        __ensureHiddenValue(dataStoreState, '__WORKER_ENV_SNAPSHOT__', Object.create(null));
-        var wrkRuntime = (wrkState.runtime && typeof wrkState.runtime === 'object')
-          ? wrkState.runtime
-          : __ensureHiddenValue(wrkState, 'runtime', Object.create(null));
-        __ensureHiddenValue(wrkRuntime, 'workerScopeKind', __ENV_WORKER_SCOPE_KIND__);
-        __ensureHiddenValue(wrkRuntime, 'expectedWorkerScopeKind', __ENV_EXPECTED_WORKER_SCOPE_KIND__);
-        __ensureHiddenValue(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
-        __ensureHiddenValue(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
-        __ensureHiddenValue(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
-        __ensureHiddenValue(wrkRuntime, 'inlineContextPatch', ${INLINE_CONTEXT_PATCH});
+        var __materialized = __materializeWorkerOwnerGraph__();
+        var wrkRuntime = __materialized.wrkRuntime;
+        __defineWorkerHiddenValue__(wrkRuntime, 'workerScopeKind', __ENV_WORKER_SCOPE_KIND__);
+        __defineWorkerHiddenValue__(wrkRuntime, 'expectedWorkerScopeKind', __ENV_EXPECTED_WORKER_SCOPE_KIND__);
+        __defineWorkerHiddenValue__(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
+        __defineWorkerHiddenValue__(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
+        __defineWorkerHiddenValue__(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
+        __defineWorkerHiddenValue__(wrkRuntime, 'inlineContextPatch', ${INLINE_CONTEXT_PATCH});
       })();
 ${prePatchOwnerSource}
       let __patchOK = false;
@@ -1384,9 +1453,10 @@ ${userLoaderSource}
   `;
 }
 
-function mkModuleWorkerSource(snapshot, absUrl){
+function mkModuleWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkModuleWorkerSource bad snapshot');
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkModuleWorkerSource bad absUrl');
+  if (expectedWorkerScopeKind !== 'dedicated' && expectedWorkerScopeKind !== 'shared') throw new Error('wrk: mkModuleWorkerSource bad expectedWorkerScopeKind');
   const runtime = __requireWorkerPatchRuntime__('workerPatchModule runtime not ready', 'preflight');
   const patchUrl = runtime && runtime.workerPatchModule;
   const inlineCoreWindow = runtime && runtime.inlineCoreWindow;
@@ -1403,6 +1473,7 @@ function mkModuleWorkerSource(snapshot, absUrl){
     snapshot: snapshot,
     absUrl: absUrl,
     patchUrl: patchUrl,
+    expectedWorkerScopeKind: expectedWorkerScopeKind,
     inlineCoreWindow: inlineCoreWindow,
     inlinePrng: inlinePrng,
     inlineCanvasPatch: inlineCanvasPatch,
@@ -1438,9 +1509,10 @@ function mkModuleWorkerSource(snapshot, absUrl){
   });
 }
 
-function mkClassicWorkerSource(snapshot, absUrl){
+function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
   if (!snapshot || typeof snapshot !== 'object') throw new Error('wrk: mkClassicWorkerSource bad snapshot');
   if (typeof absUrl !== 'string' || !absUrl) throw new Error('wrk: mkClassicWorkerSource bad absUrl');
+  if (expectedWorkerScopeKind !== 'dedicated' && expectedWorkerScopeKind !== 'shared') throw new Error('wrk: mkClassicWorkerSource bad expectedWorkerScopeKind');
   const runtime = __requireWorkerPatchRuntime__('workerPatchClassic runtime not ready', 'preflight');
   const patchUrl = runtime && runtime.workerPatchClassic;
   const inlineCoreWindow = runtime && runtime.inlineCoreWindow;
@@ -1457,6 +1529,7 @@ function mkClassicWorkerSource(snapshot, absUrl){
     snapshot: snapshot,
     absUrl: absUrl,
     patchUrl: patchUrl,
+    expectedWorkerScopeKind: expectedWorkerScopeKind,
     inlineCoreWindow: inlineCoreWindow,
     inlinePrng: inlinePrng,
     inlineCanvasPatch: inlineCanvasPatch,
@@ -1778,10 +1851,9 @@ function SafeWorkerOverride(G){
   const userURL = (typeof abs === 'string' && abs.slice(0, 5) === 'blob:' && workerType === 'module')
     ? abs
     : resolveUserScriptURL(G, abs, 'Worker');
-  const scopePrelude = `(function(){try{Object.defineProperty(self,'__EXPECTED_WORKER_SCOPE_KIND__',{value:'dedicated',writable:true,configurable:true,enumerable:false});}catch(_e){try{self.__EXPECTED_WORKER_SCOPE_KIND__='dedicated';}catch(__e){}}})();\n`;
-  const src = scopePrelude + (workerType === 'module'
-    ? workerPatchApi.mkModuleWorkerSource(snap, userURL)
-    : workerPatchApi.mkClassicWorkerSource(snap, userURL));
+  const src = ((workerType === 'module'
+    ? workerPatchApi.mkModuleWorkerSource(snap, userURL, 'dedicated')
+    : workerPatchApi.mkClassicWorkerSource(snap, userURL, 'dedicated')));
 
   const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
   const w = new NativeWorker(blobURL, { ...(opts), type: workerType });
@@ -2007,10 +2079,9 @@ function SafeSharedWorkerOverride(G){
   const userURL = (typeof abs === 'string' && abs.slice(0, 5) === 'blob:' && workerType === 'module')
     ? abs
     : resolveUserScriptURL(G, abs, 'SharedWorker');
-    const scopePrelude = `(function(){try{Object.defineProperty(self,'__EXPECTED_WORKER_SCOPE_KIND__',{value:'shared',writable:true,configurable:true,enumerable:false});}catch(_e){try{self.__EXPECTED_WORKER_SCOPE_KIND__='shared';}catch(__e){}}})();\n`;
-    const src = scopePrelude + ((workerType === 'module')
-      ? workerPatchApi.mkModuleWorkerSource(snap, userURL)
-      : workerPatchApi.mkClassicWorkerSource(snap, userURL));
+    const src = (((workerType === 'module')
+      ? workerPatchApi.mkModuleWorkerSource(snap, userURL, 'shared')
+      : workerPatchApi.mkClassicWorkerSource(snap, userURL, 'shared')));
 
     const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
 

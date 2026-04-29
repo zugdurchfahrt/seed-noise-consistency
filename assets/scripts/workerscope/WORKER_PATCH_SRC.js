@@ -26,9 +26,6 @@
     if (!self.__GW_BOOTSTRAP__) {
       throw new Error('UACHPatch: bootstrap marker missing');
     }
-    if (!self.__lastSnap__ || typeof self.__lastSnap__ !== 'object') {
-      throw new Error('UACHPatch: no snapshot');
-    }
     const nav = self.navigator;
     const proto = (typeof WorkerNavigator!=='undefined' && WorkerNavigator.prototype) || Object.getPrototypeOf(nav);
     if (!proto && !nav) {
@@ -81,6 +78,27 @@
         ? wrkState.runtime
         : null;
       return wrkRuntime;
+    };
+    const __resolveWorkerStateRoot__ = () => {
+      const C = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+        ? self.CanvasPatchContext
+        : null;
+      return (C && C.state && typeof C.state === 'object')
+        ? C.state
+        : null;
+    };
+    const __resolveWorkerSnapshotOwner__ = () => {
+      const stateRoot = __resolveWorkerStateRoot__();
+      const navModuleState = (stateRoot && stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
+        ? stateRoot.__NAV_TOTAL_SET__
+        : null;
+      const dataStoreState = (navModuleState && navModuleState.__DATA_STORE_STATE__ && typeof navModuleState.__DATA_STORE_STATE__ === 'object')
+        ? navModuleState.__DATA_STORE_STATE__
+        : null;
+      const workerEnvSnapshot = (dataStoreState && dataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
+        ? dataStoreState.__WORKER_ENV_SNAPSHOT__
+        : null;
+      return workerEnvSnapshot;
     };
     const __isWorkerScopeKind__ = (kind) => kind === 'dedicated' || kind === 'shared';
     const __isServiceWorkerScope__ = () => {
@@ -267,7 +285,11 @@
       if (!envPlatform) throw new Error('UACHPatch: missing envProfile.__PLATFORM__');
       return envPlatform;
     };
-    cache.snap = requireSnap(self.__lastSnap__, 'init');
+    const bootstrapSnapshotOwner = __resolveWorkerSnapshotOwner__();
+    if (!bootstrapSnapshotOwner) {
+      throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+    }
+    cache.snap = requireSnap(bootstrapSnapshotOwner, 'init');
 
     // Seed must be provided inside the worker realm (e.g. via CDP prelude).
     const seedInit = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
@@ -1691,18 +1713,9 @@
       }
       const snap = requireSnap(cache.snap, 'env_profile_sync');
       const envProfileSnap = snap.envProfile;
-      let envProfileRoot = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+      const envProfileRoot = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
         ? stateRoot.__ENV_PROFILE__
         : null;
-      if (!envProfileRoot) {
-        trackedDefineProperty(stateRoot, '__ENV_PROFILE__', {
-          value: Object.create(null),
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        envProfileRoot = stateRoot.__ENV_PROFILE__;
-      }
       if (!(envProfileRoot && typeof envProfileRoot === 'object')) {
         throw new Error('UACHPatch: CanvasPatchContext.state.__ENV_PROFILE__ missing');
       }
@@ -1745,32 +1758,20 @@
         ? cache.snap.fontsConfig
         : null;
       if (!snap && !cfgSnap) return false;
-      const ensureStateSlot = key => {
-        const existing = (stateRoot[key] && typeof stateRoot[key] === 'object')
-          ? stateRoot[key]
-          : null;
-        if (existing) return existing;
-        trackedDefineProperty(stateRoot, key, {
-          value: Object.create(null),
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        return stateRoot[key];
-      };
+      const fontsRoot = (stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
+        ? stateRoot.__FONTS__
+        : null;
+      if (!(fontsRoot && typeof fontsRoot === 'object')) {
+        throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__ missing');
+      }
       const ensureFontsSubSlot = key => {
-        const fontsRoot = ensureStateSlot('__FONTS__');
         const existing = (fontsRoot[key] && typeof fontsRoot[key] === 'object')
           ? fontsRoot[key]
           : null;
-        if (existing) return existing;
-        trackedDefineProperty(fontsRoot, key, {
-          value: Object.create(null),
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        return fontsRoot[key];
+        if (!existing) {
+          throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__.' + key + ' missing');
+        }
+        return existing;
       };
       if (snap) {
         const fontsState = ensureFontsSubSlot('__STATE__');
@@ -1889,72 +1890,10 @@
       const runtimeRoot = sources.runtimeRoot;
       const C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
         ? self.CanvasPatchContext
-        : (trackedDefineProperty(self, 'CanvasPatchContext', {
-            value: Object.create(null),
-            writable: true,
-            configurable: true,
-            enumerable: false
-          }), self.CanvasPatchContext);
-      const stateRoot = (C.state && typeof C.state === 'object')
+        : null;
+      const stateRoot = (C && C.state && typeof C.state === 'object')
         ? C.state
-        : (trackedDefineProperty(C, 'state', {
-            value: Object.create(null),
-            writable: true,
-            configurable: true,
-            enumerable: false
-          }), C.state);
-
-      let Core = (self.Core && typeof self.Core === 'object')
-        ? self.Core
         : null;
-      if (!Core) {
-        trackedDefineProperty(self, 'Core', {
-          value: Object.create(null),
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        Core = self.Core;
-      }
-      let coreInternal = (Core.__internal && typeof Core.__internal === 'object')
-        ? Core.__internal
-        : null;
-      if (!coreInternal) {
-        trackedDefineProperty(Core, '__internal', {
-          value: Object.create(null),
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        coreInternal = Core.__internal;
-      }
-      let prngRoot = (coreInternal.prng && typeof coreInternal.prng === 'object')
-        ? coreInternal.prng
-        : null;
-      if (!prngRoot) {
-        trackedDefineProperty(coreInternal, 'prng', {
-          value: Object.create(null),
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-        prngRoot = coreInternal.prng;
-      }
-      if (typeof prngRoot.seed !== 'string') prngRoot.seed = '';
-      if (typeof prngRoot.strToSeed !== 'function') prngRoot.strToSeed = null;
-      if (typeof prngRoot.mulberry32 !== 'function') prngRoot.mulberry32 = null;
-      if (!prngRoot.rand || typeof prngRoot.rand !== 'object') prngRoot.rand = null;
-      if (!prngRoot.pools || typeof prngRoot.pools !== 'object') prngRoot.pools = Object.create(null);
-      if (typeof prngRoot.marker !== 'string' || !prngRoot.marker) prngRoot.marker = 'envrand';
-      if (typeof prngRoot.version !== 'string' || !prngRoot.version) prngRoot.version = '1.1.1';
-      if (runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__ && coreInternal.coreToStringState !== runtimeRoot.__CORE_TOSTRING_STATE__) {
-        trackedDefineProperty(coreInternal, 'coreToStringState', {
-          value: runtimeRoot.__CORE_TOSTRING_STATE__,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        });
-      }
 
       const seed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '';
       if (!seed) {
@@ -1963,47 +1902,6 @@
       if (!(stateRoot && typeof stateRoot === 'object')) {
         throw new Error('UACHPatch: CanvasPatchContext.state missing');
       }
-      const ensureWorkerCanvasStateSlot = () => {
-        let canvasRoot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
-          ? stateRoot.__CANVAS__
-          : null;
-        if (!canvasRoot) {
-          trackedDefineProperty(stateRoot, '__CANVAS__', {
-            value: Object.create(null),
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          canvasRoot = stateRoot.__CANVAS__;
-        }
-        if (!(canvasRoot && typeof canvasRoot === 'object')) {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__ missing');
-        }
-        let canvasState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
-          ? canvasRoot.__STATE__
-          : null;
-        if (!canvasState) {
-          trackedDefineProperty(canvasRoot, '__STATE__', {
-            value: {
-              domReady: false,
-              offscreenReady: false,
-              domCanvas: null,
-              domCanvasHost: null,
-              offscreenCanvas: null,
-              defaultCtx2dFont: ''
-            },
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
-          canvasState = canvasRoot.__STATE__;
-        }
-        if (!(canvasState && typeof canvasState === 'object')) {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__.__STATE__ missing');
-        }
-        return canvasState;
-      };
-      const canvasState = ensureWorkerCanvasStateSlot();
       syncWorkerEnvProfileState(stateRoot);
       restoreWorkerFontsState(stateRoot);
 
@@ -2011,6 +1909,45 @@
       executeWorkerInlineModule(sources.inlinePrng, 'RNGsetModule', 'inlinePrng');
       executeWorkerInlineModule(sources.inlineCanvasPatch, 'CanvasPatchModule', 'inlineCanvasPatch');
       executeWorkerInlineModule(sources.inlineContextPatch, 'ContextPatchModule', 'inlineContextPatch');
+
+      const Core = (self.Core && typeof self.Core === 'object')
+        ? self.Core
+        : null;
+      if (!Core) {
+        throw new Error('UACHPatch: worker Core missing after inline install');
+      }
+      const coreInternal = (Core.__internal && typeof Core.__internal === 'object')
+        ? Core.__internal
+        : null;
+      if (!coreInternal) {
+        throw new Error('UACHPatch: worker Core.__internal missing after inline install');
+      }
+      const prngRoot = (coreInternal.prng && typeof coreInternal.prng === 'object')
+        ? coreInternal.prng
+        : null;
+      if (!prngRoot) {
+        throw new Error('UACHPatch: worker Core.__internal.prng missing after inline install');
+      }
+      if (runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__ && coreInternal.coreToStringState !== runtimeRoot.__CORE_TOSTRING_STATE__) {
+        trackedDefineProperty(coreInternal, 'coreToStringState', {
+          value: runtimeRoot.__CORE_TOSTRING_STATE__,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        });
+      }
+      const canvasRoot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
+        ? stateRoot.__CANVAS__
+        : null;
+      if (!(canvasRoot && typeof canvasRoot === 'object')) {
+        throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__ missing');
+      }
+      const canvasState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+        ? canvasRoot.__STATE__
+        : null;
+      if (!(canvasState && typeof canvasState === 'object')) {
+        throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__.__STATE__ missing');
+      }
 
       const hooks = (self.CanvasPatchHooks && typeof self.CanvasPatchHooks === 'object')
         ? self.CanvasPatchHooks
@@ -2134,7 +2071,11 @@
       }
     };
     self.__applyEnvSnapshot__ = applyWorkerSnapshot;
-    cache.snap = requireSnap(self.__lastSnap__, 'bootstrap');
+    const bootstrapSnap = __resolveWorkerSnapshotOwner__();
+    if (!bootstrapSnap) {
+      throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+    }
+    cache.snap = requireSnap(bootstrapSnap, 'bootstrap');
     if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
       const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
       emitDegrade('error', 'worker_patch_src:seed:contract:missing_bootstrap', {
