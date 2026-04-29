@@ -901,6 +901,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
         return true;
       }
+      let workerEnvSnapshot = null;
+      let workerEnvSnapshotKeys = null;
+      const workerEnvSnapshotPrev = Object.create(null);
       try {
         const workerMeta = (meta && typeof meta === 'object') ? meta : null;
         assert(workerMeta, 'worker_env_snapshot.meta missing');
@@ -925,13 +928,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             }
           }
         });
-        const workerEnvSnapshot = (__navDataStoreState && __navDataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof __navDataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
+        workerEnvSnapshot = (__navDataStoreState && __navDataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof __navDataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
           ? __navDataStoreState.__WORKER_ENV_SNAPSHOT__
           : null;
         assert(workerEnvSnapshot && typeof workerEnvSnapshot === 'object', 'worker_env_snapshot missing');
-        const workerEnvSnapshotKeys = Object.keys(workerEnvSnapshotCandidate);
+        workerEnvSnapshotKeys = Object.keys(workerEnvSnapshotCandidate);
         for (let i = 0; i < workerEnvSnapshotKeys.length; i++) {
           const key = workerEnvSnapshotKeys[i];
+          workerEnvSnapshotPrev[key] = Object.getOwnPropertyDescriptor(workerEnvSnapshot, key) || null;
           __navSetSnapshotField(workerEnvSnapshot, key, workerEnvSnapshotCandidate[key]);
         }
         assert(typeof workerEnvSnapshot.ua === 'string' && workerEnvSnapshot.ua, 'worker_env_snapshot.ua missing');
@@ -952,17 +956,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         assert(isStringArray(workerEnvSnapshot.uaData.he.formFactors, false), 'worker_env_snapshot.uaData.he.formFactors missing');
       } catch (e) {
         try {
-          const own = Object.getOwnPropertyDescriptor(__navDataStoreState, '__WORKER_ENV_SNAPSHOT__');
-          if (own && own.configurable) delete __navDataStoreState.__WORKER_ENV_SNAPSHOT__;
-          else if (own) {
-            __navDiag('error', 'nav_total_set:worker_env_snapshot_cleanup_failed', {
-              stage: 'rollback',
-              type: __navTypePipeline,
-              diagTag: 'nav_total_set',
-              key: '__WORKER_ENV_SNAPSHOT__',
-              message: 'worker env snapshot cleanup failed',
-              data: { outcome: 'throw', reason: 'worker_env_snapshot_cleanup_non_configurable' }
-            });
+          if (workerEnvSnapshot && workerEnvSnapshotKeys) {
+            for (let i = 0; i < workerEnvSnapshotKeys.length; i++) {
+              const key = workerEnvSnapshotKeys[i];
+              const prev = workerEnvSnapshotPrev[key] || null;
+              if (prev) Object.defineProperty(workerEnvSnapshot, key, prev);
+              else delete workerEnvSnapshot[key];
+            }
           }
         } catch (cleanupErr) {
           __navDiag('error', 'nav_total_set:worker_env_snapshot_cleanup_failed', {

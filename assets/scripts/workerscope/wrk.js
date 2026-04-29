@@ -623,19 +623,19 @@ function EnvBus(G){
     ? __geoStateRoot.timezone
     : null;
   function envSnapshot(){
-    const workerEnvSnapshot = __requireWorkerEnvSnapshot();
+    const snap = __requireWorkerEnvSnapshot();
     const stateRoot = __resolveCanvasPatchStateRoot();
-    const langs = workerEnvSnapshot.languages.slice();
-    const lang = workerEnvSnapshot.language;
-    const ua = workerEnvSnapshot.ua;
-    const cpu = Number(workerEnvSnapshot.hardwareConcurrency);
-    const mem = Number(workerEnvSnapshot.deviceMemory);
+    const cpu = Number(snap.hardwareConcurrency);
+    const mem = Number(snap.deviceMemory);
     const timeZone = __envTimeZone;
     if (!timeZone) throw new Error('EnvBus: state.__GEO_STATE__.timezone missing');
-    const workerWebgl = workerEnvSnapshot.webgl;
-
-    const uaData = __cloneEnvValue(workerEnvSnapshot.uaData);
-    const he = __cloneEnvValue(workerEnvSnapshot.uaData.he);
+    const uaData = (snap.uaData && typeof snap.uaData === 'object')
+      ? __cloneEnvValue(snap.uaData)
+      : null;
+    if (!uaData) {
+      throw new Error('EnvBus: worker env snapshot uaData missing');
+    }
+    const he = __cloneEnvValue(uaData.he);
     uaData.he = he;
     const envProfileSource = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
       ? stateRoot.__ENV_PROFILE__
@@ -684,6 +684,18 @@ function EnvBus(G){
       throw new Error('EnvBus: __ENV_PROFILE__.dpr missing');
     }
     const dpr = Number(envProfile.dpr);
+    snap.uaData = uaData;
+    snap.highEntropy = he;
+    snap.webgl = __cloneEnvValue(snap.webgl);
+    snap.hardwareConcurrency = cpu;
+    snap.deviceMemory = mem;
+    snap.cpu = cpu;
+    snap.mem = mem;
+    snap.dpr = dpr;
+    snap.timeZone = timeZone;
+    snap.fontsState = __cloneFontsStateForWorker__();
+    snap.fontsConfig = __cloneFontsConfigForWorker__();
+    snap.envProfile = envProfile;
     const windowKeys = (() => {
       try {
         const keys = Object.getOwnPropertyNames(G);
@@ -695,19 +707,8 @@ function EnvBus(G){
         throw new Error('EnvBus: windowKeys missing');
       }
     })();
-    // Snapshot contract: uaData + highEntropy (no CH transport).
-    return {
-      ua, language: lang, languages: langs, dpr, cpu, mem, timeZone,
-      uaData,
-      highEntropy: he,
-      fontsState: __cloneFontsStateForWorker__(),
-      fontsConfig: __cloneFontsConfigForWorker__(),
-      envProfile,
-      webgl: __cloneEnvValue(workerWebgl),
-      hardwareConcurrency: cpu,
-      deviceMemory: mem,
-      windowKeys
-    };
+    snap.windowKeys = windowKeys;
+    return snap;
   }
 
   function syncShared(port){ const snap = envSnapshot(); port.start(); port.postMessage({ __ENV_SYNC__: { envSnapshot: snap } }); }
