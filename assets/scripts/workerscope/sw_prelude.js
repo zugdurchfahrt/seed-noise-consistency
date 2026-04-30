@@ -444,6 +444,7 @@
           bitness: profileHighEntropy.bitness,
           model: profileHighEntropy.model,
           platformVersion: profileHighEntropy.platformVersion,
+          uaFullVersion: profileHighEntropy.uaFullVersion,
           fullVersionList: profileHighEntropy.fullVersionList,
           wow64: profileHighEntropy.wow64,
           formFactors: profileHighEntropy.formFactors,
@@ -1543,17 +1544,17 @@
           return Reflect.apply(target, thisArg, [keys]);
         }
       }
+      const nativeOut = Reflect.apply(target, thisArg, [keys]);
+      if (!nativeOut || typeof nativeOut.then !== 'function') {
+        return nativeOut;
+      }
       const map = {
         architecture: profileHighEntropy.architecture,
         bitness: profileHighEntropy.bitness,
         model: profileHighEntropy.model,
-        brands: brandsValue,
-        mobile: mobileValue,
-        platform: platformValue,
         platformVersion: platformVersionValue,
+        uaFullVersion: profileHighEntropy.uaFullVersion,
         fullVersionList: fullVersionListValue,
-        deviceMemory: swDeviceMemoryValue,
-        hardwareConcurrency: Number(swHardwareConcurrencyValue),
         wow64: profileHighEntropy.wow64,
         formFactors: profileHighEntropy.formFactors
       };
@@ -1575,7 +1576,17 @@
         }
         result[hint] = val;
       }
-      return Promise.resolve(result);
+      return nativeOut.then(function serviceWorkerGetHighEntropyValuesPost(nativeResolved) {
+        const base = (nativeResolved && typeof nativeResolved === 'object') ? nativeResolved : null;
+        if (!base) {
+          return Object.keys(result).length ? Object.assign({}, result) : nativeResolved;
+        }
+        const merged = Object.assign({}, base);
+        for (const hint of Object.keys(result)) {
+          merged[hint] = result[hint];
+        }
+        return merged;
+      });
     });
     __trackDefineProperty(uadProto, 'getHighEntropyValues', {
       value: getHighEntropyValues,

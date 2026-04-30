@@ -156,13 +156,13 @@ def outbound_headers_forge(profile, expected_client_hints, user_agent):
         user_agent=user_agent,
         browser_brand=profile.get("browser_brand"),
     )
-    is_safari = "Safari" in user_agent and "Chrome" not in user_agent and "Edg/" not in user_agent
-    is_firefox = "Firefox" in user_agent and "Chrome" not in user_agent and "Edg/" not in user_agent
+    is_safari = "Safari" in user_agent and "Chrome" not in user_agent and "Edg/" not in str(profile["user_agent"])
+    is_firefox = "Firefox" in user_agent and "Chrome" not in user_agent and "Edg/" not in str(profile["user_agent"])
 
     if is_safari or is_firefox:
         return {
             "Sec-CH-UA": "",
-            "Sec-CH-UA-Mobile": "?0",
+            "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
             "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
             "Accept-Language": al,
         }
@@ -174,19 +174,22 @@ def outbound_headers_forge(profile, expected_client_hints, user_agent):
         "Accept-Language": al,
         "User-Agent": str(profile["user_agent"]),
         "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
-        "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
+        "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
         "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
         "Sec-CH-Save-Data": "?0",
         # Optional non-standard compatibility knob:
         # "Sec-CH-Lang": ", ".join(expected_client_hints.get("languages", [expected_client_hints.get("language")])),
+        # Full-Version/Mobile/WoW64/Model/Form-Factors здесь больше не достраиваем: берём уже подготовленные
+        # header-twin значения из build_expected_client_hints(), чтобы пары не разъезжались.
         # Extended client hints
         "Sec-CH-UA-Platform-Version": f'"{expected_client_hints["platformVersion"]}"',
+        "Sec-CH-UA-Full-Version": expected_client_hints.get("sec_ch_ua_full_version", ""),
         "Sec-CH-UA-Full-Version-List": expected_client_hints["sec_ch_ua_full_version_list"],
         "Sec-CH-UA-Arch": expected_client_hints.get("architecture"),
         "Sec-CH-UA-Bitness": expected_client_hints.get("bitness"),
-        "Sec-CH-UA-WoW64": "?0",
-        "Sec-CH-UA-Model": expected_client_hints.get("sec_ch_ua_model"),
-        "Sec-CH-UA-Form-Factors": expected_client_hints.get("sec_ch_ua_form_factors", '["Desktop"]'),
+        "Sec-CH-UA-WoW64": expected_client_hints.get("sec_ch_ua_wow64", ""),
+        "Sec-CH-UA-Model": expected_client_hints.get("sec_ch_ua_model", ""),
+        "Sec-CH-UA-Form-Factors": expected_client_hints.get("sec_ch_ua_form_factors", ""),
         # memory/screen block
         "Sec-CH-Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
         "Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),

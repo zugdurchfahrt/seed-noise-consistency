@@ -265,6 +265,11 @@ const LOGGingModule = function LOGGingModule() {
       return slot.nonTerminalCodes.filter((v) => typeof v === "string" && v);
     }
 
+    function moduleIssueCodes(slot) {
+      if (!slot || typeof slot !== "object" || !Array.isArray(slot.issueCodes)) return [];
+      return slot.issueCodes.filter((v) => typeof v === "string" && v);
+    }
+
     function moduleSummaryKind(slot, code) {
       if (typeof code !== "string" || !code || !slot || typeof slot !== "object") return null;
       const summaryCodes = moduleSummaryCodes(slot);
@@ -285,6 +290,15 @@ const LOGGingModule = function LOGGingModule() {
       const nonTerminalCodes = moduleNonTerminalCodes(slot);
       for (let i = 0; i < nonTerminalCodes.length; i++) {
         if (nonTerminalCodes[i] === code) return true;
+      }
+      return false;
+    }
+
+    function isIssueCode(code, slot) {
+      if (typeof code !== "string" || !code || !slot || typeof slot !== "object") return false;
+      const issueCodes = moduleIssueCodes(slot);
+      for (let i = 0; i < issueCodes.length; i++) {
+        if (issueCodes[i] === code) return true;
       }
       return false;
     }
@@ -322,62 +336,134 @@ const LOGGingModule = function LOGGingModule() {
       return false;
     }
 
-    function modulePickEvent(slot, events) {
-      if (!Array.isArray(events) || !events.length) return null;
+    function moduleAuditEvaluate(slot, events) {
+      if (!slot || typeof slot !== "object") {
+        return { entry: null, status: "warn", reason: "invalid_slot" };
+      }
+      if (slot.emitter === "missing") {
+        return { entry: null, status: "error", reason: "missing_emitter" };
+      }
+      const arr = Array.isArray(events) ? events : [];
+      if (!arr.length) {
+        if (slot.requiresEmission === false) return { entry: null, status: "not_required", reason: "not_required" };
+        if (slot.source === "disabled") return { entry: null, status: "disabled", reason: "disabled" };
+        return { entry: null, status: "warn", reason: "not_emitted" };
+      }
+      const proof = moduleAuditProof(slot);
+      const requiresResultProof = !!(proof && proof.requiresResultProof === true);
+      let latestIssue = null;
+      let latestExactIssue = null;
       let latestSummary = null;
-      for (let i = events.length - 1; i >= 0; i--) {
-        const entry = events[i];
+      let latestExactSummary = null;
+      let latestNonTerminal = null;
+      let latestExactNonTerminal = null;
+      let latestOther = null;
+      let latestApplied = null;
+      const scopeSeen = requiresResultProof ? Object.create(null) : null;
+
+      for (let i = 0; i < arr.length; i++) {
+        const entry = arr[i];
+        if (!entry || typeof entry !== "object") continue;
+        latestOther = entry;
         const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
         const diagTag = (extra && typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
         const moduleName = (extra && typeof extra.module === "string" && extra.module) ? extra.module : null;
         const exact = ((diagTag && diagTag === slot.diagTag) || (moduleName && moduleName === slot.module));
-        if (!latestSummary && isSummaryCode(entry.code, slot)) {
+        const code = (typeof entry.code === "string" && entry.code) ? entry.code : "";
+        if (isIssueCode(code, slot)) {
+          latestIssue = entry;
+          if (exact) latestExactIssue = entry;
+        } else if (isSummaryCode(code, slot)) {
           latestSummary = entry;
-          if (exact) return entry;
+          if (exact) latestExactSummary = entry;
+        } else if (isNonTerminalCode(code, slot)) {
+          latestNonTerminal = entry;
+          if (exact) latestExactNonTerminal = entry;
+        }
+        if (requiresResultProof && slot.module === "WORKER_PATCH_SRC" && code === "worker_patch_src:applied") {
+          const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+          if (extra && extra.key === "installWorkerUACHMirror" && data && data.outcome === "return" && data.reason === "applied") {
+            latestApplied = entry;
+            if (typeof data.scope === "string" && data.scope) {
+              scopeSeen[data.scope] = true;
+            }
+          }
         }
       }
-      return latestSummary || null;
-    }
 
-    function isModuleAuditFinalPhase() {
-      try {
-        const doc = (global.document && typeof global.document === "object") ? global.document : null;
-        if (!doc || typeof doc.readyState !== "string") return true;
-        return doc.readyState === "complete";
-      } catch (_) {
-        return true;
-      }
-    }
+      const baseEntry = latestExactIssue
+        || latestIssue
+        || latestExactSummary
+        || latestSummary
+        || latestExactNonTerminal
+        || latestNonTerminal
+        || latestOther
+        || null;
 
-    function moduleEntryStatus(slot, entry) {
-      if (slot && slot.emitter === "missing") return "error";
-      if (!entry && slot && slot.requiresEmission === false) return "not_required";
-      if (!entry) return (slot && slot.source === "disabled") ? "disabled" : "error";
-      const code = (entry && typeof entry.code === "string") ? entry.code : "";
-      if (isSummaryCode(code, slot)) return "ok";
-      if (isNonTerminalCode(code, slot)) return "pending";
-      return "pending";
-    }
+      if (requiresResultProof) {
+        if (slot.module === "WORKER_PATCH_SRC") {
+          const hasWorker = scopeSeen.Worker === true;
+          const hasSharedWorker = scopeSeen.SharedWorker === true;
+          const matchCount = Object.keys(scopeSeen).length;
+          if (hasWorker && hasSharedWorker) {
+            return {
+              entry: latestApplied || baseEntry,
+              status: "ok",
+              reason: "result_proof_scope_pair_complete"
+            };
+          }
+          if (matchCount > 0) {
+            return {
+              entry: latestApplied || baseEntry,
+              status: "pending",
+              reason: "result_proof_scope_pair_partial"
+            };
+          }
+          return {
+            entry: baseEntry,
+            status: "pending",
+            reason: "result_proof_scope_pair_pending"
+          };
+        }
+        return {
+          entry: baseEntry,
+          status: "pending",
+          reason: "result_proof_pending"
+        };
+      }
 
-    function moduleEntryReason(slot, entry, status) {
-      if (slot && slot.emitter === "missing") return "missing_emitter";
-      if (!entry && slot && slot.requiresEmission === false) return "not_required";
-      if (!entry) return (slot && slot.source === "disabled") ? "disabled" : "not_emitted";
-      if (isSummaryCode(entry && entry.code, slot)) {
-        return (typeof slot.summaryKind === "string" && slot.summaryKind) ? slot.summaryKind : "ok";
+      if (latestExactIssue || latestIssue) {
+        return {
+          entry: latestExactIssue || latestIssue,
+          status: "error",
+          reason: "runtime_issue"
+        };
       }
-      if (isNonTerminalCode(entry && entry.code, slot)) {
-        return "non_terminal_expected";
+      if (latestExactSummary || latestSummary) {
+        return {
+          entry: latestExactSummary || latestSummary,
+          status: "ok",
+          reason: (typeof slot.summaryKind === "string" && slot.summaryKind) ? slot.summaryKind : "ok"
+        };
       }
-      return "non_terminal_result";
+      if (latestExactNonTerminal || latestNonTerminal) {
+        return {
+          entry: latestExactNonTerminal || latestNonTerminal,
+          status: "pending",
+          reason: "non_terminal_expected"
+        };
+      }
+      return {
+        entry: baseEntry,
+        status: "pending",
+        reason: "non_terminal_result"
+      };
     }
     __defineLoggerHiddenValue("__MODULE_DIAG_AUDIT__", Object.freeze({
       isSummaryCode,
       summaryKind: moduleSummaryKind,
       matchEntry: moduleEventMatchesSlot,
-      pickEntry: modulePickEvent,
-      entryStatus: moduleEntryStatus,
-      entryReason: moduleEntryReason
+      evaluate: moduleAuditEvaluate
     }), true);
 
     function isModuleAuditSyntheticCode(code) {
@@ -387,15 +473,17 @@ const LOGGingModule = function LOGGingModule() {
         );
     }
 
-    function emitModuleAuditSignal(slot, entry, status) {
+    function emitModuleAuditSignal(slot, entry, status, reasonOverride) {
       try {
         if (!slot || slot.critical !== true) return;
-        if (status !== "error") return;
+        if (status !== "error" && status !== "warn") return;
         const locate = moduleAuditLocate(slot);
         const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
         const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
         const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
-        const auditReason = moduleEntryReason(slot, entry, status);
+        const auditReason = (typeof reasonOverride === "string" && reasonOverride)
+          ? reasonOverride
+          : ((status === "warn") ? "not_emitted" : "runtime_issue");
         const code = "degrade:module_status:" + String(status);
         const observedReason = (data && typeof data.reason === "string" && data.reason) ? data.reason : null;
         const message =
@@ -404,7 +492,7 @@ const LOGGingModule = function LOGGingModule() {
           + ((auditReason && auditReason !== status) ? "; auditReason=" + auditReason : "")
           + (observedReason ? "; observedReason=" + observedReason : "");
         const entryCode = (entry && typeof entry.code === "string") ? entry.code : null;
-        __degradeApi.diag("error", code, {
+        __degradeApi.diag((status === "warn") ? "warn" : "error", code, {
           module: (slot && typeof slot.module === "string" && slot.module) ? slot.module : "set_log",
           diagTag: "degrade:module_check",
           surface: (extra && typeof extra.surface === "string" && extra.surface)
@@ -441,13 +529,13 @@ const LOGGingModule = function LOGGingModule() {
     }
 
     function isModuleAuditIssueStatus(status) {
-      return status === "error";
+      return status === "error" || status === "warn";
     }
 
-    function emitModuleAuditResolution(slot, entry, previousStatus) {
+    function emitModuleAuditResolution(slot, entry, previousStatus, reasonOverride) {
       try {
         if (!slot || slot.critical !== true) return;
-        if (!previousStatus || !isModuleAuditIssueStatus(previousStatus)) return;
+        if (!previousStatus || previousStatus === "ok") return;
         const locate = moduleAuditLocate(slot);
         const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
         const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
@@ -470,7 +558,7 @@ const LOGGingModule = function LOGGingModule() {
           type: "pipeline telemetry",
           data: {
             outcome: "return",
-            reason: "ok_after_recheck",
+            reason: (typeof reasonOverride === "string" && reasonOverride) ? reasonOverride : "ok_after_recheck",
             status: "ok_after_recheck",
             previousReason: previousStatus,
             module: slot && slot.module ? slot.module : null,
@@ -493,7 +581,6 @@ const LOGGingModule = function LOGGingModule() {
 
     function runModuleAuditProducer() {
       try {
-        const finalPhase = isModuleAuditFinalPhase();
         const buf = _buf();
         const arr = Array.isArray(buf)
           ? buf.filter((entry) => {
@@ -509,26 +596,26 @@ const LOGGingModule = function LOGGingModule() {
             const entry = arr[j];
             if (moduleEventMatchesSlot(slot, entry)) events.push(entry);
           }
-          const moduleEvent = modulePickEvent(slot, events);
-          let status = moduleEntryStatus(slot, moduleEvent);
-          if (!moduleEvent && events.length > 0) {
-            status = "pending";
-          }
+          const evaluation = moduleAuditEvaluate(slot, events);
+          const moduleEvent = (evaluation && typeof evaluation === "object") ? evaluation.entry : null;
+          const status = (evaluation && typeof evaluation.status === "string" && evaluation.status) ? evaluation.status : "pending";
+          const auditReasonOverride = (evaluation && typeof evaluation.reason === "string" && evaluation.reason) ? evaluation.reason : null;
           const previousStatus = Object.prototype.hasOwnProperty.call(__moduleAuditState.lastStatusByModule, slot.module)
             ? __moduleAuditState.lastStatusByModule[slot.module]
             : null;
           __moduleAuditState.lastStatusByModule[slot.module] = status;
           const signalKey = [
             status,
+            auditReasonOverride || "",
             moduleEvent && typeof moduleEvent.code === "string" ? moduleEvent.code : "",
             moduleEvent && typeof moduleEvent.timestamp === "string" ? moduleEvent.timestamp : ""
           ].join("|");
           if (__moduleAuditState.lastSignalByModule[slot.module] === signalKey) continue;
           __moduleAuditState.lastSignalByModule[slot.module] = signalKey;
           if (isModuleAuditIssueStatus(status)) {
-            emitModuleAuditSignal(slot, moduleEvent, status);
+            emitModuleAuditSignal(slot, moduleEvent, status, auditReasonOverride);
           } else if (status === "ok") {
-            emitModuleAuditResolution(slot, moduleEvent, previousStatus);
+            emitModuleAuditResolution(slot, moduleEvent, previousStatus, auditReasonOverride);
           }
         }
       } catch (_) {}
@@ -761,6 +848,7 @@ const LOGGingModule = function LOGGingModule() {
         const reason = (data && typeof data.reason === "string") ? data.reason : "";
         const key = (typeof extra.key === "string" && extra.key) ? extra.key : "";
         return reason === "nav_access"
+          || reason === "nav_total_set:nav_access"
           || reason === "permission_state_updated"
           || key.indexOf("permissions.") === 0
           || reason === "webgl_access"

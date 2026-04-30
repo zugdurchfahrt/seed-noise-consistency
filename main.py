@@ -451,29 +451,10 @@ def init_driver(
         user_agent=user_agent,
         navigator_platform=dom_platform,
     )
-      
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_bootstrap")
     sw_thread.start()
     logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
-
-    # Inject global seed into Dedicated/Shared workers via CDP as CDP_GLOBAL_SEED (pauses workers on start).
-    # if the CDP websocket drops mid-session, paused workers may remain paused.
-    if os.getenv("CDP_WORKER_SEED_INJECT", "1") == "1":
-        cdp.enable_worker_seed_inject(global_seed)
-        worker_seed_thread = threading.Thread(
-            target=cdp.run_worker_seed,
-            daemon=True,
-            name="cdp_worker_seed_injector",
-        )
-        worker_seed_thread.start()
-        logger.info(
-            "Worker seed injector thread started name=%s ident=%s on port %s",
-            worker_seed_thread.name,
-            worker_seed_thread.ident,
-            cdp.PORT,
-        )
-    cdp.log_cdp_runtime_diag("main_after_worker_seed_thread_start")
 
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---

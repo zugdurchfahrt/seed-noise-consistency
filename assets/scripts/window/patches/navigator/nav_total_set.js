@@ -498,7 +498,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const dpr           = Number(__envProfileState.dpr);
     const devicesLabels = __navCloneStateValue(__envProfileState.devicesLabels);
     const colorDepth    = Number(__envProfileState.colorDepth);
-    const fullVersionList = __navCloneStateValue(__envProfileState.fullVersionList);
     const storageQuotaMb = __envProfileState.storageQuotaMb;
     const storageUsedPct = __envProfileState.storageUsedPct;
     const pluginProfiles = __navCloneStateValue(Array.isArray(__envProfileState.pluginProfiles) ? __envProfileState.pluginProfiles : []);
@@ -766,6 +765,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'platform_version_missing');
       return;
     }
+    if (!(meta && typeof meta.uaFullVersion === 'string' && meta.uaFullVersion)) {
+      __navDiag('error', 'nav_total_set:ua_full_version_missing', {
+        stage: 'preflight',
+        type: __navTypePipeline,
+        diagTag: 'nav_total_set',
+        key: 'userAgentData.uaFullVersion',
+        message: 'meta.uaFullVersion missing',
+        data: { outcome: 'skip', reason: 'missing_ua_full_version' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'ua_full_version_missing');
+      return;
+    }
 
     const chPlatform = uaPlatform;
     const navPlatformOut = navPlat;
@@ -794,38 +805,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'oscpu', __navOscpuValue), __navOscpuValue)) throw new TypeError('scalar oscpu hidden slot attach failed');
     if (!Object.is(__navSetHiddenStateValue(__navScalarState, 'devicePixelRatio', dpr), dpr)) throw new TypeError('scalar devicePixelRatio hidden slot attach failed');
     function __navBuildUserAgentDataHighEntropySource() {
-      const safeDeviceMemory = __navIsValidDeviceMemoryValue(__navScalarState.deviceMemory) ? __navScalarState.deviceMemory : undefined;
-      const safeHardwareConcurrency = __navIsValidHardwareConcurrencyValue(__navScalarState.hardwareConcurrency) ? __navScalarState.hardwareConcurrency : undefined;
-      const highEntropyFullVersionList = (meta && meta.fullVersionList != null)
-        ? meta.fullVersionList
-        : fullVersionList;
-      let highEntropyUaFullVersion = (meta && typeof meta.uaFullVersion === 'string')
-        ? meta.uaFullVersion
-        : undefined;
-      if (!highEntropyUaFullVersion && Array.isArray(highEntropyFullVersionList)) {
-        for (let i = 0; i < highEntropyFullVersionList.length; i++) {
-          const item = highEntropyFullVersionList[i];
-          if (!item || typeof item !== 'object') continue;
-          const brand = String(item.brand || '');
-          const version = (typeof item.version === 'string') ? item.version : '';
-          if (version && brand !== 'Not)A;Brand' && brand !== 'Not.A/Brand') {
-            highEntropyUaFullVersion = version;
-            break;
-          }
-        }
-      }
       return {
         architecture: meta.architecture,
         bitness: meta.bitness,
         model: meta.model,
-        brands: meta.brands,
-        mobile: meta.mobile,
-        platform: uaPlatform,
         platformVersion: platformVersion,
-        uaFullVersion: highEntropyUaFullVersion,
-        fullVersionList: highEntropyFullVersionList,
-        deviceMemory: safeDeviceMemory,
-        hardwareConcurrency: safeHardwareConcurrency,
+        uaFullVersion: (meta && typeof meta.uaFullVersion === 'string')
+          ? meta.uaFullVersion
+          : undefined,
+        fullVersionList: (meta && meta.fullVersionList != null)
+          ? meta.fullVersionList
+          : fullVersionList,
         wow64: meta.wow64,
         formFactors: meta.formFactors
       };
@@ -868,6 +858,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PRODUCER__', __navBuildUserAgentDataHighEntropySource) !== __navBuildUserAgentDataHighEntropySource) throw new TypeError('highEntropy producer hidden slot attach failed');
     if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__', __navBuildUserAgentDataHighEntropyPatch) !== __navBuildUserAgentDataHighEntropyPatch) throw new TypeError('highEntropy patch builder hidden slot attach failed');
     if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__', __navPostProcessUserAgentDataHighEntropyResult) !== __navPostProcessUserAgentDataHighEntropyResult) throw new TypeError('highEntropy postprocess hidden slot attach failed');
+
     if (!Number.isFinite(colorDepth) || colorDepth <= 0) {
       __navDiag('warn', 'nav_total_set:color_depth_missing', {
         stage: 'preflight',
@@ -922,6 +913,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               bitness: workerMeta.bitness,
               model: workerMeta.model,
               platformVersion: platformVersion,
+              uaFullVersion: workerMeta.uaFullVersion,
               fullVersionList: __navCloneStateValue(workerMeta.fullVersionList != null ? workerMeta.fullVersionList : fullVersionList),
               wow64: workerMeta.wow64,
               formFactors: __navCloneStateValue(workerMeta.formFactors)
@@ -951,6 +943,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         assert(typeof workerEnvSnapshot.uaData.he.bitness === 'string' && workerEnvSnapshot.uaData.he.bitness, 'worker_env_snapshot.uaData.he.bitness missing');
         assert(typeof workerEnvSnapshot.uaData.he.model === 'string', 'worker_env_snapshot.uaData.he.model missing');
         assert(typeof workerEnvSnapshot.uaData.he.platformVersion === 'string' && workerEnvSnapshot.uaData.he.platformVersion, 'worker_env_snapshot.uaData.he.platformVersion missing');
+        assert(typeof workerEnvSnapshot.uaData.he.uaFullVersion === 'string' && workerEnvSnapshot.uaData.he.uaFullVersion, 'worker_env_snapshot.uaData.he.uaFullVersion missing');
         assert(isBrandList(workerEnvSnapshot.uaData.he.fullVersionList), 'worker_env_snapshot.uaData.he.fullVersionList missing');
         assert(typeof workerEnvSnapshot.uaData.he.wow64 === 'boolean', 'worker_env_snapshot.uaData.he.wow64 missing');
         assert(isStringArray(workerEnvSnapshot.uaData.he.formFactors, false), 'worker_env_snapshot.uaData.he.formFactors missing');
@@ -2036,7 +2029,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             message: 'window navigator.userAgentData proto missing'
           });
         } else {
-          const isUadThis = (self) => (self === nativeUAD);
+          const isUadThis = (self) => {
+            if (!self || (typeof self !== 'object' && typeof self !== 'function')) return false;
+            if (self === nativeUAD) return true;
+            try {
+              return !!uadProto && uadProto.isPrototypeOf(self);
+            } catch (_e) {
+              return false;
+            }
+          };
 
           const dBrands = Object.getOwnPropertyDescriptor(uadProto, 'brands');
           const dMobile = Object.getOwnPropertyDescriptor(uadProto, 'mobile');
@@ -2154,6 +2155,55 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 }], 'throw');
               }
             }
+            const dUaFullProto = Object.getOwnPropertyDescriptor(uadProto, 'uaFullVersion');
+            if (dUaFullProto && typeof dUaFullProto.get === 'function') {
+              __navRegisterKey('userAgentData.uaFullVersion');
+              applyCoreTargetsGroup('nav_total_set:userAgentData.uaFullVersion', [{
+                owner: uadProto,
+                key: 'uaFullVersion',
+                kind: 'accessor',
+                wrapLayer: 'strict_accessor_gateway',
+                resolve: 'proto_chain',
+                policy: 'strict',
+                diagTag: 'nav_total_set:userAgentData.uaFullVersion',
+                configurable: !!dUaFullProto.configurable,
+                enumerable: !!dUaFullProto.enumerable,
+                validThis: uadValidThis,
+                invalidThis: 'native',
+                getImpl: function userAgentDataUaFullVersionGetImpl() {
+                  if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) {
+                    throw new Error('THW: uaData.uaFullVersion missing');
+                  }
+                  __navDiag('info', 'nav_total_set:userAgentData_uaFullVersion_resolved', {
+                    stage: 'runtime',
+                    type: __navTypePipeline,
+                    diagTag: 'nav_total_set:userAgentData.uaFullVersion',
+                    key: 'userAgentData.uaFullVersion',
+                    message: 'uaFullVersion resolved',
+                    data: {
+                      outcome: 'return',
+                      reason: 'high_entropy_resolved',
+                      value: meta.uaFullVersion
+                    }
+                  });
+                  return meta.uaFullVersion;
+                }
+              }], 'throw');
+            } else {
+              __navDiag('info', 'nav_total_set:userAgentData_uaFullVersion_native_shape_kept', {
+                stage: 'preflight',
+                type: __navTypeBrowser,
+                diagTag: 'nav_total_set:userAgentData.uaFullVersion',
+                key: 'userAgentData.uaFullVersion',
+                message: 'uaData.uaFullVersion surface absent in native shape; native shape kept',
+                data: {
+                  outcome: 'skip',
+                  reason: 'native_shape_kept',
+                  policy: 'keep_native_shape',
+                  action: 'keep_native_shape'
+                }
+              });
+            }
             // `fullVersionList` is a high-entropy key returned by
             // `getHighEntropyValues()`, not stable NavigatorUAData properties across Chromium.
             // Do not create synthetic descriptors on `NavigatorUAData` here (avoid shape drift).
@@ -2211,6 +2261,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           message: 'uaData.getHighEntropyValues original missing'
         });
       } else {
+
         __navRegisterKey('userAgentData.getHighEntropyValues');
         dropOwnIfConfigurable(nativeUAD, 'getHighEntropyValues');
         applyCoreTargetsGroup('nav_total_set:userAgentData.getHighEntropyValues', [{
@@ -2308,10 +2359,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               }
               return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
                 try {
-                  return postProcessor(nativeResolved, result);
+                  const merged = postProcessor(nativeResolved, result);
+                  __navDiag('info', 'nav_total_set:userAgentData_getHighEntropyValues_resolved', {
+                    stage: 'runtime',
+                    type: __navTypePipeline,
+                    diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
+                    key: 'userAgentData.getHighEntropyValues',
+                    message: 'highEntropy values resolved',
+                    data: {
+                      outcome: 'return',
+                      reason: 'high_entropy_resolved',
+                      requestedKeys: keys.slice(),
+                      resolvedKeys: Object.keys(result),
+                      uaFullVersion: (typeof result.uaFullVersion === 'string' && result.uaFullVersion) ? result.uaFullVersion : null,
+                      returnedKeys: (merged && typeof merged === 'object') ? Object.keys(merged) : null
+                    }
+                  });
+                  return merged;
                 } catch (e) {
-                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
-                   stage: 'runtime',
+                   __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
+                    stage: 'runtime',
                    type: __navTypePipeline,
                    diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                    key: 'userAgentData.getHighEntropyValues',
@@ -2324,6 +2391,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             }
           }], 'throw');
        }
+
 
       const toJsonResolved = __navResolveDescriptor
         ? __navResolveDescriptor(uadProto, 'toJSON', { mode: 'proto_chain' })

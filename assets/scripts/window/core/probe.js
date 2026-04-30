@@ -4414,9 +4414,8 @@ function printToStringCrossRealmChecks() {
     try {
       if (!__probeModuleAudit) return rows;
       const matchEntry = (typeof __probeModuleAudit.matchEntry === "function") ? __probeModuleAudit.matchEntry : null;
-      const pickEntry = (typeof __probeModuleAudit.pickEntry === "function") ? __probeModuleAudit.pickEntry : null;
-      const entryStatus = (typeof __probeModuleAudit.entryStatus === "function") ? __probeModuleAudit.entryStatus : null;
-      if (!matchEntry || !pickEntry || !entryStatus) return rows;
+      const evaluate = (typeof __probeModuleAudit.evaluate === "function") ? __probeModuleAudit.evaluate : null;
+      if (!matchEntry || !evaluate) return rows;
       const degrade = (__probeLoggerRoot && typeof __probeLoggerRoot.__DEGRADE__ === "function") ? __probeLoggerRoot.__DEGRADE__ : null;
       const buf = (typeof degrade === "function" && typeof degrade.getBuffer === "function") ? degrade.getBuffer() : [];
       const arr = Array.isArray(buf) ? buf : [];
@@ -4430,8 +4429,9 @@ function printToStringCrossRealmChecks() {
           if (matchEntry(slot, entry)) events.push(entry);
         }
 
-        const moduleEvent = pickEntry(slot, events);
-        const moduleStatus = entryStatus(slot, moduleEvent);
+        const moduleEval = evaluate(slot, events);
+        const moduleEvent = (moduleEval && typeof moduleEval === "object") ? moduleEval.entry : null;
+        const moduleStatus = (moduleEval && typeof moduleEval.status === "string" && moduleEval.status) ? moduleEval.status : "pending";
         rows.push(__probeMakeRow(rowIndex++, slot, moduleEvent, "module", slot.module, moduleStatus));
 
         if (slot.functions !== "none") {
@@ -4446,7 +4446,9 @@ function printToStringCrossRealmChecks() {
           for (let j = 0; j < patchUnits.length; j++) {
             const unit = patchUnits[j];
             const entry = latestByUnit[unit];
-            rows.push(__probeMakeRow(rowIndex++, slot, entry, "patch", unit, entryStatus(slot, entry)));
+            const patchEval = evaluate(slot, [entry]);
+            const patchStatus = (patchEval && typeof patchEval.status === "string" && patchEval.status) ? patchEval.status : "pending";
+            rows.push(__probeMakeRow(rowIndex++, slot, entry, "patch", unit, patchStatus));
           }
         }
       }

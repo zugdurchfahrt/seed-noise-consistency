@@ -18,7 +18,6 @@ if (!W || (typeof W !== 'object' && typeof W !== 'function')) {
 const __bootstrapSeedKeys__ = [
   '__GLOBAL_SEED',
   '__EXPECTED_CLIENT_HINTS',
-  '__FULL_VERSION_LIST',
   '__NAV_PLATFORM__',
   '__UA_PLATFORM__',
   '__UA_PLATFORM_VERSION',
@@ -997,6 +996,24 @@ __envProfileState__.webglRenderer = __bootstrapInputs__.__WEBGL_RENDERER__;
 __envProfileState__.webglVendor = __bootstrapInputs__.__WEBGL_VENDOR__;
 __envProfileState__.webglUnmaskedVendor = __bootstrapInputs__.__WEBGL_UNMASKED_VENDOR__;
 __envProfileState__.webglUnmaskedRenderer = __bootstrapInputs__.__WEBGL_UNMASKED_RENDERER__;
+if (!(typeof __envProfileState__.webglVendor === 'string' && __envProfileState__.webglVendor)) {
+  throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.vendor bootstrap failed');
+}
+if (!(typeof __envProfileState__.webglRenderer === 'string' && __envProfileState__.webglRenderer)) {
+  throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.renderer bootstrap failed');
+}
+if (!(typeof __envProfileState__.webglUnmaskedVendor === 'string' && __envProfileState__.webglUnmaskedVendor)) {
+  throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.unmaskedVendor bootstrap failed');
+}
+if (!(typeof __envProfileState__.webglUnmaskedRenderer === 'string' && __envProfileState__.webglUnmaskedRenderer)) {
+  throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.unmaskedRenderer bootstrap failed');
+}
+workerEnvSnapshotState.webgl = {
+  vendor: __envProfileState__.webglVendor,
+  renderer: __envProfileState__.webglRenderer,
+  unmaskedVendor: __envProfileState__.webglUnmaskedVendor,
+  unmaskedRenderer: __envProfileState__.webglUnmaskedRenderer
+};
 __envProfileState__.gpuType = __bootstrapInputs__.__GPU_TYPE__;
 __envProfileState__.gpuArchitecture = __bootstrapInputs__.__GPU_ARCHITECTURE__;
 __envProfileState__.gpuVendor = __bootstrapInputs__.__GPU_VENDOR__;
@@ -1006,7 +1023,6 @@ __envProfileState__.profile = (__envProfileState__.profile && typeof __envProfil
   : Object.create(null);
 __envProfileState__.strict = (__bootstrapInputs__.__NAV_PATCH_STRICT__ !== undefined) ? !!__bootstrapInputs__.__NAV_PATCH_STRICT__ : true;
 __envProfileState__.debug = !!__bootstrapInputs__.__NAV_PATCH_DEBUG__;
-__envProfileState__.fullVersionList = __cloneProfileValue__(__bootstrapInputs__.__FULL_VERSION_LIST);
 __envProfileState__.storageQuotaMb = __bootstrapInputs__.__STORAGE_QUOTA_MB;
 __envProfileState__.storageUsedPct = __bootstrapInputs__.__STORAGE_USED_PCT;
 __envProfileState__.pluginProfiles = __cloneProfileValue__(Array.isArray(__bootstrapInputs__.__PLUGIN_PROFILES__) ? __bootstrapInputs__.__PLUGIN_PROFILES__ : []);

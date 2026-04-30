@@ -196,25 +196,37 @@ def build_expected_client_hints(profile, ua_platform, browser_brand, major_versi
     brands, full_version_list, sec_ch_ua, sec_ch_ua_full_version_list =  build_brands_and_related(
         browser_brand, major_version, browser_version
     )
+    mobile = False
+    wow64 = False
+    sec_ch_ua_mobile = "?1" if mobile else "?0"
+    sec_ch_ua_wow64 = "?1" if wow64 else "?0"
+    model = ""
+    sec_ch_ua_full_version = browser_version
+    form_factors = ["Desktop"]
+    sec_ch_ua_form_factors = "[" + ", ".join(f'"{item}"' for item in form_factors) + "]"
     res = {
         "platform": ua_platform,
         "brands": brands,
-        "mobile": False,
+        "mobile": mobile,
         "architecture": "x86",
         "bitness": "64", 
-        "model": "",
+        "model": model,
         "platformVersion": profile["platform_version"],
+        "uaFullVersion": browser_version,
         "fullVersionList": full_version_list,
         "sec_ch_ua": sec_ch_ua,
+        "sec_ch_ua_mobile": sec_ch_ua_mobile,
+        "sec_ch_ua_full_version": sec_ch_ua_full_version,
         "sec_ch_ua_full_version_list": sec_ch_ua_full_version_list,
-        "sec_ch_ua_model": "",
-        "sec_ch_ua_form_factors": ["Desktop"],
+        "sec_ch_ua_model": model,
+        "sec_ch_ua_form_factors": sec_ch_ua_form_factors,
         "deviceMemory": profile["deviceMemory"],
         "hardwareConcurrency": profile["hardwareConcurrency"],
-        "wow64": False,
+        "wow64": wow64,
+        "sec_ch_ua_wow64": sec_ch_ua_wow64,
         "languages": profile["languages"],
         "language": profile["language"],
-        "formFactors": ["Desktop"],
+        "formFactors": form_factors,
         "accept": generate_accept_header(browser_brand, major_version),
     }
 
@@ -290,7 +302,7 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, na
         driver: The browser driver instance (e.g., Selenium WebDriver) to apply the overrides to.
         profile (dict): A dictionary containing the 'user_agent' string to be set.
         expected_client_hints (dict): A dictionary of client hints to construct the UserAgentMetadata, including keys such as
-            'platform', 'brands', 'mobile', 'architecture', 'bitness', 'model', 'platformVersion',
+            'platform', 'brands', 'mobile', 'architecture', 'bitness', 'model', 'platformVersion', 'uaFullVersion',
             'fullVersionList', 'deviceMemory', 'hardwareConcurrency', 'wow64', and 'formFactors'.
         browser_brand (str): The browser brand name (e.g., "chrome", "edge") to determine if the override should be applied.
         navigator_platform (str): DOM-form platform for the top-level CDP navigator.platform slot.
@@ -309,6 +321,7 @@ def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, na
         "bitness":             expected_client_hints["bitness"],
         "model":               expected_client_hints["model"],
         "platformVersion":     expected_client_hints["platformVersion"],
+        "uaFullVersion":       expected_client_hints["uaFullVersion"],
         "fullVersionList":     expected_client_hints["fullVersionList"],
         "deviceMemory":        expected_client_hints["deviceMemory"],
         "hardwareConcurrency": expected_client_hints["hardwareConcurrency"],

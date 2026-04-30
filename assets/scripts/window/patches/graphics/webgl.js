@@ -94,27 +94,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
       }
     }
 
-    let __envSnapshotWebglTarget = null;
-    let __envSnapshotWebglPrev = null;
-    let __envSnapshotWebglWritten = false;
-    function __rollbackEnvSnapshotWebgl() {
-      if (!__envSnapshotWebglWritten || !__envSnapshotWebglTarget) return;
-      try {
-        if (__envSnapshotWebglPrev) {
-          Object.defineProperty(__envSnapshotWebglTarget, 'webgl', __envSnapshotWebglPrev);
-        } else {
-          delete __envSnapshotWebglTarget.webgl;
-        }
-      } catch (e) {
-        __webglDiagPipeline('error', 'webgl:env_snapshot_write_rollback_failed', {
-          stage: 'rollback',
-          key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl',
-          message: 'WebGL env snapshot field write rollback failed',
-          data: { outcome: 'throw', reason: 'env_snapshot_write_rollback_failed' }
-        }, e);
-      }
-    }
-
     try {
 
     if (!C) {
@@ -150,103 +129,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
       });
       throw new Error('CanvasPatchContext.state.__ENV_PROFILE__ missing');
     }
-    function __cloneEnvSnapshotWebglValue(value) {
-      if (Array.isArray(value)) return value.map(__cloneEnvSnapshotWebglValue);
-      if (ArrayBuffer.isView(value)) return Array.prototype.slice.call(value);
-      if (value && typeof value === 'object') {
-        const out = Object.create(null);
-        const keys = Object.keys(value);
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          out[key] = __cloneEnvSnapshotWebglValue(value[key]);
-        }
-        return out;
-      }
-      return value;
-    }
-    function __resolveEnvSnapshotWebglTarget() {
-      const nav = (__stateRoot.__NAV_TOTAL_SET__ && typeof __stateRoot.__NAV_TOTAL_SET__ === 'object') ? __stateRoot.__NAV_TOTAL_SET__ : null;
-      const store = (nav && nav.__DATA_STORE_STATE__ && typeof nav.__DATA_STORE_STATE__ === 'object') ? nav.__DATA_STORE_STATE__ : null;
-      const snap = (store && store.__WORKER_ENV_SNAPSHOT__ && typeof store.__WORKER_ENV_SNAPSHOT__ === 'object') ? store.__WORKER_ENV_SNAPSHOT__ : null;
-      if (!snap) throw new Error('__WORKER_ENV_SNAPSHOT__ missing');
-      return snap;
-    }
-    function __normalizeEnvSnapshotWebglFormats(value, key) {
-      const out = ArrayBuffer.isView(value)
-        ? Array.prototype.slice.call(value)
-        : (Array.isArray(value) ? value.slice() : null);
-      if (!Array.isArray(out)) throw new Error(String(key) + ' missing');
-      for (let i = 0; i < out.length; i++) {
-        if (typeof out[i] !== 'number' || !Number.isFinite(out[i])) throw new Error(String(key) + ' invalid');
-      }
-      return out;
-    }
-    function __writeEnvSnapshotWebgl() {
-      const snap = __resolveEnvSnapshotWebglTarget();
-      const payload = {
-        vendor: __envProfileState.webglVendor,
-        renderer: __envProfileState.webglRenderer,
-        unmaskedVendor: __envProfileState.webglUnmaskedVendor,
-        unmaskedRenderer: __envProfileState.webglUnmaskedRenderer
-      };
-      if (typeof payload.vendor !== 'string' || !payload.vendor) throw new Error('webgl.vendor missing');
-      if (typeof payload.renderer !== 'string' || !payload.renderer) throw new Error('webgl.renderer missing');
-      if (typeof payload.unmaskedVendor !== 'string' || !payload.unmaskedVendor) throw new Error('webgl.unmaskedVendor missing');
-      if (typeof payload.unmaskedRenderer !== 'string' || !payload.unmaskedRenderer) throw new Error('webgl.unmaskedRenderer missing');
-      const prev = Object.getOwnPropertyDescriptor(snap, 'webgl');
-      if (prev && prev.configurable === false) throw new TypeError('webgl snapshot field non-configurable');
-      __envSnapshotWebglTarget = snap;
-      __envSnapshotWebglPrev = prev || null;
-      Object.defineProperty(snap, 'webgl', {
-        value: {
-          vendor: payload.vendor,
-          renderer: payload.renderer,
-          unmaskedVendor: payload.unmaskedVendor,
-          unmaskedRenderer: payload.unmaskedRenderer
-        },
-        writable: true,
-        configurable: true,
-        enumerable: true
-      });
-      __envSnapshotWebglWritten = true;
-    }
-    function __writeEnvSnapshotWebglRuntime(ctx, kind) {
-      if (!ctx || typeof ctx !== 'object') return false;
-      const snap = __resolveEnvSnapshotWebglTarget();
-      const webgl = (snap.webgl && typeof snap.webgl === 'object') ? snap.webgl : null;
-      if (!webgl) throw new Error('worker env snapshot webgl missing');
-      let capabilityKey = null;
-      if (kind === 'webgl2') capabilityKey = 'webgl2';
-      else if (kind === 'webgl') capabilityKey = 'webgl';
-      else if (kind === 'experimental-webgl') capabilityKey = 'experimentalWebgl';
-      if (!capabilityKey) return false;
-      const existingCapabilities = (webgl.webglCapabilities && typeof webgl.webglCapabilities === 'object')
-        ? webgl.webglCapabilities
-        : null;
-      const hasSelectedFormats = Array.isArray(webgl.compressedTextureFormats);
-      const hasCapabilityEntry = !!(existingCapabilities && existingCapabilities[capabilityKey] && Array.isArray(existingCapabilities[capabilityKey].compressedTextureFormats));
-      if (hasSelectedFormats && hasCapabilityEntry) return false;
-      const compressedToken = (typeof ctx.COMPRESSED_TEXTURE_FORMATS === 'number')
-        ? ctx.COMPRESSED_TEXTURE_FORMATS
-        : (((window.WebGLRenderingContext || window.WebGL2RenderingContext) && typeof (window.WebGLRenderingContext || window.WebGL2RenderingContext).COMPRESSED_TEXTURE_FORMATS === 'number')
-          ? (window.WebGLRenderingContext || window.WebGL2RenderingContext).COMPRESSED_TEXTURE_FORMATS
-          : null);
-      if (compressedToken == null || typeof ctx.getParameter !== 'function') return false;
-      const formats = __normalizeEnvSnapshotWebglFormats(Reflect.apply(ctx.getParameter, ctx, [compressedToken]), 'webgl.compressedTextureFormats');
-      const capabilities = existingCapabilities ? __cloneEnvSnapshotWebglValue(existingCapabilities) : Object.create(null);
-      if (!Object.prototype.hasOwnProperty.call(capabilities, capabilityKey)) {
-        capabilities[capabilityKey] = { compressedTextureFormats: formats.slice() };
-      }
-      if (typeof capabilities.selected !== 'string' || !capabilities.selected) {
-        capabilities.selected = capabilityKey;
-      }
-      if (!hasSelectedFormats) {
-        webgl.compressedTextureFormats = formats.slice();
-      }
-      webgl.webglCapabilities = capabilities;
-      return true;
-    }
-
     const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
       ? __core.__internal
       : null;
@@ -313,18 +195,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
         key: 'Core.__registerToStringWrapper',
         message: 'Core.__registerToStringWrapper missing',
         data: { outcome: 'throw' }
-      }, e);
-      throw e;
-    }
-
-    try {
-      __writeEnvSnapshotWebgl();
-    } catch (e) {
-      __webglDiagPipeline('fatal', 'webgl:env_snapshot_write_failed', {
-        stage: 'apply',
-        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl',
-        message: 'WebGL env snapshot field write failed',
-        data: { outcome: 'throw', reason: 'env_snapshot_write_failed' }
       }, e);
       throw e;
     }
@@ -738,7 +608,6 @@ const WebglPatchModule = function WebglPatchModule(window) {
       data: { outcome: 'return' }
     });
   } catch (e) {
-    __rollbackEnvSnapshotWebgl();
     releaseEntryGuard(false);
     throw e;
   }

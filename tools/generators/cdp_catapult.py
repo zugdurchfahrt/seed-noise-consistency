@@ -1,4 +1,4 @@
-# cdp_catapult.py  (SW bootstrap + worker seed transport)
+# cdp_catapult.py  (SW bootstrap only)
 import atexit
 import json
 import time
@@ -27,15 +27,9 @@ SW_DM = None
 SW_META = None
 SW_WEBGL = None
 SW_BOOTSTRAP_ENV = None
-# --- Dedicated/Shared Worker CDP_GLOBAL_SEED injector (WorkerGlobalScope) ---
-WORKER_SEED_INJECT_ENABLED = True
-CDP_GLOBAL_SEED = None
-_RUNNING_WORKER_SEED = False
 _RUNNING = False
 _SW_WS = None
-_WORKER_SEED_WS = None
 _SW_STOPPING = False
-_WORKER_SEED_STOPPING = False
 _SW_DIAG_BINDING = "__SW_REPORT_DIAG__"
 
 
@@ -177,7 +171,7 @@ def enable_sw_bootstrap_env(
         raise ValueError("SW bootstrap: expected_client_hints.brands missing")
     if not isinstance(full_version_list, list) or not full_version_list:
         raise ValueError("SW bootstrap: expected_client_hints.fullVersionList missing")
-    for key in ("architecture", "bitness", "model", "platform", "platformVersion"):
+    for key in ("platformVersion","uaFullVersion","fullVersionList","architecture","bitness","model","wow64","formFactors"):
         if not isinstance(meta.get(key), str):
             raise ValueError(f"SW bootstrap: expected_client_hints.{key} missing")
     if not isinstance(meta.get("mobile"), bool):
@@ -219,6 +213,7 @@ def enable_sw_bootstrap_env(
             "bitness": meta["bitness"],
             "model": meta["model"],
             "platformVersion": meta["platformVersion"],
+            "uaFullVersion": meta["uaFullVersion"],
             "fullVersionList": [dict(item) for item in full_version_list],
             "wow64": meta["wow64"],
             "formFactors": list(meta["formFactors"]),
@@ -245,6 +240,14 @@ def enable_sw_bootstrap_env(
     SW_BOOTSTRAP_ENABLED = True
 
 
+def enable_worker_seed_inject(global_seed: str):
+    global WORKER_SEED_INJECT_ENABLED, WORKER_GLOBAL_SEED
+    if not isinstance(global_seed, str) or not global_seed.strip():
+        raise ValueError("Worker seed inject: global_seed must be non-empty str")
+    WORKER_GLOBAL_SEED = global_seed
+    WORKER_SEED_INJECT_ENABLED = True
+
+
 
 def _canonicalize_language_list_for_compare(value):
     if not isinstance(value, list):
@@ -258,18 +261,6 @@ def _canonicalize_language_list_for_compare(value):
             seen.add(entry)
             out.append(entry)
     return out
-
-
-def enable_worker_seed_inject(global_seed: str):
-    """
-    Enable Dedicated/Shared worker injection for CDP_GLOBAL_SEED.
-    Call this BEFORE starting run_worker_seed().
-    """
-    global WORKER_SEED_INJECT_ENABLED, CDP_GLOBAL_SEED
-    if not isinstance(global_seed, str) or not global_seed.strip():
-        raise ValueError("Worker seed inject: global_seed must be non-empty str")
-    CDP_GLOBAL_SEED = global_seed
-    WORKER_SEED_INJECT_ENABLED = True
 
 
 def stop():
@@ -289,28 +280,7 @@ def stop():
     return True
 
 
-def stop_worker_seed():
-    global _WORKER_SEED_STOPPING
-    ws = _WORKER_SEED_WS
-    if ws is None:
-        return False
-    _WORKER_SEED_STOPPING = True
-    try:
-        ws.keep_running = False
-    except Exception:
-        pass
-    try:
-        ws.close()
-    except Exception:
-        return False
-    return True
-
-
 def _stop_injectors_atexit():
-    try:
-        stop_worker_seed()
-    except Exception:
-        pass
     try:
         stop()
     except Exception:
@@ -382,52 +352,31 @@ def _build_worker_seed_prelude(global_seed: str) -> str:
   'use strict';
   const G = globalThis;
   const seed = {json.dumps(global_seed, ensure_ascii=False)};
-  const d = Object.getOwnPropertyDescriptor(G, 'CDP_GLOBAL_SEED');
-  if (d && d.configurable === false) {{
-    const cur = ('value' in d) ? d.value : G.CDP_GLOBAL_SEED;
-    if (String(cur) !== String(seed)) {{
-      throw new Error('WorkerSeed: CDP_GLOBAL_SEED non-configurable mismatch');
+  try {{
+    const d = Object.getOwnPropertyDescriptor(G, 'CDP_GLOBAL_SEED');
+    if (d && d.configurable === false) {{
+      const cur = ('value' in d) ? d.value : G.CDP_GLOBAL_SEED;
+      if (String(cur) !== String(seed)) {{
+        throw new Error('WorkerSeed: CDP_GLOBAL_SEED non-configurable mismatch');
+      }}
+      return;
     }}
-    return;
+  }} catch (e) {{
   }}
   try {{
     Object.defineProperty(G, 'CDP_GLOBAL_SEED', {{
       value: String(seed),
       writable: false,
-      configurable: false,
+      configurable: true,
       enumerable: false
     }});
   }} catch (e) {{
-    const writer = (typeof G.__DEGRADE__ === 'function') ? G.__DEGRADE__ : null;
-    if (writer && typeof writer.diag === 'function') {{
-      writer.diag('error', 'worker_seed_env:apply:define_failed', {{
-        module: 'worker_seed_env',
-        diagTag: 'worker_seed_env',
-        surface: 'worker_seed_env',
-        key: 'CDP_GLOBAL_SEED',
-        stage: 'apply',
-        message: 'CDP_GLOBAL_SEED define failed',
-        type: 'browser structure missing data',
-        data: {{ outcome: 'throw', reason: 'define_failed' }}
-      }}, e);
-    }} else if (writer) {{
-      writer('worker_seed_env:apply:define_failed', e, {{
-        level: 'error',
-        module: 'worker_seed_env',
-        diagTag: 'worker_seed_env',
-        surface: 'worker_seed_env',
-        key: 'CDP_GLOBAL_SEED',
-        stage: 'apply',
-        message: 'CDP_GLOBAL_SEED define failed',
-        type: 'browser structure missing data',
-        data: {{ outcome: 'throw', reason: 'define_failed' }}
-      }});
-    }}
-    throw e;
+    try {{ G.CDP_GLOBAL_SEED = String(seed); }} catch (_e) {{}}
   }}
 }})();
 //# sourceURL=worker_seed_env.js
 """.strip()
+
 
 def get_ws_url():
     port = PORT
@@ -505,9 +454,14 @@ def run():
 
     msg_id = {"v": 0}
     injected = set()   # targetId set
+    manual_attach_sent = set()
     sw_bootstrap_prelude = None
     sw_user_agent_override = None
     sw_expected = None
+    worker_seed_enabled = WORKER_SEED_INJECT_ENABLED is True
+    worker_seed_value = str(WORKER_GLOBAL_SEED or "") if worker_seed_enabled else ""
+    worker_seed_prelude = None
+    worker_seed_sanity_expr = None
     if do_prelude:
         if not isinstance(SW_BOOTSTRAP_ENV, dict):
             _RUNNING = False
@@ -542,6 +496,27 @@ def run():
             _RUNNING = False
             raise RuntimeError("SW bootstrap: SW_BOOTSTRAP_ENV hardwareConcurrency mismatch")
         sw_bootstrap_prelude = _build_sw_bootstrap_prelude(SW_BOOTSTRAP_ENV)
+    if worker_seed_enabled:
+        if not worker_seed_value:
+            _RUNNING = False
+            raise RuntimeError("Worker seed inject: WORKER_GLOBAL_SEED missing")
+        worker_seed_prelude = _build_worker_seed_prelude(worker_seed_value)
+        worker_seed_sanity_expr = (
+            "(() => {"
+            " const G = globalThis;"
+            " let cdpGlobalSeed = null;"
+            " try { cdpGlobalSeed = String(G.CDP_GLOBAL_SEED); } catch (e) {}"
+            " let coreToStringStateOk = null;"
+            " try {"
+            "   const s = G.__CORE_TOSTRING_STATE__;"
+            "   coreToStringStateOk = !!(s && s.__CORE_TOSTRING_STATE__ === true);"
+            " } catch (e) {}"
+            " let ensureMarkAsNativeType = null;"
+            " try { ensureMarkAsNativeType = (typeof G.__ensureMarkAsNative); } catch (e) {}"
+            " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType };"
+            "})()"
+        )
+        logger.info("Worker seed inject: seed prepared len=%s", len(worker_seed_value))
     sw_user_agent_override = _build_sw_user_agent_override(SW_BOOTSTRAP_ENV)
     sw_hardware_concurrency_override = None
     if isinstance(SW_BOOTSTRAP_ENV, dict):
@@ -570,7 +545,7 @@ def run():
             " }"
             " return Promise.resolve("
             "   (typeof uad.getHighEntropyValues === 'function')"
-            "     ? uad.getHighEntropyValues(['fullVersionList'])"
+            "     ? uad.getHighEntropyValues(['fullVersionList','uaFullVersion'])"
             "     : null"
             " ).then(function(he) {"
             "  return {"
@@ -582,6 +557,7 @@ def run():
             "    platform: uad.platform,"
             "    mobile: uad.mobile,"
             "    brands: uad.brands,"
+            "    heUaFullVersion: he && he.uaFullVersion,"
             "    heFullVersionList: he && he.fullVersionList"
             "   }"
             "  };"
@@ -645,6 +621,10 @@ def run():
                         tag = "Runtime.evaluate:sw_bootstrap_prelude"
                     elif expr == sanity_expr:
                         tag = "Runtime.evaluate:sw_sanity"
+                    elif worker_seed_prelude and expr == worker_seed_prelude:
+                        tag = "Runtime.evaluate:worker_seed_prelude"
+                    elif worker_seed_sanity_expr and expr == worker_seed_sanity_expr:
+                        tag = "Runtime.evaluate:worker_seed_sanity"
                 elif method == "Runtime.addBinding" and params.get("name") == _SW_DIAG_BINDING:
                     tag = "Runtime.addBinding:sw_diag"
             except Exception:
@@ -662,12 +642,25 @@ def run():
             "waitForDebuggerOnStart": True,
             # Required for browser-level auto-attach.
             "flatten": True,
-            "filter": [{"type": "service_worker", "exclude": False}],
+            "filter": (
+                [
+                    {"type": "service_worker", "exclude": False},
+                    {"type": "worker", "exclude": False},
+                    {"type": "shared_worker", "exclude": False},
+                ]
+                if worker_seed_enabled else
+                [{"type": "service_worker", "exclude": False}]
+            ),
         }
 
         # важно: ставим tag, иначе обработка ошибки фильтра не сработает
         send(ws, "Target.setAutoAttach", params, tag="autoattach_sw_only")
-        logger.info("SW bootstrap: enabled (autoAttach) filter=service_worker")
+        logger.info(
+            "SW bootstrap: enabled (autoAttach) filter=%s",
+            "service_worker,worker,shared_worker" if worker_seed_enabled else "service_worker",
+        )
+        if worker_seed_enabled:
+            logger.info("Worker seed inject: enabled (autoAttach) filter=worker,shared_worker")
 
        
     def on_message(ws, message):
@@ -687,6 +680,15 @@ def run():
             if tag == "autoattach_sw_only" and msg.get("error"):
                 _fatal(ws, "autoattach filter unsupported", msg.get("error"))
                 return
+            if isinstance(tag, str) and tag.startswith("attach_worker_seed:"):
+                if msg.get("error"):
+                    tid = tag.split(":", 1)[1] if ":" in tag else "unknown"
+                    logger.warning(
+                        "Worker seed inject: manual attach failed targetId=%s err=%r",
+                        tid,
+                        msg.get("error"),
+                    )
+                return
             # Session-level response error handling (flatten protocol).
             if sid and msg.get("error"):
                 if tag in ("Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity"):
@@ -702,7 +704,7 @@ def run():
                 _fatal(ws, f"session cmd failed: {tag or 'unknown'}", msg.get("error"))
                 return
             # Runtime.evaluate may include exceptionDetails inside result.
-            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity"):
+            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity", "Runtime.evaluate:worker_seed_prelude", "Runtime.evaluate:worker_seed_sanity"):
                 res = msg.get("result") or {}
                 exc = res.get("exceptionDetails")
                 if exc:
@@ -776,6 +778,10 @@ def run():
                             _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
                             return
                         exp_he = exp["uad"].get("he") or {}
+                        if uad.get("heUaFullVersion") != exp_he.get("uaFullVersion"):
+                            _resume_sw_session(ws, sid, "sanity_uad_he_ua_full_version_mismatch")
+                            _fatal(ws, "sw sanity: uad high entropy uaFullVersion mismatch", {"expected": exp, "got": out})
+                            return
                         if list(uad.get("heFullVersionList") or []) != list(exp_he.get("fullVersionList") or []):
                             _resume_sw_session(ws, sid, "sanity_uad_he_full_version_mismatch")
                             _fatal(ws, "sw sanity: uad high entropy fullVersionList mismatch", {"expected": exp, "got": out})
@@ -785,6 +791,52 @@ def run():
                     except Exception as e:
                         _resume_sw_session(ws, sid, "sanity_parse_failed")
                         _fatal(ws, "sw sanity: parse/compare failed", e)
+                if tag == "Runtime.evaluate:worker_seed_sanity":
+                    try:
+                        out = (res.get("result") or {}).get("value")
+                        got_seed = out.get("cdpGlobalSeed") if isinstance(out, dict) else None
+                        if not isinstance(got_seed, str) or got_seed != worker_seed_value:
+                            _fatal(
+                                ws,
+                                "worker seed sanity: mismatch",
+                                {"expected_len": len(worker_seed_value), "got": out},
+                            )
+                            return
+                        target_info = session_targets.get(sid) or {}
+                        logger.info(
+                            "Worker seed inject: sanity logging successful; CDP_GLOBAL_SEED verified type=%s targetId=%s url=%r seed_len=%s",
+                            target_info.get("type"),
+                            target_info.get("targetId"),
+                            target_info.get("url"),
+                            len(worker_seed_value),
+                        )
+                    except Exception as e:
+                        _fatal(ws, "worker seed sanity: parse/compare failed", e)
+            return
+
+        if msg.get("method") == "Target.targetCreated":
+            p = msg.get("params") or {}
+            info = p.get("targetInfo") or {}
+            ttype = info.get("type")
+            tid = info.get("targetId")
+            turl = info.get("url")
+            if worker_seed_enabled and ttype in ("worker", "shared_worker") and tid and tid not in injected and tid not in manual_attach_sent:
+                manual_attach_sent.add(tid)
+                logger.info(
+                    "Worker seed inject: targetCreated %s targetId=%s url=%r -> manual attach",
+                    ttype,
+                    tid,
+                    turl,
+                )
+                try:
+                    send(
+                        ws,
+                        "Target.attachToTarget",
+                        {"targetId": tid, "flatten": True},
+                        tag=f"attach_worker_seed:{tid}",
+                    )
+                except Exception as e:
+                    _patch_skipped("manual attach send failed", e)
             return
 
         if msg.get("method") == "Runtime.bindingCalled":
@@ -828,7 +880,26 @@ def run():
         if not sessionId or not tid:
             return
 
-        # Hard isolation: this module must never touch non-SW targets.
+        if worker_seed_enabled and ttype in ("worker", "shared_worker"):
+            if tid in injected:
+                return
+            injected.add(tid)
+            session_targets[sessionId] = {"targetId": tid, "url": turl, "type": ttype}
+            logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
+            try:
+                send_sess(ws, sessionId, "Runtime.enable")
+                send_sess(ws, sessionId, "Runtime.evaluate", {"expression": worker_seed_prelude, "awaitPromise": True})
+                send_sess(ws, sessionId, "Runtime.evaluate", {"expression": worker_seed_sanity_expr, "returnByValue": True, "awaitPromise": False})
+            except Exception as e:
+                _fatal(ws, "worker seed inject failed", e)
+            finally:
+                try:
+                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+                except Exception as e:
+                    _fatal(ws, "worker resume failed", e)
+            return
+
+        # Hard isolation: this module must never touch unrelated non-SW targets.
         if ttype != "service_worker":
             _patch_skipped(f"non-sw target attached: {ttype}")
             try:
@@ -909,399 +980,5 @@ def run():
         _SW_WS = None
         _RUNNING = False
         _SW_STOPPING = False
-    if fatal["err"]:
-        raise fatal["err"]
-
-
-def run_worker_seed():
-    """
-    Dedicated/Shared worker seed injector loop:
-    - connects to CDP
-    - auto-attaches to worker/shared_worker with waitForDebuggerOnStart=true (pauses on start)
-    - Runtime.evaluate(seed prelude) before resuming
-
-    IMPORTANT: if the CDP websocket drops mid-session, paused workers may remain paused.
-    """
-    global _RUNNING_WORKER_SEED, _WORKER_SEED_WS, _WORKER_SEED_STOPPING
-    if _RUNNING_WORKER_SEED:
-        return
-    _RUNNING_WORKER_SEED = True
-    _WORKER_SEED_STOPPING = False
-
-    if not WORKER_SEED_INJECT_ENABLED:
-        _RUNNING_WORKER_SEED = False
-        logger.error("Worker seed inject: disabled flag encountered (PATCH_SKIPPED)")
-        raise RuntimeError("Worker seed inject: disabled")
-    if not isinstance(CDP_GLOBAL_SEED, str) or not CDP_GLOBAL_SEED.strip():
-        _RUNNING_WORKER_SEED = False
-        logger.error("Worker seed inject: CDP_GLOBAL_SEED missing (PATCH_SKIPPED)")
-        raise RuntimeError("Worker seed inject: seed missing")
-
-    try:
-        ws_url = get_ws_url()
-    except Exception as e:
-        _RUNNING_WORKER_SEED = False
-        logger.exception("Worker seed inject: get_ws_url failed (PATCH_SKIPPED)")
-        raise ValueError("Worker seed inject: fail") from e
-
-    logger.info("Worker seed inject: seed prepared len=%s", len(str(CDP_GLOBAL_SEED)))
-
-    logger.warning("Worker seed inject: CDP websocket starting (waitForDebuggerOnStart=true): %s", ws_url)
-    log_cdp_runtime_diag("worker_seed_before_ws")
-
-    msg_id = {"v": 0}
-    injected = set()   # targetId set
-    manual_attach_sent = set()  # targetId set for fallback manual attach
-    sess_meta = {}  # sessionId -> {targetId,type,url}
-    seed_prelude = _build_worker_seed_prelude(CDP_GLOBAL_SEED)
-    worker_user_agent_override = None
-    worker_hardware_concurrency_override = None
-    worker_language_expected = None
-    worker_languages_expected = None
-    worker_hardware_concurrency_expected = None
-    if isinstance(SW_BOOTSTRAP_ENV, dict):
-        accept_language_cdp = SW_BOOTSTRAP_ENV.get("acceptLanguageCdp")
-        user_agent = SW_BOOTSTRAP_ENV.get("userAgent")
-        navigator_platform = SW_BOOTSTRAP_ENV.get("navigatorPlatform")
-        hardware_concurrency = SW_BOOTSTRAP_ENV.get("hc")
-        if (
-            isinstance(accept_language_cdp, str) and accept_language_cdp.strip()
-            and isinstance(user_agent, str) and user_agent.strip()
-            and isinstance(navigator_platform, str) and navigator_platform.strip()
-        ):
-            worker_user_agent_override = {
-                "userAgent": user_agent,
-                "acceptLanguage": accept_language_cdp,
-                "platform": navigator_platform,
-            }
-        if isinstance(hardware_concurrency, (int, float)) and int(hardware_concurrency) > 0:
-            worker_hardware_concurrency_expected = int(hardware_concurrency)
-            worker_hardware_concurrency_override = {
-                "hardwareConcurrency": int(hardware_concurrency),
-            }
-        if isinstance(SW_BOOTSTRAP_ENV.get("primary"), str) and SW_BOOTSTRAP_ENV.get("primary").strip():
-            worker_language_expected = SW_BOOTSTRAP_ENV.get("primary")
-        if isinstance(SW_BOOTSTRAP_ENV.get("langs"), list):
-            worker_languages_expected = list(SW_BOOTSTRAP_ENV.get("langs") or [])
-    sanity_expr = (
-        "(() => {"
-        " const G = globalThis;"
-        " let cdpGlobalSeed = null;"
-        " try { cdpGlobalSeed = String(G.CDP_GLOBAL_SEED); } catch (e) {}"
-        " let coreToStringStateOk = null;"
-        " try {"
-        "   const s = G.__CORE_TOSTRING_STATE__;"
-        "   coreToStringStateOk = !!(s && s.__CORE_TOSTRING_STATE__ === true);"
-        " } catch (e) {}"
-        " let ensureMarkAsNativeType = null;"
-        " try { ensureMarkAsNativeType = (typeof G.__ensureMarkAsNative); } catch (e) {}"
-        " let hardwareConcurrency = null;"
-        " try { hardwareConcurrency = Number((G.navigator && G.navigator.hardwareConcurrency)); } catch (e) {}"
-        " let language = null;"
-        " let languages = null;"
-        " try {"
-        "   const nav = G.navigator;"
-        "   language = nav && nav.language;"
-        "   languages = nav && nav.languages;"
-        " } catch (e) {}"
-        " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType, hardwareConcurrency, language, languages };"
-        "})()"
-    )
-
-
-
-    pending = {}
-    pending_sess = {}  # (sessionId, innerId) -> str tag
-    fatal = {"err": None, "disconnect": False}
-
-    def _patch_skipped(reason, err=None):
-        if err is not None:
-            logger.error("Worker seed inject: PATCH_SKIPPED %s err=%r", reason, err)
-        else:
-            logger.error("Worker seed inject: PATCH_SKIPPED %s", reason)
-
-    def _fatal(ws, reason, err=None):
-        if fatal["err"] is None:
-            fatal["err"] = RuntimeError(reason)
-        _patch_skipped(reason, err)
-        try:
-            ws.close()
-        except Exception:
-            pass
-
-    def _drop_target_state(target_id):
-        if not target_id:
-            return
-        manual_attach_sent.discard(target_id)
-        injected.discard(target_id)
-
-    def _cleanup_session_state(session_id):
-        if not session_id:
-            return None
-        meta = sess_meta.pop(session_id, None)
-        for key in [k for k in list(pending_sess.keys()) if k[0] == session_id]:
-            pending_sess.pop(key, None)
-        return meta
-
-    def _cleanup_worker_runtime_state():
-        manual_attach_sent.clear()
-        sess_meta.clear()
-        pending_sess.clear()
-        pending.clear()
-        injected.clear()
-
-    def send(ws, method, params=None, tag=None):
-        msg_id["v"] += 1
-        mid = msg_id["v"]
-        if tag:
-            pending[mid] = tag
-        ws.send(json.dumps({"id": mid, "method": method, "params": params or {}}))
-
-    def send_sess(ws, sessionId, method, params=None):
-        msg_id["v"] += 1
-        mid = msg_id["v"]
-        tag = method
-        if method == "Runtime.evaluate" and params and isinstance(params, dict):
-            try:
-                expr = params.get("expression")
-                if expr == seed_prelude:
-                    tag = "Runtime.evaluate:worker_seed_prelude"
-                elif expr == sanity_expr:
-                    tag = "Runtime.evaluate:worker_seed_sanity"
-            except Exception:
-                pass
-        pending_sess[(sessionId, mid)] = tag
-        ws.send(json.dumps({"id": mid, "method": method, "params": params or {}, "sessionId": sessionId}))
-
-    def on_open(ws):
-        log_cdp_runtime_diag("worker_seed_on_open")
-        send(ws, "Target.setDiscoverTargets", {"discover": True})
-        params = {
-            "autoAttach": True,
-            "waitForDebuggerOnStart": True,
-            "flatten": True,
-            "filter": [
-                {"type": "worker", "exclude": False},
-                {"type": "shared_worker", "exclude": False},
-            ],
-        }
-        send(ws, "Target.setAutoAttach", params, tag="autoattach_worker_seed")
-        logger.info("Worker seed inject: enabled (autoAttach) filter=worker,shared_worker")
-
-    def on_message(ws, message):
-        try:
-            msg = json.loads(message)
-        except Exception:
-            return
-
-        if "id" in msg:
-            mid = msg.get("id")
-            sid = msg.get("sessionId")
-            tag = None
-            if sid:
-                tag = pending_sess.pop((sid, mid), None)
-            if tag is None:
-                tag = pending.pop(mid, None)
-            if tag == "autoattach_worker_seed" and msg.get("error"):
-                _fatal(ws, "autoattach filter unsupported", msg.get("error"))
-                return
-            if isinstance(tag, str) and tag.startswith("attach_worker_seed:"):
-                if msg.get("error"):
-                    tid = tag.split(":", 1)[1] if ":" in tag else "unknown"
-                    logger.warning(
-                        "Worker seed inject: manual attach failed targetId=%s err=%r",
-                        tid,
-                        msg.get("error"),
-                    )
-                return
-            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:worker_seed_prelude", "Runtime.evaluate:worker_seed_sanity"):
-                res = msg.get("result") or {}
-                exc = res.get("exceptionDetails")
-                if exc:
-                    _fatal(ws, "worker seed Runtime.evaluate exceptionDetails", exc)
-                    return
-                if tag == "Runtime.evaluate:worker_seed_sanity":
-                    try:
-                        out = (res.get("result") or {}).get("value")
-                        expected_seed = str(CDP_GLOBAL_SEED)
-                        got_seed = out.get("cdpGlobalSeed") if isinstance(out, dict) else None
-                        if not isinstance(got_seed, str) or got_seed != expected_seed:
-                            _fatal(
-                                ws,
-                                "worker seed sanity: mismatch",
-                                {"expected_len": len(expected_seed), "got": out, "target": sess_meta.get(sid)},
-                            )
-                            return
-                        meta = sess_meta.get(sid) or {}
-                        ttype = meta.get("type")
-                        tid = meta.get("targetId")
-                        turl = meta.get("url")
-                        logger.info(
-                            "Worker seed inject: sanity logging successful; CDP_GLOBAL_SEED verified type=%s targetId=%s url=%r seed_len=%s",
-                            ttype,
-                            tid,
-                            turl,
-                            len(expected_seed),
-                        )
-                        if isinstance(out, dict) and isinstance(worker_language_expected, str) and worker_language_expected:
-                            got_language = out.get("language")
-                            got_languages = list(out.get("languages") or [])
-                            exp_languages = list(worker_languages_expected or [])
-                            got_languages_canonical = _canonicalize_language_list_for_compare(got_languages)
-                            exp_languages_canonical = _canonicalize_language_list_for_compare(exp_languages)
-                            language_mismatch = got_language != worker_language_expected
-                            languages_exact_mismatch = got_languages != exp_languages
-                            languages_duplicate_only = (
-                                languages_exact_mismatch
-                                and got_languages_canonical is not None
-                                and exp_languages_canonical is not None
-                                and got_languages_canonical == exp_languages_canonical
-                            )
-                            if languages_duplicate_only:
-                                logger.info(
-                                    "Worker seed inject: language sanity duplicate-only languages canonicalized type=%s targetId=%s expected=%s got=%s",
-                                    ttype,
-                                    tid,
-                                    {"language": worker_language_expected, "languages": exp_languages},
-                                    {"language": got_language, "languages": got_languages},
-                                )
-                            if language_mismatch or (languages_exact_mismatch and not languages_duplicate_only):
-                                logger.warning(
-                                    "Worker seed inject: language sanity native/profile mismatch; native getter kept type=%s targetId=%s expected=%s got=%s",
-                                    ttype,
-                                    tid,
-                                    {"language": worker_language_expected, "languages": exp_languages},
-                                    {"language": got_language, "languages": got_languages},
-                                )
-                        if isinstance(out, dict) and isinstance(worker_hardware_concurrency_expected, int):
-                            got_hardware_concurrency = int(out.get("hardwareConcurrency") or 0)
-                            if got_hardware_concurrency != int(worker_hardware_concurrency_expected):
-                                logger.warning(
-                                    "Worker seed inject: hardwareConcurrency sanity native/profile mismatch; native getter kept type=%s targetId=%s expected=%s got=%s",
-                                    ttype,
-                                    tid,
-                                    worker_hardware_concurrency_expected,
-                                    got_hardware_concurrency,
-                                )
-                    except Exception as e:
-                        _fatal(ws, "worker seed sanity: parse/compare failed", e)
-            return
-
-        if msg.get("method") == "Target.targetCreated":
-            p = msg.get("params") or {}
-            info = p.get("targetInfo") or {}
-            ttype = info.get("type")
-            tid = info.get("targetId")
-            turl = info.get("url")
-            if ttype in ("worker", "shared_worker") and tid and tid not in injected and tid not in manual_attach_sent:
-                manual_attach_sent.add(tid)
-                logger.info(
-                    "Worker seed inject: targetCreated %s targetId=%s url=%r -> manual attach",
-                    ttype,
-                    tid,
-                    turl,
-                )
-                try:
-                    send(
-                        ws,
-                        "Target.attachToTarget",
-                        {"targetId": tid, "flatten": True},
-                        tag=f"attach_worker_seed:{tid}",
-                    )
-                except Exception as e:
-                    _patch_skipped("manual attach send failed", e)
-            return
-
-        if msg.get("method") == "Target.targetDestroyed":
-            p = msg.get("params") or {}
-            _drop_target_state(p.get("targetId"))
-            return
-
-        if msg.get("method") == "Target.detachedFromTarget":
-            p = msg.get("params") or {}
-            sid = p.get("sessionId") or msg.get("sessionId")
-            meta = _cleanup_session_state(sid)
-            if meta:
-                _drop_target_state(meta.get("targetId"))
-            return
-
-        if msg.get("method") != "Target.attachedToTarget":
-            return
-
-        p = msg.get("params") or {}
-        sessionId = p.get("sessionId") or msg.get("sessionId")
-        info = p.get("targetInfo") or {}
-        ttype = info.get("type")
-        tid = info.get("targetId")
-        turl = info.get("url")
-
-        if not sessionId or not tid:
-            return
-        if ttype not in ("worker", "shared_worker"):
-            _patch_skipped(f"non-worker target attached: {ttype}")
-            try:
-                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-            except Exception as e:
-                _fatal(ws, "resume non-worker target failed", e)
-            return
-        if tid in injected:
-            return
-        injected.add(tid)
-
-        try:
-            sess_meta[sessionId] = {"targetId": tid, "type": ttype, "url": turl}
-        except Exception:
-            pass
-
-        logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
-        try:
-            send_sess(ws, sessionId, "Runtime.enable")
-            if worker_user_agent_override is not None:
-                send_sess(ws, sessionId, "Emulation.setUserAgentOverride", worker_user_agent_override)
-            if worker_hardware_concurrency_override is not None:
-                send_sess(ws, sessionId, "Emulation.setHardwareConcurrencyOverride", worker_hardware_concurrency_override)
-            send_sess(ws, sessionId, "Runtime.evaluate", {"expression": seed_prelude, "awaitPromise": True})
-            send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
-        except Exception as e:
-            _fatal(ws, "worker seed inject failed", e)
-        finally:
-            try:
-                send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-            except Exception as e:
-                _fatal(ws, "worker resume failed", e)
-
-    def on_error(ws, err):
-        if _is_ws_disconnect_error(err):
-            fatal["disconnect"] = True
-            logger.warning("Worker seed inject: websocket disconnected; stopping loop err=%r", err)
-            try:
-                ws.close()
-            except Exception:
-                pass
-            return
-        _fatal(ws, "cdp websocket error", err)
-
-    def on_close(_ws, code, msg):
-        global _RUNNING_WORKER_SEED, _WORKER_SEED_WS, _WORKER_SEED_STOPPING
-        _RUNNING_WORKER_SEED = False
-        _WORKER_SEED_WS = None
-        _cleanup_worker_runtime_state()
-        if _WORKER_SEED_STOPPING:
-            logger.info("Worker seed inject: websocket closed by stop request code=%r msg=%r", code, msg)
-        elif fatal["disconnect"]:
-            logger.info("Worker seed inject: websocket closed after disconnect code=%r msg=%r", code, msg)
-        elif code is not None or msg:
-            logger.error("Worker seed inject: websocket closed code=%r msg=%r", code, msg)
-        _WORKER_SEED_STOPPING = False
-
-    ws = WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close)
-    _WORKER_SEED_WS = ws
-    try:
-        ws.run_forever()
-    finally:
-        _WORKER_SEED_WS = None
-        _RUNNING_WORKER_SEED = False
-        _WORKER_SEED_STOPPING = False
-        _cleanup_worker_runtime_state()
     if fatal["err"]:
         raise fatal["err"]

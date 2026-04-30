@@ -237,7 +237,7 @@
     const __workerNavigatorPatchedOwners__ = Object.create(null);
     const __workerNavigatorDescriptorModes__ = Object.create(null);
     const validDpr = v => Number.isFinite(v) && v > 0;
-    const HE_KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
+    const HE_KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
     const LE_KEYS = ['brands','mobile','platform'];
     const requireSnap = (s, where) => {
       if (!s || typeof s !== 'object') {
@@ -926,23 +926,18 @@
           const s = cache.snap;
           const le = s.uaData;
           if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
-          const src = (le.he && typeof le.he === 'object') ? le.he : s.highEntropy;
-          if (!src || typeof src !== 'object') throw new Error('UACHPatch: missing highEntropy');
+          const he = le.he;
+          if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing userAgentData.he');
           const envPlatform = requirePlatformTransit(s, 'uadata.getHighEntropyValues');
-          const fullVersionList = (src.fullVersionList != null)
-            ? src.fullVersionList
-            : ((le.he && le.he.fullVersionList != null) ? le.he.fullVersionList : undefined);
-          const map = {
-            brands: toBrands(le.brands),
-            mobile: le.mobile,
-            platform: envPlatform.uaPlatform,
-            architecture: src.architecture,
-            bitness: src.bitness,
-            model: src.model,
+            const map = {
+            architecture: he.architecture,
+            bitness: he.bitness,
+            model: he.model,
             platformVersion: envPlatform.platformVersion,
-            fullVersionList: fullVersionList,
-            wow64: src.wow64,
-            formFactors: src.formFactors
+            uaFullVersion: he.uaFullVersion,
+            fullVersionList: he.fullVersionList,
+            wow64: he.wow64,
+            formFactors: he.formFactors,
           };
           const out = {};
           for (const k of keys) {
@@ -2089,6 +2084,12 @@
       }, e);
       throw e;
     }
+    const bootstrapStateRoot = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
+      ? self.CanvasPatchContext.state
+      : null;
+    if (!bootstrapStateRoot) throw new Error('UACHPatch: CanvasPatchContext.state missing');
+    syncWorkerEnvProfileState(bootstrapStateRoot);
+    restoreWorkerFontsState(bootstrapStateRoot);
     let __envSyncBcInstalled = false;
     if (!__envSyncBcInstalled) {
       if (typeof BroadcastChannel !== 'function') {
@@ -2110,10 +2111,11 @@
         const workerType = resolveWorkerType(abs, opts);
         const snap = requireSnap(cache.snap, 'nested');
         const SNAP = JSON.stringify(snap);
+        const SEED = JSON.stringify((self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '');
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'
-          ? `(async function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
-          : `(function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
+          ? `(async function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
+          : `(function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
         return [blobURL, { ...(opts || {}), type: workerType }];
       });
@@ -2282,7 +2284,7 @@
     try {
       const expectedHe = cache.snap.uaData && cache.snap.uaData.he ? cache.snap.uaData.he : null;
       const expectedPlatformTransitHe = requirePlatformTransit(cache.snap, 'sanity.userAgentData.getHighEntropyValues');
-      const sanityHePromise = sanityUAD.getHighEntropyValues(['platformVersion','fullVersionList','architecture','bitness','model','wow64','formFactors']);
+      const sanityHePromise = sanityUAD.getHighEntropyValues(['platformVersion','uaFullVersion','fullVersionList','architecture','bitness','model','wow64','formFactors']);
       if (!sanityHePromise || typeof sanityHePromise.then !== 'function') {
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator:sanity:mismatch',
@@ -2302,6 +2304,7 @@
         }
         const sanityHeProjection = {
           platformVersion: sanityHe && sanityHe.platformVersion,
+          uaFullVersion: sanityHe && sanityHe.uaFullVersion,
           fullVersionList: sanityHe && sanityHe.fullVersionList,
           architecture: sanityHe && sanityHe.architecture,
           bitness: sanityHe && sanityHe.bitness,
@@ -2311,6 +2314,7 @@
         };
         const expectedHeProjection = {
           platformVersion: expectedPlatformTransitHe.platformVersion,
+          uaFullVersion: expectedHe.uaFullVersion,
           fullVersionList: expectedHe.fullVersionList,
           architecture: expectedHe.architecture,
           bitness: expectedHe.bitness,

@@ -407,17 +407,54 @@ function EnvBus(G){
   }
   function __requireWorkerEnvSnapshot() {
     const stateRoot = __resolveCanvasPatchStateRoot();
+    if (!stateRoot) throw new Error('EnvBus: CanvasPatchContext.state missing');
     const navModuleState = (stateRoot && stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
       ? stateRoot.__NAV_TOTAL_SET__
       : null;
-    const dataStoreState = (navModuleState && navModuleState.__DATA_STORE_STATE__ && typeof navModuleState.__DATA_STORE_STATE__ === 'object')
-      ? navModuleState.__DATA_STORE_STATE__
+    const navScalarState = (navModuleState && navModuleState.__SCALAR_STATE__ && typeof navModuleState.__SCALAR_STATE__ === 'object')
+      ? navModuleState.__SCALAR_STATE__
       : null;
-    const workerEnvSnapshot = (dataStoreState && dataStoreState.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreState.__WORKER_ENV_SNAPSHOT__ === 'object')
-      ? dataStoreState.__WORKER_ENV_SNAPSHOT__
+    if (!navScalarState) throw new Error('EnvBus: __NAV_TOTAL_SET__.__SCALAR_STATE__ missing');
+    const envProfileSource = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+      ? stateRoot.__ENV_PROFILE__
       : null;
-    if (!workerEnvSnapshot) throw new Error('EnvBus: __WORKER_ENV_SNAPSHOT__ missing');
-    const out = __cloneEnvValue(workerEnvSnapshot);
+    if (!envProfileSource) throw new Error('EnvBus: __ENV_PROFILE__ missing');
+    const envPlatform = (envProfileSource.__PLATFORM__ && typeof envProfileSource.__PLATFORM__ === 'object')
+      ? envProfileSource.__PLATFORM__
+      : null;
+    if (!envPlatform) throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__ missing');
+    const workerMeta = (envProfileSource.meta && typeof envProfileSource.meta === 'object')
+      ? envProfileSource.meta
+      : null;
+    if (!workerMeta) throw new Error('EnvBus: __ENV_PROFILE__.meta missing');
+    const out = __cloneEnvValue({
+      ua: envProfileSource.userAgent,
+      language: navScalarState.language,
+      languages: __cloneEnvValue(navScalarState.languages),
+      deviceMemory: navScalarState.deviceMemory,
+      hardwareConcurrency: navScalarState.hardwareConcurrency,
+      uaData: {
+        brands: __cloneEnvValue(workerMeta.brands),
+        mobile: workerMeta.mobile,
+        platform: envPlatform.uaPlatform,
+        he: {
+          architecture: workerMeta.architecture,
+          bitness: workerMeta.bitness,
+          model: workerMeta.model,
+          platformVersion: envPlatform.platformVersion,
+          uaFullVersion: workerMeta.uaFullVersion,
+          fullVersionList: __cloneEnvValue(workerMeta.fullVersionList),
+          wow64: workerMeta.wow64,
+          formFactors: __cloneEnvValue(workerMeta.formFactors)
+        }
+      },
+      webgl: {
+        vendor: envProfileSource.webglVendor,
+        renderer: envProfileSource.webglRenderer,
+        unmaskedVendor: envProfileSource.webglUnmaskedVendor,
+        unmaskedRenderer: envProfileSource.webglUnmaskedRenderer
+      }
+    });
     const isStringArray = (value, allowEmpty) => {
       if (!Array.isArray(value)) return false;
       if (!allowEmpty && !value.length) return false;
@@ -450,6 +487,7 @@ function EnvBus(G){
     if (typeof out.uaData.he.bitness !== 'string' || !out.uaData.he.bitness) throw new Error('EnvBus: worker env snapshot uaData.he.bitness missing');
     if (typeof out.uaData.he.model !== 'string') throw new Error('EnvBus: worker env snapshot uaData.he.model missing');
     if (typeof out.uaData.he.platformVersion !== 'string' || !out.uaData.he.platformVersion) throw new Error('EnvBus: worker env snapshot uaData.he.platformVersion missing');
+    if (typeof out.uaData.he.uaFullVersion !== 'string' || !out.uaData.he.uaFullVersion) throw new Error('EnvBus: worker env snapshot uaData.he.uaFullVersion missing');
     if (!isBrandList(out.uaData.he.fullVersionList)) throw new Error('EnvBus: worker env snapshot uaData.he.fullVersionList missing');
     if (typeof out.uaData.he.wow64 !== 'boolean') throw new Error('EnvBus: worker env snapshot uaData.he.wow64 missing');
     if (!isStringArray(out.uaData.he.formFactors, false)) throw new Error('EnvBus: worker env snapshot uaData.he.formFactors missing');
@@ -1033,7 +1071,7 @@ function mkWorkerBootstrapCore(opts){
         if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
         const he = (s.uaData && s.uaData.he) || s.highEntropy;
         if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
-        const KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
+        const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
         for (const k of KEYS) {
           if (!(k in he)) throw new Error('UACHPatch: missing highEntropy.' + k);
           const v = he[k];
@@ -1369,8 +1407,7 @@ ${patchLoaderSource}
       }
       if (__patchOK) {
         try {
-          if (!self.__applyEnvSnapshot__ || !__LAST_SNAP__) throw new Error('UACHPatch: snapshot not applied');
-          self.__applyEnvSnapshot__(__LAST_SNAP__);
+          if (!__LAST_SNAP__) throw new Error('UACHPatch: snapshot not applied');
           if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
             delete self.__installWorkerUACHMirror__;
           }
@@ -1614,7 +1651,7 @@ function requireWorkerSnapshot(snap, label) {
   if (!snap.uaData) throw new Error('[WorkerOverride] snapshot.uaData missing');
   const he = (snap.uaData && snap.uaData.he) || snap.highEntropy;
   if (!he || typeof he !== 'object') throw new Error('[WorkerOverride] snapshot.highEntropy missing');
-  const KEYS = ['architecture','bitness','model','platformVersion','fullVersionList','wow64','formFactors'];
+  const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
   for (const k of KEYS) {
     if (!(k in he)) throw new Error(`[WorkerOverride] snapshot.highEntropy.${k} missing`);
     const v = he[k];
@@ -2587,7 +2624,7 @@ function ServiceWorkerOverride(G){
     if (existingPromise && typeof existingPromise.then === 'function') return existingPromise;
     const KEYS = Array.isArray(keys) && keys.length
       ? keys
-      : ['architecture','bitness','model','platformVersion','fullVersionList','formFactors','wow64'];
+      : ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','formFactors','wow64'];
     const workerEnvSnapshot = (() => {
       const lastSnap = __wrkRuntimeGet__('lastSnap');
       if (lastSnap && typeof lastSnap === 'object') return lastSnap;
