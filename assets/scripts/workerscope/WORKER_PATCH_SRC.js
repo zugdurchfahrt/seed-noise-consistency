@@ -954,6 +954,9 @@
                 return Object.keys(out).length ? Object.assign({}, out) : nativeResolved;
               }
               const merged = Object.assign({}, base);
+              merged.brands = toBrands(le.brands);
+              merged.mobile = !!le.mobile;
+              merged.platform = envPlatform.uaPlatform;
               for (const k of Object.keys(out)) {
                 merged[k] = out[k];
               }
@@ -1233,16 +1236,18 @@
             }
           }, null);
         } else {
+          __patchLanguage = true;
+          __workerNavigatorDescriptorModes__['language'] = 'patched_accessor';
           emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:language_getter_value_mismatch', {
             type: 'browser structure missing data',
             stage: 'preflight',
             module: 'WORKER_PATCH_SRC',
             surface: 'WorkerNavigator',
             key: 'language',
-            policy: 'skip',
-            action: 'keep_native_getter',
+            policy: 'patch',
+            action: 'patch_getter',
             data: {
-              outcome: 'skip',
+              outcome: 'patch',
               reason: 'getter_value_mismatch',
               nativeValue: nativeLanguage,
               profileValue: profileLanguage,
@@ -1251,17 +1256,18 @@
           }, null);
         }
       } else {
-        __workerNavigatorDescriptorModes__['language'] = 'native_skip';
+        __patchLanguage = true;
+        __workerNavigatorDescriptorModes__['language'] = 'patched_accessor';
         emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:language_native_invalid', {
           type: 'browser structure missing data',
           stage: 'preflight',
           module: 'WORKER_PATCH_SRC',
           surface: 'WorkerNavigator',
           key: 'language',
-          policy: 'skip',
-          action: 'keep_native_getter',
+          policy: 'patch',
+          action: 'patch_getter',
           data: {
-            outcome: 'skip',
+            outcome: 'patch',
             reason: 'native_invalid',
             nativeValue: nativeLanguage,
             profileValue: cache.snap.language,
@@ -1270,16 +1276,17 @@
         }, null);
       }
     } catch (e) {
-      __workerNavigatorDescriptorModes__['language'] = 'native_skip';
+      __patchLanguage = true;
+      __workerNavigatorDescriptorModes__['language'] = 'patched_accessor';
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
         type: 'browser structure missing data',
         stage: 'runtime',
         module: 'WORKER_PATCH_SRC',
         surface: 'WorkerNavigator',
         key: 'language',
-        policy: 'skip',
-        action: 'keep_native_getter',
-        data: { outcome: 'skip', reason: 'native_compare_failed' }
+        policy: 'patch',
+        action: 'patch_getter',
+        data: { outcome: 'patch', reason: 'native_compare_failed' }
       }, e);
     }
     if (__patchLanguage) {
@@ -1341,17 +1348,18 @@
               }
             }, null);
           } else {
-            __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
+            __patchLanguages = true;
+            __workerNavigatorDescriptorModes__['languages'] = 'patched_accessor';
             emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:languages_getter_value_mismatch', {
               type: 'browser structure missing data',
               stage: 'preflight',
               module: 'WORKER_PATCH_SRC',
               surface: 'WorkerNavigator',
               key: 'languages',
-              policy: 'skip',
-              action: 'keep_native_getter',
+              policy: 'patch',
+              action: 'patch_getter',
               data: {
-                outcome: 'skip',
+                outcome: 'patch',
                 reason: 'getter_value_mismatch',
                 nativeValue: nativeLanguages.slice(),
                 profileValue: Array.isArray(profileLanguages) ? profileLanguages.slice() : profileLanguages,
@@ -1361,17 +1369,18 @@
           }
         }
       } else {
-        __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
+        __patchLanguages = true;
+        __workerNavigatorDescriptorModes__['languages'] = 'patched_accessor';
         emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:languages_native_invalid', {
           type: 'browser structure missing data',
           stage: 'preflight',
           module: 'WORKER_PATCH_SRC',
           surface: 'WorkerNavigator',
           key: 'languages',
-          policy: 'skip',
-          action: 'keep_native_getter',
+          policy: 'patch',
+          action: 'patch_getter',
           data: {
-            outcome: 'skip',
+            outcome: 'patch',
             reason: 'native_invalid',
             nativeValue: nativeLanguages,
             profileValue: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages,
@@ -1380,16 +1389,17 @@
         }, null);
       }
     } catch (e) {
-      __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
+      __patchLanguages = true;
+      __workerNavigatorDescriptorModes__['languages'] = 'patched_accessor';
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
         type: 'browser structure missing data',
         stage: 'runtime',
         module: 'WORKER_PATCH_SRC',
         surface: 'WorkerNavigator',
         key: 'languages',
-        policy: 'skip',
-        action: 'keep_native_getter',
-        data: { outcome: 'skip', reason: 'native_compare_failed' }
+        policy: 'patch',
+        action: 'patch_getter',
+        data: { outcome: 'patch', reason: 'native_compare_failed' }
       }, e);
     }
     if (__patchLanguages) {
@@ -1480,16 +1490,18 @@
             }
           }, null);
         } else {
+          __patchHardwareConcurrency = true;
+          __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'patched_accessor';
           emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
             type: 'browser structure missing data',
             stage: 'preflight',
             module: 'WORKER_PATCH_SRC',
             surface: 'WorkerNavigator',
             key: 'hardwareConcurrency',
-            policy: 'skip',
-            action: 'keep_native_getter',
+            policy: 'patch',
+            action: 'patch_getter',
             data: {
-              outcome: 'skip',
+              outcome: 'patch',
               reason: 'getter_value_mismatch',
               nativeValue: nativeHardwareConcurrency,
               profileValue: profileHardwareConcurrency,
@@ -1498,17 +1510,18 @@
           }, null);
         }
       } else {
-        __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
+        __patchHardwareConcurrency = true;
+        __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'patched_accessor';
         emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_invalid', {
           type: 'browser structure missing data',
           stage: 'preflight',
           module: 'WORKER_PATCH_SRC',
           surface: 'WorkerNavigator',
           key: 'hardwareConcurrency',
-          policy: 'skip',
-          action: 'keep_native_getter',
+          policy: 'patch',
+          action: 'patch_getter',
           data: {
-            outcome: 'skip',
+            outcome: 'patch',
             reason: 'native_invalid',
             nativeValue: nativeHardwareConcurrencyResolved.value,
             profileValue: Number(cache.snap.hardwareConcurrency),
@@ -1517,16 +1530,17 @@
         }, null);
       }
     } catch (e) {
-      __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
+      __patchHardwareConcurrency = true;
+      __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'patched_accessor';
       emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:compare_failed', {
         type: 'browser structure missing data',
         stage: 'runtime',
         module: 'WORKER_PATCH_SRC',
         surface: 'WorkerNavigator',
         key: 'hardwareConcurrency',
-        policy: 'skip',
-        action: 'keep_native_getter',
-        data: { outcome: 'skip', reason: 'native_compare_failed' }
+        policy: 'patch',
+        action: 'patch_getter',
+        data: { outcome: 'patch', reason: 'native_compare_failed' }
       }, e);
     }
     if (__patchHardwareConcurrency) {
@@ -2031,7 +2045,6 @@
       return (t === 'module' || (!hasType && isModuleURL)) ? 'module' : 'classic';
     };
 
-    const prev = self.__applyEnvSnapshot__;
     const applyWorkerSnapshot = s => {
       if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
       if (cache.snap === s) return;
@@ -2050,7 +2063,6 @@
         }, e);
         throw e;
       }
-      if (typeof prev==='function') prev.call(self,s);
       const stateRoot = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
         ? self.CanvasPatchContext.state
         : null;
@@ -2065,12 +2077,16 @@
         throw new Error('UACHPatch: seed mutation is not allowed');
       }
     };
-    self.__applyEnvSnapshot__ = applyWorkerSnapshot;
+    Object.defineProperty(self, '__consumeEnvSnapshot__', {
+      value: applyWorkerSnapshot,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
     const bootstrapSnap = __resolveWorkerSnapshotOwner__();
     if (!bootstrapSnap) {
       throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
     }
-    cache.snap = requireSnap(bootstrapSnap, 'bootstrap');
     if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
       const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
       emitDegrade('error', 'worker_patch_src:seed:contract:missing_bootstrap', {
@@ -2097,7 +2113,13 @@
       }
       __envSyncBcInstalled = true;
       const bc = new BroadcastChannel('__ENV_SYNC__');
-      bc.onmessage = ev => { const s = ev?.data?.__ENV_SYNC__?.envSnapshot; if (s) applyWorkerSnapshot(s); };
+      bc.onmessage = ev => {
+        const s = ev?.data?.__ENV_SYNC__?.envSnapshot;
+        const applyFn = (typeof self.__consumeEnvSnapshot__ === 'function')
+          ? self.__consumeEnvSnapshot__
+          : null;
+        if (s && applyFn) applyFn(s);
+      };
     }
     if (self.Worker && !self.Worker.__ENV_WRAPPED__) {
       const NativeWorker = self.Worker;
@@ -2114,8 +2136,8 @@
         const SEED = JSON.stringify((self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '');
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'
-          ? `(async function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
-          : `(function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s)self.__applyEnvSnapshot__(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
+          ? `(async function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__consumeEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;const applyFn=(typeof self.__consumeEnvSnapshot__==='function')?self.__consumeEnvSnapshot__:((typeof self.__applyEnvSnapshot__==='function')?self.__applyEnvSnapshot__:null);if(s&&applyFn)applyFn(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
+          : `(function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__consumeEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;var applyFn=(typeof self.__consumeEnvSnapshot__==='function')?self.__consumeEnvSnapshot__:((typeof self.__applyEnvSnapshot__==='function')?self.__applyEnvSnapshot__:null);if(s&&applyFn)applyFn(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
         return [blobURL, { ...(opts || {}), type: workerType }];
       });

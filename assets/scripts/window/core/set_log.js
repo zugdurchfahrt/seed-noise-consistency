@@ -220,10 +220,85 @@ const LOGGingModule = function LOGGingModule() {
         (typeof c.stage === "string") ? c.stage : "",
         (typeof c.message === "string") ? c.message : "",
         (typeof c.type === "string") ? c.type : "",
+        (typeof c.scope === "string") ? c.scope : "",
+        (typeof c.scopeKind === "string") ? c.scopeKind : "",
+        (typeof c.scopeLabel === "string") ? c.scopeLabel : "",
         consoleGroup,
         eName,
         eMsg
       ].join("|");
+    }
+
+    function resolveDiagScopeIdentity(ctx, data) {
+      const safeCtx = (ctx && typeof ctx === "object") ? ctx : {};
+      const safeData = (data && typeof data === "object") ? data : null;
+      const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === "object")
+        ? stateRoot.__WRK__
+        : null;
+      const wrkRuntime = (wrkState && wrkState.runtime && typeof wrkState.runtime === "object")
+        ? wrkState.runtime
+        : null;
+      const explicitScope = (typeof safeCtx.scope === "string" && safeCtx.scope)
+        ? safeCtx.scope
+        : ((safeData && typeof safeData.scope === "string" && safeData.scope) ? safeData.scope : null);
+      const explicitKind = (typeof safeCtx.scopeKind === "string" && safeCtx.scopeKind)
+        ? safeCtx.scopeKind
+        : ((safeData && typeof safeData.scopeKind === "string" && safeData.scopeKind) ? safeData.scopeKind : null);
+      const explicitLabel = (typeof safeCtx.scopeLabel === "string" && safeCtx.scopeLabel)
+        ? safeCtx.scopeLabel
+        : ((safeData && typeof safeData.scopeLabel === "string" && safeData.scopeLabel) ? safeData.scopeLabel : null);
+      const explicitScopeKindFromScope = explicitScope === "ServiceWorker"
+        ? "service"
+        : (explicitScope === "SharedWorker"
+          ? "shared"
+          : (explicitScope === "Worker"
+            ? "dedicated"
+            : (explicitScope === "Window" ? "window" : null)));
+      const explicitScopeLabelFromScope = explicitScope === "ServiceWorker"
+        ? "ServiceWorkerGlobalScope"
+        : (explicitScope === "SharedWorker"
+          ? "SharedWorkerGlobalScope"
+          : (explicitScope === "Worker"
+            ? "WorkerGlobalScope"
+            : (explicitScope === "Window" ? "WindowGlobalScope" : null)));
+      const runtimeKind = (wrkRuntime && typeof wrkRuntime.workerScopeKind === "string" && wrkRuntime.workerScopeKind)
+        ? wrkRuntime.workerScopeKind
+        : ((wrkRuntime && typeof wrkRuntime.serviceWorkerScopeKind === "string" && wrkRuntime.serviceWorkerScopeKind)
+            ? wrkRuntime.serviceWorkerScopeKind
+            : null);
+      let actualKind = null;
+      let actualLabel = null;
+      try {
+        if (typeof ServiceWorkerGlobalScope === "function" && global instanceof ServiceWorkerGlobalScope) {
+          actualKind = "service";
+          actualLabel = "ServiceWorkerGlobalScope";
+        } else if (typeof SharedWorkerGlobalScope === "function" && global instanceof SharedWorkerGlobalScope) {
+          actualKind = "shared";
+          actualLabel = "SharedWorkerGlobalScope";
+        } else if (typeof WorkerGlobalScope === "function" && global instanceof WorkerGlobalScope) {
+          actualKind = "dedicated";
+          actualLabel = "WorkerGlobalScope";
+        } else if (W && global === W) {
+          actualKind = "window";
+          actualLabel = "WindowGlobalScope";
+        }
+      } catch (_) {}
+      const scopeKind = explicitKind || explicitScopeKindFromScope || runtimeKind || actualKind || null;
+      const scope = explicitScope || (
+        scopeKind === "service" ? "ServiceWorker" :
+        scopeKind === "shared" ? "SharedWorker" :
+        scopeKind === "dedicated" ? "Worker" :
+        scopeKind === "window" ? "Window" :
+        null
+      );
+      const scopeLabel = explicitLabel || explicitScopeLabelFromScope || actualLabel || (
+        scopeKind === "service" ? "ServiceWorkerGlobalScope" :
+        scopeKind === "shared" ? "SharedWorkerGlobalScope" :
+        scopeKind === "dedicated" ? "WorkerGlobalScope" :
+        scopeKind === "window" ? "WindowGlobalScope" :
+        null
+      );
+      return { scope, scopeKind, scopeLabel };
     }
 
     // Returns true only for first N copies of the same signature.
@@ -707,6 +782,9 @@ const LOGGingModule = function LOGGingModule() {
             critical: !!DIAG_CRITICAL_LEVELS[String(level)],
             code: (typeof entry.code === "string" && entry.code) ? entry.code : null,
             stage: (typeof extra.stage === "string" && extra.stage) ? extra.stage : null,
+            scope: (typeof extra.scope === "string" && extra.scope) ? extra.scope : null,
+            scopeKind: (typeof extra.scopeKind === "string" && extra.scopeKind) ? extra.scopeKind : null,
+            scopeLabel: (typeof extra.scopeLabel === "string" && extra.scopeLabel) ? extra.scopeLabel : null,
             message: (typeof extra.message === "string" && extra.message) ? extra.message : errMessage,
             errName: errName,
             errMessage: errMessage,
@@ -907,6 +985,15 @@ const LOGGingModule = function LOGGingModule() {
       const codeValue = (entry && typeof entry.code === "string" && entry.code)
         ? entry.code
         : (incident && typeof incident.code === "string" ? incident.code : ((entry && typeof entry.type === "string") ? entry.type : null));
+      const scopeValue = (typeof extra.scope === "string" && extra.scope)
+        ? extra.scope
+        : ((incident && typeof incident.scope === "string" && incident.scope) ? incident.scope : null);
+      const scopeKindValue = (typeof extra.scopeKind === "string" && extra.scopeKind)
+        ? extra.scopeKind
+        : ((incident && typeof incident.scopeKind === "string" && incident.scopeKind) ? incident.scopeKind : null);
+      const scopeLabelValue = (typeof extra.scopeLabel === "string" && extra.scopeLabel)
+        ? extra.scopeLabel
+        : ((incident && typeof incident.scopeLabel === "string" && incident.scopeLabel) ? incident.scopeLabel : null);
       if (
         extra
         && typeof extra === "object"
@@ -928,7 +1015,7 @@ const LOGGingModule = function LOGGingModule() {
         }
         const nextObserved = (data.observedData && typeof data.observedData === "object") ? data.observedData : null;
         if (nextObserved) {
-          const workerKeys = ["scopeKind", "language", "languages", "deviceMemory", "hardwareConcurrency", "uaData"];
+          const workerKeys = ["scope", "scopeKind", "scopeLabel", "language", "languages", "deviceMemory", "hardwareConcurrency", "uaData"];
           for (let i = 0; i < workerKeys.length; i++) {
             const k = workerKeys[i];
             if (!Object.prototype.hasOwnProperty.call(data, k) && Object.prototype.hasOwnProperty.call(nextObserved, k)) {
@@ -944,6 +1031,9 @@ const LOGGingModule = function LOGGingModule() {
         module: moduleName,
         key: keyValue,
         code: codeValue,
+        scope: scopeValue,
+        scopeKind: scopeKindValue,
+        scopeLabel: scopeLabelValue,
         error: errorValue,
         extra: shapedExtra,
         timestamp: formatCompactTimestamp(safeEntryTimestamp(entry)),
@@ -1835,7 +1925,7 @@ const LOGGingModule = function LOGGingModule() {
       if (dataIn !== null && (typeof dataIn !== "object" && typeof dataIn !== "function")) {
         dataIn = {};
       }
-      const safeData = (dataIn === null)
+      let safeData = (dataIn === null)
         ? null
         : (
             safeCtx
@@ -1845,6 +1935,18 @@ const LOGGingModule = function LOGGingModule() {
           )
           ? normalizeProbeReportData(dataIn)
           : normalizeForJSONWithLimits(dataIn, serialLimits);
+      const scopeInfo = resolveDiagScopeIdentity(safeCtx, safeData);
+      if (safeData && typeof safeData === "object" && !Array.isArray(safeData)) {
+        if (typeof scopeInfo.scope === "string" && scopeInfo.scope && !Object.prototype.hasOwnProperty.call(safeData, "scope")) {
+          safeData = Object.assign({}, safeData, { scope: scopeInfo.scope });
+        }
+        if (typeof scopeInfo.scopeKind === "string" && scopeInfo.scopeKind && !Object.prototype.hasOwnProperty.call(safeData, "scopeKind")) {
+          safeData = Object.assign({}, safeData, { scopeKind: scopeInfo.scopeKind });
+        }
+        if (typeof scopeInfo.scopeLabel === "string" && scopeInfo.scopeLabel && !Object.prototype.hasOwnProperty.call(safeData, "scopeLabel")) {
+          safeData = Object.assign({}, safeData, { scopeLabel: scopeInfo.scopeLabel });
+        }
+      }
 
       const extraObj = {
         level: normalizedLevel,
@@ -1861,6 +1963,9 @@ const LOGGingModule = function LOGGingModule() {
             : ((typeof safeCtx.module === "string" && safeCtx.module) ? safeCtx.module : undefined)),
         stage: (typeof safeCtx.stage === "string") ? safeCtx.stage : undefined,
         message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
+        scope: (typeof scopeInfo.scope === "string" && scopeInfo.scope) ? scopeInfo.scope : undefined,
+        scopeKind: (typeof scopeInfo.scopeKind === "string" && scopeInfo.scopeKind) ? scopeInfo.scopeKind : undefined,
+        scopeLabel: (typeof scopeInfo.scopeLabel === "string" && scopeInfo.scopeLabel) ? scopeInfo.scopeLabel : undefined,
         data: safeData
       };
 

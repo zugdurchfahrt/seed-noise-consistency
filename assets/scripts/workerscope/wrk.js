@@ -611,7 +611,13 @@ function EnvBus(G){
     ? __geoStateRoot.timezone
     : null;
   function envSnapshot(){
-    const snap = __requireWorkerEnvSnapshot();
+    const ownerSnap = __requireWorkerEnvSnapshot();
+    const snap = (ownerSnap && typeof ownerSnap === 'object')
+      ? __cloneEnvValue(ownerSnap)
+      : null;
+    if (!snap || typeof snap !== 'object') {
+      throw new Error('EnvBus: worker env snapshot missing');
+    }
     const stateRoot = __resolveCanvasPatchStateRoot();
     const cpu = Number(snap.hardwareConcurrency);
     const mem = Number(snap.deviceMemory);
@@ -681,21 +687,21 @@ function EnvBus(G){
     snap.mem = mem;
     snap.dpr = dpr;
     snap.timeZone = timeZone;
-    snap.fontsState = __cloneFontsStateForWorker__();
-    snap.fontsConfig = __cloneFontsConfigForWorker__();
     snap.envProfile = envProfile;
-    const windowKeys = (() => {
+    (() => {
+      const existing = __wrkRuntimeGet__('windowKeys');
+      if (Array.isArray(existing) && existing.length) return existing;
       try {
         const keys = Object.getOwnPropertyNames(G);
         if (!Array.isArray(keys) || keys.length === 0) {
           throw new Error('EnvBus: windowKeys missing');
         }
+        __wrkRuntimeSet__('windowKeys', keys.slice());
         return keys;
       } catch (e) {
         throw new Error('EnvBus: windowKeys missing');
       }
     })();
-    snap.windowKeys = windowKeys;
     return snap;
   }
 
@@ -1001,8 +1007,11 @@ function mkWorkerBootstrapCore(opts){
             try {
               var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
               var syncSnap = syncPacket && syncPacket.envSnapshot;
-              if (syncSnap && typeof self.__applyEnvSnapshot__ === 'function') {
-                self.__applyEnvSnapshot__(syncSnap);
+              var syncApply = (typeof self.__consumeEnvSnapshot__ === 'function')
+                ? self.__consumeEnvSnapshot__
+                : ((typeof self.__applyEnvSnapshot__ === 'function') ? self.__applyEnvSnapshot__ : null);
+              if (syncSnap && syncApply) {
+                syncApply(syncSnap);
               }
             } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_env_sync' }); }
           });
@@ -1030,8 +1039,11 @@ function mkWorkerBootstrapCore(opts){
                       try {
                         var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
                         var syncSnap = syncPacket && syncPacket.envSnapshot;
-                        if (syncSnap && typeof self.__applyEnvSnapshot__ === 'function') {
-                          self.__applyEnvSnapshot__(syncSnap);
+                        var syncApply = (typeof self.__consumeEnvSnapshot__ === 'function')
+                          ? self.__consumeEnvSnapshot__
+                          : ((typeof self.__applyEnvSnapshot__ === 'function') ? self.__applyEnvSnapshot__ : null);
+                        if (syncSnap && syncApply) {
+                          syncApply(syncSnap);
                         }
                       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_env_sync' }); }
                     });
@@ -1603,6 +1615,10 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
   }
   function __publishCurrentWorkerSnapshot__(reason) {
     const snap = requireWorkerSnapshot(__bridgeEnvBus.envSnapshot(), reason);
+    if (reason === 'fonts-ready' || reason === 'fonts-failed') {
+      snap.fontsState = __cloneFontsStateForWorker__();
+      snap.fontsConfig = __cloneFontsConfigForWorker__();
+    }
     __wrkRuntimeSet__('lastSnap', snap);
     publishSnapshot(snap);
     return snap;
