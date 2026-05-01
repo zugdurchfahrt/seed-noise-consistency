@@ -33,6 +33,24 @@ DYNAMIC_OVERRIDES = [
     "Sec-CH-Device-Memory",
     "Device-Memory"
 ]
+HEADER_TWIN_PAIRS = (
+    ("Sec-CH-Device-Memory", "Device-Memory"),
+)
+
+
+def _synchronize_header_twins(headers: dict, twin_pairs=HEADER_TWIN_PAIRS):
+    if not isinstance(headers, dict):
+        return headers
+    for left_key, right_key in twin_pairs:
+        has_left = left_key in headers and headers[left_key] is not None
+        has_right = right_key in headers and headers[right_key] is not None
+        if not has_left and not has_right:
+            continue
+        canonical_value = headers[left_key] if has_left else headers[right_key]
+        headers[left_key] = canonical_value
+        headers[right_key] = canonical_value
+    return headers
+
 # ===== Accept-Language HEADER =====
 def _accept_language_family(browser_brand: str | None = None, user_agent: str | None = None) -> str:
     brand = (browser_brand or "").strip().lower()
@@ -117,6 +135,42 @@ def derive_accept_language(profile, expected_client_hints=None, user_agent: str 
         user_agent=(user_agent or ((profile or {}).get("user_agent") if isinstance(profile, dict) else None)),
     )
 
+
+def build_safelisted_headers(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):
+    profile = profile or {}
+    expected_client_hints = expected_client_hints if isinstance(expected_client_hints, dict) else {}
+    active_user_agent = user_agent or str(profile.get("user_agent") or "")
+    active_brand = browser_brand or profile.get("browser_brand")
+    accept_language = profile.get("accept_language") or derive_accept_language(
+        profile,
+        expected_client_hints=expected_client_hints,
+        user_agent=active_user_agent,
+        browser_brand=active_brand,
+    )
+    family = _accept_language_family(browser_brand=active_brand, user_agent=active_user_agent)
+    device_memory = expected_client_hints["deviceMemory"] if "deviceMemory" in expected_client_hints else profile.get("deviceMemory")
+
+    # Editable policy surface: keep family-specific header choices together here.
+    base_headers = {
+        "Accept-Language": str(accept_language),
+    }
+    family_overrides = {
+        "firefox": {
+            "Sec-CH-UA": "",
+        },
+        "safari": {
+            "Sec-CH-UA": "",
+        },
+        "chromium": {
+            "Sec-CH-Device-Memory": str(device_memory),
+            "Device-Memory": str(device_memory),
+        },
+    }
+
+    headers = dict(base_headers)
+    headers.update(family_overrides.get(family, family_overrides["chromium"]))
+    return _synchronize_header_twins(headers)
+
 # ===== Accept-HEADER FORGE=====
 def _brand_key(browser_brand: str) -> str:
     b = (browser_brand or "").strip().lower()
@@ -160,14 +214,14 @@ def outbound_headers_forge(profile, expected_client_hints, user_agent):
     is_firefox = "Firefox" in user_agent and "Chrome" not in user_agent and "Edg/" not in str(profile["user_agent"])
 
     if is_safari or is_firefox:
-        return {
+        return _synchronize_header_twins({
             "Sec-CH-UA": "",
             "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
             "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
             "Accept-Language": al,
-        }
+        })
 
-    return {
+    return _synchronize_header_twins({
     # Базовая ветка (Chromium-family): AL из profile.languages → совпадает с navigator.languages
         # Core client hints
         "Accept": str(expected_client_hints["accept"]),
@@ -183,7 +237,7 @@ def outbound_headers_forge(profile, expected_client_hints, user_agent):
         # header-twin значения из build_expected_client_hints(), чтобы пары не разъезжались.
         # Extended client hints
         "Sec-CH-UA-Platform-Version": f'"{expected_client_hints["platformVersion"]}"',
-        "Sec-CH-UA-Full-Version": expected_client_hints.get("sec_ch_ua_full_version", ""),
+        "Sec-CH-UA-Full-Version": expected_client_hints["sec_ch_ua_full_version", ""],
         "Sec-CH-UA-Full-Version-List": expected_client_hints["sec_ch_ua_full_version_list"],
         "Sec-CH-UA-Arch": expected_client_hints.get("architecture"),
         "Sec-CH-UA-Bitness": expected_client_hints.get("bitness"),
@@ -200,7 +254,7 @@ def outbound_headers_forge(profile, expected_client_hints, user_agent):
         # devicepixelratio
         "Sec-CH-DPR": str(profile["device_dpr_value"]),
         "DPR": str(profile["device_dpr_value"]),
-    }
+    })
 
 def import_headers(headers, keys, flow):
     for k in keys:

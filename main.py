@@ -777,31 +777,15 @@ def init_driver(
     #  No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
     # =========================
 
-    # # --- [CH/01] detect UA family for safelisted headers ---
-    is_safari = "Safari" in user_agent and ("Chrome" not in user_agent and "Edg/" not in user_agent)
-    is_firefox = "Firefox" in user_agent and ("Chrome" not in user_agent and "Edg/" not in user_agent)
+    # --- [CH/01] build safelisted_headers (minimal set, single source of truth) ---
+    safelisted_headers = headers_adapter_module.build_safelisted_headers(
+        profile,
+        expected_client_hints=expected_client_hints,
+        user_agent=user_agent,
+        browser_brand=profile.get("browser_brand"),
+    )
 
-    # --- [CH/02] build safelisted_headers (minimal set) ---
-    if is_firefox or is_safari:
-        safelisted_headers = {
-            "Accept-Language": str(profile.get("accept_language")),
-            "Sec-CH-UA": "",
-            # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
-            # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
-        }
-    else:
-        safelisted_headers = {
-            # Main client hints
-            # "Accept": str(expected_client_hints["accept"]),
-            "Accept-Language": str(profile.get("accept_language")),
-            "Sec-CH-Device-Memory": str(profile["deviceMemory"]),
-            "Device-Memory": str(profile["deviceMemory"]),
-            # "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
-            # "Sec-CH-UA-Mobile": "?0" if not expected_client_hints.get("mobile") else "?1",
-            # "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
-        }
-
-    # --- [CH/03] CDP: apply HTTP headers for requests (affects navigation after this call) ---
+    # --- [CH/02] CDP: apply HTTP headers for requests (affects navigation after this call) ---
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": safelisted_headers})
 
     # =========================
@@ -1329,7 +1313,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://www.browserscan.net/client-hints")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

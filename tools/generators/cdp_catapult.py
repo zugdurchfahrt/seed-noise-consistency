@@ -12,7 +12,6 @@ from tools.tools_infra.overseer import logger
 
 # Use the project's existing logging pipeline (overseer.setup_logger -> intention_entitled.log).
 logger = logger.getChild("cdp_catapult")
-sw_relay_logger = logger.getChild("sw_relay")
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -118,21 +117,32 @@ def _log_sw_relay_diag(session_id: str, target_id: str, payload):
     code = str(record.get("code") or "sw_relay:unknown")
     ctx = record.get("ctx") if isinstance(record.get("ctx"), dict) else {}
     err = record.get("error") if isinstance(record.get("error"), dict) else None
-    row = {
+    data = ctx.get("data") if isinstance(ctx.get("data"), dict) else {}
+    outcome = str(data.get("outcome") or "").lower()
+    high_signal = (
+        level in ("error", "fatal")
+        or outcome in ("throw", "rollback")
+        or err is not None
+    )
+    if not high_signal:
+        return
+    summary = {
+        "code": code,
+        "stage": ctx.get("stage"),
+        "key": ctx.get("key"),
+        "message": ctx.get("message"),
+        "outcome": data.get("outcome"),
+        "reason": data.get("reason"),
         "sessionId": session_id,
         "targetId": target_id,
-        "level": level,
-        "code": code,
-        "ctx": ctx,
-        "error": err,
     }
-    line = json.dumps(row, ensure_ascii=False, sort_keys=True)
+    if err:
+        summary["error"] = err
+    line = json.dumps(summary, ensure_ascii=False, sort_keys=True)
     if level in ("error", "fatal"):
-        sw_relay_logger.error("SW relay diag: %s", line)
-    elif level == "warn":
-        sw_relay_logger.warning("SW relay diag: %s", line)
+        logger.error("SW relay blocker: %s", line)
     else:
-        sw_relay_logger.info("SW relay diag: %s", line)
+        logger.warning("SW relay blocker: %s", line)
 
 
 
