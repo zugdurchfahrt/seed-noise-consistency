@@ -1522,6 +1522,19 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
     inlineCanvasPatch: inlineCanvasPatch,
     inlineContextPatch: inlineContextPatch,
     patchUrlMissingMessage: 'UACHPatch: missing workerPatchClassic URL',
+    prePatchOwnerSource: `
+      (function __installWorkerCoreOwners__(){
+        var __runInlineModule__ = function(source, exportName, label) {
+          if (typeof source !== 'string' || !source) throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
+          var runner = new Function('window', source + '\\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
+          return runner(self);
+        };
+        __runInlineModule__(${JSON.stringify(inlineCoreWindow)}, 'CoreWindowModule', 'inlineCoreWindow');
+        __runInlineModule__(${JSON.stringify(inlinePrng)}, 'RNGsetModule', 'inlinePrng');
+        if (!self.Core || typeof self.Core !== 'object') throw new Error('UACHPatch: worker Core missing after bootstrap owner install');
+        if (!self.Core.__internal || typeof self.Core.__internal !== 'object') throw new Error('UACHPatch: worker Core.__internal missing after bootstrap owner install');
+        if (!self.Core.__internal.prng || typeof self.Core.__internal.prng !== 'object') throw new Error('UACHPatch: worker Core.__internal.prng missing after bootstrap owner install');
+      })();`,
     patchLoaderSource: `
         importScripts(PATCH_URL);`,
     userLoaderSource: `

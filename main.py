@@ -451,6 +451,7 @@ def init_driver(
         user_agent=user_agent,
         navigator_platform=dom_platform,
     )
+    cdp.enable_seed_inject(global_seed)
     sw_thread = threading.Thread(target=cdp.run, daemon=True, name="cdp_sw_bootstrap")
     sw_thread.start()
     logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
@@ -462,7 +463,10 @@ def init_driver(
         worker_patch_src = Path(SCRIPTS_WORKERSCOPE / "WORKER_PATCH_SRC.js").read_text("utf-8")
         worker_reflect_src = Path(SCRIPTS_WORKERSCOPE / "set_reflect.js").read_text("utf-8")
         worker_core_window_src = Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8")
-        worker_prng_src = Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8")
+        worker_prng_src = "\n".join([
+            cdp._build__seed_value(global_seed),
+            Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
+        ])
         worker_canvas_src = Path(SCRIPTS_PATCHES_GRAPHICS / "canvas.js").read_text("utf-8")
         worker_context_src = Path(SCRIPTS_CORE / "context.js").read_text("utf-8")
         parts = [

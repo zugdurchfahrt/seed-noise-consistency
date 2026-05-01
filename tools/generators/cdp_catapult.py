@@ -27,6 +27,8 @@ SW_DM = None
 SW_META = None
 SW_WEBGL = None
 SW_BOOTSTRAP_ENV = None
+SEED_INJECT_ENABLED = False
+CDP_GLOBAL_SEED = None
 _RUNNING = False
 _SW_WS = None
 _SW_STOPPING = False
@@ -171,7 +173,7 @@ def enable_sw_bootstrap_env(
         raise ValueError("SW bootstrap: expected_client_hints.brands missing")
     if not isinstance(full_version_list, list) or not full_version_list:
         raise ValueError("SW bootstrap: expected_client_hints.fullVersionList missing")
-    for key in ("platformVersion","uaFullVersion","fullVersionList","architecture","bitness","model","wow64","formFactors"):
+    for key in ("platform", "platformVersion", "uaFullVersion", "architecture", "bitness", "model"):
         if not isinstance(meta.get(key), str):
             raise ValueError(f"SW bootstrap: expected_client_hints.{key} missing")
     if not isinstance(meta.get("mobile"), bool):
@@ -240,12 +242,12 @@ def enable_sw_bootstrap_env(
     SW_BOOTSTRAP_ENABLED = True
 
 
-def enable_worker_seed_inject(global_seed: str):
-    global WORKER_SEED_INJECT_ENABLED, WORKER_GLOBAL_SEED
+def enable_seed_inject(global_seed: str):
+    global SEED_INJECT_ENABLED, CDP_GLOBAL_SEED
     if not isinstance(global_seed, str) or not global_seed.strip():
         raise ValueError("Worker seed inject: global_seed must be non-empty str")
-    WORKER_GLOBAL_SEED = global_seed
-    WORKER_SEED_INJECT_ENABLED = True
+    CDP_GLOBAL_SEED = global_seed
+    SEED_INJECT_ENABLED = True
 
 
 
@@ -344,7 +346,7 @@ def _build_sw_user_agent_override(sw_env: dict) -> dict:
     }
 
 
-def _build_worker_seed_prelude(global_seed: str) -> str:
+def _build__seed_value(global_seed: str) -> str:
     if not isinstance(global_seed, str) or not global_seed.strip():
         raise ValueError("Worker seed inject: global_seed must be non-empty str")
     return f"""
@@ -458,9 +460,9 @@ def run():
     sw_bootstrap_prelude = None
     sw_user_agent_override = None
     sw_expected = None
-    worker_seed_enabled = WORKER_SEED_INJECT_ENABLED is True
-    worker_seed_value = str(WORKER_GLOBAL_SEED or "") if worker_seed_enabled else ""
-    worker_seed_prelude = None
+    seed_enabled = SEED_INJECT_ENABLED is True
+    worker_seed_value = str(CDP_GLOBAL_SEED or "") if seed_enabled else ""
+    _seed_value = None
     worker_seed_sanity_expr = None
     if do_prelude:
         if not isinstance(SW_BOOTSTRAP_ENV, dict):
@@ -496,11 +498,11 @@ def run():
             _RUNNING = False
             raise RuntimeError("SW bootstrap: SW_BOOTSTRAP_ENV hardwareConcurrency mismatch")
         sw_bootstrap_prelude = _build_sw_bootstrap_prelude(SW_BOOTSTRAP_ENV)
-    if worker_seed_enabled:
+    if seed_enabled:
         if not worker_seed_value:
             _RUNNING = False
-            raise RuntimeError("Worker seed inject: WORKER_GLOBAL_SEED missing")
-        worker_seed_prelude = _build_worker_seed_prelude(worker_seed_value)
+            raise RuntimeError("Worker seed inject: CDP_GLOBAL_SEED missing")
+        _seed_value = _build__seed_value(worker_seed_value)
         worker_seed_sanity_expr = (
             "(() => {"
             " const G = globalThis;"
@@ -545,7 +547,7 @@ def run():
             " }"
             " return Promise.resolve("
             "   (typeof uad.getHighEntropyValues === 'function')"
-            "     ? uad.getHighEntropyValues(['fullVersionList','uaFullVersion'])"
+            "     ? uad.getHighEntropyValues(['architecture','bitness','formFactors','fullVersionList','model','platformVersion','uaFullVersion','wow64'])"
             "     : null"
             " ).then(function(he) {"
             "  return {"
@@ -557,8 +559,14 @@ def run():
             "    platform: uad.platform,"
             "    mobile: uad.mobile,"
             "    brands: uad.brands,"
+            "    heArchitecture: he && he.architecture,"
+            "    heBitness: he && he.bitness,"
+            "    heFormFactors: he && he.formFactors,"
+            "    heModel: he && he.model,"
+            "    hePlatformVersion: he && he.platformVersion,"
             "    heUaFullVersion: he && he.uaFullVersion,"
-            "    heFullVersionList: he && he.fullVersionList"
+            "    heFullVersionList: he && he.fullVersionList,"
+            "    heWow64: he && he.wow64"
             "   }"
             "  };"
             " });"
@@ -621,8 +629,8 @@ def run():
                         tag = "Runtime.evaluate:sw_bootstrap_prelude"
                     elif expr == sanity_expr:
                         tag = "Runtime.evaluate:sw_sanity"
-                    elif worker_seed_prelude and expr == worker_seed_prelude:
-                        tag = "Runtime.evaluate:worker_seed_prelude"
+                    elif _seed_value and expr == _seed_value:
+                        tag = "Runtime.evaluate:_seed_value"
                     elif worker_seed_sanity_expr and expr == worker_seed_sanity_expr:
                         tag = "Runtime.evaluate:worker_seed_sanity"
                 elif method == "Runtime.addBinding" and params.get("name") == _SW_DIAG_BINDING:
@@ -642,25 +650,17 @@ def run():
             "waitForDebuggerOnStart": True,
             # Required for browser-level auto-attach.
             "flatten": True,
-            "filter": (
-                [
-                    {"type": "service_worker", "exclude": False},
-                    {"type": "worker", "exclude": False},
-                    {"type": "shared_worker", "exclude": False},
-                ]
-                if worker_seed_enabled else
-                [{"type": "service_worker", "exclude": False}]
-            ),
+            "filter": [{"type": "service_worker", "exclude": False}],
         }
 
         # важно: ставим tag, иначе обработка ошибки фильтра не сработает
         send(ws, "Target.setAutoAttach", params, tag="autoattach_sw_only")
         logger.info(
             "SW bootstrap: enabled (autoAttach) filter=%s",
-            "service_worker,worker,shared_worker" if worker_seed_enabled else "service_worker",
+            "service_worker",
         )
-        if worker_seed_enabled:
-            logger.info("Worker seed inject: enabled (autoAttach) filter=worker,shared_worker")
+        if seed_enabled:
+            logger.info("Worker seed inject: enabled (autoAttach) filter=service_worker")
 
        
     def on_message(ws, message):
@@ -680,15 +680,6 @@ def run():
             if tag == "autoattach_sw_only" and msg.get("error"):
                 _fatal(ws, "autoattach filter unsupported", msg.get("error"))
                 return
-            if isinstance(tag, str) and tag.startswith("attach_worker_seed:"):
-                if msg.get("error"):
-                    tid = tag.split(":", 1)[1] if ":" in tag else "unknown"
-                    logger.warning(
-                        "Worker seed inject: manual attach failed targetId=%s err=%r",
-                        tid,
-                        msg.get("error"),
-                    )
-                return
             # Session-level response error handling (flatten protocol).
             if sid and msg.get("error"):
                 if tag in ("Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity"):
@@ -704,7 +695,7 @@ def run():
                 _fatal(ws, f"session cmd failed: {tag or 'unknown'}", msg.get("error"))
                 return
             # Runtime.evaluate may include exceptionDetails inside result.
-            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity", "Runtime.evaluate:worker_seed_prelude", "Runtime.evaluate:worker_seed_sanity"):
+            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity", "Runtime.evaluate:_seed_value", "Runtime.evaluate:worker_seed_sanity"):
                 res = msg.get("result") or {}
                 exc = res.get("exceptionDetails")
                 if exc:
@@ -778,6 +769,26 @@ def run():
                             _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
                             return
                         exp_he = exp["uad"].get("he") or {}
+                        if uad.get("heArchitecture") != exp_he.get("architecture"):
+                            _resume_sw_session(ws, sid, "sanity_uad_he_architecture_mismatch")
+                            _fatal(ws, "sw sanity: uad high entropy architecture mismatch", {"expected": exp, "got": out})
+                            return
+                        if uad.get("heBitness") != exp_he.get("bitness"):
+                            _resume_sw_session(ws, sid, "sanity_uad_he_bitness_mismatch")
+                            _fatal(ws, "sw sanity: uad high entropy bitness mismatch", {"expected": exp, "got": out})
+                            return
+                        if list(uad.get("heFormFactors") or []) != list(exp_he.get("formFactors") or []):
+                            _resume_sw_session(ws, sid, "sanity_uad_he_form_factors_mismatch")
+                            _fatal(ws, "sw sanity: uad high entropy formFactors mismatch", {"expected": exp, "got": out})
+                            return
+                        if uad.get("heModel") != exp_he.get("model"):
+                            _resume_sw_session(ws, sid, "sanity_uad_he_model_mismatch")
+                            _fatal(ws, "sw sanity: uad high entropy model mismatch", {"expected": exp, "got": out})
+                            return
+                        if uad.get("hePlatformVersion") != exp_he.get("platformVersion"):
+                            _resume_sw_session(ws, sid, "sanity_uad_he_platform_version_mismatch")
+                            _fatal(ws, "sw sanity: uad high entropy platformVersion mismatch", {"expected": exp, "got": out})
+                            return
                         if uad.get("heUaFullVersion") != exp_he.get("uaFullVersion"):
                             _resume_sw_session(ws, sid, "sanity_uad_he_ua_full_version_mismatch")
                             _fatal(ws, "sw sanity: uad high entropy uaFullVersion mismatch", {"expected": exp, "got": out})
@@ -785,6 +796,10 @@ def run():
                         if list(uad.get("heFullVersionList") or []) != list(exp_he.get("fullVersionList") or []):
                             _resume_sw_session(ws, sid, "sanity_uad_he_full_version_mismatch")
                             _fatal(ws, "sw sanity: uad high entropy fullVersionList mismatch", {"expected": exp, "got": out})
+                            return
+                        if bool(uad.get("heWow64")) != bool(exp_he.get("wow64")):
+                            _resume_sw_session(ws, sid, "sanity_uad_he_wow64_mismatch")
+                            _fatal(ws, "sw sanity: uad high entropy wow64 mismatch", {"expected": exp, "got": out})
                             return
                         logger.info("SW inject: sanity accepted target values")
                         _resume_sw_session(ws, sid, "sanity_ok")
@@ -820,23 +835,6 @@ def run():
             ttype = info.get("type")
             tid = info.get("targetId")
             turl = info.get("url")
-            if worker_seed_enabled and ttype in ("worker", "shared_worker") and tid and tid not in injected and tid not in manual_attach_sent:
-                manual_attach_sent.add(tid)
-                logger.info(
-                    "Worker seed inject: targetCreated %s targetId=%s url=%r -> manual attach",
-                    ttype,
-                    tid,
-                    turl,
-                )
-                try:
-                    send(
-                        ws,
-                        "Target.attachToTarget",
-                        {"targetId": tid, "flatten": True},
-                        tag=f"attach_worker_seed:{tid}",
-                    )
-                except Exception as e:
-                    _patch_skipped("manual attach send failed", e)
             return
 
         if msg.get("method") == "Runtime.bindingCalled":
@@ -880,7 +878,7 @@ def run():
         if not sessionId or not tid:
             return
 
-        if worker_seed_enabled and ttype in ("worker", "shared_worker"):
+        if seed_enabled and ttype in ("service_worker"):
             if tid in injected:
                 return
             injected.add(tid)
@@ -888,7 +886,7 @@ def run():
             logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
             try:
                 send_sess(ws, sessionId, "Runtime.enable")
-                send_sess(ws, sessionId, "Runtime.evaluate", {"expression": worker_seed_prelude, "awaitPromise": True})
+                send_sess(ws, sessionId, "Runtime.evaluate", {"expression": _seed_value, "awaitPromise": True})
                 send_sess(ws, sessionId, "Runtime.evaluate", {"expression": worker_seed_sanity_expr, "returnByValue": True, "awaitPromise": False})
             except Exception as e:
                 _fatal(ws, "worker seed inject failed", e)
