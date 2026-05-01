@@ -456,14 +456,12 @@ def run():
 
     msg_id = {"v": 0}
     injected = set()   # targetId set
-    manual_attach_sent = set()
     sw_bootstrap_prelude = None
     sw_user_agent_override = None
     sw_expected = None
     seed_enabled = SEED_INJECT_ENABLED is True
-    worker_seed_value = str(CDP_GLOBAL_SEED or "") if seed_enabled else ""
-    _seed_value = None
-    worker_seed_sanity_expr = None
+    _seed_value = str(CDP_GLOBAL_SEED or "") if seed_enabled else ""
+    sanity_expr = None
     if do_prelude:
         if not isinstance(SW_BOOTSTRAP_ENV, dict):
             _RUNNING = False
@@ -499,11 +497,16 @@ def run():
             raise RuntimeError("SW bootstrap: SW_BOOTSTRAP_ENV hardwareConcurrency mismatch")
         sw_bootstrap_prelude = _build_sw_bootstrap_prelude(SW_BOOTSTRAP_ENV)
     if seed_enabled:
-        if not worker_seed_value:
+        if not _seed_value:
             _RUNNING = False
             raise RuntimeError("Worker seed inject: CDP_GLOBAL_SEED missing")
-        _seed_value = _build__seed_value(worker_seed_value)
-        worker_seed_sanity_expr = (
+        _seed_value = _build__seed_value(_seed_value)
+
+
+    # Post-inject sanity probe (read back values in the SW context).
+    sanity_expr = None
+    if do_prelude:
+        sanity_expr = (
             "(() => {"
             " const G = globalThis;"
             " let cdpGlobalSeed = null;"
@@ -516,23 +519,6 @@ def run():
             " let ensureMarkAsNativeType = null;"
             " try { ensureMarkAsNativeType = (typeof G.__ensureMarkAsNative); } catch (e) {}"
             " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType };"
-            "})()"
-        )
-        logger.info("Worker seed inject: seed prepared len=%s", len(worker_seed_value))
-    sw_user_agent_override = _build_sw_user_agent_override(SW_BOOTSTRAP_ENV)
-    sw_hardware_concurrency_override = None
-    if isinstance(SW_BOOTSTRAP_ENV, dict):
-        sw_hardware_concurrency = SW_BOOTSTRAP_ENV.get("hc")
-        if isinstance(sw_hardware_concurrency, (int, float)) and int(sw_hardware_concurrency) > 0:
-            sw_hardware_concurrency_override = {
-                "hardwareConcurrency": int(sw_hardware_concurrency),
-            }
-
-    # Post-inject sanity probe (read back values in the SW context).
-    sanity_expr = None
-    if do_prelude:
-        sanity_expr = (
-            "(() => {"
             " const nav = globalThis.navigator;"
             " if (!nav) return null;"
             " const uad = nav.userAgentData;"
@@ -572,6 +558,17 @@ def run():
             " });"
              "})()"
          )
+
+        logger.info("Worker seed inject: seed prepared len=%s", len(_seed_value))
+    sw_user_agent_override = _build_sw_user_agent_override(SW_BOOTSTRAP_ENV)
+    sw_hardware_concurrency_override = None
+    if isinstance(SW_BOOTSTRAP_ENV, dict):
+        sw_hardware_concurrency = SW_BOOTSTRAP_ENV.get("hc")
+        if isinstance(sw_hardware_concurrency, (int, float)) and int(sw_hardware_concurrency) > 0:
+            sw_hardware_concurrency_override = {
+                "hardwareConcurrency": int(sw_hardware_concurrency),
+            }
+
 
     pending = {}
     pending_sess = {}  # (sessionId, innerId) -> str tag
@@ -631,7 +628,7 @@ def run():
                         tag = "Runtime.evaluate:sw_sanity"
                     elif _seed_value and expr == _seed_value:
                         tag = "Runtime.evaluate:_seed_value"
-                    elif worker_seed_sanity_expr and expr == worker_seed_sanity_expr:
+                    elif sanity_expr and expr == sanity_expr:
                         tag = "Runtime.evaluate:worker_seed_sanity"
                 elif method == "Runtime.addBinding" and params.get("name") == _SW_DIAG_BINDING:
                     tag = "Runtime.addBinding:sw_diag"
@@ -810,11 +807,11 @@ def run():
                     try:
                         out = (res.get("result") or {}).get("value")
                         got_seed = out.get("cdpGlobalSeed") if isinstance(out, dict) else None
-                        if not isinstance(got_seed, str) or got_seed != worker_seed_value:
+                        if not isinstance(got_seed, str) or got_seed != _seed_value:
                             _fatal(
                                 ws,
                                 "worker seed sanity: mismatch",
-                                {"expected_len": len(worker_seed_value), "got": out},
+                                {"expected_len": len(_seed_value), "got": out},
                             )
                             return
                         target_info = session_targets.get(sid) or {}
@@ -823,7 +820,7 @@ def run():
                             target_info.get("type"),
                             target_info.get("targetId"),
                             target_info.get("url"),
-                            len(worker_seed_value),
+                            len(_seed_value),
                         )
                     except Exception as e:
                         _fatal(ws, "worker seed sanity: parse/compare failed", e)
@@ -881,21 +878,45 @@ def run():
         if seed_enabled and ttype in ("service_worker"):
             if tid in injected:
                 return
-            injected.add(tid)
             session_targets[sessionId] = {"targetId": tid, "url": turl, "type": ttype}
             logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
             try:
                 send_sess(ws, sessionId, "Runtime.enable")
                 send_sess(ws, sessionId, "Runtime.evaluate", {"expression": _seed_value, "awaitPromise": True})
-                send_sess(ws, sessionId, "Runtime.evaluate", {"expression": worker_seed_sanity_expr, "returnByValue": True, "awaitPromise": False})
+                send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
             except Exception as e:
                 _fatal(ws, "worker seed inject failed", e)
-            finally:
-                try:
-                    send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-                except Exception as e:
-                    _fatal(ws, "worker resume failed", e)
-            return
+
+
+
+        # if seed_enabled and ttype in ("service_worker"):
+        #     if tid in injected:
+        #         return
+        #     injected.add(tid)
+        #     session_targets[sessionId] = {"targetId": tid, "url": turl, "type": ttype}
+        #     logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
+        #     try:
+        #         send_sess(ws, sessionId, "Runtime.enable")
+        #         send_sess(ws, sessionId, "Runtime.evaluate", {"expression": _seed_value, "awaitPromise": True})
+        #         send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
+        #     except Exception as e:
+        #         _fatal(ws, "worker seed inject failed", e)
+        #     finally:
+        #         try:
+        #             send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
+        #         except Exception as e:
+        #             _fatal(ws, "worker resume failed", e)
+        #     return
+
+
+
+
+
+
+
+
+
+
 
         # Hard isolation: this module must never touch unrelated non-SW targets.
         if ttype != "service_worker":

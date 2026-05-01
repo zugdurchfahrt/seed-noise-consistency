@@ -707,7 +707,13 @@ function EnvBus(G){
 
   function syncShared(port){ const snap = envSnapshot(); port.start(); port.postMessage({ __ENV_SYNC__: { envSnapshot: snap } }); }
   function syncDedicated(worker){ const snap = envSnapshot(); worker.postMessage({ __ENV_SYNC__: { envSnapshot: snap } }); }
-  return { envSnapshot, syncShared, syncDedicated };
+  return {
+    envSnapshot,
+    syncShared,
+    syncDedicated,
+    cloneFontsStateForWorker: __cloneFontsStateForWorker__,
+    cloneFontsConfigForWorker: __cloneFontsConfigForWorker__
+  };
 }
 
 
@@ -1616,8 +1622,8 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
   function __publishCurrentWorkerSnapshot__(reason) {
     const snap = requireWorkerSnapshot(__bridgeEnvBus.envSnapshot(), reason);
     if (reason === 'fonts-ready' || reason === 'fonts-failed') {
-      snap.fontsState = __cloneFontsStateForWorker__();
-      snap.fontsConfig = __cloneFontsConfigForWorker__();
+      snap.fontsState = __bridgeEnvBus.cloneFontsStateForWorker();
+      snap.fontsConfig = __bridgeEnvBus.cloneFontsConfigForWorker();
     }
     __wrkRuntimeSet__('lastSnap', snap);
     publishSnapshot(snap);
