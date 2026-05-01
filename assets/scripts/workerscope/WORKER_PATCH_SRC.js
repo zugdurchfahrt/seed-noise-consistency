@@ -9,13 +9,34 @@
     throw new Error('UACHPatch: not in WorkerGlobalScope');
   }
   const W = self;
-  const installDesc = Object.getOwnPropertyDescriptor(self, '__installWorkerUACHMirror__');
-  if (installDesc && installDesc.configurable === false) {
-    throw new Error('UACHPatch: __installWorkerUACHMirror__ non-configurable');
-  }
-  if (installDesc && Object.prototype.hasOwnProperty.call(installDesc, 'value') && typeof installDesc.value === 'function') {
-    throw new Error('UACHPatch: __installWorkerUACHMirror__ already defined');
-  }
+  const __resolveBootstrapWorkerRuntimeRoot__ = () => {
+    const C = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
+      ? self.CanvasPatchContext
+      : null;
+    const stateRoot = (C && C.state && typeof C.state === 'object')
+      ? C.state
+      : null;
+    const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
+      ? stateRoot.__WRK__
+      : null;
+    return (wrkState && wrkState.runtime && typeof wrkState.runtime === 'object')
+      ? wrkState.runtime
+      : null;
+  };
+  const __defineHiddenWorkerRuntimeValue__ = (obj, key, value) => {
+    if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
+    const desc = Object.getOwnPropertyDescriptor(obj, key);
+    if (desc && desc.configurable === false) {
+      return Object.prototype.hasOwnProperty.call(desc, 'value') ? desc.value : value;
+    }
+    Object.defineProperty(obj, key, {
+      value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return value;
+  };
   let __uachMirrorInstalled__ = false;
   const __rollbackProbeRoot__ = Object.create(null);
 
@@ -23,7 +44,11 @@
     if (__uachMirrorInstalled__) {
       throw new Error('UACHPatch: already installed');
     }
-    if (!self.__GW_BOOTSTRAP__) {
+    const bootstrapRuntimeRoot = __resolveBootstrapWorkerRuntimeRoot__();
+    if (!(bootstrapRuntimeRoot && typeof bootstrapRuntimeRoot === 'object')) {
+      throw new Error('UACHPatch: worker runtime root missing');
+    }
+    if (bootstrapRuntimeRoot.bootstrapActive !== true) {
       throw new Error('UACHPatch: bootstrap marker missing');
     }
     const nav = self.navigator;
@@ -32,7 +57,7 @@
       throw new Error('UACHPatch: WorkerNavigator unavailable');
     }
     const cache = { snap:null };
-    const relayDiag = (typeof self.__ENV_RELAY_DIAG__ === 'function') ? self.__ENV_RELAY_DIAG__ : null;
+    const relayDiag = (typeof bootstrapRuntimeRoot.relayDiag === 'function') ? bootstrapRuntimeRoot.relayDiag : null;
     const emitDegrade = (level, code, ctx, err) => {
       const d = (typeof __DEGRADE__ === "function") ? __DEGRADE__ : null;
       const x = (ctx && typeof ctx === 'object') ? ctx : {};
@@ -64,21 +89,7 @@
       }
     };
     const appliedDescriptors = [];
-    const __resolveWorkerWrkRuntimeRoot__ = () => {
-      const C = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-        ? self.CanvasPatchContext
-        : null;
-      const stateRoot = (C && C.state && typeof C.state === 'object')
-        ? C.state
-        : null;
-      const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object')
-        ? stateRoot.__WRK__
-        : null;
-      const wrkRuntime = (wrkState && wrkState.runtime && typeof wrkState.runtime === 'object')
-        ? wrkState.runtime
-        : null;
-      return wrkRuntime;
-    };
+    const __resolveWorkerWrkRuntimeRoot__ = () => __resolveBootstrapWorkerRuntimeRoot__();
     const __resolveWorkerStateRoot__ = () => {
       const C = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
         ? self.CanvasPatchContext
@@ -2077,12 +2088,7 @@
         throw new Error('UACHPatch: seed mutation is not allowed');
       }
     };
-    Object.defineProperty(self, '__consumeEnvSnapshot__', {
-      value: applyWorkerSnapshot,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
+    __defineHiddenWorkerRuntimeValue__(bootstrapRuntimeRoot, 'consumeEnvSnapshot', applyWorkerSnapshot);
     const bootstrapSnap = __resolveWorkerSnapshotOwner__();
     if (!bootstrapSnap) {
       throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
@@ -2115,9 +2121,9 @@
       const bc = new BroadcastChannel('__ENV_SYNC__');
       bc.onmessage = ev => {
         const s = ev?.data?.__ENV_SYNC__?.envSnapshot;
-        const applyFn = (typeof self.__consumeEnvSnapshot__ === 'function')
-          ? self.__consumeEnvSnapshot__
-          : null;
+        const applyFn = (typeof bootstrapRuntimeRoot.consumeEnvSnapshot === 'function')
+          ? bootstrapRuntimeRoot.consumeEnvSnapshot
+          : applyWorkerSnapshot;
         if (s && applyFn) applyFn(s);
       };
     }
@@ -2136,8 +2142,8 @@
         const SEED = JSON.stringify((self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '');
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'
-          ? `(async function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__consumeEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;const applyFn=(typeof self.__consumeEnvSnapshot__==='function')?self.__consumeEnvSnapshot__:((typeof self.__applyEnvSnapshot__==='function')?self.__applyEnvSnapshot__:null);if(s&&applyFn)applyFn(s);};}const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
-          : `(function(){'use strict';Object.defineProperty(self,'__GW_BOOTSTRAP__',{value:true,writable:true,configurable:true,enumerable:false});var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__applyEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});Object.defineProperty(self,'__consumeEnvSnapshot__',{value:function(s){self.__lastSnap__=s;},writable:true,configurable:true,enumerable:false});self.__applyEnvSnapshot__(${SNAP});if(!self.__ENV_SYNC_BC_INSTALLED__){self.__ENV_SYNC_BC_INSTALLED__=true;if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;var applyFn=(typeof self.__consumeEnvSnapshot__==='function')?self.__consumeEnvSnapshot__:((typeof self.__applyEnvSnapshot__==='function')?self.__applyEnvSnapshot__:null);if(s&&applyFn)applyFn(s);};}var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
+          ? `(async function(){'use strict';const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});const SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.CanvasPatchContext&&typeof self.CanvasPatchContext==='object')?self.CanvasPatchContext:__defHidden(self,'CanvasPatchContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('UACHPatch: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
+          : `(function(){'use strict';var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});var SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.CanvasPatchContext&&typeof self.CanvasPatchContext==='object')?self.CanvasPatchContext:__defHidden(self,'CanvasPatchContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('UACHPatch: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');var bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
         return [blobURL, { ...(opts || {}), type: workerType }];
       });
@@ -2409,10 +2415,9 @@
       throw (rollbackErr || e);
     }
   };
-  Object.defineProperty(self, '__installWorkerUACHMirror__', {
-    value: __installWorkerUACHMirror__,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
+  const __bootstrapRuntimeRoot = __resolveBootstrapWorkerRuntimeRoot__();
+  if (!__bootstrapRuntimeRoot) {
+    throw new Error('UACHPatch: worker runtime root missing before install export');
+  }
+  __defineHiddenWorkerRuntimeValue__(__bootstrapRuntimeRoot, 'installWorkerUACHMirror', __installWorkerUACHMirror__);
 })();

@@ -820,7 +820,7 @@ function mkWorkerBootstrapCore(opts){
   return `
     (async function(){
       'use strict';
-      Object.defineProperty(self, '__GW_BOOTSTRAP__', { value: true, writable: true, configurable: true, enumerable: false });
+      var __ENV_BOOTSTRAP_ACTIVE__ = true;
       var __ENV_EMIT_Q__ = [];
       var __ENV_DIAG_RELAY_ACTIVE__ = false;
       var __ENV_SHARED_PORTS__ = [];
@@ -963,14 +963,16 @@ function mkWorkerBootstrapCore(opts){
           }
         } catch(_e) {}
       };
-      try {
-        Object.defineProperty(self, '__ENV_RELAY_DIAG__', {
-          value: function(level, code, ctx, err){ __relayDiag(level, code, ctx, err); },
-          writable: false,
-          configurable: true,
-          enumerable: false
-        });
-      } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'relay_diag_define' }); }
+      function __resolveWorkerRuntimeApplyFn__(){
+        try {
+          var __materialized = __materializeWorkerOwnerGraph__();
+          var __wrkRuntime = __materialized && __materialized.wrkRuntime;
+          if (!__wrkRuntime || typeof __wrkRuntime !== 'object') return null;
+          if (typeof __wrkRuntime.consumeEnvSnapshot === 'function') return __wrkRuntime.consumeEnvSnapshot;
+          if (typeof __wrkRuntime.bootstrapApplyEnvSnapshot === 'function') return __wrkRuntime.bootstrapApplyEnvSnapshot;
+        } catch(_e) {}
+        return null;
+      }
       if (__isServiceWorkerScope__()) {
         __emitDiag('wrk:worker_bootstrap:preflight:service_scope_unsupported', new Error('ServiceWorker scope is unsupported in dedicated/shared bootstrap core'), {
           stage: 'preflight',
@@ -1013,9 +1015,10 @@ function mkWorkerBootstrapCore(opts){
             try {
               var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
               var syncSnap = syncPacket && syncPacket.envSnapshot;
-              var syncApply = (typeof self.__consumeEnvSnapshot__ === 'function')
-                ? self.__consumeEnvSnapshot__
-                : ((typeof self.__applyEnvSnapshot__ === 'function') ? self.__applyEnvSnapshot__ : null);
+              var syncApply = __resolveWorkerRuntimeApplyFn__();
+              if (!syncApply && typeof __bootstrapApplyEnvSnapshot__ === 'function') {
+                syncApply = __bootstrapApplyEnvSnapshot__;
+              }
               if (syncSnap && syncApply) {
                 syncApply(syncSnap);
               }
@@ -1045,9 +1048,10 @@ function mkWorkerBootstrapCore(opts){
                       try {
                         var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
                         var syncSnap = syncPacket && syncPacket.envSnapshot;
-                        var syncApply = (typeof self.__consumeEnvSnapshot__ === 'function')
-                          ? self.__consumeEnvSnapshot__
-                          : ((typeof self.__applyEnvSnapshot__ === 'function') ? self.__applyEnvSnapshot__ : null);
+                        var syncApply = __resolveWorkerRuntimeApplyFn__();
+                        if (!syncApply && typeof __bootstrapApplyEnvSnapshot__ === 'function') {
+                          syncApply = __bootstrapApplyEnvSnapshot__;
+                        }
                         if (syncSnap && syncApply) {
                           syncApply(syncSnap);
                         }
@@ -1098,12 +1102,6 @@ function mkWorkerBootstrapCore(opts){
         }
         return s;
       };
-      Object.defineProperty(self, '__lastSnap__', {
-        value: null,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
       var __defineWorkerHiddenValue__ = function(obj, key, value){
         if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
         var desc = Object.getOwnPropertyDescriptor(obj, key);
@@ -1256,23 +1254,20 @@ function mkWorkerBootstrapCore(opts){
       var __bootstrapApplyEnvSnapshot__ = function(s){
         if (__ENV_SNAP_APPLIED__ === s) return;
         __LAST_SNAP__ = __requireSnap(s);
-        self.__lastSnap__ = __LAST_SNAP__;
         __syncWorkerOwnerSnapshotRoute__(__LAST_SNAP__);
         __ENV_SNAP_APPLIED__ = s;
       };
-      Object.defineProperty(self, '__applyEnvSnapshot__', {
-        value: function __applyEnvSnapshot__(s){
+      (function __installBootstrapSnapshotApply__(){
+        var __materialized = __materializeWorkerOwnerGraph__();
+        var __wrkRuntime = __materialized.wrkRuntime;
+        __defineWorkerHiddenValue__(__wrkRuntime, 'bootstrapApplyEnvSnapshot', function(s){
           __bootstrapApplyEnvSnapshot__(s);
-        },
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
+        });
+      })();
       try {
-        self.__applyEnvSnapshot__(${SNAP});
+        __bootstrapApplyEnvSnapshot__(${SNAP});
       } catch (e) {
         __LAST_SNAP__ = ${SNAP};
-        self.__lastSnap__ = __LAST_SNAP__;
         self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
         __emit({ __ENV_BOOTSTRAP_ERROR__: self.__ENV_SNAP_ERROR__ });
         throw e;
@@ -1401,6 +1396,8 @@ function mkWorkerBootstrapCore(opts){
       (function __installWorkerCanvasSources__(){
         var __materialized = __materializeWorkerOwnerGraph__();
         var wrkRuntime = __materialized.wrkRuntime;
+        __defineWorkerHiddenValue__(wrkRuntime, 'bootstrapActive', __ENV_BOOTSTRAP_ACTIVE__ === true);
+        __defineWorkerHiddenValue__(wrkRuntime, 'relayDiag', function(level, code, ctx, err){ __relayDiag(level, code, ctx, err); });
         __defineWorkerHiddenValue__(wrkRuntime, 'workerScopeKind', __ENV_WORKER_SCOPE_KIND__);
         __defineWorkerHiddenValue__(wrkRuntime, 'expectedWorkerScopeKind', __ENV_EXPECTED_WORKER_SCOPE_KIND__);
         __defineWorkerHiddenValue__(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
@@ -1414,7 +1411,8 @@ ${prePatchOwnerSource}
         const PATCH_URL = ${PATCH_URL};
         if (!PATCH_URL) throw new Error(${JSON.stringify(patchUrlMissingMessage)});
 ${patchLoaderSource}
-        const installWorkerUACHMirror = self.__installWorkerUACHMirror__;
+        const __runtimeRoot = __materializeWorkerOwnerGraph__().wrkRuntime;
+        const installWorkerUACHMirror = __runtimeRoot && __runtimeRoot.installWorkerUACHMirror;
         if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
         __patchOK = true;
@@ -1426,13 +1424,7 @@ ${patchLoaderSource}
       if (__patchOK) {
         try {
           if (!__LAST_SNAP__) throw new Error('UACHPatch: snapshot not applied');
-          if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
-            delete self.__installWorkerUACHMirror__;
-          }
-          if (Object.prototype.hasOwnProperty.call(self, '__installWorkerUACHMirror__')) {
-            throw new Error('UACHPatch: __installWorkerUACHMirror__ visible after patch apply');
-          }
-          ['__GW_BOOTSTRAP__','__ENV_RELAY_DIAG__','__applyEnvSnapshot__','__lastSnap__','__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor','__ENV_PATCH_ERROR__','__ENV_PATCH_APPLY_ERROR__','__ENV_SNAP_ERROR__','__ENV_DIAG_ERROR__','__ENV_DIAG_STORE_ERROR__'].forEach(function(key){
+          ['__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor','__ENV_PATCH_ERROR__','__ENV_PATCH_APPLY_ERROR__','__ENV_SNAP_ERROR__','__ENV_DIAG_ERROR__','__ENV_DIAG_STORE_ERROR__'].forEach(function(key){
             if (!Object.prototype.hasOwnProperty.call(self, key)) return;
             try {
               delete self[key];
