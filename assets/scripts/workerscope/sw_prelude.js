@@ -940,13 +940,13 @@
           }, null);
         } else {
           swPatchLanguage = true;
-          __swDiag('warn', 'sw_prelude:language_getter_value_mismatch', {
+          __swDiag('info', 'sw_prelude:language_getter_value_mismatch', {
             stage: 'preflight',
             key: 'language',
-            message: 'service worker language native getter value differs from profile value; patch accessor',
+            message: 'service worker language native getter value differs from profile value; accessor patch planned',
             type: 'browser structure missing data',
             data: {
-              outcome: 'patch',
+              outcome: 'return',
               reason: 'getter_value_mismatch',
               policy: 'patch',
               action: 'patch_getter',
@@ -1021,13 +1021,13 @@
             }, null);
           } else {
             swPatchLanguages = true;
-            __swDiag('warn', 'sw_prelude:languages_getter_value_mismatch', {
+            __swDiag('info', 'sw_prelude:languages_getter_value_mismatch', {
               stage: 'preflight',
               key: 'languages',
-              message: 'service worker languages native getter value differs from profile value; patch accessor',
+              message: 'service worker languages native getter value differs from profile value; accessor patch planned',
               type: 'browser structure missing data',
               data: {
-                outcome: 'patch',
+                outcome: 'return',
                 reason: 'getter_value_mismatch',
                 policy: 'patch',
                 action: 'patch_getter',
@@ -1105,13 +1105,13 @@
           }, null);
         } else {
           swPatchHardwareConcurrency = true;
-          __swDiag('warn', 'sw_prelude:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
+          __swDiag('info', 'sw_prelude:hardwareConcurrency_getter_value_mismatch', {
             stage: 'preflight',
             key: 'hardwareConcurrency',
-            message: 'service worker hardwareConcurrency native getter value differs from profile value; patch accessor',
+            message: 'service worker hardwareConcurrency native getter value differs from profile value; accessor patch planned',
             type: 'browser structure missing data',
             data: {
-              outcome: 'patch',
+              outcome: 'return',
               reason: 'getter_value_mismatch',
               policy: 'patch',
               action: 'patch_getter',

@@ -496,68 +496,54 @@ def run():
             _RUNNING = False
             raise RuntimeError("SW bootstrap: SW_BOOTSTRAP_ENV hardwareConcurrency mismatch")
         sw_bootstrap_prelude = _build_sw_bootstrap_prelude(SW_BOOTSTRAP_ENV)
+    seed_expected_value = None
     if seed_enabled:
         if not _seed_value:
             _RUNNING = False
             raise RuntimeError("Worker seed inject: CDP_GLOBAL_SEED missing")
+        seed_expected_value = _seed_value
         _seed_value = _build__seed_value(_seed_value)
 
 
-    # Post-inject sanity probe (read back values in the SW context).
-    sanity_expr = None
+    # Post-inject probes in the service scope.
+    seed_sanity_expr = None
+    tostring_sanity_expr = None
     if do_prelude:
-        sanity_expr = (
+        seed_sanity_expr = (
             "(() => {"
             " const G = globalThis;"
             " let cdpGlobalSeed = null;"
             " try { cdpGlobalSeed = String(G.CDP_GLOBAL_SEED); } catch (e) {}"
+            " return { cdpGlobalSeed };"
+            "})()"
+        )
+        tostring_sanity_expr = (
+            "(() => {"
+            " const G = globalThis;"
+            " const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object') ? G.CanvasPatchContext : null;"
+            " const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;"
+            " const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object') ? stateRoot.__WRK__ : null;"
+            " const runtimeRoot = (wrkState && wrkState.runtime && typeof wrkState.runtime === 'object') ? wrkState.runtime : null;"
             " let coreToStringStateOk = null;"
             " try {"
-            "   const s = G.__CORE_TOSTRING_STATE__;"
-            "   coreToStringStateOk = !!(s && s.__CORE_TOSTRING_STATE__ === true);"
+            "   const s = runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__;"
+            "   coreToStringStateOk = !!(s && s.__CORE_TOSTRING_STATE__ === true && typeof s.nativeToString === 'function' && s.overrideMap instanceof WeakMap && s.proxyTargetMap instanceof WeakMap);"
             " } catch (e) {}"
-            " let ensureMarkAsNativeType = null;"
-            " try { ensureMarkAsNativeType = (typeof G.__ensureMarkAsNative); } catch (e) {}"
-            " return { cdpGlobalSeed, coreToStringStateOk, ensureMarkAsNativeType };"
-            " const nav = globalThis.navigator;"
-            " if (!nav) return null;"
-            " const uad = nav.userAgentData;"
-            " if (!uad) {"
-            "  return {"
-            "   language: nav.language,"
-            "   languages: nav.languages,"
-            "   hardwareConcurrency: nav.hardwareConcurrency,"
-            "   deviceMemory: nav.deviceMemory,"
-            "   uad: null"
-            "  };"
-            " }"
-            " return Promise.resolve("
-            "   (typeof uad.getHighEntropyValues === 'function')"
-            "     ? uad.getHighEntropyValues(['architecture','bitness','formFactors','fullVersionList','model','platformVersion','uaFullVersion','wow64'])"
-            "     : null"
-            " ).then(function(he) {"
-            "  return {"
-            "   language: nav.language,"
-            "   languages: nav.languages,"
-            "   hardwareConcurrency: nav.hardwareConcurrency,"
-            "   deviceMemory: nav.deviceMemory,"
-            "   uad: {"
-            "    platform: uad.platform,"
-            "    mobile: uad.mobile,"
-            "    brands: uad.brands,"
-            "    heArchitecture: he && he.architecture,"
-            "    heBitness: he && he.bitness,"
-            "    heFormFactors: he && he.formFactors,"
-            "    heModel: he && he.model,"
-            "    hePlatformVersion: he && he.platformVersion,"
-            "    heUaFullVersion: he && he.uaFullVersion,"
-            "    heFullVersionList: he && he.fullVersionList,"
-            "    heWow64: he && he.wow64"
-            "   }"
-            "  };"
-            " });"
-             "})()"
-         )
+            " let toStringBaselineOk = null;"
+            " try {"
+            "   const fpToStringDesc = Object.getOwnPropertyDescriptor(Function.prototype, 'toString');"
+            "   const existingToString = fpToStringDesc && fpToStringDesc.value;"
+            "   const currentRealmToString = (typeof existingToString === 'function') ? existingToString : Function.prototype.toString;"
+            "   const s = runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__;"
+            "   const nativeToString = (s && typeof s.nativeToString === 'function') ? s.nativeToString : null;"
+            "   toStringBaselineOk = !!(fpToStringDesc"
+            "     && typeof existingToString === 'function'"
+            "     && typeof currentRealmToString === 'function'"
+            "     && (!nativeToString || (currentRealmToString === nativeToString && Object.getPrototypeOf(currentRealmToString) === Object.getPrototypeOf(nativeToString))));"
+            " } catch (e) {}"
+            " return { coreToStringStateOk, toStringBaselineOk };"
+            "})()"
+        )
 
         logger.info("Worker seed inject: seed prepared len=%s", len(_seed_value))
     sw_user_agent_override = _build_sw_user_agent_override(SW_BOOTSTRAP_ENV)
@@ -624,12 +610,12 @@ def run():
                     expr = params.get("expression")
                     if expr == sw_bootstrap_prelude:
                         tag = "Runtime.evaluate:sw_bootstrap_prelude"
-                    elif expr == sanity_expr:
-                        tag = "Runtime.evaluate:sw_sanity"
                     elif _seed_value and expr == _seed_value:
                         tag = "Runtime.evaluate:_seed_value"
-                    elif sanity_expr and expr == sanity_expr:
-                        tag = "Runtime.evaluate:worker_seed_sanity"
+                    elif seed_sanity_expr and expr == seed_sanity_expr:
+                        tag = "Runtime.evaluate:cdp_seed_sanity"
+                    elif tostring_sanity_expr and expr == tostring_sanity_expr:
+                        tag = "Runtime.evaluate:cdp_tostring_sanity"
                 elif method == "Runtime.addBinding" and params.get("name") == _SW_DIAG_BINDING:
                     tag = "Runtime.addBinding:sw_diag"
             except Exception:
@@ -679,7 +665,7 @@ def run():
                 return
             # Session-level response error handling (flatten protocol).
             if sid and msg.get("error"):
-                if tag in ("Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity"):
+                if tag == "Runtime.evaluate:sw_bootstrap_prelude":
                     _resume_sw_session(ws, sid, "prelude_error")
                 if tag == "Runtime.addBinding:sw_diag":
                     logger.warning(
@@ -692,138 +678,69 @@ def run():
                 _fatal(ws, f"session cmd failed: {tag or 'unknown'}", msg.get("error"))
                 return
             # Runtime.evaluate may include exceptionDetails inside result.
-            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity", "Runtime.evaluate:_seed_value", "Runtime.evaluate:worker_seed_sanity"):
+            if sid and tag in ("Runtime.evaluate", "Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:_seed_value", "Runtime.evaluate:cdp_seed_sanity", "Runtime.evaluate:cdp_tostring_sanity"):
                 res = msg.get("result") or {}
                 exc = res.get("exceptionDetails")
                 if exc:
-                    if tag in ("Runtime.evaluate:sw_bootstrap_prelude", "Runtime.evaluate:sw_sanity"):
+                    if tag == "Runtime.evaluate:sw_bootstrap_prelude":
                         _resume_sw_session(ws, sid, "prelude_exception")
                     _fatal(ws, "sw prelude Runtime.evaluate exceptionDetails", exc)
                     return
                 if tag == "Runtime.evaluate:sw_bootstrap_prelude":
                     logger.info("SW bootstrap: prelude applied (UAD branch)")
-                    if not sanity_expr:
+                    if tostring_sanity_expr:
+                        try:
+                            send_sess(ws, sid, "Runtime.evaluate", {
+                                "expression": tostring_sanity_expr,
+                                "returnByValue": True,
+                                "awaitPromise": False,
+                            })
+                        except Exception as e:
+                            _resume_sw_session(ws, sid, "tostring_sanity_send_failed")
+                            _fatal(ws, "service toString sanity send failed", e)
+                    else:
                         _resume_sw_session(ws, sid, "prelude_applied")
-                if tag == "Runtime.evaluate:sw_sanity":
-                    try:
-                        out = (res.get("result") or {}).get("value")
-                        exp = sw_expected
-                        if not isinstance(out, dict):
-                            _resume_sw_session(ws, sid, "sanity_bad_result")
-                            _fatal(ws, "sw sanity: bad result type", out)
-                            return
-                        got_languages = list(out.get("languages") or [])
-                        exp_languages = list(exp["languages"] or [])
-                        got_languages_canonical = _canonicalize_language_list_for_compare(got_languages)
-                        exp_languages_canonical = _canonicalize_language_list_for_compare(exp_languages)
-                        language_mismatch = out.get("language") != exp["language"]
-                        languages_exact_mismatch = got_languages != exp_languages
-                        languages_duplicate_only = (
-                            languages_exact_mismatch
-                            and got_languages_canonical is not None
-                            and exp_languages_canonical is not None
-                            and got_languages_canonical == exp_languages_canonical
-                        )
-                        if languages_duplicate_only:
-                            logger.info(
-                                "SW inject: language sanity duplicate-only languages canonicalized expected=%s got=%s",
-                                {"language": exp.get("language"), "languages": exp_languages},
-                                {"language": out.get("language"), "languages": got_languages},
-                            )
-                        if language_mismatch or (languages_exact_mismatch and not languages_duplicate_only):
-                            logger.warning(
-                                "SW inject: language sanity native/profile mismatch; native getter kept expected=%s got=%s",
-                                {"language": exp.get("language"), "languages": exp_languages},
-                                {"language": out.get("language"), "languages": got_languages},
-                            )
-                        if int(out.get("hardwareConcurrency") or 0) != int(exp["hardwareConcurrency"]):
-                            logger.warning(
-                                "SW inject: hardwareConcurrency sanity mismatch; prefer native worker value expected=%s got=%s",
-                                exp.get("hardwareConcurrency"),
-                                out.get("hardwareConcurrency"),
-                            )
-                        if float(out.get("deviceMemory") or 0.0) != float(exp["deviceMemory"]):
-                            logger.warning(
-                                "SW inject: deviceMemory sanity mismatch; prefer native worker value expected=%s got=%s",
-                                exp.get("deviceMemory"),
-                                out.get("deviceMemory"),
-                            )
-                        uad = out.get("uad") or {}
-                        if not isinstance(uad, dict):
-                            _resume_sw_session(ws, sid, "sanity_uad_bad_result")
-                            _fatal(ws, "sw sanity: uad bad result type", {"expected": exp, "got": out})
-                            return
-                        if uad.get("platform") != exp["uad"].get("platform"):
-                            _resume_sw_session(ws, sid, "sanity_uad_platform_mismatch")
-                            _fatal(ws, "sw sanity: uad platform mismatch", {"expected": exp, "got": out})
-                            return
-                        if uad.get("mobile") != exp["uad"].get("mobile"):
-                            _resume_sw_session(ws, sid, "sanity_uad_mobile_mismatch")
-                            _fatal(ws, "sw sanity: uad mobile mismatch", {"expected": exp, "got": out})
-                            return
-                        if list(uad.get("brands") or []) != list(exp["uad"].get("brands") or []):
-                            _resume_sw_session(ws, sid, "sanity_uad_brands_mismatch")
-                            _fatal(ws, "sw sanity: uad brands mismatch", {"expected": exp, "got": out})
-                            return
-                        exp_he = exp["uad"].get("he") or {}
-                        if uad.get("heArchitecture") != exp_he.get("architecture"):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_architecture_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy architecture mismatch", {"expected": exp, "got": out})
-                            return
-                        if uad.get("heBitness") != exp_he.get("bitness"):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_bitness_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy bitness mismatch", {"expected": exp, "got": out})
-                            return
-                        if list(uad.get("heFormFactors") or []) != list(exp_he.get("formFactors") or []):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_form_factors_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy formFactors mismatch", {"expected": exp, "got": out})
-                            return
-                        if uad.get("heModel") != exp_he.get("model"):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_model_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy model mismatch", {"expected": exp, "got": out})
-                            return
-                        if uad.get("hePlatformVersion") != exp_he.get("platformVersion"):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_platform_version_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy platformVersion mismatch", {"expected": exp, "got": out})
-                            return
-                        if uad.get("heUaFullVersion") != exp_he.get("uaFullVersion"):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_ua_full_version_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy uaFullVersion mismatch", {"expected": exp, "got": out})
-                            return
-                        if list(uad.get("heFullVersionList") or []) != list(exp_he.get("fullVersionList") or []):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_full_version_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy fullVersionList mismatch", {"expected": exp, "got": out})
-                            return
-                        if bool(uad.get("heWow64")) != bool(exp_he.get("wow64")):
-                            _resume_sw_session(ws, sid, "sanity_uad_he_wow64_mismatch")
-                            _fatal(ws, "sw sanity: uad high entropy wow64 mismatch", {"expected": exp, "got": out})
-                            return
-                        logger.info("SW inject: sanity accepted target values")
-                        _resume_sw_session(ws, sid, "sanity_ok")
-                    except Exception as e:
-                        _resume_sw_session(ws, sid, "sanity_parse_failed")
-                        _fatal(ws, "sw sanity: parse/compare failed", e)
-                if tag == "Runtime.evaluate:worker_seed_sanity":
+                if tag == "Runtime.evaluate:cdp_seed_sanity":
                     try:
                         out = (res.get("result") or {}).get("value")
                         got_seed = out.get("cdpGlobalSeed") if isinstance(out, dict) else None
-                        if not isinstance(got_seed, str) or got_seed != _seed_value:
+                        if not isinstance(got_seed, str) or got_seed != seed_expected_value:
                             _fatal(
                                 ws,
-                                "worker seed sanity: mismatch",
-                                {"expected_len": len(_seed_value), "got": out},
+                                "service marker sanity: mismatch",
+                                {"expected_len": len(seed_expected_value or ""), "got": out},
                             )
                             return
                         target_info = session_targets.get(sid) or {}
                         logger.info(
-                            "Worker seed inject: sanity logging successful; CDP_GLOBAL_SEED verified type=%s targetId=%s url=%r seed_len=%s",
+                            "SW inject: seed accepted; CDP_GLOBAL_SEED verified type=%s targetId=%s url=%r seed_len=%s",
                             target_info.get("type"),
                             target_info.get("targetId"),
                             target_info.get("url"),
-                            len(_seed_value),
+                            len(seed_expected_value or ""),
                         )
                     except Exception as e:
-                        _fatal(ws, "worker seed sanity: parse/compare failed", e)
+                        _fatal(ws, "service seed sanity: parse/compare failed", e)
+                if tag == "Runtime.evaluate:cdp_tostring_sanity":
+                    try:
+                        out = (res.get("result") or {}).get("value")
+                        if not bool(out.get("coreToStringStateOk")):
+                            _fatal(ws, "service marker sanity: coreToStringState missing/invalid", {"got": out})
+                            return
+                        if not bool(out.get("toStringBaselineOk")):
+                            _fatal(ws, "service marker sanity: Function.prototype.toString baseline invalid", {"got": out})
+                            return
+                        target_info = session_targets.get(sid) or {}
+                        logger.info(
+                            "SW inject: toString sanity accepted targetId=%s url=%r coreToStringStateOk=%r toStringBaselineOk=%r",
+                            target_info.get("targetId"),
+                            target_info.get("url"),
+                            out.get("coreToStringStateOk") if isinstance(out, dict) else None,
+                            out.get("toStringBaselineOk") if isinstance(out, dict) else None,
+                        )
+                        _resume_sw_session(ws, sid, "tostring_sanity_ok")
+                    except Exception as e:
+                        _fatal(ws, "service toString sanity: parse/compare failed", e)
             return
 
         if msg.get("method") == "Target.targetCreated":
@@ -883,39 +800,9 @@ def run():
             try:
                 send_sess(ws, sessionId, "Runtime.enable")
                 send_sess(ws, sessionId, "Runtime.evaluate", {"expression": _seed_value, "awaitPromise": True})
-                send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
+                send_sess(ws, sessionId, "Runtime.evaluate", {"expression": seed_sanity_expr, "returnByValue": True, "awaitPromise": False})
             except Exception as e:
                 _fatal(ws, "worker seed inject failed", e)
-
-
-
-        # if seed_enabled and ttype in ("service_worker"):
-        #     if tid in injected:
-        #         return
-        #     injected.add(tid)
-        #     session_targets[sessionId] = {"targetId": tid, "url": turl, "type": ttype}
-        #     logger.info("Worker seed inject: attached %s targetId=%s sessionId=%s url=%r", ttype, tid, sessionId, turl)
-        #     try:
-        #         send_sess(ws, sessionId, "Runtime.enable")
-        #         send_sess(ws, sessionId, "Runtime.evaluate", {"expression": _seed_value, "awaitPromise": True})
-        #         send_sess(ws, sessionId, "Runtime.evaluate", {"expression": sanity_expr, "returnByValue": True, "awaitPromise": False})
-        #     except Exception as e:
-        #         _fatal(ws, "worker seed inject failed", e)
-        #     finally:
-        #         try:
-        #             send_sess(ws, sessionId, "Runtime.runIfWaitingForDebugger")
-        #         except Exception as e:
-        #             _fatal(ws, "worker resume failed", e)
-        #     return
-
-
-
-
-
-
-
-
-
 
 
         # Hard isolation: this module must never touch unrelated non-SW targets.
@@ -950,11 +837,6 @@ def run():
                 })
                 send_sess(ws, sessionId, "Runtime.evaluate", {
                     "expression": sw_bootstrap_prelude,
-                    "awaitPromise": True
-                })
-                send_sess(ws, sessionId, "Runtime.evaluate", {
-                    "expression": sanity_expr,
-                    "returnByValue": True,
                     "awaitPromise": True
                 })
             except Exception as e:
