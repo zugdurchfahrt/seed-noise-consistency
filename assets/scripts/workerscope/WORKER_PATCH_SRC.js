@@ -123,10 +123,15 @@
         if (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) return 'shared';
       } catch (_e) {}
       try {
-        if (typeof WorkerGlobalScope === 'function' && self instanceof WorkerGlobalScope) return 'dedicated';
+        if (typeof DedicatedWorkerGlobalScope === 'function' && self instanceof DedicatedWorkerGlobalScope) return 'dedicated';
       } catch (_e) {}
       return null;
     };
+    const __scopeNameFromKind__ = (kind) => kind === 'service'
+      ? 'ServiceWorker'
+      : (kind === 'shared'
+        ? 'SharedWorker'
+        : (kind === 'dedicated' ? 'DedicatedWorker' : null));
     const __resolveBootstrapWorkerScopeKind__ = () => {
       const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
       const runtimeKind = runtimeRoot && runtimeRoot.workerScopeKind;
@@ -182,6 +187,7 @@
       }, e);
       throw e;
     }
+    const __workerScopeName__ = __scopeNameFromKind__(workerScopeKind);
     const __isCoreToStringStateOk__ = (st) => !!(st
       && st.__CORE_TOSTRING_STATE__ === true
       && typeof st.nativeToString === 'function'
@@ -1805,7 +1811,7 @@
           ? snap.awaitReadyStatus
           : (snap.awaitReadyPending ? 'pending' : (snap.ready === true ? 'resolved' : null));
         const awaitPayload = {
-          scope: 'worker',
+          scope: __workerScopeName__ || null,
           source: 'snapshot',
           ready: snap.ready === true,
           status: snapStatus,
@@ -2160,7 +2166,7 @@
         enumerable: false
       });
     }
-    self.__SCOPE_CONSISTENCY_PATCHED__ = true;
+    self.__SCOPE_CONSISTENCY_PATCHED__ = __workerScopeName__ || true;
 
     const sanity = {
       language: self.navigator && self.navigator.language,
@@ -2392,7 +2398,7 @@
         reason: "applied",
         core: true,
         mirror: __uachMirrorInstalled__ === true,
-        scope: !!self.__SCOPE_CONSISTENCY_PATCHED__
+        scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
       },
       type: "pipeline missing data"
     };

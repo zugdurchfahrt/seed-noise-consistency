@@ -1246,9 +1246,23 @@ const __probeRun = async function(){
       function __probeWorkerInspectRow__(key) {
         const nav = self.navigator;
         const root = nav ? Object.getPrototypeOf(nav) : null;
+        const scopeLabel =
+          (typeof SharedWorkerGlobalScope === "function" && self instanceof SharedWorkerGlobalScope)
+            ? "SharedWorkerGlobalScope"
+            : ((typeof DedicatedWorkerGlobalScope === "function" && self instanceof DedicatedWorkerGlobalScope)
+              ? "DedicatedWorkerGlobalScope"
+              : "DedicatedWorkerGlobalScope");
+        const scope =
+          scopeLabel === "SharedWorkerGlobalScope"
+            ? "SharedWorker"
+            : "DedicatedWorker";
+        const scopeKind = scope === "SharedWorker" ? "shared" : "dedicated";
         const row = {
-          target: "WorkerGlobalScope.WorkerNavigator." + key,
+          target: scopeLabel + ".WorkerNavigator." + key,
           key: key,
+          scope: scope,
+          scopeKind: scopeKind,
+          scopeLabel: scopeLabel,
           descriptorOwner: null,
           descriptorShape: null,
           accessorVsData: null,
@@ -1353,10 +1367,15 @@ const __probeRun = async function(){
     const sharedName = `probe-control-shared-${Date.now()}`;
     const pushTransportRows = (variant, wait) => {
       const error = wait && wait.error ? wait.error : null;
+      const scope = variant === "SharedWorker" ? "SharedWorker" : "DedicatedWorker";
+      const scopeKind = variant === "SharedWorker" ? "shared" : "dedicated";
+      const scopeLabel = variant === "SharedWorker" ? "SharedWorkerGlobalScope" : "DedicatedWorkerGlobalScope";
       for (const key of API_CONTROL_WORKER_TARGET_KEYS) {
         rows.push({
-          target: `WorkerGlobalScope.WorkerNavigator.${key}`,
-          scope: "worker",
+          target: `${scopeLabel}.WorkerNavigator.${key}`,
+          scope: scope,
+          scopeKind: scopeKind,
+          scopeLabel: scopeLabel,
           variant,
           descriptorOwner: null,
           descriptorShape: null,
@@ -1402,7 +1421,7 @@ const __probeRun = async function(){
       if (dedicatedWait.ok) {
         const dedicatedRows = Array.isArray(dedicatedWait.value) ? dedicatedWait.value : [];
         for (const row of dedicatedRows) {
-          rows.push(Object.assign({ scope: "worker", variant: "DedicatedWorker" }, row));
+          rows.push(Object.assign({ scope: "DedicatedWorker", scopeKind: "dedicated", scopeLabel: "DedicatedWorkerGlobalScope", variant: "DedicatedWorker" }, row));
         }
       } else {
         pushTransportRows("DedicatedWorker", dedicatedWait);
@@ -1442,7 +1461,7 @@ const __probeRun = async function(){
       if (sharedWait.ok) {
         const sharedRows = Array.isArray(sharedWait.value) ? sharedWait.value : [];
         for (const row of sharedRows) {
-          rows.push(Object.assign({ scope: "worker", variant: "SharedWorker" }, row));
+          rows.push(Object.assign({ scope: "SharedWorker", scopeKind: "shared", scopeLabel: "SharedWorkerGlobalScope", variant: "SharedWorker" }, row));
         }
       } else {
         pushTransportRows("SharedWorker", sharedWait);
@@ -1658,8 +1677,10 @@ const __probeRun = async function(){
   }
 
   function workerScopeName(scopeKind) {
-    if (scopeKind === "Worker") return "DedicatedWorker";
-    if (scopeKind === "DedicatedWorker" || scopeKind === "SharedWorker" || scopeKind === "ServiceWorker") return scopeKind;
+    if (scopeKind === "Worker" || scopeKind === "worker" || scopeKind === "WorkerGlobalScope" || scopeKind === "DedicatedWorkerGlobalScope") return "DedicatedWorker";
+    if (scopeKind === "SharedWorker" || scopeKind === "SharedWorkerGlobalScope") return "SharedWorker";
+    if (scopeKind === "ServiceWorker" || scopeKind === "ServiceWorkerGlobalScope") return "ServiceWorker";
+    if (scopeKind === "DedicatedWorker") return "DedicatedWorker";
     return typeof scopeKind === "string" && scopeKind ? scopeKind : null;
   }
 
@@ -1944,7 +1965,7 @@ const __probeRun = async function(){
           const rawScopeKind = (typeof source.scopeKind === "string" && source.scopeKind)
             ? source.scopeKind
             : ((typeof source.scope === "string" && source.scope) ? source.scope : null);
-          const normalizedScopeKind = rawScopeKind === "Worker" ? "DedicatedWorker" : rawScopeKind;
+          const normalizedScopeKind = workerScopeName(rawScopeKind);
           if (normalizedScopeKind !== scopeKind) continue;
           return {
             ok: true,

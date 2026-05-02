@@ -843,7 +843,7 @@ function mkWorkerBootstrapCore(opts){
           if (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) return 'shared';
         } catch(_e) {}
         try {
-          if (typeof WorkerGlobalScope === 'function' && self instanceof WorkerGlobalScope) return 'dedicated';
+          if (typeof DedicatedWorkerGlobalScope === 'function' && self instanceof DedicatedWorkerGlobalScope) return 'dedicated';
         } catch(_e) {}
         return null;
       };
@@ -1918,7 +1918,7 @@ function SafeWorkerOverride(G){
         ) {
           sawWorkerPatchDiag = true;
         }
-        relayWorkerScopeDiag(G, 'Worker', relayDiag);
+        relayWorkerScopeDiag(G, 'DedicatedWorker', relayDiag);
         __wrkBestEffort('wrk:worker_diag_stop_propagation_failed', {
           stage: 'runtime',
           key: 'message',
@@ -1936,9 +1936,9 @@ function SafeWorkerOverride(G){
           stage: 'runtime',
           surface: 'worker',
           key: '__ENV_PATCH_OK__',
-          message: 'worker patch ok confirmed (Worker)',
+          message: 'worker patch ok confirmed (DedicatedWorker)',
           type: 'pipeline missing data',
-          data: { outcome: 'return', reason: 'worker_patch_ok_confirmed', scope: 'Worker' }
+          data: { outcome: 'return', reason: 'worker_patch_ok_confirmed', scope: 'DedicatedWorker' }
         }, null);
       }
 
@@ -1951,7 +1951,7 @@ function SafeWorkerOverride(G){
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'worker_bootstrap_error_store_failed' }
         }, () => { __wrkRuntimeSet__('lastWorkerBootstrapError', bootErr); });
-        emitWorkerBootstrapDegrade(G, 'Worker', bootErr);
+        emitWorkerBootstrapDegrade(G, 'DedicatedWorker', bootErr);
         __wrkBestEffort('wrk:worker_bootstrap_stop_propagation_failed', {
           stage: 'runtime',
           key: 'message',

@@ -229,6 +229,54 @@ const LOGGingModule = function LOGGingModule() {
       ].join("|");
     }
 
+    function scopeNameFromKind(kind) {
+      return kind === "service"
+        ? "ServiceWorker"
+        : (kind === "shared"
+          ? "SharedWorker"
+          : (kind === "dedicated"
+            ? "DedicatedWorker"
+            : (kind === "window" ? "Window" : null)));
+    }
+
+    function scopeLabelFromKind(kind) {
+      return kind === "service"
+        ? "ServiceWorkerGlobalScope"
+        : (kind === "shared"
+          ? "SharedWorkerGlobalScope"
+          : (kind === "dedicated"
+            ? "DedicatedWorkerGlobalScope"
+            : (kind === "window" ? "WindowGlobalScope" : null)));
+    }
+
+    function canonicalScopeName(scope) {
+      if (!(typeof scope === "string" && scope)) return null;
+      if (scope === "Worker" || scope === "worker") return "DedicatedWorker";
+      if (scope === "Window" || scope === "window") return "Window";
+      if (scope === "SharedWorker") return "SharedWorker";
+      if (scope === "ServiceWorker") return "ServiceWorker";
+      if (scope === "DedicatedWorker") return "DedicatedWorker";
+      return scope;
+    }
+
+    function canonicalScopeKind(kind) {
+      if (!(typeof kind === "string" && kind)) return null;
+      if (kind === "Worker" || kind === "worker" || kind === "DedicatedWorker" || kind === "DedicatedWorkerGlobalScope") return "dedicated";
+      if (kind === "SharedWorker" || kind === "SharedWorkerGlobalScope") return "shared";
+      if (kind === "ServiceWorker" || kind === "ServiceWorkerGlobalScope") return "service";
+      if (kind === "Window" || kind === "window" || kind === "WindowGlobalScope") return "window";
+      return kind;
+    }
+
+    function canonicalScopeLabel(label) {
+      if (!(typeof label === "string" && label)) return null;
+      if (label === "DedicatedWorkerGlobalScope") return "DedicatedWorkerGlobalScope";
+      if (label === "SharedWorker" || label === "SharedWorkerGlobalScope") return "SharedWorkerGlobalScope";
+      if (label === "ServiceWorker" || label === "ServiceWorkerGlobalScope") return "ServiceWorkerGlobalScope";
+      if (label === "Window" || label === "window" || label === "WindowGlobalScope") return "WindowGlobalScope";
+      return label;
+    }
+
     function resolveDiagScopeIdentity(ctx, data) {
       const safeCtx = (ctx && typeof ctx === "object") ? ctx : {};
       const safeData = (data && typeof data === "object") ? data : null;
@@ -238,34 +286,53 @@ const LOGGingModule = function LOGGingModule() {
       const wrkRuntime = (wrkState && wrkState.runtime && typeof wrkState.runtime === "object")
         ? wrkState.runtime
         : null;
-      const explicitScope = (typeof safeCtx.scope === "string" && safeCtx.scope)
+      const explicitScopeRaw = (typeof safeCtx.scope === "string" && safeCtx.scope)
         ? safeCtx.scope
         : ((safeData && typeof safeData.scope === "string" && safeData.scope) ? safeData.scope : null);
-      const explicitKind = (typeof safeCtx.scopeKind === "string" && safeCtx.scopeKind)
+      const explicitScope = canonicalScopeName(explicitScopeRaw);
+      const explicitKindRaw = (typeof safeCtx.scopeKind === "string" && safeCtx.scopeKind)
         ? safeCtx.scopeKind
         : ((safeData && typeof safeData.scopeKind === "string" && safeData.scopeKind) ? safeData.scopeKind : null);
-      const explicitLabel = (typeof safeCtx.scopeLabel === "string" && safeCtx.scopeLabel)
+      const explicitKind = canonicalScopeKind(explicitKindRaw);
+      const explicitLabelRaw = (typeof safeCtx.scopeLabel === "string" && safeCtx.scopeLabel)
         ? safeCtx.scopeLabel
         : ((safeData && typeof safeData.scopeLabel === "string" && safeData.scopeLabel) ? safeData.scopeLabel : null);
-      const explicitScopeKindFromScope = explicitScope === "ServiceWorker"
-        ? "service"
-        : (explicitScope === "SharedWorker"
-          ? "shared"
-          : (explicitScope === "Worker"
-            ? "dedicated"
-            : (explicitScope === "Window" ? "window" : null)));
-      const explicitScopeLabelFromScope = explicitScope === "ServiceWorker"
-        ? "ServiceWorkerGlobalScope"
-        : (explicitScope === "SharedWorker"
-          ? "SharedWorkerGlobalScope"
-          : (explicitScope === "Worker"
-            ? "WorkerGlobalScope"
-            : (explicitScope === "Window" ? "WindowGlobalScope" : null)));
-      const runtimeKind = (wrkRuntime && typeof wrkRuntime.workerScopeKind === "string" && wrkRuntime.workerScopeKind)
+      const explicitLabel = canonicalScopeLabel(explicitLabelRaw);
+      const explicitScopeKindMap = {
+        ServiceWorker: "service",
+        SharedWorker: "shared",
+        DedicatedWorker: "dedicated",
+        Worker: "dedicated",
+        worker: "dedicated",
+        Window: "window"
+      };
+      const explicitScopeLabelMap = {
+        ServiceWorker: "ServiceWorkerGlobalScope",
+        SharedWorker: "SharedWorkerGlobalScope",
+        DedicatedWorker: "DedicatedWorkerGlobalScope",
+        Worker: "DedicatedWorkerGlobalScope",
+        worker: "DedicatedWorkerGlobalScope",
+        Window: "WindowGlobalScope"
+      };
+      const explicitScopeKindFromScope = (typeof explicitScope === "string" && Object.prototype.hasOwnProperty.call(explicitScopeKindMap, explicitScope))
+        ? explicitScopeKindMap[explicitScope]
+        : null;
+      const explicitScopeLabelFromScope = (typeof explicitScope === "string" && Object.prototype.hasOwnProperty.call(explicitScopeLabelMap, explicitScope))
+        ? explicitScopeLabelMap[explicitScope]
+        : null;
+      const runtimeWorkerScopeKind = (wrkRuntime && typeof wrkRuntime.workerScopeKind === "string" && wrkRuntime.workerScopeKind)
         ? wrkRuntime.workerScopeKind
-        : ((wrkRuntime && typeof wrkRuntime.serviceWorkerScopeKind === "string" && wrkRuntime.serviceWorkerScopeKind)
-            ? wrkRuntime.serviceWorkerScopeKind
-            : null);
+        : null;
+      const runtimeServiceWorkerScopeKind = (wrkRuntime && typeof wrkRuntime.serviceWorkerScopeKind === "string" && wrkRuntime.serviceWorkerScopeKind)
+        ? wrkRuntime.serviceWorkerScopeKind
+        : null;
+      const runtimeKind = runtimeWorkerScopeKind || runtimeServiceWorkerScopeKind || null;
+      const runtimeServiceWorkerLane = (wrkRuntime && typeof wrkRuntime.serviceWorkerLane === "string" && wrkRuntime.serviceWorkerLane)
+        ? wrkRuntime.serviceWorkerLane
+        : null;
+      const runtimeExpectedWorkerScopeKind = (wrkRuntime && typeof wrkRuntime.expectedWorkerScopeKind === "string" && wrkRuntime.expectedWorkerScopeKind)
+        ? wrkRuntime.expectedWorkerScopeKind
+        : null;
       let actualKind = null;
       let actualLabel = null;
       try {
@@ -275,30 +342,35 @@ const LOGGingModule = function LOGGingModule() {
         } else if (typeof SharedWorkerGlobalScope === "function" && global instanceof SharedWorkerGlobalScope) {
           actualKind = "shared";
           actualLabel = "SharedWorkerGlobalScope";
-        } else if (typeof WorkerGlobalScope === "function" && global instanceof WorkerGlobalScope) {
+        } else if (typeof DedicatedWorkerGlobalScope === "function" && global instanceof DedicatedWorkerGlobalScope) {
           actualKind = "dedicated";
-          actualLabel = "WorkerGlobalScope";
+          actualLabel = "DedicatedWorkerGlobalScope";
         } else if (W && global === W) {
           actualKind = "window";
           actualLabel = "WindowGlobalScope";
         }
       } catch (_) {}
-      const scopeKind = explicitKind || explicitScopeKindFromScope || runtimeKind || actualKind || null;
-      const scope = explicitScope || (
-        scopeKind === "service" ? "ServiceWorker" :
-        scopeKind === "shared" ? "SharedWorker" :
-        scopeKind === "dedicated" ? "Worker" :
-        scopeKind === "window" ? "Window" :
-        null
-      );
-      const scopeLabel = explicitLabel || explicitScopeLabelFromScope || actualLabel || (
-        scopeKind === "service" ? "ServiceWorkerGlobalScope" :
-        scopeKind === "shared" ? "SharedWorkerGlobalScope" :
-        scopeKind === "dedicated" ? "WorkerGlobalScope" :
-        scopeKind === "window" ? "WindowGlobalScope" :
-        null
-      );
-      return { scope, scopeKind, scopeLabel };
+      const inferredExplicitKind = explicitKind || explicitScopeKindFromScope || null;
+      const inferredExplicitScope = explicitScope || scopeNameFromKind(inferredExplicitKind);
+      const inferredExplicitLabel = explicitLabel || explicitScopeLabelFromScope || scopeLabelFromKind(inferredExplicitKind);
+      const actualScope = scopeNameFromKind(actualKind);
+      const scopeKind = inferredExplicitKind || actualKind || null;
+      const scope = inferredExplicitScope || actualScope || null;
+      const scopeLabel = inferredExplicitLabel || actualLabel || scopeLabelFromKind(scopeKind);
+      const auxiliary = Object.create(null);
+      if (runtimeKind && runtimeKind !== scopeKind) {
+        auxiliary.relatedScope = scopeNameFromKind(runtimeKind);
+        auxiliary.relatedScopeKind = runtimeKind;
+        auxiliary.relatedScopeLabel = scopeLabelFromKind(runtimeKind);
+        auxiliary.workerFamily = runtimeKind;
+      }
+      if (runtimeServiceWorkerLane) {
+        auxiliary.serviceWorkerLane = runtimeServiceWorkerLane;
+      }
+      if (runtimeExpectedWorkerScopeKind) {
+        auxiliary.expectedWorkerScopeKind = runtimeExpectedWorkerScopeKind;
+      }
+      return { scope, scopeKind, scopeLabel, auxiliary };
     }
 
     // Returns true only for first N copies of the same signature.
@@ -477,7 +549,7 @@ const LOGGingModule = function LOGGingModule() {
 
       if (requiresResultProof) {
         if (slot.module === "WORKER_PATCH_SRC") {
-          const hasWorker = scopeSeen.Worker === true;
+          const hasWorker = scopeSeen.DedicatedWorker === true;
           const hasSharedWorker = scopeSeen.SharedWorker === true;
           const matchCount = Object.keys(scopeSeen).length;
           if (hasWorker && hasSharedWorker) {
@@ -1015,7 +1087,22 @@ const LOGGingModule = function LOGGingModule() {
         }
         const nextObserved = (data.observedData && typeof data.observedData === "object") ? data.observedData : null;
         if (nextObserved) {
-          const workerKeys = ["scope", "scopeKind", "scopeLabel", "language", "languages", "deviceMemory", "hardwareConcurrency", "uaData"];
+          const workerKeys = [
+            "scope",
+            "scopeKind",
+            "scopeLabel",
+            "relatedScope",
+            "relatedScopeKind",
+            "relatedScopeLabel",
+            "workerFamily",
+            "serviceWorkerLane",
+            "expectedWorkerScopeKind",
+            "language",
+            "languages",
+            "deviceMemory",
+            "hardwareConcurrency",
+            "uaData"
+          ];
           for (let i = 0; i < workerKeys.length; i++) {
             const k = workerKeys[i];
             if (!Object.prototype.hasOwnProperty.call(data, k) && Object.prototype.hasOwnProperty.call(nextObserved, k)) {
@@ -1945,6 +2032,25 @@ const LOGGingModule = function LOGGingModule() {
         }
         if (typeof scopeInfo.scopeLabel === "string" && scopeInfo.scopeLabel && !Object.prototype.hasOwnProperty.call(safeData, "scopeLabel")) {
           safeData = Object.assign({}, safeData, { scopeLabel: scopeInfo.scopeLabel });
+        }
+        if (scopeInfo.auxiliary && typeof scopeInfo.auxiliary === "object") {
+          const auxKeys = [
+            "relatedScope",
+            "relatedScopeKind",
+            "relatedScopeLabel",
+            "workerFamily",
+            "serviceWorkerLane",
+            "expectedWorkerScopeKind"
+          ];
+          for (let i = 0; i < auxKeys.length; i++) {
+            const key = auxKeys[i];
+            if (
+              Object.prototype.hasOwnProperty.call(scopeInfo.auxiliary, key)
+              && !Object.prototype.hasOwnProperty.call(safeData, key)
+            ) {
+              safeData = Object.assign({}, safeData, { [key]: scopeInfo.auxiliary[key] });
+            }
+          }
         }
       }
 
