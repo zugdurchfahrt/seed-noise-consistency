@@ -1246,23 +1246,21 @@ const __probeRun = async function(){
       function __probeWorkerInspectRow__(key) {
         const nav = self.navigator;
         const root = nav ? Object.getPrototypeOf(nav) : null;
-        const scopeLabel =
+        const scopeName =
           (typeof SharedWorkerGlobalScope === "function" && self instanceof SharedWorkerGlobalScope)
             ? "SharedWorkerGlobalScope"
             : ((typeof DedicatedWorkerGlobalScope === "function" && self instanceof DedicatedWorkerGlobalScope)
               ? "DedicatedWorkerGlobalScope"
               : "DedicatedWorkerGlobalScope");
         const scope =
-          scopeLabel === "SharedWorkerGlobalScope"
-            ? "SharedWorker"
-            : "DedicatedWorker";
-        const scopeKind = scope === "SharedWorker" ? "shared" : "dedicated";
+          scopeName === "SharedWorkerGlobalScope"
+            ? "shared"
+            : "dedicated";
         const row = {
-          target: scopeLabel + ".WorkerNavigator." + key,
+          target: scopeName + ".WorkerNavigator." + key,
           key: key,
-          scope: scope,
-          scopeKind: scopeKind,
-          scopeLabel: scopeLabel,
+          scope: scopeName,
+          scopeKind: scope,
           descriptorOwner: null,
           descriptorShape: null,
           accessorVsData: null,
@@ -1369,13 +1367,12 @@ const __probeRun = async function(){
       const error = wait && wait.error ? wait.error : null;
       const scope = variant === "SharedWorker" ? "SharedWorker" : "DedicatedWorker";
       const scopeKind = variant === "SharedWorker" ? "shared" : "dedicated";
-      const scopeLabel = variant === "SharedWorker" ? "SharedWorkerGlobalScope" : "DedicatedWorkerGlobalScope";
+      const scopeName = variant === "SharedWorker" ? "SharedWorkerGlobalScope" : "DedicatedWorkerGlobalScope";
       for (const key of API_CONTROL_WORKER_TARGET_KEYS) {
         rows.push({
-          target: `${scopeLabel}.WorkerNavigator.${key}`,
-          scope: scope,
+          target: `${scopeName}.WorkerNavigator.${key}`,
+          scope: scopeName,
           scopeKind: scopeKind,
-          scopeLabel: scopeLabel,
           variant,
           descriptorOwner: null,
           descriptorShape: null,
@@ -1421,7 +1418,7 @@ const __probeRun = async function(){
       if (dedicatedWait.ok) {
         const dedicatedRows = Array.isArray(dedicatedWait.value) ? dedicatedWait.value : [];
         for (const row of dedicatedRows) {
-          rows.push(Object.assign({ scope: "DedicatedWorker", scopeKind: "dedicated", scopeLabel: "DedicatedWorkerGlobalScope", variant: "DedicatedWorker" }, row));
+          rows.push(Object.assign({ scope: "DedicatedWorkerGlobalScope", scopeKind: "dedicated", variant: "DedicatedWorker" }, row));
         }
       } else {
         pushTransportRows("DedicatedWorker", dedicatedWait);
@@ -1461,7 +1458,7 @@ const __probeRun = async function(){
       if (sharedWait.ok) {
         const sharedRows = Array.isArray(sharedWait.value) ? sharedWait.value : [];
         for (const row of sharedRows) {
-          rows.push(Object.assign({ scope: "SharedWorker", scopeKind: "shared", scopeLabel: "SharedWorkerGlobalScope", variant: "SharedWorker" }, row));
+          rows.push(Object.assign({ scope: "SharedWorkerGlobalScope", scopeKind: "shared", variant: "SharedWorker" }, row));
         }
       } else {
         pushTransportRows("SharedWorker", sharedWait);
@@ -1618,31 +1615,31 @@ const __probeRun = async function(){
     return rows;
   }
 
-  async function __probeCollectCanonicalScopeValues(scopeLabel, targetNav) {
+  async function __probeCollectCanonicalScopeValues(scopeName, targetNav) {
     const navTarget = targetNav || null;
     if (!navTarget) {
-      throw new Error(`[probe] ${scopeLabel} navigator missing`);
+      throw new Error(`[probe] ${scopeName} navigator missing`);
     }
     const uaData = navTarget.userAgentData || null;
     const heKeys = ["architecture", "bitness", "model", "platformVersion", "fullVersionList", "wow64", "formFactors"];
     let he = null;
     if (!uaData || typeof uaData.getHighEntropyValues !== "function") {
-      throw new Error(`[probe] ${scopeLabel} userAgentData.getHighEntropyValues missing`);
+      throw new Error(`[probe] ${scopeName} userAgentData.getHighEntropyValues missing`);
     }
     const waited = await __probeAwaitWithTimeout(
       Reflect.apply(uaData.getHighEntropyValues, uaData, [heKeys]),
       __PROBE_TIMEOUTS.highEntropyMs,
-      { check: "worker_scope_audit", phase: scopeLabel, method: "NavigatorUAData.getHighEntropyValues" }
+      { check: "worker_scope_audit", phase: scopeName, method: "NavigatorUAData.getHighEntropyValues" }
     );
     if (!waited.ok) {
       if (waited.timedOut) {
-        __probeLogAsyncTimeout({ check: "worker_scope_audit", phase: scopeLabel, method: "NavigatorUAData.getHighEntropyValues" }, waited.elapsedMs, waited.timeoutMs, waited.error);
+        __probeLogAsyncTimeout({ check: "worker_scope_audit", phase: scopeName, method: "NavigatorUAData.getHighEntropyValues" }, waited.elapsedMs, waited.timeoutMs, waited.error);
       }
-      throw waited.error || new Error(`[probe] ${scopeLabel} high entropy failed`);
+      throw waited.error || new Error(`[probe] ${scopeName} high entropy failed`);
     }
     he = waited.value;
     if (!he || typeof he !== "object") {
-      throw new Error(`[probe] ${scopeLabel} high entropy result invalid`);
+      throw new Error(`[probe] ${scopeName} high entropy result invalid`);
     }
     return {
       language: navTarget.language,
@@ -1677,6 +1674,10 @@ const __probeRun = async function(){
   }
 
   function workerScopeName(scopeKind) {
+    if (scopeKind === "dedicated") return "DedicatedWorker";
+    if (scopeKind === "shared") return "SharedWorker";
+    if (scopeKind === "service") return "ServiceWorker";
+    if (scopeKind === "window") return "Window";
     if (scopeKind === "Worker" || scopeKind === "worker" || scopeKind === "WorkerGlobalScope" || scopeKind === "DedicatedWorkerGlobalScope") return "DedicatedWorker";
     if (scopeKind === "SharedWorker" || scopeKind === "SharedWorkerGlobalScope") return "SharedWorker";
     if (scopeKind === "ServiceWorker" || scopeKind === "ServiceWorkerGlobalScope") return "ServiceWorker";
@@ -1684,12 +1685,12 @@ const __probeRun = async function(){
     return typeof scopeKind === "string" && scopeKind ? scopeKind : null;
   }
 
-  function findNativeSkip(scopeLabel, field) {
+  function findNativeSkip(scopeName, field) {
     if (field !== "language" && field !== "languages" && field !== "hardwareConcurrency" && field !== "deviceMemory") {
       return null;
     }
     try {
-      const wantedScope = workerScopeName(scopeLabel);
+      const wantedScope = workerScopeName(scopeName);
       const events = getDegradeEvents();
       for (let i = events.length - 1; i >= 0; i--) {
         const entry = events[i];
@@ -1711,15 +1712,15 @@ const __probeRun = async function(){
     return null;
   }
 
-  function __probeCompareScopeValues(expectedWindow, actualScope, scopeLabel, variant) {
+  function __probeCompareScopeValues(expectedWindow, actualScope, scopeName, variant) {
     const rows = [];
     const actualValues = actualScope && typeof actualScope === "object" ? actualScope : {};
     const push = (field, expected, actual) => {
       const directMatch = __probeStableStringify(actual) === __probeStableStringify(expected);
-      const skip = directMatch ? null : findNativeSkip(scopeLabel, field);
+      const skip = directMatch ? null : findNativeSkip(scopeName, field);
       const skipMatch = !!(skip && __probeStableStringify(actual) === __probeStableStringify(skip.nativeValue));
       rows.push({
-        scope: scopeLabel,
+        scope: scopeName,
         variant: variant || null,
         field,
         match: directMatch || skipMatch,
@@ -1962,10 +1963,12 @@ const __probeRun = async function(){
             : null;
           const source = observed && typeof observed === "object" ? observed : data;
           if (!source || typeof source !== "object") continue;
-          const rawScopeKind = (typeof source.scopeKind === "string" && source.scopeKind)
-            ? source.scopeKind
-            : ((typeof source.scope === "string" && source.scope) ? source.scope : null);
-          const normalizedScopeKind = workerScopeName(rawScopeKind);
+          const rawScopeIdentity = (typeof source.scope === "string" && source.scope)
+            ? source.scope
+            : ((typeof source.scopeKind === "string" && source.scopeKind)
+              ? source.scopeKind
+              : null);
+          const normalizedScopeKind = workerScopeName(rawScopeIdentity);
           if (normalizedScopeKind !== scopeKind) continue;
           return {
             ok: true,
