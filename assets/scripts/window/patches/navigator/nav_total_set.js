@@ -48,16 +48,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
           stage: x.stage,
           message: x.message,
-          type: x.type
+          type: x.type,
+          data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null
         };
-        if (x.stage === 'apply' && (typeof ctx.message !== 'string' || !ctx.message)) {
-          ctx.message = code;
-        }
-        if (Object.prototype.hasOwnProperty.call(x, 'data')) {
-          ctx.data = x.data;
-        } else if (x.stage === 'apply' && level === 'info' && (err === undefined || err === null)) {
-          ctx.data = { outcome: 'return' };
-        }
         return __emit(level, code, ctx, err);
       } catch (diagErr) {
         return undefined;
@@ -88,8 +81,9 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: __flagKey,
           message: 'releaseGuardFlag threw',
           data: {
-            outcome: 'skip',
-            reason: 'guard_release_failed',
+            outcome: stage === 'rollback' ? 'throw' : 'skip',
+            reason: stage === 'rollback' ? 'rollback_failed' : 'guard_release_failed',
+            rollbackOk: false,
             substage: (typeof substage === 'string' && substage) ? substage : null
           }
         }, e);
@@ -444,7 +438,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           stage: 'rollback',
           key: key,
           message: 'object hidden-state reset failed',
-          data: { outcome: 'throw', reason: 'object_state_reset_failed', sourceReason: sourceReason || null }
+          data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceReason: sourceReason || null, sourceError: 'object_state_reset_failed' }
         }, err);
       }
       try {
@@ -964,7 +958,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             diagTag: 'nav_total_set',
             key: '__WORKER_ENV_SNAPSHOT__',
             message: 'worker env snapshot cleanup failed',
-            data: { outcome: 'throw', reason: 'worker_env_snapshot_cleanup_failed' }
+            data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceError: 'worker_env_snapshot_cleanup_failed' }
           }, cleanupErr);
         }
         __navDiag('error', 'nav_total_set:worker_env_snapshot_invalid', {
@@ -1179,7 +1173,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             stage: 'rollback',
             diagTag: 'nav_total_set',
             key: row.key,
-            message: 'module rollback failed'
+            message: 'module rollback failed',
+            data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false }
           }, e);
         }
       }
@@ -1295,7 +1290,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               type: __navTypeBrowser,
               diagTag: groupTag,
               key: p.key || null,
-              data: { outcome: 'rollback', reason: 'rollback_failed' }
+              data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceReason: 'apply_failed' }
             }, re);
           }
         }
@@ -1303,11 +1298,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           throw rollbackErr;
         }
         __navDiag('error', groupTag + ':apply_failed', {
-          stage: 'apply',
+          stage: 'rollback',
           type: __navTypeBrowser,
           diagTag: groupTag,
           key: activeKey,
-          data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'apply_failed' }
+          message: 'apply failed; group rolled back to native path',
+          data: { outcome: 'rollback', reason: 'apply_failed', rollbackOk: true, policy: groupPolicy }
         }, e);
         if (groupPolicy === 'throw') throw e;
         return 0;
@@ -2218,7 +2214,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:userAgentData',
               key: key || null,
-              message: 'dropOwn failed'
+              message: 'dropOwn failed',
+              data: { outcome: 'throw', reason: 'drop_own_failed' }
             }, e);
           }
         }
@@ -3324,7 +3321,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             diagTag: 'nav_total_set:performance.memory',
             key: 'performance.memory',
             message: 'performance.memory proto define failed',
-            data: { policy: 'skip', action: 'native' }
+            data: { outcome: 'skip', reason: 'proto_define_failed', policy: 'skip', action: 'native' }
           }, e);
         }
       }
@@ -3501,7 +3498,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               diagTag: 'nav_total_set:plugins',
               key: row.key,
               message: 'plugins/mimeTypes rollback failed',
-              data: { outcome: 'rollback', reason: 'rollback_failed', sourceReason: reason || null }
+              data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceReason: reason || null }
             }, e);
           }
           if (__navModuleAppliedOwners) {
@@ -3518,7 +3515,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           diagTag: 'nav_total_set:plugins',
           key: 'plugins',
           message: 'plugins/mimeTypes subgraph rolled back to native path',
-          data: { outcome: 'skip', reason: reason || 'apply_failed', rollback: 'applied' }
+          data: { outcome: 'rollback', reason: reason === 'rollback_failed' ? 'rollback_failed' : 'apply_failed', rollbackOk: true, rollback: 'applied', sourceReason: reason || null }
         }, err || null);
       }
       __navResetPluginsHiddenState();
@@ -4245,7 +4242,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           stage: 'rollback',
           key: null,
           message: 'scalar hidden-state reset failed',
-          data: { outcome: 'throw', reason: 'scalar_state_reset_failed', sourceReason: 'module_catch' }
+          data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceReason: 'module_catch', sourceError: 'scalar_state_reset_failed' }
         }, sre);
       }
       let hiddenRollbackErr = null;
@@ -4268,7 +4265,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         message: 'fatal module error',
         data: {
           outcome: 'throw',
-          reason: 'fatal',
+          reason: finalRollbackErr ? 'rollback_failed' : 'apply_failed',
           rollbackOk: !finalRollbackErr,
           descriptorRollbackOk: !rollbackErr,
           scalarStateRollbackOk: !scalarRollbackErr,

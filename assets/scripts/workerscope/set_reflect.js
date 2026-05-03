@@ -336,8 +336,8 @@
               stage: 'runtime',
               key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : null),
               message: '__wrapNativeApply apply trap failed',
-              type: 'apply_failed',
-              data: { outcome: 'throw' }
+              type: 'contract violation',
+              data: { outcome: 'throw', reason: 'apply_failed' }
             }, e);
             throw e;
           }
@@ -393,8 +393,8 @@
               stage: 'runtime',
               key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
               message: '__wrapNativeCtor argsImpl failed in apply trap',
-              type: 'apply_failed',
-              data: { outcome: 'throw', path: 'apply' }
+              type: 'contract violation',
+              data: { outcome: 'throw', reason: 'apply_failed', path: 'apply' }
             }, e);
             throw e;
           }
@@ -431,8 +431,8 @@
               stage: 'runtime',
               key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
               message: '__wrapNativeCtor argsImpl failed in construct trap',
-              type: 'apply_failed',
-              data: { outcome: 'throw', path: 'construct' }
+              type: 'contract violation',
+              data: { outcome: 'throw', reason: 'apply_failed', path: 'construct' }
             }, e);
             throw e;
           }
@@ -471,8 +471,8 @@
           stage: 'apply',
             key: '__wrapNativeCtor',
             message: '__wrapNativeCtor native mark/bridge registration failed',
-            type: 'apply_failed',
-            data: { outcome: 'throw' }
+            type: 'browser structure missing data',
+            data: { outcome: 'throw', reason: 'mark_failed' }
           }, e);
           throw e;
         }

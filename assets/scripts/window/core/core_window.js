@@ -305,8 +305,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
             key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : null),
             stage: 'runtime',
             message: '__wrapNativeApply apply trap failed',
-            type: 'apply_failed',
-            data: { outcome: 'throw' }
+            type: 'contract violation',
+            data: { outcome: 'throw', reason: 'apply_failed' }
           }, e);
           throw e;
         }
@@ -356,8 +356,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
             key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
             stage: 'runtime',
             message: '__wrapNativeCtor argsImpl failed in apply trap',
-            type: 'apply_failed',
-            data: { outcome: 'throw', path: 'apply' }
+            type: 'contract violation',
+            data: { outcome: 'throw', reason: 'apply_failed', path: 'apply' }
           }, e);
           throw e;
         }
@@ -403,8 +403,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
             key: (typeof name === 'string' && name) ? name : (nativeFn && nativeFn.name ? String(nativeFn.name) : '__wrapNativeCtor'),
             stage: 'runtime',
             message: '__wrapNativeCtor argsImpl failed in construct trap',
-            type: 'apply_failed',
-            data: { outcome: 'throw', path: 'construct' }
+            type: 'contract violation',
+            data: { outcome: 'throw', reason: 'apply_failed', path: 'construct' }
           }, e);
           throw e;
         }
@@ -452,8 +452,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
         key: '__wrapNativeCtor',
         stage: 'apply',
         message: '__wrapNativeCtor native mark/bridge registration failed',
-        type: 'apply_failed',
-        data: { outcome: 'throw' }
+        type: 'browser structure missing data',
+        data: { outcome: 'throw', reason: 'mark_failed' }
       }, e);
       throw e;
     }
@@ -606,11 +606,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
           data: (x && x.data && typeof x.data === 'object') ? x.data : null
         };
         if (!ctx.data || typeof ctx.data !== 'object') ctx.data = {};
-        if (!Object.prototype.hasOwnProperty.call(ctx.data, 'outcome')) {
-          ctx.data.outcome = (policy === 'skip')
-            ? 'skip'
-            : ((policy === 'throw' || policy === 'strict') ? 'throw' : 'return');
-        }
         if (policy && !Object.prototype.hasOwnProperty.call(ctx.data, 'policy')) {
           ctx.data.policy = policy;
         }
@@ -918,9 +913,21 @@ const CoreWindowModule = function CoreWindowModule(window) {
       function releaseGuardFlag(flagKey, token, rollbackOk, codePrefix) {
         const key = String(flagKey || '');
         if (!key) return false;
-        if (rollbackOk !== true) return false;
         const diagKey = /^__PATCH_[A-Z0-9_]+__$/.test(key) ? 'guard' : key;
         const tag = (typeof codePrefix === 'string' && codePrefix) ? codePrefix : 'core_window';
+        if (rollbackOk !== true) {
+          __emit('warn', tag + ':guard_release_skipped', {
+            module: 'core',
+            diagTag: tag,
+            surface: 'core',
+            key: diagKey,
+            stage: 'rollback',
+            message: 'guard release skipped because rollback failed',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'rollback_failed', rollbackOk: false }
+          }, null);
+          return false;
+        }
         try {
           if (__guardRegistry.get(key) !== token) return false;
           __guardRegistry.delete(key);
@@ -933,7 +940,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               stage: 'rollback',
               message: 'guard release failed',
               type: 'pipeline missing data',
-              data: { outcome: 'skip', reason: 'guard_release_failed' }
+              data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: false }
             }, null);
             return false;
           }
@@ -945,7 +952,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             stage: 'rollback',
             message: 'guard released after rollback ok',
             type: 'pipeline missing data',
-            data: { outcome: 'rollback', reason: 'rollback_ok' }
+            data: { outcome: 'rollback', reason: 'rollback_ok', rollbackOk: true }
           }, null);
           return true;
         } catch (e) {
@@ -957,7 +964,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             stage: 'rollback',
             message: 'guard release failed',
             type: 'pipeline missing data',
-            data: { outcome: 'skip', reason: 'guard_release_exception' }
+            data: { outcome: 'skip', reason: 'guard_release_exception', rollbackOk: false }
           }, e);
           return false;
         }
@@ -1058,7 +1065,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             stage: 'guard',
             type: 'pipeline missing data',
             message: e.message,
-            data: { wrapLayer: wrapLayerInput }
+            data: { outcome: 'throw', reason: code, wrapLayer: wrapLayerInput }
           });
           throw e;
         }
@@ -1463,7 +1470,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
                 kind: planItem.kind,
                 targetId: planItem.targetId,
                 invokeClass: invokeClass,
-                hook: hook && (hook.name || null)
+                hook: hook && (hook.name || null),
+                data: { outcome: 'return', reason: 'hooksPost_failed' }
               });
               return out;
             }
@@ -1579,7 +1587,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
               key,
               kind: planItem.kind,
               targetId: planItem.targetId,
-              invokeClass: invokeClass
+              invokeClass: invokeClass,
+              data: { outcome: 'throw', reason: 'promise_contract_failed', promise_method: true }
             });
             throw e;
           }
@@ -1600,7 +1609,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
                   targetId: planItem.targetId,
                   invokeClass: invokeClass,
                   hook: hook && (hook.name || null),
-                  promise_method: true
+                  promise_method: true,
+                  data: { outcome: 'return', reason: 'hooksPost_failed', promise_method: true }
                 });
                 return resolved;
               }
@@ -1810,7 +1820,20 @@ const CoreWindowModule = function CoreWindowModule(window) {
         planned.ok = true;
         planned.total = list.length;
         planned.reason = null;
-        if (!list.length) return planned;
+        if (!list.length) {
+          diagDegrade('core:applyTargets:empty', null, {
+            module: 'core_window',
+            diagTag: 'core:applyTargets',
+            surface: 'core',
+            key: null,
+            level: 'info',
+            stage: 'preflight',
+            message: 'Core.applyTargets skipped empty target list',
+            type: 'pipeline missing data',
+            data: { outcome: 'skip', reason: 'empty_targets' }
+          });
+          return planned;
+        }
 
         const seenOwners = new WeakMap();
         const failDedupe = new Set();
@@ -1822,6 +1845,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
           const dedupeKey = String(tag || 'core:applyTargets') + ':' + String(code || 'failed') + ':' + String(k || '') + ':' + String(tid || '');
           if (!failDedupe.has(dedupeKey)) {
             failDedupe.add(dedupeKey);
+            const failData = (x.data && typeof x.data === 'object') ? Object.assign({}, x.data) : {};
+            if (!Object.prototype.hasOwnProperty.call(failData, 'reason')) {
+              failData.reason = code;
+            }
+            if (!Object.prototype.hasOwnProperty.call(failData, 'outcome')) {
+              failData.outcome = (policy === 'throw' || policy === 'strict') ? 'throw' : 'skip';
+            }
+            if (policy && !Object.prototype.hasOwnProperty.call(failData, 'policy')) {
+              failData.policy = policy;
+            }
             diagDegrade(tag + ':' + code, err, Object.assign({}, x, {
               module: 'core_window',
               diagTag: tag,
@@ -1834,7 +1867,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
                   ? 'browser structure missing data'
                   : 'pipeline missing data'
               ),
-              data: (x.data && typeof x.data === 'object') ? x.data : { reason: code }
+              data: failData
             }));
           }
           if (policy === 'throw' || policy === 'strict') throw err;
@@ -1855,7 +1888,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               targetId: preflight.targetId,
               stage: 'preflight',
               message: 'Core.applyTargets preflight failed',
-              data: { reason: preflight.reason }
+              data: { outcome: (preflight.policy === 'throw' || preflight.policy === 'strict') ? 'throw' : 'skip', reason: preflight.reason, policy: preflight.policy }
             });
           }
           const owner = preflight.descriptorOwner || preflight.owner;
@@ -1908,8 +1941,28 @@ const CoreWindowModule = function CoreWindowModule(window) {
             diag.push({ planned: planned.length, total: list.length, ok: planned.ok !== false, reason: planned.reason || null });
           }
         } catch (e) {
-          diagDegrade('core:applyTargets:diag_push_failed', e);
+          diagDegrade('core:applyTargets:diag_push_failed', e, {
+            module: 'core_window',
+            diagTag: 'core:applyTargets',
+            surface: 'core',
+            key: null,
+            stage: 'runtime',
+            message: 'Core.applyTargets diag push failed',
+            type: 'pipeline missing data',
+            data: { outcome: 'return', reason: 'diag_push_failed' }
+          });
         }
+        diagDegrade('core:applyTargets:planned', null, {
+          module: 'core_window',
+          diagTag: 'core:applyTargets',
+          surface: 'core',
+          key: null,
+          level: 'info',
+          stage: 'preflight',
+          message: 'Core.applyTargets planned targets',
+          type: 'pipeline telemetry',
+          data: { outcome: 'return', reason: 'planned', planned: planned.length, total: list.length }
+        });
         return planned;
       }
 
@@ -2067,7 +2120,16 @@ const CoreWindowModule = function CoreWindowModule(window) {
         enumerable: false
       });
     } catch (e) {
-      diagDegrade('core:installCoreApplyTargets:failed', e);
+      diagDegrade('core:installCoreApplyTargets:failed', e, {
+        module: 'core_window',
+        diagTag: 'core_window',
+        surface: 'core',
+        key: 'Core.applyTargets',
+        stage: 'apply',
+        message: 'Core.applyTargets install failed',
+        type: 'pipeline missing data',
+        data: { outcome: 'throw', reason: 'install_failed' }
+      });
       throw e;
     }
   })();
