@@ -1253,19 +1253,19 @@
             }
           }, null);
         } else {
-          __patchLanguage = true;
-          __workerNavigatorDescriptorModes__['language'] = 'patched_accessor';
-          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:language_getter_value_mismatch', {
+          cache.snap.language = nativeLanguage;
+          __workerNavigatorDescriptorModes__['language'] = 'native_skip';
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:language_native_profile_mismatch_keep_native_getter', {
             type: 'browser structure missing data',
             stage: 'preflight',
             module: 'WORKER_PATCH_SRC',
             surface: 'WorkerNavigator',
             key: 'language',
-            policy: 'patch',
-            action: 'patch_getter',
+            policy: 'skip',
+            action: 'native',
             data: {
-              outcome: 'patch',
-              reason: 'getter_value_mismatch',
+              outcome: 'skip',
+              reason: 'native_profile_mismatch_keep_native_getter',
               nativeValue: nativeLanguage,
               profileValue: profileLanguage,
               scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
@@ -1365,19 +1365,19 @@
               }
             }, null);
           } else {
-            __patchLanguages = true;
-            __workerNavigatorDescriptorModes__['languages'] = 'patched_accessor';
-            emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:languages_getter_value_mismatch', {
+            cache.snap.languages = nativeLanguages.slice();
+            __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
+            emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:languages_native_profile_mismatch_keep_native_getter', {
               type: 'browser structure missing data',
               stage: 'preflight',
               module: 'WORKER_PATCH_SRC',
               surface: 'WorkerNavigator',
               key: 'languages',
-              policy: 'patch',
-              action: 'patch_getter',
+              policy: 'skip',
+              action: 'native',
               data: {
-                outcome: 'patch',
-                reason: 'getter_value_mismatch',
+                outcome: 'skip',
+                reason: 'native_profile_mismatch_keep_native_getter',
                 nativeValue: nativeLanguages.slice(),
                 profileValue: Array.isArray(profileLanguages) ? profileLanguages.slice() : profileLanguages,
                 scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
@@ -1507,19 +1507,20 @@
             }
           }, null);
         } else {
-          __patchHardwareConcurrency = true;
-          __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'patched_accessor';
+          cache.snap.hardwareConcurrency = nativeHardwareConcurrency;
+          cache.snap.cpu = nativeHardwareConcurrency;
+          __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
           emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
             type: 'browser structure missing data',
             stage: 'preflight',
             module: 'WORKER_PATCH_SRC',
             surface: 'WorkerNavigator',
             key: 'hardwareConcurrency',
-            policy: 'patch',
-            action: 'patch_getter',
+            policy: 'skip',
+            action: 'native',
             data: {
-              outcome: 'patch',
-              reason: 'getter_value_mismatch',
+              outcome: 'skip',
+              reason: 'native_profile_mismatch_keep_native_getter',
               nativeValue: nativeHardwareConcurrency,
               profileValue: profileHardwareConcurrency,
               scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
@@ -1731,7 +1732,16 @@
         throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
       }
       const runner = new Function('window', source + '\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
-      return runner(self);
+      try {
+        return runner(self);
+      } finally {
+        try {
+          const d = Object.getOwnPropertyDescriptor(self, exportName);
+          if (d && d.configurable !== false) {
+            delete self[exportName];
+          }
+        } catch (_) {}
+      }
     };
     const syncWorkerEnvProfileState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {

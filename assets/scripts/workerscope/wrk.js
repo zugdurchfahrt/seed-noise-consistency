@@ -1481,7 +1481,14 @@ function mkModuleWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
         var __runInlineModule__ = function(source, exportName, label) {
           if (typeof source !== 'string' || !source) throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
           var runner = new Function('window', source + '\\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
-          return runner(self);
+          try {
+            return runner(self);
+          } finally {
+            try {
+              var d = Object.getOwnPropertyDescriptor(self, exportName);
+              if (d && d.configurable !== false) delete self[exportName];
+            } catch (_) {}
+          }
         };
         __runInlineModule__(${JSON.stringify(inlineCoreWindow)}, 'CoreWindowModule', 'inlineCoreWindow');
         __runInlineModule__(${JSON.stringify(inlinePrng)}, 'RNGsetModule', 'inlinePrng');
@@ -1537,7 +1544,14 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
         var __runInlineModule__ = function(source, exportName, label) {
           if (typeof source !== 'string' || !source) throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
           var runner = new Function('window', source + '\\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
-          return runner(self);
+          try {
+            return runner(self);
+          } finally {
+            try {
+              var d = Object.getOwnPropertyDescriptor(self, exportName);
+              if (d && d.configurable !== false) delete self[exportName];
+            } catch (_) {}
+          }
         };
         __runInlineModule__(${JSON.stringify(inlineCoreWindow)}, 'CoreWindowModule', 'inlineCoreWindow');
         __runInlineModule__(${JSON.stringify(inlinePrng)}, 'RNGsetModule', 'inlinePrng');
