@@ -157,13 +157,6 @@
     }
     const workerScopeKind = __resolveBootstrapWorkerScopeKind__();
     const __workerScopeName__ = __scopeNameFromKind__(workerScopeKind);
-    const __resolveWorkerScopeMarker__ = () => {
-      const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
-      const runtimeScope = (runtimeRoot && typeof runtimeRoot.workerScope === 'string' && runtimeRoot.workerScope)
-        ? runtimeRoot.workerScope
-        : null;
-      return runtimeScope || __workerScopeName__ || null;
-    };
     const __isCoreToStringStateOk__ = (st) => !!(st
       && st.__CORE_TOSTRING_STATE__ === true
       && typeof st.nativeToString === 'function'
@@ -2106,27 +2099,17 @@
     }
     applyWorkerSnapshot(bootstrapSnap);
     consumePendingEnvSnapshots();
-    const bootstrapStateRoot = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
-      ? self.CanvasPatchContext.state
-      : null;
-    if (!bootstrapStateRoot) throw new Error('UACHPatch: CanvasPatchContext.state missing');
-    syncWorkerEnvProfileState(bootstrapStateRoot);
-    restoreWorkerFontsState(bootstrapStateRoot);
-    let __envSyncBcInstalled = false;
-    if (!__envSyncBcInstalled) {
-      if (typeof BroadcastChannel !== 'function') {
-        throw new Error('UACHPatch: BroadcastChannel missing');
-      }
-      __envSyncBcInstalled = true;
-      const bc = new BroadcastChannel('__ENV_SYNC__');
-      bc.onmessage = ev => {
-        const s = ev?.data?.__ENV_SYNC__?.envSnapshot;
-        const applyFn = (typeof bootstrapRuntimeRoot.consumeEnvSnapshot === 'function')
-          ? bootstrapRuntimeRoot.consumeEnvSnapshot
-          : applyWorkerSnapshot;
-        if (s && applyFn) applyFn(s);
-      };
+    if (typeof BroadcastChannel !== 'function') {
+      throw new Error('UACHPatch: BroadcastChannel missing');
     }
+    const bc = new BroadcastChannel('__ENV_SYNC__');
+    bc.onmessage = ev => {
+      const s = ev?.data?.__ENV_SYNC__?.envSnapshot;
+      const applyFn = (typeof bootstrapRuntimeRoot.consumeEnvSnapshot === 'function')
+        ? bootstrapRuntimeRoot.consumeEnvSnapshot
+        : applyWorkerSnapshot;
+      if (s && applyFn) applyFn(s);
+    };
     if (self.Worker && !self.Worker.__ENV_WRAPPED__) {
       const NativeWorker = self.Worker;
       const dWorker = Object.getOwnPropertyDescriptor(self, 'Worker');
