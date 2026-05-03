@@ -969,9 +969,24 @@ function mkWorkerBootstrapCore(opts){
           var __wrkRuntime = __materialized && __materialized.wrkRuntime;
           if (!__wrkRuntime || typeof __wrkRuntime !== 'object') return null;
           if (typeof __wrkRuntime.consumeEnvSnapshot === 'function') return __wrkRuntime.consumeEnvSnapshot;
-          if (typeof __wrkRuntime.bootstrapApplyEnvSnapshot === 'function') return __wrkRuntime.bootstrapApplyEnvSnapshot;
         } catch(_e) {}
         return null;
+      }
+      function __queueWorkerRuntimeSnapshot__(s){
+        try {
+          if (!s || typeof s !== 'object') return false;
+          var __materialized = __materializeWorkerOwnerGraph__();
+          var __wrkRuntime = __materialized && __materialized.wrkRuntime;
+          if (!__wrkRuntime || typeof __wrkRuntime !== 'object') return false;
+          var q = Array.isArray(__wrkRuntime.pendingEnvSnapshots) ? __wrkRuntime.pendingEnvSnapshots : null;
+          if (!q) {
+            q = [];
+            __defineWorkerHiddenValue__(__wrkRuntime, 'pendingEnvSnapshots', q);
+          }
+          q.push(s);
+          return true;
+        } catch(_e) {}
+        return false;
       }
       if (__isServiceWorkerScope__()) {
         __emitDiag('wrk:worker_bootstrap:preflight:service_scope_unsupported', new Error('ServiceWorker scope is unsupported in dedicated/shared bootstrap core'), {
@@ -1016,11 +1031,10 @@ function mkWorkerBootstrapCore(opts){
               var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
               var syncSnap = syncPacket && syncPacket.envSnapshot;
               var syncApply = __resolveWorkerRuntimeApplyFn__();
-              if (!syncApply && typeof __bootstrapApplyEnvSnapshot__ === 'function') {
-                syncApply = __bootstrapApplyEnvSnapshot__;
-              }
               if (syncSnap && syncApply) {
                 syncApply(syncSnap);
+              } else if (syncSnap && !syncApply && !__queueWorkerRuntimeSnapshot__(syncSnap)) {
+                throw new Error('WorkerBootstrap: env sync consumer missing');
               }
             } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_env_sync' }); }
           });
@@ -1049,11 +1063,10 @@ function mkWorkerBootstrapCore(opts){
                         var syncPacket = msgEv && msgEv.data && msgEv.data.__ENV_SYNC__;
                         var syncSnap = syncPacket && syncPacket.envSnapshot;
                         var syncApply = __resolveWorkerRuntimeApplyFn__();
-                        if (!syncApply && typeof __bootstrapApplyEnvSnapshot__ === 'function') {
-                          syncApply = __bootstrapApplyEnvSnapshot__;
-                        }
                         if (syncSnap && syncApply) {
                           syncApply(syncSnap);
+                        } else if (syncSnap && !syncApply && !__queueWorkerRuntimeSnapshot__(syncSnap)) {
+                          throw new Error('WorkerBootstrap: shared env sync consumer missing');
                         }
                       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_env_sync' }); }
                     });
@@ -1257,13 +1270,6 @@ function mkWorkerBootstrapCore(opts){
         __syncWorkerOwnerSnapshotRoute__(__LAST_SNAP__);
         __ENV_SNAP_APPLIED__ = s;
       };
-      (function __installBootstrapSnapshotApply__(){
-        var __materialized = __materializeWorkerOwnerGraph__();
-        var __wrkRuntime = __materialized.wrkRuntime;
-        __defineWorkerHiddenValue__(__wrkRuntime, 'bootstrapApplyEnvSnapshot', function(s){
-          __bootstrapApplyEnvSnapshot__(s);
-        });
-      })();
       try {
         __bootstrapApplyEnvSnapshot__(${SNAP});
       } catch (e) {

@@ -63,6 +63,7 @@ from profile_data_source.datashell_win32 import data_4_win32
 from profile_data_source.macintel import macintel_data
 # ----------------------- MODULES-----------------------
 import tools.generators.cdp_catapult as cdp
+import tools.generators.cdp_worker_env as cdp_worker_env
 import tools.tools_runtime.helpers as helpers_module
 import tools.tools_runtime.headers_adapter as headers_adapter_module
 import tools.tools_infra.vpn_utils as vpn_utils_module
@@ -456,6 +457,26 @@ def init_driver(
     sw_thread.start()
     logger.info("Thread started name=%s ident=%s on port %s", sw_thread.name, sw_thread.ident, cdp.PORT)
     cdp.log_cdp_runtime_diag("main_after_sw_thread_start")
+
+    cdp_worker_env.enable_worker_env_inject(
+        language=language,
+        normalized_languages=normalized_languages,
+        hardware_concurrency=hardware_concurrency_value,
+        user_agent=user_agent,
+        navigator_platform=dom_platform,
+    )
+    worker_env_thread = threading.Thread(
+        target=cdp_worker_env.run,
+        daemon=True,
+        name="cdp_worker_env_injector",
+    )
+    worker_env_thread.start()
+    logger.info(
+        "Worker env injector thread started name=%s ident=%s on port %s",
+        worker_env_thread.name,
+        worker_env_thread.ident,
+        cdp.PORT,
+    )
 
 
     # --- Assembling main bundle (DOM/Canvas/WebGL etc) ---

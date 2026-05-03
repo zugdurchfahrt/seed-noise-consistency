@@ -2076,6 +2076,17 @@
       __bootstrapSnapshotConsumed__ = true;
     };
     __defineHiddenWorkerRuntimeValue__(bootstrapRuntimeRoot, 'consumeEnvSnapshot', applyWorkerSnapshot);
+    const consumePendingEnvSnapshots = () => {
+      const pending = Array.isArray(bootstrapRuntimeRoot.pendingEnvSnapshots)
+        ? bootstrapRuntimeRoot.pendingEnvSnapshots
+        : null;
+      if (!(pending && pending.length)) return;
+      const queued = pending.slice(0);
+      pending.length = 0;
+      for (let i = 0; i < queued.length; i++) {
+        applyWorkerSnapshot(queued[i]);
+      }
+    };
     const bootstrapSnap = __resolveWorkerSnapshotOwner__();
     if (!bootstrapSnap) {
       throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
@@ -2094,6 +2105,7 @@
       throw e;
     }
     applyWorkerSnapshot(bootstrapSnap);
+    consumePendingEnvSnapshots();
     const bootstrapStateRoot = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
       ? self.CanvasPatchContext.state
       : null;
@@ -2155,22 +2167,12 @@
       hardwareConcurrency: self.navigator && self.navigator.hardwareConcurrency
     };
     if (sanity.language !== cache.snap.language) {
-      emitDegrade('warn', 'worker_patch_src:workernavigator:sanity:language_native_profile_mismatch_keep_native_getter', {
-        type: 'browser structure missing data',
-        stage: 'sanity',
-        module: 'WORKER_PATCH_SRC',
-        surface: 'WorkerNavigator',
-        key: 'language',
-        policy: 'skip',
-        action: 'keep_native_getter',
-        data: {
-          outcome: 'skip',
-          reason: 'getter_value_mismatch',
-          nativeValue: sanity.language,
-          profileValue: cache.snap.language,
-          scope: __workerScopeMarker__
-        }
-      }, null);
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'language',
+        'UACHPatch: language mismatch',
+        { actual: sanity.language, expected: cache.snap.language }
+      );
     }
     const sanityLanguagesCanonical = canonicalizeLanguageListForCompare(sanity.languages);
     const snapLanguagesCanonical = canonicalizeLanguageListForCompare(cache.snap.languages);
@@ -2194,22 +2196,15 @@
           }
         }, null);
       } else {
-        emitDegrade('warn', 'worker_patch_src:workernavigator:sanity:languages_native_profile_mismatch_keep_native_getter', {
-          type: 'browser structure missing data',
-          stage: 'sanity',
-          module: 'WORKER_PATCH_SRC',
-          surface: 'WorkerNavigator',
-          key: 'languages',
-          policy: 'skip',
-          action: 'keep_native_getter',
-          data: {
-            outcome: 'skip',
-            reason: 'getter_value_mismatch',
-            nativeValue: Array.isArray(sanity.languages) ? sanity.languages.slice() : sanity.languages,
-            profileValue: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages,
-            scope: __workerScopeMarker__
+        failWorkerNavigatorSanity(
+          'worker_patch_src:workernavigator:sanity:mismatch',
+          'languages',
+          'UACHPatch: languages mismatch',
+          {
+            actual: Array.isArray(sanity.languages) ? sanity.languages.slice() : sanity.languages,
+            expected: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages
           }
-        }, null);
+        );
       }
     }
     if (Number(sanity.deviceMemory) !== Number(cache.snap.deviceMemory)) {
@@ -2221,22 +2216,12 @@
       );
     }
     if (Number(sanity.hardwareConcurrency) !== Number(cache.snap.hardwareConcurrency)) {
-      emitDegrade('warn', 'worker_patch_src:workernavigator:sanity:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
-        type: 'browser structure missing data',
-        stage: 'sanity',
-        module: 'WORKER_PATCH_SRC',
-        surface: 'WorkerNavigator',
-        key: 'hardwareConcurrency',
-        policy: 'skip',
-        action: 'keep_native_getter',
-        data: {
-          outcome: 'skip',
-          reason: 'getter_value_mismatch',
-          nativeValue: sanity.hardwareConcurrency,
-          profileValue: cache.snap.hardwareConcurrency,
-          scope: __workerScopeMarker__
-        }
-      }, null);
+      failWorkerNavigatorSanity(
+        'worker_patch_src:workernavigator:sanity:mismatch',
+        'hardwareConcurrency',
+        'UACHPatch: hardwareConcurrency mismatch',
+        { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
+      );
     }
     const sanityUAD = self.navigator && self.navigator.userAgentData;
     if (!sanityUAD || typeof sanityUAD !== 'object') {
