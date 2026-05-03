@@ -186,11 +186,30 @@ const ContextPatchModule = function ContextPatchModule(window) {
   function emitWebGLMonitor(entry) {
     try {
       if (!isWebGLAccessLoggerEnabled()) return;
+      const x = (entry && typeof entry === 'object') ? entry : {};
+      emitContextDiag('info', 'context:webgl:monitor', null, {
+        module: 'webgl',
+        diagTag: 'webgl',
+        surface: 'webgl',
+        key: (typeof x.method === 'string' && x.method) ? x.method : null,
+        stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
+        message: (typeof x.message === 'string' && x.message) ? x.message : 'webgl monitor event',
+        type: 'pipeline missing data',
+        data: {
+          loggerGroup: 'WEBGLlogger',
+          loggerChannel: 'monitor_diag',
+          eventType: (typeof x.eventType === 'string' && x.eventType) ? x.eventType : 'webgl',
+          method: (typeof x.method === 'string' && x.method) ? x.method : '',
+          hook: (typeof x.hook === 'string' && x.hook) ? x.hook : '',
+          args: Object.prototype.hasOwnProperty.call(x, 'args') ? x.args : [],
+          result: Object.prototype.hasOwnProperty.call(x, 'result') ? x.result : null,
+          error: Object.prototype.hasOwnProperty.call(x, 'error') ? x.error : null
+        }
+      });
       const push = (__loggerRoot && typeof __loggerRoot.__pushWebGLMonitor__ === 'function')
         ? __loggerRoot.__pushWebGLMonitor__
         : null;
       if (typeof push !== 'function') return;
-      const x = (entry && typeof entry === 'object') ? entry : {};
       push({
         eventType: (typeof x.eventType === 'string' && x.eventType) ? x.eventType : 'webgl',
         method: (typeof x.method === 'string' && x.method) ? x.method : '',
@@ -224,6 +243,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return method === 'getParameter'
       || method === 'getSupportedExtensions'
       || method === 'getExtension'
+      || method === 'readPixels'
       || method === 'getShaderPrecisionFormat'
       || method === 'shaderSource'
       || method === 'getUniform';
@@ -317,25 +337,67 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return (typeof global !== 'undefined' && global.CanvasPatchHooks) ? global.CanvasPatchHooks : null;
   }
 
-  // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
-  // NOTE: this value is used as a stable fallback for hook keys (fontStr) when ctx.font is unreadable/empty.
-  const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
-    const cached = (
-      C
-      && C.state
-      && C.state.__CANVAS__
-      && C.state.__CANVAS__.__STATE__
-      && typeof C.state.__CANVAS__.__STATE__.defaultCtx2dFont === 'string'
-    ) ? C.state.__CANVAS__.__STATE__.defaultCtx2dFont : '';
-    if (cached && cached.trim()) return cached.trim();
-    emitContextDiag('warn', 'context:ctx2d:guard:default_font_missing', null, {
-      stage: 'guard',
-      key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
-      type: 'pipeline missing data',
-      message: 'shared default ctx2d font missing'
-    });
-    return '';
-  })();
+  function __resolveCanvasStateForFont__() {
+    const canvasRoot = (C && C.state && C.state.__CANVAS__ && typeof C.state.__CANVAS__ === 'object')
+      ? C.state.__CANVAS__
+      : null;
+    const canvasState = (canvasRoot && canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+      ? canvasRoot.__STATE__
+      : null;
+    return canvasState;
+  }
+
+  function __readSharedDefaultCtx2dFont__() {
+    const canvasState = __resolveCanvasStateForFont__();
+    const cached = (canvasState && typeof canvasState.defaultCtx2dFont === 'string')
+      ? canvasState.defaultCtx2dFont.trim()
+      : '';
+    return cached || null;
+  }
+
+  function __storeSharedDefaultCtx2dFont__(ctx) {
+    const canvasState = __resolveCanvasStateForFont__();
+    if (!canvasState) {
+      emitContextDiag('error', 'context:ctx2d:guard:default_font_state_missing', null, {
+        stage: 'guard',
+        key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
+        type: 'pipeline missing data',
+        message: 'shared default ctx2d font state missing'
+      });
+      return false;
+    }
+    const existing = (typeof canvasState.defaultCtx2dFont === 'string') ? canvasState.defaultCtx2dFont.trim() : '';
+    if (existing) return true;
+    const font = (ctx && typeof ctx.font === 'string') ? ctx.font.trim() : '';
+    if (!font) {
+      emitContextDiag('error', 'context:ctx2d:guard:default_font_capture_failed', null, {
+        stage: 'guard',
+        key: 'ctx.font',
+        type: 'browser structure missing data',
+        message: 'default ctx2d font capture failed'
+      });
+      return false;
+    }
+    canvasState.defaultCtx2dFont = font;
+    return true;
+  }
+
+  function getFontStr(self) {
+    try {
+      const liveFont = (self && typeof self.font === 'string' && self.font.trim()) ? self.font.trim() : '';
+      if (liveFont) return liveFont;
+      const sharedFont = __readSharedDefaultCtx2dFont__();
+      if (sharedFont) return sharedFont;
+      throw new Error('[ContextPatch] shared default ctx2d font missing');
+    } catch (e) {
+      emitContextDiag('warn', 'context:ctx2d:runtime:font_read_failed', e, {
+        stage: 'runtime',
+        key: 'font',
+        type: 'browser structure missing data'
+      });
+      throw e;
+    }
+  }
 
   function keepNativeMethods(proto, methods) {
     if (!proto || !Array.isArray(methods) || !methods.length) return false;
@@ -893,6 +955,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
             if (typeof hook !== 'function') continue;
             try {
               const res = hook.apply(self, [orig, ...patched]);
+              if (Array.isArray(res) && method === 'getSupportedExtensions') {
+                emitWebGLAccess(method, patched, res, {
+                  source: 'issued_override',
+                  hook: hook.name || 'anon'
+                });
+                return res;
+              }
               if (res !== undefined && !Array.isArray(res)) {
                 emitWebGLAccess(method, patched, res, {
                   source: 'issued_override',
@@ -997,21 +1066,22 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const orig = resolveKeptNative(proto, 'getContext') || proto.getContext;
     if (typeof orig !== 'function') return 0;
 
-    const dispatch = function(boundOwner, contextId, contextAttributes) {
-      const args = Array.prototype.slice.call(arguments, 1);
+    const dispatch = function(self, argsLike) {
+      const args = Array.prototype.slice.call(argsLike || []);
       const type = args[0];
       const rest = args.length > 1 ? Array.prototype.slice.call(args, 1) : [];
-      const res = Reflect.apply(orig, boundOwner, args);
+      const res = Reflect.apply(orig, self, args);
       let ctx = res;
 
       try {
         if (ctx) {
-          installIssuedSerializationMethods(boundOwner);
+          installIssuedSerializationMethods(self);
         }
         if (type === '2d' && ctx) {
           ctx = createSafeCtxProxy(ctx);
+          __storeSharedDefaultCtx2dFont__(ctx);
           for (const hook of (ctx2dHooks || [])) {
-            try { ctx = hook.call(boundOwner, ctx, type, ...rest) || ctx; } catch (e) {
+            try { ctx = hook.call(self, ctx, type, ...rest) || ctx; } catch (e) {
               emitContextDiag('warn', 'context:getContext:ctx2d_hook_failed', e, {
                 stage: 'hook',
                 key: 'getContext',
@@ -1025,7 +1095,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
             installIssuedWebGLMethods(ctx);
           }
           for (const hook of (webglHooks || [])) {
-            try { hook.call(boundOwner, ctx, type, ...rest); } catch (e) {
+            try { hook.call(self, ctx, type, ...rest); } catch (e) {
               emitContextDiag('warn', 'context:getContext:webgl_hook_failed', e, {
                 stage: 'hook',
                 key: 'getContext',
@@ -1035,7 +1105,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
         }
         for (const hook of (htmlHooks || [])) {
-          try { hook.call(boundOwner, ctx, type, ...rest); } catch (e) {
+          try { hook.call(self, ctx, type, ...rest); } catch (e) {
             emitContextDiag('warn', 'context:getContext:html_hook_failed', e, {
               stage: 'hook',
               key: 'getContext',
@@ -1043,22 +1113,29 @@ const ContextPatchModule = function ContextPatchModule(window) {
             });
           }
         }
-        registerIssuedContext(ctx, type, boundOwner);
+        registerIssuedContext(ctx, type, self);
       } catch (e) {
         emitContextDiag('error', 'context:getContext:chain_failed', e, {
           stage: 'hook',
           key: 'getContext',
           data: { type: type || null }
         });
-        registerIssuedContext(ctx, type, boundOwner);
+        registerIssuedContext(ctx, type, self);
       }
 
       return ctx;
     };
 
-    const wrappedGetContext = dispatch.bind(null, owner);
+    const wrappedGetContextRaw = (function() {
+      switch (orig.length) {
+        case 0: return ({ getContext() { return dispatch(this, arguments); } }).getContext;
+        case 1: return ({ getContext(a0) { return dispatch(this, arguments); } }).getContext;
+        case 2: return ({ getContext(a0, a1) { return dispatch(this, arguments); } }).getContext;
+        default: return ({ getContext(...a) { return dispatch(this, a); } }).getContext;
+      }
+    })();
     const wrapped = registerToStringWrapper(
-      wrappedGetContext,
+      wrappedGetContextRaw,
       orig,
       'getContext',
       'ContextPatch:getContext'
@@ -1262,20 +1339,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       patchedMethods.add(wrapped);
       return true;
     }
-
-      const getFontStr = (self) => {
-      try {
-        const f = self && typeof self.font === 'string' && self.font.trim() ? self.font : DEFAULT_CTX2D_FONT;
-        return f;
-      } catch (e) {
-        emitContextDiag('warn', 'context:ctx2d:runtime:font_read_failed', e, {
-          stage: 'runtime',
-          key: 'font',
-          type: 'browser structure missing data'
-        });
-        return DEFAULT_CTX2D_FONT;
-      }
-    };
 
     // --- getImageData: route read-path through gateway without changing native answer ---
     patchOnce('getImageData', (orig) => (target, thisArg, argList) => {
@@ -1493,7 +1556,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         applied += installIssuedSerializationMethods(C.__OFFSCREEN_CANVAS__);
         applied += installIssuedGetContextMethod(C.__OFFSCREEN_CANVAS__, Ctx.offscreenGetContextHooks, Ctx.ctx2DGetContextHooks, Ctx.webglGetContextHooks);
       }
-      state.offscreen = true;
+      state.offscreen = applied > 0;
     }
     if (__loggerRoot && __loggerRoot.__DEBUG__) {
       emitContextDiag('info', 'context:offscreen:apply:patches_applied', null, {
@@ -1512,7 +1575,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       captureKeepNativeRefs();
       let applied = 0, total = 2;
       let already = 0;
-      state.webgl = true;
+      state.webgl = applied > 0;
       emitContextDiag('info', 'context:webgl:apply:patches_applied', null, {
         stage: 'apply',
         surface: 'webgl',

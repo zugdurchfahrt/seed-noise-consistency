@@ -129,6 +129,166 @@ const WebglPatchModule = function WebglPatchModule(window) {
       });
       throw new Error('CanvasPatchContext.state.__ENV_PROFILE__ missing');
     }
+    function __captureDescriptorState(target, key) {
+      return {
+        target: target,
+        key: key,
+        exists: !!(target && Object.prototype.hasOwnProperty.call(target, key)),
+        desc: (target && Object.getOwnPropertyDescriptor(target, key)) || null
+      };
+    }
+    function __restoreDescriptorState(state) {
+      try {
+        const target = state && state.target;
+        if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+          throw new Error('restore target missing');
+        }
+        if (state.exists && state.desc) {
+          Object.defineProperty(target, state.key, state.desc);
+        } else {
+          delete target[state.key];
+        }
+        return true;
+      } catch (e) {
+        __webglDiagBrowser('error', 'webglstorage:rollback_failed', {
+          diagTag: 'webglstorage',
+          stage: 'rollback',
+          key: state && state.key ? state.key : null,
+          message: 'WebGL storage rollback failed',
+          data: { outcome: 'skip', reason: 'rollback_failed' }
+        }, e);
+        return false;
+      }
+    }
+    function __hideOwnSurface(target, key) {
+      try {
+        if (!target || (typeof target !== 'object' && typeof target !== 'function')) return true;
+        if (!Object.prototype.hasOwnProperty.call(target, key)) return true;
+        const d = Object.getOwnPropertyDescriptor(target, key);
+        if (!d || d.enumerable === false) return true;
+        if (d.configurable === false) {
+          __webglDiagBrowser('warn', 'webglstorage:hide_surface_nonconfigurable', {
+            diagTag: 'webglstorage',
+            stage: 'apply',
+            key: key,
+            message: 'WebGL storage hide skipped: non-configurable',
+            data: { outcome: 'skip', reason: 'hide_surface_nonconfigurable' }
+          }, null);
+          return false;
+        }
+        if ('value' in d) {
+          Object.defineProperty(target, key, {
+            value: d.value,
+            writable: !!d.writable,
+            configurable: !!d.configurable,
+            enumerable: false
+          });
+        } else {
+          Object.defineProperty(target, key, {
+            get: d.get,
+            set: d.set,
+            configurable: !!d.configurable,
+            enumerable: false
+          });
+        }
+        return true;
+      } catch (e) {
+        __webglDiagBrowser('warn', 'webglstorage:hide_surface_failed', {
+          diagTag: 'webglstorage',
+          stage: 'apply',
+          key: key,
+          message: 'WebGL storage hide failed',
+          data: { outcome: 'skip', reason: 'hide_surface_failed' }
+        }, e);
+        return false;
+      }
+    }
+    function __setHiddenValue(target, key, value) {
+      const own = !!(target && Object.prototype.hasOwnProperty.call(target, key));
+      const d = own ? (Object.getOwnPropertyDescriptor(target, key) || null) : null;
+      if (d && d.configurable === false) {
+        target[key] = value;
+        __hideOwnSurface(target, key);
+        return;
+      }
+      Object.defineProperty(target, key, {
+        value: value,
+        writable: d ? !!d.writable : true,
+        configurable: d ? !!d.configurable : true,
+        enumerable: false
+      });
+    }
+    function __loadWebGLStorageDictionary() {
+      const provider = (typeof WEBglDICKts === 'function') ? WEBglDICKts : null;
+      if (typeof provider !== 'function') {
+        __webglDiagPipeline('fatal', 'webglstorage:dictionary_provider_missing', {
+          diagTag: 'webglstorage',
+          stage: 'preflight',
+          key: 'WEBglDICKts',
+          message: 'WebGL storage dictionary provider missing',
+          data: { outcome: 'throw' }
+        }, null);
+        throw new Error('WEBglDICKts missing');
+      }
+      const dictionary = provider(window);
+      if (!dictionary || typeof dictionary !== 'object') {
+        throw new Error('WEBglDICKts dictionary invalid');
+      }
+      if (!Array.isArray(dictionary.paramWhitelist)) {
+        throw new Error('WEBglDICKts paramWhitelist invalid');
+      }
+      if (!Array.isArray(dictionary.extensionsWhitelist)) {
+        throw new Error('WEBglDICKts extensionsWhitelist invalid');
+      }
+      for (let i = 0; i < dictionary.paramWhitelist.length; i += 1) {
+        const value = dictionary.paramWhitelist[i];
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          throw new Error('WEBglDICKts paramWhitelist entry invalid');
+        }
+      }
+      for (let i = 0; i < dictionary.extensionsWhitelist.length; i += 1) {
+        const value = dictionary.extensionsWhitelist[i];
+        if (typeof value !== 'string' || !value) {
+          throw new Error('WEBglDICKts extensionsWhitelist entry invalid');
+        }
+      }
+      return dictionary;
+    }
+    const __webglStorageDescriptorState = __captureDescriptorState(__stateRoot, '__WEBGL_STATE__');
+    try {
+      const __existingWebGLState = (__stateRoot.__WEBGL_STATE__ && typeof __stateRoot.__WEBGL_STATE__ === 'object')
+        ? __stateRoot.__WEBGL_STATE__
+        : null;
+      const __webglState = __existingWebGLState || {
+        paramWhitelist: [],
+        extensionsWhitelist: []
+      };
+      __setHiddenValue(__stateRoot, '__WEBGL_STATE__', __webglState);
+      const __webglDictionary = __loadWebGLStorageDictionary();
+      __webglState.paramWhitelist = __webglDictionary.paramWhitelist.slice();
+      __webglState.extensionsWhitelist = __webglDictionary.extensionsWhitelist.slice();
+      __webglDiagPipeline('info', 'webglstorage:whitelist_loaded', {
+        diagTag: 'webglstorage',
+        stage: 'apply',
+        key: 'CanvasPatchContext.state.__WEBGL_STATE__',
+        message: 'WebGL storage dictionary loaded',
+        data: {
+          outcome: 'return',
+          paramWhitelistLength: __webglState.paramWhitelist.length,
+          extensionsWhitelistLength: __webglState.extensionsWhitelist.length
+        }
+      }, null);
+    } catch (e) {
+      const rollbackOk = __restoreDescriptorState(__webglStorageDescriptorState);
+      __webglDiagBrowser('error', 'webglstorage:apply_failed', {
+        diagTag: 'webglstorage',
+        stage: 'apply',
+        key: 'CanvasPatchContext.state.__WEBGL_STATE__',
+        message: 'WebGL storage dictionary apply failed',
+        data: { outcome: 'throw', rollbackOk: rollbackOk }
+      }, e);
+      throw e;
+    }
     const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
       ? __core.__internal
       : null;

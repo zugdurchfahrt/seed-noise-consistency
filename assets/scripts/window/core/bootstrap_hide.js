@@ -190,46 +190,31 @@ const canvasState = __ensureHiddenObjectSlot__(
     offscreenReady: false,
     domCanvas: null,
     domCanvasHost: null,
-    offscreenCanvas: null,
-    defaultCtx2dFont: ''
+    offscreenCanvas: null
   })
 );
-
-const __bootstrapDefaultCtx2dFontCached__ = (typeof canvasState.defaultCtx2dFont === 'string' && canvasState.defaultCtx2dFont.trim())
-  ? canvasState.defaultCtx2dFont.trim()
-  : '';
-if (!__bootstrapDefaultCtx2dFontCached__) {
-  try {
-    const doc = (W && W.document && typeof W.document.createElement === 'function')
-      ? W.document
-      : null;
-    const bootstrapCanvas = doc
-      ? doc.createElement('canvas')
-      : ((typeof W.OffscreenCanvas === 'function') ? new W.OffscreenCanvas(1, 1) : null);
-    if (!bootstrapCanvas || typeof bootstrapCanvas.getContext !== 'function') {
-      throw new Error('[module] CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont source missing');
-    }
-    const bootstrapCtx = bootstrapCanvas.getContext('2d');
-    const font = (bootstrapCtx && typeof bootstrapCtx.font === 'string' && bootstrapCtx.font.trim())
-      ? bootstrapCtx.font.trim()
-      : '';
-    if (!font) {
-      throw new Error('[module] CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont invalid');
-    }
-    canvasState.defaultCtx2dFont = font;
-  } catch (e) {
-    __emitBootstrapTransferDiag__(
-      'error',
-      'bootstrap_hide:canvas_default_font_missing',
-      'state.__CANVAS__.__STATE__.defaultCtx2dFont',
-      'canvas default font owner-transfer failed',
-      'bootstrap_input_incomplete',
-      e,
-      null
-    );
-    throw e;
-  }
+__ensureHiddenOwnSlot__(
+  canvasState,
+  'defaultCtx2dFont',
+  '[module] CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont bootstrap failed'
+);
+if (typeof canvasState.defaultCtx2dFont !== 'string' || !canvasState.defaultCtx2dFont.trim()) {
+  __defineHiddenValue__(canvasState, 'defaultCtx2dFont', null);
 }
+
+// CanvasPatchContext.state.__WEBGL_STATE__
+const webglState = __ensureHiddenObjectSlot__(
+  stateRoot,
+  '__WEBGL_STATE__',
+  '[module] CanvasPatchContext.state.__WEBGL_STATE__ bootstrap failed',
+  () => ({
+    paramWhitelist: [],
+    extensionsWhitelist: []
+  })
+);
+if (!Array.isArray(webglState.paramWhitelist)) webglState.paramWhitelist = [];
+if (!Array.isArray(webglState.extensionsWhitelist)) webglState.extensionsWhitelist = [];
+
 
 // CanvasPatchContext.state.__SCREEN__
 const screenRoot = __ensureHiddenObjectSlot__(

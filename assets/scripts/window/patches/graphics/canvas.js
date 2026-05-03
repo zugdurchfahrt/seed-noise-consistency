@@ -68,20 +68,29 @@ function __canvasCreateDomHostElements() {
   };
 }
 const C  = G.CanvasPatchContext;
-const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
-const __canvasStateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
-const __canvasEnvProfileState = (__canvasStateRoot && __canvasStateRoot.__ENV_PROFILE__ && typeof __canvasStateRoot.__ENV_PROFILE__ === 'object')
-  ? __canvasStateRoot.__ENV_PROFILE__
-  : null;
-const __canvasEnvScreenState = (__canvasEnvProfileState && __canvasEnvProfileState.__SCREEN__ && typeof __canvasEnvProfileState.__SCREEN__ === 'object')
-  ? __canvasEnvProfileState.__SCREEN__
-  : null;
-const __canvasScreenWidth = Number(__canvasEnvScreenState && __canvasEnvScreenState.width);
-const __canvasScreenHeight = Number(__canvasEnvScreenState && __canvasEnvScreenState.height);
-const __canvasDpr = Number(__canvasEnvProfileState && __canvasEnvProfileState.dpr);
-if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+// === CanvasEnvBus phase ===
+// 1) reading CanvasPatchContext.state
+// 2) reading logger/env/screen/prng roots
+// 3) validating dependencies
+// 4) preparing helper functions
+// 5) writing hidden init-state into CanvasPatchContext
+const __canvasEnvBus = (function initCanvasEnvBus() {
+  if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+
+  const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+  const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+  const envProfileState = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+    ? stateRoot.__ENV_PROFILE__
+    : null;
+  const envScreenState = (envProfileState && envProfileState.__SCREEN__ && typeof envProfileState.__SCREEN__ === 'object')
+    ? envProfileState.__SCREEN__
+    : null;
+  const screenWidth = Number(envScreenState && envScreenState.width);
+  const screenHeight = Number(envScreenState && envScreenState.height);
+  const dpr = Number(envProfileState && envProfileState.dpr);
+
   function emitCanvasDiag(level, code, err, extra) {
-    const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
+    const d = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
     if (typeof d !== 'function') return;
     const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
     const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
@@ -101,15 +110,16 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     }
     d(eventCode, e, ctx);
   }
+
   if (
-    Number.isFinite(__canvasScreenWidth) &&
-    Number.isFinite(__canvasScreenHeight) &&
-    Number.isFinite(__canvasDpr)
+    Number.isFinite(screenWidth) &&
+    Number.isFinite(screenHeight) &&
+    Number.isFinite(dpr)
   ) {
     if (
-      __canvasScreenWidth <= 0 ||
-      __canvasScreenHeight <= 0 ||
-      __canvasDpr <= 0
+      screenWidth <= 0 ||
+      screenHeight <= 0 ||
+      dpr <= 0
     ) {
       emitCanvasDiag('warn', 'canvas:preflight:screen_metrics_invalid', null, {
         stage: 'preflight',
@@ -118,14 +128,15 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         data: {
           outcome: 'skip',
           reason: 'screen_metrics_invalid',
-          width: __canvasScreenWidth,
-          height: __canvasScreenHeight,
-          dpr: __canvasDpr
+          width: screenWidth,
+          height: screenHeight,
+          dpr: dpr
         }
       });
     }
   }
-  function __resolvePrngState() {
+
+  function resolvePrngState() {
     const __core = G && G.Core;
     const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
       ? __core.__internal
@@ -142,57 +153,23 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     };
   }
 
-  // === MODULE INITIALIZATION ===
-  // Создаём <canvas> (идемпотентно) и разделяем DOM/Offscreen пути
-  const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-  if (!__stateRoot) {
+  if (!stateRoot) {
     throw new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available');
   }
-  const __canvasModuleSlot = (__stateRoot.__CANVAS__ && typeof __stateRoot.__CANVAS__ === 'object')
-    ? __stateRoot.__CANVAS__
+  const canvasModuleSlot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
+    ? stateRoot.__CANVAS__
     : null;
-  if (!__canvasModuleSlot) {
+  if (!canvasModuleSlot) {
     throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS__ is undefined — module registration is not available');
   }
-  const __canvasState = (__canvasModuleSlot.__STATE__ && typeof __canvasModuleSlot.__STATE__ === 'object')
-    ? __canvasModuleSlot.__STATE__
+  const canvasState = (canvasModuleSlot.__STATE__ && typeof canvasModuleSlot.__STATE__ === 'object')
+    ? canvasModuleSlot.__STATE__
     : null;
-  if (!__canvasState) {
+  if (!canvasState) {
     throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS__.__STATE__ is undefined — module registration is not available');
   }
 
-  // Native default ctx2d font (MDN/Chromium-consistent). Cache it once in CanvasPatchContext.
-  const DEFAULT_CTX2D_FONT = (function initDefaultCtx2DFont(){
-    try {
-      const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string') ? __canvasState.defaultCtx2dFont : '';
-      if (cached && cached.trim()) return cached.trim();
-
-      let canvas = null;
-      if (__canvasCanCreateElements()) {
-        canvas = __canvasCreateCanvas();
-      } else if (typeof G.OffscreenCanvas === 'function') {
-        canvas = new G.OffscreenCanvas(1, 1);
-      } else {
-        throw new Error('[CanvasPatch] document.createElement missing');
-      }
-      const ctx = (canvas && typeof canvas.getContext === 'function') ? canvas.getContext('2d') : null;
-      const font = (ctx && typeof ctx.font === 'string' && ctx.font.trim()) ? ctx.font.trim() : '';
-      if (!font) throw new Error('[CanvasPatch] default ctx2d.font missing/invalid');
-      return font;
-    } catch (e) {
-      emitCanvasDiag('warn', 'canvas:ctx2d:guard:default_font_compute_failed', e, {
-        stage: 'guard',
-        key: 'ctx.font',
-        type: 'browser structure missing data'
-      });
-      const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string') ? __canvasState.defaultCtx2dFont : '';
-      return (cached && cached.trim()) ? cached.trim() : '';
-    }
-  })();
-
-  // keep internal handles inside CanvasPatchContext (non-enumerable),
-  // do not publish generic aliases like window.canvas/window.div/window.offscreenCanvas.
-  function __defineHidden__(obj, prop, value, diagCode, diagKey, message) {
+  function defineHidden(obj, prop, value, diagCode, diagKey, message) {
     const stage = (typeof diagCode === 'string' && diagCode.indexOf(':guard:') !== -1)
       ? 'guard'
       : ((typeof diagCode === 'string' && diagCode.indexOf(':preflight:') !== -1) ? 'preflight' : 'apply');
@@ -224,6 +201,67 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
         return false;
       }
     }
+  }
+
+  defineHidden(
+    canvasModuleSlot,
+    '__ENV_BUS__',
+    Object.freeze({
+      phase: 'CanvasEnvBus',
+      hasDocument: !!__canvasDocument,
+      hasCreateElement: __canvasCanCreateElements(),
+      hasLogger: !!loggerRoot,
+      hasEnvProfile: !!envProfileState,
+      hasEnvScreen: !!envScreenState,
+      screenWidth: Number.isFinite(screenWidth) ? screenWidth : null,
+      screenHeight: Number.isFinite(screenHeight) ? screenHeight : null,
+      dpr: Number.isFinite(dpr) ? dpr : null
+    }),
+    'canvas:apply:env_bus_state_define_failed',
+    'CanvasPatchContext.state.__CANVAS__.__ENV_BUS__',
+    'CanvasEnvBus init-state defineProperty failed; fallback assign used'
+  );
+
+  return {
+    loggerRoot,
+    stateRoot,
+    envProfileState,
+    envScreenState,
+    screenWidth,
+    screenHeight,
+    dpr,
+    canvasModuleSlot,
+    canvasState,
+    emitCanvasDiag,
+    resolvePrngState,
+    defineHidden
+  };
+})();
+const __loggerRoot = __canvasEnvBus.loggerRoot;
+const __canvasStateRoot = __canvasEnvBus.stateRoot;
+const __canvasEnvProfileState = __canvasEnvBus.envProfileState;
+const __canvasEnvScreenState = __canvasEnvBus.envScreenState;
+const __canvasScreenWidth = __canvasEnvBus.screenWidth;
+const __canvasScreenHeight = __canvasEnvBus.screenHeight;
+const __canvasDpr = __canvasEnvBus.dpr;
+const __stateRoot = __canvasEnvBus.stateRoot;
+const __canvasModuleSlot = __canvasEnvBus.canvasModuleSlot;
+const __canvasState = __canvasEnvBus.canvasState;
+const emitCanvasDiag = __canvasEnvBus.emitCanvasDiag;
+const __resolvePrngState = __canvasEnvBus.resolvePrngState;
+const __defineHidden__ = __canvasEnvBus.defineHidden;
+
+  function __readSharedDefaultCtx2dFont__() {
+    const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string')
+      ? __canvasState.defaultCtx2dFont.trim()
+      : '';
+    return cached || null;
+  }
+
+  function __requireSharedDefaultCtx2dFont__() {
+    const font = __readSharedDefaultCtx2dFont__();
+    if (typeof font === 'string' && font) return font;
+    throw new Error('[CanvasPatch] shared default ctx2d font missing');
   }
 
   // создаём скрытый HTML-canvas в окне
@@ -574,7 +612,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
     const txt  = String(text ?? '');
     const fRaw = (typeof font === 'string' && font.trim())
       ? font
-      : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : DEFAULT_CTX2D_FONT;
+      : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : __requireSharedDefaultCtx2dFont__();
     const fStr = fRaw.replace(/\s+/g, ' ');
     const mm = fStr.match(/(\d+(?:\.\d+)?)px/i);
     const px = mm ? parseFloat(mm[1]) : 16;
@@ -616,7 +654,7 @@ if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — regis
 
       const fontStr = (typeof font === 'string' && font.trim())
         ? font
-        : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : DEFAULT_CTX2D_FONT;
+        : (this && typeof this.font === 'string' && this.font.trim()) ? this.font : __requireSharedDefaultCtx2dFont__();
       const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
       const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
         ? stateRoot.__FONTS__
