@@ -265,23 +265,19 @@ const LOGGingModule = function LOGGingModule() {
       const wrkRuntime = (wrkState && wrkState.runtime && typeof wrkState.runtime === "object")
         ? wrkState.runtime
         : null;
-      const explicitScopeRaw = (typeof safeCtx.scope === "string" && safeCtx.scope)
+      let explicitScope = (typeof safeCtx.scope === "string" && safeCtx.scope)
         ? safeCtx.scope
         : ((safeData && typeof safeData.scope === "string" && safeData.scope) ? safeData.scope : null);
-      const explicitScope = canonicalScopeName(explicitScopeRaw);
-      const explicitKindRaw = (typeof safeCtx.scopeKind === "string" && safeCtx.scopeKind)
+      let explicitKind = (typeof safeCtx.scopeKind === "string" && safeCtx.scopeKind)
         ? safeCtx.scopeKind
         : ((safeData && typeof safeData.scopeKind === "string" && safeData.scopeKind) ? safeData.scopeKind : null);
-      const explicitKind = canonicalScopeKind(explicitKindRaw);
-      const explicitScopeKindMap = {
-        ServiceWorkerGlobalScope: "service",
-        SharedWorkerGlobalScope: "shared",
-        DedicatedWorkerGlobalScope: "dedicated",
-        WindowGlobalScope: "window"
-      };
-      const explicitScopeKindFromScope = (typeof explicitScope === "string" && Object.prototype.hasOwnProperty.call(explicitScopeKindMap, explicitScope))
-        ? explicitScopeKindMap[explicitScope]
-        : null;
+      explicitScope = canonicalScopeName(explicitScope);
+      explicitKind = canonicalScopeKind(explicitKind);
+      if (!explicitKind && explicitScope === "ServiceWorkerGlobalScope") explicitKind = "service";
+      else if (!explicitKind && explicitScope === "SharedWorkerGlobalScope") explicitKind = "shared";
+      else if (!explicitKind && explicitScope === "DedicatedWorkerGlobalScope") explicitKind = "dedicated";
+      else if (!explicitKind && explicitScope === "WindowGlobalScope") explicitKind = "window";
+      if (!explicitScope && explicitKind) explicitScope = scopeNameFromKind(explicitKind);
       const runtimeWorkerScopeKind = (wrkRuntime && typeof wrkRuntime.workerScopeKind === "string" && wrkRuntime.workerScopeKind)
         ? wrkRuntime.workerScopeKind
         : null;
@@ -312,20 +308,19 @@ const LOGGingModule = function LOGGingModule() {
           actualScope = "WindowGlobalScope";
         }
       } catch (_) {}
-      const inferredExplicitKind = explicitKind || explicitScopeKindFromScope || null;
-      const inferredExplicitScope = explicitScope || scopeNameFromKind(inferredExplicitKind);
-      const scopeKind = inferredExplicitKind || actualKind || null;
-      const scope = inferredExplicitScope || actualScope || null;
+      const scopeKind = explicitKind || actualKind || null;
+      const scope = explicitScope || actualScope || null;
+      const hasExplicitIdentity = !!(explicitKind || explicitScope);
       const auxiliary = Object.create(null);
-      if (runtimeKind && runtimeKind !== scopeKind) {
+      if (!hasExplicitIdentity && runtimeKind && runtimeKind !== scopeKind) {
         auxiliary.relatedScope = scopeNameFromKind(runtimeKind);
         auxiliary.relatedScopeKind = runtimeKind;
         auxiliary.workerFamily = runtimeKind;
       }
-      if (runtimeServiceWorkerLane) {
+      if (scopeKind === "service" && runtimeServiceWorkerLane) {
         auxiliary.serviceWorkerLane = runtimeServiceWorkerLane;
       }
-      if (runtimeExpectedWorkerScopeKind) {
+      if (!hasExplicitIdentity && runtimeExpectedWorkerScopeKind) {
         auxiliary.expectedWorkerScopeKind = runtimeExpectedWorkerScopeKind;
       }
       return { scope, scopeKind, auxiliary };

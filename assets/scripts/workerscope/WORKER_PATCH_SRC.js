@@ -51,12 +51,24 @@
     if (bootstrapRuntimeRoot.bootstrapActive !== true) {
       throw new Error('UACHPatch: bootstrap marker missing');
     }
+    const __workerScopeMarker__ = (() => {
+      const runtimeScope = (typeof bootstrapRuntimeRoot.workerScope === 'string' && bootstrapRuntimeRoot.workerScope)
+        ? bootstrapRuntimeRoot.workerScope
+        : null;
+      if (runtimeScope) return runtimeScope;
+      const runtimeKind = bootstrapRuntimeRoot && bootstrapRuntimeRoot.workerScopeKind;
+      return runtimeKind === 'shared'
+        ? 'SharedWorker'
+        : (runtimeKind === 'dedicated' ? 'DedicatedWorker' : null);
+    })();
+    __defineHiddenWorkerRuntimeValue__(bootstrapRuntimeRoot, 'workerScope', __workerScopeMarker__);
     const nav = self.navigator;
     const proto = (typeof WorkerNavigator!=='undefined' && WorkerNavigator.prototype) || Object.getPrototypeOf(nav);
     if (!proto && !nav) {
       throw new Error('UACHPatch: WorkerNavigator unavailable');
     }
     const cache = { snap:null };
+    let __bootstrapSnapshotConsumed__ = false;
     const relayDiag = (typeof bootstrapRuntimeRoot.relayDiag === 'function') ? bootstrapRuntimeRoot.relayDiag : null;
     const emitDegrade = (level, code, ctx, err) => {
       const d = (typeof __DEGRADE__ === "function") ? __DEGRADE__ : null;
@@ -118,15 +130,6 @@
       } catch (_e) {}
       return false;
     };
-    const __detectWorkerScopeKind__ = () => {
-      try {
-        if (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) return 'shared';
-      } catch (_e) {}
-      try {
-        if (typeof DedicatedWorkerGlobalScope === 'function' && self instanceof DedicatedWorkerGlobalScope) return 'dedicated';
-      } catch (_e) {}
-      return null;
-    };
     const __scopeNameFromKind__ = (kind) => kind === 'service'
       ? 'ServiceWorker'
       : (kind === 'shared'
@@ -153,41 +156,14 @@
       throw e;
     }
     const workerScopeKind = __resolveBootstrapWorkerScopeKind__();
-    const actualWorkerScopeKind = __detectWorkerScopeKind__();
-    if (!__isWorkerScopeKind__(actualWorkerScopeKind)) {
-      const e = new Error('UACHPatch: actual worker scope kind missing');
-      emitDegrade('error', 'worker_patch_src:scope_kind:runtime:missing', {
-        type: 'browser structure missing data',
-        stage: 'runtime',
-        module: 'WORKER_PATCH_SRC',
-        surface: 'worker',
-        key: '__WORKER_SCOPE_KIND__',
-        policy: 'throw',
-        action: 'throw',
-        data: { outcome: 'throw', reason: 'worker_scope_kind_missing' }
-      }, e);
-      throw e;
-    }
-    if (workerScopeKind !== actualWorkerScopeKind) {
-      const e = new Error('UACHPatch: worker scope kind mismatch');
-      emitDegrade('error', 'worker_patch_src:scope_kind:contract:mismatch', {
-        type: 'pipeline missing data',
-        stage: 'contract',
-        module: 'WORKER_PATCH_SRC',
-        surface: 'worker',
-        key: '__WORKER_SCOPE_KIND__',
-        policy: 'throw',
-        action: 'throw',
-        data: {
-          outcome: 'throw',
-          reason: 'worker_scope_kind_mismatch',
-          expected: workerScopeKind,
-          actual: actualWorkerScopeKind
-        }
-      }, e);
-      throw e;
-    }
     const __workerScopeName__ = __scopeNameFromKind__(workerScopeKind);
+    const __resolveWorkerScopeMarker__ = () => {
+      const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
+      const runtimeScope = (runtimeRoot && typeof runtimeRoot.workerScope === 'string' && runtimeRoot.workerScope)
+        ? runtimeRoot.workerScope
+        : null;
+      return runtimeScope || __workerScopeName__ || null;
+    };
     const __isCoreToStringStateOk__ = (st) => !!(st
       && st.__CORE_TOSTRING_STATE__ === true
       && typeof st.nativeToString === 'function'
@@ -1249,26 +1225,24 @@
               reason: 'getter_value_match',
               nativeValue: nativeLanguage,
               profileValue: profileLanguage,
-              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+              scope: __workerScopeMarker__
             }
           }, null);
         } else {
-          cache.snap.language = nativeLanguage;
-          __workerNavigatorDescriptorModes__['language'] = 'native_skip';
-          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:language_native_profile_mismatch_keep_native_getter', {
+          emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:language_getter_value_mismatch', {
             type: 'browser structure missing data',
             stage: 'preflight',
             module: 'WORKER_PATCH_SRC',
             surface: 'WorkerNavigator',
             key: 'language',
             policy: 'skip',
-            action: 'native',
+            action: 'keep_native_getter',
             data: {
               outcome: 'skip',
-              reason: 'native_profile_mismatch_keep_native_getter',
+              reason: 'getter_value_mismatch',
               nativeValue: nativeLanguage,
               profileValue: profileLanguage,
-              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+              scope: __workerScopeMarker__
             }
           }, null);
         }
@@ -1288,7 +1262,7 @@
             reason: 'native_invalid',
             nativeValue: nativeLanguage,
             profileValue: cache.snap.language,
-            scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            scope: __workerScopeMarker__
           }
         }, null);
       }
@@ -1338,7 +1312,7 @@
               reason: 'getter_value_match',
               nativeValue: nativeLanguages.slice(),
               profileValue: profileLanguages,
-              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+              scope: __workerScopeMarker__
             }
           }, null);
         } else {
@@ -1361,26 +1335,25 @@
                 profileValue: Array.isArray(profileLanguages) ? profileLanguages.slice() : profileLanguages,
                 canonicalNativeValue: nativeCanonical,
                 canonicalProfileValue: profileCanonical,
-                scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+                scope: __workerScopeMarker__
               }
             }, null);
           } else {
-            cache.snap.languages = nativeLanguages.slice();
             __workerNavigatorDescriptorModes__['languages'] = 'native_skip';
-            emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:languages_native_profile_mismatch_keep_native_getter', {
+            emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:languages_getter_value_mismatch', {
               type: 'browser structure missing data',
               stage: 'preflight',
               module: 'WORKER_PATCH_SRC',
               surface: 'WorkerNavigator',
               key: 'languages',
               policy: 'skip',
-              action: 'native',
+              action: 'keep_native_getter',
               data: {
                 outcome: 'skip',
-                reason: 'native_profile_mismatch_keep_native_getter',
+                reason: 'getter_value_mismatch',
                 nativeValue: nativeLanguages.slice(),
                 profileValue: Array.isArray(profileLanguages) ? profileLanguages.slice() : profileLanguages,
-                scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+                scope: __workerScopeMarker__
               }
             }, null);
           }
@@ -1401,7 +1374,7 @@
             reason: 'native_invalid',
             nativeValue: nativeLanguages,
             profileValue: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages,
-            scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            scope: __workerScopeMarker__
           }
         }, null);
       }
@@ -1503,13 +1476,10 @@
               reason: 'native_descriptor_match',
               nativeValue: nativeHardwareConcurrency,
               profileValue: profileHardwareConcurrency,
-              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+              scope: __workerScopeMarker__
             }
           }, null);
         } else {
-          cache.snap.hardwareConcurrency = nativeHardwareConcurrency;
-          cache.snap.cpu = nativeHardwareConcurrency;
-          __workerNavigatorDescriptorModes__['hardwareConcurrency'] = 'native_skip';
           emitDegrade('warn', 'worker_patch_src:workernavigator_descriptor:hardwareConcurrency_native_profile_mismatch_keep_native_getter', {
             type: 'browser structure missing data',
             stage: 'preflight',
@@ -1517,13 +1487,13 @@
             surface: 'WorkerNavigator',
             key: 'hardwareConcurrency',
             policy: 'skip',
-            action: 'native',
+            action: 'keep_native_getter',
             data: {
               outcome: 'skip',
-              reason: 'native_profile_mismatch_keep_native_getter',
+              reason: 'getter_value_mismatch',
               nativeValue: nativeHardwareConcurrency,
               profileValue: profileHardwareConcurrency,
-              scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+              scope: __workerScopeMarker__
             }
           }, null);
         }
@@ -1543,7 +1513,7 @@
             reason: 'native_invalid',
             nativeValue: nativeHardwareConcurrencyResolved.value,
             profileValue: Number(cache.snap.hardwareConcurrency),
-            scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+            scope: __workerScopeMarker__
           }
         }, null);
       }
@@ -2074,7 +2044,7 @@
 
     const applyWorkerSnapshot = s => {
       if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
-      if (cache.snap === s) return;
+      if (cache.snap === s && __bootstrapSnapshotConsumed__ === true) return;
       const prevSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
       cache.snap = requireSnap(s, 'apply');
       if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
@@ -2103,6 +2073,7 @@
       if (prevSeed != null && curSeed != null && prevSeed !== curSeed) {
         throw new Error('UACHPatch: seed mutation is not allowed');
       }
+      __bootstrapSnapshotConsumed__ = true;
     };
     __defineHiddenWorkerRuntimeValue__(bootstrapRuntimeRoot, 'consumeEnvSnapshot', applyWorkerSnapshot);
     const bootstrapSnap = __resolveWorkerSnapshotOwner__();
@@ -2122,6 +2093,7 @@
       }, e);
       throw e;
     }
+    applyWorkerSnapshot(bootstrapSnap);
     const bootstrapStateRoot = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
       ? self.CanvasPatchContext.state
       : null;
@@ -2176,8 +2148,6 @@
         enumerable: false
       });
     }
-    self.__SCOPE_CONSISTENCY_PATCHED__ = __workerScopeName__ || true;
-
     const sanity = {
       language: self.navigator && self.navigator.language,
       languages: self.navigator && self.navigator.languages,
@@ -2197,7 +2167,8 @@
           outcome: 'skip',
           reason: 'getter_value_mismatch',
           nativeValue: sanity.language,
-          profileValue: cache.snap.language
+          profileValue: cache.snap.language,
+          scope: __workerScopeMarker__
         }
       }, null);
     }
@@ -2235,7 +2206,8 @@
             outcome: 'skip',
             reason: 'getter_value_mismatch',
             nativeValue: Array.isArray(sanity.languages) ? sanity.languages.slice() : sanity.languages,
-            profileValue: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages
+            profileValue: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages,
+            scope: __workerScopeMarker__
           }
         }, null);
       }
@@ -2261,7 +2233,8 @@
           outcome: 'skip',
           reason: 'getter_value_mismatch',
           nativeValue: sanity.hardwareConcurrency,
-          profileValue: cache.snap.hardwareConcurrency
+          profileValue: cache.snap.hardwareConcurrency,
+          scope: __workerScopeMarker__
         }
       }, null);
     }
@@ -2408,7 +2381,7 @@
         reason: "applied",
         core: true,
         mirror: __uachMirrorInstalled__ === true,
-        scope: self.__SCOPE_CONSISTENCY_PATCHED__ || null
+        scope: __workerScopeMarker__
       },
       type: "pipeline missing data"
     };
