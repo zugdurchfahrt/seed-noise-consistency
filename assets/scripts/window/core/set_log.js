@@ -208,6 +208,8 @@ const LOGGingModule = function LOGGingModule() {
         && typeof data.consoleGroup === "string"
         && data.consoleGroup
       ) ? data.consoleGroup : "";
+      const dataReason = (data && typeof data.reason === "string") ? data.reason : "";
+      const dataOutcome = (data && typeof data.outcome === "string") ? data.outcome : "";
       const eName = (err && typeof err.name === "string") ? err.name : "";
       const eMsg = (err && typeof err.message === "string") ? err.message : (err == null ? "" : String(err));
       return [
@@ -222,10 +224,45 @@ const LOGGingModule = function LOGGingModule() {
         (typeof c.type === "string") ? c.type : "",
         (typeof c.scope === "string") ? c.scope : "",
         (typeof c.scopeKind === "string") ? c.scopeKind : "",
+        dataReason,
+        dataOutcome,
         consoleGroup,
         eName,
         eMsg
       ].join("|");
+    }
+
+    function normalizeDiagType(rawType, code, ctx, data) {
+      const typeValue = (typeof rawType === "string" && rawType) ? rawType : "";
+      const safeCtx = (ctx && typeof ctx === "object") ? ctx : {};
+      const safeData = (data && typeof data === "object") ? data : null;
+      const reason = (safeData && typeof safeData.reason === "string") ? safeData.reason : "";
+      const outcome = (safeData && typeof safeData.outcome === "string") ? safeData.outcome : "";
+      const stage = (typeof safeCtx.stage === "string") ? safeCtx.stage : "";
+      const codeValue = String(code || "");
+
+      if (reason === "rollback_failed" || /:rollback_failed$/.test(codeValue)) return "rollback_failed";
+      if (reason === "apply_failed" || /:apply_failed$/.test(codeValue)) return "apply_failed";
+      if (reason === "native_throw" || /:native_throw$/.test(codeValue)) return "native_throw";
+      if (reason === "mark_failed" || /:mark_failed$/.test(codeValue)) return "mark_failed";
+      if (reason === "preflight_failed" || reason === "preflight_exception" || /:preflight_failed$/.test(codeValue)) return "preflight_failed";
+      if (
+        reason === "guard_failed"
+        || reason === "guard_exception"
+        || reason === "guard_write_failed"
+        || reason === "guard_release_failed"
+        || reason === "guard_release_exception"
+        || /:guard_(failed|exception|write_failed|release_failed|release_exception)$/.test(codeValue)
+      ) return "guard_failed";
+      if (stage === "guard" && (outcome === "skip" || outcome === "throw")) {
+        return reason === "already_patched" ? "guard_exit" : "guard_failed";
+      }
+      if (stage === "preflight" && (outcome === "skip" || outcome === "throw" || typeValue === "pipeline missing data" || typeValue === "browser structure missing data")) {
+        return "preflight_failed";
+      }
+      if (typeValue === "pipeline missing data") return "pipeline diagnostic";
+      if (typeValue === "browser structure missing data") return "browser diagnostic";
+      return typeValue || undefined;
     }
 
     function scopeNameFromKind(kind) {
@@ -1947,9 +1984,8 @@ const LOGGingModule = function LOGGingModule() {
             safeCtx = {};
           }
 
-      // accept any string type; do not overwrite ctx.type
+      // accept any string type; normalize legacy generic labels after data/stage are known
       const rawType = (safeCtx && typeof safeCtx.type === "string") ? safeCtx.type : undefined;
-      const validatedType = rawType; // keep as-is; undefined if not provided
 
       // Preserve `null` as a distinct value; only coerce truly invalid types.
       // `data` is allowed to be `object|function|null` (arrays are ok).
@@ -1995,6 +2031,14 @@ const LOGGingModule = function LOGGingModule() {
           }
         }
       }
+      const validatedType = normalizeDiagType(rawType, normalizedCode, safeCtx, safeData);
+
+      const hasExplicitCtxKey = !!(safeCtx && Object.prototype.hasOwnProperty.call(safeCtx, "key"));
+      const normalizedKey = hasExplicitCtxKey
+        ? ((typeof safeCtx.key === "string" && safeCtx.key) ? safeCtx.key : (safeCtx.key === null ? null : undefined))
+        : ((typeof safeCtx.diagTag === "string" && safeCtx.diagTag)
+          ? safeCtx.diagTag
+          : ((typeof safeCtx.module === "string" && safeCtx.module) ? safeCtx.module : undefined));
 
       const extraObj = {
         level: normalizedLevel,
@@ -2002,13 +2046,8 @@ const LOGGingModule = function LOGGingModule() {
         module: (typeof safeCtx.module === "string") ? safeCtx.module : undefined,
         diagTag: (typeof safeCtx.diagTag === "string") ? safeCtx.diagTag : undefined,
         surface: (typeof safeCtx.surface === "string") ? safeCtx.surface : undefined,
-        // Fill missing keys for log consumers: prefer explicit ctx.key, otherwise reuse diagTag/module.
-        // This keeps pipeline semantics intact while avoiding "null holes" in the log table.
-        key: (typeof safeCtx.key === "string" && safeCtx.key)
-          ? safeCtx.key
-          : ((typeof safeCtx.diagTag === "string" && safeCtx.diagTag)
-            ? safeCtx.diagTag
-            : ((typeof safeCtx.module === "string" && safeCtx.module) ? safeCtx.module : undefined)),
+        // Preserve explicit `key:null`; only synthesize key when caller omitted the key field.
+        key: normalizedKey,
         stage: (typeof safeCtx.stage === "string") ? safeCtx.stage : undefined,
         message: (typeof safeCtx.message === "string") ? safeCtx.message : undefined,
         scope: (typeof scopeInfo.scope === "string" && scopeInfo.scope) ? scopeInfo.scope : undefined,
@@ -2137,9 +2176,11 @@ const LOGGingModule = function LOGGingModule() {
         diagTag: (extra && typeof extra.diagTag === "string" && extra.diagTag)
           ? extra.diagTag
           : ((safeEntry && typeof safeEntry.diagTag === "string" && safeEntry.diagTag) ? safeEntry.diagTag : runtimeTag),
-        key: (extra && typeof extra.key === "string" && extra.key)
-          ? extra.key
-          : ((safeEntry && typeof safeEntry.key === "string" && safeEntry.key) ? safeEntry.key : ""),
+        key: (extra && Object.prototype.hasOwnProperty.call(extra, "key"))
+          ? (extra.key === null ? "null" : ((typeof extra.key === "string" && extra.key) ? extra.key : ""))
+          : ((safeEntry && Object.prototype.hasOwnProperty.call(safeEntry, "key"))
+            ? (safeEntry.key === null ? "null" : ((typeof safeEntry.key === "string" && safeEntry.key) ? safeEntry.key : ""))
+            : ""),
         message: resolvedMessage,
         error: (error && typeof error.name === "string" && error.name)
           ? error.name

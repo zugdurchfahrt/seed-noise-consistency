@@ -16,8 +16,33 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __core = (__windowRef && __windowRef.Core && (typeof __windowRef.Core === 'object' || typeof __windowRef.Core === 'function'))
       ? __windowRef.Core
       : null;
-    const __navTypePipeline = 'pipeline missing data';
-    const __navTypeBrowser = 'browser structure missing data';
+    const __navTypePipeline = 'pipeline diagnostic';
+    const __navTypeBrowser = 'browser diagnostic';
+    function __navResolveDiagType(code, x) {
+      const safe = (x && typeof x === 'object') ? x : {};
+      const data = (safe.data && typeof safe.data === 'object') ? safe.data : null;
+      const reason = (data && typeof data.reason === 'string') ? data.reason : '';
+      const outcome = (data && typeof data.outcome === 'string') ? data.outcome : '';
+      const stage = (typeof safe.stage === 'string') ? safe.stage : '';
+      const rawType = (typeof safe.type === 'string' && safe.type) ? safe.type : null;
+      const codeValue = String(code || '');
+      if (reason === 'rollback_failed' || /:rollback_failed$/.test(codeValue)) return 'rollback_failed';
+      if (reason === 'apply_failed' || /:apply_failed$/.test(codeValue)) return 'apply_failed';
+      if (reason === 'native_throw' || /:native_throw$/.test(codeValue)) return 'native_throw';
+      if (reason === 'mark_failed' || /:mark_failed$/.test(codeValue)) return 'mark_failed';
+      if (reason === 'preflight_failed' || reason === 'preflight_exception' || /:preflight_failed$/.test(codeValue)) return 'preflight_failed';
+      if (
+        reason === 'guard_failed'
+        || reason === 'guard_exception'
+        || reason === 'guard_write_failed'
+        || reason === 'guard_release_failed'
+        || reason === 'guard_release_exception'
+        || /:guard_(failed|exception|write_failed|release_failed|release_exception)$/.test(codeValue)
+      ) return 'guard_failed';
+      if (stage === 'preflight' && (outcome === 'skip' || outcome === 'throw')) return 'preflight_failed';
+      if (stage === 'guard' && (outcome === 'skip' || outcome === 'throw')) return reason === 'already_patched' ? 'guard_exit' : 'guard_failed';
+      return rawType;
+    }
 
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
     const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object')
@@ -48,7 +73,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
           stage: x.stage,
           message: x.message,
-          type: x.type,
+          type: __navResolveDiagType(code, x),
           data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null
         };
         return __emit(level, code, ctx, err);
