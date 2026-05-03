@@ -2287,32 +2287,24 @@
             { actual: sanityHe, expected: expectedHe }
           );
         }
-        const sanityHeProjection = {
-          platformVersion: sanityHe && sanityHe.platformVersion,
-          uaFullVersion: sanityHe && sanityHe.uaFullVersion,
-          fullVersionList: sanityHe && sanityHe.fullVersionList,
-          architecture: sanityHe && sanityHe.architecture,
-          bitness: sanityHe && sanityHe.bitness,
-          model: sanityHe && sanityHe.model,
-          wow64: sanityHe && sanityHe.wow64,
-          formFactors: sanityHe && sanityHe.formFactors
+        const comparableHeKeys = ['uaFullVersion', 'fullVersionList', 'architecture', 'bitness', 'model', 'wow64', 'formFactors'];
+        const actualHeValues = {
+          platformVersion: sanityHe && sanityHe.platformVersion
         };
-        const expectedHeProjection = {
-          platformVersion: expectedPlatformTransitHe.platformVersion,
-          uaFullVersion: expectedHe.uaFullVersion,
-          fullVersionList: expectedHe.fullVersionList,
-          architecture: expectedHe.architecture,
-          bitness: expectedHe.bitness,
-          model: expectedHe.model,
-          wow64: expectedHe.wow64,
-          formFactors: expectedHe.formFactors
+        const expectedHeValues = {
+          platformVersion: expectedPlatformTransitHe.platformVersion
         };
-        if (!sameJson(sanityHeProjection, expectedHeProjection)) {
+        for (let i = 0; i < comparableHeKeys.length; i++) {
+          const key = comparableHeKeys[i];
+          actualHeValues[key] = sanityHe && sanityHe[key];
+          expectedHeValues[key] = expectedHe[key];
+        }
+        if (!sameJson(actualHeValues, expectedHeValues)) {
           failWorkerNavigatorSanity(
             'worker_patch_src:workernavigator:sanity:mismatch',
             'userAgentData.getHighEntropyValues',
             'UACHPatch: high entropy mismatch',
-            { actual: sanityHeProjection, expected: expectedHeProjection }
+            { actual: actualHeValues, expected: expectedHeValues }
           );
         }
       }).catch(function(e) {
