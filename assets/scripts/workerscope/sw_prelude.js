@@ -288,7 +288,6 @@
     const wrkState = __ensureSwHiddenObject(stateRoot, '__WRK__');
     const bootstrapRoot = __ensureSwHiddenObject(wrkState, 'bootstrap');
     const runtimeRoot = __ensureSwHiddenObject(wrkState, 'runtime');
-    __defineTrackedHiddenValue(G, '__WORKER_SCOPE_KIND__', 'service');
     __defineTrackedHiddenValue(runtimeRoot, 'workerScopeKind', 'service');
     __defineTrackedHiddenValue(runtimeRoot, 'expectedWorkerScopeKind', 'service');
     __defineTrackedHiddenValue(runtimeRoot, 'serviceWorkerLane', 'runtime');
