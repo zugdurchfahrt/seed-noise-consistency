@@ -30,7 +30,7 @@ const AudioContextModule = function AudioContextModule(window) {
       module: __MODULE,
       diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
       surface: __SURFACE,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE),
       stage: x.stage, // no local normalization/re-classification
       message: x.message,
       data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
@@ -301,7 +301,7 @@ const AudioContextModule = function AudioContextModule(window) {
         level: 'error',
         type: __audioTypePipeline,
         diagTag: groupTag,
-        key: null,
+        key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
       });
       if (groupPolicy === 'throw') throw e;
@@ -316,7 +316,7 @@ const AudioContextModule = function AudioContextModule(window) {
         level: 'warn',
         type: __audioTypeBrowser,
         diagTag: groupTag,
-        key: null,
+        key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: reason, policy: groupPolicy }
       });
       if (groupPolicy === 'throw') throw err;
@@ -366,7 +366,7 @@ const AudioContextModule = function AudioContextModule(window) {
           level: 'warn',
           type: __audioTypePipeline,
           diagTag: groupTag,
-          key: null,
+          key: groupTag,
           data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'missing_core_registerPatchedTarget', policy: groupPolicy }
         });
       }
@@ -376,7 +376,7 @@ const AudioContextModule = function AudioContextModule(window) {
         level: 'warn',
         type: __audioTypeBrowser,
         diagTag: groupTag,
-        key: null,
+        key: groupTag,
         data: { outcome: 'rollback', policy: groupPolicy }
       });
       let rollbackErr = null;
@@ -402,7 +402,7 @@ const AudioContextModule = function AudioContextModule(window) {
         level: 'error',
         type: __audioTypeBrowser,
         diagTag: groupTag,
-        key: null,
+        key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
       });
       if (rollbackErr) throw rollbackErr;
@@ -891,7 +891,7 @@ const AudioContextModule = function AudioContextModule(window) {
 
     emitDegrade('info', __tag + ':ready', null, {
       stage: 'apply',
-      key: null,
+      key: __flagKey,
       message: 'ok',
       type: 'ok',
       data: { outcome: 'return', ctxClasses: CTX_CLASSES.length, targets: __totalTargets, applied: __totalApplied }
@@ -902,7 +902,7 @@ const AudioContextModule = function AudioContextModule(window) {
       module: __tag,
       diagTag: __tag,
       surface: __surface,
-      key: null,
+      key: __flagKey,
       stage: 'apply',
       message: 'fatal module error',
       type: __audioTypeBrowser,

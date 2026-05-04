@@ -35,7 +35,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
         module: __module,
         diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __module,
         surface: __surface,
-        key: (typeof x.key === "string" || x.key === null) ? x.key : null,
+        key: (typeof x.key === "string" && x.key) ? x.key : ((typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __flagKey),
         stage: x.stage,
         message: x.message,
         data: Object.prototype.hasOwnProperty.call(x, "data") ? x.data : null,

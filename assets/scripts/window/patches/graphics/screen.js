@@ -13,23 +13,26 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __emit = (level, code, ctx, err) => {
     try {
       if (__diag) return __diag(level, code, ctx || null, err || null);
-      if (typeof __D === 'function') return __D(String(code), err || null, ctx || null);
+      if (typeof __D === 'function') {
+        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
+        return __D(String(code), err || null, Object.assign({}, safeCtx, { level: level || 'info' }));
+      }
     } catch (emitErr) {
       return undefined;
     }
     return undefined;
   };
   function __screenDiag(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : null;
+    const x = (extra && typeof extra === 'object') ? extra : {};
     const ctx = {
       module: __screenModule,
       diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __screenModule,
       surface: __screenSurface,
-      key: (x && Object.prototype.hasOwnProperty.call(x, 'key')) ? x.key : null,
-      stage: x ? x.stage : undefined,
-      message: x ? x.message : undefined,
-      data: x ? x.data : undefined,
-      type: x ? x.type : undefined
+      key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __screenModule),
+      stage: x.stage,
+      message: x.message,
+      data: x.data,
+      type: x.type
     };
     __emit(level, code, ctx, err || null);
   }

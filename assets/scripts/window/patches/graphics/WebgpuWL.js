@@ -29,7 +29,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       module: __module,
       diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __module,
       surface: __surface,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey),
       stage: x.stage,
       message: x.message,
       data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
@@ -546,7 +546,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
 
     __moduleDiag('info', __module + ':ready', {
       stage: 'apply',
-      key: null,
+      key: __flagKey,
       message: 'WL ready & snapshot installed',
       type: 'ok',
       data: { outcome: 'return' }
@@ -563,7 +563,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
 
     __moduleDiag('error', __module + ':fatal', {
       stage: 'apply',
-      key: null,
+      key: __flagKey,
       message: 'fatal module error',
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'fatal', rollbackOk: !!rollbackOk }

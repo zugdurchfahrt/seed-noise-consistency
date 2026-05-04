@@ -70,7 +70,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           module: __tag,
           diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag,
           surface: __surface,
-          key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+          key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey),
           stage: x.stage,
           message: x.message,
           type: __navResolveDiagType(code, x),
@@ -2210,20 +2210,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   return meta.uaFullVersion;
                 }
               }], 'throw');
-            } else {
-              __navDiag('info', 'nav_total_set:userAgentData_uaFullVersion_native_shape_kept', {
-                stage: 'preflight',
-                type: __navTypeBrowser,
-                diagTag: 'nav_total_set:userAgentData.uaFullVersion',
-                key: 'userAgentData.uaFullVersion',
-                message: 'uaData.uaFullVersion surface absent in native shape; native shape kept',
-                data: {
-                  outcome: 'skip',
-                  reason: 'native_shape_kept',
-                  policy: 'keep_native_shape',
-                  action: 'keep_native_shape'
-                }
-              });
             }
             // `fullVersionList` is a high-entropy key returned by
             // `getHighEntropyValues()`, not stable NavigatorUAData properties across Chromium.

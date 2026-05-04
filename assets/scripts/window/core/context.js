@@ -1388,20 +1388,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const rest = (argList && argList.length > 3) ? Array.prototype.slice.call(argList, 3) : [];
       const H = getHooks();
 
-      if (H && typeof H.applyFillTextHook === 'function') {
-        try {
-          const callOrig = (...a) => Reflect.apply(target, thisArg, a);
-          return H.applyFillTextHook.call(thisArg, callOrig, text, x, y, ...rest);
-        } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, {
-            stage: 'hook',
-            key: 'fillText',
-            type: 'browser structure missing data',
-            data: { outcome: 'throw', reason: 'hook_apply_failed' }
-          });
-          throw e;
-        }
-      }
 
       let callArgs = [text, x, y, ...rest];
       if (H && typeof H.fillTextNoiseHook === 'function') {
@@ -1428,20 +1414,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const rest = (argList && argList.length > 3) ? Array.prototype.slice.call(argList, 3) : [];
       const H = getHooks();
 
-      if (H && typeof H.applyStrokeTextHook === 'function') {
-        try {
-          const callOrig = (...a) => Reflect.apply(target, thisArg, a);
-          return H.applyStrokeTextHook.call(thisArg, callOrig, text, x, y, ...rest);
-        } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, {
-            stage: 'hook',
-            key: 'strokeText',
-            type: 'browser structure missing data',
-            data: { outcome: 'throw', reason: 'hook_apply_failed' }
-          });
-          throw e;
-        }
-      }
 
       let callArgs = [text, x, y, ...rest];
       if (H && typeof H.strokeTextNoiseHook === 'function') {

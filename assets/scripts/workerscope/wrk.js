@@ -927,7 +927,7 @@ function mkWorkerBootstrapCore(opts){
           }
           if (typeof d === 'function') {
             if (typeof d.diag === 'function') d.diag('error', code, ctx, e);
-            else d(code, e, ctx);
+            else d(code, e, Object.assign({}, ctx, { level: 'error' }));
           }
         } catch(__diagErr) {
           try { self.__ENV_DIAG_ERROR__ = String((__diagErr && (__diagErr.stack || __diagErr.message)) || __diagErr); } catch(__diagStoreErr) { self.__ENV_DIAG_STORE_ERROR__ = String((__diagStoreErr && (__diagStoreErr.stack || __diagStoreErr.message)) || __diagStoreErr); }
@@ -1827,7 +1827,7 @@ function emitWorkerBootstrapDegrade(G, scope, bootErr) {
     d.diag('error', 'worker_bootstrap:apply:error', ctx, err);
     return;
   }
-  d('worker_bootstrap:apply:error', err, ctx);
+  d('worker_bootstrap:apply:error', err, Object.assign({}, ctx, { level: 'error' }));
 }
 
 function relayWorkerScopeDiag(G, scope, payload) {

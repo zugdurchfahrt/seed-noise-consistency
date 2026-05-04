@@ -96,7 +96,7 @@
       module: __MODULE,
       diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : String(code || 'geo'),
       surface: __SURFACE,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey),
       stage: stage,
       message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'geo'),
       type: __resolveType(code, x.type),

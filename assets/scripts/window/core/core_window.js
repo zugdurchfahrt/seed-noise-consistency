@@ -26,9 +26,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
   const __emit = (level, code, ctx, err) => {
     try {
       const _err = (typeof err === 'undefined') ? null : err;
-      if (__diag) return __diag(level, code, ctx || null, _err);
+      let safeCtx = (ctx && typeof ctx === 'object') ? ctx : null;
+      if (safeCtx && (safeCtx.key === null || typeof safeCtx.key === 'undefined' || safeCtx.key === '')) {
+        safeCtx = Object.assign({}, safeCtx, {
+          key: (typeof safeCtx.diagTag === 'string' && safeCtx.diagTag)
+            ? safeCtx.diagTag
+            : ((typeof safeCtx.module === 'string' && safeCtx.module) ? safeCtx.module : 'core_window')
+        });
+      }
+      if (__diag) return __diag(level, code, safeCtx || null, _err);
       if (typeof __D === 'function') {
-        const extra = (ctx && typeof ctx === 'object') ? Object.assign({ level }, ctx) : (ctx || { level });
+        const extra = safeCtx ? Object.assign({ level }, safeCtx) : { level };
         return __D(code, _err, extra || null);
       }
     } catch (emitErr) {
@@ -1696,9 +1704,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
             tag, policy, targetId, key, kind
           };
         }
-        if (kind === 'promise_method' && wrapLayer === 'core_wrapper') {
-          wrapLayer = 'named_wrapper';
-        }
         if ((kind === 'method' || kind === 'promise_method')
             && invokeClass === 'normal'
             && wrapLayer === 'core_wrapper') {
@@ -1707,12 +1712,11 @@ const CoreWindowModule = function CoreWindowModule(window) {
             tag, policy, targetId, key, kind
           };
         }
-        if (kind === 'method'
+        if ((kind === 'method' || kind === 'promise_method')
             && invokeClass === 'brand_strict'
-            && wrapLayer !== 'core_wrapper'
-            && wrapLayer !== 'named_wrapper') {
+            && wrapLayer !== 'core_wrapper') {
           return { ok: false, reason: 'wrap_layer_unsupported',
-            error: new TypeError('[Core.applyTargets] brand_strict requires core_wrapper or named_wrapper wrapLayer'),
+            error: new TypeError('[Core.applyTargets] brand_strict requires core_wrapper wrapLayer'),
             tag, policy, targetId, key, kind
           };
         }

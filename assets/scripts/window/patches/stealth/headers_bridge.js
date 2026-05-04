@@ -23,7 +23,7 @@
       d.diag(level, code, ctx, e);
       return;
     }
-    d(code, e, ctx);
+    d(code, e, Object.assign({}, ctx, { level: level || 'info' }));
   }
   // Starting ignore list for CDP interceptor: challenge domains are not touched
   const CH_PASS = ['.cloudflare.com','.challenge.cloudflare.com','.akamaihd.net','.perimeterx.net','.hcaptcha.com','.recaptcha.net'];
