@@ -133,7 +133,10 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
         browser_brand=active_brand,
     )
     family = _accept_language_family(browser_brand=active_brand, user_agent=active_user_agent)
-    device_memory = str(expected_client_hints.get("deviceMemory") or profile.get("deviceMemory"))
+    # Use profile DeviceMemory for header emission because the pipeline relies on
+    # the browser flag path to keep the outbound Device-Memory surface stable.
+    # Do not source this header from runtime patch state.
+    device_memory = str(profile["deviceMemory"])
     if family in ("firefox", "safari"):
         cdp_outbound_headers = {
             "Sec-CH-UA": "",

@@ -770,16 +770,18 @@ if (__langMissingKeys__.length === 0) {
   }
   __setBootstrapTransferStatus__('lang', true, 'owner_ready', { source: 'window_transit' });
 } else {
+  const e = new Error('[module] CanvasPatchContext.state.__LANG_STATE__ bootstrap failed');
   __setBootstrapTransferStatus__('lang', false, 'bootstrap_input_incomplete', { missingKeys: __langMissingKeys__.slice() });
   __emitBootstrapTransferDiag__(
-    'warn',
+    'error',
     'bootstrap_hide:lang_transfer_incomplete',
     'state.__LANG_STATE__',
     'language owner-transfer incomplete',
     'bootstrap_input_incomplete',
-    null,
+    e,
     { missingKeys: __langMissingKeys__.slice() }
   );
+  throw e;
 }
 
 const __platformMissingKeys__ = [];
