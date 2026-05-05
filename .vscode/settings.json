@@ -1,0 +1,6 @@
+{
+  "python.defaultInterpreterPath": "C:\\venvs\\myproj\\Scripts\\python.exe",
+  "python.envFile": "${workspaceFolder}\\.vscode\\.env",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.executeInFileDir": true
+}

@@ -819,6 +819,108 @@ const LOGGingModule = function LOGGingModule() {
       return (typeof entry.timestamp === "string" && entry.timestamp) ? entry.timestamp : new Date().toISOString();
     }
 
+    function resolveRuntimeCaptureScopeIdentity() {
+      try {
+        if (typeof ServiceWorkerGlobalScope === "function" && global instanceof ServiceWorkerGlobalScope) {
+          return { scope: "ServiceWorkerGlobalScope", scopeKind: "service" };
+        }
+        if (typeof SharedWorkerGlobalScope === "function" && global instanceof SharedWorkerGlobalScope) {
+          return { scope: "SharedWorkerGlobalScope", scopeKind: "shared" };
+        }
+        if (typeof DedicatedWorkerGlobalScope === "function" && global instanceof DedicatedWorkerGlobalScope) {
+          return { scope: "DedicatedWorkerGlobalScope", scopeKind: "dedicated" };
+        }
+        if (W && global === W) {
+          return { scope: "WindowGlobalScope", scopeKind: "window" };
+        }
+      } catch (_) {}
+      return { scope: null, scopeKind: null };
+    }
+
+    const RUNTIME_CAPTURE_LIMIT = toPosInt(global.__RUNTIME_CAPTURE_LIMIT, 200);
+    __ensureLoggerHiddenValue("__RUNTIME_CAPTURE_STATE__", function () {
+      return {
+        limit: RUNTIME_CAPTURE_LIMIT,
+        entries: []
+      };
+    }, function (v) {
+      return !!(v && typeof v === "object" && Array.isArray(v.entries));
+    }, true);
+
+    function getRuntimeCaptureState() {
+      const state = __loggerRoot.__RUNTIME_CAPTURE_STATE__;
+      if (state && typeof state === "object" && Array.isArray(state.entries)) {
+        if (!Number.isFinite(state.limit) || state.limit <= 0) state.limit = RUNTIME_CAPTURE_LIMIT;
+        return state;
+      }
+      return __ensureLoggerHiddenValue("__RUNTIME_CAPTURE_STATE__", function () {
+        return {
+          limit: RUNTIME_CAPTURE_LIMIT,
+          entries: []
+        };
+      }, function (v) {
+        return !!(v && typeof v === "object" && Array.isArray(v.entries));
+      }, true);
+    }
+
+    function shapeRuntimeCaptureEntry(code, key, message, data, err) {
+      const scopeInfo = resolveRuntimeCaptureScopeIdentity();
+      const safeData = (data && typeof data === "object") ? normalizeForJSON(data) : null;
+      return {
+        type: "runtime_capture",
+        code: (typeof code === "string" && code) ? code : "runtime_capture",
+        module: "set_log",
+        diagTag: "set_log:runtime_capture",
+        surface: "logger",
+        key: (typeof key === "string" || key === null) ? key : null,
+        stage: "runtime",
+        message: (typeof message === "string" && message) ? message : String(message || "Runtime capture"),
+        diagType: "browser runtime incident",
+        scope: scopeInfo.scope,
+        scopeKind: scopeInfo.scopeKind,
+        data: safeData,
+        error: err instanceof Error ? {
+          name: err.name,
+          message: err.message,
+          stack: err.stack || null
+        } : (err ? normalizeForJSON(err) : null),
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    function pushRuntimeCapture(code, key, message, data, err) {
+      try {
+        const state = getRuntimeCaptureState();
+        state.entries.push(shapeRuntimeCaptureEntry(code, key, message, data, err));
+        if (state.entries.length > state.limit) {
+          state.entries.splice(0, state.entries.length - state.limit);
+        }
+      } catch (e) {
+        try { recordLoggerError(e, "__pushRuntimeCapture__"); } catch (_) {}
+      }
+    }
+
+    __defineLoggerHiddenValue("__getRuntimeCapture__", function () {
+      try {
+        const state = getRuntimeCaptureState();
+        return state.entries.slice();
+      } catch (e) {
+        try { recordLoggerError(e, "__getRuntimeCapture__"); } catch (_) {}
+        return [];
+      }
+    }, false);
+
+    __defineLoggerHiddenValue("__clearRuntimeCapture__", function () {
+      try {
+        const state = getRuntimeCaptureState();
+        state.entries.length = 0;
+        return true;
+      } catch (e) {
+        try { recordLoggerError(e, "__clearRuntimeCapture__"); } catch (_) {}
+        return false;
+      }
+    }, false);
+
     function normalizeDiagIncident(entry, idx) {
       try {
         if (!entry || typeof entry !== "object") return null;
@@ -872,19 +974,21 @@ const LOGGingModule = function LOGGingModule() {
         const hasRuntimeData = Object.keys(runtimeData).length > 0;
         return {
           idx: (typeof idx === "number") ? idx : null,
-          diagTag: "runtime",
-          module: "runtime",
-          key: null,
+          diagTag: (typeof entry.diagTag === "string" && entry.diagTag) ? entry.diagTag : "set_log:runtime_capture",
+          module: (typeof entry.module === "string" && entry.module) ? entry.module : "set_log",
+          key: Object.prototype.hasOwnProperty.call(entry, "key") ? entry.key : null,
           timestamp: safeEntryTimestamp(entry),
           entryType: entryType,
           level: lvl,
           critical: true,
           code: entryType,
-          stage: "runtime",
+          stage: (typeof entry.stage === "string" && entry.stage) ? entry.stage : "runtime",
+          scope: (typeof entry.scope === "string" && entry.scope) ? entry.scope : null,
+          scopeKind: (typeof entry.scopeKind === "string" && entry.scopeKind) ? entry.scopeKind : null,
           message: msg,
           errName: null,
           errMessage: msg,
-          diagType: "browser structure missing data",
+          diagType: (typeof entry.diagType === "string" && entry.diagType) ? entry.diagType : "browser structure missing data",
           data: hasRuntimeData ? runtimeData : null
         };
       } catch (_) {
@@ -2385,21 +2489,25 @@ const LOGGingModule = function LOGGingModule() {
       pushLog(level, args, level === "error" || level === "warn" || level === "log", module);
     }, false);
 
-    // ===== 5) Uncaught errors + unhandled rejections (consistent, no logError) =====
+    // ===== 5) Uncaught/runtime observation bucket (kept out of __DEGRADE__) =====
 
     // 5.1 window.onerror (script errors)
     const prevOnError = (typeof global.onerror === "function") ? global.onerror : null;
     global.onerror = function (message, source, lineno, colno, error) {
       try {
-        pushEntry({
-          type: "onerror",
-          message: typeof message === "string" ? message : safeStringify(message),
-          source: source || null,
-          lineno: typeof lineno === "number" ? lineno : null,
-          colno: typeof colno === "number" ? colno : null,
-          stack: error && error.stack ? String(error.stack) : null,
-          timestamp: new Date().toISOString(),
-        });
+        pushRuntimeCapture(
+          "onerror",
+          "window.onerror",
+          typeof message === "string" ? message : safeStringify(message),
+          {
+            outcome: "return",
+            reason: "onerror",
+            source: source || null,
+            lineno: typeof lineno === "number" ? lineno : null,
+            colno: typeof colno === "number" ? colno : null
+          },
+          error instanceof Error ? error : null
+        );
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           emitRawConsoleError(e);
@@ -2430,15 +2538,19 @@ const LOGGingModule = function LOGGingModule() {
           if (e && e.error) {
             if (global.onerror === __loggerOnError) return;
             const err = e.error;
-            pushEntry({
-              type: "onerror",
-              message: (typeof e.message === "string" && e.message) ? e.message : (err && err.message ? String(err.message) : "Error"),
-              source: (typeof e.filename === "string" && e.filename) ? e.filename : null,
-              lineno: (typeof e.lineno === "number") ? e.lineno : null,
-              colno: (typeof e.colno === "number") ? e.colno : null,
-              stack: err && err.stack ? String(err.stack) : null,
-              timestamp: new Date().toISOString(),
-            });
+            pushRuntimeCapture(
+              "onerror",
+              "window.addEventListener(error)",
+              (typeof e.message === "string" && e.message) ? e.message : (err && err.message ? String(err.message) : "Error"),
+              {
+                outcome: "return",
+                reason: "onerror",
+                source: (typeof e.filename === "string" && e.filename) ? e.filename : null,
+                lineno: (typeof e.lineno === "number") ? e.lineno : null,
+                colno: (typeof e.colno === "number") ? e.colno : null
+              },
+              err instanceof Error ? err : null
+            );
             return;
           }
 
@@ -2446,12 +2558,18 @@ const LOGGingModule = function LOGGingModule() {
           const url =
             target && (target.src || target.href) ? (target.src || target.href) : null;
 
-          pushEntry({
-            type: "resource_error",
-            message: e && e.message ? String(e.message) : "Resource error",
-            source: url,
-            timestamp: new Date().toISOString(),
-          });
+          pushRuntimeCapture(
+            "resource_error",
+            "window.addEventListener(error)",
+            e && e.message ? String(e.message) : "Resource error",
+            {
+              outcome: "return",
+              reason: "resource_error",
+              source: url,
+              tagName: (target && typeof target.tagName === "string" && target.tagName) ? String(target.tagName).toLowerCase() : null
+            },
+            null
+          );
         } catch (e) {
           if (env && env.DEBUG_DEGRADES) {
             emitRawConsoleError(e);
@@ -2466,13 +2584,16 @@ const LOGGingModule = function LOGGingModule() {
     global.addEventListener("unhandledrejection", function (event) {
       try {
         const reason = event ? event.reason : null;
-        pushEntry({
-          type: "unhandledrejection",
-          message:
-            reason && reason.message ? String(reason.message) : String(reason),
-          stack: reason && reason.stack ? String(reason.stack) : null,
-          timestamp: new Date().toISOString(),
-        });
+        pushRuntimeCapture(
+          "unhandledrejection",
+          "window.addEventListener(unhandledrejection)",
+          reason && reason.message ? String(reason.message) : String(reason),
+          {
+            outcome: "return",
+            reason: "unhandledrejection"
+          },
+          reason instanceof Error ? reason : null
+        );
       } catch (e) {
         if (env && env.DEBUG_DEGRADES) {
           emitRawConsoleError(e);
@@ -2492,14 +2613,22 @@ const LOGGingModule = function LOGGingModule() {
       if (isWorker && typeof global.addEventListener === "function") {
         global.addEventListener("error", function (e) {
           try {
-            pushEntry({
-              type: "worker_error",
+            __degradeApi.diag("error", "worker_error", {
+              module: "set_log",
+              diagTag: "set_log:runtime_capture",
+              surface: "logger",
+              key: "worker.addEventListener(error)",
+              stage: "runtime",
               message: e && e.message ? String(e.message) : "Worker error",
-              filename: e && e.filename ? String(e.filename) : null,
-              lineno: typeof (e && e.lineno) === "number" ? e.lineno : null,
-              colno: typeof (e && e.colno) === "number" ? e.colno : null,
-              timestamp: new Date().toISOString(),
-            });
+              type: "browser runtime incident",
+              data: {
+                outcome: "return",
+                reason: "worker_error",
+                filename: e && e.filename ? String(e.filename) : null,
+                lineno: typeof (e && e.lineno) === "number" ? e.lineno : null,
+                colno: typeof (e && e.colno) === "number" ? e.colno : null
+              }
+            }, (e && e.error instanceof Error) ? e.error : null);
            } catch (e) {
               if (env && env.DEBUG_DEGRADES) {
                 emitRawConsoleError(e);
@@ -2511,13 +2640,19 @@ const LOGGingModule = function LOGGingModule() {
         global.addEventListener("unhandledrejection", function (event) {
           try {
             const reason = event ? event.reason : null;
-            pushEntry({
-              type: "worker_unhandledrejection",
-              message:
-                reason && reason.message ? String(reason.message) : String(reason),
-              stack: reason && reason.stack ? String(reason.stack) : null,
-              timestamp: new Date().toISOString(),
-            });
+            __degradeApi.diag("error", "worker_unhandledrejection", {
+              module: "set_log",
+              diagTag: "set_log:runtime_capture",
+              surface: "logger",
+              key: "worker.addEventListener(unhandledrejection)",
+              stage: "runtime",
+              message: reason && reason.message ? String(reason.message) : String(reason),
+              type: "browser runtime incident",
+              data: {
+                outcome: "return",
+                reason: "worker_unhandledrejection"
+              }
+            }, reason instanceof Error ? reason : null);
            } catch (e) {
               if (env && env.DEBUG_DEGRADES) {
                 emitRawConsoleError(e);

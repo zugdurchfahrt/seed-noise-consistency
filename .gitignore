@@ -1,27 +1,22 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-.vscode/
 
 user_data/
 profiles/
 
 cfg_vpn/
-JS_fonts_patch
-PROXY_START.txt
 mitmproxy-ca-cert.p12
-runmine_mcp.py
 profile_data_source/profile.json
 assets/Manifest/fonts-manifest.json
-# assets/generated_fonts
-# assets/generated_fonts/Win32
+assets/JS_fonts_patch/font_patch.generated.js
+assets/generated_fonts
+assets/generated_fonts/Win32
 assets/generated_fonts/Win32/cache_data/
 assets/generated_fonts/Win32/fonts_index.json
 assets/generated_fonts/Win32/cache_data/
 assets/generated_fonts/MacIntel
-AGENTS.md
 
-
-logs/brandmauer.log
 logs/chrome-devtools-mcp.log
 logs/intention_entitled.log
 logs/proxy_full.log
+AGENTS.md

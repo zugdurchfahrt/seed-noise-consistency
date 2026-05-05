@@ -1,10 +1,26 @@
+import sys
+import pathlib
+from pathlib import Path
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tools.tools_infra.overseer import logger
+proxy_logger = logger.getChild("proxy")
+
+
+
 from mitmproxy import http
-import json
 from collections import deque
-from tools.tools_infra.overseer import setup_logger
-proxy_logger = setup_logger().getChild("proxy")
-proxy_logger.info("Модуль logs/proxy_full.log")
-LOG_PATH = "mitmproxy_full_log.txt"  
+import json
+
+
+LOG_PATH = PROJECT_ROOT / "logs" / "proxy_full.log"
+PROFILE_JSON_PATH = PROJECT_ROOT / "profile_data_source" / "profile.json"
+
+
+logger.info("Модуль logs/proxy_full.log")
+
 
 
 # ===== OUTBOUND HEADERS-REQUESTS HANDLING =====
@@ -13,6 +29,21 @@ BASE_CORS = {
     "Access-Control-Allow-Credentials": "true",
 }
 IGNORED_KEYWORDS = ["copilot", "github", "vscode", "visualstudio"]
+
+COMMON_TWO_LEVEL_TLDS = {
+    "co.uk", "com.au", "co.jp", "com.br", "com.mx", "com.tr", "com.sg", "com.hk"
+}
+
+GOOGLE_OWNED_INFRA_FAMILIES = [
+    ".googleapis.com",
+    ".googleusercontent.com",
+    ".gstatic.com",
+    ".withgoogle.com",
+    ".gvt1.com",
+    ".ggpht.com",
+    ".ytimg.com",
+    ".youtube.com",
+]
 
 # Domain suffixes for ignore (точное совпадение TLD и поддоменов)
 IGNORED_HOSTS = [
@@ -85,6 +116,50 @@ def _matches_suffix(host: str, suffixes: list[str]) -> bool:
             return True
     return False
 
+def _host_root(host: str) -> str:
+    h = (host or "").lower().strip(".")
+    if not h:
+        return ""
+    labels = h.split(".")
+    if len(labels) < 2:
+        return h
+    tail2 = ".".join(labels[-2:])
+    if tail2 in COMMON_TWO_LEVEL_TLDS and len(labels) >= 3:
+        return ".".join(labels[-3:])
+    return tail2
+
+def _is_google_owned_host(host: str) -> bool:
+    h = (host or "").lower().strip(".")
+    if not h:
+        return False
+    root = _host_root(h)
+    if "google" in root:
+        return True
+    return _matches_suffix(h, GOOGLE_OWNED_INFRA_FAMILIES)
+
+def get_ignore_reason(flow: http.HTTPFlow) -> str | None:
+    host = (flow.request.host or "").lower()
+    if _is_google_owned_host(host):
+        return "google_owned_bypass"
+
+    matched = any(kw in host for kw in IGNORED_KEYWORDS) or _matches_suffix(host, IGNORED_HOSTS)
+    if not matched:
+        return None
+
+    resp = getattr(flow, "response", None)
+    if resp is not None:
+        sc = getattr(resp, "status_code", None)
+        if sc and sc >= 400:
+            return None  # ошибки всегда логируем, даже для игнор-хостов
+
+        h = {k.lower(): v for k, v in resp.headers.items()}
+        set_cookie_l = (h.get("set-cookie", "") or "").lower()
+        server_l     = (h.get("server", "") or "").lower()
+        if ("cloudflare" in server_l) or any(t in set_cookie_l for t in ["__cf_bm", "cf_clearance", "ak_bmsc", "datadome"]):
+            return None  # челленджи тоже логируем
+
+    return "ignored_host_background"
+
 
 
 
@@ -95,29 +170,7 @@ def is_ignored(flow: http.HTTPFlow) -> bool:
     - If a host from IGNORED_HOSTS (by keyword or suffix), но есть ошибка/челлендж — не игнорируем (логируем);
     - otherwise ignore .
     """
-    host = (flow.request.host or "").lower()
-
-    # Hit the key word or domen suffix?
-    matched = any(kw in host for kw in IGNORED_KEYWORDS) or _matches_suffix(host, IGNORED_HOSTS)
-    if not matched:
-        return False
-
-    # Is there an answer? —verify, Isn't it "bad"
-    resp = getattr(flow, "response", None)
-    if resp is not None:
-        sc = getattr(resp, "status_code", None)
-        if sc and sc >= 400:
-            return False  # ошибки всегда логируем, даже для игнор-хостов
-
-        # Signs of challenge, even with 2xx
-        h = {k.lower(): v for k, v in resp.headers.items()}
-        set_cookie_l = (h.get("set-cookie", "") or "").lower()
-        server_l     = (h.get("server", "") or "").lower()
-        if ("cloudflare" in server_l) or any(t in set_cookie_l for t in ["__cf_bm", "cf_clearance", "ak_bmsc", "datadome"]):
-            return False  # челленджи тоже логируем
-
-    # Ordinary background traffic - ignore
-    return True
+    return get_ignore_reason(flow) is not None
 
 class CORSBypass:
     BUFFER_SIZE = 300
@@ -128,13 +181,13 @@ class CORSBypass:
 
         data = {}
         try:
-            with open("profile.json", "r", encoding="utf-8") as f:
+            with open(PROFILE_JSON_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self.profile = data.get("profile", {})
             self.expected_client_hints = data.get("expected_client_hints", {})
-            proxy_logger.info("[CORSBypass] profile.json loaded")
+            logger.info("[CORSBypass] profile.json loaded")
         except Exception:
-            proxy_logger.warning("[CORSBypass] failed to load profile.json, using defaults")
+            logger.warning("[CORSBypass] failed to load profile.json, using defaults")
             self.profile = {}
             self.expected_client_hints = {}
         self.ch_per_host = {}
@@ -168,7 +221,7 @@ class CORSBypass:
                     msg.append(f"{k}: {v}")
             msg.append("=" * 40)
             logline = "\n".join(msg)
-            proxy_logger.info(logline)
+            logger.info(logline)
 
             # save both in a structured buffer and in raw text
             self.ring_buffer.append({
@@ -181,10 +234,56 @@ class CORSBypass:
             })
             self.all_logs.append(logline)
         except Exception as e:
-            proxy_logger.error(f"[CORSBypass] log write failed: {e}", exc_info=True)
+            logger.error(f"[CORSBypass] log write failed: {e}", exc_info=True)
+
+    def log_bypass(self, flow: http.HTTPFlow, phase: str, reason: str) -> None:
+        try:
+            with open(LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(f"==== BYPASS {phase.upper()} ====\n")
+                f.write(f"Reason: {reason}\n")
+                f.write("Mode: no-touch\n")
+                f.write(f"{flow.request.method} {flow.request.pretty_url}\n")
+                for k, v in flow.request.headers.items():
+                    f.write(f"{k}: {v}\n")
+                if flow.response:
+                    f.write(f"Status: {flow.response.status_code}\n")
+                    for k, v in flow.response.headers.items():
+                        f.write(f"{k}: {v}\n")
+                f.write("\n" + "="*40 + "\n\n")
+
+            msg = [
+                f"==== BYPASS {phase.upper()} ===",
+                f"Reason: {reason}",
+                "Mode: no-touch",
+                f"{flow.request.method} {flow.request.pretty_url}",
+            ]
+            for k, v in flow.request.headers.items():
+                msg.append(f"{k}: {v}")
+            if flow.response:
+                msg.append(f"<< response {flow.response.status_code} >>")
+                for k, v in flow.response.headers.items():
+                    msg.append(f"{k}: {v}")
+            msg.append("=" * 40)
+            logline = "\n".join(msg)
+            logger.info(logline)
+
+            self.ring_buffer.append({
+                "phase": f"bypass_{phase}",
+                "reason": reason,
+                "url": flow.request.pretty_url,
+                "method": flow.request.method,
+                "request_headers": dict(flow.request.headers),
+                "response_code": flow.response.status_code if flow.response else None,
+                "response_headers": dict(flow.response.headers) if flow.response else None,
+            })
+            self.all_logs.append(logline)
+        except Exception as e:
+            logger.error(f"[CORSBypass] bypass log write failed: {e}", exc_info=True)
 
     def request(self, flow: http.HTTPFlow) -> None:
-        if is_ignored(flow):
+        ignore_reason = get_ignore_reason(flow)
+        if ignore_reason:
+            self.log_bypass(flow, "request", ignore_reason)
             return
         # ADD: challenge endpoints → pass-through (Do not touch the request headlines)
         path_l = (flow.request.path or "").lower()
@@ -194,7 +293,9 @@ class CORSBypass:
         strip_proxy_headers(flow.request.headers)
 
     def response(self, flow: http.HTTPFlow) -> None:
-        if is_ignored(flow):
+        ignore_reason = get_ignore_reason(flow)
+        if ignore_reason:
+            self.log_bypass(flow, "response", ignore_reason)
             return
         self.log_request(flow, "response")
 
@@ -203,7 +304,7 @@ class CORSBypass:
         accept_ch = flow.response.headers.get("Accept-CH")
         if accept_ch:
             self.ch_per_host[host] = [h.strip() for h in accept_ch.split(",") if h.strip()]
-            proxy_logger.info(f"[CORSBypass] {host} requests CH: {self.ch_per_host[host]}")
+            logger.info(f"[CORSBypass] {host} requests CH: {self.ch_per_host[host]}")
 
         path_l       = (flow.request.path or "").lower()
         set_cookie_l = (flow.response.headers.get("Set-Cookie","") or "").lower()
@@ -225,7 +326,7 @@ class CORSBypass:
             ("application/json" in req_accept)
         ):
             flow.response.headers["Content-Type"] = "application/json"
-            proxy_logger.info(
+            logger.info(
                 f"[CORSBypass] Corrected Content-Type to application/json for {flow.request.pretty_url}"
             )
 
@@ -255,15 +356,15 @@ class CORSBypass:
         is_critical = resp.status_code in critical_statuses or any(kw in body_lower for kw in keywords)
         alert_headers = [k for k in resp.headers.keys() if k.lower().startswith("x-") or "block" in k.lower()]
         if is_critical or alert_headers:
-            from datetime import datetime
+            from datetime import datetime, timezone
             alert_context = list(self.ring_buffer)[-10:]
             ctx_lines = [
                 f"[{x['phase']}] {x['method']} {x['url']} {x['response_code']}"
                 for x in alert_context if x.get('url')
             ]
-            proxy_logger.warning(
+            logger.warning(
                 f"!!! ALERT !!! [{flow.request.pretty_url}]\n"
-                f"Time: {datetime.utcnow().isoformat()}\n"
+                f"Time: {datetime.now(timezone.utc).isoformat()}\n"
                 f"Status: {resp.status_code} | "
                 f"Headers: {[k + ':' + v for k, v in resp.headers.items() if k.lower().startswith('x-') or 'block' in k.lower()]} | "
                 f"Body: {body_lower[:300]}\n"
@@ -286,14 +387,14 @@ class CORSBypass:
             if pattern not in pats:
                 pats.append(pattern)
                 ctx.options.ignore_hosts = pats
-                proxy_logger.warning(f"[CORSBypass] Escalate to TLS passthrough for: .{root}")
+                logger.warning(f"[CORSBypass] Escalate to TLS passthrough for: .{root}")
                 # Close the current server connect— The next attempt will go to tunnel
                 try:
                     flow.server_conn.close()
                 except Exception:
                     pass
         except Exception as e:
-            proxy_logger.error(f"[CORSBypass] Failed to enable passthrough: {e}")
+           logger.error(f"[CORSBypass] Failed to enable passthrough: {e}")
 
     def _apply_cors(self, flow: http.HTTPFlow) -> None:
         url = flow.request.pretty_url
@@ -302,7 +403,7 @@ class CORSBypass:
 
         # Если Origin отсутствует — не выставляем CORS вовсе
         if not origin:
-            proxy_logger.info(f"[CORSBypass] No Origin — skip CORS: {url}")
+            logger.info(f"[CORSBypass] No Origin — skip CORS: {url}")
             return
 
         if is_preflight:
@@ -326,7 +427,7 @@ class CORSBypass:
                 headers["Access-Control-Allow-Private-Network"] = "true"
 
             flow.response = http.Response.make(200, b"", headers)
-            proxy_logger.info(f"[CORSBypass] Preflight OPTIONS patched: {url}")
+            logger.info(f"[CORSBypass] Preflight OPTIONS patched: {url}")
             return
 
         # Ordinary answer: echo-Origin + -Credentials + Vary: Origin
@@ -340,7 +441,7 @@ class CORSBypass:
         else:
             flow.response.headers["Vary"] = "Origin"
 
-        proxy_logger.info(f"[CORSBypass] CORS patched: {url}")
+        logger.info(f"[CORSBypass] CORS patched: {url}")
 
 
     def done(self):

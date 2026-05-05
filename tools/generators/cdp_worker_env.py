@@ -1,7 +1,8 @@
 import atexit
 import json
 import threading
-
+import pathlib
+from pathlib import Path
 from websocket import WebSocketApp
 
 import tools.generators.cdp_catapult as cdp
@@ -9,6 +10,8 @@ from tools.tools_infra.overseer import logger
 
 
 logger = logger.getChild("cdp_worker_env")
+
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 _ENABLED = False
 _RUNNING = False

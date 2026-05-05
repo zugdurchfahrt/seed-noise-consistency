@@ -1,0 +1,59 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "PY: Debug current file",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${fileDirname}",
+      "console": "integratedTerminal",
+      "env": {
+          "CHROME_DEBUG_PORT": "9222",
+          "CHROMEDRIVER_PORT": "9515",
+          "CHROME_BINARY": "C:\\55555\\switch\\port\\chrome-win64\\chrome.exe",
+          "CHROMEDRIVER_PATH": "C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONUTF8": "1",
+          "VSCODE_CDP_DEBUG": "1"
+      },
+      "python": "C:\\venvs\\myproj\\Scripts\\python.exe",
+      "args": ["-B"]
+    },
+    {
+      "name": "JS: Attach Chrome",
+      "type": "chrome",
+      "request": "attach",
+      "address": "127.0.0.1",
+      "port": 9222,
+      "urlFilter": "*",
+      "timeout": 60000,
+      "trace": true
+    },
+    {
+      "name": "Debug main.py (with mitmproxy)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}\\main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "CHROME_DEBUG_PORT": "9222",
+        "CHROMEDRIVER_PORT": "9515",
+        "CHROME_BINARY": "C:\\55555\\switch\\port\\chrome-win64\\chrome.exe",
+        "CHROMEDRIVER_PATH": "C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUTF8": "1",
+        "VSCODE_CDP_DEBUG": "1"
+      },
+      "python": "C:\\venvs\\myproj\\Scripts\\python.exe"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "PY + JS",
+      "configurations": ["PY: Debug current file", "JS: Attach Chrome"],
+      "stopAll": true
+    }
+  ]
+}

@@ -15,6 +15,8 @@ from datetime import datetime
 import sys
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chromium.service import ChromiumService
+import selenium.webdriver.chromium.service as selenium_chromium_service
 from selenium.common.exceptions import WebDriverException
 import undetected_chromedriver as uc
 
@@ -91,6 +93,8 @@ setup_logger(child_levels={
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
     "permissions_dict": logging.INFO,
+    "helpers_runtime": logging.INFO,
+    "cdp_worker_env": logging.INFO,
 })
 
 
@@ -137,7 +141,8 @@ def get_random_profile(country_data, platform):
 def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_headers=None):
     """
     Fetch.enable + Fetch.requestPaused: modify only requests that match the patterns.
-    Domain lists are taken dynamically from the page (window.__CDP_ALLOW_SUFFIXES / __CDP_IGNORED_SUFFIXES),
+    Domain lists are taken dynamically from the page hidden state
+    (CanvasPatchContext.state.__HEADERS__.__STATE__.allowSuffixes / ignoreSuffixes),
     which are synchronized with window.HeadersInterceptor.addAllow/addIgnore.
     If rules is empty (as in the current build), Fetch interception is not active; header injection is performed only at the level of Network.setExtraHTTPHeaders (CDP) and JS patch.
     """
@@ -177,7 +182,16 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
         # Read the current lists from the window. returnByValue is mandaratory
         try:
             res = driver.execute_cdp_cmd("Runtime.evaluate", {
-                "expression": "(function(){return {allow: (window.__CDP_ALLOW_SUFFIXES||[]), ignore: (window.__CDP_IGNORED_SUFFIXES||[])}})()",
+                "expression": """(function(){
+                    const C = (window.CanvasPatchContext && typeof window.CanvasPatchContext === 'object') ? window.CanvasPatchContext : null;
+                    const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
+                    const headersRoot = (stateRoot && stateRoot.__HEADERS__ && typeof stateRoot.__HEADERS__ === 'object') ? stateRoot.__HEADERS__ : null;
+                    const headersState = (headersRoot && headersRoot.__STATE__ && typeof headersRoot.__STATE__ === 'object') ? headersRoot.__STATE__ : null;
+                    return {
+                        allow: (headersState && Array.isArray(headersState.allowSuffixes)) ? headersState.allowSuffixes : [],
+                        ignore: (headersState && Array.isArray(headersState.ignoreSuffixes)) ? headersState.ignoreSuffixes : []
+                    };
+                })()""",
                 "returnByValue": True
             })
             val = (res.get("result") or {}).get("value") or {}
@@ -305,12 +319,14 @@ def init_driver(
     offset_minutes = country_data["offset_minutes"]
     latitude = country_data["latitude"]
     longitude = country_data["longitude"]
+    proxy_address = "127.0.0.1:8082"
     proxy = Proxy()
     proxy.proxy_type = ProxyType.MANUAL
-    proxy.http_proxy = "127.0.0.1:8082"
-    proxy.ssl_proxy = "127.0.0.1:8082"
+    proxy.http_proxy = proxy_address
+    proxy.ssl_proxy = proxy_address
     chrome_options = Options()
     chrome_options.proxy = proxy
+    chrome_options.add_argument(f"--proxy-server=http://{proxy_address}")
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
     chrome_options.add_argument(f"--user-agent={user_agent}")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -318,28 +334,58 @@ def init_driver(
     chrome_options.add_argument("--enable-features=ReduceDeviceMemory")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
+    chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
+    if chrome_debug_port_raw.lower() in {"0", "auto"}:
+        raise ValueError("CHROME_DEBUG_PORT must be fixed")
+    try:
+        chrome_debug_port = int(chrome_debug_port_raw)
+    except ValueError as exc:
+        raise ValueError("CHROME_DEBUG_PORT must be an integer") from exc
+
+    chromedriver_port_raw = os.getenv("CHROMEDRIVER_PORT", "9515").strip()
+    if chromedriver_port_raw.lower() in {"0", "auto"}:
+        raise ValueError("CHROMEDRIVER_PORT must be fixed")
+    try:
+        chromedriver_port = int(chromedriver_port_raw)
+    except ValueError as exc:
+        raise ValueError("CHROMEDRIVER_PORT must be an integer") from exc
+
+    if chrome_debug_port == chromedriver_port:
+        raise ValueError(
+            f"Port collision: CHROME_DEBUG_PORT={chrome_debug_port} "
+            f"must differ from CHROMEDRIVER_PORT={chromedriver_port}"
+        )
+
     vscode_cdp_debug = os.getenv("VSCODE_CDP_DEBUG", "").strip() == "1"
     if vscode_cdp_debug:
-        chrome_debug_port_raw = os.getenv("CHROME_DEBUG_PORT", "9222").strip()
-        if chrome_debug_port_raw.lower() in {"0", "auto"}:
-            raise ValueError("CHROME_DEBUG_PORT must be fixed when VSCODE_CDP_DEBUG=1")
-        try:
-            chrome_debug_port = int(chrome_debug_port_raw)
-        except ValueError as exc:
-            raise ValueError("CHROME_DEBUG_PORT must be an integer when VSCODE_CDP_DEBUG=1") from exc
-    else:
-        chrome_debug_port = 9222
+        logger.info(
+            "Fixed ports enabled: chrome_devtools=%s chromedriver=%s",
+            chrome_debug_port,
+            chromedriver_port,
+        )
+
+    chrome_options.debugger_address = f"127.0.0.1:{chrome_debug_port}"
     chrome_options.add_argument(f"--remote-debugging-port={chrome_debug_port}")
     chrome_options.add_argument("--remote-debugging-address=127.0.0.1")
     chrome_options.add_argument("--remote-allow-origins=*")
     chrome_options.add_argument("--disable-dev-shm-usage")
     # chrome_options.add_argument("--disable-features=AsyncDNS")
     chrome_options.binary_location = CHROME_BINARY
-    driver = uc.Chrome(
-        driver_executable_path=CHROMEDRIVER_PATH,
-        options=chrome_options,
-        port=chrome_debug_port,
-    )
+    original_chromium_service = selenium_chromium_service.ChromiumService
+
+    class FixedPortChromiumService(ChromiumService):
+        def __init__(self, executable_path=None, port=0, *args, **kwargs):
+            effective_port = chromedriver_port if not port else port
+            super().__init__(executable_path=executable_path, port=effective_port, *args, **kwargs)
+
+    selenium_chromium_service.ChromiumService = FixedPortChromiumService
+    try:
+        driver = uc.Chrome(
+            driver_executable_path=CHROMEDRIVER_PATH,
+            options=chrome_options,
+        )
+    finally:
+        selenium_chromium_service.ChromiumService = original_chromium_service
     logger.info("Initiating Webdriver...")
 
 
@@ -794,7 +840,7 @@ def init_driver(
     # Connect page_js (core + targets + wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     # =========================
-    # [CH] Setting up Client hints (CDP-only) + __HEADERS__ (JS, NEW DOCUMENT)
+    # [CH] Setting up Client hints (CDP-only) + hidden headers state (JS, NEW DOCUMENT)
     #  No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
     # =========================
 
@@ -810,44 +856,69 @@ def init_driver(
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": safelisted_headers})
 
     # =========================
-    # [HDR] window.__HEADERS__ + bridge (NEW DOCUMENT)
-    # IMPORTANT: register __HEADERS__ BEFORE anything that may rely on it (e.g. HeadersInterceptor(window) call elsewhere).
+    # [HDR] CanvasPatchContext.state.__HEADERS__.__STATE__ + bridge (NEW DOCUMENT)
+    # IMPORTANT: register hidden headers owner-state BEFORE anything that may rely on it.
     # =========================
 
-    # --- [HDR/01] prepare JS for NEW DOCUMENT: window.__HEADERS__ ---
-    # window.__HEADERS__ — Basic set for JS-paatch. На cross-origin  safelisted (accept-language).
+    # --- [HDR/01] prepare JS for NEW DOCUMENT: hidden headers owner-state ---
+    # Basic set for JS patch. На cross-origin safelisted (accept-language).
     # Keys like sec-ch-* will be ignored by JS (CDP-only).
         
-    # headers_window_js = f"""
-    # window.__HEADERS__ = {json.dumps(safelisted_headers, ensure_ascii=False)};
+    headers_window_js = f"""
+    (function() {{
+      const C = (window.CanvasPatchContext && typeof window.CanvasPatchContext === 'object') ? window.CanvasPatchContext : null;
+      if (!C) throw new Error('HeadersStage: CanvasPatchContext missing');
+      const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+      if (!stateRoot) throw new Error('HeadersStage: CanvasPatchContext.state missing');
+      const defHidden = function(owner, key, value) {{
+        Object.defineProperty(owner, key, {{
+          value: value,
+          writable: true,
+          configurable: true,
+          enumerable: false
+        }});
+        return owner[key];
+      }};
+      const headersRoot = (stateRoot.__HEADERS__ && typeof stateRoot.__HEADERS__ === 'object')
+        ? stateRoot.__HEADERS__
+        : defHidden(stateRoot, '__HEADERS__', Object.create(null));
+      if (!headersRoot || typeof headersRoot !== 'object') throw new Error('HeadersStage: CanvasPatchContext.state.__HEADERS__ missing');
+      const headersState = (headersRoot.__STATE__ && typeof headersRoot.__STATE__ === 'object')
+        ? headersRoot.__STATE__
+        : defHidden(headersRoot, '__STATE__', Object.create(null));
+      if (!headersState || typeof headersState !== 'object') throw new Error('HeadersStage: CanvasPatchContext.state.__HEADERS__.__STATE__ missing');
+      defHidden(headersState, 'headers', {json.dumps(safelisted_headers, ensure_ascii=False)});
+      if (!Array.isArray(headersState.allowSuffixes)) defHidden(headersState, 'allowSuffixes', []);
+      if (!Array.isArray(headersState.ignoreSuffixes)) defHidden(headersState, 'ignoreSuffixes', []);
+      if (typeof headersState.bridgeReady !== 'boolean') defHidden(headersState, 'bridgeReady', false);
+    }})();
 
-    # {Path(SCRIPTS_PATCHES_STEALTH / "headers_interceptor.js").read_text("utf-8")}
-    # HeadersInterceptor(window);
+    {Path(SCRIPTS_PATCHES_STEALTH / "headers_interceptor.js").read_text("utf-8")}
+    HeadersInterceptor(window);
 
-    # //# sourceURL=headers_stage.js
-    # """
-    # # --- [HDR/02] CDP: register __HEADERS__ for every NEW DOCUMENT ---
-    # # window.__HEADERS__ injected (safelisted only)
-    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
+    //# sourceURL=headers_stage.js
+    """
+    # --- [HDR/02] CDP: register hidden headers owner-state for every NEW DOCUMENT ---
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
     
  
     # --- [HDR/03] load bridge JS (text) ---
     # Headers interceptor bridge to sync allow/ignore CDP with Fetch interceptor
-    # headers_bridge_path = (SCRIPTS_PATCHES_STEALTH / "headers_bridge.js")
-    # headers_bridge_js = headers_bridge_path.read_text("utf-8")
+    headers_bridge_path = (SCRIPTS_PATCHES_STEALTH / "headers_bridge.js")
+    headers_bridge_js = headers_bridge_path.read_text("utf-8")
 
-    # # --- [HDR/04] CDP: register bridge for every NEW DOCUMENT ---
-    # driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
+    # --- [HDR/04] CDP: register bridge for every NEW DOCUMENT ---
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
 
-    # # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
-    # fetch_rules = []
+    # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
+    fetch_rules = []
 
-    # _install_fetch_interceptor(
-    #     driver,
-    #     fetch_rules,
-    #     extra_headers_fn=lambda url, method, rtype: safelisted_headers,
-    #     blocked_headers=[]
-    # )
+    _install_fetch_interceptor(
+        driver,
+        fetch_rules,
+        extra_headers_fn=lambda url, method, rtype: safelisted_headers,
+        blocked_headers=[]
+    )
 
     logger.info("All fingerprint stealth  patches successfully injected into new document")
     logger.info("WebDriver launched successfully")
@@ -1284,24 +1355,30 @@ def main():
             json.dump(data, f, ensure_ascii=False, indent=2)
         logger.info("new profile.json created for mitmproxy")
 
+        mitmproxy_proc = None
+        use_external_mitmproxy = os.getenv("EVENSTEAM_EXTERNAL_MITMPROXY", "").strip() == "1"
+
         # # --- mitmproxy start ---
-        # mitmproxy_proc = subprocess.Popen(
-        #     ["mitmproxy", "-s", str(CORS_ADDON)],
-        #     cwd=str(PROJECT_ROOT)
-        # )
+        if use_external_mitmproxy:
+            logger.info("External mitmproxy mode enabled; internal proxy launch skipped")
+        else:
+            mitmproxy_proc = subprocess.Popen(
+                ["mitmdump", "--mode", "regular@8082", "-s", str(CORS_ADDON), "-v"],
+                cwd=str(PROJECT_ROOT)
+            )
 
-        # def wait_for_port(host, port, timeout=10):
-        #     start = time.time()
-        #     while time.time() - start < timeout:
-        #         try:
-        #             with socket.create_connection((host, port), timeout=1):
-        #                 return True
-        #         except OSError:
-        #             time.sleep(0.5)
-        #     return False
+        def wait_for_port(host, port, timeout=10):
+            start = time.time()
+            while time.time() - start < timeout:
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        return True
+                except OSError:
+                    time.sleep(0.5)
+            return False
 
-        # if not wait_for_port("127.0.0.1", 8080):
-        #     raise RuntimeError("mitmproxy not launched")
+        if not wait_for_port("127.0.0.1", 8082):
+            raise RuntimeError("mitmproxy not launched")
        
         driver = init_driver(
             profile, country_data, dom_platform, profile["user_agent"],
@@ -1334,7 +1411,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs/tests/workers.html")
+        driver.get("https://amiunique.org/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
@@ -1363,9 +1440,10 @@ def main():
         logger.info(f"Error: {e}")
 
     # ----------------------- THAT'S ALL, FOLKS!  -----------------------
-    # finally:
-    #     # Wait for mitmproxy to complete, then close the file
-    #     mitmproxy_proc.terminate()
-    #     mitmproxy_proc.wait()
+    finally:
+        # Wait for mitmproxy to complete, then close the file
+        if 'mitmproxy_proc' in locals() and mitmproxy_proc is not None:
+            mitmproxy_proc.terminate()
+            mitmproxy_proc.wait()
 if __name__ == "__main__":
     main()

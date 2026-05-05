@@ -285,9 +285,6 @@ class VPNClient:
             'chromedriver.exe',
             'geckodriver.exe',
             'tor.exe',
-            'mitmdump.exe',
-            'mitmproxy.exe',
-            'mitmweb.exe',
         }
         
         # Browser processes are only terminated if their cmdline points to our USER_DATA_DIR.

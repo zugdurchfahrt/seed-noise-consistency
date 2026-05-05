@@ -4,7 +4,8 @@
  * Патчит fetch и XHR, инжектируя заголовки по профилю.
  * Важно:
  *  - API экспортируется ВСЕГДА: window.HeadersInterceptor = { ... }
- *  - Патч сети применяется ТОЛЬКО когда готовы зависимости (CanvasPatchContext + window.__HEADERS__)
+ *  - Патч сети применяется ТОЛЬКО когда готовы зависимости
+ *    (CanvasPatchContext + CanvasPatchContext.state.__HEADERS__.__STATE__.headers)
  *  - Повторный вызов HeadersInterceptor(window) безопасен (idempotent guard)
  */
 
@@ -245,14 +246,28 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     return s[0] === '.' ? s : '.' + s;
   }
 
+  let __headersState = null;
+
+  function __syncHiddenHeaderLists__() {
+    if (!__headersState || typeof __headersState !== 'object') return;
+    __headersState.allowSuffixes = Array.from(ALLOW_SUFFIXES);
+    __headersState.ignoreSuffixes = Array.from(IGNORED_SUFFIXES);
+  }
+
   function addAllow(s) {
     const v = normSuffix(s);
-    if (v) ALLOW_SUFFIXES.add(v);
+    if (v) {
+      ALLOW_SUFFIXES.add(v);
+      __syncHiddenHeaderLists__();
+    }
   }
 
   function addIgnore(s) {
     const v = normSuffix(s);
-    if (v) IGNORED_SUFFIXES.add(v);
+    if (v) {
+      IGNORED_SUFFIXES.add(v);
+      __syncHiddenHeaderLists__();
+    }
   }
 
   function listAllow() {
@@ -358,22 +373,86 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     return;
   }
 
-  const RAW_H = (window.__HEADERS__ && typeof window.__HEADERS__ === 'object') ? window.__HEADERS__ : null;
+  function __defineHiddenValue__(owner, key, value) {
+    Object.defineProperty(owner, key, {
+      value: value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return owner[key];
+  }
+
+  function __ensureHeadersState__(stateRoot) {
+    const owner = (stateRoot && typeof stateRoot === 'object') ? stateRoot : null;
+    if (!owner) throw new Error('[HeadersInterceptor] CanvasPatchContext.state missing');
+    const headersRoot = (owner.__HEADERS__ && typeof owner.__HEADERS__ === 'object')
+      ? owner.__HEADERS__
+      : __defineHiddenValue__(owner, '__HEADERS__', Object.create(null));
+    if (!headersRoot || typeof headersRoot !== 'object') {
+      throw new Error('[HeadersInterceptor] CanvasPatchContext.state.__HEADERS__ missing');
+    }
+    const headersState = (headersRoot.__STATE__ && typeof headersRoot.__STATE__ === 'object')
+      ? headersRoot.__STATE__
+      : __defineHiddenValue__(headersRoot, '__STATE__', Object.create(null));
+    if (!headersState || typeof headersState !== 'object') {
+      throw new Error('[HeadersInterceptor] CanvasPatchContext.state.__HEADERS__.__STATE__ missing');
+    }
+    if (!Array.isArray(headersState.allowSuffixes)) __defineHiddenValue__(headersState, 'allowSuffixes', []);
+    if (!Array.isArray(headersState.ignoreSuffixes)) __defineHiddenValue__(headersState, 'ignoreSuffixes', []);
+    if (typeof headersState.bridgeReady !== 'boolean') __defineHiddenValue__(headersState, 'bridgeReady', false);
+    return headersState;
+  }
+
+  try {
+    __headersState = __ensureHeadersState__(__stateRoot);
+  } catch (e) {
+    emitDegrade('warn', 'headers_interceptor:init:preflight:headers_state_missing', e, {
+      stage: 'preflight',
+      surface: 'CanvasPatchContext.state.__HEADERS__.__STATE__',
+      key: 'CanvasPatchContext.state.__HEADERS__.__STATE__',
+      type: __typePipeline,
+      message: 'CanvasPatchContext.state.__HEADERS__.__STATE__ missing',
+      data: {
+        outcome: 'skip',
+        reason: 'headers_state_missing',
+        missing: 'CanvasPatchContext.state.__HEADERS__.__STATE__'
+      }
+    });
+    releaseGuard(true, 'preflight', 'headers_state_missing');
+    return;
+  }
+
+  if (Array.isArray(__headersState.allowSuffixes)) {
+    for (const sfx of __headersState.allowSuffixes) {
+      const v = normSuffix(sfx);
+      if (v) ALLOW_SUFFIXES.add(v);
+    }
+  }
+  if (Array.isArray(__headersState.ignoreSuffixes)) {
+    for (const sfx of __headersState.ignoreSuffixes) {
+      const v = normSuffix(sfx);
+      if (v) IGNORED_SUFFIXES.add(v);
+    }
+  }
+  __syncHiddenHeaderLists__();
+
+  const RAW_H = (__headersState.headers && typeof __headersState.headers === 'object') ? __headersState.headers : null;
   if (!RAW_H) {
     emitDegrade('warn', 'headers_interceptor:init:preflight:headers_missing', null, {
       stage: 'preflight',
-      surface: '__HEADERS__',
-      key: '__HEADERS__',
+      surface: 'CanvasPatchContext.state.__HEADERS__.__STATE__.headers',
+      key: 'CanvasPatchContext.state.__HEADERS__.__STATE__.headers',
       type: __typePipeline,
-      message: 'window.__HEADERS__ missing',
+      message: 'CanvasPatchContext.state.__HEADERS__.__STATE__.headers missing',
       data: {
         outcome: 'skip',
         reason: 'headers_missing',
-        missing: '__HEADERS__'
+        missing: 'CanvasPatchContext.state.__HEADERS__.__STATE__.headers'
       }
     });
     releaseGuard(true, 'preflight', 'headers_missing');
-    return; // API уже экспортирован; main.py вызовет HeadersInterceptor(window) повторно после инжекта
+    return; // API уже экспортирован; main.py вызовет HeadersInterceptor(window) повторно после owner-state инжекта
   }
 
   const HEADER_PROFILES = {
@@ -384,7 +463,7 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     full: Object.keys(RAW_H),
   };
 
-  /** Собираем объект: {name: value} по выбранным ключам из window.__HEADERS__ */
+  /** Собираем объект: {name: value} по выбранным ключам из hidden headers owner-state */
   function getProfiledHeaders(profileName) {
     const allowKeys = HEADER_PROFILES[profileName || headerProfile] || [];
     const out = {};
@@ -551,5 +630,6 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     action: 'skip',
     data: { profile: headerProfile, outcome: 'return' }
   });
-  releaseGuard(false, 'apply', 'installed');
+  // Successful apply keeps the guard latched for this document.
+  // Guard release is reserved for preflight exits / rollback-ok paths.
 }
