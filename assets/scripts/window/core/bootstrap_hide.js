@@ -52,11 +52,13 @@ const __bootstrapSeedKeys__ = [
   '__PLUGIN_PROFILES__'
 ];
 
+// Read-only capture of public bootstrap inputs before owner-transfer.
 const __bootstrapInputs__ = Object.create(null);
 for (const key of __bootstrapSeedKeys__) {
   __bootstrapInputs__[key] = W[key];
 }
 
+// Hidden helper functions.
 function __defineHiddenValue__(obj, key, value) {
   const d = Object.getOwnPropertyDescriptor(obj, key);
   if (d && d.configurable === false) return null;
@@ -118,7 +120,7 @@ function __ensureHiddenOwnSlot__(owner, key, errorMessage) {
   }
 }
 
-// CanvasPatchContext bootstrap tree.
+// Root/container creation.
 const C = __ensureHiddenObjectOrFunctionSlot__(
   W,
   'CanvasPatchContext',
@@ -133,6 +135,7 @@ const stateRoot = __ensureHiddenObjectSlot__(
   () => Object.create(null)
 );
 
+// Module route slots.
 // CanvasPatchContext.state.__FONTS__
 const fontsRoot = __ensureHiddenObjectSlot__(
   stateRoot,
@@ -224,7 +227,7 @@ const screenRoot = __ensureHiddenObjectSlot__(
   () => Object.create(null)
 );
 
-// CanvasPatchContext.state.__NAV_TOTAL_SET__
+// Navigator route skeleton; nav_total_set.js owns the detailed population.
 const navRoot = __ensureHiddenObjectSlot__(
   stateRoot,
   '__NAV_TOTAL_SET__',
@@ -518,7 +521,7 @@ const __SURFACE = 'bootstrap_hide';
 const __D = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
 const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
 
-// Diagnostics and transfer-state helpers.
+// Transit helper functions.
 function __bootstrapHideEmit__(level, code, extra, err) {
   const x = (extra && typeof extra === 'object') ? extra : {};
   const ctx = {
@@ -686,6 +689,8 @@ function __ensureBootstrapTransitStatus__() {
   if (!status.geo || typeof status.geo !== 'object') status.geo = Object.create(null);
   if (!status.lang || typeof status.lang !== 'object') status.lang = Object.create(null);
   if (!status.platform || typeof status.platform !== 'object') status.platform = Object.create(null);
+  // Screen here means bootstrap transfer readiness, not ScreenPatchModule apply readiness.
+  if (!status.screen || typeof status.screen !== 'object') status.screen = Object.create(null);
   if (!status.retention || typeof status.retention !== 'object') status.retention = Object.create(null);
   return status;
 }
@@ -750,7 +755,7 @@ if (!(typeof __bootstrapPrimaryLanguage__ === 'string' && __bootstrapPrimaryLang
 if (!(Array.isArray(__bootstrapNormalizedLanguages__) && __bootstrapNormalizedLanguages__.length > 0)) __langMissingKeys__.push('__normalizedLanguages');
 if (__langMissingKeys__.length === 0) {
   __langTransitState__.primaryLanguage = __bootstrapPrimaryLanguage__;
-  __langTransitState__.normalizedLanguages = __bootstrapNormalizedLanguages__;
+  __langTransitState__.normalizedLanguages = __bootstrapNormalizedLanguages__.slice();
   if (Array.isArray(__langTransitState__.normalizedLanguages) && !Object.isFrozen(__langTransitState__.normalizedLanguages)) {
     Object.freeze(__langTransitState__.normalizedLanguages);
   }
@@ -814,7 +819,9 @@ if (__screenMissingKeys__.length === 0) {
     : 'landscape-primary';
   __envProfileState__.dpr = __bootstrapScreenDpr__;
   __envProfileState__.colorDepth = __bootstrapScreenColorDepth__;
+  __setBootstrapTransferStatus__('screen', true, 'owner_ready', { source: 'window_transit' });
 } else {
+  __setBootstrapTransferStatus__('screen', false, 'bootstrap_input_incomplete', { missingKeys: __screenMissingKeys__.slice() });
   __emitBootstrapTransferDiag__(
     'warn',
     'bootstrap_hide:screen_transfer_incomplete',
@@ -868,7 +875,7 @@ __envProfileState__.storageQuotaMb = __bootstrapInputs__.__STORAGE_QUOTA_MB;
 __envProfileState__.storageUsedPct = __bootstrapInputs__.__STORAGE_USED_PCT;
 __envProfileState__.pluginProfiles = __cloneProfileValue__(Array.isArray(__bootstrapInputs__.__PLUGIN_PROFILES__) ? __bootstrapInputs__.__PLUGIN_PROFILES__ : []);
 
-// Cleanup gating and env surface sanitization.
+// Cleanup gates.
 function __emitCleanupDiag__(level, code, key, message, reason, err) {
   return __bootstrapHideEmit__(level, code, {
     diagTag: 'bootstrap_hide',
@@ -905,6 +912,15 @@ function __platformTransitOwnerReady__() {
     typeof state.domPlatform === 'string' && !!state.domPlatform &&
     typeof state.uaPlatform === 'string' && !!state.uaPlatform &&
     typeof state.platformVersion === 'string' && !!state.platformVersion;
+}
+
+function __screenTransitOwnerReady__() {
+  const state = __ensureEnvScreenState__(__envProfileState__);
+  return !!state &&
+    __isFiniteNumber__(state.width) &&
+    __isFiniteNumber__(state.height) &&
+    __isFiniteNumber__(state.dpr) &&
+    __isFiniteNumber__(state.colorDepth);
 }
 
 function __workerTransitSnapshotReady__() {
@@ -987,6 +1003,17 @@ function __getBootstrapSanitizeGate__(key) {
     };
   }
   if (
+    key === '__WIDTH' ||
+    key === '__HEIGHT' ||
+    key === '__DPR' ||
+    key === '__COLOR_DEPTH'
+  ) {
+    return {
+      ready: __screenTransitOwnerReady__(),
+      reason: 'screen_owner_not_ready'
+    };
+  }
+  if (
     key === '__EXPECTED_CLIENT_HINTS' ||
     key === '__USER_AGENT' ||
     key === '__VENDOR' ||
@@ -1060,7 +1087,9 @@ function __runBootstrapEnvCleanup__(win, trigger) {
   return { outcome: 'return', reason: 'completed' };
 }
 __defineHiddenValue__(C, '__runBootstrapEnvCleanup__', __runBootstrapEnvCleanup__);
-  __bootstrapHideEmit__('info', 'bootstrap_hide:ready', {
+
+// Ready diag.
+__bootstrapHideEmit__('info', 'bootstrap_hide:ready', {
     diagTag: 'bootstrap_hide',
     surface: 'window',
     key: 'bootstrap_hide',
