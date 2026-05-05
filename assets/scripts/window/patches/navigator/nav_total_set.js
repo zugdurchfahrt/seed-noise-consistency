@@ -520,20 +520,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const storageQuotaMb = __envProfileState.storageQuotaMb;
     const storageUsedPct = __envProfileState.storageUsedPct;
     const pluginProfiles = __navCloneStateValue(Array.isArray(__envProfileState.pluginProfiles) ? __envProfileState.pluginProfiles : []);
-    const primaryLanguage = __navPrimaryLanguage;
-    const normalizedLanguages = __navCloneStateValue(__navNormalizedLanguages);
-
     // strictness & diagnostics
     const STRICT        = (__envProfileState.strict !== undefined) ? !!__envProfileState.strict : true;
     const DEBUG         = !!__envProfileState.debug;
     let __navNativePermissionsQuery = null;
     let __navNativePermissionsThis = null;
-    let __navPermissionsState = __navObjectPermissionsState;
     function __navNormalizePermissionState(state) {
       return (state === 'granted' || state === 'denied' || state === 'prompt') ? state : 'prompt';
     }
     function __navGetPermissionState(name) {
-      return __navNormalizePermissionState(__navPermissionsState ? __navPermissionsState[name] : undefined);
+      return __navNormalizePermissionState(__navObjectPermissionsState ? __navObjectPermissionsState[name] : undefined);
     }
     function __navSetPermissionState(name, state, source) {
       if (typeof name !== 'string' || !name) {
@@ -564,7 +560,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         });
         return false;
       }
-      __navPermissionsState[name] = normalizedState;
+      __navObjectPermissionsState[name] = normalizedState;
       __navDiag('info', 'nav_total_set:permission_state_updated', {
         stage: 'runtime',
         type: __navTypePipeline,
@@ -575,7 +571,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           outcome: 'return',
           reason: 'permission_state_updated',
           permission: name,
-          state: __navPermissionsState[name],
+          state: __navObjectPermissionsState[name],
           source: (typeof source === 'string' && source) ? source : 'internal'
         }
       });
@@ -796,7 +792,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'ua_full_version_missing');
       return;
     }
-
     const chPlatform = uaPlatform;
     const navPlatformOut = navPlat;
     const __navProductSubValue = "20030107";
@@ -832,9 +827,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         uaFullVersion: (meta && typeof meta.uaFullVersion === 'string')
           ? meta.uaFullVersion
           : undefined,
-        fullVersionList: (meta && meta.fullVersionList != null)
-          ? meta.fullVersionList
-          : fullVersionList,
+        fullVersionList: meta.fullVersionList,
         wow64: meta.wow64,
         formFactors: meta.formFactors
       };
@@ -933,7 +926,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               model: workerMeta.model,
               platformVersion: platformVersion,
               uaFullVersion: workerMeta.uaFullVersion,
-              fullVersionList: __navCloneStateValue(workerMeta.fullVersionList != null ? workerMeta.fullVersionList : fullVersionList),
+              fullVersionList: __navCloneStateValue(workerMeta.fullVersionList),
               wow64: workerMeta.wow64,
               formFactors: __navCloneStateValue(workerMeta.formFactors)
             }
