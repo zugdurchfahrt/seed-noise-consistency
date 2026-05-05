@@ -18,21 +18,6 @@ ACCEPT_TEMPLATES = {
     ],
 }
 
-MINIMAL_HEADERS = [
-    "User-Agent",
-    "Accept-Language"
-]
-
-DYNAMIC_OVERRIDES = [
-    "User-Agent",
-    "Accept",
-    "Accept-Language",
-    "Sec-CH-UA",
-    "Sec-CH-UA-Platform",
-    "Sec-CH-UA-Mobile",
-    "Sec-CH-Device-Memory",
-    "Device-Memory"
-]
 HEADER_TWIN_PAIRS = (
     ("Sec-CH-Device-Memory", "Device-Memory"),
 )
@@ -136,7 +121,7 @@ def derive_accept_language(profile, expected_client_hints=None, user_agent: str 
     )
 
 
-def build_safelisted_headers(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):
+def _build_header_sets(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):
     profile = profile or {}
     expected_client_hints = expected_client_hints if isinstance(expected_client_hints, dict) else {}
     active_user_agent = user_agent or str(profile.get("user_agent") or "")
@@ -148,28 +133,64 @@ def build_safelisted_headers(profile, expected_client_hints=None, user_agent: st
         browser_brand=active_brand,
     )
     family = _accept_language_family(browser_brand=active_brand, user_agent=active_user_agent)
-    device_memory = expected_client_hints["deviceMemory"] if "deviceMemory" in expected_client_hints else profile.get("deviceMemory")
-
-    # Editable policy surface: keep family-specific header choices together here.
-    base_headers = {
-        "Accept-Language": str(accept_language),
-    }
-    family_overrides = {
-        "firefox": {
+    device_memory = str(expected_client_hints.get("deviceMemory") or profile.get("deviceMemory"))
+    if family in ("firefox", "safari"):
+        cdp_outbound_headers = {
             "Sec-CH-UA": "",
-        },
-        "safari": {
+            "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
+            "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
+            "Accept-Language": str(accept_language),
+        }
+        js_safelisted_headers = {
+            "Accept-Language": str(accept_language),
             "Sec-CH-UA": "",
-        },
-        "chromium": {
-            "Sec-CH-Device-Memory": str(device_memory),
-            "Device-Memory": str(device_memory),
-        },
+        }
+    else:
+        cdp_outbound_headers = {
+            "Accept": str(expected_client_hints["accept"]),
+            "Accept-Language": str(accept_language),
+            "User-Agent": str(profile["user_agent"]),
+            "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
+            "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
+            "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
+            "Sec-CH-Save-Data": "?0",
+            "Sec-CH-UA-Platform-Version": f'"{expected_client_hints["platformVersion"]}"',
+            "Sec-CH-UA-Full-Version": expected_client_hints["sec_ch_ua_full_version"],
+            "Sec-CH-UA-Full-Version-List": expected_client_hints["sec_ch_ua_full_version_list"],
+            "Sec-CH-UA-Arch": expected_client_hints.get("architecture"),
+            "Sec-CH-UA-Bitness": expected_client_hints.get("bitness"),
+            "Sec-CH-UA-WoW64": expected_client_hints.get("sec_ch_ua_wow64", ""),
+            "Sec-CH-UA-Model": expected_client_hints.get("sec_ch_ua_model", ""),
+            "Sec-CH-UA-Form-Factors": expected_client_hints.get("sec_ch_ua_form_factors", ""),
+            "Sec-CH-Device-Memory": device_memory,
+            "Device-Memory": device_memory,
+            "Sec-CH-Viewport-Width": str(profile["screen_width"]),
+            "Sec-CH-Viewport-Height": str(profile["screen_height"]),
+            "Sec-CH-Width": str(profile["screen_width"]),
+            "Viewport-Width": str(profile["screen_width"]),
+            "Sec-CH-DPR": str(profile["device_dpr_value"]),
+            "DPR": str(profile["device_dpr_value"]),
+        }
+        js_safelisted_headers = {
+            "Accept-Language": str(accept_language),
+            "Sec-CH-Device-Memory": device_memory,
+            "Device-Memory": device_memory,
+        }
+
+    return {
+        "family": family,
+        "cdp_outbound_headers": _synchronize_header_twins(cdp_outbound_headers),
+        "js_safelisted_headers": _synchronize_header_twins(js_safelisted_headers),
     }
 
-    headers = dict(base_headers)
-    headers.update(family_overrides.get(family, family_overrides["chromium"]))
-    return _synchronize_header_twins(headers)
+
+def build_safelisted_headers(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):
+    return _build_header_sets(
+        profile,
+        expected_client_hints=expected_client_hints,
+        user_agent=user_agent,
+        browser_brand=browser_brand,
+    )["js_safelisted_headers"]
 
 # ===== Accept-HEADER FORGE=====
 def _brand_key(browser_brand: str) -> str:
@@ -203,58 +224,29 @@ def generate_accept_header(browser_brand: str, major_version: int, kind: str = "
 
 # ===== OUTBOUND CLNIENT HINTS  HEADERS HANDLING=====
 def outbound_headers_forge(profile, expected_client_hints, user_agent):
-    # Build Accept-Language once from the canonical profile seed.
-    al = profile.get("accept_language") or derive_accept_language(
+    return _build_header_sets(
         profile,
         expected_client_hints=expected_client_hints,
         user_agent=user_agent,
         browser_brand=profile.get("browser_brand"),
+    )["cdp_outbound_headers"]
+
+
+def build_runtime_header_sets(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):
+    header_sets = _build_header_sets(
+        profile,
+        expected_client_hints=expected_client_hints,
+        user_agent=user_agent,
+        browser_brand=browser_brand,
     )
-    is_safari = "Safari" in user_agent and "Chrome" not in user_agent and "Edg/" not in str(profile["user_agent"])
-    is_firefox = "Firefox" in user_agent and "Chrome" not in user_agent and "Edg/" not in str(profile["user_agent"])
-
-    if is_safari or is_firefox:
-        return _synchronize_header_twins({
-            "Sec-CH-UA": "",
-            "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
-            "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
-            "Accept-Language": al,
-        })
-
-    return _synchronize_header_twins({
-    # Базовая ветка (Chromium-family): AL из profile.languages → совпадает с navigator.languages
-        # Core client hints
-        "Accept": str(expected_client_hints["accept"]),
-        "Accept-Language": al,
-        "User-Agent": str(profile["user_agent"]),
-        "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
-        "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
-        "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
-        "Sec-CH-Save-Data": "?0",
-        # Optional non-standard compatibility knob:
-        # "Sec-CH-Lang": ", ".join(expected_client_hints.get("languages", [expected_client_hints.get("language")])),
-        # Full-Version/Mobile/WoW64/Model/Form-Factors здесь больше не достраиваем: берём уже подготовленные
-        # header-twin значения из build_expected_client_hints(), чтобы пары не разъезжались.
-        # Extended client hints
-        "Sec-CH-UA-Platform-Version": f'"{expected_client_hints["platformVersion"]}"',
-        "Sec-CH-UA-Full-Version": expected_client_hints["sec_ch_ua_full_version", ""],
-        "Sec-CH-UA-Full-Version-List": expected_client_hints["sec_ch_ua_full_version_list"],
-        "Sec-CH-UA-Arch": expected_client_hints.get("architecture"),
-        "Sec-CH-UA-Bitness": expected_client_hints.get("bitness"),
-        "Sec-CH-UA-WoW64": expected_client_hints.get("sec_ch_ua_wow64", ""),
-        "Sec-CH-UA-Model": expected_client_hints.get("sec_ch_ua_model", ""),
-        "Sec-CH-UA-Form-Factors": expected_client_hints.get("sec_ch_ua_form_factors", ""),
-        # memory/screen block
-        "Sec-CH-Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
-        "Device-Memory": str(expected_client_hints.get("deviceMemory", profile["deviceMemory"])),
-        "Sec-CH-Viewport-Width": str(profile["screen_width"]),
-        "Sec-CH-Viewport-Height": str(profile["screen_height"]),
-        "Sec-CH-Width": str(profile["screen_width"]),
-        "Viewport-Width": str(profile["screen_width"]),
-        # devicepixelratio
-        "Sec-CH-DPR": str(profile["device_dpr_value"]),
-        "DPR": str(profile["device_dpr_value"]),
-    })
+    if header_sets["family"] == "chromium":
+        full_version_header = header_sets["cdp_outbound_headers"].get("Sec-CH-UA-Full-Version")
+        if not isinstance(full_version_header, str) or not full_version_header:
+            raise ValueError("HeadersStage: outbound Sec-CH-UA-Full-Version missing")
+    return {
+        "cdp_outbound_headers": header_sets["cdp_outbound_headers"],
+        "js_safelisted_headers": header_sets["js_safelisted_headers"],
+    }
 
 def import_headers(headers, keys, flow):
     for k in keys:

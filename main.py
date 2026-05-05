@@ -844,16 +844,18 @@ def init_driver(
     #  No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
     # =========================
 
-    # --- [CH/01] build safelisted_headers (minimal set, single source of truth) ---
-    safelisted_headers = headers_adapter_module.build_safelisted_headers(
+    # --- [CH/01] build runtime header sets in headers module ---
+    runtime_header_sets = headers_adapter_module.build_runtime_header_sets(
         profile,
         expected_client_hints=expected_client_hints,
         user_agent=user_agent,
-        browser_brand=profile.get("browser_brand"),
+        browser_brand=browser_brand,
     )
+    cdp_outbound_headers = runtime_header_sets["cdp_outbound_headers"]
+    safelisted_headers = runtime_header_sets["js_safelisted_headers"]
 
     # --- [CH/02] CDP: apply HTTP headers for requests (affects navigation after this call) ---
-    driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": safelisted_headers})
+    driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": cdp_outbound_headers})
 
     # =========================
     # [HDR] CanvasPatchContext.state.__HEADERS__.__STATE__ + bridge (NEW DOCUMENT)
