@@ -46,7 +46,24 @@ PATCH_OUT                = ASSETS / 'JS_fonts_patch' / 'font_patch.generated.js'
 CHROME_BINARY            = os.getenv("CHROME_BINARY", r"C:\\55555\\switch\\port\\chrome-win64\\chrome.exe")
 CHROMEDRIVER_PATH        = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\port\\chromedriver-win64\\chromedriver.exe")
 
-# Только папки. Никаких путей к файлам.
+# ----------------------- MITMPROXY SWITCH -----------------------
+# Active profile: with mitmproxy.
+# MITMPROXY_ON = True
+
+# Active profile: without mitmproxy.
+MITMPROXY_OFF = True
+
+_mitmproxy_on = globals().get("MITMPROXY_ON", False) is True
+_mitmproxy_off = globals().get("MITMPROXY_OFF", False) is True
+if _mitmproxy_on == _mitmproxy_off:
+    raise RuntimeError("Exactly one mitmproxy switch must be active: MITMPROXY_ON or MITMPROXY_OFF")
+
+MITMPROXY_ENABLED = _mitmproxy_on
+MITMPROXY_HOST = "127.0.0.1"
+MITMPROXY_PORT = 8082
+MITMPROXY_ADDRESS = f"{MITMPROXY_HOST}:{MITMPROXY_PORT}"
+
+# LOCAL MODULES PATHS
 PY_MODULE_DIRS = [
     PROJECT_ROOT / "tools" / "tools_infra",
     PROJECT_ROOT / "tools" / "tools_runtime",
@@ -319,14 +336,17 @@ def init_driver(
     offset_minutes = country_data["offset_minutes"]
     latitude = country_data["latitude"]
     longitude = country_data["longitude"]
-    proxy_address = "127.0.0.1:8082"
-    proxy = Proxy()
-    proxy.proxy_type = ProxyType.MANUAL
-    proxy.http_proxy = proxy_address
-    proxy.ssl_proxy = proxy_address
     chrome_options = Options()
-    chrome_options.proxy = proxy
-    chrome_options.add_argument(f"--proxy-server=http://{proxy_address}")
+    if MITMPROXY_ENABLED:
+        proxy = Proxy()
+        proxy.proxy_type = ProxyType.MANUAL
+        proxy.http_proxy = MITMPROXY_ADDRESS
+        proxy.ssl_proxy = MITMPROXY_ADDRESS
+        chrome_options.proxy = proxy
+        chrome_options.add_argument(f"--proxy-server=http://{MITMPROXY_ADDRESS}")
+        logger.info("MITMPROXY: ON, Chrome uses proxy %s", MITMPROXY_ADDRESS)
+    else:
+        logger.info("MITMPROXY: OFF, Chrome uses direct connection")
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
     chrome_options.add_argument(f"--user-agent={user_agent}")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -1340,19 +1360,19 @@ def main():
         }
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.info("new profile.json created for mitmproxy")
+        logger.info("new profile.json created for runtime")
 
         mitmproxy_proc = None
-        use_external_mitmproxy = os.getenv("EVENSTEAM_EXTERNAL_MITMPROXY", "").strip() == "1"
 
         # # --- mitmproxy start ---
-        if use_external_mitmproxy:
-            logger.info("External mitmproxy mode enabled; internal proxy launch skipped")
-        else:
+        if MITMPROXY_ENABLED:
             mitmproxy_proc = subprocess.Popen(
-                ["mitmdump", "--mode", "regular@8082", "-s", str(CORS_ADDON), "-v"],
+                ["mitmdump", "--mode", f"regular@{MITMPROXY_PORT}", "-s", str(CORS_ADDON), "-v"],
                 cwd=str(PROJECT_ROOT)
             )
+            logger.info("MITMPROXY: mitmdump started")
+        else:
+            logger.info("MITMPROXY: mitmdump skipped")
 
         def wait_for_port(host, port, timeout=10):
             start = time.time()
@@ -1364,7 +1384,7 @@ def main():
                     time.sleep(0.5)
             return False
 
-        if not wait_for_port("127.0.0.1", 8082):
+        if MITMPROXY_ENABLED and not wait_for_port(MITMPROXY_HOST, MITMPROXY_PORT):
             raise RuntimeError("mitmproxy not launched")
        
         driver = init_driver(
@@ -1398,7 +1418,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://amiunique.org/")
+        driver.get("https://abrahamjuliot.github.io/creepjs")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():

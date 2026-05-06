@@ -1,7 +1,7 @@
 # Readme_ENG.md
 
 **TL;DR**: Research-grade anti-fingerprinting pipeline (Python + JavaScript) injecting deterministic, seed-based patches for Canvas/WebGL/WebGPU/Fonts/Headers via CDP.  
-**Runs on Windows with VPN** (ProtonVPN/OpenVPN) + proxy  
+**Runs on Windows with VPN** (ProtonVPN/OpenVPN) + optional proxy  
 
 Browser Anti-Fingerprinting: Python + JavaScript
 
@@ -11,7 +11,7 @@ Browser Anti-Fingerprinting: Python + JavaScript
 The system has been designed to evaluate and mitigate modern browser fingerprinting surfaces (Canvas 2D/OffscreenCanvas, WebGL/WebGPU, Fonts, UA-CH/Headers).
 
 ## Architecture
-Python (Selenium + undetected_chromedriver) + JavaScript patches (modules) injection via CDP to control fingerprint surfaces, proxy application is available as a switchable option.
+Python (Selenium + undetected_chromedriver) + JavaScript patches (modules) injection via CDP to control fingerprint surfaces. Mitmproxy is optional and is switched directly in `main.py`.
 
 ## Ethics & scope
 The tools are intended for testing, debugging and research purposes only. Do not use to bypass security controls or violate site policies or laws.  
@@ -43,27 +43,53 @@ to the extent possible. You may copy, modify, publish, use, compile, sell,
 and distribute, with or without attribution. Software is provided “AS IS”.
 
 ## Requirements
-OS: Windows 10/11 (batch files and OpenVPN path assume Windows).  
+OS: Windows 10/11 (OpenVPN path assumes Windows).  
 Python: 3.12 (3.11+ recommended).
 
 ## 3rd-party
 OpenVPN installed locally (default path is set in `vpn_utils.py`, can be changed).  
-`mitmproxy` (in `requirements.txt`).  
+`mitmproxy` (in `requirements.txt`, only needed when the mitmproxy switch is ON).  
 Chrome/Chromium — local copy of Chrome for Testing path configured in `main.py`.  
 All Python deps are pinned in `requirements.txt`.
 
 ## Run modes
-### With mitmproxy (`main.py`)
 
-✔ Easier browsing without immediate challenges.  
+There is one entrypoint: `main.py`.
+
+Mitmproxy is controlled by a small visible switch near the top of `main.py`:
+
+```python
+MITMPROXY_ON = True
+# MITMPROXY_OFF = True
+```
+
+This means: run **with mitmproxy**. `main.py` starts `mitmdump`, sends Chrome through `127.0.0.1:8082`, and stops the process on exit.
+
+To run **without mitmproxy**, flip the two lines:
+
+```python
+# MITMPROXY_ON = True
+MITMPROXY_OFF = True
+```
+
+In this mode, `main.py` does not start `mitmdump`, does not set Chrome proxy options, and Chrome connects directly.
+
+Only one line must be active. If both are active or both are commented, startup fails immediately with a clear error.
+
+### With mitmproxy
+
+✔ Easier browsing without immediate CORS/header challenges.  
 ✔ Direct visibility into CORS/headers/`Client Hints`.  
-✖ Requires installing/setting up mitmproxy.  
+✖ Requires `mitmproxy`.  
 ✖ Detectors may identify mitmproxy TLS fingerprint as not "native".
 
-### Without mitmproxy (`main_no_proxy.py`)
-✔ Fewer external deps.  
-✖ CORS limitations hinder the effectiveness for real browsing; nevertheless, the model is advantageous as a "pure API/JS" paradigm.  
-Note: VPN usage is enforced in both modes; the script was not run/tested without VPN.
+### Without mitmproxy
+
+✔ Simpler and lighter startup.  
+✔ No local proxy layer.  
+✖ CORS limitations may reduce effectiveness for real browsing; this mode is better as a direct browser/CDP/JS pipeline.
+
+Note: VPN usage is enforced in both modes unless you disable the VPN calls separately.
 
 ### Using without a built-in VPN client
 The script can be run without controlling OpenVPN. In this case, you can:  
@@ -221,10 +247,23 @@ Defines the contract-driven patching engine through `Core.applyTargets`. Downstr
   ```
 
 
-### Launchers
+### Mitmproxy switch
 
-- `NO_PROXY_START.bat` — venv → `python main_no_proxy.py`.
-- `PROXY_START.bat` — venv → mitmproxy (addon) → `python main.py`.
+Open `main.py`, choose one active profile, then press Play/F5 in VS Code.
+
+With mitmproxy:
+
+```python
+MITMPROXY_ON = True
+# MITMPROXY_OFF = True
+```
+
+Without mitmproxy:
+
+```python
+# MITMPROXY_ON = True
+MITMPROXY_OFF = True
+```
 
 ## Quick start (Windows)
 
@@ -241,15 +280,7 @@ Put `.ovpn` into `configs\`.
 
 Place `*.woff2` into `assets\fonts_raw\`.
 
-Run:
-
-```powershell
-:: with proxy
-PROXY_START.bat
-
-:: without proxy
-NO_PROXY_START.bat
-```
+Run `main.py` from VS Code or from the terminal. The active mitmproxy profile is selected inside `main.py` by the switch shown above.
 
 * If you face error "permission denied" during installation → run
   `pip install --no-cache-dir -r requirements.txt`
