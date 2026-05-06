@@ -1,29 +1,10 @@
 /*
-== CONTRACT (CURRENT PIPELINE FACTS) ==
-
-1) Roles (single contract)
-- `window.CanvasPatchContext` — internal state/registries/queues (pipeline “bus”) used by `context.js`.
-- `window.CanvasPatchHooks` — export surface ONLY (functions) consumed by `context.js.registerAllHooks()` and by ctx2D wrappers
-  (analogy: `window.webglHooks`).
-
-2) Identity / export rule (DO NOT break reference)
-- Never replace `window.CanvasPatchHooks` object entirely (no `window.CanvasPatchHooks = { ... }`).
-- Reason: `context.js` validates + registers against one container, and wrappers read hooks by reference; replacing the object creates “two baskets”.
-- Allowed pattern: ensure container exists, then assign properties onto the SAME object identity; optional `Object.defineProperty(...)`
-  is OK only if `value` is that same existing object (non-enumerable export, like in `webgl.js`).
-
-3) Required exports (facts from `/assets/scripts/window/core/context.js::registerAllHooks()`)
-- `patchToDataURLInjectNoise`, `masterToDataURLHook`, `patchToBlobInjectNoise`, `patchConvertToBlobInjectNoise`
-- `measureTextNoiseHook`, `applyMeasureTextHook`, `fillTextNoiseHook`, `strokeTextNoiseHook`
-- `fillRectNoiseHook`, `applyDrawImageHook`
-
-4) Disabled/non-required exports kept as commented operational switches
-- `patchCanvasIHDRHook`, `patch2DNoise`, `addCanvasNoise` are intentionally not in the required list.
-- Do not delete commented switch lines in the final export block.
-
-5) Local constraints for this module draft
-- No silent-swallow: if something fails, keep native untouched (atomic skip) + emit `__DEGRADE__.diag`, or fail-fast.
-
+Canvas patch module contract:
+- `CanvasPatchContext` owns internal state and hook registries.
+- `CanvasPatchHooks` is the function export surface consumed by `context.js`.
+- Do not replace the `CanvasPatchHooks` object; update properties on the existing identity.
+- Required exports must match `context.js::registerAllHooks()`.
+- Disabled exports below are kept as commented operational switches.
 */
 
 const CanvasPatchModule = function CanvasPatchModule(window) {
@@ -576,10 +557,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     return min + frac * (max - min);
   }
 
-
   function q256(v){ return Math.round(v * 256) / 256; }
-
-
 
   const __CNV_CFG__ = {
     dxPx: 0.10,      // амплитуда X (px)
@@ -861,7 +839,6 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
 
   }
 
-
   // toDataURL path uses the same PNG ancillary byte-builder as Blob exports.
   function patchToDataURLInjectNoise(res, type, quality) {
     if (typeof res !== 'string') return res;
@@ -906,7 +883,6 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     }
   }
     
-
   // === HOOK FUNCTIONS ===
   function applyDrawImageHook(origDrawImage, ...args) {
     const a = args.slice();
@@ -924,7 +900,6 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     }
     return res;
   }
-
 
 // --- final export ---
 // IMPORTANT: do not replace the CanvasPatchHooks object identity.
