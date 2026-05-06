@@ -225,6 +225,16 @@ Defines the contract-driven patching engine through `Core.applyTargets`. Downstr
 - `assets/JS_fonts_patch/font_patch.generated.js` — auto-generated fonts patch, consumed by `font_module.js`.
 - `assets/templates/font_patch.template.j2` — Jinja2 template used by `rand_met.py` to generate the JS patch.
 
+### Fonts
+
+Ready-to-use generated fonts are already included in `assets/generated_fonts/Win32` and `assets/generated_fonts/MacIntel`, together with their `fonts_index.json` files. For a normal run, you do not need to add or move any font files.
+
+The bundled fonts were taken from Google Fonts and then renamed by the project pipeline for runtime use. They are meant to make the project start without forcing every user to search for their own font set first.
+
+If you want to use your own fonts, place only `.woff2` files into `assets/fonts_raw/` and run the project normally. During startup, `rand_met.py` treats `fonts_raw` as an intake folder: it validates the files, skips unsuitable fonts, copies accepted files into the platform-specific generated folder, updates the index, and regenerates the runtime font patch. After a file is accepted, it is removed from `fonts_raw`.
+
+Custom fonts should be normal text fonts. Avoid icon fonts, emoji fonts, empty/broken files, fonts without basic ASCII coverage, and fonts with restrictive embedding flags or extreme metrics.
+
 
 ### Logging
 
@@ -278,7 +288,7 @@ pip install -r requirements.txt
 
 Put `.ovpn` into `configs\`.
 
-Place `*.woff2` into `assets\fonts_raw\`.
+Fonts are already prepared in `assets\generated_fonts\`; no font setup is required for a normal run. To add your own fonts, put `.woff2` files into `assets\fonts_raw\` and let the startup font pipeline process them.
 
 Run `main.py` from VS Code or from the terminal. The active mitmproxy profile is selected inside `main.py` by the switch shown above.
 
