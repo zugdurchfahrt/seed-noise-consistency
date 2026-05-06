@@ -44,7 +44,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     }
     return undefined;
   };
-  const __exit = (level, code, ctx, ret) => (__emit(level, code, ctx, null), ret);
   const __throw = (code, ctx, err) => (__emit('error', code, ctx, err), (() => { throw err; })());
 
   // --- nativization provider  ---
@@ -571,25 +570,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
     return __wrapStrictScalarAccessorGateway(key, getter, desc, validThis, options);
   }
 
-  {
-    const toStringDesc = nativeGetOwnProp(Function.prototype, 'toString');
-    const currentToString = toStringDesc && toStringDesc.value;
-    if (typeof currentToString !== 'function') {
-      const e = new Error('[CoreWindow] Function.prototype.toString missing');
-      __emit('error', 'core_window:toString_missing', {
-        module: 'core',
-        diagTag: 'core_window',
-        surface: 'core',
-        key: 'Function.prototype.toString',
-        stage: 'preflight',
-        message: 'Function.prototype.toString missing',
-        type: 'browser structure missing data',
-        data: { outcome: 'throw' }
-      }, e);
-      throw e;
-    }
-  }
-
   // === Core2.0 targets dispatcher (Window scope) ===
   // Methodology: Core controls preflight/dispatch/nativization/diag. Module applies descriptors.
   (function installCoreApplyTargets(){
@@ -700,7 +680,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         || v === 'strict_accessor_gateway'
         || v === 'object_return_gateway'
         || v === 'materialized_accessor_gateway'
-        || v === 'named_wrapper'
         || v === 'core_wrapper'
       ) return v;
       return null;
@@ -762,7 +741,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         : ((Core.__targetRegistry instanceof WeakMap) ? Core.__targetRegistry : new WeakMap());
       const __patchGuardSeq = (__internal.__patchGuardSeq instanceof WeakMap)
         ? __internal.__patchGuardSeq
-        : ((Core.__patchGuardSeq instanceof WeakMap) ? Core.__patchGuardSeq : new WeakMap());
+        : new WeakMap();
       const __guardRegistry = (__internal.guards instanceof Map) ? __internal.guards : new Map();
       const __prngRoot = (__internal.prng && typeof __internal.prng === 'object')
         ? __internal.prng
@@ -1228,14 +1207,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const materializedAccessorContract = planItem.policy === 'strict' && isMaterializedAccessorGatewayWrapLayer(wrapLayer);
         const accessorGatewayContract = strictScalarContract || objectReturnContract || materializedAccessorContract;
         const requiresExistingDescriptor = strictScalarContract || objectReturnContract;
-        const allowShapeChange = !!planItem.allowShapeChange;
         if (requiresExistingDescriptor && !desc) {
           const e = new Error('[Core.applyTargets] accessor strict requires descriptor');
           return fail(planItem.policy, planItem.tag, 'descriptor_missing', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
         const descIsAccessor = !!desc && hasAccessorShape(desc);
-        const canShapeChange = false;
-        if (desc && !descIsAccessor && !canShapeChange) {
+        if (desc && !descIsAccessor) {
           const e = new TypeError('[Core.applyTargets] kind mismatch for accessor');
           return fail(planItem.policy, planItem.tag, 'kind_mismatch', e, { key: planItem.key, kind: planItem.kind, targetId: planItem.targetId });
         }
@@ -1659,7 +1636,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const tag = item.diagTag ? String(item.diagTag) : 'core:applyTargets';
         const targetId = item.targetId ? String(item.targetId) : ('pf:' + sameTargetKey(owner, key));
         const allowCreate = !!item.allowCreate;
-        const allowShapeChange = !!item.allowShapeChange;
         let resolveMode = normalizeResolveMode(item.resolve);
         if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) {
           return { ok: false, reason: 'owner_invalid', error: new TypeError('[Core.applyTargets] owner invalid'), tag, policy, targetId, key: key || null, kind: kind || null };
@@ -1774,8 +1750,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
         }
         if (desc && kind === 'accessor') {
           const accessorShape = hasAccessorShape(desc);
-          const canShapeChange = false;
-          if (!accessorShape && !canShapeChange) {
+          if (!accessorShape) {
             return { ok: false, reason: 'kind_mismatch', error: new TypeError('[Core.applyTargets] kind mismatch for accessor'), tag, policy, targetId, key, kind };
           }
           if (!desc.configurable) {
@@ -1813,8 +1788,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           wrapLayer,
           resolve: resolveMode,
           desc: cloneDesc(desc),
-          allowCreate,
-          allowShapeChange
+          allowCreate
         };
       }
 
@@ -1924,7 +1898,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
             desc: cloneDesc(desc),
             nextDesc: null,
             allowCreate: !!preflight.allowCreate,
-            allowShapeChange: !!preflight.allowShapeChange,
             rollbackInfo: { owner, key, desc: cloneDesc(desc) }
           };
 
@@ -1982,30 +1955,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      safeDefine(Core, 'patchDataProp', {
-        value: patchDataProp,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, 'patchAccessor', {
-        value: patchAccessor,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, 'patchMethod', {
-        value: patchMethod,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, 'patchPromiseMethod', {
-        value: patchPromiseMethod,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
       safeDefine(Core, 'preflightTarget', {
         value: function corePreflightTarget(target) {
           return preflightTarget(target, null);
@@ -2048,12 +1997,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
           return true;
         },
         writable: true,
-        configurable: true,
-        enumerable: false
-      });
-      safeDefine(Core, '__patchGuardSeq', {
-        value: __patchGuardSeq,
-        writable: false,
         configurable: true,
         enumerable: false
       });
