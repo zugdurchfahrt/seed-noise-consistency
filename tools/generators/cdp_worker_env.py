@@ -19,7 +19,7 @@ _STOPPING = False
 _WS = None
 _CONFIG = None
 
-
+# cdp_worker_env.py propagates page environment overrides into DedicatedWorker/SharedWorker contexts via CDP before they start running.
 def enable_worker_env_inject(*, language, normalized_languages, hardware_concurrency, user_agent, navigator_platform):
     global _ENABLED, _CONFIG
     if not isinstance(language, str) or not language.strip():
