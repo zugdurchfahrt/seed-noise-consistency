@@ -763,9 +763,7 @@ def init_driver(
             writable: true,
             configurable: true,
             enumerable: false
-        }}
-    }});
-    Object.defineProperties(window, {{
+        }},
         __cpu: {{
             value: {json.dumps(hardware_concurrency_value)},
             writable: true,
