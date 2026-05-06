@@ -1,84 +1,126 @@
 # Readme_RUS.md
 
-**Коротко (TL;DR):** исследовательский анти‑фингерпринтинг‑пайплайн (Python + JavaScript) с детерминированными (seed‑based) патчами Canvas/WebGL/WebGPU/Fonts/Headers через CDP.  
-**Работает на Windows с VPN** (ProtonVPN/OpenVPN) + proxy.
+**Коротко (TL;DR):** исследовательский anti-fingerprinting pipeline (Python + JavaScript) с детерминированными seed-based патчами Canvas/WebGL/WebGPU/Fonts/Headers через CDP.  
+**Работает на Windows с VPN** (ProtonVPN/OpenVPN) + опциональный proxy.
 
-Браузерный антифингерпринтинг на Python + JavaScript
+Browser Anti-Fingerprinting: Python + JavaScript
 
-English version: check README_EN.md.
+English version: see README.md.
 
-## О чём этот проект
-Этот проект — система обхода современных методов browser fingerprinting (Canvas 2D/Offscreen, WebGL/WebGPU, Fonts, UA‑CH/Headers).  
-Архитектурно это стек Python (Selenium + undetected_chromedriver) + CDP‑инъекции JavaScript‑патчей (модулей) для управляемой подмены отпечатков, опциональное использование прокси.
+## О чем этот проект
 
-## Этичность и область применения
-Инструменты предназначены для тестирования, отладки и исследований совместимости. Не используйте для обхода мер безопасности и нарушений законодательства.  
-Код предоставляется исключительно для исследования приватности и тестирования стойкости детекторов. Ответственность за применение лежит на пользователе. Не используйте на ресурсах, чьи условия это запрещают.
+Система предназначена для оценки и смягчения современных browser fingerprinting surfaces: Canvas 2D/OffscreenCanvas, WebGL/WebGPU, Fonts, UA-CH/Headers.
+
+## Архитектура
+
+Python (Selenium + undetected_chromedriver) + инъекция JavaScript-патчей/модулей через CDP для управления fingerprint surfaces. Mitmproxy теперь опционален и переключается прямо в `main.py`.
+
+## Этика и область применения
+
+Инструменты предназначены только для тестирования, отладки и исследований. Не используйте их для обхода защитных механизмов, нарушения правил сайтов или законов.  
+Это инструмент для исследования приватности и устойчивости детекторов. Ответственность за применение лежит на пользователе.
 
 ## Важный дисклеймер
-Это не панацея и не «хакерский инструмент». Современные методы (TLS‑отпечатки, поведенческие проверки, контроль параметров WebGL/WebGPU, изменения в API AudioContext и др.) позволяют коррелировать сессии и деанонимизировать окружение даже при подменах. Контролируя часть поверхности, код не обеспечивает полную анонимизацию.
 
-## Цель проекта
-Исследовать браузер «изнутри»: какие API доступны и какие каналы утечки используются.  
-Понять, как шрифты, WebGL, Client Hints, плагины и т. д. влияют на «фингерпринт» пользователя.  
-Проверить, насколько можно контролировать фингерпринт и воспроизводить его через создание профилей и управление сетевой прослойкой.
+Это не "silver bullet" и не набор средств для полной анонимности. Современные техники fingerprinting (TLS fingerprints, behavioral checks, WebGL/WebGPU constraints, AudioContext API updates и т.д.) могут коррелировать сессии и деанонимизировать окружение даже при наличии патчей. Частичный контроль поверхности не дает полной анонимности.
+
+## Цели проекта
+
+Основная цель проекта - исследовать браузер изнутри, понять, какие API используются и где могут быть каналы утечки данных.  
+Понять, как шрифты, `WebGL`, `Client Hints`, plug-ins и другие компоненты влияют на fingerprint.  
+Сохранять наблюдаемость fingerprinting-поверхностей и их воспроизводимость через профилирование и управление сетевой прослойкой.
 
 ## Конфигурация и принципы
-- Без харда: значения профиля не забиты жёстко; формируются словарями и помещаются в `window.__*`.
-- Совместимость с MDN/Chromium: хуки держатся в нативных границах API; избегаем Illegal invocation.
-- `__GLOBAL_SEED` / DPR / device metrics: синхронизация значений через инициализационные переменные.
+
+Без хардкода: значения профиля собираются из словарей/profile data и попадают в `window.__*` только как входные bootstrap/bridge-значения. Реальная patch-логика, helpers и промежуточное состояние постепенно переносятся в module-local closure state, а не хранятся как долгоживущие public globals.  
+Совместимость с MDN/Chromium: hooks остаются внутри native API boundaries; closure-owned routing/helpers используются для сохранения receiver/owner contracts и предотвращения Illegal invocation.  
+`__GLOBAL_SEED` / DPR / device metrics синхронизируются через initialization variables.
 
 ## Статус проекта
-Проект исследовательский и некоммерческий, публикуется «как есть». Гарантий стабильности нет.  
-Разрабатывался одним автором — охват всех сценариев и сред ограничен. Форки и доработки приветствуются.  
-Подробные границы применимости см. в Issues / TODO.  
-Проверено только на Windows + ProtonVPN (OpenVPN CLI). Другие OS/VPN не тестировались.  
-Freeze: 2025‑09‑11 (принимаются правки документации и минорные фиксы).  
-Общее состояние: пайплайн инициализируется, скрипт работает, выполняет свои задачи, отдельные поверхности подменяются.
+
+Исследовательский и некоммерческий проект; публикуется "as is". Гарантий стабильности нет.  
+Проект разрабатывается одним автором, поэтому охват сценариев и окружений ограничен. Forks и contributions приветствуются.  
+Границы применимости см. в Issues/TODO.  
+Проверялось только на Windows + ProtonVPN (OpenVPN CLI). Другие OS/VPN не тестировались.  
+В целом pipeline инициализируется, скрипт запускается и выполняет назначенные задачи.
 
 ## Лицензия
-Проект распространяется по The Unlicense (Public Domain). Автор отказывается от авторских и смежных прав в максимально допустимой законом мере.  
-Разрешено копировать, изменять, публиковать, использовать, компилировать, продавать и распространять исходники и сборки без условий; атрибуция не требуется. ПО поставляется «как есть».
 
-## Предварительные требования
-- OS: Windows 10/11 (батники и путь OpenVPN рассчитаны на Windows).  
-- Python: 3.12 (рекомендуется 3.11+).
+The Unlicense (Public Domain). Авторские и смежные права waived  
+to the extent possible. Разрешено копировать, изменять, публиковать, использовать, компилировать, продавать  
+и распространять проект, с attribution или без нее. Software provided "AS IS".
+
+## Требования
+
+OS: Windows 10/11 (путь OpenVPN рассчитан на Windows).  
+Python: 3.12 (рекомендуется 3.11+).
 
 ## Сторонние компоненты
-- OpenVPN установлен локально (путь по умолчанию задаётся в `vpn_utils.py` и может быть изменён).  
-- `mitmproxy` (включён в `requirements.txt`).  
-- Chrome/Chromium — в `main.py` прописан локальный адрес для Chrome for Testing.  
-- Все Python‑зависимости зафиксированы в `requirements.txt`.
+
+OpenVPN установлен локально (дефолтный путь определен в `vpn_utils.py`, может быть изменен).  
+`mitmproxy` (есть в `requirements.txt`, нужен только когда переключатель mitmproxy включен).  
+Chrome/Chromium - локальная копия Chrome for Testing; путь настроен в `main.py`.  
+Все Python-зависимости указаны в `requirements.txt`.
 
 ## Режимы запуска
-### Через mitmproxy (`main.py`)
-✔ Можно ходить по сайтам без моментального «челленджа».  
-✔ Видны CORS/заголовки/Client Hints напрямую.  
-✖ Требуется установка и настройка mitmproxy.  
-✖ TLS‑отпечаток прокси не «нативный».
 
-### Без mitmproxy (`main_no_proxy.py`)
-✔ Меньше внешних зависимостей.  
-✖ Трудно использовать для реального серфинга из‑за ограничений CORS, но полезно как «чистая» модель API/JS.
+Есть одна точка входа: `main.py`.
 
-Примечание: использование VPN жёстко зафиксировано в обоих режимах; без VPN скрипт не запускался и не тестировался.
+Mitmproxy управляется маленьким видимым переключателем возле начала `main.py`:
+
+```python
+MITMPROXY_ON = True
+# MITMPROXY_OFF = True
+```
+
+Это значит: запуск **с mitmproxy**. `main.py` сам запускает `mitmdump`, направляет Chrome через `127.0.0.1:8082` и останавливает процесс при выходе.
+
+Чтобы запустить **без mitmproxy**, поменяйте активную строку:
+
+```python
+# MITMPROXY_ON = True
+MITMPROXY_OFF = True
+```
+
+В этом режиме `main.py` не запускает `mitmdump`, не ставит proxy options для Chrome, и Chrome подключается напрямую.
+
+Активной должна быть только одна строка. Если активны обе или обе закомментированы, запуск сразу завершится понятной ошибкой.
+
+### С mitmproxy
+
+✔ Проще ходить по сайтам без немедленных CORS/header challenges.  
+✔ Есть прямой доступ к CORS/headers/`Client Hints`.  
+✖ Требуется `mitmproxy`.  
+✖ Детекторы могут видеть TLS fingerprint mitmproxy как не "native".
+
+### Без mitmproxy
+
+✔ Более простой и легкий запуск.  
+✔ Нет локальной proxy-прослойки.  
+✖ Ограничения CORS могут снижать эффективность для реального browsing; этот режим лучше подходит как прямой browser/CDP/JS pipeline.
+
+Примечание: VPN используется в обоих режимах, если отдельно не отключить VPN calls.
 
 ### Использование без встроенного VPN-клиента
-Скрипт можно запускать и без управления OpenVPN изнутри. В этом случае вы можете:  
-✔ Использовать любой другой VPN-клиент (включая те, что управляются через графический интерфейс).    
-✔ Или вовсе работать без VPN.  
-Для этого достаточно в def main(): закомментировать вызовы методов экземпляра VPNClient, отвечающих за проверку, подготовку и подключение VPN:  
-        #  client.verify()  
-        #  client.prepare()  
-        #  logger.info("preparation completed")  
-        #  client.connect()  
-        client.post()  
-В таком режиме скрипт будет работать точно так же, как и раньше: все последующие шаги выполняются, только без остановки/запуска OpenVPN-процессов.  
-Если у вас уже поднят VPN любым другим способом, скрипт просто будет использовать текущее сетевое окружение.
 
+Скрипт можно запускать без управления OpenVPN изнутри. В этом случае можно:  
+✔ Использовать любой другой VPN-клиент, включая управляемый через GUI.  
+✔ Или работать вообще без VPN.  
+Для этого достаточно закомментировать в `def main():` вызовы методов `VPNClient`, отвечающие за проверку, подготовку и подключение:
 
+```python
+# client.verify()
+# client.prepare()
+# logger.info("Preparation completed")
+# client.connect()
+client.post()
+```
+
+В этом режиме скрипт работает как раньше: все последующие шаги выполняются, но VPN-процессы не останавливаются и не запускаются.  
+Если VPN уже поднят любым другим способом, скрипт просто использует текущее сетевое окружение.
 
 ## Структура репозитория
+
 ```text
 ├── assets/
 │   ├── JS_fonts_patch/
@@ -90,126 +132,177 @@ Freeze: 2025‑09‑11 (принимаются правки документац
 │   │   └── Win32/
 │   │       ├── cache_data/
 │   ├── scripts/
-│   │   ├── GeoOverride_source.js
-│   │   ├── RTCPeerConnection.js
-│   │   ├── TimezoneOverride_source.js
-│   │   ├── WORKER_PATCH_SRC.js
-│   │   ├── audiocontext.js
-│   │   ├── canvas.js
-│   │   ├── context.js
-│   │   ├── core_window.js
-│   │   ├── env_params.js
-│   │   ├── font_module.js
-│   │   ├── headers_interceptor.js
-│   │   ├── hide_webdriver.js
-│   │   ├── nav_total_set.js
-│   │   ├── screen.js
-│   │   ├── set_log.js
-│   │   ├── webgl.js
-│   │   ├── webgpu.js
-│   │   └── wrk.js
+│   │   ├── window/
+│   │   │   ├── core/
+│   │   │   │   ├── bootstrap_hide.js
+│   │   │   │   ├── context.js
+│   │   │   │   ├── core_window.js
+│   │   │   │   ├── prng_seed.js
+│   │   │   │   ├── probe.js
+│   │   │   │   └── set_log.js
+│   │   │   └── patches/
+│   │   │       ├── graphics/
+│   │   │       ├── media/
+│   │   │       ├── navigator/
+│   │   │       └── stealth/
+│   │   └── workerscope/
+│   │       ├── set_reflect.js
+│   │       ├── sw_prelude.js
+│   │       ├── worker_bootstrap.js
+│   │       ├── WORKER_PATCH_SRC.js
+│   │       └── wrk.js
 │   └── templates/
 │       └── font_patch.template.j2
-├── configs/
+├── cfg_vpn/
 ├── logs/
+├── profile_data_source/
+│   ├── datashell_win32.py
+│   ├── depo_browser.py
+│   ├── FONTS_DESIGNER_BY_FAMILY_JSON.json
+│   ├── FONTS_LICENSE_BY_FAMILY_JSON.json
+│   ├── macintel.py
+│   ├── permissions_dict.py
+│   ├── plugins_dict.py
+│   └── profile.json
 ├── profiles/
-│   └── profile_20250909_112712_584426.json
+├── tools/
+│   ├── generators/
+│   │   ├── cdp_catapult.py
+│   │   ├── cdp_worker_env.py
+│   │   └── rand_met.py
+│   ├── tools_infra/
+│   │   ├── overseer.py
+│   │   └── vpn_utils.py
+│   └── tools_runtime/
+│       ├── handle_cors_addon.py
+│       ├── headers_adapter.py
+│       └── helpers.py
 ├── user_data/
-├── NO_PROXY_START.bat
-├── PROXY_START.bat
-├── WEBGL_DICKts.js
-├── WebgpuWL.js
-├── datashell_win32.py
-├── depo_browser.py
-├── handle_cors_addon.py
-├── headers_adapter.py
-├── cdp_catapult.py
-├── macintel.py
 ├── main.py
-├── main_no_proxy.py
-├── mitmproxy_full_log.txt
-├── overseer.py
-├── plugins_dict.py
-├── profile.json
-├── rand_met.py
+├── Readme_RUS.md
 ├── requirements.txt
-├── tools.py
-└── vpn_utils.py
+└── README.md
 ```
 
 ## Обзор модулей (кратко)
-### Python (корень)
-- `main.py` — точка оркестрации: Selenium + undetected‑chromedriver, генерация/применение профиля, инъекция JS‑патчей через основной bundle, управление CDP, прокси‑режим.  
-- `main_no_proxy.py` — альтернативная конфигурация без использования прокси (ограничения CORS).  
-- `cdp_catapult` — инжектор ServiceWorkerGlobalScope.  
-- `vpn_utils.py` — управление VPN‑процессом: выбор случайного `.ovpn` из `configs/`, запуск VPN, подготовка региональных полей профиля (timezone/geolocation). 
-- `handle_cors_addon.py` — аддон mitmproxy: корректные CORS (включая preflight), фильтрация служебных доменов, кольцевой буфер логов; читает `profiles/profile.json` для ожидаемых Client Hints.  
-- `headers_adapter.py` — реалистичный `Accept` под бренд/мажорную версию.  
-- `rand_met.py` — пайплайн шрифтов: per‑platform `generated_fonts/...`, эмитит `fonts_index.json` и генерирует `assets/JS_fonts_patch/font_patch.generated.js` из шаблона Jinja2.  
-- `tools.py` — хелперы профиля/метрик устройства (UA‑CH, языки, версии браузера, утилиты заголовков).  
-- `depo_browser.py` — словарь версий (Chrome/Firefox/Edge/Safari) для состава профиля.  
-- `plugins_dict.py` — наборы «плагинов» для профилей.  
-- `datashell_win32.py` / `macintel.py` — платформенные словари для Win32 / MacIntel.  
-- `WEBGL_DICKts.js` / `WebgpuWL.js` — whitelists/limits/parameters для WebGL/WebGPU.  
-- `overseer.py` — Python‑логгер.
 
-### JavaScript (`assets/scripts`)
-- `set_log.js` — JS‑логирование.  
-- `env_params.js` — инициализация PRNG на базе `__GLOBAL_SEED`.  
-- `hide_webdriver.js` — маскировка webdriver.  
-- `nav_total_set.js`, `screen.js`, `audiocontext.js` — корректировки `navigator`/`screen`/`AudioContext` в рамках политики сидирования/шума.  
-- `font_module.js` — потребляет `window.fontPatchConfigs`; регистрирует `@font-face`, инжектит CSS шрифтов.
-- `core_window.js` — создаёт весь window-core: nativization/toString/safeDefine и т.п.   
-- `context.js` — регистрация хуков и цепочки применения.  
-- `canvas.js` — хуки Canvas 2D/Offscreen с учётом DPR и «edge‑respecting» шумом.  
-- `webgl.js` / `webgpu.js` — хуки WebGL/WebGPU; перехват параметров/расширений; дополняются статическими whitelist‑ами (см. выше).  
-- `headers_interceptor.js` — генератор `Accept` под бренд/версию; safelisted‑патч для fetch/XHR на cross‑origin; синхронизация с CDP Fetch‑мостом.  
-- `RTCPeerConnection.js` — фильтрация non‑relay ICE‑кандидатов; нормализация ICE‑серверов.  
-- `GeoOverride_source.js` / `TimezoneOverride_source.js` — оверрайды гео/часового пояса.  
-- `wrk.js` / `WORKER_PATCH_SRC.js` : снапшоты окружения, синхронизация Dedicated/Shared/Service Worker (UA/UA‑CH, inline bootstrap).
+### Python
+
+- `main.py` - главный оркестратор и точка входа: собирает/загружает данные профиля, готовит CDP payload для инъекции, запускает Selenium + undetected-chromedriver, подключает runtime helpers и применяет staged JS pipeline к window и worker scopes.
+- `profile_data_source/` - словари и базовые данные профиля для сборки платформы и браузера: Win32/MacIntel shells, карты версий браузеров, наборы plugins, настройки permissions и profile defaults.
+- `tools/generators/rand_met.py` - шрифтовой pipeline: готовит generated fonts для платформ, cache metadata и `assets/JS_fonts_patch/font_patch.generated.js` из Jinja2-шаблона.
+- `tools/generators/cdp_catapult.py` - собирает CDP-side payload и содержит helper для доставки в `ServiceWorker`, используемый runtime injection flow.
+- `tools/generators/cdp_worker_env.py` - подключается к `DedicatedWorker` и `SharedWorker` targets через CDP и применяет те же environment overrides, что и main page; поддерживает согласованность worker-side поверхностей `userAgent`, `language`, `languages`, `platform` и `hardwareConcurrency` до возобновления выполнения.
+- `tools/tools_runtime/handle_cors_addon.py` - runtime addon для mitmproxy: CORS/preflight handling, фильтрация служебных доменов и координация request/response-side headers.
+- `tools/tools_runtime/headers_adapter.py` - формирует реалистичные `Accept`/header-наборы под бренд и версию браузера.
+- `tools/tools_runtime/helpers.py` - общие runtime/profile helpers для `main.py` и injection pipeline.
+- `tools/tools_infra/vpn_utils.py` - управление жизненным циклом VPN и region-aligned setup с использованием `.ovpn` файлов из `cfg_vpn/`.
+- `tools/tools_infra/overseer.py` - helper для логирования и диагностики на стороне Python.
+- `tools/tools_native_check/` - helpers для нормативной проверки proxy/native-surface механики, включая registry checks и bridge-firewall tooling.
+
+### JavaScript (`assets/scripts/window/core`)
+
+- `core_window.js` - базовый слой для window-модулей и общей инфраструктуры `Core`. Здесь находятся общие wrappers, `Core.applyTargets`, безопасная установка дескрипторов, native shaping, маскировка `toString`, `invalid-this` contract и диагностические утилиты. Модуль задает contract-driven patching engine: downstream modules используют его как общий слой, который сохраняет native behavior/appearance, корректно обрабатывает `invalid receiver` и другие engine-level errors, не ломая ожидаемую native pass-through semantics.
+- `context.js` - оркестрационный модуль для хуков и `Canvas`/`WebGL`: собирает `CanvasPatchHooks`, проверяет наличие экспортированных хуков из модулей и регистрирует их в unified hook queue. Также это patching gateway: он оборачивает `getContext`, `toDataURL`, `toBlob`, `convertToBlob`, методы `CanvasRenderingContext2D` и `WebGL` prototypes, чтобы downstream modules проходили через одну точку применения, без proxy leaks, потери `this` и поломки нативной механики дескрипторов.
+- `prng_seed.js` - gateway для `__GLOBAL_SEED` от Python backend к JavaScript environment. Модуль устанавливает seed-driven PRNG state и предоставляет deterministic seed context, который используется ниже по цепочке graphics/media patches.
+- `bootstrap_hide.js` - инициализирует внутренний bootstrap-контекст и переносит значения из публичной поверхности `window` в hidden state. Создает и поддерживает `CanvasPatchContext`, переносит bootstrap data во внутренние state objects, скрывает служебные поля от enumeration и удаляет временные global values после подготовки required owners and retention snapshots.
+- `set_log.js` - JS-side logging/diagnostic emitter. Создает JS-side logger/diag buffer и unified `__DEGRADE__` channel, через который pipeline incidents собираются и нормализуются.
+- `probe.js` - слой внутренней наблюдаемости и self-checking. Проверяет critical APIs после загрузки патчей и валидирует runtime invariants, descriptor integrity, call semantics и timeout behavior. Findings пишутся в тот же diagnostic stream.
+
+### JavaScript (`assets/scripts/window/patches/*`)
+
+- `graphics/canvas.js` - Canvas 2D/Offscreen hooks с seed-based noise и обертками, сохраняющими инварианты.
+- `graphics/webgl.js`, `graphics/WEBGL_DICKts.js` - перехват `WebGL` плюс статические whitelist/parameter data.
+- `graphics/webgpu.js`, `graphics/WebgpuWL.js` - перехват `WebGPU` плюс whitelist/limits data.
+- `graphics/screen.js` - patching поверхностей `screen` и `visualViewport`.
+- `media/audiocontext.js` - seed-based/media adjustments, согласованные с AudioContext.
+- `media/font_module.js` - потребляет generated font configs, регистрирует `@font-face` и инжектит CSS/font-loading glue.
+- `media/RTCPeerConnection.js` - нормализация ICE servers и non-relay/network-shaping logic.
+- `navigator/nav_total_set.js`, `navigator/override_ua_data.js` - выравнивание navigator, UA-CH, language и client-hint surfaces на стороне window.
+- `stealth/hide_webdriver.js` - маскировка webdriver и связанное native-surface hardening.
+- `stealth/headers_interceptor.js`, `stealth/headers_bridge.js` - shaping request/header на JS-стороне, синхронизированный с CDP/mitmproxy path.
+- `stealth/GeoOverride_source.js`, `stealth/TimezoneOverride_source.js` - geo/timezone overrides.
+
+### JavaScript (`assets/scripts/workerscope`)
+
+- `wrk.js` - координатор worker-scope: отвечает за перенос окружения и установку патчей в `DedicatedWorker`, `SharedWorker` и `ServiceWorker`.
+- `WORKER_PATCH_SRC.js` - основной набор worker-side патчей, который применяется внутри worker-контекста после bootstrap/prelude этапов.
+- `worker_bootstrap.js` - ранняя связка для `Worker`: перехватывает создание worker и передает туда подготовленный patch payload до выполнения пользовательского worker-кода.
+- `sw_prelude.js` - prelude для `ServiceWorker`: подготавливает окружение перед применением worker-патчей.
+- `set_reflect.js` - worker-side helper для reflection/native-surface механики: помогает сохранять ожидаемый вид функций, `toString`-поведение и совместимость с native-like поверхностью.
 
 ### Генерируемые файлы и шаблоны
-- `assets/Manifest/fonts-manifest.json` — диагностический манифест (большой JSON).  
-- `assets/JS_fonts_patch/font_patch.generated.js` — автогенерируемый шрифтовой патч, потребляется `font_module.js`.  
-- `assets/templates/font_patch.template.j2` — шаблон Jinja2, который использует `rand_met.py` для генерации JS‑патча.
 
-### Лаунчеры
-- `NO_PROXY_START.bat` — venv → `python main_no_proxy.py`.  
-- `PROXY_START.bat` — venv → mitmproxy (addon) → `python main.py`.
+- `assets/Manifest/fonts-manifest.json` - диагностический манифест (большой JSON); не является прямым runtime-источником, а служит диагностическим артефактом.
+- `assets/JS_fonts_patch/font_patch.generated.js` - авто-генерируемый fonts patch, который потребляет `font_module.js`.
+- `assets/templates/font_patch.template.j2` - Jinja2-шаблон, который `rand_met.py` использует для генерации JS patch.
+
+### Логирование
+
+- В консоли можно вызвать:
+- `L.__PROBE__();` - вывод результатов probe-диагностики из `probe.js` в консоль DevTools; данные также сохраняются в JSON/HTML для чтения и обработки.
+
+- `L.__DEGRADE__.getBuffer();` - вывод буфера `set_log.js` в консоль DevTools.
+
+- Сохранение лога `set_log.js` в JSON:
+
+  ```js
+  (() => {
+    const json = JSON.stringify(L.__DEGRADE__?.getBuffer?.() || [], null, 2);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: `degrade-buffer-${stamp}.json` });
+    a.click();
+    URL.revokeObjectURL(url);
+  })();
+  ```
+
+### Переключатель mitmproxy
+
+Откройте `main.py`, выберите один активный профиль и нажмите Play/F5 в VS Code.
+
+С mitmproxy:
+
+```python
+MITMPROXY_ON = True
+# MITMPROXY_OFF = True
+```
+
+Без mitmproxy:
+
+```python
+# MITMPROXY_ON = True
+MITMPROXY_OFF = True
+```
 
 ## Быстрый старт (Windows)
+
 Установить зависимости:
-```CMD
+
+```powershell
 python -m venv venv
 venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Положить `.ovpn` в папку `configs\`.  
+Положить `.ovpn` в `configs\`.
+
 Поместить `*.woff2` в `assets\fonts_raw\`.
 
-Минимальное/максимальное количество — любое, но число должно быть задано в `rand_met.py` в секции “Step 3: Select a random amount n fonts for fingerPrint”; иначе скрипт работать не будет.
+Запустить `main.py` из VS Code или терминала. Активный профиль mitmproxy выбирается внутри `main.py` переключателем выше.
 
-Запуск:
-```powershell
-:: с прокси
-PROXY_START.bat
-
-:: без прокси
-NO_PROXY_START.bat
-```
-
-*Если при установке словите «permission denied», выполните:*  
-```CMD
-pip install --no-cache-dir -r requirements.txt
-```
+* Если при установке возникает ошибка "permission denied", выполните:
+  `pip install --no-cache-dir -r requirements.txt`
 
 ## Issues/TODO
-- Синхронизация Canvas(window) -Canvas(SharedWorkerGlobalScope).
-- Синхронизация GPU(window) -GPU(ServiveWorkerGlobalScope).
-- Интегрировать модуль `getClientRects` / `getBoundingClientRect` (проксирование).  
-- Ротация TLS‑отпечатка через OpenSSL.  
-- события `success/ready` из мест, где фиксируется только факт установки хуков считать только `applied`: механика поставлена, но результат еще не доказан.  
-- Итоговый `success` ставить только после постусловия на наблюдаемой поверхности.  
-- Для font-модуля фиксировать `success` только если после завершения текущей цепочки состояние уже наблюдается через `DOM/CSS/font-measurement surface`, а не только через внутренние структуры; иначе фиксировать `applied_but_not_effective` или не ставить `success`.  
+
+- Синхронизировать Canvas window ↔ Canvas SharedWorkerScope.
+- Синхронизировать GPU window ↔ GPU ServiceWorkerScope.
+- Завершить настройку nativization system.
+- Интегрировать proxying для `getClientRects` / `getBoundingClientRect`.
+- Реализовать ротацию TLS fingerprint через OpenSSL.
+- События `success/ready` из мест, где фиксируется только факт установки hooks, считать только `applied`: механизм установлен, но результат еще не доказан.
+- Эмитить финальный `success` только после postcondition на observable surface.
+- Для font module эмитить `success` только если состояние наблюдаемо после текущей цепочки через `DOM/CSS/font-measurement surface`, а не только через внутренние структуры; иначе помечать `applied_but_not_effective` или не эмитить `success`.
+- Завершить baseline `__DEGRADE__` module audit coverage: module audit уже использует explicit status codes under `degrade:module_status:*` through shared module inventory. Нужно расширить load/result postconditions, где это требуется, чтобы final module audit не зависел от ad hoc probe-only logic.
