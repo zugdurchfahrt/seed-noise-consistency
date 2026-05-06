@@ -792,14 +792,116 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
 
 
   // Deterministic pixel-noise remains in 2D draw/text hooks.
-  // 2026-02-11: keep toDataURL hook lightweight and single-pass.
-  // No decode/getImageData/re-encode/readback calls here.
+  // Keep toDataURL hook single-pass: no getImageData, no re-render, no pixel/dimension changes.
   function patchToDataURLInjectNoise(res, type, quality) {
     if (typeof res !== 'string') return res;
     if (type && String(type).toLowerCase() !== 'image/png') return res;
     if (res.indexOf('data:image/png;base64,') !== 0) return res;
 
-    return res;
+    try {
+      const __prng = __resolvePrngState();
+      if (typeof __prng.seed !== 'string' || !__prng.seed) {
+        emitCanvasDiag('warn', 'canvas:toDataURL:png_chunk_seed_missing', null, {
+          stage: 'hook',
+          key: 'toDataURL',
+          data: { outcome: 'return_native', reason: 'core_prng_seed_missing' }
+        });
+        return res;
+      }
+
+      const comma = res.indexOf(',');
+      if (comma < 0) return res;
+      const prefix = res.slice(0, comma + 1);
+      const base64 = res.slice(comma + 1);
+      const bin = atob(base64);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+
+      const sig = [137, 80, 78, 71, 13, 10, 26, 10];
+      if (u8.length < 8 + 12) return res;
+      for (let i = 0; i < 8; i++) if (u8[i] !== sig[i]) return res;
+      if (String.fromCharCode(u8[12], u8[13], u8[14], u8[15]) !== 'IHDR') return res;
+
+      function readU32BE(a, off) {
+        return ((a[off] << 24) | (a[off + 1] << 16) | (a[off + 2] << 8) | a[off + 3]) >>> 0;
+      }
+      function writeU32BE(a, off, v) {
+        a[off] = (v >>> 24) & 255;
+        a[off + 1] = (v >>> 16) & 255;
+        a[off + 2] = (v >>> 8) & 255;
+        a[off + 3] = v & 255;
+      }
+      function getCrcTable() {
+        if (G._crcTable) return G._crcTable;
+        const t = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+          let c = n;
+          for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+          t[n] = c >>> 0;
+        }
+        G._crcTable = t;
+        return t;
+      }
+      function crc32Chunk(typeStr, dataU8) {
+        const tab = getCrcTable();
+        let crc = ~0 >>> 0;
+        for (let i = 0; i < 4; i++) crc = (tab[(crc ^ (typeStr.charCodeAt(i) & 255)) & 255] ^ (crc >>> 8)) >>> 0;
+        for (let i = 0; i < dataU8.length; i++) crc = (tab[(crc ^ dataU8[i]) & 255] ^ (crc >>> 8)) >>> 0;
+        return (~crc) >>> 0;
+      }
+
+      let off = 8;
+      let iendOff = -1;
+      while (off + 12 <= u8.length) {
+        const clen = readU32BE(u8, off);
+        const typeOff = off + 4;
+        const dataOff = off + 8;
+        const crcOff = dataOff + clen;
+        const next = crcOff + 4;
+        if (next > u8.length) break;
+        const chunk = String.fromCharCode(u8[typeOff], u8[typeOff + 1], u8[typeOff + 2], u8[typeOff + 3]);
+        if (chunk === 'IEND') {
+          iendOff = off;
+          break;
+        }
+        off = next;
+      }
+      if (iendOff < 0) return res;
+
+      const seedHash = stringHash(__prng.seed + '|toDataURL|png-ancillary');
+      const bytesHash = stringHash(base64.slice(0, 4096) + '|' + u8.length);
+      const payload = new Uint8Array(8);
+      writeU32BE(payload, 0, seedHash >>> 0);
+      writeU32BE(payload, 4, bytesHash >>> 0);
+
+      const chunkType = 'iHDr';
+      const addLen = 4 + 4 + payload.length + 4;
+      const out = new Uint8Array(u8.length + addLen);
+      out.set(u8.subarray(0, iendOff), 0);
+      let w = iendOff;
+      writeU32BE(out, w, payload.length >>> 0); w += 4;
+      out[w++] = chunkType.charCodeAt(0) & 255;
+      out[w++] = chunkType.charCodeAt(1) & 255;
+      out[w++] = chunkType.charCodeAt(2) & 255;
+      out[w++] = chunkType.charCodeAt(3) & 255;
+      out.set(payload, w); w += payload.length;
+      writeU32BE(out, w, crc32Chunk(chunkType, payload)); w += 4;
+      out.set(u8.subarray(iendOff), w);
+
+      let s = '';
+      const CH = 0x8000;
+      for (let i = 0; i < out.length; i += CH) {
+        s += String.fromCharCode.apply(null, out.subarray(i, i + CH));
+      }
+      return prefix + btoa(s);
+    } catch (e) {
+      emitCanvasDiag('warn', 'canvas:toDataURL:png_chunk_failed', e, {
+        stage: 'hook',
+        key: 'toDataURL',
+        data: { outcome: 'return_native', reason: 'png_ancillary_chunk_failed' }
+      });
+      return res;
+    }
   }
     
 
