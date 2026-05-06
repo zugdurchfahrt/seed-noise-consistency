@@ -446,8 +446,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
     const res = Reflect.apply(orig, this, args);
     if (!Array.isArray(res)) return res;
 
-    return res.filter(ext => whitelist.includes(ext));
+    // Do not shrink the native extension surface.
+    // The dictionary is a policy boundary, not a replacement profile.
+    return res.slice();
   }
+
+
 
   function webglGetExtensionPatch(orig, name, ...rest) {
     const __webglState = (__stateRoot.__WEBGL_STATE__ && typeof __stateRoot.__WEBGL_STATE__ === 'object')
@@ -458,8 +462,15 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (whitelist.length === 0) {
       return; // undefined -> native pass-through in patchMethod
     }
-    if (!whitelist.includes(name)) return null;
+    
     const res = Reflect.apply(orig, this, [name].concat(rest));
+    if (res) return res;
+
+    // Keep impossible/non-native extensions unavailable.
+    if (!whitelist.includes(name)) return null;
+    return res;
+
+
     //  WEBGL_debug_renderer_info
     if (name === 'WEBGL_debug_renderer_info' &&
       res && typeof res === 'object' &&
