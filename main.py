@@ -257,7 +257,7 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
 
 
-def apply_page_hardware_override(driver, hardware_concurrency_value):
+def apply_hardware_override(driver, hardware_concurrency_value):
     try:
         driver.execute_cdp_cmd(
             "Emulation.setHardwareConcurrencyOverride",
@@ -266,6 +266,18 @@ def apply_page_hardware_override(driver, hardware_concurrency_value):
         logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
     except Exception as e:
         logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
+
+
+def read_page_device_memory(driver, device_memory_value):
+    try:
+        device_memory_value = driver.execute_script("return navigator.deviceMemory")
+        if not isinstance(device_memory_value, (int, float)) or device_memory_value <= 0:
+            raise RuntimeError(f"invalid page-side navigator.deviceMemory: {device_memory_value!r}")
+        logger.info("Direct page-side deviceMemory read: %s", device_memory_value)
+        return device_memory_value
+    except Exception as e:
+        logger.warning("Direct page-side deviceMemory read failed: %s", e)
+        raise
 
 
 def apply_page_locale_override(driver, language):
@@ -464,7 +476,7 @@ def init_driver(
             driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", emulation_metrics)
             apply_window_bounds_override(driver, device_metrics, "bootstrap")
     
-    apply_page_hardware_override(
+    apply_hardware_override(
         driver,
         hardware_concurrency_value=hardware_concurrency_value,
     )
@@ -833,12 +845,18 @@ def init_driver(
     }});
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
-
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, dom_platform)
-
+    
+    device_memory_value = read_page_device_memory(
+        driver,
+        device_memory_value=device_memory_value,
+    )
+    profile["deviceMemory"] = device_memory_value
+    expected_client_hints["deviceMemory"] = device_memory_value
+       
     
     # Connect page_js (core + targets + wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})

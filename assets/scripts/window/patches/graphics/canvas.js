@@ -693,53 +693,153 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
   }
 
 
-  // Keep native-shaped blob output here; draw/text noise remains in canvas pipeline.
+  // PNG export layer: add one private ancillary chunk before IEND.
+  // No getImageData, no re-render, no pixel changes, no dimension/IHDR changes.
+  let __canvasCrcTable = null;
+
+  function readU32BE(a, off) {
+    return ((a[off] << 24) | (a[off + 1] << 16) | (a[off + 2] << 8) | a[off + 3]) >>> 0;
+  }
+  function writeU32BE(a, off, v) {
+    a[off] = (v >>> 24) & 255;
+    a[off + 1] = (v >>> 16) & 255;
+    a[off + 2] = (v >>> 8) & 255;
+    a[off + 3] = v & 255;
+  }
+  function getCanvasCrcTable() {
+    if (__canvasCrcTable) return __canvasCrcTable;
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    __canvasCrcTable = t;
+    return t;
+  }
+  function crc32Chunk(typeStr, dataU8) {
+    const tab = getCanvasCrcTable();
+    let crc = ~0 >>> 0;
+    for (let i = 0; i < 4; i++) crc = (tab[(crc ^ (typeStr.charCodeAt(i) & 255)) & 255] ^ (crc >>> 8)) >>> 0;
+    for (let i = 0; i < dataU8.length; i++) crc = (tab[(crc ^ dataU8[i]) & 255] ^ (crc >>> 8)) >>> 0;
+    return (~crc) >>> 0;
+  }
+  function patchPngAncillaryBytes(u8, seed) {
+    const sig = [137, 80, 78, 71, 13, 10, 26, 10];
+    if (!(u8 && u8.length >= 8 + 12)) return null;
+    for (let i = 0; i < 8; i++) if (u8[i] !== sig[i]) return null;
+    if (String.fromCharCode(u8[12], u8[13], u8[14], u8[15]) !== 'IHDR') return null;
+
+    let off = 8;
+    let iendOff = -1;
+    while (off + 12 <= u8.length) {
+      const clen = readU32BE(u8, off);
+      const typeOff = off + 4;
+      const dataOff = off + 8;
+      const crcOff = dataOff + clen;
+      const next = crcOff + 4;
+      if (next > u8.length) break;
+      const chunk = String.fromCharCode(u8[typeOff], u8[typeOff + 1], u8[typeOff + 2], u8[typeOff + 3]);
+      if (chunk === 'IEND') {
+        iendOff = off;
+        break;
+      }
+      off = next;
+    }
+    if (iendOff < 0) return null;
+
+    let sample = '';
+    const sampleLen = Math.min(4096, u8.length);
+    for (let i = 0; i < sampleLen; i++) sample += String.fromCharCode(u8[i]);
+
+    const seedHash = stringHash(seed + '|png-ancillary');
+    const bytesHash = stringHash(sample + '|' + u8.length);
+    const textPayload = 'vpAg\0seed=' + (seedHash >>> 0).toString(16) + ';data=' + (bytesHash >>> 0).toString(16);
+    const payload = new Uint8Array(textPayload.length);
+    for (let i = 0; i < textPayload.length; i++) payload[i] = textPayload.charCodeAt(i) & 255;
+
+    const chunkType = 'tEXt';
+    const addLen = 4 + 4 + payload.length + 4;
+    const out = new Uint8Array(u8.length + addLen);
+    out.set(u8.subarray(0, iendOff), 0);
+    let w = iendOff;
+    writeU32BE(out, w, payload.length >>> 0); w += 4;
+    out[w++] = chunkType.charCodeAt(0) & 255;
+    out[w++] = chunkType.charCodeAt(1) & 255;
+    out[w++] = chunkType.charCodeAt(2) & 255;
+    out[w++] = chunkType.charCodeAt(3) & 255;
+    out.set(payload, w); w += payload.length;
+    writeU32BE(out, w, crc32Chunk(chunkType, payload)); w += 4;
+    out.set(u8.subarray(iendOff), w);
+
+    return out;
+  }
+
+  async function patchPngBlobAncillaryChunk(blob, key, reqType) {
+    if (!blob || !(blob instanceof Blob)) return blob;
+
+    const mime = String(reqType || blob.type || 'image/png').toLowerCase();
+    if (!/^image\/png$/i.test(mime)) return blob;
+
+    const __prng = __resolvePrngState();
+    if (typeof __prng.seed !== 'string' || !__prng.seed) {
+      emitCanvasDiag('warn', 'canvas:' + key + ':png_chunk_seed_missing', null, {
+        stage: 'hook',
+        key,
+        data: { outcome: 'return_native', reason: 'core_prng_seed_missing' }
+      });
+      return blob;
+    }
+
+    const buf = await blob.arrayBuffer();
+    const patched = patchPngAncillaryBytes(new Uint8Array(buf), __prng.seed);
+    if (!patched) return blob;
+    return new Blob([patched], { type: blob.type || 'image/png' });
+  }
+
+  // Blob export path uses the shared PNG ancillary byte-builder.
   async function patchToBlobInjectNoise(blob, ...args) {
     try {
-      if (!blob || !(blob instanceof Blob)) return;
+      if (!blob || !(blob instanceof Blob)) return blob;
 
-      const typeArg = (typeof args[0] === 'string')
-        ? args[0]
-        : (args[0] && typeof args[0] === 'object' ? args[0].type : undefined);
+      const typeArg = (typeof args[1] === 'string') ? args[1] : undefined;
 
       const mime = (typeArg || blob.type || 'image/png').toLowerCase();
-      if (!/^image\/png$/i.test(mime)) return;
+      if (!/^image\/png$/i.test(mime)) return blob;
 
-      return blob;
+      return await patchPngBlobAncillaryChunk(blob, 'toBlob', mime);
     } catch (e) {
       emitCanvasDiag('warn', 'canvas:toBlob:hook_failed', e, {
         stage: 'hook',
         key: 'toBlob'
       });
-      return;
+      return blob;
     }
   }
 
-  // Promise-ветка convertToBlob: post-process PNG bytes без decode/getImageData + IHDR fallback.
-  // 2026-02-11: heavy PNG blob post-process disabled in convertToBlob path (CPU guard).
+  // Offscreen convertToBlob path uses the same PNG byte-builder as toBlob/toDataURL.
   async function patchConvertToBlobInjectNoise(blob, options) {
     try {
-      if (!blob || !(blob instanceof Blob)) return;
+      if (!blob || !(blob instanceof Blob)) return blob;
 
       const reqType = (options && options.type) || blob.type || 'image/png';
       const mime = String(reqType).toLowerCase();
-      if (!/^image\/png$/i.test(mime)) return;
+      if (!/^image\/png$/i.test(mime)) return blob;
    
-      return blob;
+      return await patchPngBlobAncillaryChunk(blob, 'convertToBlob', mime);
 
     } catch (e) {
       emitCanvasDiag('warn', 'canvas:convertToBlob:hook_failed', e, {
         stage: 'hook',
         key: 'convertToBlob'
       });
-      return;
+      return blob;
     }
 
   }
 
 
-  // Deterministic pixel-noise remains in 2D draw/text hooks.
-  // Keep toDataURL hook single-pass: no getImageData, no re-render, no pixel/dimension changes.
+  // toDataURL path uses the same PNG ancillary byte-builder as Blob exports.
   function patchToDataURLInjectNoise(res, type, quality) {
     if (typeof res !== 'string') return res;
     if (type && String(type).toLowerCase() !== 'image/png') return res;
@@ -764,76 +864,8 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       const u8 = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
 
-      const sig = [137, 80, 78, 71, 13, 10, 26, 10];
-      if (u8.length < 8 + 12) return res;
-      for (let i = 0; i < 8; i++) if (u8[i] !== sig[i]) return res;
-      if (String.fromCharCode(u8[12], u8[13], u8[14], u8[15]) !== 'IHDR') return res;
-
-      function readU32BE(a, off) {
-        return ((a[off] << 24) | (a[off + 1] << 16) | (a[off + 2] << 8) | a[off + 3]) >>> 0;
-      }
-      function writeU32BE(a, off, v) {
-        a[off] = (v >>> 24) & 255;
-        a[off + 1] = (v >>> 16) & 255;
-        a[off + 2] = (v >>> 8) & 255;
-        a[off + 3] = v & 255;
-      }
-      function getCrcTable() {
-        if (G._crcTable) return G._crcTable;
-        const t = new Uint32Array(256);
-        for (let n = 0; n < 256; n++) {
-          let c = n;
-          for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-          t[n] = c >>> 0;
-        }
-        G._crcTable = t;
-        return t;
-      }
-      function crc32Chunk(typeStr, dataU8) {
-        const tab = getCrcTable();
-        let crc = ~0 >>> 0;
-        for (let i = 0; i < 4; i++) crc = (tab[(crc ^ (typeStr.charCodeAt(i) & 255)) & 255] ^ (crc >>> 8)) >>> 0;
-        for (let i = 0; i < dataU8.length; i++) crc = (tab[(crc ^ dataU8[i]) & 255] ^ (crc >>> 8)) >>> 0;
-        return (~crc) >>> 0;
-      }
-
-      let off = 8;
-      let iendOff = -1;
-      while (off + 12 <= u8.length) {
-        const clen = readU32BE(u8, off);
-        const typeOff = off + 4;
-        const dataOff = off + 8;
-        const crcOff = dataOff + clen;
-        const next = crcOff + 4;
-        if (next > u8.length) break;
-        const chunk = String.fromCharCode(u8[typeOff], u8[typeOff + 1], u8[typeOff + 2], u8[typeOff + 3]);
-        if (chunk === 'IEND') {
-          iendOff = off;
-          break;
-        }
-        off = next;
-      }
-      if (iendOff < 0) return res;
-
-      const seedHash = stringHash(__prng.seed + '|toDataURL|png-ancillary');
-      const bytesHash = stringHash(base64.slice(0, 4096) + '|' + u8.length);
-      const payload = new Uint8Array(8);
-      writeU32BE(payload, 0, seedHash >>> 0);
-      writeU32BE(payload, 4, bytesHash >>> 0);
-
-      const chunkType = 'iHDr';
-      const addLen = 4 + 4 + payload.length + 4;
-      const out = new Uint8Array(u8.length + addLen);
-      out.set(u8.subarray(0, iendOff), 0);
-      let w = iendOff;
-      writeU32BE(out, w, payload.length >>> 0); w += 4;
-      out[w++] = chunkType.charCodeAt(0) & 255;
-      out[w++] = chunkType.charCodeAt(1) & 255;
-      out[w++] = chunkType.charCodeAt(2) & 255;
-      out[w++] = chunkType.charCodeAt(3) & 255;
-      out.set(payload, w); w += payload.length;
-      writeU32BE(out, w, crc32Chunk(chunkType, payload)); w += 4;
-      out.set(u8.subarray(iendOff), w);
+      const out = patchPngAncillaryBytes(u8, __prng.seed);
+      if (!out) return res;
 
       let s = '';
       const CH = 0x8000;
