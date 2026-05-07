@@ -1173,7 +1173,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navModuleApplied.push({
         owner,
         key,
-        origDesc: cloneDescriptor(planItem.origDesc)
+        origDesc: cloneDescriptor(planItem.origDesc),
+        rollback: (typeof planItem.rollback === 'function') ? planItem.rollback : null
       });
     }
 
@@ -1183,8 +1184,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const row = __navModuleApplied[i];
         if (!row || !row.owner || typeof row.key !== 'string') continue;
         try {
-          if (row.origDesc) Object.defineProperty(row.owner, row.key, row.origDesc);
-          else delete row.owner[row.key];
+          if (typeof row.rollback !== 'function') throw new Error('invalid core rollback plan item');
+          row.rollback();
         } catch (e) {
           if (!rollbackErr) rollbackErr = e;
           __navDiagBrowser('error', 'nav_total_set:module_rollback_failed', {
@@ -1273,14 +1274,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           const p = plans[i];
           if (!p || p.skipApply) continue;
           activeKey = (p && typeof p.key === 'string') ? p.key : activeKey;
-          if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
+          if (!p.owner || typeof p.key !== 'string' || !p.nextDesc || typeof p.apply !== 'function') {
             throw new Error('invalid plan item');
           }
-          Object.defineProperty(p.owner, p.key, p.nextDesc);
-          const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
-          if (!isSameDescriptor(after, p.nextDesc)) {
-            throw new Error('descriptor post-check mismatch');
-          }
+          p.apply();
           applied.push(p);
         }
 
@@ -1299,8 +1296,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         for (let i = applied.length - 1; i >= 0; i--) {
           const p = applied[i];
           try {
-            if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
-            else delete p.owner[p.key];
+            if (typeof p.rollback !== 'function') throw new Error('invalid core rollback plan item');
+            p.rollback();
           } catch (re) {
             if (!rollbackErr) rollbackErr = re;
             __navDiag('error', groupTag + ':rollback_failed', {
@@ -3492,8 +3489,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           const row = __navModuleApplied[i];
           if (!row || !row.owner || typeof row.key !== 'string') continue;
           try {
-            if (row.origDesc) Object.defineProperty(row.owner, row.key, row.origDesc);
-            else delete row.owner[row.key];
+            if (typeof row.rollback !== 'function') throw new Error('invalid core rollback plan item');
+            row.rollback();
           } catch (e) {
             if (!rollbackErr) rollbackErr = e;
             __navDiag('error', 'nav_total_set:plugins_rollback_failed', {

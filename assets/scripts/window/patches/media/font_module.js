@@ -272,18 +272,6 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     return;
   }
 
-  function isSameDescriptor(actual, expected) {
-    if (!actual || !expected) return false;
-    const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i];
-      if (Object.prototype.hasOwnProperty.call(expected, k)) {
-        if (actual[k] !== expected[k]) return false;
-      }
-    }
-    return true;
-  }
-
   function applyTargetGroup(groupTag, targets, policy) {
     const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
     let groupKey = null;
@@ -363,7 +351,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       for (let i = 0; i < plans.length; i++) {
         const p = plans[i];
         if (!p || p.skipApply) continue;
-        if (!p.nextDesc || !p.owner || typeof p.key !== 'string') {
+        if (!p.nextDesc || !p.owner || typeof p.key !== 'string' || typeof p.apply !== 'function') {
           const e = new Error('invalid execution plan item');
           __fontDiagBrowser('error', groupTag + ':contract_violation', {
             stage: 'contract',
@@ -374,20 +362,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           }, e);
           throw e;
         }
-        Object.defineProperty(p.owner, p.key, p.nextDesc);
-        const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
-        if (!isSameDescriptor(after, p.nextDesc)) {
-          const e = new Error('descriptor post-check mismatch');
-          __fontDiagBrowser('error', groupTag + ':contract_violation', {
-            stage: 'contract',
-            diagTag: groupTag,
-            key: p.key || groupKey,
-            message: 'descriptor post-check mismatch',
-            data: { outcome: 'throw', reason: 'descriptor_post_check_mismatch' }
-          }, e);
-          throw e;
-        }
-        p.applied = true;
+        p.apply();
         done.push(p);
       }
       __fontDiagPipeline('info', groupTag + ':group_applied', {
@@ -403,8 +378,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       for (let i = done.length - 1; i >= 0; i--) {
         const p = done[i];
         try {
-          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
-          else delete p.owner[p.key];
+          if (typeof p.rollback !== 'function') throw new Error('invalid core rollback plan item');
+          p.rollback();
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
           __fontDiagBrowser('error', groupTag + ':rollback_failed', {

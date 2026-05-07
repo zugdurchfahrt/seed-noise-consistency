@@ -328,14 +328,10 @@ const AudioContextModule = function AudioContextModule(window) {
       for (let i = 0; i < plans.length; i++) {
         const p = plans[i];
         if (!p || p.skipApply) continue;
-        if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
+        if (!p.owner || typeof p.key !== 'string' || !p.nextDesc || typeof p.apply !== 'function') {
           throw new Error('[AudioContextPatch] invalid plan item');
         }
-        Object.defineProperty(p.owner, p.key, p.nextDesc);
-        const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
-        if (!isSameDescriptor(after, p.nextDesc)) {
-          throw new Error('[AudioContextPatch] descriptor post-check mismatch for ' + p.key);
-        }
+        p.apply();
         applied.push(p);
       }
 
@@ -383,8 +379,8 @@ const AudioContextModule = function AudioContextModule(window) {
       for (let i = applied.length - 1; i >= 0; i--) {
         const p = applied[i];
         try {
-          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
-          else delete p.owner[p.key];
+          if (typeof p.rollback !== 'function') throw new Error('[AudioContextPatch] invalid rollback plan item');
+          p.rollback();
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
           degrade(groupTag + ':rollback_failed', re, {

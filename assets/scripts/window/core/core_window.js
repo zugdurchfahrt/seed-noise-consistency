@@ -619,6 +619,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
       if ('set' in d) copy.set = d.set;
       return copy;
     }
+    function sameDescriptor(actual, expected) {
+      if (!actual || !expected) return false;
+      const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        if (Object.prototype.hasOwnProperty.call(expected, k) && actual[k] !== expected[k]) {
+          return false;
+        }
+      }
+      return true;
+    }
     function hasAccessorShape(desc) {
       return !!desc && (Object.prototype.hasOwnProperty.call(desc, 'get') || Object.prototype.hasOwnProperty.call(desc, 'set'));
     }
@@ -977,6 +988,64 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const bucket = getTargetBucket(owner, true);
         if (!bucket) return false;
         bucket.add(String(key));
+        return true;
+      }
+      function applyPlanItem(planItem) {
+        if (!planItem || !planItem.owner || typeof planItem.key !== 'string' || !planItem.nextDesc) {
+          throw new Error('[Core.applyTargets] invalid plan item');
+        }
+        if (planItem.skipApply) return false;
+        safeDefine(planItem.owner, planItem.key, planItem.nextDesc);
+        const after = nativeGetOwnProp(planItem.owner, planItem.key);
+        if (!sameDescriptor(after, planItem.nextDesc)) {
+          const e = new Error('[Core.applyTargets] descriptor post-check mismatch');
+          diagDegrade((planItem.tag || 'core:applyTargets') + ':postcheck_failed', e, {
+            module: 'core_window',
+            diagTag: planItem.tag || 'core:applyTargets',
+            surface: 'core',
+            key: planItem.key,
+            stage: 'contract',
+            message: 'Core.applyTargets descriptor post-check mismatch',
+            type: 'browser structure missing data',
+            data: { outcome: 'throw', reason: 'descriptor_postcheck_mismatch', policy: planItem.policy || null }
+          });
+          try {
+            rollbackPlanItem(planItem);
+          } catch (rollbackErr) {
+            diagDegrade((planItem.tag || 'core:applyTargets') + ':rollback_failed', rollbackErr, {
+              module: 'core_window',
+              diagTag: planItem.tag || 'core:applyTargets',
+              surface: 'core',
+              key: planItem.key,
+              stage: 'rollback',
+              message: 'Core.applyTargets rollback failed after descriptor post-check mismatch',
+              type: 'browser structure missing data',
+              data: { outcome: 'throw', reason: 'rollback_failed', sourceReason: 'descriptor_postcheck_mismatch', policy: planItem.policy || null }
+            });
+            throw rollbackErr;
+          }
+          throw e;
+        }
+        planItem.applied = true;
+        return true;
+      }
+      function rollbackPlanItem(planItem) {
+        if (!planItem || !planItem.owner || typeof planItem.key !== 'string') {
+          throw new Error('[Core.applyTargets] invalid rollback plan item');
+        }
+        if (planItem.origDesc) {
+          safeDefine(planItem.owner, planItem.key, planItem.origDesc);
+          const restored = nativeGetOwnProp(planItem.owner, planItem.key);
+          if (!sameDescriptor(restored, planItem.origDesc)) {
+            throw new Error('[Core.applyTargets] rollback descriptor mismatch');
+          }
+        } else {
+          delete planItem.owner[planItem.key];
+          if (nativeGetOwnProp(planItem.owner, planItem.key)) {
+            throw new Error('[Core.applyTargets] rollback delete mismatch');
+          }
+        }
+        planItem.applied = false;
         return true;
       }
 
@@ -1898,7 +1967,9 @@ const CoreWindowModule = function CoreWindowModule(window) {
             desc: cloneDesc(desc),
             nextDesc: null,
             allowCreate: !!preflight.allowCreate,
-            rollbackInfo: { owner, key, desc: cloneDesc(desc) }
+            rollbackInfo: { owner, key, desc: cloneDesc(desc) },
+            apply: null,
+            rollback: null
           };
 
           if (kind === 'data') {
@@ -1910,6 +1981,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
           } else {
             if (patchPromiseMethod(planItem, t, desc, fail) === planned) return planned;
           }
+          planItem.apply = function coreApplyPlanItem() {
+            return applyPlanItem(planItem);
+          };
+          planItem.rollback = function coreRollbackPlanItem() {
+            return rollbackPlanItem(planItem);
+          };
           planned.push(planItem);
         }
 
@@ -1929,17 +2006,6 @@ const CoreWindowModule = function CoreWindowModule(window) {
             data: { outcome: 'return', reason: 'diag_push_failed' }
           });
         }
-        diagDegrade('core:applyTargets:planned', null, {
-          module: 'core_window',
-          diagTag: 'core:applyTargets',
-          surface: 'core',
-          key: null,
-          level: 'info',
-          stage: 'preflight',
-          message: 'Core.applyTargets planned targets',
-          type: 'pipeline telemetry',
-          data: { outcome: 'return', reason: 'planned', planned: planned.length, total: list.length }
-        });
         return planned;
       }
 

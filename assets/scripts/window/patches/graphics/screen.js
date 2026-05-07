@@ -532,14 +532,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       for (let i = 0; i < plans.length; i++) {
         const p = plans[i];
         if (!p || p.skipApply) continue;
-        if (!p.owner || typeof p.key !== 'string' || !p.nextDesc) {
+        if (!p.owner || typeof p.key !== 'string' || !p.nextDesc || typeof p.apply !== 'function') {
           throw new Error('invalid core plan item');
         }
-        Object.defineProperty(p.owner, p.key, p.nextDesc);
-        const after = Object.getOwnPropertyDescriptor(p.owner, p.key);
-        if (!sameDesc(after, p.nextDesc)) {
-          throw new Error('descriptor post-check mismatch');
-        }
+        p.apply();
         applied.push(p);
       }
       const coreRegisterPatchedTarget = (__core && typeof __core.registerPatchedTarget === 'function')
@@ -587,8 +583,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       for (let i = applied.length - 1; i >= 0; i--) {
         const p = applied[i];
         try {
-          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
-          else delete p.owner[p.key];
+          if (typeof p.rollback !== 'function') throw new Error('invalid core rollback plan item');
+          p.rollback();
           if (!cleanupRegisteredCoreTarget(p.owner, p.key, groupTag, 'rollback(registry_cleanup)', 'apply_failed') && !rollbackErr) {
             rollbackErr = new Error('target_registry_cleanup_failed');
           }
@@ -603,7 +599,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             data: {
               outcome: 'throw',
               reason: 'rollback_failed',
-              substage: 'rollback(Object.defineProperty/delete)'
+              substage: 'Core.applyTargets.rollback'
             }
           }, re);
         }
@@ -620,7 +616,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         data: {
           outcome: groupPolicy === 'throw' ? 'throw' : 'skip',
           reason: (e && e.message) ? String(e.message) : 'apply_failed',
-          substage: 'apply(Object.defineProperty/postcheck)'
+          substage: 'Core.applyTargets.apply'
         }
       }, e);
       if (groupPolicy === 'throw') throw e;
@@ -632,8 +628,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       __moduleRollbackStack.push(function rollbackCoreTargetsGroup() {
         for (let i = appliedSnapshot.length - 1; i >= 0; i--) {
           const p = appliedSnapshot[i];
-          if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
-          else delete p.owner[p.key];
+          if (typeof p.rollback !== 'function') throw new Error('invalid core rollback plan item');
+          p.rollback();
           cleanupRegisteredCoreTarget(p.owner, p.key, groupTag, 'rollback(module_teardown)', 'module_teardown');
         }
         delete __screenAppliedGroups[groupTag];
@@ -650,8 +646,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     for (let i = appliedSnapshot.length - 1; i >= 0; i--) {
       const p = appliedSnapshot[i];
       try {
-        if (p.origDesc) Object.defineProperty(p.owner, p.key, p.origDesc);
-        else delete p.owner[p.key];
+        if (typeof p.rollback !== 'function') throw new Error('invalid core rollback plan item');
+        p.rollback();
         if (!cleanupRegisteredCoreTarget(p.owner, p.key, groupTag, 'rollback(postcheck)', reason || 'postcheck_failed') && !rollbackErr) {
           rollbackErr = new Error('target_registry_cleanup_failed');
         }
