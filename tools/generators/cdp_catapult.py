@@ -16,6 +16,8 @@ logger = logger.getChild("cdp_catapult")
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 SCRIPTS_WORKERSCOPE = PROJECT_ROOT / "assets" / "scripts" / "workerscope"
+SCRIPTS_WINDOW_CORE = PROJECT_ROOT / "assets" / "scripts" / "window" / "core"
+SCRIPTS_WINDOW_GRAPHICS = PROJECT_ROOT / "assets" / "scripts" / "window" / "patches" / "graphics"
 PORT = None
 # --- SW bootstrap prelude (ServiceWorkerGlobalScope) ---
 SW_BOOTSTRAP_ENABLED = True
@@ -315,8 +317,14 @@ def _build_sw_bootstrap_prelude(sw_env: dict) -> str:
         value = webgl.get(key)
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"SW inject: bad webgl.{key}")
+    if not isinstance(CDP_GLOBAL_SEED, str) or not CDP_GLOBAL_SEED.strip():
+        raise ValueError("SW inject: CDP_GLOBAL_SEED missing for canvas export layer")
     prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
     reflect_path = SCRIPTS_WORKERSCOPE / "set_reflect.js"
+    core_window_path = SCRIPTS_WINDOW_CORE / "core_window.js"
+    prng_path = SCRIPTS_WINDOW_CORE / "prng_seed.js"
+    canvas_path = SCRIPTS_WINDOW_GRAPHICS / "canvas.js"
+    context_path = SCRIPTS_WINDOW_CORE / "context.js"
     sw_env_json = json.dumps({
         "scopeKind": "service",
         "lane": "runtime",
@@ -330,7 +338,21 @@ def _build_sw_bootstrap_prelude(sw_env: dict) -> str:
     }, ensure_ascii=False)
     sw_prelude_js = prelude_path.read_text("utf-8")
     sw_reflect_js = reflect_path.read_text("utf-8")
-    return ("const __SW_BOOTSTRAP_ENV__ = " + sw_env_json + ";\n" + sw_reflect_js + "\n" + sw_prelude_js).strip()
+    sw_inline_core_window = core_window_path.read_text("utf-8")
+    sw_inline_prng = "\n".join([
+        _build__seed_value(str(CDP_GLOBAL_SEED)),
+        prng_path.read_text("utf-8"),
+    ])
+    sw_inline_canvas = canvas_path.read_text("utf-8")
+    sw_inline_context = context_path.read_text("utf-8")
+    inline_sources = "\n".join([
+        "const __SW_BOOTSTRAP_ENV__ = " + sw_env_json + ";",
+        "const __SW_INLINE_CORE_WINDOW__ = " + json.dumps(sw_inline_core_window, ensure_ascii=False) + ";",
+        "const __SW_INLINE_PRNG__ = " + json.dumps(sw_inline_prng, ensure_ascii=False) + ";",
+        "const __SW_INLINE_CANVAS_PATCH__ = " + json.dumps(sw_inline_canvas, ensure_ascii=False) + ";",
+        "const __SW_INLINE_CONTEXT_PATCH__ = " + json.dumps(sw_inline_context, ensure_ascii=False) + ";",
+    ])
+    return (inline_sources + "\n" + sw_reflect_js + "\n" + sw_prelude_js).strip()
 
 
 def _build_sw_user_agent_override(sw_env: dict) -> dict:

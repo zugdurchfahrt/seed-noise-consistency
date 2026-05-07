@@ -834,7 +834,189 @@
       return true;
     }
 
+    function __materializeServiceWorkerCanvasGraph() {
+      const C = __ensureSwHiddenObject(G, 'CanvasPatchContext');
+      const stateRoot = __ensureSwHiddenObject(C, 'state');
+      const wrkState = __ensureSwHiddenObject(stateRoot, '__WRK__');
+      const runtimeRoot = __ensureSwHiddenObject(wrkState, 'runtime');
+      const envProfileRoot = __ensureSwHiddenObject(stateRoot, '__ENV_PROFILE__');
+      __ensureSwHiddenObject(envProfileRoot, '__SCREEN__');
+      const fontsRoot = __ensureSwHiddenObject(stateRoot, '__FONTS__');
+      const fontsState = __ensureSwHiddenObject(fontsRoot, '__STATE__');
+      const fontsConfig = __ensureSwHiddenObject(fontsRoot, '__CONFIG__');
+      const canvasRoot = __ensureSwHiddenObject(stateRoot, '__CANVAS__');
+      const canvasState = __ensureSwHiddenObject(canvasRoot, '__STATE__');
+      const Core = __ensureSwHiddenObject(G, 'Core');
+      const coreInternal = __ensureSwHiddenObject(Core, '__internal');
+      const prngRoot = __ensureSwHiddenObject(coreInternal, 'prng');
+
+      if (!Object.prototype.hasOwnProperty.call(fontsState, 'ready')) {
+        __defineTrackedHiddenValue(fontsState, 'ready', false);
+      }
+      if (!Object.prototype.hasOwnProperty.call(fontsState, 'error')) {
+        __defineTrackedHiddenValue(fontsState, 'error', null);
+      }
+      if (!Object.prototype.hasOwnProperty.call(fontsState, 'awaitReady')) {
+        __defineTrackedHiddenValue(fontsState, 'awaitReady', null);
+      }
+      if (!Object.prototype.hasOwnProperty.call(fontsState, 'awaitReadyStatus')) {
+        __defineTrackedHiddenValue(fontsState, 'awaitReadyStatus', null);
+      }
+      if (!Object.prototype.hasOwnProperty.call(fontsConfig, 'configs')) {
+        __defineTrackedHiddenValue(fontsConfig, 'configs', []);
+      }
+      if (!Object.prototype.hasOwnProperty.call(canvasState, 'domReady')) {
+        __defineTrackedHiddenValue(canvasState, 'domReady', false);
+      }
+      if (!Object.prototype.hasOwnProperty.call(canvasState, 'offscreenReady')) {
+        __defineTrackedHiddenValue(canvasState, 'offscreenReady', false);
+      }
+      if (!Object.prototype.hasOwnProperty.call(canvasState, 'domCanvas')) {
+        __defineTrackedHiddenValue(canvasState, 'domCanvas', null);
+      }
+      if (!Object.prototype.hasOwnProperty.call(canvasState, 'domCanvasHost')) {
+        __defineTrackedHiddenValue(canvasState, 'domCanvasHost', null);
+      }
+      if (!Object.prototype.hasOwnProperty.call(canvasState, 'offscreenCanvas')) {
+        __defineTrackedHiddenValue(canvasState, 'offscreenCanvas', null);
+      }
+      if (!Object.prototype.hasOwnProperty.call(canvasState, 'defaultCtx2dFont')) {
+        __defineTrackedHiddenValue(canvasState, 'defaultCtx2dFont', '');
+      }
+
+      return { C, stateRoot, runtimeRoot, canvasState, prngRoot };
+    }
+
+    function __executeSwInlineModule(source, exportName, label) {
+      if (typeof source !== 'string' || !source) {
+        __fail('sw_prelude:canvas_export:inline_source_missing', {
+          stage: 'preflight',
+          key: String(label || exportName || 'inlineModule'),
+          message: 'service worker canvas inline source missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'inline_source_missing' }
+        }, new Error('SW canvas inline source missing'));
+      }
+      const exportLiteral = JSON.stringify(String(exportName || ''));
+      const runner = new Function(
+        'window',
+        source
+          + '\nconst __swExportName = ' + exportLiteral + ';'
+          + '\nconst __swExportFn = (typeof ' + String(exportName) + ' === "function")'
+          + ' ? ' + String(exportName)
+          + ' : ((window && typeof window[__swExportName] === "function") ? window[__swExportName] : null);'
+          + '\nif (typeof __swExportFn !== "function") throw new Error("SW inline export missing: " + __swExportName);'
+          + '\nreturn __swExportFn(window);'
+      );
+      try {
+        return runner(G);
+      } finally {
+        try {
+          const d = Object.getOwnPropertyDescriptor(G, exportName);
+          if (d && d.configurable !== false) {
+            delete G[exportName];
+          }
+        } catch (e) {
+          __swDiag('warn', 'sw_prelude:canvas_export:cleanup_failed', {
+            stage: 'apply',
+            key: String(exportName || ''),
+            message: 'service worker canvas inline export cleanup failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'return', reason: 'cleanup_failed' }
+          }, e);
+        }
+      }
+    }
+
+    function __installServiceWorkerCanvasExportLayer() {
+      const OffscreenCanvasCtor = (typeof G.OffscreenCanvas === 'function') ? G.OffscreenCanvas : null;
+      if (!OffscreenCanvasCtor || !OffscreenCanvasCtor.prototype) {
+        __swDiag('info', 'sw_prelude:canvas_export_skipped', {
+          stage: 'apply',
+          key: 'OffscreenCanvas',
+          message: 'service worker canvas export layer skipped',
+          type: 'browser structure missing data',
+          data: { outcome: 'skip', reason: 'offscreen_canvas_missing' }
+        }, null);
+        return false;
+      }
+
+      const graph = __materializeServiceWorkerCanvasGraph();
+      const seed = (G.CDP_GLOBAL_SEED != null) ? String(G.CDP_GLOBAL_SEED) : '';
+      if (!seed) {
+        __fail('sw_prelude:canvas_export:seed_missing', {
+          stage: 'preflight',
+          key: 'CDP_GLOBAL_SEED',
+          message: 'service worker canvas seed missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'seed_missing' }
+        }, new Error('SW canvas seed missing'));
+      }
+
+      if (graph.canvasState.__SW_CANVAS_EXPORT_LAYER_INSTALLED__ === true) {
+        return true;
+      }
+
+      const inlineCoreWindow = (typeof __SW_INLINE_CORE_WINDOW__ === 'string') ? __SW_INLINE_CORE_WINDOW__ : '';
+      const inlinePrng = (typeof __SW_INLINE_PRNG__ === 'string') ? __SW_INLINE_PRNG__ : '';
+      const inlineCanvasPatch = (typeof __SW_INLINE_CANVAS_PATCH__ === 'string') ? __SW_INLINE_CANVAS_PATCH__ : '';
+      const inlineContextPatch = (typeof __SW_INLINE_CONTEXT_PATCH__ === 'string') ? __SW_INLINE_CONTEXT_PATCH__ : '';
+
+      __executeSwInlineModule(inlineCoreWindow, 'CoreWindowModule', 'inlineCoreWindow');
+      __executeSwInlineModule(inlinePrng, 'RNGsetModule', 'inlinePrng');
+      __executeSwInlineModule(inlineCanvasPatch, 'CanvasPatchModule', 'inlineCanvasPatch');
+      __executeSwInlineModule(inlineContextPatch, 'ContextPatchModule', 'inlineContextPatch');
+
+      const hooks = (G.CanvasPatchHooks && typeof G.CanvasPatchHooks === 'object')
+        ? G.CanvasPatchHooks
+        : null;
+      const patchCtx = (G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
+        ? G.CanvasPatchContext
+        : null;
+      if (!hooks || typeof hooks.patchConvertToBlobInjectNoise !== 'function') {
+        __fail('sw_prelude:canvas_export:hook_missing', {
+          stage: 'preflight',
+          key: 'CanvasPatchHooks.patchConvertToBlobInjectNoise',
+          message: 'service worker canvas export hook missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'patchConvertToBlobInjectNoise_missing' }
+        }, new Error('SW CanvasPatchHooks.patchConvertToBlobInjectNoise missing'));
+      }
+      if (!patchCtx || typeof patchCtx.registerOffscreenConvertToBlobHook !== 'function') {
+        __fail('sw_prelude:canvas_export:registrar_missing', {
+          stage: 'preflight',
+          key: 'CanvasPatchContext.registerOffscreenConvertToBlobHook',
+          message: 'service worker canvas export registrar missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'registerOffscreenConvertToBlobHook_missing' }
+        }, new Error('SW registerOffscreenConvertToBlobHook missing'));
+      }
+      if (typeof patchCtx.applyOffscreenPatches !== 'function') {
+        __fail('sw_prelude:canvas_export:apply_missing', {
+          stage: 'preflight',
+          key: 'CanvasPatchContext.applyOffscreenPatches',
+          message: 'service worker offscreen apply missing',
+          type: 'pipeline missing data',
+          data: { outcome: 'throw', reason: 'applyOffscreenPatches_missing' }
+        }, new Error('SW applyOffscreenPatches missing'));
+      }
+
+      patchCtx.registerOffscreenConvertToBlobHook(hooks.patchConvertToBlobInjectNoise);
+      const applied = patchCtx.applyOffscreenPatches();
+      __defineTrackedHiddenValue(graph.canvasState, '__SW_CANVAS_EXPORT_LAYER_INSTALLED__', true);
+      __defineTrackedHiddenValue(graph.runtimeRoot, 'serviceWorkerCanvasExportLayerInstalled', true);
+      __swDiag('info', 'sw_prelude:canvas_export_installed', {
+        stage: 'apply',
+        key: 'OffscreenCanvas.prototype.convertToBlob',
+        message: 'service worker canvas export layer installed',
+        type: 'pipeline missing data',
+        data: { outcome: 'return', applied }
+      }, null);
+      return true;
+    }
+
     __installServiceWorkerWebGLMirror(webgl);
+    __installServiceWorkerCanvasExportLayer();
 
     const nav = G.navigator;
     if (!nav) {
