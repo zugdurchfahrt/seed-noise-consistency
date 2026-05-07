@@ -1223,9 +1223,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   function __screenViewportSnapshot() {
     const htmlRoot = document.documentElement || null;
-    const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
-      ? __screenCanvasState.domCanvasHost
-      : null;
     const snapshot = {
       innerWidth: __screenReadAccessorValue(window, windowProto, 'innerWidth', window),
       innerHeight: __screenReadAccessorValue(window, windowProto, 'innerHeight', window),
@@ -1233,9 +1230,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       outerHeight: __screenReadAccessorValue(window, windowProto, 'outerHeight', window),
       htmlClientWidth: htmlRoot ? htmlRoot.clientWidth : null,
       htmlClientHeight: htmlRoot ? htmlRoot.clientHeight : null,
-      divClientWidth: divRoot ? divRoot.clientWidth : null,
-      divClientHeight: divRoot ? divRoot.clientHeight : null,
-      divOwnerPath: divRoot ? 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost' : null,
       mediaQueries: __screenCollectViewportQueries(),
       visualViewport: null
     };
@@ -1284,12 +1278,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (!Object.is(snapshot.innerHeight, viewportExpected.innerHeight)) {
       mismatches.push({ key: 'window.innerHeight', expected: viewportExpected.innerHeight, actual: snapshot.innerHeight });
     }
-    if (snapshot.divClientWidth !== null && !Object.is(snapshot.divClientWidth, viewportExpected.innerWidth)) {
-      mismatches.push({ key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.clientWidth', expected: viewportExpected.innerWidth, actual: snapshot.divClientWidth });
-    }
-    if (snapshot.divClientHeight !== null && !Object.is(snapshot.divClientHeight, viewportExpected.innerHeight)) {
-      mismatches.push({ key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.clientHeight', expected: viewportExpected.innerHeight, actual: snapshot.divClientHeight });
-    }
     __screenAppendMandatoryQueryMismatches(snapshot.mediaQueries, mismatches, 'matchMedia.');
     if (enforceVisualViewport && snapshot.visualViewport) {
       if (!Object.is(snapshot.visualViewport.height, viewportExpected.visualViewportHeight)) mismatches.push({ key: 'visualViewport.height', expected: viewportExpected.visualViewportHeight, actual: snapshot.visualViewport.height });
@@ -1321,7 +1309,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     orientation: [],
     mediaQueries: __screenCollectDisplayQueries()
   };
-  const viewportObserved = { window: [], visualViewport: [], root: [], mediaQueries: __screenCollectViewportQueries() };
+  const viewportObserved = { window: [], visualViewport: [], mediaQueries: __screenCollectViewportQueries() };
   const hostWindowObserved = [];
   const displayTargets = [];
   const viewportTargets = [];
@@ -1440,52 +1428,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const elementProto = (typeof Element !== 'undefined' && Element && Element.prototype) ? Element.prototype : null;
   const clientWidthDesc = elementProto ? Object.getOwnPropertyDescriptor(elementProto, 'clientWidth') : null;
   const clientHeightDesc = elementProto ? Object.getOwnPropertyDescriptor(elementProto, 'clientHeight') : null;
-  const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
-    ? __screenCanvasState.domCanvasHost
-    : null;
-  if (divRoot) {
-    const divRootMap = [
-      { key: 'clientWidth', expected: viewportExpected.innerWidth },
-      { key: 'clientHeight', expected: viewportExpected.innerHeight }
-    ];
-    for (let i = ZERO; i < divRootMap.length; i++) {
-      const item = divRootMap[i];
-      const fact = __screenDescribeAccessorSurface(divRoot, null, item.key);
-      fact.ownerLabel = 'canvas.domCanvasHost';
-      viewportObserved.root.push(fact);
-      try {
-        fact.actual = divRoot[item.key];
-      } catch (e) {
-        fact.readFailed = true;
-        fact.readError = (e && e.message) ? String(e.message) : 'native_read_failed';
-        viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + fact.readError);
-      }
-      fact.expected = item.expected;
-      fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
-      if (!fact.readFailed && !fact.matchesExpected) {
-        if (nativeScreenAccessorsOnly) {
-          viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':native_profile_mismatch_keep_native_getter');
-        } else {
-          const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
-          const targetPlan = __screenBuildAccessorTarget(
-            divRoot,
-            null,
-            item.key,
-            item.expected,
-            'screen:viewport_group:div',
-            {
-              allowCreate: true,
-              invalidThis: 'throw',
-              configurable: protoDesc ? !!protoDesc.configurable : true,
-              enumerable: protoDesc ? !!protoDesc.enumerable : false
-            }
-          );
-          if (!targetPlan.ok) viewportReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + targetPlan.reason);
-          else viewportTargets.push(targetPlan.target);
-        }
-      }
-    }
-  }
   if (visualViewportObj && visualViewportProto) {
     const visualViewportMap = [
       { key: 'width', expected: viewportExpected.visualViewportWidth },
@@ -1666,12 +1608,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const localTargets = [];
     const localReasons = [];
     const htmlRoot = document.documentElement || null;
-    const divRoot = (__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object')
-      ? __screenCanvasState.domCanvasHost
-      : null;
-    const coreIsTargetRegistered = (__core && typeof __core.isTargetRegistered === 'function')
-      ? __core.isTargetRegistered
-      : null;
     __screenGroupModes.viewportSubstage = substage;
     if (!htmlRoot) {
       localReasons.push('document.documentElement:missing');
@@ -1712,46 +1648,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             }
           );
           if (!targetPlan.ok) localReasons.push('document.documentElement.' + item.key + ':' + targetPlan.reason);
-          else localTargets.push(targetPlan.target);
-        }
-      }
-    }
-    if (divRoot) {
-      const divRootMap = [
-        { key: 'clientWidth', expected: viewportExpected.innerWidth },
-        { key: 'clientHeight', expected: viewportExpected.innerHeight }
-      ];
-      for (let i = ZERO; i < divRootMap.length; i++) {
-        const item = divRootMap[i];
-        let actual = null;
-        let readFailed = false;
-        let readError = null;
-        try {
-          actual = divRoot[item.key];
-        } catch (e) {
-          readFailed = true;
-          readError = (e && e.message) ? String(e.message) : 'native_read_failed';
-        }
-        if (readFailed) {
-          localReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + readError);
-          continue;
-        }
-        if (!Object.is(actual, item.expected)) {
-          const protoDesc = item.key === 'clientWidth' ? clientWidthDesc : clientHeightDesc;
-          const targetPlan = __screenBuildAccessorTarget(
-            divRoot,
-            null,
-            item.key,
-            item.expected,
-            'screen:viewport_group:div',
-            {
-              allowCreate: true,
-              invalidThis: 'throw',
-              configurable: protoDesc ? !!protoDesc.configurable : true,
-              enumerable: protoDesc ? !!protoDesc.enumerable : false
-            }
-          );
-          if (!targetPlan.ok) localReasons.push('CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost.' + item.key + ':' + targetPlan.reason);
           else localTargets.push(targetPlan.target);
         }
       }
@@ -1888,11 +1784,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         html: {
           width: runtimeSnapshot ? runtimeSnapshot.htmlClientWidth : (document.documentElement ? document.documentElement.clientWidth : null),
           height: runtimeSnapshot ? runtimeSnapshot.htmlClientHeight : (document.documentElement ? document.documentElement.clientHeight : null)
-        },
-        div: {
-          ownerPath: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
-          width: runtimeSnapshot ? runtimeSnapshot.divClientWidth : (__screenHasCanvasHost() ? __screenCanvasState.domCanvasHost.clientWidth : null),
-          height: runtimeSnapshot ? runtimeSnapshot.divClientHeight : (__screenHasCanvasHost() ? __screenCanvasState.domCanvasHost.clientHeight : null)
         },
         window: {
           width: runtimeSnapshot ? runtimeSnapshot.innerWidth : window.innerWidth,

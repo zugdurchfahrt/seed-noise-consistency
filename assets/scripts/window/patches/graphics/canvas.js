@@ -218,8 +218,6 @@ const __loggerRoot = __canvasEnvBus.loggerRoot;
 const __canvasStateRoot = __canvasEnvBus.stateRoot;
 const __canvasEnvProfileState = __canvasEnvBus.envProfileState;
 const __canvasEnvScreenState = __canvasEnvBus.envScreenState;
-const __canvasScreenWidth = __canvasEnvBus.screenWidth;
-const __canvasScreenHeight = __canvasEnvBus.screenHeight;
 const __canvasDpr = __canvasEnvBus.dpr;
 const __stateRoot = __canvasEnvBus.stateRoot;
 const __canvasModuleSlot = __canvasEnvBus.canvasModuleSlot;
@@ -273,42 +271,11 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     // SSOT: CanvasPatchContext
     const existingCanvas = (__canvasState && __canvasState.domCanvas);
     const existingHost = (__canvasState && __canvasState.domCanvasHost);
-    if (existingCanvas && existingHost && existingHost.contains(existingCanvas) && existingHost.parentNode) {
+    if (existingCanvas && existingHost && existingHost.contains(existingCanvas)) {
       __canvasState.domReady = true;
       return;
     }
 
-    const screenWidth = __canvasScreenWidth;
-    const screenHeight = __canvasScreenHeight;
-    const viewportWidth = (
-      Number.isFinite(G.innerWidth) && G.innerWidth > 0
-    ) ? Math.round(G.innerWidth) : (
-      Number.isFinite(screenWidth) && screenWidth > 0 ? Math.round(screenWidth) : NaN
-    );
-    const viewportHeight = (
-      Number.isFinite(G.innerHeight) && G.innerHeight > 0
-    ) ? Math.round(G.innerHeight) : (
-      Number.isFinite(screenHeight) && screenHeight > 0 ? Math.round(screenHeight) : NaN
-    );
-    if (!Number.isFinite(viewportWidth) || !Number.isFinite(viewportHeight) || viewportWidth <= 0 || viewportHeight <= 0) {
-      emitCanvasDiag('warn', 'canvas:preflight:viewport_dims_missing', null, {
-        stage: 'preflight',
-        key: 'innerWidth/innerHeight/__WIDTH/__HEIGHT',
-        type: 'pipeline missing data',
-        message: 'viewport dimensions unavailable for DOM canvas host init',
-        data: {
-          outcome: 'skip',
-          reason: 'viewport_dims_missing',
-          innerWidth: Number.isFinite(G.innerWidth) ? G.innerWidth : null,
-          innerHeight: Number.isFinite(G.innerHeight) ? G.innerHeight : null,
-          __WIDTH: screenWidth,
-          __HEIGHT: screenHeight,
-          viewportWidth: viewportWidth,
-          viewportHeight: viewportHeight
-        }
-      });
-      return;
-    }
     const domFactory = __canvasCreateDomHostElements();
     const div = domFactory.host;
     const canvas = domFactory.canvas;
@@ -347,6 +314,8 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       });
       return;
     }
+    const canvasHostWidth = baseCanvasWidth;
+    const canvasHostHeight = baseCanvasHeight;
     const __prng = __resolvePrngState();
     if (typeof __prng.seed !== 'string' || !__prng.seed) {
       emitCanvasDiag('warn', 'canvas:preflight:core_prng_seed_missing', null, {
@@ -379,21 +348,20 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     const u2 = rng();
     div.id = 'canvas_01' + u1.toString(36).slice(2, 10);
     const OFFSCREEN_LEFT_PX =
-      -(viewportWidth + Math.floor(1000 + u2 * 4002));
+      -(canvasHostWidth + Math.floor(1000 + u2 * 4002));
 
     div.style.position = 'fixed';
     div.style.left = `${OFFSCREEN_LEFT_PX}px`;
     div.style.top = '0';
-    div.style.width = `${viewportWidth}px`;
-    div.style.height = `${viewportHeight}px`;
+    div.style.width = canvasHostWidth + 'px';
+    div.style.height = canvasHostHeight + 'px';
     div.style.opacity = '0';
     div.style.pointerEvents = 'none';
-    (doc.body || doc.documentElement).appendChild(div);
 
     canvas.width = baseCanvasWidth;
     canvas.height = baseCanvasHeight;
-    canvas.style.width = viewportWidth + 'px';
-    canvas.style.height = viewportHeight + 'px';
+    canvas.style.width = canvasHostWidth + 'px';
+    canvas.style.height = canvasHostHeight + 'px';
     canvas.style.display = 'block';
     canvas.style.background = 'transparent';
     div.appendChild(canvas);
@@ -431,30 +399,35 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     __canvasState.domReady = true;
   }
 
-  // создаём OffscreenCanvas (и в окне, и в воркере)
+  // создаём OffscreenCanvas для issued/internal hooks без привязки к screen/viewport.
   function _ensureOffscreenOnce() {
     if (__canvasState.offscreenReady) return;
     if (typeof G.OffscreenCanvas === 'undefined') return;
 
-    const screenWidth = __canvasScreenWidth;
-    const screenHeight = __canvasScreenHeight;
-    if (!Number.isFinite(screenWidth) || !Number.isFinite(screenHeight)) {
-      emitCanvasDiag('warn', 'canvas:preflight:screen_dims_missing', null, {
+    const defaultCanvas = __canvasCreateCanvas();
+    const offscreenWidth = defaultCanvas ? Number(defaultCanvas.width) : NaN;
+    const offscreenHeight = defaultCanvas ? Number(defaultCanvas.height) : NaN;
+    if (
+      !Number.isFinite(offscreenWidth) || offscreenWidth <= 0 ||
+      !Number.isFinite(offscreenHeight) || offscreenHeight <= 0
+    ) {
+      emitCanvasDiag('warn', 'canvas:preflight:offscreen_default_bitmap_size_missing', null, {
         stage: 'preflight',
-        key: '__WIDTH/__HEIGHT',
-        type: 'pipeline missing data',
-        message: 'screen dimensions unavailable for OffscreenCanvas init',
+        key: 'HTMLCanvasElement.width/height',
+        type: 'browser structure missing data',
+        message: 'native canvas default bitmap size unavailable for OffscreenCanvas init',
         data: {
           outcome: 'skip',
-          reason: 'screen_dims_missing',
-          __WIDTH: screenWidth,
-          __HEIGHT: screenHeight
+          reason: 'offscreen_default_bitmap_size_missing',
+          width: offscreenWidth,
+          height: offscreenHeight,
+          hasCreateElement: __canvasCanCreateElements()
         }
       });
       return;
     }
     if (!(__canvasState && __canvasState.offscreenCanvas)) {
-      const osc = new G.OffscreenCanvas(screenWidth, screenHeight);
+      const osc = new G.OffscreenCanvas(offscreenWidth, offscreenHeight);
       __defineHidden__(__canvasState, 'offscreenCanvas', osc,
         'canvas:apply:offscreen_storage_define_failed',
         'CanvasPatchContext.state.__CANVAS__.__STATE__.offscreenCanvas',
@@ -557,15 +530,33 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     return min + frac * (max - min);
   }
 
+
   function q256(v){ return Math.round(v * 256) / 256; }
+
+
 
   const __CNV_CFG__ = {
     dxPx: 0.10,      // амплитуда X (px)
     dyPx: 0.10,      // амплитуда Y (px)
   };
 
-  // TEXT / FONTS: TextMetrics proxy/cache plus draw-argument jitter.
-  // Keep width noise local to `applyMeasureTextHook`; do not mutate shared metric state.
+  // =====================================================================
+  // TEXT / FONTS (Layer 1: vector/layout stage, pre-raster)
+  //
+  // What lives here (single semantic block):
+  // - TextMetrics: `measureTextNoiseHook` + `applyMeasureTextHook` (Proxy + cache)
+  // - Text draw noise: `fillTextNoiseHook` / `strokeTextNoiseHook` (arg-level jitter)
+  // - Font-scaling masters: `patchFontSizeScalingHooks()` → `applyFillTextHook` / `applyStrokeTextHook`
+  //
+  // Runtime order (facts from `sunami/assets/scripts/window/core/context.js`):
+  // - fillText:  `applyFillTextHook` (if exists) → `fillTextNoiseHook` → native
+  // - strokeText:`applyStrokeTextHook` (if exists) → `strokeTextNoiseHook` → native
+  //
+  // Important invariants:
+  // - `widthNoise` must remain local to `applyMeasureTextHook` (do not mutate global state here).
+  // - TextMetrics cache can "freeze" first-seen values per key; if first `measureText()` happens before fonts load,
+  //   downstream hashes may stop changing. Root-cause is *not proven here* — needs runtime confirmation.
+  // =====================================================================
   function measureTextNoiseHook(res, text, font) {
     if (!res) return null;
     const txt  = String(text ?? '');
@@ -602,7 +593,14 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
   //  Proxy TextMetrics
   function applyMeasureTextHook(nativeMetrics, text, font) {
     try {
-      // Cache keys include the current font epoch; only native-present TextMetrics fields are exposed.
+      // Cache-freeze root cause (by design): TextMetrics cache has no invalidation.
+      // If the first measureText() for a key happens before fonts are actually ready,
+      // the cached values can "cement" early/fallback metrics forever for that key.
+      //
+      // Mitigation (minimal, MDN/Chromium-consistent):
+      // - Do not create/use TextMetrics cache until fonts are ready in CanvasPatchContext.state.__FONTS__.__STATE__.
+      // - Couple cache epoch to familySnapshot.versionToken so runtime font-family transitions invalidate old keys.
+      // - Keep API-shape compatibility: do not synthesize values for properties absent on native TextMetrics.
 
       const fontStr = (typeof font === 'string' && font.trim())
         ? font
@@ -694,152 +692,54 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     return [ q256(x), q256(y), q256(w), q256(h) ];
   }
 
-  // PNG export layer: add one private ancillary chunk before IEND.
-  // No getImageData, no re-render, no pixel changes, no dimension/IHDR changes.
-  let __canvasCrcTable = null;
 
-  function readU32BE(a, off) {
-    return ((a[off] << 24) | (a[off + 1] << 16) | (a[off + 2] << 8) | a[off + 3]) >>> 0;
-  }
-  function writeU32BE(a, off, v) {
-    a[off] = (v >>> 24) & 255;
-    a[off + 1] = (v >>> 16) & 255;
-    a[off + 2] = (v >>> 8) & 255;
-    a[off + 3] = v & 255;
-  }
-  function getCanvasCrcTable() {
-    if (__canvasCrcTable) return __canvasCrcTable;
-    const t = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      t[n] = c >>> 0;
-    }
-    __canvasCrcTable = t;
-    return t;
-  }
-  function crc32Chunk(typeStr, dataU8) {
-    const tab = getCanvasCrcTable();
-    let crc = ~0 >>> 0;
-    for (let i = 0; i < 4; i++) crc = (tab[(crc ^ (typeStr.charCodeAt(i) & 255)) & 255] ^ (crc >>> 8)) >>> 0;
-    for (let i = 0; i < dataU8.length; i++) crc = (tab[(crc ^ dataU8[i]) & 255] ^ (crc >>> 8)) >>> 0;
-    return (~crc) >>> 0;
-  }
-  function patchPngAncillaryBytes(u8, seed) {
-    const sig = [137, 80, 78, 71, 13, 10, 26, 10];
-    if (!(u8 && u8.length >= 8 + 12)) return null;
-    for (let i = 0; i < 8; i++) if (u8[i] !== sig[i]) return null;
-    if (String.fromCharCode(u8[12], u8[13], u8[14], u8[15]) !== 'vpAg') return null;
-
-    let off = 8;
-    let iendOff = -1;
-    while (off + 12 <= u8.length) {
-      const clen = readU32BE(u8, off);
-      const typeOff = off + 4;
-      const dataOff = off + 8;
-      const crcOff = dataOff + clen;
-      const next = crcOff + 4;
-      if (next > u8.length) break;
-      const chunk = String.fromCharCode(u8[typeOff], u8[typeOff + 1], u8[typeOff + 2], u8[typeOff + 3]);
-      if (chunk === 'IEND') {
-        iendOff = off;
-        break;
-      }
-      off = next;
-    }
-    if (iendOff < 0) return null;
-
-    let sample = '';
-    const sampleLen = Math.min(4096, u8.length);
-    for (let i = 0; i < sampleLen; i++) sample += String.fromCharCode(u8[i]);
-
-    const seedHash = stringHash(seed + '|png-ancillary');
-    const bytesHash = stringHash(sample + '|' + u8.length);
-    const payload = new Uint8Array(8);
-    writeU32BE(payload, 0, seedHash >>> 0);
-    writeU32BE(payload, 4, bytesHash >>> 0);
-
-    const chunkType = 'vpAg';
-    const addLen = 4 + 4 + payload.length + 4;
-    const out = new Uint8Array(u8.length + addLen);
-    out.set(u8.subarray(0, iendOff), 0);
-    let w = iendOff;
-    writeU32BE(out, w, payload.length >>> 0); w += 4;
-    out[w++] = chunkType.charCodeAt(0) & 255;
-    out[w++] = chunkType.charCodeAt(1) & 255;
-    out[w++] = chunkType.charCodeAt(2) & 255;
-    out[w++] = chunkType.charCodeAt(3) & 255;
-    out.set(payload, w); w += payload.length;
-    writeU32BE(out, w, crc32Chunk(chunkType, payload)); w += 4;
-    out.set(u8.subarray(iendOff), w);
-
-    return out;
-  }
-
-  async function patchPngBlobAncillaryChunk(blob, key, reqType) {
-    if (!blob || !(blob instanceof Blob)) return blob;
-
-    const mime = String(reqType || blob.type || 'image/png').toLowerCase();
-    if (!/^image\/png$/i.test(mime)) return blob;
-
-    const __prng = __resolvePrngState();
-    if (typeof __prng.seed !== 'string' || !__prng.seed) {
-      emitCanvasDiag('warn', 'canvas:' + key + ':png_chunk_seed_missing', null, {
-        stage: 'hook',
-        key,
-        data: { outcome: 'return_native', reason: 'core_prng_seed_missing' }
-      });
-      return blob;
-    }
-
-    const buf = await blob.arrayBuffer();
-    const patched = patchPngAncillaryBytes(new Uint8Array(buf), __prng.seed);
-    if (!patched) return blob;
-    return new Blob([patched], { type: blob.type || 'image/png' });
-  }
-
-  // Blob export path uses the shared PNG ancillary byte-builder.
+  // Keep native-shaped blob output here; draw/text noise remains in canvas pipeline.
   async function patchToBlobInjectNoise(blob, ...args) {
     try {
-      if (!blob || !(blob instanceof Blob)) return blob;
+      if (!blob || !(blob instanceof Blob)) return;
 
-      const typeArg = (typeof args[1] === 'string') ? args[1] : undefined;
+      const typeArg = (typeof args[0] === 'string')
+        ? args[0]
+        : (args[0] && typeof args[0] === 'object' ? args[0].type : undefined);
 
       const mime = (typeArg || blob.type || 'image/png').toLowerCase();
-      if (!/^image\/png$/i.test(mime)) return blob;
+      if (!/^image\/png$/i.test(mime)) return;
 
-      return await patchPngBlobAncillaryChunk(blob, 'toBlob', mime);
+      return blob;
     } catch (e) {
       emitCanvasDiag('warn', 'canvas:toBlob:hook_failed', e, {
         stage: 'hook',
         key: 'toBlob'
       });
-      return blob;
+      return;
     }
   }
 
-  // Offscreen convertToBlob path uses the same PNG byte-builder as toBlob/toDataURL.
+  // Promise-ветка convertToBlob: post-process PNG bytes без decode/getImageData + IHDR fallback.
+  // 2026-02-11: heavy PNG blob post-process disabled in convertToBlob path (CPU guard).
   async function patchConvertToBlobInjectNoise(blob, options) {
     try {
-      if (!blob || !(blob instanceof Blob)) return blob;
+      if (!blob || !(blob instanceof Blob)) return;
 
       const reqType = (options && options.type) || blob.type || 'image/png';
       const mime = String(reqType).toLowerCase();
-      if (!/^image\/png$/i.test(mime)) return blob;
+      if (!/^image\/png$/i.test(mime)) return;
    
-      return await patchPngBlobAncillaryChunk(blob, 'convertToBlob', mime);
+      return blob;
 
     } catch (e) {
       emitCanvasDiag('warn', 'canvas:convertToBlob:hook_failed', e, {
         stage: 'hook',
         key: 'convertToBlob'
       });
-      return blob;
+      return;
     }
 
   }
 
-  // toDataURL path uses the same PNG ancillary byte-builder as Blob exports.
+
+  // Deterministic pixel-noise remains in 2D draw/text hooks.
+  // Keep toDataURL hook single-pass: no getImageData, no re-render, no pixel/dimension changes.
   function patchToDataURLInjectNoise(res, type, quality) {
     if (typeof res !== 'string') return res;
     if (type && String(type).toLowerCase() !== 'image/png') return res;
@@ -864,8 +764,76 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       const u8 = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
 
-      const out = patchPngAncillaryBytes(u8, __prng.seed);
-      if (!out) return res;
+      const sig = [137, 80, 78, 71, 13, 10, 26, 10];
+      if (u8.length < 8 + 12) return res;
+      for (let i = 0; i < 8; i++) if (u8[i] !== sig[i]) return res;
+      if (String.fromCharCode(u8[12], u8[13], u8[14], u8[15]) !== 'IHDR') return res;
+
+      function readU32BE(a, off) {
+        return ((a[off] << 24) | (a[off + 1] << 16) | (a[off + 2] << 8) | a[off + 3]) >>> 0;
+      }
+      function writeU32BE(a, off, v) {
+        a[off] = (v >>> 24) & 255;
+        a[off + 1] = (v >>> 16) & 255;
+        a[off + 2] = (v >>> 8) & 255;
+        a[off + 3] = v & 255;
+      }
+      function getCrcTable() {
+        if (G._crcTable) return G._crcTable;
+        const t = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+          let c = n;
+          for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+          t[n] = c >>> 0;
+        }
+        G._crcTable = t;
+        return t;
+      }
+      function crc32Chunk(typeStr, dataU8) {
+        const tab = getCrcTable();
+        let crc = ~0 >>> 0;
+        for (let i = 0; i < 4; i++) crc = (tab[(crc ^ (typeStr.charCodeAt(i) & 255)) & 255] ^ (crc >>> 8)) >>> 0;
+        for (let i = 0; i < dataU8.length; i++) crc = (tab[(crc ^ dataU8[i]) & 255] ^ (crc >>> 8)) >>> 0;
+        return (~crc) >>> 0;
+      }
+
+      let off = 8;
+      let iendOff = -1;
+      while (off + 12 <= u8.length) {
+        const clen = readU32BE(u8, off);
+        const typeOff = off + 4;
+        const dataOff = off + 8;
+        const crcOff = dataOff + clen;
+        const next = crcOff + 4;
+        if (next > u8.length) break;
+        const chunk = String.fromCharCode(u8[typeOff], u8[typeOff + 1], u8[typeOff + 2], u8[typeOff + 3]);
+        if (chunk === 'IEND') {
+          iendOff = off;
+          break;
+        }
+        off = next;
+      }
+      if (iendOff < 0) return res;
+
+      const seedHash = stringHash(__prng.seed + '|toDataURL|png-ancillary');
+      const bytesHash = stringHash(base64.slice(0, 4096) + '|' + u8.length);
+      const payload = new Uint8Array(8);
+      writeU32BE(payload, 0, seedHash >>> 0);
+      writeU32BE(payload, 4, bytesHash >>> 0);
+
+      const chunkType = 'iHDr';
+      const addLen = 4 + 4 + payload.length + 4;
+      const out = new Uint8Array(u8.length + addLen);
+      out.set(u8.subarray(0, iendOff), 0);
+      let w = iendOff;
+      writeU32BE(out, w, payload.length >>> 0); w += 4;
+      out[w++] = chunkType.charCodeAt(0) & 255;
+      out[w++] = chunkType.charCodeAt(1) & 255;
+      out[w++] = chunkType.charCodeAt(2) & 255;
+      out[w++] = chunkType.charCodeAt(3) & 255;
+      out.set(payload, w); w += payload.length;
+      writeU32BE(out, w, crc32Chunk(chunkType, payload)); w += 4;
+      out.set(u8.subarray(iendOff), w);
 
       let s = '';
       const CH = 0x8000;
@@ -883,6 +851,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     }
   }
     
+
   // === HOOK FUNCTIONS ===
   function applyDrawImageHook(origDrawImage, ...args) {
     const a = args.slice();
@@ -893,13 +862,15 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
   }
 
 
-  // master toDataURL hook: one post-process pass through PNG ancillary layer.
+  // master-хук toDataURL: один post-process (без дополнительного IHDR-прохода)
   function masterToDataURLHook(res, type, quality) {
+    // 2026-02-11: single post-pass only.
     if (typeof patchToDataURLInjectNoise === 'function') {
       res = patchToDataURLInjectNoise.call(this, res, type, quality);
     }
     return res;
   }
+
 
 // --- final export ---
 // IMPORTANT: do not replace the CanvasPatchHooks object identity.
@@ -943,7 +914,7 @@ try {
 
 // __CanvasPatchHooks__.patch2DNoise = patch2DNoise;
 __CanvasPatchHooks__.patchToDataURLInjectNoise = patchToDataURLInjectNoise;
-// Disabled/non-required export kept as an operational switch.
+// 2026-02-11: disabled export with runtime-disabled hook.
 // __CanvasPatchHooks__.patchCanvasIHDRHook = patchCanvasIHDRHook;
 __CanvasPatchHooks__.masterToDataURLHook = masterToDataURLHook;
 __CanvasPatchHooks__.patchToBlobInjectNoise = patchToBlobInjectNoise;
