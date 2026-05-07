@@ -10,66 +10,47 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
 
   const __fontTypePipeline = 'pipeline missing data';
   const __fontTypeBrowser = 'browser structure missing data';
-  function __fontDiag(level, code, extra, err) {
+  const __MODULE = 'fonts';
+  const __SURFACE = 'fonts';
+  const __loggerRoot = (__fontRealmRoot && __fontRealmRoot.CanvasPatchContext && __fontRealmRoot.CanvasPatchContext.__logger && typeof __fontRealmRoot.CanvasPatchContext.__logger === 'object')
+    ? __fontRealmRoot.CanvasPatchContext.__logger
+    : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
+  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+  function __emit(level, code, ctx, err) {
     try {
-      const __loggerRoot = (__fontRealmRoot && __fontRealmRoot.CanvasPatchContext && __fontRealmRoot.CanvasPatchContext.__logger && typeof __fontRealmRoot.CanvasPatchContext.__logger === 'object')
-        ? __fontRealmRoot.CanvasPatchContext.__logger
-        : null;
-      const D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-      const emitCode = String(code || 'fonts');
-      const ctx = (extra && typeof extra === 'object') ? extra : null;
-      if (D && typeof D.diag === 'function') {
-        D.diag(level, emitCode, ctx, err || null);
-        return;
+      if (__diag) return __diag(level, code, ctx, err);
+      if (typeof __D === 'function') {
+        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
+        const safeLevel = (level === undefined || level === null) ? 'info' : level;
+        const safeErr = (err === undefined || err === null) ? null : err;
+        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
       }
-      if (typeof D === 'function') {
-        if (ctx && typeof ctx === 'object') {
-          D(emitCode, err || null, Object.assign({ level: level }, ctx));
-          return;
-        }
-        D(emitCode, err || null, { level: level });
-      }
-    } catch (_) {
-      return;
+    } catch (emitErr) {
+      return undefined;
     }
   }
-  function __fontDiagPipeline(level, code, extra, err) {
+
+  function __fontDiag(level, code, extra, err) {
     const x = (extra && typeof extra === 'object') ? extra : {};
-    __fontDiag(level, code, {
-      module: (typeof x.module === 'string' && x.module) ? x.module : 'fonts',
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'fonts',
-      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'fonts',
+    const ctx = {
+      module: __MODULE,
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+      surface: __SURFACE,
       key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
-      message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'fonts'),
+      stage: x.stage,
+      message: x.message,
       data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: (typeof x.type === 'string' && x.type) ? x.type : __fontTypePipeline
-    }, err);
+      type: x.type
+    };
+    return __emit(level, code, ctx, err);
+  }
+  function __fontDiagPipeline(level, code, extra, err) {
+    return __fontDiag(level, code, extra, err);
   }
   function __fontDiagBrowser(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    __fontDiag(level, code, {
-      module: (typeof x.module === 'string' && x.module) ? x.module : 'fonts',
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'fonts',
-      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : 'fonts',
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
-      message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'fonts'),
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: (typeof x.type === 'string' && x.type) ? x.type : __fontTypeBrowser
-    }, err);
+    return __fontDiag(level, code, extra, err);
   }
-  function degrade(code, err, extra) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    __fontDiagPipeline('warn', code, {
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'fonts',
-      stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'fonts'),
-      data: x
-    }, err || null);
-  }
-
   function __makeFontFamilySnapshot() {
     return {
       allowedFamilies: null,
@@ -474,7 +455,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         stage: 'guard',
         diagTag: __tag,
         surface: __surface,
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'Core.guardFlag missing',
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
       }, null);
@@ -486,7 +467,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       stage: 'guard',
       diagTag: __tag,
       surface: __surface,
-      key: __flagKey,
+      key: 'entry_guard',
       message: 'guardFlag threw',
       data: { outcome: 'skip', reason: 'guard_failed' }
     }, e);
@@ -504,7 +485,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         stage: stage || 'preflight',
         diagTag: __tag,
         surface: __surface,
-        key: __flagKey,
+        key: 'entry_guard',
         message: message,
         data: { outcome: 'skip', reason: reason || 'guard_release_failed' }
       }, eRelease);
@@ -1341,7 +1322,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         __setFontsAwaitState(__fontFontFaceSet.ready, 'native', null, null);
       }
     } catch (eRestore) {
-      degrade('fonts:await_ready_restore_failed', eRestore);
+      __fontDiagPipeline('warn', 'fonts:await_ready_restore_failed', {
+        stage: 'runtime',
+        key: 'document.fonts.ready',
+        message: 'awaitReady restore failed',
+        type: __fontTypePipeline,
+        data: { outcome: 'skip', reason: 'await_ready_restore_failed' }
+      }, eRestore);
     }
     __releaseGuardOnSkip('preflight', 'guard release failed after nav_platform skip', 'guard_release_failed');
     return;
@@ -1522,7 +1509,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
               __fontsState.error = String((err && (err.stack || err.message)) || err);
               __refreshFontsEpochState();
             } catch (eSet) {
-              degrade('fonts:data:set_error_failed', eSet);
+              __fontDiagPipeline('warn', 'fonts:data:set_error_failed', {
+                stage: 'runtime',
+                key: 'CanvasPatchContext.state.__FONTS__.error',
+                message: 'font error state write failed',
+                type: __fontTypePipeline,
+                data: { outcome: 'skip', reason: 'set_error_failed' }
+              }, eSet);
             }
 
             __settleAwaitFontsReady('rejected', err);
@@ -1541,7 +1534,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           try {
             if (__fontEventTarget) __fontEventTarget.dispatchEvent(new Event('fontsready'));
           } catch (eEvt) {
-            degrade('fonts:event:dispatch_failed', eEvt);
+            __fontDiagPipeline('warn', 'fonts:event:dispatch_failed', {
+              stage: 'runtime',
+              key: 'dispatchEvent',
+              message: 'fontsready dispatch failed',
+              type: __fontTypePipeline,
+              data: { outcome: 'skip', reason: 'dispatch_failed' }
+            }, eEvt);
           }
            __fontDiagPipeline('info', 'fonts:load_settled', {
              stage: 'runtime',
@@ -1558,12 +1557,24 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         __fontsState.error = String((e && (e.stack || e.message)) || e);
         __refreshFontsEpochState();
       } catch (eSet) {
-        degrade('fonts:data:set_error_failed', eSet);
+        __fontDiagPipeline('warn', 'fonts:data:set_error_failed', {
+          stage: 'runtime',
+          key: 'CanvasPatchContext.state.__FONTS__.error',
+          message: 'font error state write failed',
+          type: __fontTypePipeline,
+          data: { outcome: 'skip', reason: 'set_error_failed' }
+        }, eSet);
       }
       try {
         __settleAwaitFontsReady('rejected', e);
       } catch (eRej) {
-        degrade('fonts:await_ready_reject_failed', eRej);
+        __fontDiagPipeline('warn', 'fonts:await_ready_reject_failed', {
+          stage: 'runtime',
+          key: 'document.fonts.ready',
+          message: 'awaitReady reject failed',
+          type: __fontTypePipeline,
+          data: { outcome: 'skip', reason: 'await_ready_reject_failed' }
+        }, eRej);
       }
       __fontDiagBrowser('error', 'fonts:load_unexpected_rejection', {
         stage: 'runtime',
@@ -1644,7 +1655,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         stage: 'rollback',
         diagTag: __tag,
         surface: __surface,
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'releaseGuardFlag threw after apply failure',
         data: { outcome: rollbackOk ? 'rollback' : 'skip', reason: 'guard_release_failed' }
       }, eRelease);

@@ -30,7 +30,7 @@ const AudioContextModule = function AudioContextModule(window) {
       module: __MODULE,
       diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
       surface: __SURFACE,
-      key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE),
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
       stage: x.stage, // no local normalization/re-classification
       message: x.message,
       data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
@@ -190,11 +190,9 @@ const AudioContextModule = function AudioContextModule(window) {
   let __guardToken = null;
   try {
     if (!__core || typeof __core.guardFlag !== 'function') {
-      __D?.diag?.('warn', __tag + ':guard_missing', {
-        module: __tag,
+      __moduleDiag('warn', __tag + ':guard_missing', {
         diagTag: __tag,
-        surface: __surface,
-        key: __flagKey,
+        key: 'entry_guard',
         stage: 'guard',
         message: 'Core.guardFlag missing',
         type: __audioTypePipeline,
@@ -204,11 +202,9 @@ const AudioContextModule = function AudioContextModule(window) {
     }
     __guardToken = __core.guardFlag(__flagKey, __tag);
   } catch (e) {
-    __D?.diag?.('warn', __tag + ':guard_failed', {
-      module: __tag,
+    __moduleDiag('warn', __tag + ':guard_failed', {
       diagTag: __tag,
-      surface: __surface,
-      key: __flagKey,
+      key: 'entry_guard',
       stage: 'guard',
       message: 'guardFlag threw',
       type: __audioTypePipeline,
@@ -887,18 +883,16 @@ const AudioContextModule = function AudioContextModule(window) {
 
     emitDegrade('info', __tag + ':ready', null, {
       stage: 'apply',
-      key: __flagKey,
+      key: __tag,
       message: 'ok',
       type: 'ok',
       data: { outcome: 'return', ctxClasses: CTX_CLASSES.length, targets: __totalTargets, applied: __totalApplied }
     });
   } catch (e) {
     const rollbackErr = e;
-    __D?.diag?.('error', __tag + ':fatal', {
-      module: __tag,
+    __moduleDiag('error', __tag + ':fatal', {
       diagTag: __tag,
-      surface: __surface,
-      key: __flagKey,
+      key: __tag,
       stage: 'apply',
       message: 'fatal module error',
       type: __audioTypeBrowser,
@@ -909,11 +903,9 @@ const AudioContextModule = function AudioContextModule(window) {
         __core.releaseGuardFlag(__flagKey, __guardToken, false, __tag);
       }
     } catch (eRelease) {
-      __D?.diag?.('warn', __tag + ':guard_release_failed', {
-        module: __tag,
+      __moduleDiag('warn', __tag + ':guard_release_failed', {
         diagTag: __tag,
-        surface: __surface,
-        key: __flagKey,
+        key: 'entry_guard',
         stage: 'rollback',
         message: 'releaseGuardFlag threw after apply failure',
         type: __audioTypePipeline,

@@ -32,12 +32,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
         module: 'webgl',
         diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'webgl',
         surface: 'webgl',
-        key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey),
+        key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
         stage: x.stage,
         message: x.message,
         data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
         type: x.type
-      }, err || null);
+      }, err);
     }
     function __webglDiagPipeline(level, code, extra, err) {
       const x0 = (extra && typeof extra === 'object') ? extra : {};
@@ -61,7 +61,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
       if (!__core || typeof __core.guardFlag !== 'function') {
         __webglDiagPipeline('fatal', 'webgl:guard_missing', {
           stage: 'guard',
-          key: __flagKey,
+          key: 'entry_guard',
           message: 'Core.guardFlag missing',
           data: { outcome: 'throw' }
         }, null);
@@ -71,7 +71,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
     } catch (e) {
       __webglDiagPipeline('fatal', 'webgl:guard_failed', {
         stage: 'guard',
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'guardFlag failed',
         data: { outcome: 'throw' }
       }, e);
@@ -87,7 +87,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
       } catch (e) {
         __webglDiagPipeline('warn', 'webgl:guard_release_failed', {
           stage: 'rollback',
-          key: __flagKey,
+          key: 'entry_guard',
           message: 'releaseGuardFlag failed',
           data: { outcome: 'skip', reason: 'guard_release_failed' }
         }, e);
@@ -99,7 +99,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (!C) {
       __webglDiagPipeline('fatal', 'webgl:canvas_patch_context_missing', {
         stage: 'preflight',
-        key: null,
+        key: 'CanvasPatchContext',
         message: 'CanvasPatchContext missing',
         data: { outcome: 'throw' }
       });
@@ -333,7 +333,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (!__webglInstancePatched__ || !__webglDebugInfoPatched__ || !__webglShaderSourcePatchedProtos__ || !__webglDebugInfoCache__) {
       __webglDiagBrowser('fatal', 'webgl:weak_structures_missing', {
         stage: 'preflight',
-        key: null,
+        key: 'weak_structures',
         message: 'WeakMap/WeakSet are required',
         data: { outcome: 'throw' }
       });
@@ -774,7 +774,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
     __webglDiag('info', 'webgl:patches_applied', {
       stage: 'apply',
       type: __webglTypePipeline,
-      key: null,
+      key: 'webgl',
       message: 'webgl patches applied',
       data: { outcome: 'return' }
     });

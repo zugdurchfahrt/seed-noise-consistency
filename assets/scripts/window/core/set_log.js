@@ -635,9 +635,9 @@ const LOGGingModule = function LOGGingModule() {
           surface: (extra && typeof extra.surface === "string" && extra.surface)
             ? extra.surface
             : (slot && typeof slot.diagTag === "string" && slot.diagTag ? slot.diagTag : "logger"),
-          key: (extra && (typeof extra.key === "string" || extra.key === null))
+          key: (extra && typeof extra.key === "string" && extra.key)
             ? extra.key
-            : (expected && (typeof expected.key === "string" || expected.key === null))
+            : (expected && typeof expected.key === "string" && expected.key)
               ? expected.key
               : ((slot && typeof slot.module === "string" && slot.module) ? slot.module : null),
           stage: "audit",
@@ -684,9 +684,9 @@ const LOGGingModule = function LOGGingModule() {
           surface: (extra && typeof extra.surface === "string" && extra.surface)
             ? extra.surface
             : (slot && typeof slot.diagTag === "string" && slot.diagTag ? slot.diagTag : "logger"),
-          key: (extra && (typeof extra.key === "string" || extra.key === null))
+          key: (extra && typeof extra.key === "string" && extra.key)
             ? extra.key
-              : (expected && (typeof expected.key === "string" || expected.key === null))
+              : (expected && typeof expected.key === "string" && expected.key)
                 ? expected.key
                 : ((slot && typeof slot.module === "string" && slot.module) ? slot.module : null),
           stage: "audit",

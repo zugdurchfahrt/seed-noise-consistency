@@ -12,10 +12,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __emit = (level, code, ctx, err) => {
     try {
-      if (__diag) return __diag(level, code, ctx || null, err || null);
+      if (__diag) return __diag(level, code, ctx, err);
       if (typeof __D === 'function') {
         const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-        return __D(String(code), err || null, Object.assign({}, safeCtx, { level: level || 'info' }));
+        const safeLevel = (level === undefined || level === null) ? 'info' : level;
+        const safeErr = (err === undefined || err === null) ? null : err;
+        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
       }
     } catch (emitErr) {
       return undefined;
@@ -28,13 +30,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       module: __screenModule,
       diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __screenModule,
       surface: __screenSurface,
-      key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __screenModule),
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
       stage: x.stage,
       message: x.message,
-      data: x.data,
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
       type: x.type
     };
-    __emit(level, code, ctx, err || null);
+    return __emit(level, code, ctx, err);
   }
   let __guardToken = null;
   if (!__core || typeof __core.guardFlag !== 'function') {
@@ -42,7 +44,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: __flagKey,
+      key: 'entry_guard',
       message: 'Core.guardFlag missing',
       data: {
         outcome: 'skip',
@@ -58,7 +60,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: __flagKey,
+      key: 'entry_guard',
       message: 'guardFlag threw',
       data: {
         outcome: 'skip',
@@ -94,7 +96,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'guard release failed after preflight skip',
         data: {
           outcome: 'skip',
@@ -129,7 +131,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'guard release failed after state registration skip',
         data: {
           outcome: 'skip',
@@ -168,7 +170,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'guard release failed after env screen state missing skip',
         data: {
           outcome: 'skip',
@@ -207,7 +209,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'guard release failed after screen state missing skip',
         data: {
           outcome: 'skip',
@@ -348,7 +350,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           stage: 'apply',
           type: __screenTypeBrowser,
           diagTag: 'screen',
-          key: null,
+          key: 'receiverMatchesTarget',
           message: 'receiverMatchesTarget failed',
           data: { outcome: 'skip', reason: 'exception', substage: 'receiverMatchesTarget' }
         }, e);
@@ -568,7 +570,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           stage: 'preflight',
           type: __screenTypePipeline,
           diagTag: groupTag,
-          key: null,
+          key: groupTag,
           message: 'Core.registerPatchedTarget missing',
           data: {
             outcome: groupPolicy === 'throw' ? 'throw' : 'skip',
@@ -1765,7 +1767,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       stage: 'runtime',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: null,
+      key: 'viewport_group',
       message: 'runtime viewport snapshot',
       data: __screenAugmentData('viewport', {
         outcome: 'return',
@@ -1816,7 +1818,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         ? (__screenGroupModes.coordinationPatched ? 'ok' : __screenTypePipeline)
         : __screenTypeBrowser,
       diagTag: 'screen',
-      key: null,
+      key: 'screen',
       message: __screenCoordinationComplete
         ? (__screenGroupModes.coordinationPatched ? 'screen module coordinated and applied' : 'screen module completed with coherent native state')
         : 'screen module completed with incomplete coordination',
@@ -1898,7 +1900,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           stage: 'rollback',
           type: __screenTypeBrowser,
           diagTag: 'screen',
-          key: null,
+          key: 'screen',
           message: 'module rollback failed',
           data: {
             outcome: 'rollback',
@@ -1913,7 +1915,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       stage: 'apply',
       type: __screenTypeBrowser,
       diagTag: 'screen',
-      key: null,
+      key: 'screen',
       message: 'fatal module error',
       data: {
         outcome: 'throw',
@@ -1931,7 +1933,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'rollback',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'guard release failed in fatal catch',
         data: {
           outcome: 'skip',

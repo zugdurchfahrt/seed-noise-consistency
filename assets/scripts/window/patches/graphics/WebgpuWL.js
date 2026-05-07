@@ -29,19 +29,19 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       module: __module,
       diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __module,
       surface: __surface,
-      key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey),
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
       stage: x.stage,
       message: x.message,
       data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
       type: x.type
-    }, err || null);
+    }, err);
   }
 
   let __guardToken = null;
   if (!__core || typeof __core.guardFlag !== 'function') {
     __moduleDiag('warn', __module + ':guard_missing', {
       stage: 'guard',
-      key: __flagKey,
+      key: 'entry_guard',
       message: 'Core.guardFlag missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
@@ -53,7 +53,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   } catch (e) {
     __moduleDiag('warn', __module + ':guard_failed', {
       stage: 'guard',
-      key: __flagKey,
+      key: 'entry_guard',
       message: 'guardFlag threw',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'guard_failed' }
@@ -70,7 +70,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     } catch (e) {
       __moduleDiag('warn', __module + ':guard_release_exception', {
         stage: 'rollback',
-        key: __flagKey,
+        key: 'entry_guard',
         message: 'releaseGuardFlag failed',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_exception' }
@@ -546,7 +546,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
 
     __moduleDiag('info', __module + ':ready', {
       stage: 'apply',
-      key: __flagKey,
+      key: __module,
       message: 'WL ready & snapshot installed',
       type: 'ok',
       data: { outcome: 'return' }
@@ -563,7 +563,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
 
     __moduleDiag('error', __module + ':fatal', {
       stage: 'apply',
-      key: __flagKey,
+      key: __module,
       message: 'fatal module error',
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'fatal', rollbackOk: !!rollbackOk }

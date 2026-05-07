@@ -6,103 +6,43 @@
     : null;
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
-  const __ALLOWED_STAGES = {
-    preflight: true,
-    apply: true,
-    rollback: true,
-    contract: true,
-    hook: true,
-    runtime: true,
-    guard: true
-  };
 
   const __emit = (level, code, ctx, err) => {
     try {
-      if (__diag) return __diag(String(level || 'info'), String(code || 'geo'), ctx, err || null);
+      if (__diag) return __diag(level, code, ctx, err);
       if (typeof __D === 'function') {
-        return __D(String(code || 'geo'), err || null, Object.assign({}, ctx || {}, { level: String(level || 'info') }));
+        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
+        const safeLevel = (level === undefined || level === null) ? 'info' : level;
+        const safeErr = (err === undefined || err === null) ? null : err;
+        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
       }
-    } catch (_) {
-      return;
+    } catch (emitErr) {
+      return undefined;
     }
   };
-
-  function __codeIncludes(code, token) {
-    return String(code || '').indexOf(token) !== -1;
-  }
-
-  function __resolveStage(code, stage) {
-    if (typeof stage === 'string' && __ALLOWED_STAGES[stage]) return stage;
-    if (__codeIncludes(code, 'rollback')) return 'rollback';
-    if (__codeIncludes(code, 'invalid_plan_item') || __codeIncludes(code, 'descriptor_postcheck_mismatch')) return 'contract';
-    if (__codeIncludes(code, ':apply') || __codeIncludes(code, ':patched')) return 'apply';
-    if (__codeIncludes(code, ':preflight') || __codeIncludes(code, '_missing')) return 'preflight';
-    if (__codeIncludes(code, 'mask_position_failed')) return 'hook';
-    return 'runtime';
-  }
-
-  function __resolveType(code, type) {
-    if (typeof type === 'string' && type) return type;
-    if (code === 'geo:core_missing' || code === 'geo:coords_missing') return 'pipeline missing data';
-    if (__codeIncludes(code, 'geolocation_') && __codeIncludes(code, '_missing')) return 'browser structure missing data';
-    if (__codeIncludes(code, 'invalid_plan_item') || __codeIncludes(code, 'descriptor_postcheck_mismatch')) return 'contract violation';
-    if (__codeIncludes(code, 'rollback')) return 'contract violation';
-    if (__codeIncludes(code, ':patched')) return 'ok';
-    return 'pipeline missing data';
-  }
-
-  function __resolveLevel(code, level) {
-    if (typeof level === 'string' && level) return level;
-    if (__codeIncludes(code, '_failed')) return 'error';
-    if (code === 'geo:patched') return 'info';
-    if (__codeIncludes(code, '_skipped') || __codeIncludes(code, '_missing')) return 'warn';
-    return 'warn';
-  }
-
-  function __resolveOutcome(code, outcome) {
-    if (typeof outcome === 'string' && outcome) return outcome;
-    if (__codeIncludes(code, 'rollback')) return 'rollback';
-    if (__codeIncludes(code, '_skipped') || __codeIncludes(code, '_missing')) return 'skip';
-    if (__codeIncludes(code, '_failed')) return 'throw';
-    if (__codeIncludes(code, ':patched')) return 'return';
-    return 'return';
-  }
-
-  function __normalizeData(extra, outcome) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const src = (x.data && typeof x.data === 'object') ? x.data : {};
-    const data = Object.assign({}, src);
-    if (!Object.prototype.hasOwnProperty.call(x, 'data')) {
-      const passthrough = ['latitude', 'longitude', 'reason', 'policy'];
-      for (let i = 0; i < passthrough.length; i++) {
-        const key = passthrough[i];
-        if (Object.prototype.hasOwnProperty.call(x, key)) data[key] = x[key];
-      }
-    }
-    data.outcome = outcome;
-    return data;
-  }
 
   const __tag = __MODULE;
   const __flagKey = '__PATCH_GEOLOCATION__';
   const C = window && window.CanvasPatchContext;
   const Core = window && window.Core;
-  function degrade(code, err, extra) {
+  function __moduleDiag(level, code, extra, err) {
     const x = (extra && typeof extra === 'object') ? extra : {};
-    const stage = __resolveStage(code, x.stage);
-    const level = __resolveLevel(code, x.level);
-    const outcome = __resolveOutcome(code, x && x.data ? x.data.outcome : null);
     const ctx = {
       module: __MODULE,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : String(code || 'geo'),
+      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
       surface: __SURFACE,
-      key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey),
-      stage: stage,
-      message: (typeof x.message === 'string' && x.message) ? x.message : String(code || 'geo'),
-      type: __resolveType(code, x.type),
-      data: __normalizeData(x, outcome)
+      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+      stage: x.stage,
+      message: x.message,
+      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
+      type: x.type
     };
-    __emit(level, code, ctx, err || null);
+    return __emit(level, code, ctx, err);
+  }
+  function degrade(code, err, extra) {
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const level = (typeof x.level === 'string' && x.level) ? x.level : 'warn';
+    return __moduleDiag(level, code, x, err);
   }
 
   function cloneDesc(d) {
@@ -520,7 +460,9 @@
       return false;
     }
     degrade('geo:patched', null, {
+      level: 'info',
       stage: 'apply',
+      key: 'geolocation',
       message: '[GeoOverride] geolocation patch applied',
       type: 'ok',
       data: { outcome: 'return', latitude: lat, longitude: lon }
@@ -571,7 +513,7 @@
   }
   if (typeof Core.guardFlag !== 'function') {
     degrade('geo:guard_missing', null, {
-      key: __flagKey,
+      key: 'entry_guard',
       stage: 'guard',
       message: 'Core.guardFlag missing',
       type: 'pipeline missing data',
@@ -595,7 +537,7 @@
     __guardToken = Core.guardFlag(__flagKey, __tag);
   } catch (e) {
     degrade('geo:guard_failed', e, {
-      key: __flagKey,
+      key: 'entry_guard',
       stage: 'guard',
       message: 'guardFlag threw',
       type: 'pipeline missing data',
@@ -612,7 +554,7 @@
       }
     } catch (e) {
       degrade('geo:guard_release_exception', e, {
-        key: __flagKey,
+        key: 'entry_guard',
         stage: 'rollback',
         message: 'releaseGuardFlag failed',
         type: 'pipeline missing data',

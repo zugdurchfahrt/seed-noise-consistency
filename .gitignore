@@ -13,8 +13,8 @@ assets/generated_fonts
 assets/generated_fonts/Win32
 assets/generated_fonts/Win32/cache_data/
 assets/generated_fonts/Win32/fonts_index.json
-assets/generated_fonts/Win32/cache_data/
 assets/generated_fonts/MacIntel
+assets/generated_fonts/MacIntel/cache_data/
 
 logs/chrome-devtools-mcp.log
 logs/intention_entitled.log
