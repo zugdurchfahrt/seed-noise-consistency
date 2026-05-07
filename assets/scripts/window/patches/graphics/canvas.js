@@ -540,23 +540,8 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     dyPx: 0.10,      // амплитуда Y (px)
   };
 
-  // =====================================================================
-  // TEXT / FONTS (Layer 1: vector/layout stage, pre-raster)
-  //
-  // What lives here (single semantic block):
-  // - TextMetrics: `measureTextNoiseHook` + `applyMeasureTextHook` (Proxy + cache)
-  // - Text draw noise: `fillTextNoiseHook` / `strokeTextNoiseHook` (arg-level jitter)
-  // - Font-scaling masters: `patchFontSizeScalingHooks()` → `applyFillTextHook` / `applyStrokeTextHook`
-  //
-  // Runtime order (facts from `sunami/assets/scripts/window/core/context.js`):
-  // - fillText:  `applyFillTextHook` (if exists) → `fillTextNoiseHook` → native
-  // - strokeText:`applyStrokeTextHook` (if exists) → `strokeTextNoiseHook` → native
-  //
-  // Important invariants:
-  // - `widthNoise` must remain local to `applyMeasureTextHook` (do not mutate global state here).
-  // - TextMetrics cache can "freeze" first-seen values per key; if first `measureText()` happens before fonts load,
-  //   downstream hashes may stop changing. Root-cause is *not proven here* — needs runtime confirmation.
-  // =====================================================================
+  // TEXT / FONTS: TextMetrics proxy/cache plus draw-argument jitter.
+  // Keep width noise local to `applyMeasureTextHook`; do not mutate shared metric state.
   function measureTextNoiseHook(res, text, font) {
     if (!res) return null;
     const txt  = String(text ?? '');
@@ -593,14 +578,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
   //  Proxy TextMetrics
   function applyMeasureTextHook(nativeMetrics, text, font) {
     try {
-      // Cache-freeze root cause (by design): TextMetrics cache has no invalidation.
-      // If the first measureText() for a key happens before fonts are actually ready,
-      // the cached values can "cement" early/fallback metrics forever for that key.
-      //
-      // Mitigation (minimal, MDN/Chromium-consistent):
-      // - Do not create/use TextMetrics cache until fonts are ready in CanvasPatchContext.state.__FONTS__.__STATE__.
-      // - Couple cache epoch to familySnapshot.versionToken so runtime font-family transitions invalidate old keys.
-      // - Keep API-shape compatibility: do not synthesize values for properties absent on native TextMetrics.
+      // Cache keys include the current font epoch; only native-present TextMetrics fields are exposed.
 
       const fontStr = (typeof font === 'string' && font.trim())
         ? font
@@ -896,7 +874,6 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
 
   // master-хук toDataURL: один post-process (без дополнительного IHDR-прохода)
   function masterToDataURLHook(res, type, quality) {
-    // 2026-02-11: single post-pass only.
     if (typeof patchToDataURLInjectNoise === 'function') {
       res = patchToDataURLInjectNoise.call(this, res, type, quality);
     }
@@ -946,7 +923,7 @@ try {
 
 // __CanvasPatchHooks__.patch2DNoise = patch2DNoise;
 __CanvasPatchHooks__.patchToDataURLInjectNoise = patchToDataURLInjectNoise;
-// 2026-02-11: disabled export with runtime-disabled hook.
+// Disabled/non-required export kept as an operational switch.
 // __CanvasPatchHooks__.patchCanvasIHDRHook = patchCanvasIHDRHook;
 __CanvasPatchHooks__.masterToDataURLHook = masterToDataURLHook;
 __CanvasPatchHooks__.patchToBlobInjectNoise = patchToBlobInjectNoise;
