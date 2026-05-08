@@ -154,17 +154,17 @@ const LOGGingModule = function LOGGingModule() {
       { module: "hide_webdriver", diagTag: "hide_webdriver", codePrefix: "hide_webdriver", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["hide_webdriver:ready", "hide_webdriver:webdriver_native_skip"] },
       { module: "rng_set", diagTag: "rng_set", codePrefix: "rng_set", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "ready", summaryCodes: ["rng_set:ready"] },
       { module: "nav_total_set", diagTag: "nav_total_set", codePrefix: "nav_total_set", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["nav_total_set:applied"] },
-      { module: "screen", diagTag: "screen", codePrefix: "screen", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["screen:patches_applied", "screen:coordination_ready"], nonTerminalCodes: ["screen:display_group_ready", "screen:viewport_group_ready", "screen:host_window_group_ready", "screen:display_group_applied", "screen:viewport_group_applied", "screen:host_window_group_applied", "screen:patched_viewport", "screen:deferred_viewport_reconcile_scheduled"] },
-      { module: "fonts", diagTag: "fonts", codePrefix: "fonts", source: "bundle", emitter: "diag", functions: "auto", critical: true },
+      { module: "screen", diagTag: "screen", codePrefix: "screen", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["screen:patches_applied", "screen:coordination_ready"], issueCodes: ["screen:coordination_incomplete"], nonTerminalCodes: ["screen:display_group_ready", "screen:viewport_group_ready", "screen:host_window_group_ready", "screen:display_group_applied", "screen:viewport_group_applied", "screen:host_window_group_applied", "screen:patched_viewport", "screen:deferred_viewport_reconcile_scheduled"] },
+      { module: "fonts", diagTag: "fonts", codePrefix: "fonts", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "ready", summaryCodes: ["fonts:load_settled"] },
       { module: "canvas", diagTag: "canvas", codePrefix: "canvas", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["canvas:applied"], nonTerminalCodes: ["canvas:preflight:dom_deferred"] },
       { module: "webgl", diagTag: "webgl", codePrefix: "webgl", source: "bundle", emitter: "diag", functions: "auto", aliases: ["webglstorage"], critical: true, summaryKind: "applied", summaryCodes: ["webgl:patches_applied"] },
       { module: "webgpu_wl", diagTag: "webgpu_wl", codePrefix: "webgpu_wl", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "ready", summaryCodes: ["webgpu_wl:ready"] },
       { module: "webgpu", diagTag: "webgpu", codePrefix: "webgpu", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "ready", summaryCodes: ["webgpu:ready"] },
       { module: "audiocontext", diagTag: "audiocontext", codePrefix: "audiocontext", source: "bundle", emitter: "diag", functions: "auto", aliases: ["audio"], critical: true, summaryKind: "ready", summaryCodes: ["audiocontext:ready"] },
-      { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none", critical: true },
+      { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "applied", summaryCodes: ["context:webgl:apply:patches_applied", "context:canvas:apply:patches_applied", "context:offscreen:apply:patches_applied"], nonTerminalCodes: ["context:webgl:monitor", "context:webgl:access", "context:canvas:access", "context:issued_webgl:hook:override"] },
       { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["tz:applied"] },
       { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["geo:patched"] },
-      { module: "uad_override", diagTag: "uad_override", codePrefix: "uad_override", source: "cdp", emitter: "diag", functions: "auto", critical: true },
+      { module: "override_ua_data", diagTag: "override_ua_data", codePrefix: "override_ua_data", source: "bundle", emitter: "diag", functions: "auto", critical: false, optional: true, summaryKind: "applied", summaryCodes: ["override_ua_data:applied"], nonTerminalCodes: ["override_ua_data:disabled"] },
       { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto", critical: false },
       { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto", critical: false },
       { module: "wrk", diagTag: "wrk", codePrefix: "wrk", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "ready", summaryCodes: ["wrk:ready"] },
@@ -489,9 +489,14 @@ const LOGGingModule = function LOGGingModule() {
         return { entry: null, status: "error", reason: "missing_emitter" };
       }
       const arr = Array.isArray(events) ? events : [];
+      if (slot.source === "disabled") {
+        return { entry: arr.length ? arr[arr.length - 1] : null, status: "disabled", reason: "disabled" };
+      }
+      if (slot.optional === true) {
+        if (!arr.length) return { entry: null, status: "optional", reason: "optional" };
+      }
       if (!arr.length) {
         if (slot.requiresEmission === false) return { entry: null, status: "not_required", reason: "not_required" };
-        if (slot.source === "disabled") return { entry: null, status: "disabled", reason: "disabled" };
         return { entry: null, status: "warn", reason: "not_emitted" };
       }
       const proof = moduleAuditProof(slot);
@@ -515,7 +520,8 @@ const LOGGingModule = function LOGGingModule() {
         const moduleName = (extra && typeof extra.module === "string" && extra.module) ? extra.module : null;
         const exact = ((diagTag && diagTag === slot.diagTag) || (moduleName && moduleName === slot.module));
         const code = (typeof entry.code === "string" && entry.code) ? entry.code : "";
-        if (isIssueCode(code, slot)) {
+        const level = (extra && typeof extra.level === "string" && extra.level) ? extra.level : "";
+        if (isIssueCode(code, slot) || level === "warn" || level === "error" || level === "fatal") {
           latestIssue = entry;
           if (exact) latestExactIssue = entry;
         } else if (isSummaryCode(code, slot)) {
@@ -578,9 +584,12 @@ const LOGGingModule = function LOGGingModule() {
       }
 
       if (latestExactIssue || latestIssue) {
+        const issueEntry = latestExactIssue || latestIssue;
+        const issueExtra = (issueEntry && issueEntry.extra && typeof issueEntry.extra === "object") ? issueEntry.extra : null;
+        const issueLevel = (issueExtra && typeof issueExtra.level === "string" && issueExtra.level) ? issueExtra.level : "";
         return {
-          entry: latestExactIssue || latestIssue,
-          status: "error",
+          entry: issueEntry,
+          status: issueLevel === "warn" ? "warn" : "error",
           reason: "runtime_issue"
         };
       }
@@ -592,6 +601,13 @@ const LOGGingModule = function LOGGingModule() {
         };
       }
       if (latestExactNonTerminal || latestNonTerminal) {
+        if (slot.optional === true) {
+          return {
+            entry: latestExactNonTerminal || latestNonTerminal,
+            status: "optional",
+            reason: "optional"
+          };
+        }
         return {
           entry: latestExactNonTerminal || latestNonTerminal,
           status: "pending",
@@ -600,8 +616,8 @@ const LOGGingModule = function LOGGingModule() {
       }
       return {
         entry: baseEntry,
-        status: "pending",
-        reason: "non_terminal_result"
+        status: "warn",
+        reason: "unclassified_module_event"
       };
     }
     __defineLoggerHiddenValue("__MODULE_DIAG_AUDIT__", Object.freeze({
@@ -743,8 +759,10 @@ const LOGGingModule = function LOGGingModule() {
           }
           const evaluation = moduleAuditEvaluate(slot, events);
           const moduleEvent = (evaluation && typeof evaluation === "object") ? evaluation.entry : null;
-          const status = (evaluation && typeof evaluation.status === "string" && evaluation.status) ? evaluation.status : "pending";
-          const auditReasonOverride = (evaluation && typeof evaluation.reason === "string" && evaluation.reason) ? evaluation.reason : null;
+          const status = (evaluation && typeof evaluation.status === "string" && evaluation.status) ? evaluation.status : "warn";
+          const auditReasonOverride = (evaluation && typeof evaluation.reason === "string" && evaluation.reason)
+            ? evaluation.reason
+            : ((evaluation && typeof evaluation === "object") ? null : "invalid_evaluation");
           const previousStatus = Object.prototype.hasOwnProperty.call(__moduleAuditState.lastStatusByModule, slot.module)
             ? __moduleAuditState.lastStatusByModule[slot.module]
             : null;
@@ -2088,215 +2106,6 @@ const LOGGingModule = function LOGGingModule() {
     writable: false,
     configurable: false
   });
-  if (!Object.prototype.hasOwnProperty.call(__loggerRoot, "__PROBE_LIVE_READER__")) {
-    const __probeLiveCfg = (global.__PROBE_LIVE_READER_CONFIG__ && typeof global.__PROBE_LIVE_READER_CONFIG__ === "object")
-      ? global.__PROBE_LIVE_READER_CONFIG__
-      : {};
-    const __probeLiveState = {
-      intervalMs: toPosInt(__probeLiveCfg.intervalMs, 1000),
-      maxRows: toPosInt(__probeLiveCfg.maxRows, 80),
-      panelId: (typeof __probeLiveCfg.panelId === "string" && __probeLiveCfg.panelId) ? __probeLiveCfg.panelId : "__probe_live_reader__",
-      enabled: false,
-      timerId: null,
-      lastIndex: 0,
-      rows: [],
-      lastRenderSig: "",
-      startedAt: null
-    };
-
-    function __probeLiveDiag(level, code, message, data, err) {
-      try {
-        __degradeApi.diag(level, code, {
-          module: "set_log",
-          diagTag: "set_log:probe_live_reader",
-          surface: "logger",
-          key: "__PROBE_LIVE_READER__",
-          stage: "runtime",
-          message: message,
-          data: data == null ? null : data,
-          type: "pipeline telemetry"
-        }, err || null);
-      } catch (_) {}
-    }
-
-    function __probeLiveGetBuffer() {
-      try {
-        const buf = __degradeApi.getBuffer();
-        return Array.isArray(buf) ? buf : [];
-      } catch (e) {
-        __probeLiveDiag("warn", "set_log:probe_live_reader_buffer_failed", "__DEGRADE__.getBuffer failed", {
-          outcome: "skip",
-          reason: "buffer_failed"
-        }, e);
-        return [];
-      }
-    }
-
-    function __probeLiveEnsurePanel() {
-      if (!G || !G.documentElement || !G.body) return null;
-      let host = G.getElementById(__probeLiveState.panelId);
-      if (host) return host;
-      host = G.createElement("div");
-      host.id = __probeLiveState.panelId;
-      host.setAttribute("data-probe-live-reader", "1");
-      host.style.position = "fixed";
-      host.style.right = "12px";
-      host.style.bottom = "12px";
-      host.style.zIndex = "2147483647";
-      host.style.width = "420px";
-      host.style.maxHeight = "40vh";
-      host.style.overflow = "auto";
-      host.style.background = "rgba(12,12,14,0.95)";
-      host.style.color = "#e8e8e8";
-      host.style.border = "1px solid rgba(255,255,255,0.18)";
-      host.style.borderRadius = "8px";
-      host.style.boxShadow = "0 6px 18px rgba(0,0,0,0.35)";
-      host.style.padding = "8px 10px";
-      host.style.font = "12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-      host.style.whiteSpace = "pre-wrap";
-      host.style.wordBreak = "break-word";
-      host.style.pointerEvents = "auto";
-      G.body.appendChild(host);
-      return host;
-    }
-
-    function __probeLiveEntryToRow(entry, index) {
-      const safeEntry = (entry && typeof entry === "object") ? entry : null;
-      const extra = (safeEntry && safeEntry.extra && typeof safeEntry.extra === "object") ? safeEntry.extra : null;
-      const error = (safeEntry && safeEntry.error && typeof safeEntry.error === "object") ? safeEntry.error : null;
-      const entryType = (safeEntry && safeEntry.type) ? String(safeEntry.type) : "";
-      const runtimeLevel = (entryType && Object.prototype.hasOwnProperty.call(DIAG_RUNTIME_TYPES, entryType))
-        ? DIAG_RUNTIME_TYPES[entryType]
-        : "";
-      const runtimeTag = runtimeLevel ? "runtime" : "";
-      const topMessage = (safeEntry && typeof safeEntry.message === "string") ? safeEntry.message : "";
-      const topError = (safeEntry && typeof safeEntry.error === "string") ? safeEntry.error : "";
-      const resolvedMessage = extra && typeof extra.message === "string"
-        ? extra.message
-        : (topMessage || (error && typeof error.message === "string" ? error.message : ""));
-      return {
-        idx: index,
-        timestamp: safeEntry && safeEntry.timestamp ? String(safeEntry.timestamp) : "",
-        type: entryType,
-        level: (extra && typeof extra.level === "string" && extra.level)
-          ? extra.level
-          : ((safeEntry && typeof safeEntry.level === "string" && safeEntry.level) ? safeEntry.level : runtimeLevel),
-        code: (safeEntry && safeEntry.code) ? String(safeEntry.code) : entryType,
-        module: (extra && typeof extra.module === "string" && extra.module)
-          ? extra.module
-          : ((safeEntry && typeof safeEntry.module === "string" && safeEntry.module) ? safeEntry.module : runtimeTag),
-        diagTag: (extra && typeof extra.diagTag === "string" && extra.diagTag)
-          ? extra.diagTag
-          : ((safeEntry && typeof safeEntry.diagTag === "string" && safeEntry.diagTag) ? safeEntry.diagTag : runtimeTag),
-        key: (extra && Object.prototype.hasOwnProperty.call(extra, "key"))
-          ? (extra.key === null ? "null" : ((typeof extra.key === "string" && extra.key) ? extra.key : ""))
-          : ((safeEntry && Object.prototype.hasOwnProperty.call(safeEntry, "key"))
-            ? (safeEntry.key === null ? "null" : ((typeof safeEntry.key === "string" && safeEntry.key) ? safeEntry.key : ""))
-            : ""),
-        message: resolvedMessage,
-        error: (error && typeof error.name === "string" && error.name)
-          ? error.name
-          : (topError || resolvedMessage)
-      };
-    }
-
-    function __probeLiveFormatRows(rows) {
-      const arr = Array.isArray(rows) ? rows : [];
-      if (!arr.length) return "[probe-live] waiting for __DEGRADE__ events";
-      return arr.map((row) => {
-        return [
-          row.timestamp || "",
-          row.level || row.type || "",
-          row.code || "",
-          row.module || row.diagTag || "",
-          row.key || "",
-          row.message || row.error || ""
-        ].filter(Boolean).join(" | ");
-      }).join("\n");
-    }
-
-    function __probeLiveRender(force) {
-      const host = __probeLiveEnsurePanel();
-      if (!host) return false;
-      const text = __probeLiveFormatRows(__probeLiveState.rows);
-      if (!force && text === __probeLiveState.lastRenderSig) return false;
-      __probeLiveState.lastRenderSig = text;
-      const header = "[probe-live] __DEGRADE__ buffer";
-      const meta = "rows=" + __probeLiveState.rows.length + ", intervalMs=" + __probeLiveState.intervalMs;
-      host.textContent = header + "\n" + meta + "\n\n" + text;
-      return true;
-    }
-
-    function __probeLivePoll() {
-      const buf = __probeLiveGetBuffer();
-      if (!buf.length) {
-        __probeLiveRender(false);
-        return __probeLiveState.rows.slice();
-      }
-      if (buf.length < __probeLiveState.lastIndex) {
-        __probeLiveState.lastIndex = 0;
-        __probeLiveState.rows = [];
-      }
-      if (buf.length === __probeLiveState.lastIndex) {
-        __probeLiveRender(false);
-        return __probeLiveState.rows.slice();
-      }
-      for (let i = __probeLiveState.lastIndex; i < buf.length; i++) {
-        __probeLiveState.rows.push(__probeLiveEntryToRow(buf[i], i));
-      }
-      if (__probeLiveState.rows.length > __probeLiveState.maxRows) {
-        __probeLiveState.rows = __probeLiveState.rows.slice(-__probeLiveState.maxRows);
-      }
-      __probeLiveState.lastIndex = buf.length;
-      __probeLiveRender(false);
-      return __probeLiveState.rows.slice();
-    }
-
-    function __probeLiveStart() {
-      if (__probeLiveState.enabled) return true;
-      if (!G || G.documentElement) {
-        __probeLiveDiag("warn", "set_log:probe_live_reader_not_window_realm", "probe live reader requires document", {
-          outcome: "skip",
-          reason: "document_missing"
-        }, null);
-        return false;
-      }
-      __probeLiveState.enabled = true;
-      __probeLiveState.startedAt = Date.now();
-      try {
-        __probeLiveRender(true);
-        __probeLivePoll();
-        __probeLiveState.timerId = global.setInterval(__probeLivePoll, __probeLiveState.intervalMs);
-        __probeLiveDiag("info", "set_log:probe_live_reader_started", "probe live reader started", {
-          outcome: "return",
-          reason: "started",
-          intervalMs: __probeLiveState.intervalMs,
-          maxRows: __probeLiveState.maxRows
-        }, null);
-        return true;
-      } catch (e) {
-        __probeLiveState.enabled = false;
-        __probeLiveState.timerId = null;
-        __probeLiveDiag("error", "set_log:probe_live_reader_start_failed", "probe live reader start failed", {
-          outcome: "skip",
-          reason: "start_failed"
-        }, e);
-        return false;
-      }
-    }
-
-    function __probeLiveStop() {
-      if (__probeLiveState.timerId != null) {
-        try { global.clearInterval(__probeLiveState.timerId); } catch (_) {}
-      }
-      __probeLiveState.timerId = null;
-      __probeLiveState.enabled = false;
-      return true;
-    }
-
-  }
-
-
     // ===== 2) Core logger: pushLog (console + errors) =====
     function pushLog(level, args, withStack, module, bufferMeta) {
       try {

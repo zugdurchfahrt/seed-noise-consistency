@@ -109,11 +109,20 @@ const __probeRun = async function(){
     } catch (_) {}
   }
 
-  globalThis.__PROBE_FLAGS__ = {
+  const __PROBE_DEFAULT_FLAGS__ = {
     workerScopeAudit: true,
     brandCheck: true,
     receiverChecks: true
   };
+  if (!globalThis.__PROBE_FLAGS__ || typeof globalThis.__PROBE_FLAGS__ !== "object") {
+    globalThis.__PROBE_FLAGS__ = Object.assign({}, __PROBE_DEFAULT_FLAGS__);
+  } else {
+    for (const key of Object.keys(__PROBE_DEFAULT_FLAGS__)) {
+      if (!Object.prototype.hasOwnProperty.call(globalThis.__PROBE_FLAGS__, key)) {
+        globalThis.__PROBE_FLAGS__[key] = __PROBE_DEFAULT_FLAGS__[key];
+      }
+    }
+  }
   function __probeNum(v, fallback) {
     const n = Number(v);
     return (Number.isFinite(n) && n > 0) ? Math.floor(n) : fallback;
@@ -279,9 +288,21 @@ const __probeRun = async function(){
     "userAgentData.brands",
     "userAgentData.mobile",
     "userAgentData.platform",
+    "userAgentData.uaFullVersion",
     "userAgentData.fullVersionList",
     "userAgentData.getHighEntropyValues",
     "userAgentData.toJSON"
+  ];
+
+  const USER_AGENT_DATA_HIGH_ENTROPY_HINTS = [
+    "architecture",
+    "bitness",
+    "formFactors",
+    "fullVersionList",
+    "model",
+    "platformVersion",
+    "uaFullVersion",
+    "wow64"
   ];
 
 
@@ -387,6 +408,7 @@ const __probeRun = async function(){
         "brands",
         "mobile",
         "platform",
+        "uaFullVersion",
         "fullVersionList",
         "getHighEntropyValues",
         "toJSON"
@@ -1497,25 +1519,12 @@ const __probeRun = async function(){
 
   async function printFieldValues() {
     const uaData = nav && nav.userAgentData ? nav.userAgentData : null;
-    const highEntropyBasePath = "userAgentData.";
-    const highEntropySkipKeys = new Set(["brands", "mobile", "platform", "getHighEntropyValues", "toJSON"]);
-    const highEntropyKeys = [];
-    const highEntropyPaths = new Set();
-    const highEntropyValuesByPath = new Map();
+    const highEntropyKeys = USER_AGENT_DATA_HIGH_ENTROPY_HINTS.slice();
+    const highEntropyValuesByKey = new Map();
     let highEntropyFetchError = null;
     let highEntropyFetchAttempted = false;
     let highEntropyAsyncState = null;
     let highEntropyElapsedMs = null;
-
-    for (const path of NAV_VALUE_PATHS) {
-      if (!String(path).startsWith(highEntropyBasePath)) continue;
-      const key = String(path).slice(highEntropyBasePath.length);
-      if (!key || key.indexOf(".") !== -1) continue;
-      if (highEntropySkipKeys.has(key)) continue;
-      if (highEntropyPaths.has(path)) continue;
-      highEntropyPaths.add(path);
-      highEntropyKeys.push(key);
-    }
 
     if (highEntropyKeys.length > 0) {
       if (!uaData || typeof uaData.getHighEntropyValues !== "function") {
@@ -1542,8 +1551,7 @@ const __probeRun = async function(){
             highEntropyAsyncState = "rejected";
           } else {
             for (const key of highEntropyKeys) {
-              const path = `${highEntropyBasePath}${key}`;
-              highEntropyValuesByPath.set(path, {
+              highEntropyValuesByKey.set(key, {
                 present: Object.prototype.hasOwnProperty.call(highEntropyResult, key),
                 value: highEntropyResult[key]
               });
@@ -1560,44 +1568,6 @@ const __probeRun = async function(){
     }
 
     const rows = NAV_VALUE_PATHS.map((path) => {
-      if (highEntropyPaths.has(path)) {
-        const key = String(path).slice(highEntropyBasePath.length);
-        const highEntropyEntry = highEntropyValuesByPath.get(path) || null;
-        if (highEntropyEntry && highEntropyEntry.present) {
-          return {
-            field: path,
-            ok: true,
-            value: toPrintable(highEntropyEntry.value),
-            error: null,
-            source: "userAgentData.getHighEntropyValues",
-            asyncState: highEntropyAsyncState,
-            elapsedMs: highEntropyElapsedMs
-          };
-        }
-        if (highEntropyFetchError) {
-          return {
-            field: path,
-            ok: false,
-            value: null,
-            error: errorToString(highEntropyFetchError),
-            source: "userAgentData.getHighEntropyValues",
-            asyncState: highEntropyAsyncState,
-            elapsedMs: highEntropyElapsedMs
-          };
-        }
-        if (highEntropyFetchAttempted) {
-          return {
-            field: path,
-            ok: false,
-            value: null,
-            error: `TypeError: Missing '${key}' in getHighEntropyValues result`,
-            source: "userAgentData.getHighEntropyValues",
-            asyncState: highEntropyAsyncState || "rejected",
-            elapsedMs: highEntropyElapsedMs
-          };
-        }
-      }
-
       const r = readPath(nav, path);
       return {
         field: path,
@@ -1607,6 +1577,34 @@ const __probeRun = async function(){
         source: "direct"
       };
     });
+    for (const key of highEntropyKeys) {
+      const highEntropyEntry = highEntropyValuesByKey.get(key) || null;
+      if (highEntropyEntry && highEntropyEntry.present) {
+        rows.push({
+          field: `userAgentData.getHighEntropyValues.${key}`,
+          ok: true,
+          value: toPrintable(highEntropyEntry.value),
+          error: null,
+          source: "userAgentData.getHighEntropyValues",
+          asyncState: highEntropyAsyncState,
+          elapsedMs: highEntropyElapsedMs
+        });
+        continue;
+      }
+      rows.push({
+        field: `userAgentData.getHighEntropyValues.${key}`,
+        ok: false,
+        value: null,
+        error: highEntropyFetchError
+          ? errorToString(highEntropyFetchError)
+          : (highEntropyFetchAttempted
+            ? `TypeError: Missing '${key}' in getHighEntropyValues result`
+            : "TypeError: high entropy fetch not attempted"),
+        source: "userAgentData.getHighEntropyValues",
+        asyncState: highEntropyAsyncState || "rejected",
+        elapsedMs: highEntropyElapsedMs
+      });
+    }
 
     __probeConsoleCall("group", "[probe] Field values");
     __probeConsoleCall("table", rows);
@@ -1621,7 +1619,7 @@ const __probeRun = async function(){
       throw new Error(`[probe] ${scopeName} navigator missing`);
     }
     const uaData = navTarget.userAgentData || null;
-    const heKeys = ["architecture", "bitness", "model", "platformVersion", "fullVersionList", "wow64", "formFactors"];
+    const heKeys = USER_AGENT_DATA_HIGH_ENTROPY_HINTS.slice();
     let he = null;
     if (!uaData || typeof uaData.getHighEntropyValues !== "function") {
       throw new Error(`[probe] ${scopeName} userAgentData.getHighEntropyValues missing`);
@@ -1650,6 +1648,7 @@ const __probeRun = async function(){
         brands: uaData && Array.isArray(uaData.brands) ? JSON.parse(JSON.stringify(uaData.brands)) : uaData ? uaData.brands : null,
         mobile: uaData ? uaData.mobile : null,
         platform: uaData ? uaData.platform : null,
+        uaFullVersion: uaData ? uaData.uaFullVersion : null,
         fullVersionList: uaData && Array.isArray(uaData.fullVersionList) ? JSON.parse(JSON.stringify(uaData.fullVersionList)) : (he && Array.isArray(he.fullVersionList) ? JSON.parse(JSON.stringify(he.fullVersionList)) : null),
         highEntropy: JSON.parse(JSON.stringify(he))
       }
@@ -1739,9 +1738,9 @@ const __probeRun = async function(){
     push("userAgentData.brands", expectedWindow.uaData.brands, actualValues.uaData && actualValues.uaData.brands);
     push("userAgentData.mobile", expectedWindow.uaData.mobile, actualValues.uaData && actualValues.uaData.mobile);
     push("userAgentData.platform", expectedWindow.uaData.platform, actualValues.uaData && actualValues.uaData.platform);
+    push("userAgentData.uaFullVersion", expectedWindow.uaData.uaFullVersion, actualValues.uaData && actualValues.uaData.uaFullVersion);
     push("userAgentData.fullVersionList", expectedWindow.uaData.fullVersionList, actualValues.uaData && actualValues.uaData.fullVersionList);
-    const heFields = ["architecture", "bitness", "model", "platformVersion", "fullVersionList", "wow64", "formFactors"];
-    for (const field of heFields) {
+    for (const field of USER_AGENT_DATA_HIGH_ENTROPY_HINTS) {
       push(`userAgentData.getHighEntropyValues.${field}`, expectedWindow.uaData.highEntropy[field], actualValues.uaData && actualValues.uaData.highEntropy ? actualValues.uaData.highEntropy[field] : null);
     }
     return rows;
@@ -1858,6 +1857,7 @@ const __probeRun = async function(){
         }
       }
     `;
+    const workerHighEntropyKeysJson = JSON.stringify(USER_AGENT_DATA_HIGH_ENTROPY_HINTS);
     const dedicatedSource = `
       (async function(){
         "use strict";
@@ -1867,7 +1867,7 @@ const __probeRun = async function(){
           if (!nav) throw new Error("navigator missing");
           const uaData = nav.userAgentData;
           if (!uaData || typeof uaData.getHighEntropyValues !== "function") throw new Error("userAgentData missing");
-          const heKeys = ["architecture","bitness","model","platformVersion","fullVersionList","wow64","formFactors"];
+          const heKeys = ${workerHighEntropyKeysJson};
           const he = await Reflect.apply(uaData.getHighEntropyValues, uaData, [heKeys]);
           return {
             language: nav.language,
@@ -1879,6 +1879,7 @@ const __probeRun = async function(){
               brands: Array.isArray(uaData.brands) ? JSON.parse(JSON.stringify(uaData.brands)) : uaData.brands,
               mobile: uaData.mobile,
               platform: uaData.platform,
+              uaFullVersion: uaData.uaFullVersion,
               fullVersionList: Array.isArray(uaData.fullVersionList) ? JSON.parse(JSON.stringify(uaData.fullVersionList)) : (he && Array.isArray(he.fullVersionList) ? JSON.parse(JSON.stringify(he.fullVersionList)) : null),
               highEntropy: JSON.parse(JSON.stringify(he))
             }
@@ -1907,7 +1908,7 @@ const __probeRun = async function(){
         if (!nav) throw new Error("navigator missing");
         const uaData = nav.userAgentData;
         if (!uaData || typeof uaData.getHighEntropyValues !== "function") throw new Error("userAgentData missing");
-        const heKeys = ["architecture","bitness","model","platformVersion","fullVersionList","wow64","formFactors"];
+        const heKeys = ${workerHighEntropyKeysJson};
         const he = await Reflect.apply(uaData.getHighEntropyValues, uaData, [heKeys]);
         return {
           language: nav.language,
@@ -1919,6 +1920,7 @@ const __probeRun = async function(){
             brands: Array.isArray(uaData.brands) ? JSON.parse(JSON.stringify(uaData.brands)) : uaData.brands,
             mobile: uaData.mobile,
             platform: uaData.platform,
+            uaFullVersion: uaData.uaFullVersion,
             fullVersionList: Array.isArray(uaData.fullVersionList) ? JSON.parse(JSON.stringify(uaData.fullVersionList)) : (he && Array.isArray(he.fullVersionList) ? JSON.parse(JSON.stringify(he.fullVersionList)) : null),
             highEntropy: JSON.parse(JSON.stringify(he))
           }
@@ -2211,12 +2213,14 @@ const __probeRun = async function(){
         ["userAgentData.brands", (x) => x && x.uaData ? x.uaData.brands : null],
         ["userAgentData.mobile", (x) => x && x.uaData ? x.uaData.mobile : null],
         ["userAgentData.platform", (x) => x && x.uaData ? x.uaData.platform : null],
+        ["userAgentData.uaFullVersion", (x) => x && x.uaData ? x.uaData.uaFullVersion : null],
         ["userAgentData.fullVersionList", (x) => x && x.uaData ? x.uaData.fullVersionList : null],
         ["userAgentData.getHighEntropyValues.architecture", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.architecture : null],
         ["userAgentData.getHighEntropyValues.bitness", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.bitness : null],
         ["userAgentData.getHighEntropyValues.model", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.model : null],
         ["userAgentData.getHighEntropyValues.platformVersion", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.platformVersion : null],
         ["userAgentData.getHighEntropyValues.fullVersionList", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.fullVersionList : null],
+        ["userAgentData.getHighEntropyValues.uaFullVersion", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.uaFullVersion : null],
         ["userAgentData.getHighEntropyValues.wow64", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.wow64 : null],
         ["userAgentData.getHighEntropyValues.formFactors", (x) => x && x.uaData && x.uaData.highEntropy ? x.uaData.highEntropy.formFactors : null]
       ];
@@ -4371,9 +4375,15 @@ function printToStringCrossRealmChecks() {
     const locate = (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
     const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
     const rowData = entry ? __probeDataCell(entry) : null;
-    return {
+    const fileValue = data && typeof data.file === "string"
+      ? data.file
+      : (locate && typeof locate.file === "string" ? locate.file : null);
+    const row = {
       idx: index,
-      kind: kind,
+      module: slot && typeof slot.module === "string"
+        ? slot.module
+        : (extra && typeof extra.module === "string" ? extra.module : null),
+      unit: (typeof unit === "string" && unit) ? unit : null,
       status: status,
       source: slot && typeof slot.source === "string" ? slot.source : null,
       timestamp: entry && typeof entry.timestamp === "string" ? entry.timestamp : null,
@@ -4385,21 +4395,15 @@ function printToStringCrossRealmChecks() {
       level: extra && typeof extra.level === "string"
         ? extra.level
         : (expected && typeof expected.level === "string" ? expected.level : null),
-      diagTag: extra && typeof extra.diagTag === "string"
-        ? extra.diagTag
-        : (slot && typeof slot.diagTag === "string" ? slot.diagTag : null),
-      module: slot && typeof slot.module === "string"
-        ? slot.module
-        : (extra && typeof extra.module === "string" ? extra.module : null),
       stage: extra && typeof extra.stage === "string"
         ? extra.stage
         : (expected && typeof expected.stage === "string" ? expected.stage : null),
       key: extra && (typeof extra.key === "string" || extra.key === null)
         ? extra.key
         : (expected && (typeof expected.key === "string" || expected.key === null) ? expected.key : null),
-      file: data && typeof data.file === "string"
-        ? data.file
-        : (locate && typeof locate.file === "string" ? locate.file : null),
+      diagTag: extra && typeof extra.diagTag === "string"
+        ? extra.diagTag
+        : (slot && typeof slot.diagTag === "string" ? slot.diagTag : null),
       message: (extra && typeof extra.message === "string")
         ? extra.message
         : (entry && entry.error && typeof entry.error === "object" && typeof entry.error.message === "string")
@@ -4419,6 +4423,13 @@ function printToStringCrossRealmChecks() {
             })()
           : null)
     };
+    if (typeof fileValue === "string" && fileValue) row.file = fileValue;
+    Object.defineProperty(row, "__probeKind", {
+      value: (kind === "patch") ? "patch" : "module",
+      enumerable: false,
+      configurable: true
+    });
+    return row;
   }
 
   function __probePatchUnit(slot, entry) {
@@ -4427,9 +4438,11 @@ function printToStringCrossRealmChecks() {
     if (!extra) return null;
     const code = (typeof entry.code === "string" && entry.code) ? entry.code : null;
     const diagTag = (typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
+    if (code && code.indexOf("degrade:module_status:") === 0) return null;
     if (code && (code.indexOf(":nav_access") >= 0 || extra.message === "nav access")) return null;
+    if (code && __probeModuleAudit && typeof __probeModuleAudit.isSummaryCode === "function" && __probeModuleAudit.isSummaryCode(code, slot)) return null;
     if (diagTag && diagTag !== slot.diagTag) return diagTag;
-    if (code && (!__probeModuleAudit || typeof __probeModuleAudit.isSummaryCode !== "function" || !__probeModuleAudit.isSummaryCode(code))) return code;
+    if (code) return code;
     return null;
   }
 
@@ -4476,12 +4489,36 @@ function printToStringCrossRealmChecks() {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      __probeDiag("error", "probe:module_check_failed", {
+        diagTag: "probe:module_check",
+        stage: "module_check",
+        key: "moduleCheck",
+        message: "module check failed",
+        type: "probe telemetry",
+        data: {
+          outcome: "throw",
+          reason: "module_check_failed"
+        }
+      }, e);
+    }
 
+    const moduleRows = rows.filter((row) => row && row.__probeKind === "module");
+    const patchRows = rows.filter((row) => row && row.__probeKind === "patch");
     __probeConsoleCall("group", "[probe] module check");
-    __probeConsoleCall("table", rows);
+    __probeConsoleCall("table", moduleRows);
+    if (patchRows.length) {
+      __probeConsoleCall("groupCollapsed", "[probe] module check patch details");
+      __probeConsoleCall("table", patchRows);
+      __probeConsoleCall("groupEnd");
+    }
     __probeConsoleCall("groupEnd");
-    return rows;
+    Object.defineProperty(moduleRows, "__probePatchRows", {
+      value: patchRows,
+      enumerable: false,
+      configurable: true
+    });
+    return moduleRows;
   }
 
   function printNavigatorCollectionChecks() {
@@ -4700,6 +4737,7 @@ function printToStringCrossRealmChecks() {
     __probeLogAsyncTimeout(apiControlMeta, apiControlWait.elapsedMs, apiControlWait.timeoutMs, apiControlWait.error);
   }
 
+  const __probeModuleCheckState = {};
   const result = {
     ok: true,
     timestamp: new Date().toISOString(),
@@ -4784,7 +4822,10 @@ function printToStringCrossRealmChecks() {
       watchdogState: workerAccessorObservabilityWait.timedOut ? "timed_out" : "rejected"
     },
     degrade: printLastDegradeEvents(),
-    moduleCheck: printModuleCheck(),
+    moduleCheck: (__probeModuleCheckState.rows = printModuleCheck()),
+    modulePatchDetails: __probeModuleCheckState.rows && Array.isArray(__probeModuleCheckState.rows.__probePatchRows)
+      ? __probeModuleCheckState.rows.__probePatchRows
+      : [],
     watchdog: {
       enabled: __PROBE_ENABLE_WORKER_SCOPE_AUDIT__,
       totalBudgetMs: __PROBE_ENABLE_WORKER_SCOPE_AUDIT__ ? __PROBE_TIMEOUTS.totalMs : 0,
@@ -4938,7 +4979,12 @@ function __probeEscapeHtml(s) {
 
 function __probeTableHtml(rows) {
   const arr = Array.isArray(rows) ? rows : [];
-  const cols = arr.length ? Array.from(new Set(arr.flatMap((r) => Object.keys(r || {})))) : [];
+  const allCols = arr.length ? Array.from(new Set(arr.flatMap((r) => Object.keys(r || {})))) : [];
+  const cols = allCols.filter((c) => arr.some((r) => {
+    const v = r && Object.prototype.hasOwnProperty.call(r, c) ? r[c] : null;
+    return v !== null && typeof v !== "undefined" && v !== "";
+  }));
+  if (!cols.length) return arr.length ? "<pre>(no printable columns)</pre>" : "<pre>(no rows)</pre>";
   const thead = cols.map((c) => `<th>${__probeEscapeHtml(c)}</th>`).join("");
   const tbody = arr
     .map((r) => {
@@ -4998,6 +5044,9 @@ function __probeDownloadHtmlReport(result) {
   // const workerScopeRows = result && result.workerScopeAudit && result.workerScopeAudit.rows;
   const methodsRows = result && result.methods && result.methods.rows;
   const degradeRows = result && result.degrade && result.degrade.rows;
+  const moduleCheckRows = result && Array.isArray(result.moduleCheck) ? result.moduleCheck : [];
+  const moduleRows = moduleCheckRows;
+  const modulePatchRows = result && Array.isArray(result.modulePatchDetails) ? result.modulePatchDetails : [];
   const toStringCrossRows = result && result.toStringCrossRealm && result.toStringCrossRealm.rows;
   const receiverRows = result && result.receiverChecks && result.receiverChecks.rows;
   const workerAccessorObservabilityRows = result && result.workerAccessorObservability && result.workerAccessorObservability.rows;
@@ -5094,6 +5143,12 @@ function __probeDownloadHtmlReport(result) {
   <section>
     <h2>Function.prototype.toString cross-realm checks (hard invariants + informational)</h2>
     ${__probeChecksVerticalHtml(toStringCrossRows)}
+  </section>
+
+  <section>
+    <h2>Module check</h2>
+    ${__probeTableHtml(moduleRows)}
+    ${modulePatchRows.length ? `<details><summary>Patch details (${modulePatchRows.length})</summary>${__probeTableHtml(modulePatchRows)}</details>` : ""}
   </section>
 
   <section>
