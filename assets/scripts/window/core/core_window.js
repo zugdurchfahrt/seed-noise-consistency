@@ -27,7 +27,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     try {
       const _err = (typeof err === 'undefined') ? null : err;
       let safeCtx = (ctx && typeof ctx === 'object') ? ctx : null;
-      if (safeCtx && (safeCtx.key === null || typeof safeCtx.key === 'undefined' || safeCtx.key === '')) {
+      if (safeCtx && (typeof safeCtx.key === 'undefined' || safeCtx.key === '')) {
         safeCtx = Object.assign({}, safeCtx, {
           key: (typeof safeCtx.diagTag === 'string' && safeCtx.diagTag)
             ? safeCtx.diagTag
@@ -259,7 +259,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
       module: 'core',
       diagTag: 'core_window',
       surface: 'core',
-      key: (typeof key === 'string' && key) ? key : null,
+      key: (typeof key === 'string' && key) ? key : 'Core.wrapFactory',
       stage: 'preflight',
       message: message,
       type: 'contract violation',
@@ -587,11 +587,15 @@ const CoreWindowModule = function CoreWindowModule(window) {
           module: (x && typeof x.module === 'string' && x.module) ? x.module : 'core_window',
           diagTag: (x && typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'core_window',
           surface: (x && typeof x.surface === 'string' && x.surface) ? x.surface : 'core',
-          key: (x && (typeof x.key === 'string' || x.key === null)) ? x.key : null,
+          key: (x && typeof x.key === 'string' && x.key)
+            ? x.key
+            : ((x && x.key === null)
+              ? null
+              : ((x && typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : 'core_window')),
           stage: (x && typeof x.stage === 'string' && x.stage) ? x.stage : 'apply',
           message: (x && typeof x.message === 'string' && x.message) ? x.message : String(code || 'core_window:diag'),
           type: (x && typeof x.type === 'string' && x.type) ? x.type : null,
-          data: (x && x.data && typeof x.data === 'object') ? x.data : null
+          data: (x && x.data && typeof x.data === 'object') ? Object.assign({}, x.data) : null
         };
         if (!ctx.data || typeof ctx.data !== 'object') ctx.data = {};
         if (policy && !Object.prototype.hasOwnProperty.call(ctx.data, 'policy')) {
@@ -1061,7 +1065,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
               module: 'core_window',
               diagTag: 'core:onInvalidThis',
               surface: 'core',
-              key: null,
+              key: 'Core.onInvalidThis',
               stage: 'runtime',
               type: 'browser structure missing data',
               message: 'native invalid-this invocation threw',
@@ -1080,7 +1084,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core_window',
             diagTag: 'core:onInvalidThis',
             surface: 'core',
-            key: null,
+            key: 'Core.onInvalidThis',
             stage: 'runtime',
             type: 'contract violation',
             message: 'native invalid-this bridge missing',
@@ -1117,7 +1121,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core_window',
             diagTag: 'core:wrapGetter',
             surface: 'core',
-            key: key || null,
+            key: (typeof key === 'string' && key) ? key : 'Core.wrapGetter',
             stage: 'guard',
             type: 'pipeline missing data',
             message: e.message,
@@ -1181,7 +1185,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core_window',
             diagTag: 'core:wrapGetter',
             surface: 'core',
-            key: key || null,
+            key: (typeof key === 'string' && key) ? key : 'Core.wrapGetter',
             stage: 'contract',
             type: 'contract violation',
             message: 'core_wrapper getter path requires native getter',
@@ -1198,7 +1202,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
           module: 'core_window',
           diagTag: 'core:wrapGetter',
           surface: 'core',
-          key: key || null,
+          key: (typeof key === 'string' && key) ? key : 'Core.wrapGetter',
           stage: 'contract',
           type: 'contract violation',
           message: 'synthetic getter path forbidden because native getter is missing',
@@ -1872,7 +1876,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core_window',
             diagTag: 'core:applyTargets',
             surface: 'core',
-            key: null,
+            key: 'Core.applyTargets',
             level: 'info',
             stage: 'preflight',
             message: 'Core.applyTargets skipped empty target list',
@@ -1999,7 +2003,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
             module: 'core_window',
             diagTag: 'core:applyTargets',
             surface: 'core',
-            key: null,
+            key: 'Core.applyTargets.diag',
             stage: 'runtime',
             message: 'Core.applyTargets diag push failed',
             type: 'pipeline missing data',
@@ -2163,7 +2167,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
     module: 'core_window',
     diagTag: 'core_window',
     surface: 'core',
-    key: null,
+    key: 'Core',
     stage: 'apply',
     message: 'core_window ready',
     type: null,

@@ -247,6 +247,14 @@ const LOGGingModule = function LOGGingModule() {
       if (reason === "mark_failed" || /:mark_failed$/.test(codeValue)) return "mark_failed";
       if (reason === "preflight_failed" || reason === "preflight_exception" || /:preflight_failed$/.test(codeValue)) return "preflight_failed";
       if (
+        stage === "rollback"
+        && (
+          reason === "guard_release_failed"
+          || reason === "guard_release_exception"
+          || /:guard_release_(failed|exception|skipped)$/.test(codeValue)
+        )
+      ) return "rollback_failed";
+      if (
         reason === "guard_failed"
         || reason === "guard_exception"
         || reason === "guard_write_failed"

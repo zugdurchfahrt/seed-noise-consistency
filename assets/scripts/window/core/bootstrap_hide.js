@@ -673,7 +673,7 @@ function __emitBootstrapTransferDiag__(level, code, key, message, reason, err, e
     key: key,
     stage: 'bootstrap',
     message: message,
-    type: 'browser structure missing data',
+    type: 'pipeline missing data',
     data: data
   }, err);
 }

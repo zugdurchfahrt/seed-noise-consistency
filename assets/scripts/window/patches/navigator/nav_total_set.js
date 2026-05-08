@@ -2358,15 +2358,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
                 try {
                   const merged = postProcessor(nativeResolved, result);
-                  __navDiag('info', 'nav_total_set:userAgentData_getHighEntropyValues_resolved', {
+                  const requestedKeySig = keys.map(function navHighEntropyKeySigItem(k) {
+                    return String(k).replace(/[^A-Za-z0-9_.-]/g, '_');
+                  }).join('+') || 'empty';
+                  __navDiag('info', 'nav_total_set:userAgentData_getHighEntropyValues_resolved:' + requestedKeySig, {
                     stage: 'runtime',
                     type: __navTypePipeline,
                     diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
-                    key: 'userAgentData.getHighEntropyValues',
+                    key: 'userAgentData.getHighEntropyValues[' + requestedKeySig + ']',
                     message: 'highEntropy values resolved',
                     data: {
                       outcome: 'return',
                       reason: 'high_entropy_resolved',
+                      requestSig: requestedKeySig,
                       requestedKeys: keys.slice(),
                       resolvedKeys: Object.keys(result),
                       uaFullVersion: (typeof result.uaFullVersion === 'string' && result.uaFullVersion) ? result.uaFullVersion : null,
