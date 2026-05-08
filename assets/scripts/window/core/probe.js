@@ -79,6 +79,136 @@ const __probeRun = async function(){
     return count;
   }
 
+  function __probeIsPlainObject(value) {
+    if (!value || typeof value !== "object") return false;
+    try {
+      const proto = Object.getPrototypeOf(value);
+      return proto === Object.prototype || proto === null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function __probeNormalizeReportScalar(value) {
+    if (value === null || typeof value === "undefined") return value;
+    const t = typeof value;
+    if (t === "string" || t === "number" || t === "boolean") return value;
+    if (value instanceof Error) return errorShape(value);
+    if (Array.isArray(value)) {
+      const lim = Math.min(value.length, 8);
+      const out = new Array(lim);
+      for (let i = 0; i < lim; i++) out[i] = copyJson(value[i]);
+      if (value.length > lim) out.push(`[... ${value.length - lim} more items]`);
+      return out;
+    }
+    if (__probeIsPlainObject(value)) {
+      const keys = Object.keys(value);
+      const out = {};
+      const lim = Math.min(keys.length, 8);
+      for (let i = 0; i < lim; i++) {
+        const k = keys[i];
+        out[k] = copyJson(value[k]);
+      }
+      if (keys.length > lim) out.__truncated_keys__ = keys.length - lim;
+      return out;
+    }
+    return toPrintable(value);
+  }
+
+  function __probeNormalizeReportRow(section, row) {
+    if (!row || typeof row !== "object") return __probeNormalizeReportScalar(row);
+    const out = {};
+    function pick(key, alias) {
+      if (!Object.prototype.hasOwnProperty.call(row, key)) return;
+      out[alias || key] = __probeNormalizeReportScalar(row[key]);
+    }
+    if (section === "field_values") {
+      pick("field"); pick("ok"); pick("value"); pick("error"); pick("source");
+      return out;
+    }
+    if (section === "worker_scope_audit") {
+      pick("scope"); pick("variant"); pick("field"); pick("match"); pick("expected"); pick("actual"); pick("error");
+      return out;
+    }
+    if (section === "prototype_descriptors") {
+      pick("prototype");
+      if (Array.isArray(row.rows)) out.rowCount = row.rows.length;
+      if (Array.isArray(row.rows) && row.rows.length) {
+        const first = row.rows[0];
+        if (first && typeof first === "object") {
+          const keys = Object.keys(first).slice(0, 8);
+          if (keys.length) out.rowShape = keys;
+        }
+      }
+      return Object.keys(out).length ? out : __probeNormalizeReportScalar(row);
+    }
+    if (section === "touched_methods") {
+      pick("method"); pick("ok"); pick("exists"); pick("isMethod"); pick("signature"); pick("toStringStatus"); pick("setProtoStatus"); pick("error");
+      return out;
+    }
+    if (section === "receiver_checks") {
+      pick("check"); pick("method"); pick("available"); pick("match"); pick("badThrew"); pick("badError"); pick("goodError"); pick("badAsyncState"); pick("goodAsyncState");
+      return out;
+    }
+    if (section === "audio_own_property_checks") {
+      pick("check"); pick("method"); pick("match"); pick("expectedAfterCreateOwn"); pick("actualAfterCreateOwn"); pick("extra"); pick("error");
+      return out;
+    }
+    if (section === "prototype_instanceof_checks" || section === "tostring_cross_realm_checks") {
+      pick("check"); pick("match"); pick("expected"); pick("actual"); pick("error");
+      return out;
+    }
+    if (section === "descriptor_expectations") {
+      pick("prototype"); pick("key"); pick("allMatch"); pick("missingActual");
+      const mismatchKeys = [];
+      const keys = Object.keys(row);
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        if (k.indexOf("match_") === 0 && row[k] === false) mismatchKeys.push(k.slice(6));
+      }
+      if (mismatchKeys.length) out.mismatchFields = mismatchKeys;
+      return out;
+    }
+    if (section === "degrade_last_50") {
+      pick("idx"); pick("timestamp"); pick("level"); pick("code"); pick("module"); pick("key"); pick("message"); pick("err");
+      return out;
+    }
+    if (section === "module_check") {
+      pick("module"); pick("unit"); pick("status"); pick("code"); pick("message");
+      return out;
+    }
+    const keys = Object.keys(row);
+    for (let i = 0; i < Math.min(keys.length, 8); i++) pick(keys[i]);
+    if (keys.length > 8) out.__truncated_keys__ = keys.length - 8;
+    return out;
+  }
+
+  function __probeNormalizeReportData(value) {
+    if (!__probeIsPlainObject(value)) return copyJson(value);
+    const out = {};
+    if (Object.prototype.hasOwnProperty.call(value, "section")) out.section = copyJson(value.section);
+    if (Object.prototype.hasOwnProperty.call(value, "status")) out.status = copyJson(value.status);
+    if (Object.prototype.hasOwnProperty.call(value, "probeRunId")) out.probeRunId = copyJson(value.probeRunId);
+    if (Object.prototype.hasOwnProperty.call(value, "summary")) out.summary = __probeNormalizeReportScalar(value.summary);
+    if (Object.prototype.hasOwnProperty.call(value, "reason")) out.reason = copyJson(value.reason);
+    if (Object.prototype.hasOwnProperty.call(value, "error")) out.error = __probeNormalizeReportScalar(value.error);
+    const section = (typeof value.section === "string" && value.section) ? value.section : "";
+    if (Array.isArray(value.rows)) {
+      const lim = Math.min(value.rows.length, 64);
+      out.rows = new Array(lim);
+      for (let i = 0; i < lim; i++) out.rows[i] = __probeNormalizeReportRow(section, value.rows[i]);
+      if (value.rows.length > lim) out.rows.push(`[... ${value.rows.length - lim} more items]`);
+    }
+    if (Array.isArray(value.rawEntries)) {
+      const lim = Math.min(value.rawEntries.length, 12);
+      out.rawEntries = new Array(lim);
+      for (let i = 0; i < lim; i++) out.rawEntries[i] = __probeNormalizeReportScalar(value.rawEntries[i]);
+      if (value.rawEntries.length > lim) out.rawEntries.push(`[... ${value.rawEntries.length - lim} more items]`);
+    }
+    if (Object.prototype.hasOwnProperty.call(value, "meta")) out.meta = __probeNormalizeReportScalar(value.meta);
+    return out;
+  }
+
   function __probeReport(section, payload, err) {
     try {
       const sectionName = (typeof section === "string" && section) ? section : "unknown";
@@ -104,7 +234,7 @@ const __probeRun = async function(){
         key: sectionName,
         message: `[probe] section report ${sectionName} #${__probeRunStartedAt}`,
         type: "probe telemetry",
-        data: data
+        data: __probeNormalizeReportData(data)
       }, err || null);
     } catch (_) {}
   }

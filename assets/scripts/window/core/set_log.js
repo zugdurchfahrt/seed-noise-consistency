@@ -275,32 +275,21 @@ const LOGGingModule = function LOGGingModule() {
       return typeValue || undefined;
     }
 
-    function scopeNameFromKind(kind) {
-      return kind === "service"
-        ? "ServiceWorkerGlobalScope"
-        : (kind === "shared"
-          ? "SharedWorkerGlobalScope"
-          : (kind === "dedicated"
-            ? "DedicatedWorkerGlobalScope"
-            : (kind === "window" ? "WindowGlobalScope" : null)));
-    }
-
-    function canonicalScopeName(scope) {
-      if (!(typeof scope === "string" && scope)) return null;
-      if (scope === "Worker" || scope === "worker" || scope === "DedicatedWorker" || scope === "DedicatedWorkerGlobalScope") return "DedicatedWorkerGlobalScope";
-      if (scope === "Window" || scope === "window" || scope === "WindowGlobalScope") return "WindowGlobalScope";
-      if (scope === "SharedWorker" || scope === "SharedWorkerGlobalScope") return "SharedWorkerGlobalScope";
-      if (scope === "ServiceWorker" || scope === "ServiceWorkerGlobalScope") return "ServiceWorkerGlobalScope";
-      return scope;
-    }
-
-    function canonicalScopeKind(kind) {
-      if (!(typeof kind === "string" && kind)) return null;
-      if (kind === "Worker" || kind === "worker" || kind === "DedicatedWorker" || kind === "DedicatedWorkerGlobalScope") return "dedicated";
-      if (kind === "SharedWorker" || kind === "SharedWorkerGlobalScope") return "shared";
-      if (kind === "ServiceWorker" || kind === "ServiceWorkerGlobalScope") return "service";
-      if (kind === "Window" || kind === "window" || kind === "WindowGlobalScope") return "window";
-      return kind;
+    function canonicalScopeIdentity(value) {
+      if (!(typeof value === "string" && value)) return { scope: null, scopeKind: null };
+      if (value === "Worker" || value === "worker" || value === "dedicated" || value === "DedicatedWorker" || value === "DedicatedWorkerGlobalScope") {
+        return { scope: "DedicatedWorkerGlobalScope", scopeKind: "dedicated" };
+      }
+      if (value === "shared" || value === "SharedWorker" || value === "SharedWorkerGlobalScope") {
+        return { scope: "SharedWorkerGlobalScope", scopeKind: "shared" };
+      }
+      if (value === "service" || value === "ServiceWorker" || value === "ServiceWorkerGlobalScope") {
+        return { scope: "ServiceWorkerGlobalScope", scopeKind: "service" };
+      }
+      if (value === "Window" || value === "window" || value === "WindowGlobalScope") {
+        return { scope: "WindowGlobalScope", scopeKind: "window" };
+      }
+      return { scope: value, scopeKind: null };
     }
 
     function resolveDiagScopeIdentity(ctx, data) {
@@ -318,13 +307,12 @@ const LOGGingModule = function LOGGingModule() {
       let explicitKind = (typeof safeCtx.scopeKind === "string" && safeCtx.scopeKind)
         ? safeCtx.scopeKind
         : ((safeData && typeof safeData.scopeKind === "string" && safeData.scopeKind) ? safeData.scopeKind : null);
-      explicitScope = canonicalScopeName(explicitScope);
-      explicitKind = canonicalScopeKind(explicitKind);
-      if (!explicitKind && explicitScope === "ServiceWorkerGlobalScope") explicitKind = "service";
-      else if (!explicitKind && explicitScope === "SharedWorkerGlobalScope") explicitKind = "shared";
-      else if (!explicitKind && explicitScope === "DedicatedWorkerGlobalScope") explicitKind = "dedicated";
-      else if (!explicitKind && explicitScope === "WindowGlobalScope") explicitKind = "window";
-      if (!explicitScope && explicitKind) explicitScope = scopeNameFromKind(explicitKind);
+      const explicitScopeIdentity = canonicalScopeIdentity(explicitScope);
+      const explicitKindIdentity = canonicalScopeIdentity(explicitKind);
+      explicitScope = explicitScopeIdentity.scope;
+      explicitKind = explicitKindIdentity.scopeKind || ((typeof explicitKind === "string" && explicitKind) ? explicitKind : null);
+      if (!explicitKind && explicitScopeIdentity.scopeKind) explicitKind = explicitScopeIdentity.scopeKind;
+      if (!explicitScope && explicitKindIdentity.scopeKind) explicitScope = explicitKindIdentity.scope;
       const runtimeWorkerScopeKind = (wrkRuntime && typeof wrkRuntime.workerScopeKind === "string" && wrkRuntime.workerScopeKind)
         ? wrkRuntime.workerScopeKind
         : null;
@@ -360,7 +348,8 @@ const LOGGingModule = function LOGGingModule() {
       const hasExplicitIdentity = !!(explicitKind || explicitScope);
       const auxiliary = Object.create(null);
       if (!hasExplicitIdentity && runtimeKind && runtimeKind !== scopeKind) {
-        auxiliary.relatedScope = scopeNameFromKind(runtimeKind);
+        const runtimeIdentity = canonicalScopeIdentity(runtimeKind);
+        auxiliary.relatedScope = runtimeIdentity.scopeKind ? runtimeIdentity.scope : null;
         auxiliary.relatedScopeKind = runtimeKind;
         auxiliary.workerFamily = runtimeKind;
       }
@@ -1682,127 +1671,6 @@ const LOGGingModule = function LOGGingModule() {
       return normalizeForJSONWithLimits(value, SERIAL_LIMITS, seen, depth);
     }
 
-    function normalizeProbeScalar(value) {
-      if (value === null || typeof value === "undefined") return value;
-      const t = typeof value;
-      if (t === "string" || t === "number" || t === "boolean") return normalizeForJSON(value);
-      if (value instanceof Error) return normalizeForJSON(value);
-      if (Array.isArray(value)) {
-        const lim = Math.min(value.length, 8);
-        const out = new Array(lim);
-        for (let i = 0; i < lim; i++) out[i] = normalizeForJSON(value[i], null, 2);
-        if (value.length > lim) out.push(`[... ${value.length - lim} more items]`);
-        return out;
-      }
-      if (isPlainObject(value)) {
-        const keys = Object.keys(value);
-        const out = {};
-        const lim = Math.min(keys.length, 8);
-        for (let i = 0; i < lim; i++) {
-          const k = keys[i];
-          out[k] = normalizeForJSON(value[k], null, 2);
-        }
-        if (keys.length > lim) out.__truncated_keys__ = keys.length - lim;
-        return out;
-      }
-      return metadataSnapshot(value, safeTag(value));
-    }
-
-    function normalizeProbeRow(section, row) {
-      if (!row || typeof row !== "object") return normalizeProbeScalar(row);
-      const out = {};
-      function pick(key, alias) {
-        if (!Object.prototype.hasOwnProperty.call(row, key)) return;
-        const v = row[key];
-        out[alias || key] = normalizeProbeScalar(v);
-      }
-      if (section === "field_values") {
-        pick("field"); pick("ok"); pick("value"); pick("error"); pick("source");
-        return out;
-      }
-      if (section === "worker_scope_audit") {
-        pick("scope"); pick("variant"); pick("field"); pick("match"); pick("expected"); pick("actual"); pick("error");
-        return out;
-      }
-      if (section === "prototype_descriptors") {
-        pick("prototype");
-        if (Array.isArray(row.rows)) out.rowCount = row.rows.length;
-        if (Array.isArray(row.rows) && row.rows.length) {
-          const first = row.rows[0];
-          if (first && typeof first === "object") {
-            const keys = Object.keys(first).slice(0, 8);
-            if (keys.length) out.rowShape = keys;
-          }
-        }
-        return Object.keys(out).length ? out : metadataSnapshot(row, safeTag(row));
-      }
-      if (section === "touched_methods") {
-        pick("method"); pick("ok"); pick("exists"); pick("isMethod"); pick("signature"); pick("toStringStatus"); pick("setProtoStatus"); pick("error");
-        return out;
-      }
-      if (section === "receiver_checks") {
-        pick("check"); pick("method"); pick("available"); pick("match"); pick("badThrew"); pick("badError"); pick("goodError"); pick("badAsyncState"); pick("goodAsyncState");
-        return out;
-      }
-      if (section === "audio_own_property_checks") {
-        pick("check"); pick("method"); pick("match"); pick("expectedAfterCreateOwn"); pick("actualAfterCreateOwn"); pick("extra"); pick("error");
-        return out;
-      }
-      if (section === "prototype_instanceof_checks" || section === "tostring_cross_realm_checks") {
-        pick("check"); pick("match"); pick("expected"); pick("actual"); pick("error");
-        return out;
-      }
-      if (section === "descriptor_expectations") {
-        pick("prototype"); pick("key"); pick("allMatch"); pick("missingActual");
-        const mismatchKeys = [];
-        const keys = Object.keys(row);
-        for (let i = 0; i < keys.length; i++) {
-          const k = keys[i];
-          if (k.indexOf("match_") === 0 && row[k] === false) mismatchKeys.push(k.slice(6));
-        }
-        if (mismatchKeys.length) out.mismatchFields = mismatchKeys;
-        return out;
-      }
-      if (section === "degrade_last_50") {
-        pick("idx"); pick("timestamp"); pick("level"); pick("code"); pick("module"); pick("key"); pick("message"); pick("err");
-        return out;
-      }
-      if (section === "module_check") {
-        pick("module"); pick("kind"); pick("unit"); pick("status"); pick("code"); pick("message");
-        return out;
-      }
-      const keys = Object.keys(row);
-      for (let i = 0; i < Math.min(keys.length, 8); i++) pick(keys[i]);
-      if (keys.length > 8) out.__truncated_keys__ = keys.length - 8;
-      return out;
-    }
-
-    function normalizeProbeReportData(value) {
-      if (!isPlainObject(value)) return normalizeForJSON(value);
-      const out = {};
-      if (Object.prototype.hasOwnProperty.call(value, "section")) out.section = normalizeForJSON(value.section);
-      if (Object.prototype.hasOwnProperty.call(value, "status")) out.status = normalizeForJSON(value.status);
-      if (Object.prototype.hasOwnProperty.call(value, "probeRunId")) out.probeRunId = normalizeForJSON(value.probeRunId);
-      if (Object.prototype.hasOwnProperty.call(value, "summary")) out.summary = normalizeProbeScalar(value.summary);
-      if (Object.prototype.hasOwnProperty.call(value, "reason")) out.reason = normalizeForJSON(value.reason);
-      if (Object.prototype.hasOwnProperty.call(value, "error")) out.error = normalizeProbeScalar(value.error);
-      const section = (typeof value.section === "string" && value.section) ? value.section : "";
-      if (Array.isArray(value.rows)) {
-        const lim = Math.min(value.rows.length, 64);
-        out.rows = new Array(lim);
-        for (let i = 0; i < lim; i++) out.rows[i] = normalizeProbeRow(section, value.rows[i]);
-        if (value.rows.length > lim) out.rows.push(`[... ${value.rows.length - lim} more items]`);
-      }
-      if (Array.isArray(value.rawEntries)) {
-        const lim = Math.min(value.rawEntries.length, 12);
-        out.rawEntries = new Array(lim);
-        for (let i = 0; i < lim; i++) out.rawEntries[i] = normalizeProbeScalar(value.rawEntries[i]);
-        if (value.rawEntries.length > lim) out.rawEntries.push(`[... ${value.rawEntries.length - lim} more items]`);
-      }
-      if (Object.prototype.hasOwnProperty.call(value, "meta")) out.meta = normalizeProbeScalar(value.meta);
-      return out;
-    }
-
     function safeStringify(value) {
       try {
         return JSON.stringify(normalizeForJSON(value), null, 2);
@@ -2021,14 +1889,7 @@ const LOGGingModule = function LOGGingModule() {
       }
       let safeData = (dataIn === null)
         ? null
-        : (
-            safeCtx
-            && safeCtx.module === "probe"
-            && safeCtx.diagTag === "probe:report"
-            && isPlainObject(dataIn)
-          )
-          ? normalizeProbeReportData(dataIn)
-          : normalizeForJSONWithLimits(dataIn, serialLimits);
+        : normalizeForJSONWithLimits(dataIn, serialLimits);
       const scopeInfo = resolveDiagScopeIdentity(safeCtx, safeData);
       if (safeData && typeof safeData === "object" && !Array.isArray(safeData)) {
         if (typeof scopeInfo.scope === "string" && scopeInfo.scope) {
@@ -2350,7 +2211,7 @@ const LOGGingModule = function LOGGingModule() {
       }
 
     // ===== 6) Export helper (in-session) =====
-    __defineLoggerHiddenValue("exportMyDebugLog", function () {
+    const exportMyDebugLog = __defineLoggerHiddenValue("exportMyDebugLog", function exportMyDebugLog() {
       try {
         if (typeof document === "undefined" || !document) return;
         const list = (typeof __loggerRoot.__DEGRADE__ === "function" && typeof __loggerRoot.__DEGRADE__.getBuffer === "function")
@@ -2389,91 +2250,17 @@ const LOGGingModule = function LOGGingModule() {
         }
       }
     }, false);
-
-    // ===== 7) One-click toggles (no markers) =====
-    __defineLoggerHiddenValue("DEBUG_ALL_ON", function () {
-      try {
-        __loggerRoot.__DEBUG__ = true;
-        __loggerRoot._logLevel = "trace";
-        if (__loggerRoot._logConfig) {
-          for (const k in __loggerRoot._logConfig) {
-            __loggerRoot._logConfig[k].enabled = true;
-            __loggerRoot._logConfig[k].level = "trace";
-          }
-        }
-        if (typeof __loggerRoot.__DEGRADE__ === "function") {
-          __loggerRoot.__DEGRADE__("DEBUG_ALL_ON", null);
-        }
-      } catch (e) {
-        if (env && env.DEBUG_DEGRADES) {
-          emitRawConsoleError(e);
-          try { recordLoggerError(e, "DEBUG_ALL_ON"); } catch (_) {}
-        }
+    try {
+      const exportAliasDesc = Object.getOwnPropertyDescriptor(global, "exportMyDebugLog");
+      if (!exportAliasDesc || exportAliasDesc.configurable !== false || exportAliasDesc.value === exportMyDebugLog) {
+        __defineGlobalCompatValue("exportMyDebugLog", exportMyDebugLog, false);
       }
-    }, false);
-
-    __defineLoggerHiddenValue("DEBUG_ALL_OFF", function () {
-      try {
-        __loggerRoot.__DEBUG__ = false;
-        __loggerRoot._logLevel = "error";
-        if (__loggerRoot._logConfig) {
-          for (const k in __loggerRoot._logConfig) {
-            __loggerRoot._logConfig[k].enabled = false;
-          }
-        }
-        if (typeof __loggerRoot.__DEGRADE__ === "function") {
-          __loggerRoot.__DEGRADE__("DEBUG_ALL_OFF", null);
-        }
-      } catch (e) {
-        if (env && env.DEBUG_DEGRADES) {
-          emitRawConsoleError(e);
-          try { recordLoggerError(e, "DEBUG_ALL_OFF"); } catch (_) {}
-        }
-      }
-    }, false);
-
-    __defineLoggerHiddenValue("DEBUG_ALL_TOGGLE", function () {
-      try {
-        if (__loggerRoot.__DEBUG__) __loggerRoot.DEBUG_ALL_OFF();
-        else __loggerRoot.DEBUG_ALL_ON();
-      } catch (e) {
-        if (env && env.DEBUG_DEGRADES) {
-          emitRawConsoleError(e);
-          try { recordLoggerError(e, "DEBUG_ALL_TOGGLE"); } catch (_) {}
-        }
-      }
-    }, false);
-
-    // Logger self-diagnostics mode toggles (controls verbosity, not runtime throws)
-    __defineLoggerHiddenValue("DEBUG_DEGRADES_ON", function () {
-      try {
-        env.DEBUG_DEGRADES = true;
-        if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_ON", null);
-      } catch (e) {
+    } catch (e) {
+      if (env && env.DEBUG_DEGRADES) {
         emitRawConsoleError(e);
-        try { recordLoggerError(e, "DEBUG_DEGRADES_ON"); } catch (_) {}
+        try { recordLoggerError(e, "exportMyDebugLog:global_alias"); } catch (_) {}
       }
-    }, false);
-
-    __defineLoggerHiddenValue("DEBUG_DEGRADES_OFF", function () {
-      try {
-        env.DEBUG_DEGRADES = false;
-        if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_OFF", null);
-      } catch (e) {
-        emitRawConsoleError(e);
-        try { recordLoggerError(e, "DEBUG_DEGRADES_OFF"); } catch (_) {}
-      }
-    }, false);
-
-    __defineLoggerHiddenValue("DEBUG_DEGRADES_TOGGLE", function () {
-      try {
-        env.DEBUG_DEGRADES = !env.DEBUG_DEGRADES;
-        if (typeof __loggerRoot.__DEGRADE__ === "function") __loggerRoot.__DEGRADE__("DEBUG_DEGRADES_TOGGLE", null, { enabled: !!env.DEBUG_DEGRADES });
-      } catch (e) {
-        emitRawConsoleError(e);
-        try { recordLoggerError(e, "DEBUG_DEGRADES_TOGGLE"); } catch (_) {}
-      }
-    }, false);
+    }
 
     __defineLoggerHiddenValue("CONSOLE_CAPTURE_COMPACT_ON", function () {
       try {
