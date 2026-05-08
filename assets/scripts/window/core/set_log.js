@@ -109,8 +109,10 @@ const LOGGingModule = function LOGGingModule() {
     // ===== 0) Central store: private buffer only =====
     const STORE = (__loggerRoot.STORE instanceof WeakMap) ? __loggerRoot.STORE : new WeakMap();
     const FALLBACK_BUF = Array.isArray(__loggerRoot.FALLBACK_BUF) ? __loggerRoot.FALLBACK_BUF : [];
+    const ACCESS_BUF = Array.isArray(__loggerRoot.ACCESS_BUF) ? __loggerRoot.ACCESS_BUF : [];
     __defineLoggerHiddenValue("STORE", STORE, true);
     __defineLoggerHiddenValue("FALLBACK_BUF", FALLBACK_BUF, true);
+    __defineLoggerHiddenValue("ACCESS_BUF", ACCESS_BUF, true);
     let degradeFn = null;
 
     function _buf() {
@@ -1141,16 +1143,13 @@ const LOGGingModule = function LOGGingModule() {
       };
     }
 
-    function buildDegradeBufferMeta(rawEntries) {
+    function buildDegradeBufferMeta(rawEntries, accessEntries) {
       const arr = Array.isArray(rawEntries) ? rawEntries : [];
+      const accessArr = Array.isArray(accessEntries) ? accessEntries : [];
       const meta = {
-        totalBuffer: arr.length,
-        totalCritical: 0,
-        totalAccess: 0,
         byLevel: {},
         byCode: {},
         byModule: {},
-        byEntryType: {},
         lastCritical: [],
         lastAccess: []
       };
@@ -1160,26 +1159,16 @@ const LOGGingModule = function LOGGingModule() {
         const level = (typeof incident.level === "string" && incident.level) ? incident.level : "info";
         const code = (typeof incident.code === "string" && incident.code) ? incident.code : "unknown";
         const moduleName = (typeof incident.module === "string" && incident.module) ? incident.module : "unknown";
-        const entryType = (typeof incident.entryType === "string" && incident.entryType) ? incident.entryType : "unknown";
         meta.byLevel[level] = (meta.byLevel[level] || 0) + 1;
         meta.byCode[code] = (meta.byCode[code] || 0) + 1;
         meta.byModule[moduleName] = (meta.byModule[moduleName] || 0) + 1;
-        meta.byEntryType[entryType] = (meta.byEntryType[entryType] || 0) + 1;
-        if (isAccessBufferEntry(arr[i])) {
-          meta.totalAccess += 1;
-          meta.lastAccess.push(shapeDegradeBufferEntry(arr[i], i, SERIAL_LIMITS));
-        }
         if (!incident.critical) continue;
-        meta.totalCritical += 1;
         meta.lastCritical.push(shapeDegradeBufferEntry(arr[i], i, LAST_CRITICAL_SERIAL_LIMITS));
       }
+      for (let i = 0; i < accessArr.length; i++) {
+        meta.lastAccess.push(shapeDegradeBufferEntry(accessArr[i], i, SERIAL_LIMITS));
+      }
       if (meta.lastCritical.length > 30) meta.lastCritical = meta.lastCritical.slice(-30);
-      if (meta.lastAccess.length > 50) meta.lastAccess = meta.lastAccess.slice(-50);
-      meta.lastTimestamp = arr.length ? formatCompactTimestamp(safeEntryTimestamp(arr[arr.length - 1])) : null;
-      meta.cursor = {
-        nextSinceIndex: arr.length,
-        lastTimestamp: meta.lastTimestamp
-      };
       return meta;
     }
 
@@ -1909,6 +1898,13 @@ const LOGGingModule = function LOGGingModule() {
 
     function pushEntry(entry) {
       try {
+        if (isAccessBufferEntry(entry)) {
+          ACCESS_BUF.push(entry);
+          if (ACCESS_BUF.length > 50) {
+            ACCESS_BUF.splice(0, ACCESS_BUF.length - 50);
+          }
+          return;
+        }
         _buf().push(entry);
         if (shouldRescheduleModuleAudit(entry)) {
           queueModuleAuditRun();
@@ -1971,11 +1967,10 @@ const LOGGingModule = function LOGGingModule() {
         const raw = _buf().slice();
         const shaped = [];
         for (let i = 0; i < raw.length; i++) {
-          if (isAccessBufferEntry(raw[i])) continue;
           shaped.push(shapeDegradeBufferEntry(raw[i], i));
         }
         Object.defineProperty(shaped, "meta", {
-          value: buildDegradeBufferMeta(raw),
+          value: buildDegradeBufferMeta(raw, ACCESS_BUF.slice()),
           enumerable: false,
           writable: false,
           configurable: false
