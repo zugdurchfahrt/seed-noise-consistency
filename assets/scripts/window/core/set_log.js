@@ -947,6 +947,7 @@ const LOGGingModule = function LOGGingModule() {
         if (!extra || typeof extra !== "object") return extra;
         if (
           codeValue !== "context:webgl:access"
+          && codeValue !== "context:canvas:access"
           && codeValue !== "context:issued_webgl:hook:override"
           && codeValue !== "nav_total_set:nav_access"
         ) return extra;
@@ -978,8 +979,10 @@ const LOGGingModule = function LOGGingModule() {
 
     function isAccessEntryCode(codeValue) {
       return codeValue === "context:webgl:access"
+        || codeValue === "context:canvas:access"
         || codeValue === "context:issued_webgl:hook:override"
         || codeValue === "nav_total_set:nav_access"
+        || codeValue === "nav_total_set:getHighEntropyValues_resolved"
         || codeValue === "nav_total_set:permission_state_updated"
         || codeValue === "fonts:fontface:local_only_replaced_with_managed_src"
         || codeValue === "fonts:fontface:local_only_passthrough_not_proven";
@@ -999,6 +1002,7 @@ const LOGGingModule = function LOGGingModule() {
           || reason === "permission_state_updated"
           || key.indexOf("permissions.") === 0
           || reason === "webgl_access"
+          || reason === "canvas_access"
           || reason === "local_only_replaced_with_managed_src"
           || reason === "local_only_passthrough_not_proven";
       } catch (_) {

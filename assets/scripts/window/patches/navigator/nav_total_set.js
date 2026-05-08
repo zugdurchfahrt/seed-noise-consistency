@@ -860,10 +860,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
       const out = Object.assign({}, base);
       for (const hint of Object.keys(result)) {
-        const current = out[hint];
-        if (current === undefined || current === null || (typeof current === 'string' && !current && hint !== 'model') || (Array.isArray(current) && !current.length)) {
-          out[hint] = result[hint];
-        }
+        out[hint] = result[hint];
       }
       return out;
     }
@@ -2361,11 +2358,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   const requestedKeySig = keys.map(function navHighEntropyKeySigItem(k) {
                     return String(k).replace(/[^A-Za-z0-9_.-]/g, '_');
                   }).join('+') || 'empty';
-                  __navDiag('info', 'nav_total_set:userAgentData_getHighEntropyValues_resolved:' + requestedKeySig, {
+                  __navDiag('info', 'nav_total_set:getHighEntropyValues_resolved', {
                     stage: 'runtime',
                     type: __navTypePipeline,
                     diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
-                    key: 'userAgentData.getHighEntropyValues[' + requestedKeySig + ']',
+                    key: 'getHighEntropyValues',
                     message: 'highEntropy values resolved',
                     data: {
                       outcome: 'return',

@@ -309,6 +309,46 @@ const ContextPatchModule = function ContextPatchModule(window) {
     } catch (_) {}
   }
 
+  function emitCanvasAccess(method, args, result, source, phase, hook, count) {
+    try {
+      const safeArgs = Array.isArray(args) ? args : [];
+      let resultMeta = null;
+      if (typeof result === 'string') resultMeta = { kind: 'string', length: result.length };
+      else if (result != null) {
+        try {
+          resultMeta = (typeof Blob !== 'undefined' && result instanceof Blob)
+            ? { kind: 'Blob', size: result.size, type: result.type || '' }
+            : { kind: (result.constructor && result.constructor.name) || typeof result };
+        } catch (_) {
+          resultMeta = { kind: typeof result };
+        }
+      }
+      emitContextDiag('info', 'context:canvas:access', null, {
+        module: 'context',
+        stage: 'runtime',
+        surface: 'canvas',
+        key: method,
+        message: 'canvas access',
+        type: 'pipeline diagnostic',
+        data: {
+          outcome: 'return',
+          reason: 'canvas_access',
+          extra: {
+            loggerGroup: 'CANVASlogger',
+            loggerChannel: 'access',
+            method: method,
+            source: (typeof source === 'string' && source) ? source : 'native',
+            hook: (typeof hook === 'string' && hook) ? hook : null,
+            hookCount: Number.isFinite(count) ? count : null,
+            hookPhase: (typeof phase === 'string' && phase) ? phase : null,
+            request: safeArgs.length ? safeArgs[0] : null,
+            resultMeta: resultMeta
+          }
+        }
+      });
+    } catch (_) {}
+  }
+
   const patchedMethods = new WeakSet();
   const coreWindow = (global && global.Core && typeof global.Core === 'object')
     ? global.Core
@@ -711,7 +751,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
             const patchedArgs = Array.prototype.slice.call(arguments);
             const out = Reflect.apply(orig, this, patchedArgs);
             let res = out;
-            for (const hook of getHooksList()) {
+            const hooks = getHooksList();
+            for (const hook of hooks) {
               try {
                 const r = hook.call(this, res, ...patchedArgs);
                 if (typeof r === 'string') res = r;
@@ -723,6 +764,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 });
                 throw e;
               }
+            }
+            if (hooks && hooks.length) {
+              emitCanvasAccess(method, patchedArgs, res, 'issued_serialization', 'post', null, hooks.length);
             }
             return res;
           } finally {
@@ -751,7 +795,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
               if (out && typeof out.then === 'function') {
                 out.then(
-                  (b2) => { callback(b2); },
+                  (b2) => {
+                    const hooks = getHooksList();
+                    if (hooks && hooks.length) {
+                      emitCanvasAccess(method, Array.prototype.slice.call(args), b2, 'issued_serialization', 'post', null, hooks.length);
+                    }
+                    callback(b2);
+                  },
                   (e)  => {
                     emitContextDiag('warn', 'context:issued_serialization:hook_failed', e, {
                       stage: 'hook',
@@ -763,6 +813,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 return;
               }
 
+              const hooks = getHooksList();
+              if (hooks && hooks.length) {
+                emitCanvasAccess(method, Array.prototype.slice.call(args), out, 'issued_serialization', 'post', null, hooks.length);
+              }
               callback(out);
             };
 
@@ -786,7 +840,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
             (blob) => {
               const out = applyHooksAsync(self, blob, args);
               return Promise.resolve(out).then(
-                (b2) => { return b2; },
+                (b2) => {
+                  emitCanvasAccess(method, Array.prototype.slice.call(args), b2, 'issued_serialization', 'post', null, hooks.length);
+                  return b2;
+                },
                 (e)  => { throw e; }
               );
             },
@@ -1072,6 +1129,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       const rest = args.length > 1 ? Array.prototype.slice.call(args, 1) : [];
       const res = Reflect.apply(orig, self, args);
       let ctx = res;
+      let issuedHookCount = 0;
 
       try {
         if (ctx) {
@@ -1080,6 +1138,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         if (type === '2d' && ctx) {
           ctx = createSafeCtxProxy(ctx);
           __storeSharedDefaultCtx2dFont__(ctx);
+          issuedHookCount += (ctx2dHooks && ctx2dHooks.length) || 0;
           for (const hook of (ctx2dHooks || [])) {
             try { ctx = hook.call(self, ctx, type, ...rest) || ctx; } catch (e) {
               emitContextDiag('warn', 'context:getContext:ctx2d_hook_failed', e, {
@@ -1094,6 +1153,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           if (ctx) {
             installIssuedWebGLMethods(ctx);
           }
+          issuedHookCount += (webglHooks && webglHooks.length) || 0;
           for (const hook of (webglHooks || [])) {
             try { hook.call(self, ctx, type, ...rest); } catch (e) {
               emitContextDiag('warn', 'context:getContext:webgl_hook_failed', e, {
@@ -1104,6 +1164,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
             }
           }
         }
+        issuedHookCount += (htmlHooks && htmlHooks.length) || 0;
         for (const hook of (htmlHooks || [])) {
           try { hook.call(self, ctx, type, ...rest); } catch (e) {
             emitContextDiag('warn', 'context:getContext:html_hook_failed', e, {
@@ -1114,6 +1175,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
           }
         }
         registerIssuedContext(ctx, type, self);
+        if (ctx && issuedHookCount) {
+          emitCanvasAccess('getContext', args, ctx, 'issued_factory', 'post', null, issuedHookCount);
+        }
       } catch (e) {
         emitContextDiag('error', 'context:getContext:chain_failed', e, {
           stage: 'hook',
@@ -1360,7 +1424,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
         if (H && typeof H.applyMeasureTextHook === 'function') {
           const r = Reflect.apply(H.applyMeasureTextHook, thisArg, [m, txt, fontStr]);
-
           return r ?? m;
         }
 
