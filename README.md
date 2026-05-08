@@ -256,6 +256,7 @@ Custom fonts should be normal text fonts. Avoid icon fonts, emoji fonts, empty/b
   })();
   ```
 
+You also can  easily just type `exportMyDebugLog()` in Devtools console to get the same result.
 
 ### Mitmproxy switch
 

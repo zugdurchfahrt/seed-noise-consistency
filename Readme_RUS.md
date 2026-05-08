@@ -266,6 +266,8 @@ client.post()
     URL.revokeObjectURL(url);
   })();
   ```
+  
+Вы также можете просто ввести `exportMyDebugLog()` в консоли DevTools, чтобы получить тот же результат.
 
 ### Переключатель mitmproxy
 
