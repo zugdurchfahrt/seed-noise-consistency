@@ -2210,7 +2210,7 @@ const LOGGingModule = function LOGGingModule() {
         }
       }
 
-    // ===== 6) Export helper (in-session) =====
+    // ===== 6) Export helper (hidden logger-state only) =====
     const exportMyDebugLog = __defineLoggerHiddenValue("exportMyDebugLog", function exportMyDebugLog() {
       try {
         if (typeof document === "undefined" || !document) return;
@@ -2250,17 +2250,6 @@ const LOGGingModule = function LOGGingModule() {
         }
       }
     }, false);
-    try {
-      const exportAliasDesc = Object.getOwnPropertyDescriptor(global, "exportMyDebugLog");
-      if (!exportAliasDesc || exportAliasDesc.configurable !== false || exportAliasDesc.value === exportMyDebugLog) {
-        __defineGlobalCompatValue("exportMyDebugLog", exportMyDebugLog, false);
-      }
-    } catch (e) {
-      if (env && env.DEBUG_DEGRADES) {
-        emitRawConsoleError(e);
-        try { recordLoggerError(e, "exportMyDebugLog:global_alias"); } catch (_) {}
-      }
-    }
 
     __defineLoggerHiddenValue("CONSOLE_CAPTURE_COMPACT_ON", function () {
       try {

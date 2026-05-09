@@ -658,7 +658,6 @@ def init_driver(
                 const C = window.CanvasPatchContext; if (!C) return;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
-                if (C.applyCtx2DContextPatches)  C.applyCtx2DContextPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             }})(window);
             (function runBootstrapEnvCleanup(win) {{

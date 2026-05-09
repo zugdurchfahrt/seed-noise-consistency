@@ -921,7 +921,6 @@ try {
   });
 }
 
-// __CanvasPatchHooks__.patch2DNoise = patch2DNoise;
 __CanvasPatchHooks__.patchToDataURLInjectNoise = patchToDataURLInjectNoise;
 // Disabled/non-required export kept as an operational switch.
 // __CanvasPatchHooks__.patchCanvasIHDRHook = patchCanvasIHDRHook;
@@ -933,7 +932,6 @@ __CanvasPatchHooks__.applyMeasureTextHook = applyMeasureTextHook;
 __CanvasPatchHooks__.fillTextNoiseHook = fillTextNoiseHook;
 __CanvasPatchHooks__.strokeTextNoiseHook = strokeTextNoiseHook;
 __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
-// __CanvasPatchHooks__.addCanvasNoise = addCanvasNoise;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
 
 }

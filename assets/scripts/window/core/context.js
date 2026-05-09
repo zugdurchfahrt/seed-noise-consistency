@@ -583,8 +583,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.ctx2DStrokeTextHooks                = C.ctx2DStrokeTextHooks               || [];
   C.ctx2DFillRectHooks                  = C.ctx2DFillRectHooks                 || [];
   C.ctx2DDrawImageHooks                 = C.ctx2DDrawImageHooks                || [];
-  // C.canvas2DNoiseHooks                  = C.canvas2DNoiseHooks                 || [];
-
   C.webglGetParameterHooks              = C.webglGetParameterHooks             || [];
   C.webglGetSupportedExtensionsHooks    = C.webglGetSupportedExtensionsHooks   || [];
   C.webglGetExtensionHooks              = C.webglGetExtensionHooks             || [];
@@ -615,13 +613,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
   C.registerCtx2DStrokeTextHook               = fn => registerOnce(C.ctx2DStrokeTextHooks, fn);
   C.registerCtx2DFillRectHook                 = fn => registerOnce(C.ctx2DFillRectHooks, fn);
   C.registerCtx2DDrawImageHook                = fn => registerOnce(C.ctx2DDrawImageHooks, fn);
-  // C.registerCtx2DAddNoiseHook                 = fn => registerOnce(C.canvas2DNoiseHooks, fn);
-  // 2026-02-11: TEMPORARILY DISABLED in one place (pipeline de-integration only).
-  // Related implementations to revisit later:
-  // assets/scripts/window/patches/graphics/canvas.js -> masterToDataURLHook, patchToBlobInjectNoise, patchConvertToBlobInjectNoise, addCanvasNoise
-
-  // if (C.registerCtx2DAddNoiseHook)          C.registerCtx2DAddNoiseHook(H.addCanvasNoise);
-
   C.registerWebGLGetContextHook               = fn => registerOnce(C.webglGetContextHooks, fn);
   C.registerWebGLGetParameterHook             = fn => registerOnce(C.webglGetParameterHooks, fn);
   C.registerWebGLGetSupportedExtensionsHook   = fn => registerOnce(C.webglGetSupportedExtensionsHooks, fn);
@@ -633,8 +624,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   // === 3. Patch utilities ===
 
-
- // === WEBGL PATCHING ===
+  // === WEBGL PATCHING ===
   // METHODOLOGY NOTE:
   // WebGL patchMethod is a separate context-level gateway contract.
   // Its current preflight sequence, diag/logging, and override-log toggles
@@ -1516,8 +1506,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return ctx;
   }
 
-
-
   // === 6. applying of patches===
   C.applyCanvasElementPatches = function(){
     const state = __ensurePatchState__(this);
@@ -1530,10 +1518,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
       this.ctx2DGetContextHooks,
       this.webglGetContextHooks
     );
-    if (C && C.__DOM_CANVAS__) {
+    const canvasState = __resolveCanvasStateForFont__();
+    const domCanvas = canvasState ? canvasState.domCanvas : null;
+    if (domCanvas) {
       total += 3;
-      applied += installIssuedSerializationMethods(C.__DOM_CANVAS__);
-      applied += installIssuedGetContextMethod(C.__DOM_CANVAS__, this.htmlCanvasGetContextHooks, this.ctx2DGetContextHooks, this.webglGetContextHooks);
+      applied += installIssuedSerializationMethods(domCanvas);
+      applied += installIssuedGetContextMethod(domCanvas, this.htmlCanvasGetContextHooks, this.ctx2DGetContextHooks, this.webglGetContextHooks);
     }
     state.canvas = applied > 0;
     if (__loggerRoot && __loggerRoot.__DEBUG__) {
@@ -1559,10 +1549,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
         Ctx.ctx2DGetContextHooks,
         Ctx.webglGetContextHooks
       );
-      if (C && C.__OFFSCREEN_CANVAS__) {
+      const canvasState = __resolveCanvasStateForFont__();
+      const offscreenCanvas = canvasState ? canvasState.offscreenCanvas : null;
+      if (offscreenCanvas) {
         total += 2;
-        applied += installIssuedSerializationMethods(C.__OFFSCREEN_CANVAS__);
-        applied += installIssuedGetContextMethod(C.__OFFSCREEN_CANVAS__, Ctx.offscreenGetContextHooks, Ctx.ctx2DGetContextHooks, Ctx.webglGetContextHooks);
+        applied += installIssuedSerializationMethods(offscreenCanvas);
+        applied += installIssuedGetContextMethod(offscreenCanvas, Ctx.offscreenGetContextHooks, Ctx.ctx2DGetContextHooks, Ctx.webglGetContextHooks);
       }
       state.offscreen = applied > 0;
     }
@@ -1613,7 +1605,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
     // 3) Validation of the availability of exports Canvas-hooks (from CanvasPatchModule)
     [
       // 2026-02-11: 'patchCanvasIHDRHook' disabled (non-wired runtime hook, kept out of required list).
-      // 2026-03-07: 'patch2DNoise','addCanvasNoise' disabled (non-wired runtime hook, kept out of required list).
       'patchToDataURLInjectNoise','masterToDataURLHook', 'fillTextNoiseHook','strokeTextNoiseHook', 'patchToBlobInjectNoise', 'patchConvertToBlobInjectNoise',
       'measureTextNoiseHook','applyMeasureTextHook', 'fillRectNoiseHook', 'applyDrawImageHook',
     ].forEach(name => {

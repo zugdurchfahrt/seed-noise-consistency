@@ -1,5 +1,3 @@
-# Readme_ENG.md
-
 **TL;DR**: Research-grade anti-fingerprinting pipeline (Python + JavaScript) injecting deterministic, seed-based patches for Canvas/WebGL/WebGPU/Fonts/Headers via CDP.  
 **Runs on Windows with VPN** (ProtonVPN/OpenVPN) + optional proxy  
 
@@ -256,7 +254,7 @@ Custom fonts should be normal text fonts. Avoid icon fonts, emoji fonts, empty/b
   })();
   ```
 
-You also can  easily just type `exportMyDebugLog()` in Devtools console to get the same result.
+You also can  easily just type `L.exportMyDebugLog()` in Devtools console to get the same result.
 
 ### Mitmproxy switch
 
