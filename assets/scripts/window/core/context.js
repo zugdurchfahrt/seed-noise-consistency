@@ -127,17 +127,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       enumerable: false
     });
   }
-  const issuedContextRegistry = (C && C.__issuedContextRegistry__ instanceof WeakMap)
-    ? C.__issuedContextRegistry__
-    : new WeakMap();
-  if (!Object.prototype.hasOwnProperty.call(C, '__issuedContextRegistry__')) {
-    Object.defineProperty(C, '__issuedContextRegistry__', {
-      value: issuedContextRegistry,
-      writable: false,
-      configurable: true,
-      enumerable: false
-    });
-  }
+
   const ctx2DGatewayMethods = Object.freeze(
     Array.prototype.concat.call([], GATEWAY_METHODS.ctx2DRead, GATEWAY_METHODS.ctx2DCore)
   );
@@ -148,7 +138,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
   let issuedOffscreenFactoryPatched = false;
 
   // === 0. Utilities ===
-  const NOP = () => {};
   function emitContextDiag(level, code, err, extra) {
     try {
       const x = (extra && typeof extra === "object") ? extra : {};
@@ -494,19 +483,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
       return OffscreenCanvasRenderingContext2D.prototype;
     }
     return null;
-  }
-
-  function registerIssuedContext(ctx, contextId, owner) {
-    if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) return ctx;
-    const kind = (typeof contextId === 'string' && contextId) ? contextId : null;
-    let surface = 'canvas';
-    if (kind && /^webgl/.test(kind)) surface = 'webgl';
-    issuedContextRegistry.set(ctx, {
-      kind,
-      surface,
-      owner: (owner && owner.constructor && owner.constructor.name) ? String(owner.constructor.name) : null
-    });
-    return ctx;
   }
 
   captureKeepNativeRefs();
@@ -1174,7 +1150,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
             });
           }
         }
-        registerIssuedContext(ctx, type, self);
         if (ctx && issuedHookCount) {
           emitCanvasAccess('getContext', args, ctx, 'issued_factory', 'post', null, issuedHookCount);
         }
@@ -1184,9 +1159,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           key: 'getContext',
           data: { type: type || null }
         });
-        registerIssuedContext(ctx, type, self);
       }
-
       return ctx;
     };
 
