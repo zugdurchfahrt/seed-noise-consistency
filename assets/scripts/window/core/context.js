@@ -176,30 +176,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     try {
       if (!isWebGLAccessLoggerEnabled()) return;
       const x = (entry && typeof entry === 'object') ? entry : {};
-      emitContextDiag('info', 'context:webgl:monitor', null, {
-        module: 'webgl',
-        diagTag: 'webgl',
-        surface: 'webgl',
-        key: (typeof x.method === 'string' && x.method) ? x.method : null,
-        stage: (typeof x.stage === 'string' && x.stage) ? x.stage : 'runtime',
-        message: (typeof x.message === 'string' && x.message) ? x.message : 'webgl monitor event',
-        type: 'pipeline missing data',
-        data: {
-          loggerGroup: 'WEBGLlogger',
-          loggerChannel: 'monitor_diag',
-          eventType: (typeof x.eventType === 'string' && x.eventType) ? x.eventType : 'webgl',
-          method: (typeof x.method === 'string' && x.method) ? x.method : '',
-          hook: (typeof x.hook === 'string' && x.hook) ? x.hook : '',
-          args: Object.prototype.hasOwnProperty.call(x, 'args') ? x.args : [],
-          result: Object.prototype.hasOwnProperty.call(x, 'result') ? x.result : null,
-          error: Object.prototype.hasOwnProperty.call(x, 'error') ? x.error : null
-        }
-      });
-      const push = (__loggerRoot && typeof __loggerRoot.__pushWebGLMonitor__ === 'function')
-        ? __loggerRoot.__pushWebGLMonitor__
-        : null;
-      if (typeof push !== 'function') return;
-      push({
+      const monitor = {
         eventType: (typeof x.eventType === 'string' && x.eventType) ? x.eventType : 'webgl',
         method: (typeof x.method === 'string' && x.method) ? x.method : '',
         hook: (typeof x.hook === 'string' && x.hook) ? x.hook : '',
@@ -207,13 +184,33 @@ const ContextPatchModule = function ContextPatchModule(window) {
         message: (typeof x.message === 'string' && x.message) ? x.message : '',
         args: Object.prototype.hasOwnProperty.call(x, 'args') ? x.args : [],
         result: Object.prototype.hasOwnProperty.call(x, 'result') ? x.result : null,
-        error: Object.prototype.hasOwnProperty.call(x, 'error') ? x.error : null,
+        error: Object.prototype.hasOwnProperty.call(x, 'error') ? x.error : null
+      };
+      const extra = (Object.prototype.hasOwnProperty.call(x, 'extra') && x.extra && typeof x.extra === 'object') ? x.extra : null;
+      emitContextDiag('info', 'context:webgl:monitor', null, {
+        module: 'webgl',
+        diagTag: 'webgl',
+        surface: 'webgl',
+        key: monitor.method || null,
+        stage: monitor.stage,
+        message: monitor.message || 'webgl monitor event',
+        type: 'pipeline missing data',
+        data: Object.assign({
+          loggerGroup: 'WEBGLlogger',
+          loggerChannel: 'monitor_diag'
+        }, monitor)
+      });
+      const push = (__loggerRoot && typeof __loggerRoot.__pushWebGLMonitor__ === 'function')
+        ? __loggerRoot.__pushWebGLMonitor__
+        : null;
+      if (typeof push !== 'function') return;
+      push(Object.assign({}, monitor, {
         extra: Object.assign({
           loggerGroup: 'WEBGLlogger',
           loggerChannel: 'monitor'
-        }, (Object.prototype.hasOwnProperty.call(x, 'extra') && x.extra && typeof x.extra === 'object') ? x.extra : null),
+        }, extra),
         timestamp: new Date().toISOString()
-      });
+      }));
     } catch (_) {}
   }
 
@@ -228,14 +225,18 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return true;
   }
 
+  const WEBGL_ACCESS_METHODS = Object.freeze({
+    getParameter: true,
+    getSupportedExtensions: true,
+    getExtension: true,
+    readPixels: true,
+    getShaderPrecisionFormat: true,
+    shaderSource: true,
+    getUniform: true
+  });
+
   function shouldLogWebGLAccess(method) {
-    return method === 'getParameter'
-      || method === 'getSupportedExtensions'
-      || method === 'getExtension'
-      || method === 'readPixels'
-      || method === 'getShaderPrecisionFormat'
-      || method === 'shaderSource'
-      || method === 'getUniform';
+    return !!WEBGL_ACCESS_METHODS[method];
   }
 
   function summarizeWebGLAccessValue(value) {
