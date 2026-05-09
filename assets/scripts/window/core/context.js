@@ -935,17 +935,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
         const args = Array.isArray(argsLike) ? argsLike : Array.prototype.slice.call(argsLike);
 
         if (guard && isObj) {
-          if (guard.has(self)) return orig.apply(self, args);
+          if (guard.has(self)) return Reflect.apply(orig, self, args);
           guard.add(self);
         }
 
         try {
           if (typeof guardInstance === "function" && !guardInstance(proto, self)) {
-            return orig.apply(self, args);
+            return Reflect.apply(orig, self, args);
           }
 
           if (isPostOrigOnceMode) {
-            const out = orig.apply(self, args);
+            const out = Reflect.apply(orig, self, args);
             for (const hook of hooks) {
               if (typeof hook !== 'function') continue;
               try {
@@ -965,7 +965,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
                     result: out
                   }
                 });
-                throw e;
               }
             }
             emitWebGLAccess(method, args, out, {
@@ -1041,10 +1040,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
                   args: patched
                 }
               });
-              throw e;
             }
           }
-          const out = orig.apply(self, patched);
+          const out = Reflect.apply(orig, self, patched);
           emitWebGLAccess(method, patched, out, {
             source: 'issued_native'
           });
