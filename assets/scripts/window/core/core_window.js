@@ -1,7 +1,7 @@
 const CoreWindowModule = function CoreWindowModule(window) {
   'use strict';
 
-  const C = window.CanvasPatchContext;
+  const C = window.FernwehContext;
   const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
   const G = (typeof globalThis !== 'undefined' && globalThis)
         || (typeof self       !== 'undefined' && self)

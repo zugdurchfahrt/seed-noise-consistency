@@ -10,8 +10,8 @@
   const __SURFACE = 'worker_bootstrap';
 
   function __resolveCanvasPatchContext() {
-    const C = (W && W.CanvasPatchContext && (typeof W.CanvasPatchContext === 'object' || typeof W.CanvasPatchContext === 'function'))
-      ? W.CanvasPatchContext
+    const C = (W && W.FernwehContext && (typeof W.FernwehContext === 'object' || typeof W.FernwehContext === 'function'))
+      ? W.FernwehContext
       : null;
     return C;
   }
@@ -264,10 +264,10 @@
 
       const __workerBootstrapState = __ensureWorkerBootstrapState();
       if (!__workerBootstrapState) {
-        const err = new Error('WorkerBootstrap: CanvasPatchContext.state.__WRK__.bootstrap unavailable');
+        const err = new Error('WorkerBootstrap: FernwehContext.state.__WRK__.bootstrap unavailable');
         __moduleDiag('error', __MODULE + ':state_missing', {
           stage: 'preflight',
-          key: 'CanvasPatchContext.state.__WRK__.bootstrap',
+          key: 'FernwehContext.state.__WRK__.bootstrap',
           message: 'worker bootstrap module-state unavailable',
           type: 'pipeline missing data',
           data: { outcome: 'throw', reason: 'state_missing' }
@@ -422,7 +422,7 @@
       const err = new Error('WorkerBootstrap: WorkerPatchHooks missing');
       __moduleDiag('error', __MODULE + ':hooks_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__WRK__.hooks.WorkerPatchHooks',
+        key: 'FernwehContext.state.__WRK__.hooks.WorkerPatchHooks',
         message: 'WorkerPatchHooks missing',
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'hooks_missing' }

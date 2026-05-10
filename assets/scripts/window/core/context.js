@@ -2,9 +2,9 @@
 // === CONTEXT PATCH MODULE ===
 const ContextPatchModule = function ContextPatchModule(window) {
   'use strict';  
-  const C  = window.CanvasPatchContext;
+  const C  = window.FernwehContext;
   const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
-    if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+    if (!C) throw new Error('[FernwehContext] FernwehContext is undefined — registratio not available');
   const G = (typeof globalThis !== 'undefined' && globalThis)
     || (typeof self       !== 'undefined' && self)
     || (typeof window     !== 'undefined' && window)
@@ -12,7 +12,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     || {};
     
   const global = window;
-  if (global.CanvasPatchContext && global.CanvasPatchContext.__READY__) {
+  if (global.FernwehContext && global.FernwehContext.__READY__) {
     return; // in case is already initialized
   }
 
@@ -289,39 +289,39 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
 
   function getHooks(){
-    return (typeof global !== 'undefined' && global.CanvasPatchHooks) ? global.CanvasPatchHooks : null;
+    return (typeof global !== 'undefined' && global.FernwehHooks) ? global.FernwehHooks : null;
   }
 
   function __resolveCanvasStateForFont__() {
     const canvasRoot = (C && C.state && C.state.__CANVAS__ && typeof C.state.__CANVAS__ === 'object')
       ? C.state.__CANVAS__
       : null;
-    const canvasState = (canvasRoot && canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+    const fernwehState = (canvasRoot && canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
       ? canvasRoot.__STATE__
       : null;
-    return canvasState;
+    return fernwehState;
   }
 
   function __readSharedDefaultCtx2dFont__() {
-    const canvasState = __resolveCanvasStateForFont__();
-    const cached = (canvasState && typeof canvasState.defaultCtx2dFont === 'string')
-      ? canvasState.defaultCtx2dFont.trim()
+    const fernwehState = __resolveCanvasStateForFont__();
+    const cached = (fernwehState && typeof fernwehState.defaultCtx2dFont === 'string')
+      ? fernwehState.defaultCtx2dFont.trim()
       : '';
     return cached || null;
   }
 
   function __storeSharedDefaultCtx2dFont__(ctx) {
-    const canvasState = __resolveCanvasStateForFont__();
-    if (!canvasState) {
+    const fernwehState = __resolveCanvasStateForFont__();
+    if (!fernwehState) {
       emitContextDiag('error', 'context:ctx2d:guard:default_font_state_missing', null, {
         stage: 'guard',
-        key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
+        key: 'FernwehContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
         type: 'pipeline missing data',
         message: 'shared default ctx2d font state missing'
       });
       return false;
     }
-    const existing = (typeof canvasState.defaultCtx2dFont === 'string') ? canvasState.defaultCtx2dFont.trim() : '';
+    const existing = (typeof fernwehState.defaultCtx2dFont === 'string') ? fernwehState.defaultCtx2dFont.trim() : '';
     if (existing) return true;
     const font = (ctx && typeof ctx.font === 'string') ? ctx.font.trim() : '';
     if (!font) {
@@ -333,7 +333,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       });
       return false;
     }
-    canvasState.defaultCtx2dFont = font;
+    fernwehState.defaultCtx2dFont = font;
     return true;
   }
 
@@ -1265,7 +1265,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       return Reflect.apply(target, thisArg, argList || []);
     });
 
-    // --- measureText: post-process TextMetrics via CanvasPatchHooks.applyMeasureTextHook ---
+    // --- measureText: post-process TextMetrics via FernwehHooks.applyMeasureTextHook ---
     patchOnce('measureText', (orig) => (target, thisArg, argList) => {
       const txt = ''.concat((argList && argList.length) ? argList[0] : '');
       const m = Reflect.apply(target, thisArg, [txt]);
@@ -1407,8 +1407,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
       this.ctx2DGetContextHooks,
       this.webglGetContextHooks
     );
-    const canvasState = __resolveCanvasStateForFont__();
-    const domCanvas = canvasState ? canvasState.domCanvas : null;
+    const fernwehState = __resolveCanvasStateForFont__();
+    const domCanvas = fernwehState ? fernwehState.domCanvas : null;
     if (domCanvas) {
       total += 3;
       applied += installIssuedSerializationMethods(domCanvas);
@@ -1438,8 +1438,8 @@ const ContextPatchModule = function ContextPatchModule(window) {
         Ctx.ctx2DGetContextHooks,
         Ctx.webglGetContextHooks
       );
-      const canvasState = __resolveCanvasStateForFont__();
-      const offscreenCanvas = canvasState ? canvasState.offscreenCanvas : null;
+      const fernwehState = __resolveCanvasStateForFont__();
+      const offscreenCanvas = fernwehState ? fernwehState.offscreenCanvas : null;
       if (offscreenCanvas) {
         total += 2;
         applied += installIssuedSerializationMethods(offscreenCanvas);
@@ -1478,17 +1478,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   // === 4. FINAL REGISTRATION ===
   function registerAllHooks() {
-    const C = window.CanvasPatchContext;
+    const C = window.FernwehContext;
     if (!C) return;
     const state = __ensurePatchState__(C);
     if (state.hooksRegistered) return;
 
     // 1) We guarantee the presence of registers
-    window.CanvasPatchHooks = window.CanvasPatchHooks || {};
+    window.FernwehHooks = window.FernwehHooks || {};
     window.webglHooks       = window.webglHooks       || {};
 
     // 2) We take aliases after initialization
-    const H = window.CanvasPatchHooks;
+    const H = window.FernwehHooks;
     const webglHooks = window.webglHooks;
 
     // 3) Validation of the availability of exports Canvas-hooks (from CanvasPatchModule)
@@ -1498,7 +1498,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       'measureTextNoiseHook','applyMeasureTextHook', 'fillRectNoiseHook', 'applyDrawImageHook',
     ].forEach(name => {
       if (typeof H[name] !== 'function') {
-        throw new Error(`[CanvasPatch] Hook ${name} not defined in CanvasPatchHooks`);
+        throw new Error(`[FernwehContext] Hook ${name} not defined in FernwehHooks`);
       }
     });
 
@@ -1542,7 +1542,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (C.registerWebGLGetUniformHook)               C.registerWebGLGetUniformHook(webglHooks.webglGetUniformHook);
     state.hooksRegistered = true;
   }
-    // keep registerAllHooks inside CanvasPatchContext to avoid a standalone window export
+    // keep registerAllHooks inside FernwehContext to avoid a standalone window export
     if (!Object.prototype.hasOwnProperty.call(C, 'registerAllHooks')) {
       Object.defineProperty(C, 'registerAllHooks', {
         value: registerAllHooks,

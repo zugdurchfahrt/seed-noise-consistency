@@ -9,8 +9,8 @@
   const __uaSnapshot = (typeof g.__USER_AGENT === 'string' && g.__USER_AGENT) ? g.__USER_AGENT : null;
 
   // ---- NORMATIVE: local diag adapter (single gateway; no local normalization) ----
-  const __loggerRoot = (g && g.CanvasPatchContext && g.CanvasPatchContext.__logger && typeof g.CanvasPatchContext.__logger === 'object')
-    ? g.CanvasPatchContext.__logger
+  const __loggerRoot = (g && g.FernwehContext && g.FernwehContext.__logger && typeof g.FernwehContext.__logger === 'object')
+    ? g.FernwehContext.__logger
     : null;
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -56,9 +56,9 @@
 
   // ---- TEMPORARY: module is present but disabled by default (opt-in via profile) ----
   // Purpose: keep legacy file available without accidental activation/conflicts in pipeline.
-  // Enable only by setting: CanvasPatchContext.state.__ENV_PROFILE__.profile.override_ua_data_enabled === true
-  const __stateRoot = (g && g.CanvasPatchContext && g.CanvasPatchContext.state && typeof g.CanvasPatchContext.state === 'object')
-    ? g.CanvasPatchContext.state
+  // Enable only by setting: FernwehContext.state.__ENV_PROFILE__.profile.override_ua_data_enabled === true
+  const __stateRoot = (g && g.FernwehContext && g.FernwehContext.state && typeof g.FernwehContext.state === 'object')
+    ? g.FernwehContext.state
     : null;
   const __envProfileState = (__stateRoot && __stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
     ? __stateRoot.__ENV_PROFILE__

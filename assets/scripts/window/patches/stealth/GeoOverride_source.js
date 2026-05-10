@@ -1,8 +1,8 @@
 (() => {
   const __MODULE = 'GeoOverride';
   const __SURFACE = 'geolocation';
-  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-    ? window.CanvasPatchContext.__logger
+  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+    ? window.FernwehContext.__logger
     : null;
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -23,7 +23,7 @@
 
   const __tag = __MODULE;
   const __flagKey = '__PATCH_GEOLOCATION__';
-  const C = window && window.CanvasPatchContext;
+  const C = window && window.FernwehContext;
   const Core = window && window.Core;
   function __moduleDiag(level, code, extra, err) {
     const x = (extra && typeof extra === 'object') ? extra : {};
@@ -471,10 +471,10 @@
   }
 
   if (!C) {
-    degrade('geo:canvas_patch_context_missing', new Error('[GeoOverride] CanvasPatchContext is required'), {
+    degrade('geo:canvas_patch_context_missing', new Error('[GeoOverride] FernwehContext is required'), {
       stage: 'preflight',
-      key: 'CanvasPatchContext',
-      message: '[GeoOverride] CanvasPatchContext is required',
+      key: 'FernwehContext',
+      message: '[GeoOverride] FernwehContext is required',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
     });
@@ -569,10 +569,10 @@
   try {
     __geoState = __ensureGeoState();
     if (!__geoState) {
-      degrade('geo:geo_state_missing', new Error('[GeoOverride] CanvasPatchContext.state.__GEO_STATE__ is required'), {
+      degrade('geo:geo_state_missing', new Error('[GeoOverride] FernwehContext.state.__GEO_STATE__ is required'), {
         stage: 'preflight',
         key: 'state.__GEO_STATE__',
-        message: '[GeoOverride] CanvasPatchContext.state.__GEO_STATE__ is required',
+        message: '[GeoOverride] FernwehContext.state.__GEO_STATE__ is required',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'geo_state_missing' }
       });

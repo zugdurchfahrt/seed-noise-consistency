@@ -5,8 +5,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenSurface = 'screen';
   const __core = window.Core;
   const __flagKey = '__PATCH_SCREEN__';
-  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-    ? window.CanvasPatchContext.__logger
+  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+    ? window.FernwehContext.__logger
     : null;
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -72,19 +72,19 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (!__guardToken) return; // already_patched: Core emits screen:already_patched
 
   // Read-only preflight: required dependency check, separate from guard semantics.
-  const C = window.CanvasPatchContext;
+  const C = window.FernwehContext;
   if (!C) {
-    const canvasMissingErr = new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available');
+    const canvasMissingErr = new Error('[FernwehContext] FernwehContext is undefined - module registration is not available');
     __screenDiag('warn', 'screen:canvas_patch_context_missing', {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: 'CanvasPatchContext',
-      message: 'CanvasPatchContext is undefined - module registration is not available',
+      key: 'FernwehContext',
+      message: 'FernwehContext is undefined - module registration is not available',
       data: {
         outcome: 'skip',
         reason: 'canvas_patch_context_missing',
-        missing: 'CanvasPatchContext'
+        missing: 'FernwehContext'
       }
     }, canvasMissingErr);
     try {
@@ -101,7 +101,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         data: {
           outcome: 'skip',
           reason: 'guard_release_failed',
-          substage: 'CanvasPatchContext'
+          substage: 'FernwehContext'
         }
       }, releaseErr);
     }
@@ -109,17 +109,17 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   const __screenStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__screenStateRoot) {
-    const stateMissingErr = new Error('[CanvasPatch] CanvasPatchContext.state is undefined - module registration is not available');
+    const stateMissingErr = new Error('[FernwehContext] FernwehContext.state is undefined - module registration is not available');
     __screenDiag('warn', 'screen:canvas_patch_state_missing', {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: 'CanvasPatchContext.state',
-      message: 'CanvasPatchContext.state is undefined - module registration is not available',
+      key: 'FernwehContext.state',
+      message: 'FernwehContext.state is undefined - module registration is not available',
       data: {
         outcome: 'skip',
         reason: 'canvas_patch_state_missing',
-        missing: 'CanvasPatchContext.state'
+        missing: 'FernwehContext.state'
       }
     }, stateMissingErr);
     try {
@@ -136,7 +136,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         data: {
           outcome: 'skip',
           reason: 'guard_release_failed',
-          substage: 'CanvasPatchContext.state'
+          substage: 'FernwehContext.state'
         }
       }, releaseErr);
     }
@@ -153,14 +153,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__',
-      message: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__ unavailable',
+      key: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__',
+      message: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__ unavailable',
       data: {
         outcome: 'skip',
         reason: 'env_screen_state_missing',
-        missing: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__'
+        missing: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__'
       }
-    }, new Error('[ScreenPatch] CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__ unavailable'));
+    }, new Error('[ScreenPatch] FernwehContext.state.__ENV_PROFILE__.__SCREEN__ unavailable'));
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
@@ -175,7 +175,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         data: {
           outcome: 'skip',
           reason: 'guard_release_failed',
-          substage: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__'
+          substage: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__'
         }
       }, releaseErr);
     }
@@ -192,14 +192,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: 'CanvasPatchContext.state.__SCREEN__',
-      message: 'CanvasPatchContext.state.__SCREEN__ unavailable',
+      key: 'FernwehContext.state.__SCREEN__',
+      message: 'FernwehContext.state.__SCREEN__ unavailable',
       data: {
         outcome: 'skip',
         reason: 'screen_state_missing',
-        missing: 'CanvasPatchContext.state.__SCREEN__'
+        missing: 'FernwehContext.state.__SCREEN__'
       }
-    }, new Error('[ScreenPatch] CanvasPatchContext.state.__SCREEN__ unavailable'));
+    }, new Error('[ScreenPatch] FernwehContext.state.__SCREEN__ unavailable'));
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
@@ -214,7 +214,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         data: {
           outcome: 'skip',
           reason: 'guard_release_failed',
-          substage: 'CanvasPatchContext.state.__SCREEN__'
+          substage: 'FernwehContext.state.__SCREEN__'
         }
       }, releaseErr);
     }

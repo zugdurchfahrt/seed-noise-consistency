@@ -4,8 +4,8 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   const __surface = 'webgpu';
   const __flagKey = '__WEBGPU_WHITELIST__';
   const __core = window && window.Core;
-  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-    ? window.CanvasPatchContext.__logger
+  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+    ? window.FernwehContext.__logger
     : null;
   const __degrade = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__degrade && typeof __degrade.diag === 'function') ? __degrade.diag.bind(__degrade) : null;
@@ -238,13 +238,13 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
 
   let __state = null;
   try {
-    const C = window.CanvasPatchContext;
+    const C = window.FernwehContext;
     if (!C) {
-      const preflightErr = new Error('[WebGPUPatch] CanvasPatchContext is undefined - no further execution');
+      const preflightErr = new Error('[WebGPUPatch] FernwehContext is undefined - no further execution');
       __moduleDiag('error', __module + ':preflight_failed', {
         stage: 'preflight',
-        key: 'CanvasPatchContext',
-        message: 'CanvasPatchContext is undefined',
+        key: 'FernwehContext',
+        message: 'FernwehContext is undefined',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'missing_canvas_patch_context' }
       }, preflightErr);
@@ -253,11 +253,11 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     }
     const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
     if (!__stateRoot) {
-      const preflightErr = new Error('[WebGPUPatch] CanvasPatchContext.state is undefined - no further execution');
+      const preflightErr = new Error('[WebGPUPatch] FernwehContext.state is undefined - no further execution');
       __moduleDiag('error', __module + ':preflight_failed', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state',
-        message: 'CanvasPatchContext.state is undefined',
+        key: 'FernwehContext.state',
+        message: 'FernwehContext.state is undefined',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
       }, preflightErr);

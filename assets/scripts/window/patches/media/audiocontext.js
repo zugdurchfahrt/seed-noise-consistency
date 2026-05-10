@@ -5,8 +5,8 @@ const AudioContextModule = function AudioContextModule(window) {
   const __MODULE = 'audiocontext';
   const __SURFACE = 'audio';
 
-  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-    ? window.CanvasPatchContext.__logger
+  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+    ? window.FernwehContext.__logger
     : null;
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -51,24 +51,24 @@ const AudioContextModule = function AudioContextModule(window) {
     emitDegrade(lvl, code, err, x);
   }
 
-  const C = window.CanvasPatchContext;
+  const C = window.FernwehContext;
   if (!C) {
-    degrade('audiocontext:canvas_patch_context_missing', new Error('[CanvasPatch] CanvasPatchContext is undefined — module registration is not available'), {
+    degrade('audiocontext:canvas_patch_context_missing', new Error('[FernwehContext] FernwehContext is undefined — module registration is not available'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: 'CanvasPatchContext',
+      key: 'FernwehContext',
       data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
     });
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    degrade('audiocontext:canvas_patch_state_missing', new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available'), {
+    degrade('audiocontext:canvas_patch_state_missing', new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
-      key: 'CanvasPatchContext.state',
+      key: 'FernwehContext.state',
       data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
     });
     return;

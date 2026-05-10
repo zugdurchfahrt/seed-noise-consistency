@@ -5,8 +5,8 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
   const __flagKey = '__PATCH_WEBGPU__';
   const __webgpuTypePipeline = 'pipeline missing data';
   const __webgpuTypeBrowser = 'browser structure missing data';
-  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-    ? window.CanvasPatchContext.__logger
+  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+    ? window.FernwehContext.__logger
     : null;
   const __webgpuDegrade = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __webgpuDegradeDiag = (__webgpuDegrade && typeof __webgpuDegrade.diag === 'function')
@@ -113,13 +113,13 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     }
   }
 
-  const C = window.CanvasPatchContext;
+  const C = window.FernwehContext;
   if (!C) {
-    degrade('fatal', 'webgpu:canvas_patch_context_missing', new Error('[CanvasPatch] CanvasPatchContext is undefined - module registration is not available'), {
+    degrade('fatal', 'webgpu:canvas_patch_context_missing', new Error('[FernwehContext] FernwehContext is undefined - module registration is not available'), {
       stage: 'preflight',
       type: __webgpuTypePipeline,
-      key: 'CanvasPatchContext',
-      message: 'CanvasPatchContext is undefined',
+      key: 'FernwehContext',
+      message: 'FernwehContext is undefined',
       data: { outcome: 'skip', reason: 'missing_canvas_patch_context' }
     });
     releaseEntryGuard(true);
@@ -127,11 +127,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    degrade('fatal', 'webgpu:canvas_patch_state_missing', new Error('[CanvasPatch] CanvasPatchContext.state is undefined - module registration is not available'), {
+    degrade('fatal', 'webgpu:canvas_patch_state_missing', new Error('[FernwehContext] FernwehContext.state is undefined - module registration is not available'), {
       stage: 'preflight',
       type: __webgpuTypePipeline,
-      key: 'CanvasPatchContext.state',
-      message: 'CanvasPatchContext.state is undefined',
+      key: 'FernwehContext.state',
+      message: 'FernwehContext.state is undefined',
       data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
     });
     releaseEntryGuard(true);
@@ -141,11 +141,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     ? __stateRoot.__ENV_PROFILE__
     : null;
   if (!__envProfileState) {
-    degrade('fatal', 'webgpu:env_profile_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__ENV_PROFILE__ is required'), {
+    degrade('fatal', 'webgpu:env_profile_missing', new Error('[WebGPUPatchModule] FernwehContext.state.__ENV_PROFILE__ is required'), {
       stage: 'preflight',
       type: __webgpuTypePipeline,
-      key: 'CanvasPatchContext.state.__ENV_PROFILE__',
-      message: 'CanvasPatchContext.state.__ENV_PROFILE__ is required',
+      key: 'FernwehContext.state.__ENV_PROFILE__',
+      message: 'FernwehContext.state.__ENV_PROFILE__ is required',
       data: { outcome: 'skip', reason: 'missing_env_profile' }
     });
     releaseEntryGuard(true);
@@ -229,11 +229,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       ? __stateRoot.__WEBGPU_WL_STATE__
       : null;
     if (!__webgpuWLState) {
-      degrade('fatal', 'webgpu:wl_state_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__WEBGPU_WL_STATE__ is required'), {
+      degrade('fatal', 'webgpu:wl_state_missing', new Error('[WebGPUPatchModule] FernwehContext.state.__WEBGPU_WL_STATE__ is required'), {
         stage: 'preflight',
         type: __webgpuTypePipeline,
-        key: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__',
-        message: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__ is required',
+        key: 'FernwehContext.state.__WEBGPU_WL_STATE__',
+        message: 'FernwehContext.state.__WEBGPU_WL_STATE__ is required',
         data: { outcome: 'skip', reason: 'missing_webgpu_wl_state' }
       });
       releaseEntryGuard(true);
@@ -243,11 +243,11 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       ? __webgpuWLState.store
       : null;
     if (!__webgpuWLStore) {
-      degrade('fatal', 'webgpu:wl_store_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__WEBGPU_WL_STATE__.store is required'), {
+      degrade('fatal', 'webgpu:wl_store_missing', new Error('[WebGPUPatchModule] FernwehContext.state.__WEBGPU_WL_STATE__.store is required'), {
         stage: 'preflight',
         type: __webgpuTypePipeline,
-        key: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__.store',
-        message: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__.store is required',
+        key: 'FernwehContext.state.__WEBGPU_WL_STATE__.store',
+        message: 'FernwehContext.state.__WEBGPU_WL_STATE__.store is required',
         data: { outcome: 'skip', reason: 'missing_webgpu_wl_store' }
       });
       releaseEntryGuard(true);
@@ -257,10 +257,10 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       ? __webgpuWLStore.featuresWhitelist
       : null;
     if (!__webgpuFeaturesWhitelist) {
-      degrade('fatal', 'webgpu:features_whitelist_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__WEBGPU_WL_STATE__.store.featuresWhitelist is required'), {
+      degrade('fatal', 'webgpu:features_whitelist_missing', new Error('[WebGPUPatchModule] FernwehContext.state.__WEBGPU_WL_STATE__.store.featuresWhitelist is required'), {
         stage: 'preflight',
         type: __webgpuTypePipeline,
-        key: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__.store.featuresWhitelist',
+        key: 'FernwehContext.state.__WEBGPU_WL_STATE__.store.featuresWhitelist',
         message: 'featuresWhitelist is required',
         data: { outcome: 'skip', reason: 'missing_features_whitelist' }
       });
@@ -271,10 +271,10 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       ? __webgpuWLStore.limitsWhitelist
       : null;
     if (!__webgpuLimitsWhitelist) {
-      degrade('fatal', 'webgpu:limits_whitelist_missing', new Error('[WebGPUPatchModule] CanvasPatchContext.state.__WEBGPU_WL_STATE__.store.limitsWhitelist is required'), {
+      degrade('fatal', 'webgpu:limits_whitelist_missing', new Error('[WebGPUPatchModule] FernwehContext.state.__WEBGPU_WL_STATE__.store.limitsWhitelist is required'), {
         stage: 'preflight',
         type: __webgpuTypePipeline,
-        key: 'CanvasPatchContext.state.__WEBGPU_WL_STATE__.store.limitsWhitelist',
+        key: 'FernwehContext.state.__WEBGPU_WL_STATE__.store.limitsWhitelist',
         message: 'limitsWhitelist is required',
         data: { outcome: 'skip', reason: 'missing_limits_whitelist' }
       });

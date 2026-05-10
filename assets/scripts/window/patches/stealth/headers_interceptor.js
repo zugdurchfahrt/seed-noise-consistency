@@ -5,7 +5,7 @@
  * Важно:
  *  - API экспортируется ВСЕГДА: window.HeadersInterceptor = { ... }
  *  - Патч сети применяется ТОЛЬКО когда готовы зависимости
- *    (CanvasPatchContext + CanvasPatchContext.state.__HEADERS__.__STATE__.headers)
+ *    (FernwehContext + FernwehContext.state.__HEADERS__.__STATE__.headers)
  *  - Повторный вызов HeadersInterceptor(window) безопасен (idempotent guard)
  */
 
@@ -17,8 +17,8 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
   const __typeBrowser = 'browser structure missing data';
   const __flagKey = '__PATCH_HEADERS_INTERCEPTOR__';
   const __core = window && window.Core;
-  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-    ? window.CanvasPatchContext.__logger
+  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+    ? window.FernwehContext.__logger
     : null;
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -337,18 +337,18 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     }
   }
 
-  const C = window.CanvasPatchContext;
+  const C = window.FernwehContext;
   if (!C) {
     emitDegrade('warn', 'headers_interceptor:init:preflight:canvas_context_missing', null, {
       stage: 'preflight',
-      surface: 'CanvasPatchContext',
-      key: 'CanvasPatchContext',
+      surface: 'FernwehContext',
+      key: 'FernwehContext',
       type: __typePipeline,
-      message: 'CanvasPatchContext missing',
+      message: 'FernwehContext missing',
       data: {
         outcome: 'skip',
         reason: 'canvas_patch_context_missing',
-        missing: 'CanvasPatchContext'
+        missing: 'FernwehContext'
       }
     });
     releaseGuard(true, 'preflight', 'canvas_patch_context_missing');
@@ -359,14 +359,14 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
   if (!__stateRoot) {
     emitDegrade('warn', 'headers_interceptor:init:preflight:canvas_state_missing', null, {
       stage: 'preflight',
-      surface: 'CanvasPatchContext.state',
-      key: 'CanvasPatchContext.state',
+      surface: 'FernwehContext.state',
+      key: 'FernwehContext.state',
       type: __typePipeline,
-      message: 'CanvasPatchContext.state missing',
+      message: 'FernwehContext.state missing',
       data: {
         outcome: 'skip',
         reason: 'canvas_patch_state_missing',
-        missing: 'CanvasPatchContext.state'
+        missing: 'FernwehContext.state'
       }
     });
     releaseGuard(true, 'preflight', 'canvas_patch_state_missing');
@@ -385,18 +385,18 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
 
   function __ensureHeadersState__(stateRoot) {
     const owner = (stateRoot && typeof stateRoot === 'object') ? stateRoot : null;
-    if (!owner) throw new Error('[HeadersInterceptor] CanvasPatchContext.state missing');
+    if (!owner) throw new Error('[HeadersInterceptor] FernwehContext.state missing');
     const headersRoot = (owner.__HEADERS__ && typeof owner.__HEADERS__ === 'object')
       ? owner.__HEADERS__
       : __defineHiddenValue__(owner, '__HEADERS__', Object.create(null));
     if (!headersRoot || typeof headersRoot !== 'object') {
-      throw new Error('[HeadersInterceptor] CanvasPatchContext.state.__HEADERS__ missing');
+      throw new Error('[HeadersInterceptor] FernwehContext.state.__HEADERS__ missing');
     }
     const headersState = (headersRoot.__STATE__ && typeof headersRoot.__STATE__ === 'object')
       ? headersRoot.__STATE__
       : __defineHiddenValue__(headersRoot, '__STATE__', Object.create(null));
     if (!headersState || typeof headersState !== 'object') {
-      throw new Error('[HeadersInterceptor] CanvasPatchContext.state.__HEADERS__.__STATE__ missing');
+      throw new Error('[HeadersInterceptor] FernwehContext.state.__HEADERS__.__STATE__ missing');
     }
     if (!Array.isArray(headersState.allowSuffixes)) __defineHiddenValue__(headersState, 'allowSuffixes', []);
     if (!Array.isArray(headersState.ignoreSuffixes)) __defineHiddenValue__(headersState, 'ignoreSuffixes', []);
@@ -409,14 +409,14 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
   } catch (e) {
     emitDegrade('warn', 'headers_interceptor:init:preflight:headers_state_missing', e, {
       stage: 'preflight',
-      surface: 'CanvasPatchContext.state.__HEADERS__.__STATE__',
-      key: 'CanvasPatchContext.state.__HEADERS__.__STATE__',
+      surface: 'FernwehContext.state.__HEADERS__.__STATE__',
+      key: 'FernwehContext.state.__HEADERS__.__STATE__',
       type: __typePipeline,
-      message: 'CanvasPatchContext.state.__HEADERS__.__STATE__ missing',
+      message: 'FernwehContext.state.__HEADERS__.__STATE__ missing',
       data: {
         outcome: 'skip',
         reason: 'headers_state_missing',
-        missing: 'CanvasPatchContext.state.__HEADERS__.__STATE__'
+        missing: 'FernwehContext.state.__HEADERS__.__STATE__'
       }
     });
     releaseGuard(true, 'preflight', 'headers_state_missing');
@@ -441,14 +441,14 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
   if (!RAW_H) {
     emitDegrade('warn', 'headers_interceptor:init:preflight:headers_missing', null, {
       stage: 'preflight',
-      surface: 'CanvasPatchContext.state.__HEADERS__.__STATE__.headers',
-      key: 'CanvasPatchContext.state.__HEADERS__.__STATE__.headers',
+      surface: 'FernwehContext.state.__HEADERS__.__STATE__.headers',
+      key: 'FernwehContext.state.__HEADERS__.__STATE__.headers',
       type: __typePipeline,
-      message: 'CanvasPatchContext.state.__HEADERS__.__STATE__.headers missing',
+      message: 'FernwehContext.state.__HEADERS__.__STATE__.headers missing',
       data: {
         outcome: 'skip',
         reason: 'headers_missing',
-        missing: 'CanvasPatchContext.state.__HEADERS__.__STATE__.headers'
+        missing: 'FernwehContext.state.__HEADERS__.__STATE__.headers'
       }
     });
     releaseGuard(true, 'preflight', 'headers_missing');

@@ -1,5 +1,5 @@
 const WebglPatchModule = function WebglPatchModule(window) {
-    const C = window.CanvasPatchContext;
+    const C = window.FernwehContext;
     const G = (typeof globalThis !== 'undefined' && globalThis)
           || (typeof self       !== 'undefined' && self)
           || (typeof window     !== 'undefined' && window)
@@ -7,8 +7,8 @@ const WebglPatchModule = function WebglPatchModule(window) {
           || {};
     const __webglTypePipeline = 'pipeline missing data';
     const __webglTypeBrowser = 'browser structure missing data';
-    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-      ? window.CanvasPatchContext.__logger
+    const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+      ? window.FernwehContext.__logger
       : null;
     const __webglDegrade = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     const __webglDegradeDiag = (__webglDegrade && typeof __webglDegrade.diag === 'function')
@@ -99,11 +99,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (!C) {
       __webglDiagPipeline('fatal', 'webgl:canvas_patch_context_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext',
-        message: 'CanvasPatchContext missing',
+        key: 'FernwehContext',
+        message: 'FernwehContext missing',
         data: { outcome: 'throw' }
       });
-      throw new Error('CanvasPatchContext missing');
+      throw new Error('FernwehContext missing');
     }
 
     // basic random from the existing seed initialization
@@ -111,11 +111,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (!__stateRoot) {
       __webglDiagPipeline('fatal', 'webgl:canvas_patch_state_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state',
-        message: 'CanvasPatchContext.state missing',
+        key: 'FernwehContext.state',
+        message: 'FernwehContext.state missing',
         data: { outcome: 'throw' }
       });
-      throw new Error('CanvasPatchContext.state missing');
+      throw new Error('FernwehContext.state missing');
     }
     const __envProfileState = (__stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
       ? __stateRoot.__ENV_PROFILE__
@@ -123,11 +123,11 @@ const WebglPatchModule = function WebglPatchModule(window) {
     if (!__envProfileState) {
       __webglDiagPipeline('fatal', 'webgl:env_profile_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__ENV_PROFILE__',
-        message: 'CanvasPatchContext.state.__ENV_PROFILE__ missing',
+        key: 'FernwehContext.state.__ENV_PROFILE__',
+        message: 'FernwehContext.state.__ENV_PROFILE__ missing',
         data: { outcome: 'throw' }
       });
-      throw new Error('CanvasPatchContext.state.__ENV_PROFILE__ missing');
+      throw new Error('FernwehContext.state.__ENV_PROFILE__ missing');
     }
     function __captureDescriptorState(target, key) {
       return {
@@ -270,7 +270,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
       __webglDiagPipeline('info', 'webglstorage:whitelist_loaded', {
         diagTag: 'webglstorage',
         stage: 'apply',
-        key: 'CanvasPatchContext.state.__WEBGL_STATE__',
+        key: 'FernwehContext.state.__WEBGL_STATE__',
         message: 'WebGL storage dictionary loaded',
         data: {
           outcome: 'return',
@@ -283,7 +283,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
       __webglDiagBrowser('error', 'webglstorage:apply_failed', {
         diagTag: 'webglstorage',
         stage: 'apply',
-        key: 'CanvasPatchContext.state.__WEBGL_STATE__',
+        key: 'FernwehContext.state.__WEBGL_STATE__',
         message: 'WebGL storage dictionary apply failed',
         data: { outcome: 'throw', rollbackOk: rollbackOk }
       }, e);
@@ -559,7 +559,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
   // readPixels is void and writes into the provided buffer.
   // Its noise hook must run post-orig; the executor mode is set here (not globally).
   const hookModeStore = (C.__hookModeStore && typeof C.__hookModeStore === 'object') ? C.__hookModeStore : null;
-  if (!hookModeStore) throw new Error('[WebGLPatch] CanvasPatchContext.__hookModeStore missing');
+  if (!hookModeStore) throw new Error('[WebGLPatch] FernwehContext.__hookModeStore missing');
   if (!Object.prototype.hasOwnProperty.call(hookModeStore, 'post_orig_once')) {
     Object.defineProperty(hookModeStore, 'post_orig_once', {
       value: Object.freeze({}),

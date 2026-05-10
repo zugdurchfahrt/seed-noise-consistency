@@ -3,23 +3,23 @@
     || (typeof self !== 'undefined' && self)
     || (typeof window !== 'undefined' && window)
     || {};
-  const C = (G.CanvasPatchContext && (typeof G.CanvasPatchContext === 'object' || typeof G.CanvasPatchContext === 'function'))
-    ? G.CanvasPatchContext
+  const C = (G.FernwehContext && (typeof G.FernwehContext === 'object' || typeof G.FernwehContext === 'function'))
+    ? G.FernwehContext
     : null;
   if (!C || !C.state || typeof C.state !== 'object') {
-    throw new Error('[fonts] CanvasPatchContext.state missing');
+    throw new Error('[fonts] FernwehContext.state missing');
   }
   const fontsRoot = (C.state.__FONTS__ && typeof C.state.__FONTS__ === 'object')
     ? C.state.__FONTS__
     : null;
   if (!fontsRoot) {
-    throw new Error('[fonts] CanvasPatchContext.state.__FONTS__ missing');
+    throw new Error('[fonts] FernwehContext.state.__FONTS__ missing');
   }
   let slot = (fontsRoot.__CONFIG__ && typeof fontsRoot.__CONFIG__ === 'object')
     ? fontsRoot.__CONFIG__
     : null;
   if (!slot) {
-    throw new Error('[fonts] CanvasPatchContext.state.__FONTS__.__CONFIG__ missing');
+    throw new Error('[fonts] FernwehContext.state.__FONTS__.__CONFIG__ missing');
   }
   slot.configs = {{ configs_json | safe }};
 })();

@@ -7,8 +7,8 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     const __tzTypeBrowser = "browser structure missing data";
     const __flagKey = '__PATCH_TIMEZONE__';
     const __core = window && window.Core;
-    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-      ? window.CanvasPatchContext.__logger
+    const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+      ? window.FernwehContext.__logger
       : null;
     const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -99,7 +99,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     }
 
     function __resolveGeoTransitState() {
-      const C = window && window.CanvasPatchContext;
+      const C = window && window.FernwehContext;
       if (!C || typeof C !== 'object') return null;
       const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
       if (stateRoot && stateRoot.__GEO_STATE__ && typeof stateRoot.__GEO_STATE__ === 'object') {
@@ -109,7 +109,7 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     }
 
     function __resolveLangTransitState() {
-      const C = window && window.CanvasPatchContext;
+      const C = window && window.FernwehContext;
       if (!C || typeof C !== 'object') return null;
       const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
       if (stateRoot && stateRoot.__LANG_STATE__ && typeof stateRoot.__LANG_STATE__ === 'object') {

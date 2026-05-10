@@ -159,7 +159,7 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
     """
     Fetch.enable + Fetch.requestPaused: modify only requests that match the patterns.
     Domain lists are taken dynamically from the page hidden state
-    (CanvasPatchContext.state.__HEADERS__.__STATE__.allowSuffixes / ignoreSuffixes),
+    (FernwehContext.state.__HEADERS__.__STATE__.allowSuffixes / ignoreSuffixes),
     which are synchronized with window.HeadersInterceptor.addAllow/addIgnore.
     If rules is empty (as in the current build), Fetch interception is not active; header injection is performed only at the level of Network.setExtraHTTPHeaders (CDP) and JS patch.
     """
@@ -200,7 +200,7 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
         try:
             res = driver.execute_cdp_cmd("Runtime.evaluate", {
                 "expression": """(function(){
-                    const C = (window.CanvasPatchContext && typeof window.CanvasPatchContext === 'object') ? window.CanvasPatchContext : null;
+                    const C = (window.FernwehContext && typeof window.FernwehContext === 'object') ? window.FernwehContext : null;
                     const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
                     const headersRoot = (stateRoot && stateRoot.__HEADERS__ && typeof stateRoot.__HEADERS__ === 'object') ? stateRoot.__HEADERS__ : null;
                     const headersState = (headersRoot && headersRoot.__STATE__ && typeof headersRoot.__STATE__ === 'object') ? headersRoot.__STATE__ : null;
@@ -602,10 +602,10 @@ def init_driver(
             """,
             f"""
             (function initWorkerscopeRuntime(win) {{
-                const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
-                    ? win.CanvasPatchContext
+                const C = (win && win.FernwehContext && typeof win.FernwehContext === 'object')
+                    ? win.FernwehContext
                     : null;
-                if (!C) throw new Error('WorkerscopeInit: CanvasPatchContext missing');
+                if (!C) throw new Error('WorkerscopeInit: FernwehContext missing');
                 function defineHidden(obj, key, value) {{
                     if (!obj || (typeof obj !== 'object' && typeof obj !== 'function')) return value;
                     const desc = Object.getOwnPropertyDescriptor(obj, key);
@@ -626,7 +626,7 @@ def init_driver(
                 const wrkRuntime = (wrkState && wrkState.runtime && typeof wrkState.runtime === 'object')
                     ? wrkState.runtime
                     : null;
-                if (!wrkRuntime) throw new Error('WorkerscopeInit: CanvasPatchContext.state.__WRK__.runtime missing');
+                if (!wrkRuntime) throw new Error('WorkerscopeInit: FernwehContext.state.__WRK__.runtime missing');
                 defineHidden(wrkRuntime, 'inlinePatch', {json.dumps(worker_patch_src)});
                 defineHidden(wrkRuntime, 'inlineReflect', {json.dumps(worker_reflect_src)});
                 defineHidden(wrkRuntime, 'inlineCoreWindow', {json.dumps(worker_core_window_src)});
@@ -651,18 +651,18 @@ def init_driver(
             WebGPUPatchModule(window);
             AudioContextModule(window);
             ContextPatchModule(window);
-            if (window.CanvasPatchContext && typeof window.CanvasPatchContext.registerAllHooks === 'function') {{
-                window.CanvasPatchContext.registerAllHooks();
+            if (window.FernwehContext && typeof window.FernwehContext.registerAllHooks === 'function') {{
+                window.FernwehContext.registerAllHooks();
             }}
             (function applyAllPatchesCustomOrder(win) {{
-                const C = window.CanvasPatchContext; if (!C) return;
+                const C = window.FernwehContext; if (!C) return;
                 if (C.applyCanvasElementPatches) C.applyCanvasElementPatches();
                 if (C.applyOffscreenPatches)     C.applyOffscreenPatches();
                 if (C.applyWebGLContextPatches)  C.applyWebGLContextPatches();
             }})(window);
             (function runBootstrapEnvCleanup(win) {{
-                const C = (win && win.CanvasPatchContext && typeof win.CanvasPatchContext === 'object')
-                    ? win.CanvasPatchContext
+                const C = (win && win.FernwehContext && typeof win.FernwehContext === 'object')
+                    ? win.FernwehContext
                     : null;
                 if (!C || typeof C.__runBootstrapEnvCleanup__ !== 'function') return;
                 C.__runBootstrapEnvCleanup__(win, 'bundle_finalize');
@@ -882,7 +882,7 @@ def init_driver(
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": cdp_outbound_headers})
 
     # =========================
-    # [HDR] CanvasPatchContext.state.__HEADERS__.__STATE__ + bridge (NEW DOCUMENT)
+    # [HDR] FernwehContext.state.__HEADERS__.__STATE__ + bridge (NEW DOCUMENT)
     # IMPORTANT: register hidden headers owner-state BEFORE anything that may rely on it.
     # =========================
 
@@ -892,10 +892,10 @@ def init_driver(
         
     headers_window_js = f"""
     (function() {{
-      const C = (window.CanvasPatchContext && typeof window.CanvasPatchContext === 'object') ? window.CanvasPatchContext : null;
-      if (!C) throw new Error('HeadersStage: CanvasPatchContext missing');
+      const C = (window.FernwehContext && typeof window.FernwehContext === 'object') ? window.FernwehContext : null;
+      if (!C) throw new Error('HeadersStage: FernwehContext missing');
       const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-      if (!stateRoot) throw new Error('HeadersStage: CanvasPatchContext.state missing');
+      if (!stateRoot) throw new Error('HeadersStage: FernwehContext.state missing');
       const defHidden = function(owner, key, value) {{
         Object.defineProperty(owner, key, {{
           value: value,
@@ -908,11 +908,11 @@ def init_driver(
       const headersRoot = (stateRoot.__HEADERS__ && typeof stateRoot.__HEADERS__ === 'object')
         ? stateRoot.__HEADERS__
         : defHidden(stateRoot, '__HEADERS__', Object.create(null));
-      if (!headersRoot || typeof headersRoot !== 'object') throw new Error('HeadersStage: CanvasPatchContext.state.__HEADERS__ missing');
+      if (!headersRoot || typeof headersRoot !== 'object') throw new Error('HeadersStage: FernwehContext.state.__HEADERS__ missing');
       const headersState = (headersRoot.__STATE__ && typeof headersRoot.__STATE__ === 'object')
         ? headersRoot.__STATE__
         : defHidden(headersRoot, '__STATE__', Object.create(null));
-      if (!headersState || typeof headersState !== 'object') throw new Error('HeadersStage: CanvasPatchContext.state.__HEADERS__.__STATE__ missing');
+      if (!headersState || typeof headersState !== 'object') throw new Error('HeadersStage: FernwehContext.state.__HEADERS__.__STATE__ missing');
       defHidden(headersState, 'headers', {json.dumps(safelisted_headers, ensure_ascii=False)});
       if (!Array.isArray(headersState.allowSuffixes)) defHidden(headersState, 'allowSuffixes', []);
       if (!Array.isArray(headersState.ignoreSuffixes)) defHidden(headersState, 'ignoreSuffixes', []);

@@ -12,8 +12,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
   const __fontTypeBrowser = 'browser structure missing data';
   const __MODULE = 'fonts';
   const __SURFACE = 'fonts';
-  const __loggerRoot = (__fontRealmRoot && __fontRealmRoot.CanvasPatchContext && __fontRealmRoot.CanvasPatchContext.__logger && typeof __fontRealmRoot.CanvasPatchContext.__logger === 'object')
-    ? __fontRealmRoot.CanvasPatchContext.__logger
+  const __loggerRoot = (__fontRealmRoot && __fontRealmRoot.FernwehContext && __fontRealmRoot.FernwehContext.__logger && typeof __fontRealmRoot.FernwehContext.__logger === 'object')
+    ? __fontRealmRoot.FernwehContext.__logger
     : null;
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -89,11 +89,11 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     };
   }
 
-  const C = (__fontRealmRoot && __fontRealmRoot.CanvasPatchContext) || null;
+  const C = (__fontRealmRoot && __fontRealmRoot.FernwehContext) || null;
   if (!C) {
     __fontDiagPipeline('warn', 'fonts:canvas_patch_context_missing', {
       stage: 'preflight',
-      message: 'CanvasPatchContext missing',
+      message: 'FernwehContext missing',
       data: { outcome: 'skip', reason: 'missing_canvas_patch_context' }
     }, null);
     return;
@@ -113,8 +113,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
   if (!__stateRoot) {
     __fontDiagPipeline('warn', 'fonts:canvas_patch_state_missing', {
       stage: 'preflight',
-      key: 'CanvasPatchContext.state',
-      message: 'CanvasPatchContext.state missing',
+      key: 'FernwehContext.state',
+      message: 'FernwehContext.state missing',
       data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
     }, null);
     return;
@@ -127,8 +127,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     if (existing) return existing;
     __fontDiagPipeline('warn', 'fonts:fonts_config_missing', {
       stage: 'preflight',
-      key: 'CanvasPatchContext.state.__FONTS__',
-      message: 'CanvasPatchContext.state.__FONTS__ missing',
+      key: 'FernwehContext.state.__FONTS__',
+      message: 'FernwehContext.state.__FONTS__ missing',
       data: { outcome: 'skip', reason: 'fonts_module_slot_missing' }
     }, null);
     return null;
@@ -144,8 +144,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     if (existing) return existing;
     __fontDiagPipeline('warn', 'fonts:fonts_config_missing', {
       stage: 'preflight',
-      key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__',
-      message: 'CanvasPatchContext.state.__FONTS__.__CONFIG__ missing',
+      key: 'FernwehContext.state.__FONTS__.__CONFIG__',
+      message: 'FernwehContext.state.__FONTS__.__CONFIG__ missing',
       data: { outcome: 'skip', reason: 'fonts_config_missing' }
     }, null);
     return null;
@@ -165,9 +165,9 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     if (existing) return existing;
     __fontDiagPipeline('warn', 'fonts:fonts_state_missing', {
       stage: 'preflight',
-      surface: 'CanvasPatchContext.state.__FONTS__',
-      key: 'CanvasPatchContext.state.__FONTS__.__STATE__',
-      message: 'CanvasPatchContext.state.__FONTS__.__STATE__ missing',
+      surface: 'FernwehContext.state.__FONTS__',
+      key: 'FernwehContext.state.__FONTS__.__STATE__',
+      message: 'FernwehContext.state.__FONTS__.__STATE__ missing',
       data: { outcome: 'skip', reason: 'missing_fonts_state_slot' }
     }, null);
     return null;
@@ -501,8 +501,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       __fontDiagPipeline('warn', 'fonts:configs_missing_or_invalid', {
         stage: 'preflight',
         diagTag: 'fonts',
-        key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
-        message: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs missing/invalid (skip font patch)',
+        key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
+        message: 'FernwehContext.state.__FONTS__.__CONFIG__.configs missing/invalid (skip font patch)',
         data: { outcome: 'skip', reason: 'configs_missing_or_invalid', typeof: typeof __fontsConfigState.configs }
       }, null);
       __releaseGuardOnSkip('preflight', 'guard release failed after preflight skip', 'guard_release_failed');
@@ -1313,8 +1313,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     __fontDiagPipeline('warn', 'fonts:nav_platform_missing', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform',
-      message: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform missing (skip font patch)',
+      key: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform',
+      message: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform missing (skip font patch)',
       data: { outcome: 'skip', reason: 'missing_nav_platform' }
     }, null);
     try {
@@ -1342,7 +1342,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     __fontDiagPipeline('warn', 'fonts:filtered_empty', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
+      key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
       message: 'filtered fonts list is empty',
       data: { platform: domPlat }
     }, null);
@@ -1350,7 +1350,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     __fontDiagPipeline('info', 'fonts:filtered_count', {
       stage: 'preflight',
       diagTag: 'fonts',
-      key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
+      key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
       message: 'filtered fonts list prepared',
       data: { platform: domPlat, count: fonts.length }
     }, null);
@@ -1369,8 +1369,8 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       __fontDiagPipeline('warn', 'fonts:dom_override_nav_platform_missing', {
         stage: 'preflight',
         diagTag: 'fonts',
-        key: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform',
-        message: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform missing (skip dom override)',
+        key: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform',
+        message: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform missing (skip dom override)',
         data: { outcome: 'skip', reason: 'missing_nav_platform' }
       }, null);
       return;
@@ -1387,7 +1387,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         __fontDiagPipeline('warn', 'fonts:dom_override_filtered_empty', {
           stage: 'preflight',
           diagTag: 'fonts',
-          key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
+          key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
           message: 'dom override skipped: no filtered fonts',
           data: { platform: domPlat }
         }, null);
@@ -1484,7 +1484,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           __fontDiagBrowser('warn', 'fonts:load_item_failed', {
             stage: 'runtime',
             diagTag: 'fonts',
-            key: 'CanvasPatchContext.state.__FONTS__.__CONFIG__.configs',
+            key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
             message: 'font item build failed',
             data: { outcome: 'skip', reason: 'font_item_build_failed' }
           }, e);
@@ -1511,7 +1511,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
             } catch (eSet) {
               __fontDiagPipeline('warn', 'fonts:data:set_error_failed', {
                 stage: 'runtime',
-                key: 'CanvasPatchContext.state.__FONTS__.error',
+                key: 'FernwehContext.state.__FONTS__.error',
                 message: 'font error state write failed',
                 type: __fontTypePipeline,
                 data: { outcome: 'skip', reason: 'set_error_failed' }
@@ -1559,7 +1559,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       } catch (eSet) {
         __fontDiagPipeline('warn', 'fonts:data:set_error_failed', {
           stage: 'runtime',
-          key: 'CanvasPatchContext.state.__FONTS__.error',
+          key: 'FernwehContext.state.__FONTS__.error',
           message: 'font error state write failed',
           type: __fontTypePipeline,
           data: { outcome: 'skip', reason: 'set_error_failed' }

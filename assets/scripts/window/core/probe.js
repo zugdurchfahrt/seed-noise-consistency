@@ -23,8 +23,8 @@ const __probeRun = async function(){
   const __probeProxyTargetMap = (__probeCoreToStringState && __probeCoreToStringState.proxyTargetMap instanceof WeakMap)
     ? __probeCoreToStringState.proxyTargetMap
     : null;
-  const __probeLoggerRoot = (W && W.CanvasPatchContext && W.CanvasPatchContext.__logger && typeof W.CanvasPatchContext.__logger === "object")
-    ? W.CanvasPatchContext.__logger
+  const __probeLoggerRoot = (W && W.FernwehContext && W.FernwehContext.__logger && typeof W.FernwehContext.__logger === "object")
+    ? W.FernwehContext.__logger
     : null;
   const __probeDegrade = (__probeLoggerRoot && typeof __probeLoggerRoot.__DEGRADE__ === "function") ? __probeLoggerRoot.__DEGRADE__ : null;
   const __probeRawConsole = (__probeLoggerRoot && __probeLoggerRoot.__RAW_CONSOLE__ && typeof __probeLoggerRoot.__RAW_CONSOLE__ === "object")
@@ -1916,8 +1916,8 @@ const __probeRun = async function(){
           };
         };
         try {
-          const ctx = self && self.CanvasPatchContext && typeof self.CanvasPatchContext === "object"
-            ? self.CanvasPatchContext
+          const ctx = self && self.FernwehContext && typeof self.FernwehContext === "object"
+            ? self.FernwehContext
             : null;
           const stateRoot = ctx && ctx.state && typeof ctx.state === "object"
             ? ctx.state
@@ -1929,7 +1929,7 @@ const __probeRun = async function(){
             ? wrkState.runtime
             : null;
           if (!runtime) {
-            throw new Error("CanvasPatchContext.state.__WRK__.runtime missing");
+            throw new Error("FernwehContext.state.__WRK__.runtime missing");
           }
           const ensureMarkAsNative = typeof runtime.__ensureMarkAsNative === "function"
             ? runtime.__ensureMarkAsNative
@@ -1938,10 +1938,10 @@ const __probeRun = async function(){
             ? runtime.__CORE_TOSTRING_STATE__
             : null;
           if (typeof ensureMarkAsNative !== "function") {
-            throw new Error("CanvasPatchContext.state.__WRK__.runtime.__ensureMarkAsNative missing");
+            throw new Error("FernwehContext.state.__WRK__.runtime.__ensureMarkAsNative missing");
           }
           if (!state || typeof state.nativeToString !== "function" || !(state.overrideMap instanceof WeakMap) || !(state.proxyTargetMap instanceof WeakMap)) {
-            throw new Error("CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__ missing");
+            throw new Error("FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__ missing");
           }
           const markAsNative = ensureMarkAsNative();
           if (typeof markAsNative !== "function") {
@@ -2520,8 +2520,8 @@ const __probeRun = async function(){
       }
       function __probeWorkerResolveProxyTargetMap__() {
         try {
-          const ctx = self && self.CanvasPatchContext && typeof self.CanvasPatchContext === "object"
-            ? self.CanvasPatchContext
+          const ctx = self && self.FernwehContext && typeof self.FernwehContext === "object"
+            ? self.FernwehContext
             : null;
           const stateRoot = ctx && ctx.state && typeof ctx.state === "object"
             ? ctx.state
@@ -5332,8 +5332,8 @@ return result;
 };
 try {
   const W = (typeof window !== "undefined") ? window : null;
-  const L = (W && W.CanvasPatchContext && W.CanvasPatchContext.__logger && typeof W.CanvasPatchContext.__logger === "object")
-    ? W.CanvasPatchContext.__logger
+  const L = (W && W.FernwehContext && W.FernwehContext.__logger && typeof W.FernwehContext.__logger === "object")
+    ? W.FernwehContext.__logger
     : null;
   if (L) {
     Object.defineProperty(L, "__PROBE__", {

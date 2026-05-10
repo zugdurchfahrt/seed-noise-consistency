@@ -7,14 +7,14 @@ const LOGGingModule = function LOGGingModule() {
     const W = (typeof window !== "undefined" && window) ? window : null;
 
     const global = G;
-    const C = ((W || G).CanvasPatchContext && (typeof (W || G).CanvasPatchContext === "object" || typeof (W || G).CanvasPatchContext === "function"))
-      ? (W || G).CanvasPatchContext
+    const C = ((W || G).FernwehContext && (typeof (W || G).FernwehContext === "object" || typeof (W || G).FernwehContext === "function"))
+      ? (W || G).FernwehContext
       : null;
-    if (!C) throw new Error("[LOGGingModule] CanvasPatchContext missing");
+    if (!C) throw new Error("[LOGGingModule] FernwehContext missing");
     const stateRoot = (C.state && typeof C.state === "object") ? C.state : null;
-    if (!stateRoot) throw new Error("[LOGGingModule] CanvasPatchContext.state missing");
+    if (!stateRoot) throw new Error("[LOGGingModule] FernwehContext.state missing");
     const __loggerRoot = (C.__logger && typeof C.__logger === "object") ? C.__logger : null;
-    if (!__loggerRoot) throw new Error("[LOGGingModule] CanvasPatchContext.__logger missing");
+    if (!__loggerRoot) throw new Error("[LOGGingModule] FernwehContext.__logger missing");
 
     function __defineLoggerHiddenValue(name, value, writable) {
       Object.defineProperty(__loggerRoot, name, {

@@ -203,9 +203,9 @@ client.post()
 ### JavaScript (`assets/scripts/window/core`)
 
 - `core_window.js` - базовый слой для window-модулей и общей инфраструктуры `Core`. Здесь находятся общие wrappers, `Core.applyTargets`, безопасная установка дескрипторов, native shaping, маскировка `toString`, `invalid-this` contract и диагностические утилиты. Модуль задает contract-driven patching engine: downstream modules используют его как общий слой, который сохраняет native behavior/appearance, корректно обрабатывает `invalid receiver` и другие engine-level errors, не ломая ожидаемую native pass-through semantics.
-- `context.js` - оркестрационный модуль для хуков и `Canvas`/`WebGL`: собирает `CanvasPatchHooks`, проверяет наличие экспортированных хуков из модулей и регистрирует их в unified hook queue. Также это patching gateway: он оборачивает `getContext`, `toDataURL`, `toBlob`, `convertToBlob`, методы `CanvasRenderingContext2D` и `WebGL` prototypes, чтобы downstream modules проходили через одну точку применения, без proxy leaks, потери `this` и поломки нативной механики дескрипторов.
+- `context.js` - оркестрационный модуль для хуков и `Canvas`/`WebGL`: собирает `FernwehHooks`, проверяет наличие экспортированных хуков из модулей и регистрирует их в unified hook queue. Также это patching gateway: он оборачивает `getContext`, `toDataURL`, `toBlob`, `convertToBlob`, методы `CanvasRenderingContext2D` и `WebGL` prototypes, чтобы downstream modules проходили через одну точку применения, без proxy leaks, потери `this` и поломки нативной механики дескрипторов.
 - `prng_seed.js` - gateway для `__GLOBAL_SEED` от Python backend к JavaScript environment. Модуль устанавливает seed-driven PRNG state и предоставляет deterministic seed context, который используется ниже по цепочке graphics/media patches.
-- `bootstrap_hide.js` - инициализирует внутренний bootstrap-контекст и переносит значения из публичной поверхности `window` в hidden state. Создает и поддерживает `CanvasPatchContext`, переносит bootstrap data во внутренние state objects, скрывает служебные поля от enumeration и удаляет временные global values после подготовки required owners and retention snapshots.
+- `bootstrap_hide.js` - инициализирует внутренний bootstrap-контекст и переносит значения из публичной поверхности `window` в hidden state. Создает и поддерживает `FernwehContext`, переносит bootstrap data во внутренние state objects, скрывает служебные поля от enumeration и удаляет временные global values после подготовки required owners and retention snapshots.
 - `set_log.js` - JS-side logging/diagnostic emitter. Создает JS-side logger/diag buffer и unified `__DEGRADE__` channel, через который pipeline incidents собираются и нормализуются.
 - `probe.js` - слой внутренней наблюдаемости и self-checking. Проверяет critical APIs после загрузки патчей и валидирует runtime invariants, descriptor integrity, call semantics и timeout behavior. Findings пишутся в тот же diagnostic stream.
 
@@ -291,7 +291,7 @@ MITMPROXY_OFF = True
 
 Установить зависимости:
 
-```powershell
+```pwsh
 python -m venv venv
 venv\Scripts\activate
 pip install --upgrade pip
@@ -309,12 +309,9 @@ pip install -r requirements.txt
 
 ## Issues/TODO
 
-- Синхронизировать Canvas window ↔ Canvas SharedWorkerScope.
-- Синхронизировать GPU window ↔ GPU ServiceWorkerScope.
-- Завершить настройку nativization system.
 - Интегрировать proxying для `getClientRects` / `getBoundingClientRect`.
 - Реализовать ротацию TLS fingerprint через OpenSSL.
 - События `success/ready` из мест, где фиксируется только факт установки hooks, считать только `applied`: механизм установлен, но результат еще не доказан.
-- Эмитить финальный `success` только после postcondition на observable surface.
+- Эмитить финальный `success` только после postcondition на observable surface:
 - Для font module эмитить `success` только если состояние наблюдаемо после текущей цепочки через `DOM/CSS/font-measurement surface`, а не только через внутренние структуры; иначе помечать `applied_but_not_effective` или не эмитить `success`.
-- Завершить baseline `__DEGRADE__` module audit coverage: module audit уже использует explicit status codes under `degrade:module_status:*` through shared module inventory. Нужно расширить load/result postconditions, где это требуется, чтобы final module audit не зависел от ad hoc probe-only logic.
+

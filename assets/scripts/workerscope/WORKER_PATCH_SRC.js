@@ -10,8 +10,8 @@
   }
   const W = self;
   const __resolveBootstrapWorkerRuntimeRoot__ = () => {
-    const C = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-      ? self.CanvasPatchContext
+    const C = (self && self.FernwehContext && typeof self.FernwehContext === 'object')
+      ? self.FernwehContext
       : null;
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
@@ -103,8 +103,8 @@
     const appliedDescriptors = [];
     const __resolveWorkerWrkRuntimeRoot__ = () => __resolveBootstrapWorkerRuntimeRoot__();
     const __resolveWorkerStateRoot__ = () => {
-      const C = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-        ? self.CanvasPatchContext
+      const C = (self && self.FernwehContext && typeof self.FernwehContext === 'object')
+        ? self.FernwehContext
         : null;
       return (C && C.state && typeof C.state === 'object')
         ? C.state
@@ -273,7 +273,7 @@
     };
     const bootstrapSnapshotOwner = __resolveWorkerSnapshotOwner__();
     if (!bootstrapSnapshotOwner) {
-      throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+      throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
     }
     cache.snap = requireSnap(bootstrapSnapshotOwner, 'init');
 
@@ -388,8 +388,8 @@
           type: 'pipeline missing data',
           stage: 'preflight',
           module: 'WORKER_PATCH_SRC',
-          surface: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
-          key: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
+          surface: 'FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
+          key: 'FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
           policy: 'throw',
           action: 'throw'
         }, e);
@@ -502,22 +502,22 @@
     if (!nativeUAD) throw new Error('worker_patch_src: worker navigator.userAgentData missing');
     const uadProto = Object.getPrototypeOf(nativeUAD);
     if (!uadProto) throw new Error('worker_patch_src: worker navigator.userAgentData proto missing');
-    const stateRootForUAD = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
-      ? self.CanvasPatchContext.state
+    const stateRootForUAD = (self.FernwehContext && typeof self.FernwehContext === 'object' && self.FernwehContext.state && typeof self.FernwehContext.state === 'object')
+      ? self.FernwehContext.state
       : null;
-    if (!stateRootForUAD) throw new Error('UACHPatch: CanvasPatchContext.state missing');
+    if (!stateRootForUAD) throw new Error('UACHPatch: FernwehContext.state missing');
     const navModuleStateForUAD = (stateRootForUAD.__NAV_TOTAL_SET__ && typeof stateRootForUAD.__NAV_TOTAL_SET__ === 'object')
       ? stateRootForUAD.__NAV_TOTAL_SET__
       : null;
-    if (!navModuleStateForUAD) throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__ missing');
+    if (!navModuleStateForUAD) throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__ missing');
     const dataStoreStateForUAD = (navModuleStateForUAD.__DATA_STORE_STATE__ && typeof navModuleStateForUAD.__DATA_STORE_STATE__ === 'object')
       ? navModuleStateForUAD.__DATA_STORE_STATE__
       : null;
-    if (!dataStoreStateForUAD) throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing');
+    if (!dataStoreStateForUAD) throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing');
     const workerEnvSnapshotOwner = (dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__ === 'object')
       ? dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__
       : null;
-    if (!workerEnvSnapshotOwner) throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+    if (!workerEnvSnapshotOwner) throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
     const uadState = (workerEnvSnapshotOwner.workerNavigatorUADataState && typeof workerEnvSnapshotOwner.workerNavigatorUADataState === 'object')
       ? workerEnvSnapshotOwner.workerNavigatorUADataState
       : Object.create(null);
@@ -1708,7 +1708,7 @@
     };
     const syncWorkerEnvProfileState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
-        throw new Error('UACHPatch: CanvasPatchContext.state missing for envProfile sync');
+        throw new Error('UACHPatch: FernwehContext.state missing for envProfile sync');
       }
       const snap = requireSnap(cache.snap, 'env_profile_sync');
       const envProfileSnap = snap.envProfile;
@@ -1716,7 +1716,7 @@
         ? stateRoot.__ENV_PROFILE__
         : null;
       if (!(envProfileRoot && typeof envProfileRoot === 'object')) {
-        throw new Error('UACHPatch: CanvasPatchContext.state.__ENV_PROFILE__ missing');
+        throw new Error('UACHPatch: FernwehContext.state.__ENV_PROFILE__ missing');
       }
       const cloneEnvProfileValue = value => {
         if (Array.isArray(value)) {
@@ -1748,7 +1748,7 @@
     };
     const restoreWorkerFontsState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
-        throw new Error('UACHPatch: CanvasPatchContext.state missing for fonts restore');
+        throw new Error('UACHPatch: FernwehContext.state missing for fonts restore');
       }
       const snap = (cache.snap && cache.snap.fontsState && typeof cache.snap.fontsState === 'object')
         ? cache.snap.fontsState
@@ -1761,14 +1761,14 @@
         ? stateRoot.__FONTS__
         : null;
       if (!(fontsRoot && typeof fontsRoot === 'object')) {
-        throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__ missing');
+        throw new Error('UACHPatch: FernwehContext.state.__FONTS__ missing');
       }
       const ensureFontsSubSlot = key => {
         const existing = (fontsRoot[key] && typeof fontsRoot[key] === 'object')
           ? fontsRoot[key]
           : null;
         if (!existing) {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__.' + key + ' missing');
+          throw new Error('UACHPatch: FernwehContext.state.__FONTS__.' + key + ' missing');
         }
         return existing;
       };
@@ -1873,22 +1873,22 @@
     };
 
     const installWorkerCanvasPipeline = () => {
-      const existingCanvasState = (self.CanvasPatchContext
-        && typeof self.CanvasPatchContext === 'object'
-        && self.CanvasPatchContext.state
-        && typeof self.CanvasPatchContext.state === 'object'
-        && self.CanvasPatchContext.state.__CANVAS__
-        && typeof self.CanvasPatchContext.state.__CANVAS__ === 'object'
-        && self.CanvasPatchContext.state.__CANVAS__.__STATE__
-        && typeof self.CanvasPatchContext.state.__CANVAS__.__STATE__ === 'object')
-        ? self.CanvasPatchContext.state.__CANVAS__.__STATE__
+      const existingCanvasState = (self.FernwehContext
+        && typeof self.FernwehContext === 'object'
+        && self.FernwehContext.state
+        && typeof self.FernwehContext.state === 'object'
+        && self.FernwehContext.state.__CANVAS__
+        && typeof self.FernwehContext.state.__CANVAS__ === 'object'
+        && self.FernwehContext.state.__CANVAS__.__STATE__
+        && typeof self.FernwehContext.state.__CANVAS__.__STATE__ === 'object')
+        ? self.FernwehContext.state.__CANVAS__.__STATE__
         : null;
       if (existingCanvasState && existingCanvasState.__WORKER_CANVAS_PATCH_INSTALLED__ === true) return true;
 
       const sources = resolveWorkerCanvasPatchSources();
       const runtimeRoot = sources.runtimeRoot;
-      const C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-        ? self.CanvasPatchContext
+      const C = (self.FernwehContext && typeof self.FernwehContext === 'object')
+        ? self.FernwehContext
         : null;
       const stateRoot = (C && C.state && typeof C.state === 'object')
         ? C.state
@@ -1899,7 +1899,7 @@
         throw new Error('UACHPatch: worker canvas seed missing');
       }
       if (!(stateRoot && typeof stateRoot === 'object')) {
-        throw new Error('UACHPatch: CanvasPatchContext.state missing');
+        throw new Error('UACHPatch: FernwehContext.state missing');
       }
       syncWorkerEnvProfileState(stateRoot);
       restoreWorkerFontsState(stateRoot);
@@ -1939,26 +1939,26 @@
         ? stateRoot.__CANVAS__
         : null;
       if (!(canvasRoot && typeof canvasRoot === 'object')) {
-        throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__ missing');
+        throw new Error('UACHPatch: FernwehContext.state.__CANVAS__ missing');
       }
-      const canvasState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+      const fernwehState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
         ? canvasRoot.__STATE__
         : null;
-      if (!(canvasState && typeof canvasState === 'object')) {
-        throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__.__STATE__ missing');
+      if (!(fernwehState && typeof fernwehState === 'object')) {
+        throw new Error('UACHPatch: FernwehContext.state.__CANVAS__.__STATE__ missing');
       }
 
-      const hooks = (self.CanvasPatchHooks && typeof self.CanvasPatchHooks === 'object')
-        ? self.CanvasPatchHooks
+      const hooks = (self.FernwehHooks && typeof self.FernwehHooks === 'object')
+        ? self.FernwehHooks
         : null;
-      const patchCtx = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-        ? self.CanvasPatchContext
+      const patchCtx = (self.FernwehContext && typeof self.FernwehContext === 'object')
+        ? self.FernwehContext
         : null;
       if (!patchCtx) {
-        throw new Error('UACHPatch: worker CanvasPatchContext missing after install');
+        throw new Error('UACHPatch: worker FernwehContext missing after install');
       }
       if (!hooks) {
-        throw new Error('UACHPatch: worker CanvasPatchHooks missing after install');
+        throw new Error('UACHPatch: worker FernwehHooks missing after install');
       }
 
       if (typeof patchCtx.registerOffscreenConvertToBlobHook === 'function' && typeof hooks.patchConvertToBlobInjectNoise === 'function') {
@@ -1990,7 +1990,7 @@
         patchCtx.applyWebGLContextPatches();
       }
 
-      trackedDefineProperty(canvasState, '__WORKER_CANVAS_PATCH_INSTALLED__', {
+      trackedDefineProperty(fernwehState, '__WORKER_CANVAS_PATCH_INSTALLED__', {
         value: true,
         writable: true,
         configurable: true,
@@ -2053,10 +2053,10 @@
         }, e);
         throw e;
       }
-      const stateRoot = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object' && self.CanvasPatchContext.state && typeof self.CanvasPatchContext.state === 'object')
-        ? self.CanvasPatchContext.state
+      const stateRoot = (self.FernwehContext && typeof self.FernwehContext === 'object' && self.FernwehContext.state && typeof self.FernwehContext.state === 'object')
+        ? self.FernwehContext.state
         : null;
-      if (!stateRoot) throw new Error('UACHPatch: CanvasPatchContext.state missing');
+      if (!stateRoot) throw new Error('UACHPatch: FernwehContext.state missing');
       // Worker runtime consumes cache.snap; do not rewrite the canonical
       // __WORKER_ENV_SNAPSHOT__ owner-store from the consumer apply path.
       syncWorkerEnvProfileState(stateRoot);
@@ -2082,7 +2082,7 @@
     };
     const bootstrapSnap = __resolveWorkerSnapshotOwner__();
     if (!bootstrapSnap) {
-      throw new Error('UACHPatch: CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+      throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
     }
     if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
       const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
@@ -2125,8 +2125,8 @@
         const SEED = JSON.stringify((self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '');
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'
-          ? `(async function(){'use strict';const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});const SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.CanvasPatchContext&&typeof self.CanvasPatchContext==='object')?self.CanvasPatchContext:__defHidden(self,'CanvasPatchContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('UACHPatch: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
-          : `(function(){'use strict';var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});var SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.CanvasPatchContext&&typeof self.CanvasPatchContext==='object')?self.CanvasPatchContext:__defHidden(self,'CanvasPatchContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('UACHPatch: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');var bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
+          ? `(async function(){'use strict';const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});const SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('UACHPatch: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
+          : `(function(){'use strict';var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});var SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('UACHPatch: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');var bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
         return [blobURL, { ...(opts || {}), type: workerType }];
       });

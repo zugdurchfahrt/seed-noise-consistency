@@ -318,7 +318,7 @@ def _build_sw_bootstrap_prelude(sw_env: dict) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"SW inject: bad webgl.{key}")
     if not isinstance(CDP_GLOBAL_SEED, str) or not CDP_GLOBAL_SEED.strip():
-        raise ValueError("SW inject: CDP_GLOBAL_SEED missing for canvas export layer")
+        raise ValueError("SW inject: CDP_GLOBAL_SEED missing for pipeline export layer")
     prelude_path = SCRIPTS_WORKERSCOPE / "sw_prelude.js"
     reflect_path = SCRIPTS_WORKERSCOPE / "set_reflect.js"
     core_window_path = SCRIPTS_WINDOW_CORE / "core_window.js"
@@ -552,7 +552,7 @@ def run():
         tostring_sanity_expr = (
             "(() => {"
             " const G = globalThis;"
-            " const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object') ? G.CanvasPatchContext : null;"
+            " const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object') ? G.FernwehContext : null;"
             " const stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;"
             " const wrkState = (stateRoot && stateRoot.__WRK__ && typeof stateRoot.__WRK__ === 'object') ? stateRoot.__WRK__ : null;"
             " const runtimeRoot = (wrkState && wrkState.runtime && typeof wrkState.runtime === 'object') ? wrkState.runtime : null;"

@@ -10,8 +10,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __windowRef = (window && (typeof window === 'object' || typeof window === 'function'))
       ? window
       : null;
-    const C = (__windowRef && __windowRef.CanvasPatchContext && (typeof __windowRef.CanvasPatchContext === 'object' || typeof __windowRef.CanvasPatchContext === 'function'))
-      ? __windowRef.CanvasPatchContext
+    const C = (__windowRef && __windowRef.FernwehContext && (typeof __windowRef.FernwehContext === 'object' || typeof __windowRef.FernwehContext === 'function'))
+      ? __windowRef.FernwehContext
       : null;
     const __core = (__windowRef && __windowRef.Core && (typeof __windowRef.Core === 'object' || typeof __windowRef.Core === 'function'))
       ? __windowRef.Core
@@ -154,7 +154,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!C) {
       __navDiagPipeline('warn', 'nav_total_set:canvas_patch_context_missing', {
         stage: 'preflight',
-        message: 'CanvasPatchContext missing',
+        message: 'FernwehContext missing',
         data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'canvas_patch_context_missing');
@@ -164,7 +164,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!__stateRoot) {
       __navDiagPipeline('warn', 'nav_total_set:canvas_patch_state_missing', {
         stage: 'preflight',
-        message: 'CanvasPatchContext.state missing',
+        message: 'FernwehContext.state missing',
         data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'canvas_patch_state_missing');
@@ -176,8 +176,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!__navModuleState) {
       __navDiagPipeline('warn', 'nav_total_set:module_state_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__',
-        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__ missing',
+        key: 'FernwehContext.state.__NAV_TOTAL_SET__',
+        message: 'FernwehContext.state.__NAV_TOTAL_SET__ missing',
         data: { outcome: 'skip', reason: 'module_state_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'module_state_missing');
@@ -248,8 +248,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!__navDataStoreState) {
       __navDiagPipeline('warn', 'nav_total_set:data_store_state_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__',
-        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing',
+        key: 'FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__',
+        message: 'FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing',
         data: { outcome: 'skip', reason: 'data_store_state_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'data_store_state_missing');
@@ -261,8 +261,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!__navScalarState) {
       __navDiagPipeline('warn', 'nav_total_set:scalar_state_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__',
-        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ missing',
+        key: 'FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__',
+        message: 'FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ missing',
         data: { outcome: 'skip', reason: 'scalar_state_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'scalar_state_missing');
@@ -286,8 +286,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     ) {
       __navDiagPipeline('warn', 'nav_total_set:scalar_state_slot_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__',
-        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ scalar slot missing',
+        key: 'FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__',
+        message: 'FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ scalar slot missing',
         data: { outcome: 'skip', reason: 'scalar_state_slot_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'scalar_state_slot_missing');
@@ -299,8 +299,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!__navObjectState) {
       __navDiagPipeline('warn', 'nav_total_set:object_state_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__',
-        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ missing',
+        key: 'FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__',
+        message: 'FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ missing',
         data: { outcome: 'skip', reason: 'object_state_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'object_state_missing');
@@ -354,8 +354,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     ) {
       __navDiagPipeline('warn', 'nav_total_set:object_state_nested_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__',
-        message: 'CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ nested slot missing',
+        key: 'FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__',
+        message: 'FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ nested slot missing',
         data: { outcome: 'skip', reason: 'object_state_nested_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'object_state_nested_missing');
@@ -389,8 +389,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!__envProfileState) {
       __navDiagPipeline('error', 'nav_total_set:env_profile_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__ENV_PROFILE__',
-        message: 'CanvasPatchContext.state.__ENV_PROFILE__ missing',
+        key: 'FernwehContext.state.__ENV_PROFILE__',
+        message: 'FernwehContext.state.__ENV_PROFILE__ missing',
         data: { outcome: 'skip', reason: 'env_profile_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'env_profile_missing');
@@ -402,8 +402,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (!__envPlatformState) {
       __navDiagPipeline('error', 'nav_total_set:env_platform_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__',
-        message: 'CanvasPatchContext.state.__ENV_PROFILE__.__PLATFORM__ missing',
+        key: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__',
+        message: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__ missing',
         data: { outcome: 'skip', reason: 'env_platform_missing' }
       });
       __navReleaseEntryGuard(true, 'preflight', 'env_platform_missing');

@@ -123,31 +123,31 @@ function __ensureHiddenOwnSlot__(owner, key, errorMessage) {
 // Root/container creation.
 const C = __ensureHiddenObjectOrFunctionSlot__(
   W,
-  'CanvasPatchContext',
-  '[module] CanvasPatchContext bootstrap failed',
+  'FernwehContext',
+  '[module] FernwehContext bootstrap failed',
   {}
 );
 
 const stateRoot = __ensureHiddenObjectSlot__(
   C,
   'state',
-  '[module] CanvasPatchContext.state bootstrap failed',
+  '[module] FernwehContext.state bootstrap failed',
   () => Object.create(null)
 );
 
 // Module route slots.
-// CanvasPatchContext.state.__FONTS__
+// FernwehContext.state.__FONTS__
 const fontsRoot = __ensureHiddenObjectSlot__(
   stateRoot,
   '__FONTS__',
-  '[module] CanvasPatchContext.state.__FONTS__ bootstrap failed',
+  '[module] FernwehContext.state.__FONTS__ bootstrap failed',
   () => Object.create(null)
 );
 
 const fontsState = __ensureHiddenObjectSlot__(
   fontsRoot,
   '__STATE__',
-  '[module] CanvasPatchContext.state.__FONTS__.__STATE__ bootstrap failed',
+  '[module] FernwehContext.state.__FONTS__.__STATE__ bootstrap failed',
   () => ({
     ready: false,
     error: null,
@@ -167,7 +167,7 @@ const fontsState = __ensureHiddenObjectSlot__(
 const fontsConfigState = __ensureHiddenObjectSlot__(
   fontsRoot,
   '__CONFIG__',
-  '[module] CanvasPatchContext.state.__FONTS__.__CONFIG__ bootstrap failed',
+  '[module] FernwehContext.state.__FONTS__.__CONFIG__ bootstrap failed',
   () => {
     const state = Object.create(null);
     state.configs = [];
@@ -176,18 +176,18 @@ const fontsConfigState = __ensureHiddenObjectSlot__(
 );
 if (!Array.isArray(fontsConfigState.configs)) fontsConfigState.configs = [];
 
-// CanvasPatchContext.state.__CANVAS__
+// FernwehContext.state.__CANVAS__
 const canvasRoot = __ensureHiddenObjectSlot__(
   stateRoot,
   '__CANVAS__',
-  '[module] CanvasPatchContext.state.__CANVAS__ bootstrap failed',
+  '[module] FernwehContext.state.__CANVAS__ bootstrap failed',
   () => Object.create(null)
 );
 
-const canvasState = __ensureHiddenObjectSlot__(
+const fernwehState = __ensureHiddenObjectSlot__(
   canvasRoot,
   '__STATE__',
-  '[module] CanvasPatchContext.state.__CANVAS__.__STATE__ bootstrap failed',
+  '[module] FernwehContext.state.__CANVAS__.__STATE__ bootstrap failed',
   () => ({
     domReady: false,
     offscreenReady: false,
@@ -197,19 +197,19 @@ const canvasState = __ensureHiddenObjectSlot__(
   })
 );
 __ensureHiddenOwnSlot__(
-  canvasState,
+  fernwehState,
   'defaultCtx2dFont',
-  '[module] CanvasPatchContext.state.__CANVAS__.__STATE__.defaultCtx2dFont bootstrap failed'
+  '[module] FernwehContext.state.__CANVAS__.__STATE__.defaultCtx2dFont bootstrap failed'
 );
-if (typeof canvasState.defaultCtx2dFont !== 'string' || !canvasState.defaultCtx2dFont.trim()) {
-  __defineHiddenValue__(canvasState, 'defaultCtx2dFont', null);
+if (typeof fernwehState.defaultCtx2dFont !== 'string' || !fernwehState.defaultCtx2dFont.trim()) {
+  __defineHiddenValue__(fernwehState, 'defaultCtx2dFont', null);
 }
 
-// CanvasPatchContext.state.__WEBGL_STATE__
+// FernwehContext.state.__WEBGL_STATE__
 const webglState = __ensureHiddenObjectSlot__(
   stateRoot,
   '__WEBGL_STATE__',
-  '[module] CanvasPatchContext.state.__WEBGL_STATE__ bootstrap failed',
+  '[module] FernwehContext.state.__WEBGL_STATE__ bootstrap failed',
   () => ({
     paramWhitelist: [],
     extensionsWhitelist: []
@@ -219,11 +219,11 @@ if (!Array.isArray(webglState.paramWhitelist)) webglState.paramWhitelist = [];
 if (!Array.isArray(webglState.extensionsWhitelist)) webglState.extensionsWhitelist = [];
 
 
-// CanvasPatchContext.state.__SCREEN__
+// FernwehContext.state.__SCREEN__
 const screenRoot = __ensureHiddenObjectSlot__(
   stateRoot,
   '__SCREEN__',
-  '[module] CanvasPatchContext.state.__SCREEN__ bootstrap failed',
+  '[module] FernwehContext.state.__SCREEN__ bootstrap failed',
   () => Object.create(null)
 );
 
@@ -231,228 +231,228 @@ const screenRoot = __ensureHiddenObjectSlot__(
 const navRoot = __ensureHiddenObjectSlot__(
   stateRoot,
   '__NAV_TOTAL_SET__',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__ bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__ bootstrap failed',
   () => Object.create(null)
 );
 
 const navDataStoreState = __ensureHiddenObjectSlot__(
   navRoot,
   '__DATA_STORE_STATE__',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ bootstrap failed',
   () => Object.create(null)
 );
 
 const workerEnvSnapshotState = __ensureHiddenObjectSlot__(
   navDataStoreState,
   '__WORKER_ENV_SNAPSHOT__',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ bootstrap failed',
   () => Object.create(null)
 );
 
 const navScalarState = __ensureHiddenObjectSlot__(
   navRoot,
   '__SCALAR_STATE__',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ bootstrap failed',
   () => Object.create(null)
 );
 
-__ensureHiddenOwnSlot__(navScalarState, 'platform', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.platform bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'vendor', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.vendor bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'appVersion', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.appVersion bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'productSub', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.productSub bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'vendorSub', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.vendorSub bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'maxTouchPoints', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.maxTouchPoints bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'deviceMemory', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.deviceMemory bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'hardwareConcurrency', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.hardwareConcurrency bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'language', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.language bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'languages', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.languages bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'buildID', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.buildID bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'globalPrivacyControl', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.globalPrivacyControl bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'oscpu', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.oscpu bootstrap failed');
-__ensureHiddenOwnSlot__(navScalarState, 'devicePixelRatio', '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.devicePixelRatio bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'platform', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.platform bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'vendor', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.vendor bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'appVersion', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.appVersion bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'productSub', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.productSub bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'vendorSub', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.vendorSub bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'maxTouchPoints', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.maxTouchPoints bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'deviceMemory', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.deviceMemory bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'hardwareConcurrency', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.hardwareConcurrency bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'language', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.language bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'languages', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.languages bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'buildID', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.buildID bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'globalPrivacyControl', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.globalPrivacyControl bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'oscpu', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.oscpu bootstrap failed');
+__ensureHiddenOwnSlot__(navScalarState, 'devicePixelRatio', '[module] FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__.devicePixelRatio bootstrap failed');
 
 const navObjectState = __ensureHiddenObjectSlot__(
   navRoot,
   '__OBJECT_STATE__',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectUserAgentDataState = __ensureHiddenObjectSlot__(
   navObjectState,
   'userAgentData',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectUserAgentDataLowEntropyState = __ensureHiddenObjectSlot__(
   navObjectUserAgentDataState,
   'lowEntropy',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.lowEntropy bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.lowEntropy bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectUserAgentDataHighEntropyState = __ensureHiddenObjectSlot__(
   navObjectUserAgentDataState,
   'highEntropy',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.highEntropy bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.highEntropy bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectUserAgentDataToJSONState = __ensureHiddenObjectSlot__(
   navObjectUserAgentDataState,
   'toJSON',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.toJSON bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.toJSON bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectPluginsState = __ensureHiddenObjectSlot__(
   navObjectState,
   'plugins',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectPluginsProtoMethodsState = __ensureHiddenObjectSlot__(
   navObjectPluginsState,
   'protoMethods',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins.protoMethods bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins.protoMethods bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectPluginsPluginRecordsState = __ensureHiddenObjectSlot__(
   navObjectPluginsState,
   'pluginRecords',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins.pluginRecords bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.plugins.pluginRecords bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectMimeTypesState = __ensureHiddenObjectSlot__(
   navObjectState,
   'mimeTypes',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectMimeTypesProtoMethodsState = __ensureHiddenObjectSlot__(
   navObjectMimeTypesState,
   'protoMethods',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes.protoMethods bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes.protoMethods bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectMimeTypesMimeRecordsState = __ensureHiddenObjectSlot__(
   navObjectMimeTypesState,
   'mimeRecords',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes.mimeRecords bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.mimeTypes.mimeRecords bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectPermissionsState = __ensureHiddenObjectSlot__(
   navObjectState,
   'permissions',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.permissions bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.permissions bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectStorageState = __ensureHiddenObjectSlot__(
   navObjectState,
   'storage',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectStorageEstimateState = __ensureHiddenObjectSlot__(
   navObjectStorageState,
   'estimate',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.estimate bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.estimate bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectStorageWebkitTemporaryStorageState = __ensureHiddenObjectSlot__(
   navObjectStorageState,
   'webkitTemporaryStorage',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.webkitTemporaryStorage bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.webkitTemporaryStorage bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectStoragePersistenceState = __ensureHiddenObjectSlot__(
   navObjectStorageState,
   'persistence',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.persistence bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.persistence bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectPerformanceState = __ensureHiddenObjectSlot__(
   navObjectState,
   'performance',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.performance bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.performance bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectPerformanceMemoryState = __ensureHiddenObjectSlot__(
   navObjectPerformanceState,
   'memory',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.performance.memory bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.performance.memory bootstrap failed',
   () => Object.create(null)
 );
 
 const navObjectCredentialsState = __ensureHiddenObjectSlot__(
   navObjectState,
   'credentials',
-  '[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.credentials bootstrap failed',
+  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.credentials bootstrap failed',
   () => Object.create(null)
 );
 
-// CanvasPatchContext.state.__HIDE_WEBDRIVER__
+// FernwehContext.state.__HIDE_WEBDRIVER__
 const hideWebdriverRoot = __ensureHiddenObjectSlot__(
   stateRoot,
   '__HIDE_WEBDRIVER__',
-  '[module] CanvasPatchContext.state.__HIDE_WEBDRIVER__ bootstrap failed',
+  '[module] FernwehContext.state.__HIDE_WEBDRIVER__ bootstrap failed',
   () => Object.create(null)
 );
 
 const hideWebdriverState = __ensureHiddenObjectSlot__(
   hideWebdriverRoot,
   '__STATE__',
-  '[module] CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__ bootstrap failed',
+  '[module] FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__ bootstrap failed',
   () => Object.create(null)
 );
 
-// CanvasPatchContext.state.__WRK__
+// FernwehContext.state.__WRK__
 const wrkRoot = __ensureHiddenObjectSlot__(
   stateRoot,
   '__WRK__',
-  '[module] CanvasPatchContext.state.__WRK__ bootstrap failed',
+  '[module] FernwehContext.state.__WRK__ bootstrap failed',
   () => Object.create(null)
 );
 
 const wrkBootstrapState = __ensureHiddenObjectSlot__(
   wrkRoot,
   'bootstrap',
-  '[module] CanvasPatchContext.state.__WRK__.bootstrap bootstrap failed',
+  '[module] FernwehContext.state.__WRK__.bootstrap bootstrap failed',
   () => Object.create(null)
 );
 
 const wrkRuntimeState = __ensureHiddenObjectSlot__(
   wrkRoot,
   'runtime',
-  '[module] CanvasPatchContext.state.__WRK__.runtime bootstrap failed',
+  '[module] FernwehContext.state.__WRK__.runtime bootstrap failed',
   () => Object.create(null)
 );
 
 const wrkHooksState = __ensureHiddenObjectSlot__(
   wrkRoot,
   'hooks',
-  '[module] CanvasPatchContext.state.__WRK__.hooks bootstrap failed',
+  '[module] FernwehContext.state.__WRK__.hooks bootstrap failed',
   () => Object.create(null)
 );
 
-// CanvasPatchContext runtime helpers and patch state.
+// FernwehContext runtime helpers and patch state.
 const patchStateRoot = __ensureHiddenObjectSlot__(
   C,
   '__patchState',
-  '[module] CanvasPatchContext.__patchState__ bootstrap failed',
+  '[module] FernwehContext.__patchState__ bootstrap failed',
   () => ({
     canvas: false,
     offscreen: false,
@@ -464,7 +464,7 @@ const patchStateRoot = __ensureHiddenObjectSlot__(
 const hookModeStore = __ensureHiddenObjectSlot__(
   C,
   '__hookModeStore',
-  '[module] CanvasPatchContext.__hookModeStore bootstrap failed',
+  '[module] FernwehContext.__hookModeStore bootstrap failed',
   () => Object.create(null)
 );
 if (!Object.prototype.hasOwnProperty.call(hookModeStore, 'post_orig_once')) {
@@ -483,7 +483,7 @@ if (typeof C.__READY__ !== 'boolean') {
 const loggerRoot = __ensureHiddenObjectSlot__(
   C,
   '__logger',
-  '[module] CanvasPatchContext.__logger bootstrap failed',
+  '[module] FernwehContext.__logger bootstrap failed',
   () => Object.create(null)
 );
 
@@ -766,11 +766,11 @@ if (__langMissingKeys__.length === 0) {
     __langTransitState__.normalizedLanguages.length === 0 ||
     __langTransitState__.normalizedLanguages[0] !== __langTransitState__.primaryLanguage
   ) {
-    throw new Error('[module] CanvasPatchContext.state.__LANG_STATE__ bootstrap invalid');
+    throw new Error('[module] FernwehContext.state.__LANG_STATE__ bootstrap invalid');
   }
   __setBootstrapTransferStatus__('lang', true, 'owner_ready', { source: 'window_transit' });
 } else {
-  const e = new Error('[module] CanvasPatchContext.state.__LANG_STATE__ bootstrap failed');
+  const e = new Error('[module] FernwehContext.state.__LANG_STATE__ bootstrap failed');
   __setBootstrapTransferStatus__('lang', false, 'bootstrap_input_incomplete', { missingKeys: __langMissingKeys__.slice() });
   __emitBootstrapTransferDiag__(
     'error',
@@ -847,16 +847,16 @@ __envProfileState__.webglVendor = __bootstrapInputs__.__WEBGL_VENDOR__;
 __envProfileState__.webglUnmaskedVendor = __bootstrapInputs__.__WEBGL_UNMASKED_VENDOR__;
 __envProfileState__.webglUnmaskedRenderer = __bootstrapInputs__.__WEBGL_UNMASKED_RENDERER__;
 if (!(typeof __envProfileState__.webglVendor === 'string' && __envProfileState__.webglVendor)) {
-  throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.vendor bootstrap failed');
+  throw new Error('[module] FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.vendor bootstrap failed');
 }
 if (!(typeof __envProfileState__.webglRenderer === 'string' && __envProfileState__.webglRenderer)) {
-  throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.renderer bootstrap failed');
+  throw new Error('[module] FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.renderer bootstrap failed');
 }
 if (!(typeof __envProfileState__.webglUnmaskedVendor === 'string' && __envProfileState__.webglUnmaskedVendor)) {
-  throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.unmaskedVendor bootstrap failed');
+  throw new Error('[module] FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.unmaskedVendor bootstrap failed');
 }
 if (!(typeof __envProfileState__.webglUnmaskedRenderer === 'string' && __envProfileState__.webglUnmaskedRenderer)) {
-  throw new Error('[module] CanvasPatchContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.unmaskedRenderer bootstrap failed');
+  throw new Error('[module] FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__.webgl.unmaskedRenderer bootstrap failed');
 }
 workerEnvSnapshotState.webgl = {
   vendor: __envProfileState__.webglVendor,

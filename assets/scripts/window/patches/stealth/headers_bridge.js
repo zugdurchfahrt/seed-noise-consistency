@@ -12,8 +12,8 @@
     return owner[key];
   }
   function __emit(level, code, ctx, err) {
-    const __loggerRoot = (g && g.CanvasPatchContext && g.CanvasPatchContext.__logger && typeof g.CanvasPatchContext.__logger === 'object')
-      ? g.CanvasPatchContext.__logger
+    const __loggerRoot = (g && g.FernwehContext && g.FernwehContext.__logger && typeof g.FernwehContext.__logger === 'object')
+      ? g.FernwehContext.__logger
       : null;
     const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     if (typeof d !== 'function') return;
@@ -44,23 +44,23 @@
   const CH_PASS = ['.cloudflare.com','.challenge.cloudflare.com','.akamaihd.net','.perimeterx.net','.hcaptcha.com','.recaptcha.net'];
   function norm(s){ return !s ? s : (s[0] === "." ? s : "." + s); }
   function ensureHeadersState() {
-    const C = (g && g.CanvasPatchContext && typeof g.CanvasPatchContext === 'object')
-      ? g.CanvasPatchContext
+    const C = (g && g.FernwehContext && typeof g.FernwehContext === 'object')
+      ? g.FernwehContext
       : null;
-    if (!C) throw new Error('headers_bridge: CanvasPatchContext missing');
+    if (!C) throw new Error('headers_bridge: FernwehContext missing');
     const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-    if (!stateRoot) throw new Error('headers_bridge: CanvasPatchContext.state missing');
+    if (!stateRoot) throw new Error('headers_bridge: FernwehContext.state missing');
     const headersRoot = (stateRoot.__HEADERS__ && typeof stateRoot.__HEADERS__ === 'object')
       ? stateRoot.__HEADERS__
       : defineHiddenValue(stateRoot, '__HEADERS__', Object.create(null));
     if (!headersRoot || typeof headersRoot !== 'object') {
-      throw new Error('headers_bridge: CanvasPatchContext.state.__HEADERS__ missing');
+      throw new Error('headers_bridge: FernwehContext.state.__HEADERS__ missing');
     }
     const headersState = (headersRoot.__STATE__ && typeof headersRoot.__STATE__ === 'object')
       ? headersRoot.__STATE__
       : defineHiddenValue(headersRoot, '__STATE__', Object.create(null));
     if (!headersState || typeof headersState !== 'object') {
-      throw new Error('headers_bridge: CanvasPatchContext.state.__HEADERS__.__STATE__ missing');
+      throw new Error('headers_bridge: FernwehContext.state.__HEADERS__.__STATE__ missing');
     }
     if (!Array.isArray(headersState.allowSuffixes)) defineHiddenValue(headersState, 'allowSuffixes', []);
     if (!Array.isArray(headersState.ignoreSuffixes)) defineHiddenValue(headersState, 'ignoreSuffixes', []);
@@ -76,13 +76,13 @@
     } catch (e) {
       emitDegrade('warn', 'headers_bridge:init:preflight:headers_state_missing', e, {
         stage: 'preflight',
-        surface: 'CanvasPatchContext.state.__HEADERS__.__STATE__',
-        key: 'CanvasPatchContext.state.__HEADERS__.__STATE__',
-        message: 'CanvasPatchContext.state.__HEADERS__.__STATE__ missing',
+        surface: 'FernwehContext.state.__HEADERS__.__STATE__',
+        key: 'FernwehContext.state.__HEADERS__.__STATE__',
+        message: 'FernwehContext.state.__HEADERS__.__STATE__ missing',
         data: {
           outcome: 'skip',
           reason: 'headers_state_missing',
-          missing: 'CanvasPatchContext.state.__HEADERS__.__STATE__'
+          missing: 'FernwehContext.state.__HEADERS__.__STATE__'
         }
       });
       return;
@@ -118,7 +118,7 @@
     }
     headersState.bridgeReady = true;
     emitDegrade('info', 'headers_bridge:init:apply:ready', null, {
-      key: 'CanvasPatchContext.state.__HEADERS__.__STATE__',
+      key: 'FernwehContext.state.__HEADERS__.__STATE__',
       message: 'CDP bridge ready',
       data: {
         allowCount: Array.isArray(headersState.allowSuffixes) ? headersState.allowSuffixes.length : 0,

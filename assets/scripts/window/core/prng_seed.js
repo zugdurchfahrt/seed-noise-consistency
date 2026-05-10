@@ -8,9 +8,9 @@
           || (typeof global     !== 'undefined' && global)
           || {};
 
-    const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-      ? window.CanvasPatchContext.__logger
-      : ((G && G.CanvasPatchContext && G.CanvasPatchContext.__logger && typeof G.CanvasPatchContext.__logger === 'object') ? G.CanvasPatchContext.__logger : null);
+    const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+      ? window.FernwehContext.__logger
+      : ((G && G.FernwehContext && G.FernwehContext.__logger && typeof G.FernwehContext.__logger === 'object') ? G.FernwehContext.__logger : null);
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
     const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
     const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -72,7 +72,7 @@
       s = String(s); const n = s.length; const k = Math.max(2, Math.min(keep || 4, Math.floor(n / 4)));
       return (n <= 2 * k) ? '"' + s + '" (len ' + n + ')' : '"' + s.slice(0, k) + '…' + s.slice(-k) + '" (len ' + n + ')';
     }
-    const C = (G && G.CanvasPatchContext) || (window && window.CanvasPatchContext) || null;
+    const C = (G && G.FernwehContext) || (window && window.FernwehContext) || null;
     const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
       ? __core.__internal
       : null;
@@ -334,8 +334,8 @@
   const __rngHasOwnExport = Object.prototype.hasOwnProperty.call(G, 'RNGsetModule');
   const __rngExportDesc = __rngHasOwnExport ? Object.getOwnPropertyDescriptor(G, 'RNGsetModule') : null;
   const __rngCanFillPlaceholder = !!(__rngExportDesc && __rngExportDesc.configurable !== false && G.RNGsetModule === undefined);
-  const __outerLoggerRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.__logger && typeof G.CanvasPatchContext.__logger === 'object')
-    ? G.CanvasPatchContext.__logger
+  const __outerLoggerRoot = (G && G.FernwehContext && G.FernwehContext.__logger && typeof G.FernwehContext.__logger === 'object')
+    ? G.FernwehContext.__logger
     : null;
   const __outerDegrade = (__outerLoggerRoot && typeof __outerLoggerRoot.__DEGRADE__ === 'function') ? __outerLoggerRoot.__DEGRADE__ : null;
   const __outerDiag = (__outerDegrade && typeof __outerDegrade.diag === 'function') ? __outerDegrade.diag.bind(__outerDegrade) : null;

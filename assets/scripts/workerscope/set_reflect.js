@@ -70,10 +70,10 @@
   }
 
   function __ensureWorkerCanvasPatchContext() {
-    const existing = (self && self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-      ? self.CanvasPatchContext
+    const existing = (self && self.FernwehContext && typeof self.FernwehContext === 'object')
+      ? self.FernwehContext
       : null;
-    return existing || __setHiddenValue(self, 'CanvasPatchContext', Object.create(null));
+    return existing || __setHiddenValue(self, 'FernwehContext', Object.create(null));
   }
 
   function __ensureWorkerWrkRuntimeRoot() {
@@ -178,7 +178,7 @@
 
     const ownedCoreToStringState = validateCoreToStringStateCandidate(
       (__wrkRuntimeRoot && __wrkRuntimeRoot.__CORE_TOSTRING_STATE__) ? __wrkRuntimeRoot.__CORE_TOSTRING_STATE__ : null,
-      'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__'
+      'FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__'
     );
     let sharedCoreToStringState = ownedCoreToStringState || null;
 
@@ -214,7 +214,7 @@
       } catch (eState) {
         __wrkDiag('error', 'wrk:core_tostring_state_owner_define_failed', {
           stage: 'apply',
-          key: 'CanvasPatchContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
+          key: 'FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
           message: 'failed to define owner-route __CORE_TOSTRING_STATE__',
           type: 'pipeline missing data',
           data: { outcome: 'throw' }
@@ -640,7 +640,7 @@
     }
 
       if (!__wrkRuntimeRoot || typeof __wrkRuntimeRoot !== 'object') {
-        throw new Error('UACHPatch: CanvasPatchContext.state.__WRK__.runtime missing');
+        throw new Error('UACHPatch: FernwehContext.state.__WRK__.runtime missing');
       }
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeApply', __wrapNativeApply);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeAccessor', __wrapNativeAccessor);

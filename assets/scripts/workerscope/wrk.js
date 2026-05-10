@@ -11,8 +11,8 @@ const WrkModule = function WrkModule(window) {
   const __tag = 'wrk';
   const __flagKey = '__PATCH_WRK__';
   function __resolveWrkDegrade__() {
-    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
-      ? G.CanvasPatchContext
+    const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
+      ? G.FernwehContext
       : null;
     const L = (C && C.__logger && typeof C.__logger === 'object')
       ? C.__logger
@@ -91,8 +91,8 @@ const WrkModule = function WrkModule(window) {
   }
 
   function __resolveCanvasPatchContext__() {
-    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
-      ? G.CanvasPatchContext
+    const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
+      ? G.FernwehContext
       : null;
     return C;
   }
@@ -149,8 +149,8 @@ const WrkModule = function WrkModule(window) {
 
   function __resolveScopeWrkRuntimeRoot__(scope) {
     if (!scope || (typeof scope !== 'object' && typeof scope !== 'function')) return null;
-    const C = (scope.CanvasPatchContext && typeof scope.CanvasPatchContext === 'object')
-      ? scope.CanvasPatchContext
+    const C = (scope.FernwehContext && typeof scope.FernwehContext === 'object')
+      ? scope.FernwehContext
       : null;
     if (!C) return null;
     const stateRoot = (C.state && typeof C.state === 'object')
@@ -226,7 +226,7 @@ const WrkModule = function WrkModule(window) {
     const err = new Error('[WrkModule] FAIL_FAST: worker patch runtime not ready');
     __wrkDiag('error', 'wrk:worker_patch_runtime_missing', {
       stage: (typeof stage === 'string' && stage) ? stage : 'preflight',
-      key: 'CanvasPatchContext.state.__WRK__.runtime',
+      key: 'FernwehContext.state.__WRK__.runtime',
       message: (typeof reason === 'string' && reason) ? reason : 'worker patch runtime not ready',
       type: 'pipeline missing data',
       data: { outcome: 'throw', reason: 'worker_patch_runtime_missing' }
@@ -247,7 +247,7 @@ const WrkModule = function WrkModule(window) {
     const err = new Error('[WrkModule] FAIL_FAST: worker patch api not ready');
     __wrkDiag('error', 'wrk:worker_patch_api_missing', {
       stage: (typeof stage === 'string' && stage) ? stage : 'preflight',
-      key: 'CanvasPatchContext.state.__WRK__.runtime.workerPatchApi',
+      key: 'FernwehContext.state.__WRK__.runtime.workerPatchApi',
       message: (typeof reason === 'string' && reason) ? reason : 'worker patch api not ready',
       type: 'pipeline missing data',
       data: { outcome: 'throw', reason: 'worker_patch_api_missing' }
@@ -265,13 +265,13 @@ const WrkModule = function WrkModule(window) {
   }
 
   function __updateWorkerSnapshotStatus__(ready, stage) {
-    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
-      ? G.CanvasPatchContext
+    const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
+      ? G.FernwehContext
       : null;
     if (!C) return;
     __wrkBestEffort('wrk:worker_snapshot_status_update_failed', {
       stage: 'apply',
-      key: 'CanvasPatchContext.__workerEnvSnapshotReady__',
+      key: 'FernwehContext.__workerEnvSnapshotReady__',
       message: 'worker snapshot status update failed',
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'worker_snapshot_status_update_failed' }
@@ -290,13 +290,13 @@ const WrkModule = function WrkModule(window) {
   }
 
   function __retryBootstrapEnvCleanup__() {
-    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
-      ? G.CanvasPatchContext
+    const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
+      ? G.FernwehContext
       : null;
     if (!C || typeof C.__runBootstrapEnvCleanup__ !== 'function') return;
     __wrkBestEffort('wrk:bootstrap_cleanup_retry_failed', {
       stage: 'cleanup',
-      key: 'CanvasPatchContext.__runBootstrapEnvCleanup__',
+      key: 'FernwehContext.__runBootstrapEnvCleanup__',
       message: 'bootstrap env cleanup retry failed',
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'bootstrap_cleanup_retry_failed' }
@@ -397,8 +397,8 @@ function EnvBus(G){
     return __wrkCloneEnvValue__(v);
   }
   function __resolveCanvasPatchStateRoot() {
-    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
-      ? G.CanvasPatchContext
+    const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
+      ? G.FernwehContext
       : null;
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
@@ -407,7 +407,7 @@ function EnvBus(G){
   }
   function __requireWorkerEnvSnapshot() {
     const stateRoot = __resolveCanvasPatchStateRoot();
-    if (!stateRoot) throw new Error('EnvBus: CanvasPatchContext.state missing');
+    if (!stateRoot) throw new Error('EnvBus: FernwehContext.state missing');
     const navModuleState = (stateRoot && stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
       ? stateRoot.__NAV_TOTAL_SET__
       : null;
@@ -604,8 +604,8 @@ function EnvBus(G){
       configs: __cloneEnvValue(configs)
     };
   }
-  const __geoStateRoot = (G && G.CanvasPatchContext && G.CanvasPatchContext.state && typeof G.CanvasPatchContext.state === 'object' && G.CanvasPatchContext.state.__GEO_STATE__ && typeof G.CanvasPatchContext.state.__GEO_STATE__ === 'object')
-    ? G.CanvasPatchContext.state.__GEO_STATE__
+  const __geoStateRoot = (G && G.FernwehContext && G.FernwehContext.state && typeof G.FernwehContext.state === 'object' && G.FernwehContext.state.__GEO_STATE__ && typeof G.FernwehContext.state.__GEO_STATE__ === 'object')
+    ? G.FernwehContext.state.__GEO_STATE__
     : null;
   const __envTimeZone = (__geoStateRoot && typeof __geoStateRoot.timezone === 'string' && __geoStateRoot.timezone)
     ? __geoStateRoot.timezone
@@ -1130,9 +1130,9 @@ function mkWorkerBootstrapCore(opts){
         return value;
       };
       var __materializeWorkerOwnerGraph__ = function(){
-        var C = (self.CanvasPatchContext && typeof self.CanvasPatchContext === 'object')
-          ? self.CanvasPatchContext
-          : __defineWorkerHiddenValue__(self, 'CanvasPatchContext', Object.create(null));
+        var C = (self.FernwehContext && typeof self.FernwehContext === 'object')
+          ? self.FernwehContext
+          : __defineWorkerHiddenValue__(self, 'FernwehContext', Object.create(null));
         var stateRoot = (C.state && typeof C.state === 'object')
           ? C.state
           : __defineWorkerHiddenValue__(C, 'state', Object.create(null));
@@ -1176,7 +1176,7 @@ function mkWorkerBootstrapCore(opts){
         var canvasRoot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
           ? stateRoot.__CANVAS__
           : __defineWorkerHiddenValue__(stateRoot, '__CANVAS__', Object.create(null));
-        var canvasState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+        var fernwehState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
           ? canvasRoot.__STATE__
           : __defineWorkerHiddenValue__(canvasRoot, '__STATE__', {
               domReady: false,
@@ -1202,22 +1202,22 @@ function mkWorkerBootstrapCore(opts){
           throw new Error('UACHPatch: __WORKER_ENV_SNAPSHOT__ owner route missing');
         }
         if (!envProfileRoot || typeof envProfileRoot !== 'object') {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__ENV_PROFILE__ missing');
+          throw new Error('UACHPatch: FernwehContext.state.__ENV_PROFILE__ missing');
         }
         if (!fontsRoot || typeof fontsRoot !== 'object') {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__ missing');
+          throw new Error('UACHPatch: FernwehContext.state.__FONTS__ missing');
         }
         if (!fontsState || typeof fontsState !== 'object') {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__.__STATE__ missing');
+          throw new Error('UACHPatch: FernwehContext.state.__FONTS__.__STATE__ missing');
         }
         if (!fontsConfig || typeof fontsConfig !== 'object') {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__FONTS__.__CONFIG__ missing');
+          throw new Error('UACHPatch: FernwehContext.state.__FONTS__.__CONFIG__ missing');
         }
         if (!canvasRoot || typeof canvasRoot !== 'object') {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__ missing');
+          throw new Error('UACHPatch: FernwehContext.state.__CANVAS__ missing');
         }
-        if (!canvasState || typeof canvasState !== 'object') {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__CANVAS__.__STATE__ missing');
+        if (!fernwehState || typeof fernwehState !== 'object') {
+          throw new Error('UACHPatch: FernwehContext.state.__CANVAS__.__STATE__ missing');
         }
         if (!Core || (typeof Core !== 'object' && typeof Core !== 'function')) {
           throw new Error('UACHPatch: Core missing');
@@ -1229,7 +1229,7 @@ function mkWorkerBootstrapCore(opts){
           throw new Error('UACHPatch: Core.__internal.prng missing');
         }
         if (!wrkRuntime || typeof wrkRuntime !== 'object') {
-          throw new Error('UACHPatch: CanvasPatchContext.state.__WRK__.runtime missing');
+          throw new Error('UACHPatch: FernwehContext.state.__WRK__.runtime missing');
         }
         return {
           C: C,
@@ -1243,7 +1243,7 @@ function mkWorkerBootstrapCore(opts){
           fontsState: fontsState,
           fontsConfig: fontsConfig,
           canvasRoot: canvasRoot,
-          canvasState: canvasState,
+          fernwehState: fernwehState,
           Core: Core,
           coreInternal: coreInternal,
           prngRoot: prngRoot,
@@ -1618,8 +1618,8 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
   }
   const __bridgeEnvBus = EnvBus(global);
   function __resolveFontsStateForWorkerSync__() {
-    const C = (global && global.CanvasPatchContext && typeof global.CanvasPatchContext === 'object')
-      ? global.CanvasPatchContext
+    const C = (global && global.FernwehContext && typeof global.FernwehContext === 'object')
+      ? global.FernwehContext
       : null;
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
@@ -1656,7 +1656,7 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
       readyPromise.then(() => {
         __wrkBestEffort('wrk:fonts_snapshot_sync_publish_failed', {
           stage: 'runtime',
-          key: 'CanvasPatchContext.state.__FONTS__.__STATE__.awaitReady',
+          key: 'FernwehContext.state.__FONTS__.__STATE__.awaitReady',
           message: 'worker fonts snapshot sync publish failed',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'fonts_snapshot_sync_publish_failed', source: 'awaitReady:resolved' }
@@ -1664,7 +1664,7 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
       }, () => {
         __wrkBestEffort('wrk:fonts_snapshot_sync_publish_failed', {
           stage: 'runtime',
-          key: 'CanvasPatchContext.state.__FONTS__.__STATE__.awaitReady',
+          key: 'FernwehContext.state.__FONTS__.__STATE__.awaitReady',
           message: 'worker fonts snapshot sync publish failed',
           type: 'pipeline missing data',
           data: { outcome: 'skip', reason: 'fonts_snapshot_sync_publish_failed', source: 'awaitReady:failed' }
@@ -1868,7 +1868,7 @@ function SafeWorkerOverride(G){
     const e = new Error('[WorkerOverride] FAIL_FAST: worker patch api not ready');
     __wrkDiag('error', 'wrk:worker_override_bridge_not_ready', {
       stage: 'preflight',
-      key: 'CanvasPatchContext.state.__WRK__.runtime.workerPatchApi',
+      key: 'FernwehContext.state.__WRK__.runtime.workerPatchApi',
       message: 'worker override runtime api not ready',
       type: 'pipeline missing data',
       data: { outcome: 'throw', reason: 'worker_patch_api_not_ready' }
@@ -2275,7 +2275,7 @@ function ServiceWorkerOverride(G){
   'use strict';
   __wrkBestEffort('wrk:service_worker_registration_lane_state_failed', {
     stage: 'apply',
-    key: 'CanvasPatchContext.state.__WRK__.runtime.serviceWorkerLane',
+    key: 'FernwehContext.state.__WRK__.runtime.serviceWorkerLane',
     message: 'service worker registration lane state failed',
     type: 'pipeline missing data',
     data: { outcome: 'skip', reason: 'service_worker_registration_lane_state_failed' }
@@ -2736,7 +2736,7 @@ function ServiceWorkerOverride(G){
 
   __wrkDiag('info', 'wrk:worker_patch_hooks_ready', {
     stage: 'apply',
-    key: 'CanvasPatchContext.state.__WRK__.hooks.WorkerPatchHooks',
+    key: 'FernwehContext.state.__WRK__.hooks.WorkerPatchHooks',
     message: 'WorkerPatchHooks ready',
     type: 'pipeline missing data',
     data: { outcome: 'return' }

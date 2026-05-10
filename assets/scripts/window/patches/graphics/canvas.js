@@ -1,8 +1,8 @@
 /*
 Canvas patch module contract:
-- `CanvasPatchContext` owns internal state and hook registries.
-- `CanvasPatchHooks` is the function export surface consumed by `context.js`.
-- Do not replace the `CanvasPatchHooks` object; update properties on the existing identity.
+- `FernwehContext` owns internal state and hook registries.
+- `FernwehHooks` is the function export surface consumed by `context.js`.
+- Do not replace the `FernwehHooks` object; update properties on the existing identity.
 - Required exports must match `context.js::registerAllHooks()`.
 - Disabled exports below are kept as commented operational switches.
 */
@@ -41,15 +41,15 @@ function __canvasCreateDomHostElements() {
     ok: !!(host && canvas)
   };
 }
-const C  = G.CanvasPatchContext;
+const C  = G.FernwehContext;
 // === CanvasEnvBus phase ===
-// 1) reading CanvasPatchContext.state
+// 1) reading FernwehContext.state
 // 2) reading logger/env/screen/prng roots
 // 3) validating dependencies
 // 4) preparing helper functions
-// 5) writing hidden init-state into CanvasPatchContext
+// 5) writing hidden init-state into FernwehContext
 const __canvasEnvBus = (function initCanvasEnvBus() {
-  if (!C) throw new Error('[CanvasPatch] CanvasPatchContext is undefined — registratio not available');
+  if (!C) throw new Error('[FernwehContext] FernwehContext is undefined — registratio not available');
 
   const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
@@ -63,7 +63,7 @@ const __canvasEnvBus = (function initCanvasEnvBus() {
   const screenHeight = Number(envScreenState && envScreenState.height);
   const dpr = Number(envProfileState && envProfileState.dpr);
 
-  function emitCanvasDiag(level, code, err, extra) {
+  function emitDiag(level, code, err, extra) {
     const d = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
     if (typeof d !== 'function') return;
     const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
@@ -98,9 +98,9 @@ const __canvasEnvBus = (function initCanvasEnvBus() {
       screenHeight <= 0 ||
       dpr <= 0
     ) {
-      emitCanvasDiag('warn', 'canvas:preflight:screen_metrics_invalid', null, {
+      emitDiag('warn', 'canvas:preflight:screen_metrics_invalid', null, {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__ENV_PROFILE__.__SCREEN__.width/height/dpr',
+        key: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__.width/height/dpr',
         message: 'screen metrics invalid',
         data: {
           outcome: 'skip',
@@ -131,19 +131,19 @@ const __canvasEnvBus = (function initCanvasEnvBus() {
   }
 
   if (!stateRoot) {
-    throw new Error('[CanvasPatch] CanvasPatchContext.state is undefined — module registration is not available');
+    throw new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available');
   }
   const canvasModuleSlot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
     ? stateRoot.__CANVAS__
     : null;
   if (!canvasModuleSlot) {
-    throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS__ is undefined — module registration is not available');
+    throw new Error('[FernwehContext] FernwehContext.state.__CANVAS__ is undefined — module registration is not available');
   }
-  const canvasState = (canvasModuleSlot.__STATE__ && typeof canvasModuleSlot.__STATE__ === 'object')
+  const fernwehState = (canvasModuleSlot.__STATE__ && typeof canvasModuleSlot.__STATE__ === 'object')
     ? canvasModuleSlot.__STATE__
     : null;
-  if (!canvasState) {
-    throw new Error('[CanvasPatch] CanvasPatchContext.state.__CANVAS__.__STATE__ is undefined — module registration is not available');
+  if (!fernwehState) {
+    throw new Error('[FernwehContext] FernwehContext.state.__CANVAS__.__STATE__ is undefined — module registration is not available');
   }
 
   function defineHidden(obj, prop, value, diagCode, diagKey, message) {
@@ -159,7 +159,7 @@ const __canvasEnvBus = (function initCanvasEnvBus() {
       });
       return true;
     } catch (eSet) {
-      emitCanvasDiag('warn', diagCode, eSet, {
+      emitDiag('warn', diagCode, eSet, {
         stage,
         key: diagKey || prop,
         type: 'browser structure missing data',
@@ -169,7 +169,7 @@ const __canvasEnvBus = (function initCanvasEnvBus() {
         obj[prop] = value;
         return true;
       } catch (eAssign) {
-        emitCanvasDiag('warn', diagCode, eAssign, {
+        emitDiag('warn', diagCode, eAssign, {
           stage,
           key: diagKey || prop,
           type: 'browser structure missing data',
@@ -195,7 +195,7 @@ const __canvasEnvBus = (function initCanvasEnvBus() {
       dpr: Number.isFinite(dpr) ? dpr : null
     }),
     'canvas:apply:env_bus_state_define_failed',
-    'CanvasPatchContext.state.__CANVAS__.__ENV_BUS__',
+    'FernwehContext.state.__CANVAS__.__ENV_BUS__',
     'CanvasEnvBus init-state defineProperty failed; fallback assign used'
   );
 
@@ -208,8 +208,8 @@ const __canvasEnvBus = (function initCanvasEnvBus() {
     screenHeight,
     dpr,
     canvasModuleSlot,
-    canvasState,
-    emitCanvasDiag,
+    fernwehState,
+    emitDiag,
     resolvePrngState,
     defineHidden
   };
@@ -221,8 +221,8 @@ const __canvasEnvScreenState = __canvasEnvBus.envScreenState;
 const __canvasDpr = __canvasEnvBus.dpr;
 const __stateRoot = __canvasEnvBus.stateRoot;
 const __canvasModuleSlot = __canvasEnvBus.canvasModuleSlot;
-const __canvasState = __canvasEnvBus.canvasState;
-const emitCanvasDiag = __canvasEnvBus.emitCanvasDiag;
+const __canvasState = __canvasEnvBus.fernwehState;
+const emitDiag = __canvasEnvBus.emitDiag;
 const __resolvePrngState = __canvasEnvBus.resolvePrngState;
 const __defineHidden__ = __canvasEnvBus.defineHidden;
 
@@ -236,7 +236,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
   function __requireSharedDefaultCtx2dFont__() {
     const font = __readSharedDefaultCtx2dFont__();
     if (typeof font === 'string' && font) return font;
-    throw new Error('[CanvasPatch] shared default ctx2d font missing');
+    throw new Error('[FernwehContext] shared default ctx2d font missing');
   }
 
   // создаём скрытый HTML-canvas в окне
@@ -247,7 +247,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     const docReadyState = (doc && typeof doc.readyState === 'string') ? doc.readyState : null;
     if (!doc || (!doc.body && !doc.documentElement) || !__canvasCanCreateElements()) {
       const domDeferred = !!(__canvasCanCreateElements() && docReadyState === 'loading');
-      emitCanvasDiag(domDeferred ? 'info' : 'warn', domDeferred ? 'canvas:preflight:dom_deferred' : 'canvas:preflight:dom_unavailable', null, {
+      emitDiag(domDeferred ? 'info' : 'warn', domDeferred ? 'canvas:preflight:dom_deferred' : 'canvas:preflight:dom_unavailable', null, {
         stage: 'preflight',
         key: 'document',
         type: 'browser structure missing data',
@@ -268,7 +268,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       return; // нет DOM — выходим
     }
 
-    // SSOT: CanvasPatchContext
+    // SSOT: FernwehContext
     const existingCanvas = (__canvasState && __canvasState.domCanvas);
     const existingHost = (__canvasState && __canvasState.domCanvasHost);
     if (existingCanvas && existingHost && existingHost.contains(existingCanvas)) {
@@ -280,7 +280,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     const div = domFactory.host;
     const canvas = domFactory.canvas;
     if (!domFactory.ok) {
-      emitCanvasDiag('warn', 'canvas:preflight:dom_element_create_failed', null, {
+      emitDiag('warn', 'canvas:preflight:dom_element_create_failed', null, {
         stage: 'preflight',
         key: 'document.createElement',
         type: 'browser structure missing data',
@@ -300,7 +300,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       !Number.isFinite(baseCanvasWidth) || baseCanvasWidth <= 0 ||
       !Number.isFinite(baseCanvasHeight) || baseCanvasHeight <= 0
     ) {
-      emitCanvasDiag('warn', 'canvas:preflight:native_default_bitmap_size_invalid', null, {
+      emitDiag('warn', 'canvas:preflight:native_default_bitmap_size_invalid', null, {
         stage: 'preflight',
         key: 'HTMLCanvasElement.width/height',
         type: 'browser structure missing data',
@@ -318,7 +318,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     const canvasHostHeight = baseCanvasHeight;
     const __prng = __resolvePrngState();
     if (typeof __prng.seed !== 'string' || !__prng.seed) {
-      emitCanvasDiag('warn', 'canvas:preflight:core_prng_seed_missing', null, {
+      emitDiag('warn', 'canvas:preflight:core_prng_seed_missing', null, {
         stage: 'preflight',
         key: 'Core.__internal.prng.seed',
         type: 'pipeline missing data',
@@ -331,7 +331,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       return;
     }
     if (typeof __prng.strToSeed !== 'function' || typeof __prng.mulberry32 !== 'function') {
-      emitCanvasDiag('warn', 'canvas:preflight:core_prng_helpers_missing', null, {
+      emitDiag('warn', 'canvas:preflight:core_prng_helpers_missing', null, {
         stage: 'preflight',
         key: 'Core.__internal.prng.strToSeed/Core.__internal.prng.mulberry32',
         type: 'pipeline missing data',
@@ -368,20 +368,20 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
 
     const canvasStored = __defineHidden__(__canvasState, 'domCanvas', canvas,
       'canvas:apply:dom_storage_define_failed',
-      'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvas',
+      'FernwehContext.state.__CANVAS__.__STATE__.domCanvas',
       'DOM canvas defineProperty failed; fallback assign used'
     );
     const hostStored = __defineHidden__(__canvasState, 'domCanvasHost', div,
       'canvas:apply:dom_storage_define_failed',
-      'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvasHost',
+      'FernwehContext.state.__CANVAS__.__STATE__.domCanvasHost',
       'DOM host defineProperty failed; fallback assign used'
     );
     const domCanvasReady = !!(__canvasState && __canvasState.domCanvas === canvas);
     const domHostReady = !!(__canvasState && __canvasState.domCanvasHost === div);
     if (!canvasStored || !hostStored || !domCanvasReady || !domHostReady) {
-      emitCanvasDiag('warn', 'canvas:apply:dom_storage_incomplete', null, {
+      emitDiag('warn', 'canvas:apply:dom_storage_incomplete', null, {
         stage: 'apply',
-        key: 'CanvasPatchContext.state.__CANVAS__.__STATE__.domCanvas/domCanvasHost',
+        key: 'FernwehContext.state.__CANVAS__.__STATE__.domCanvas/domCanvasHost',
         type: 'browser structure missing data',
         message: 'dom canvas host storage incomplete',
         data: {
@@ -411,7 +411,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       !Number.isFinite(offscreenWidth) || offscreenWidth <= 0 ||
       !Number.isFinite(offscreenHeight) || offscreenHeight <= 0
     ) {
-      emitCanvasDiag('warn', 'canvas:preflight:offscreen_default_bitmap_size_missing', null, {
+      emitDiag('warn', 'canvas:preflight:offscreen_default_bitmap_size_missing', null, {
         stage: 'preflight',
         key: 'HTMLCanvasElement.width/height',
         type: 'browser structure missing data',
@@ -430,7 +430,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       const osc = new G.OffscreenCanvas(offscreenWidth, offscreenHeight);
       __defineHidden__(__canvasState, 'offscreenCanvas', osc,
         'canvas:apply:offscreen_storage_define_failed',
-        'CanvasPatchContext.state.__CANVAS__.__STATE__.offscreenCanvas',
+        'FernwehContext.state.__CANVAS__.__STATE__.offscreenCanvas',
         'offscreen defineProperty failed; fallback assign used'
       );
     }
@@ -450,7 +450,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     const domReady = !!(__canvasState && __canvasState.domReady === true);
     const documentReadyState = (__canvasDocument && typeof __canvasDocument.readyState === 'string') ? __canvasDocument.readyState : null;
     if (domReady && hasCanvas && hasCanvasHost && hasOffscreen) {
-      emitCanvasDiag('info', 'canvas:applied', null, {
+      emitDiag('info', 'canvas:applied', null, {
         stage: 'apply',
         message: 'Canvas realInit done',
         data: {
@@ -467,7 +467,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     }
     const initDeferred = !domReady && documentReadyState === 'loading';
     if (initDeferred) return;
-    emitCanvasDiag('warn', 'canvas:apply:real_init_incomplete', null, {
+    emitDiag('warn', 'canvas:apply:real_init_incomplete', null, {
       stage: 'apply',
       type: 'browser structure missing data',
       message: 'Canvas realInit incomplete',
@@ -491,7 +491,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
         '__REAL_INIT_DOM_DEFERRED__',
         true,
         'canvas:apply:real_init_deferred_flag_define_failed',
-        'CanvasPatchContext.state.__CANVAS__.__STATE__.__REAL_INIT_DOM_DEFERRED__',
+        'FernwehContext.state.__CANVAS__.__STATE__.__REAL_INIT_DOM_DEFERRED__',
         'realInit deferred flag defineProperty failed; fallback assign used'
       );
       __canvasDocument.addEventListener('DOMContentLoaded', () => {
@@ -637,7 +637,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
         has: (t,p) => p in t,
       });
     } catch (e) {
-      emitCanvasDiag('warn', 'canvas:measureText:hook:failed', e, {
+      emitDiag('warn', 'canvas:measureText:hook:failed', e, {
         stage: 'hook',
         key: 'measureText'
       });
@@ -761,7 +761,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
 
     const __prng = __resolvePrngState();
     if (typeof __prng.seed !== 'string' || !__prng.seed) {
-      emitCanvasDiag('warn', 'canvas:' + key + ':png_chunk_seed_missing', null, {
+      emitDiag('warn', 'canvas:' + key + ':png_chunk_seed_missing', null, {
         stage: 'hook',
         key,
         data: { outcome: 'return_native', reason: 'core_prng_seed_missing' }
@@ -787,7 +787,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
 
       return await patchPngBlobAncillaryChunk(blob, 'toBlob', mime);
     } catch (e) {
-      emitCanvasDiag('warn', 'canvas:toBlob:hook_failed', e, {
+      emitDiag('warn', 'canvas:toBlob:hook_failed', e, {
         stage: 'hook',
         key: 'toBlob'
       });
@@ -807,7 +807,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       return await patchPngBlobAncillaryChunk(blob, 'convertToBlob', mime);
 
     } catch (e) {
-      emitCanvasDiag('warn', 'canvas:convertToBlob:hook_failed', e, {
+      emitDiag('warn', 'canvas:convertToBlob:hook_failed', e, {
         stage: 'hook',
         key: 'convertToBlob'
       });
@@ -826,7 +826,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
     try {
       const __prng = __resolvePrngState();
       if (typeof __prng.seed !== 'string' || !__prng.seed) {
-        emitCanvasDiag('warn', 'canvas:toDataURL:png_chunk_seed_missing', null, {
+        emitDiag('warn', 'canvas:toDataURL:png_chunk_seed_missing', null, {
           stage: 'hook',
           key: 'toDataURL',
           data: { outcome: 'return_native', reason: 'core_prng_seed_missing' }
@@ -852,7 +852,7 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
       }
       return prefix + btoa(s);
     } catch (e) {
-      emitCanvasDiag('warn', 'canvas:toDataURL:png_chunk_failed', e, {
+      emitDiag('warn', 'canvas:toDataURL:png_chunk_failed', e, {
         stage: 'hook',
         key: 'toDataURL',
         data: { outcome: 'return_native', reason: 'png_ancillary_chunk_failed' }
@@ -882,23 +882,23 @@ const __defineHidden__ = __canvasEnvBus.defineHidden;
 
 
 // --- final export ---
-// IMPORTANT: do not replace the CanvasPatchHooks object identity.
+// IMPORTANT: do not replace the FernwehHooks object identity.
 // Other modules may hold a reference to the existing object and/or keep config fields on it.
-const __CanvasPatchHooksExisting__ = window.CanvasPatchHooks;
+const __CanvasPatchHooksExisting__ = window.FernwehHooks;
 const __CanvasPatchHooks__ =
   (__CanvasPatchHooksExisting__ && (typeof __CanvasPatchHooksExisting__ === 'object' || typeof __CanvasPatchHooksExisting__ === 'function'))
     ? __CanvasPatchHooksExisting__
     : (__CanvasPatchHooksExisting__ == null ? {} : null);
 
 if (!__CanvasPatchHooks__) {
-  // Contract violation: CanvasPatchHooks must be an object container for exports.
+  // Contract violation: FernwehHooks must be an object container for exports.
   // Fail-fast: context.js relies on this being an object and will otherwise misbehave silently.
-  throw new Error('[CanvasPatch] CanvasPatchHooks contract violation (expected object)');
+  throw new Error('[FernwehContext] FernwehHooks contract violation (expected object)');
 }
 
 // Prefer hidden (non-enumerable) export 
 try {
-  Object.defineProperty(window, 'CanvasPatchHooks', {
+  Object.defineProperty(window, 'FernwehHooks', {
     value: __CanvasPatchHooks__,
     writable: true,
     configurable: true,
@@ -906,17 +906,17 @@ try {
   });
 } catch (e) {
   // Fallback: best-effort assignment. Do NOT allocate a new object here.
-  try { if (window.CanvasPatchHooks == null) window.CanvasPatchHooks = __CanvasPatchHooks__; } catch (eSet) {
-    emitCanvasDiag('warn', 'canvas:CanvasPatchHooks:fallback_assign_failed', eSet, {
+  try { if (window.FernwehHooks == null) window.FernwehHooks = __CanvasPatchHooks__; } catch (eSet) {
+    emitDiag('warn', 'canvas:FernwehHooks:fallback_assign_failed', eSet, {
       stage: 'apply',
-      key: 'CanvasPatchHooks',
+      key: 'FernwehHooks',
       type: 'browser structure missing data',
-      message: 'CanvasPatchHooks fallback assign failed'
+      message: 'FernwehHooks fallback assign failed'
     });
   }
-  emitCanvasDiag('warn', 'canvas:CanvasPatchHooks:define_failed', e, {
+  emitDiag('warn', 'canvas:FernwehHooks:define_failed', e, {
     stage: 'apply',
-    key: 'CanvasPatchHooks',
+    key: 'FernwehHooks',
     type: 'browser structure missing data'
   });
 }

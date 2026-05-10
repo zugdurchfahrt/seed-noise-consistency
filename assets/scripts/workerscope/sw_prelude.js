@@ -30,8 +30,8 @@
   }
 
   function __resolveWorkerBridgeRuntime() {
-    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
-      ? G.CanvasPatchContext
+    const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
+      ? G.FernwehContext
       : null;
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
@@ -283,7 +283,7 @@
         }, new Error('SW bootstrap lane mismatch'));
       }
     }
-    const C = __ensureSwHiddenObject(G, 'CanvasPatchContext');
+    const C = __ensureSwHiddenObject(G, 'FernwehContext');
     const stateRoot = __ensureSwHiddenObject(C, 'state');
     const wrkState = __ensureSwHiddenObject(stateRoot, '__WRK__');
     const bootstrapRoot = __ensureSwHiddenObject(wrkState, 'bootstrap');
@@ -299,7 +299,7 @@
     if (!__swBootstrapEnvLiteral || typeof __swBootstrapEnvLiteral !== 'object') {
       throw new Error('SW bootstrap env literal missing');
     }
-    const C = __ensureSwHiddenObject(G, 'CanvasPatchContext');
+    const C = __ensureSwHiddenObject(G, 'FernwehContext');
     const stateRoot = __ensureSwHiddenObject(C, 'state');
     const wrkState = __ensureSwHiddenObject(stateRoot, '__WRK__');
     const bootstrapRoot = __ensureSwHiddenObject(wrkState, 'bootstrap');
@@ -319,8 +319,8 @@
   }
 
   function __resolveSwEnv() {
-    const C = (G && G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
-      ? G.CanvasPatchContext
+    const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
+      ? G.FernwehContext
       : null;
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
@@ -419,7 +419,7 @@
     if (!env || typeof env !== 'object') {
       __fail('sw_prelude:env_missing', {
         stage: 'preflight',
-        key: 'CanvasPatchContext.state.__WRK__.bootstrap.__SW_ENV__',
+        key: 'FernwehContext.state.__WRK__.bootstrap.__SW_ENV__',
         message: 'service worker env missing',
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'env_missing' }
@@ -835,7 +835,7 @@
     }
 
     function __materializeServiceWorkerCanvasGraph() {
-      const C = __ensureSwHiddenObject(G, 'CanvasPatchContext');
+      const C = __ensureSwHiddenObject(G, 'FernwehContext');
       const stateRoot = __ensureSwHiddenObject(C, 'state');
       const wrkState = __ensureSwHiddenObject(stateRoot, '__WRK__');
       const runtimeRoot = __ensureSwHiddenObject(wrkState, 'runtime');
@@ -845,7 +845,7 @@
       const fontsState = __ensureSwHiddenObject(fontsRoot, '__STATE__');
       const fontsConfig = __ensureSwHiddenObject(fontsRoot, '__CONFIG__');
       const canvasRoot = __ensureSwHiddenObject(stateRoot, '__CANVAS__');
-      const canvasState = __ensureSwHiddenObject(canvasRoot, '__STATE__');
+      const fernwehState = __ensureSwHiddenObject(canvasRoot, '__STATE__');
       const Core = __ensureSwHiddenObject(G, 'Core');
       const coreInternal = __ensureSwHiddenObject(Core, '__internal');
       const prngRoot = __ensureSwHiddenObject(coreInternal, 'prng');
@@ -865,26 +865,26 @@
       if (!Object.prototype.hasOwnProperty.call(fontsConfig, 'configs')) {
         __defineTrackedHiddenValue(fontsConfig, 'configs', []);
       }
-      if (!Object.prototype.hasOwnProperty.call(canvasState, 'domReady')) {
-        __defineTrackedHiddenValue(canvasState, 'domReady', false);
+      if (!Object.prototype.hasOwnProperty.call(fernwehState, 'domReady')) {
+        __defineTrackedHiddenValue(fernwehState, 'domReady', false);
       }
-      if (!Object.prototype.hasOwnProperty.call(canvasState, 'offscreenReady')) {
-        __defineTrackedHiddenValue(canvasState, 'offscreenReady', false);
+      if (!Object.prototype.hasOwnProperty.call(fernwehState, 'offscreenReady')) {
+        __defineTrackedHiddenValue(fernwehState, 'offscreenReady', false);
       }
-      if (!Object.prototype.hasOwnProperty.call(canvasState, 'domCanvas')) {
-        __defineTrackedHiddenValue(canvasState, 'domCanvas', null);
+      if (!Object.prototype.hasOwnProperty.call(fernwehState, 'domCanvas')) {
+        __defineTrackedHiddenValue(fernwehState, 'domCanvas', null);
       }
-      if (!Object.prototype.hasOwnProperty.call(canvasState, 'domCanvasHost')) {
-        __defineTrackedHiddenValue(canvasState, 'domCanvasHost', null);
+      if (!Object.prototype.hasOwnProperty.call(fernwehState, 'domCanvasHost')) {
+        __defineTrackedHiddenValue(fernwehState, 'domCanvasHost', null);
       }
-      if (!Object.prototype.hasOwnProperty.call(canvasState, 'offscreenCanvas')) {
-        __defineTrackedHiddenValue(canvasState, 'offscreenCanvas', null);
+      if (!Object.prototype.hasOwnProperty.call(fernwehState, 'offscreenCanvas')) {
+        __defineTrackedHiddenValue(fernwehState, 'offscreenCanvas', null);
       }
-      if (!Object.prototype.hasOwnProperty.call(canvasState, 'defaultCtx2dFont')) {
-        __defineTrackedHiddenValue(canvasState, 'defaultCtx2dFont', '');
+      if (!Object.prototype.hasOwnProperty.call(fernwehState, 'defaultCtx2dFont')) {
+        __defineTrackedHiddenValue(fernwehState, 'defaultCtx2dFont', '');
       }
 
-      return { C, stateRoot, runtimeRoot, canvasState, prngRoot };
+      return { C, stateRoot, runtimeRoot, fernwehState, prngRoot };
     }
 
     function __executeSwInlineModule(source, exportName, label) {
@@ -934,7 +934,7 @@
         __swDiag('info', 'sw_prelude:canvas_export_skipped', {
           stage: 'apply',
           key: 'OffscreenCanvas',
-          message: 'service worker canvas export layer skipped',
+          message: 'service worker pipeline export layer skipped',
           type: 'browser structure missing data',
           data: { outcome: 'skip', reason: 'offscreen_canvas_missing' }
         }, null);
@@ -953,7 +953,7 @@
         }, new Error('SW canvas seed missing'));
       }
 
-      if (graph.canvasState.__SW_CANVAS_EXPORT_LAYER_INSTALLED__ === true) {
+      if (graph.fernwehState.__SW_CANVAS_EXPORT_LAYER_INSTALLED__ === true) {
         return true;
       }
 
@@ -967,26 +967,26 @@
       __executeSwInlineModule(inlineCanvasPatch, 'CanvasPatchModule', 'inlineCanvasPatch');
       __executeSwInlineModule(inlineContextPatch, 'ContextPatchModule', 'inlineContextPatch');
 
-      const hooks = (G.CanvasPatchHooks && typeof G.CanvasPatchHooks === 'object')
-        ? G.CanvasPatchHooks
+      const hooks = (G.FernwehHooks && typeof G.FernwehHooks === 'object')
+        ? G.FernwehHooks
         : null;
-      const patchCtx = (G.CanvasPatchContext && typeof G.CanvasPatchContext === 'object')
-        ? G.CanvasPatchContext
+      const patchCtx = (G.FernwehContext && typeof G.FernwehContext === 'object')
+        ? G.FernwehContext
         : null;
       if (!hooks || typeof hooks.patchConvertToBlobInjectNoise !== 'function') {
         __fail('sw_prelude:canvas_export:hook_missing', {
           stage: 'preflight',
-          key: 'CanvasPatchHooks.patchConvertToBlobInjectNoise',
-          message: 'service worker canvas export hook missing',
+          key: 'FernwehHooks.patchConvertToBlobInjectNoise',
+          message: 'service worker pipeline export hook missing',
           type: 'pipeline missing data',
           data: { outcome: 'throw', reason: 'patchConvertToBlobInjectNoise_missing' }
-        }, new Error('SW CanvasPatchHooks.patchConvertToBlobInjectNoise missing'));
+        }, new Error('SW FernwehHooks.patchConvertToBlobInjectNoise missing'));
       }
       if (!patchCtx || typeof patchCtx.registerOffscreenConvertToBlobHook !== 'function') {
         __fail('sw_prelude:canvas_export:registrar_missing', {
           stage: 'preflight',
-          key: 'CanvasPatchContext.registerOffscreenConvertToBlobHook',
-          message: 'service worker canvas export registrar missing',
+          key: 'FernwehContext.registerOffscreenConvertToBlobHook',
+          message: 'service worker pipeline export registrar missing',
           type: 'pipeline missing data',
           data: { outcome: 'throw', reason: 'registerOffscreenConvertToBlobHook_missing' }
         }, new Error('SW registerOffscreenConvertToBlobHook missing'));
@@ -994,7 +994,7 @@
       if (typeof patchCtx.applyOffscreenPatches !== 'function') {
         __fail('sw_prelude:canvas_export:apply_missing', {
           stage: 'preflight',
-          key: 'CanvasPatchContext.applyOffscreenPatches',
+          key: 'FernwehContext.applyOffscreenPatches',
           message: 'service worker offscreen apply missing',
           type: 'pipeline missing data',
           data: { outcome: 'throw', reason: 'applyOffscreenPatches_missing' }
@@ -1003,12 +1003,12 @@
 
       patchCtx.registerOffscreenConvertToBlobHook(hooks.patchConvertToBlobInjectNoise);
       const applied = patchCtx.applyOffscreenPatches();
-      __defineTrackedHiddenValue(graph.canvasState, '__SW_CANVAS_EXPORT_LAYER_INSTALLED__', true);
+      __defineTrackedHiddenValue(graph.fernwehState, '__SW_CANVAS_EXPORT_LAYER_INSTALLED__', true);
       __defineTrackedHiddenValue(graph.runtimeRoot, 'serviceWorkerCanvasExportLayerInstalled', true);
       __swDiag('info', 'sw_prelude:canvas_export_installed', {
         stage: 'apply',
         key: 'OffscreenCanvas.prototype.convertToBlob',
-        message: 'service worker canvas export layer installed',
+        message: 'service worker pipeline export layer installed',
         type: 'pipeline missing data',
         data: { outcome: 'return', applied }
       }, null);

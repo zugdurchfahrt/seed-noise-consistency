@@ -4,8 +4,8 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   const __typePipeline = 'pipeline missing data';
   const __typeBrowser = 'browser structure missing data';
 
-  const __loggerRoot = (window && window.CanvasPatchContext && window.CanvasPatchContext.__logger && typeof window.CanvasPatchContext.__logger === 'object')
-    ? window.CanvasPatchContext.__logger
+  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
+    ? window.FernwehContext.__logger
     : null;
   const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
   const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
@@ -43,25 +43,25 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     return __moduleDiag(x.level, code, x, err);
   }
 
-  const C = window.CanvasPatchContext;
+  const C = window.FernwehContext;
   if (!C) {
-    degrade('hide_webdriver:canvas_patch_context_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext missing'), {
+    degrade('hide_webdriver:canvas_patch_context_missing', new Error('[HideWebdriverPatchModule] FernwehContext missing'), {
       level: 'warn',
       stage: 'preflight',
-      message: 'CanvasPatchContext missing',
+      message: 'FernwehContext missing',
       type: __typePipeline,
-      data: { outcome: 'skip', reason: 'canvas_patch_context_missing', missing: 'CanvasPatchContext' }
+      data: { outcome: 'skip', reason: 'canvas_patch_context_missing', missing: 'FernwehContext' }
     });
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    degrade('hide_webdriver:canvas_patch_state_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext.state missing'), {
+    degrade('hide_webdriver:canvas_patch_state_missing', new Error('[HideWebdriverPatchModule] FernwehContext.state missing'), {
       level: 'warn',
       stage: 'preflight',
-      message: 'CanvasPatchContext.state missing',
+      message: 'FernwehContext.state missing',
       type: __typePipeline,
-      data: { outcome: 'skip', reason: 'canvas_patch_state_missing', missing: 'CanvasPatchContext.state' }
+      data: { outcome: 'skip', reason: 'canvas_patch_state_missing', missing: 'FernwehContext.state' }
     });
     return;
   }
@@ -75,13 +75,13 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     ? __stateRoot.__HIDE_WEBDRIVER__
     : null;
   if (!__hideWebdriverRoot) {
-    degrade('hide_webdriver:module_state_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext.state.__HIDE_WEBDRIVER__ missing'), {
+    degrade('hide_webdriver:module_state_missing', new Error('[HideWebdriverPatchModule] FernwehContext.state.__HIDE_WEBDRIVER__ missing'), {
       level: 'warn',
       stage: 'preflight',
-      key: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__',
-      message: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__ missing',
+      key: 'FernwehContext.state.__HIDE_WEBDRIVER__',
+      message: 'FernwehContext.state.__HIDE_WEBDRIVER__ missing',
       type: __typePipeline,
-      data: { outcome: 'skip', reason: 'module_state_missing', missing: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__' }
+      data: { outcome: 'skip', reason: 'module_state_missing', missing: 'FernwehContext.state.__HIDE_WEBDRIVER__' }
     });
     return;
   }
@@ -89,13 +89,13 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     ? __hideWebdriverRoot.__STATE__
     : null;
   if (!__hideWebdriverState) {
-    degrade('hide_webdriver:module_state_missing', new Error('[HideWebdriverPatchModule] CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__ missing'), {
+    degrade('hide_webdriver:module_state_missing', new Error('[HideWebdriverPatchModule] FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__ missing'), {
       level: 'warn',
       stage: 'preflight',
-      key: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__',
-      message: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__ missing',
+      key: 'FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__',
+      message: 'FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__ missing',
       type: __typePipeline,
-      data: { outcome: 'skip', reason: 'module_state_missing', missing: 'CanvasPatchContext.state.__HIDE_WEBDRIVER__.__STATE__' }
+      data: { outcome: 'skip', reason: 'module_state_missing', missing: 'FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__' }
     });
     return;
   }
