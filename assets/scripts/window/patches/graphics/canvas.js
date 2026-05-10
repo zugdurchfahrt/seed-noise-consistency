@@ -181,6 +181,15 @@ const __canvasEnvBus = (function initCanvasEnvBus() {
   }
 
   defineHidden(
+    fernwehState,
+    'willReadFrequently',
+    true,
+    'canvas:apply:will_read_frequently_define_failed',
+    'FernwehContext.state.__CANVAS__.__STATE__.willReadFrequently',
+    'willReadFrequently defineProperty failed; fallback assign used'
+  );
+
+  defineHidden(
     canvasModuleSlot,
     '__ENV_BUS__',
     Object.freeze({

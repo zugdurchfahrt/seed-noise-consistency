@@ -264,6 +264,65 @@ const ContextPatchModule = function ContextPatchModule(window) {
     } catch (_) {}
   }
 
+
+  function resolveWillReadFrequently() {
+    const canvasRoot = (C && C.state && C.state.__CANVAS__ && typeof C.state.__CANVAS__ === 'object')
+      ? C.state.__CANVAS__
+      : null;
+    const canvasState = (canvasRoot && canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
+      ? canvasRoot.__STATE__
+      : null;
+
+    return !!(canvasState && canvasState.willReadFrequently === true);
+  }
+
+  function normalizeGetContextReadbackArgs(args, diagKey) {
+    const input = Array.isArray(args) ? args : [];
+    const type = input[0];
+
+    if (type !== '2d') return input;
+    if (!resolveWillReadFrequently()) return input;
+
+    const out = input.slice();
+    const rawOptions = out.length > 1 ? out[1] : undefined;
+
+    if (rawOptions != null && (typeof rawOptions !== 'object' && typeof rawOptions !== 'function')) {
+      emitContextDiag('warn', 'context:getContext:willReadFrequently_options_invalid', null, {
+        stage: 'preflight',
+        key: diagKey || 'getContext',
+        type: 'browser structure missing data',
+        message: '2d context options is not object; willReadFrequently not injected',
+        data: { outcome: 'skip', reason: 'options_not_object' }
+      });
+      return input;
+    }
+
+    let nextOptions;
+    try {
+      nextOptions = rawOptions ? Object.assign({}, rawOptions) : {};
+    } catch (e) {
+      emitContextDiag('warn', 'context:getContext:willReadFrequently_options_clone_failed', e, {
+        stage: 'preflight',
+        key: diagKey || 'getContext',
+        type: 'browser structure missing data',
+        message: '2d context options clone failed; willReadFrequently not injected',
+        data: { outcome: 'skip', reason: 'options_clone_failed' }
+      });
+      return input;
+    }
+
+    if (nextOptions.willReadFrequently == null) {
+      nextOptions.willReadFrequently = true;
+    }
+
+    out[1] = nextOptions;
+    return out;
+  }
+
+
+
+
+
   const patchedMethods = new WeakSet();
   const coreWindow = (global && global.Core && typeof global.Core === 'object')
     ? global.Core
@@ -978,8 +1037,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const orig = resolveKeptNative(proto, 'getContext') || proto.getContext;
     if (typeof orig !== 'function') return 0;
 
+
     const dispatch = function(self, argsLike) {
-      const args = Array.prototype.slice.call(argsLike || []);
+      const rawArgs = Array.prototype.slice.call(argsLike || []);
+      const args = normalizeGetContextReadbackArgs(rawArgs, 'getContext');
       const type = args[0];
       const rest = args.length > 1 ? Array.prototype.slice.call(args, 1) : [];
       const res = Reflect.apply(orig, self, args);
