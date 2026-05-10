@@ -239,35 +239,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return !!WEBGL_ACCESS_METHODS[method];
   }
 
-  function summarizeWebGLAccessValue(value) {
-    if (value == null) return value;
-    const t = typeof value;
-    if (t === 'string' || t === 'number' || t === 'boolean') return value;
-    if (Array.isArray(value)) {
-      return {
-        kind: 'Array',
-        length: value.length,
-        sample: value.slice(0, 16)
-      };
-    }
-    try {
-      if (typeof ArrayBuffer !== 'undefined' && typeof ArrayBuffer.isView === 'function' && ArrayBuffer.isView(value)) {
-        return {
-          kind: (value && value.constructor && value.constructor.name) ? value.constructor.name : 'TypedArray',
-          length: (value && typeof value.length === 'number') ? value.length : 0,
-          sample: Array.prototype.slice.call(value, 0, 16)
-        };
-      }
-    } catch (_) {}
-    let ctorName = null;
-    let tag = null;
-    try { ctorName = (value && value.constructor && value.constructor.name) ? value.constructor.name : null; } catch (_) {}
-    try { tag = Object.prototype.toString.call(value); } catch (_) {}
-    return {
-      kind: ctorName || tag || t
-    };
-  }
-
   function emitWebGLAccess(method, args, result, extra) {
     try {
       if (!isWebGLAccessLoggerEnabled()) return;
@@ -291,8 +262,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
             hook: (typeof x.hook === 'string' && x.hook) ? x.hook : null,
             request: safeArgs.length ? safeArgs[0] : null,
             args: safeArgs,
-            result: result,
-            resultMeta: summarizeWebGLAccessValue(result)
+            result: result
           }
         }
       });
@@ -630,15 +600,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
   // WebGL patchMethod is a separate context-level gateway contract.
   // Its current preflight sequence, diag/logging, and override-log toggles
   // are part of the patch semantics here, not incidental debug noise.
-  // Do not remove, reorder, or "normalize" these paths without explicit manual
-  // approval and runtime revalidation of this module.
 
   // ===== WEBGL issued override logging: two toggles (ВКЛ/ВЫКЛ) =====
   // Эти тумблеры влияют ТОЛЬКО на issued override logging в working path.
   // Standard access logging goes through context:webgl:access in __DEGRADE__.
   // Второй тумблер оставлен выключенным: отдельный auxiliary monitor-path сейчас не нужен.
   const WEBGL_OVERRIDE_DIAG_LOG    = true;  // true=ВКЛ, false=ВЫКЛ (__DEGRADE__.diag для issued override)
-  const WEBGL_OVERRIDE_LOG = false; // true=ВКЛ, false=ВЫКЛ (auxiliary monitor path for override)
+  const WEBGL_OVERRIDE_LOG = true; // true=ВКЛ, false=ВЫКЛ (auxiliary monitor path for override)
 
   function installIssuedSerializationMethods(owner) {
     if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return 0;
@@ -831,6 +799,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
     }
     return applied;
   }
+
+  // The current issued-instance path has a deliberate observability trade-off:
+  // the hooked method may appear as an own property on the concrete ctx instance.
+  // However, installing hooks on the issued instance after getContext() keeps
+  // the broader prototype surface closer to Chromium behavior
+  // and remains the stable baseline for this WebGL method family
+
+  // As WebGL methods are brand- and receiver-sensitive APIs, switching this
+  // hook to WebGLRenderingContext.prototype or WebGL2RenderingContext.prototype
+  // leads to worse observability for Function.prototype.toString, Proxy/Reflect
+  // behavior, and prototype-chain checks.
 
   function installIssuedWebGLMethods(ctx) {
     if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) {

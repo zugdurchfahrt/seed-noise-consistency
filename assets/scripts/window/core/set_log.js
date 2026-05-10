@@ -1647,6 +1647,25 @@ const LOGGingModule = function LOGGingModule() {
           return outArr;
         }
 
+        // TypedArray/DataView snapshots are centralized here so access emitters
+        // can pass raw results without per-module resultMeta summarizers.
+        if (typeof ArrayBuffer !== "undefined" && typeof ArrayBuffer.isView === "function" && ArrayBuffer.isView(value)) {
+          const out = metadataSnapshotWithLimits(value, tag, limits);
+          const viewLength = (typeof value.length === "number" && isFinite(value.length)) ? value.length : null;
+          if (viewLength !== null) {
+            const lim = Math.min(viewLength, limits.array);
+            const sample = new Array(lim);
+            for (let i = 0; i < lim; i++) {
+              sample[i] = normalizeForJSONWithLimits(value[i], limits, seen, lvl + 1);
+            }
+            out.sample = sample;
+            if (viewLength > lim) out.sample_truncated = viewLength - lim;
+          } else if (typeof value.byteLength === "number" && isFinite(value.byteLength)) {
+            out.byteLength = value.byteLength;
+          }
+          return out;
+        }
+
         if (!isPlainObject(value)) return metadataSnapshotWithLimits(value, tag, limits);
 
         const out = {};
