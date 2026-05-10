@@ -163,7 +163,7 @@ const LOGGingModule = function LOGGingModule() {
       { module: "webgpu_wl", diagTag: "webgpu_wl", codePrefix: "webgpu_wl", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "ready", summaryCodes: ["webgpu_wl:ready"] },
       { module: "webgpu", diagTag: "webgpu", codePrefix: "webgpu", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "ready", summaryCodes: ["webgpu:ready"] },
       { module: "audiocontext", diagTag: "audiocontext", codePrefix: "audiocontext", source: "bundle", emitter: "diag", functions: "auto", aliases: ["audio"], critical: true, summaryKind: "ready", summaryCodes: ["audiocontext:ready"] },
-      { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "applied", summaryCodes: ["context:webgl:apply:patches_applied", "context:canvas:apply:patches_applied", "context:offscreen:apply:patches_applied"], nonTerminalCodes: ["context:webgl:monitor", "context:webgl:access", "context:canvas:access", "context:issued_webgl:hook:override"] },
+      { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "applied", summaryCodes: ["context:webgl:apply:patches_applied", "context:canvas:apply:patches_applied", "context:offscreen:apply:patches_applied"], nonTerminalCodes: ["context:webgl:access", "context:canvas:access"] },
       { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["tz:applied"] },
       { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["geo:patched"] },
       { module: "override_ua_data", diagTag: "override_ua_data", codePrefix: "override_ua_data", source: "bundle", emitter: "diag", functions: "auto", critical: false, optional: true, summaryKind: "applied", summaryCodes: ["override_ua_data:applied"], nonTerminalCodes: ["override_ua_data:disabled"] },
@@ -957,28 +957,24 @@ const LOGGingModule = function LOGGingModule() {
         if (
           codeValue !== "context:webgl:access"
           && codeValue !== "context:canvas:access"
-          && codeValue !== "context:issued_webgl:hook:override"
+          && codeValue !== "webgpu:adapter:access"
+          && codeValue !== "webgpu:device:access"
+          && codeValue !== "webgpu:requestAdapter:access"
+          && codeValue !== "webgpu:requestDevice:access"
+          && codeValue !== "webgpu:adapter:non_whitelisted_property"
+          && codeValue !== "webgpu:device:non_whitelisted_property"
           && codeValue !== "nav_total_set:nav_access"
         ) return extra;
         const data = (extra.data && typeof extra.data === "object") ? extra.data : null;
         if (!data) return extra;
         const accessPayload = (data.extra && typeof data.extra === "object")
           ? data.extra
-          : (codeValue === "context:issued_webgl:hook:override" ? Object.assign({}, data) : null);
+          : null;
         if (!accessPayload) return extra;
         const nextExtra = Object.assign({}, extra);
         const nextData = Object.assign({}, data);
         nextData.access = accessPayload;
-        if (codeValue === "context:issued_webgl:hook:override") {
-          delete nextData.loggerGroup;
-          delete nextData.loggerChannel;
-          delete nextData.hook;
-          delete nextData.path;
-          delete nextData.args;
-          delete nextData.result;
-        } else {
-          delete nextData.extra;
-        }
+        delete nextData.extra;
         nextExtra.data = nextData;
         return nextExtra;
       } catch (_) {
@@ -989,7 +985,12 @@ const LOGGingModule = function LOGGingModule() {
     function isAccessEntryCode(codeValue) {
       return codeValue === "context:webgl:access"
         || codeValue === "context:canvas:access"
-        || codeValue === "context:issued_webgl:hook:override"
+        || codeValue === "webgpu:adapter:access"
+        || codeValue === "webgpu:device:access"
+        || codeValue === "webgpu:requestAdapter:access"
+        || codeValue === "webgpu:requestDevice:access"
+        || codeValue === "webgpu:adapter:non_whitelisted_property"
+        || codeValue === "webgpu:device:non_whitelisted_property"
         || codeValue === "nav_total_set:nav_access"
         || codeValue === "nav_total_set:getHighEntropyValues_resolved"
         || codeValue === "nav_total_set:permission_state_updated"
@@ -1011,6 +1012,7 @@ const LOGGingModule = function LOGGingModule() {
           || reason === "permission_state_updated"
           || key.indexOf("permissions.") === 0
           || reason === "webgl_access"
+          || reason === "webgpu_access"
           || reason === "canvas_access"
           || reason === "local_only_replaced_with_managed_src"
           || reason === "local_only_passthrough_not_proven";
@@ -1510,6 +1512,48 @@ const LOGGingModule = function LOGGingModule() {
           array: SERIAL_LIMITS.array,
           string: SERIAL_LIMITS.string,
           metaKeys: SERIAL_LIMITS.metaKeys * 2
+        },
+        "webgpu:adapter:access": {
+          depth: SERIAL_LIMITS.depth + 2,
+          keys: SERIAL_LIMITS.keys,
+          array: SERIAL_LIMITS.array,
+          string: SERIAL_LIMITS.string,
+          metaKeys: SERIAL_LIMITS.metaKeys * 2
+        },
+        "webgpu:device:access": {
+          depth: SERIAL_LIMITS.depth + 2,
+          keys: SERIAL_LIMITS.keys,
+          array: SERIAL_LIMITS.array,
+          string: SERIAL_LIMITS.string,
+          metaKeys: SERIAL_LIMITS.metaKeys * 2
+        },
+        "webgpu:requestAdapter:access": {
+          depth: SERIAL_LIMITS.depth + 2,
+          keys: SERIAL_LIMITS.keys,
+          array: SERIAL_LIMITS.array,
+          string: SERIAL_LIMITS.string,
+          metaKeys: SERIAL_LIMITS.metaKeys * 2
+        },
+        "webgpu:requestDevice:access": {
+          depth: SERIAL_LIMITS.depth + 2,
+          keys: SERIAL_LIMITS.keys,
+          array: SERIAL_LIMITS.array,
+          string: SERIAL_LIMITS.string,
+          metaKeys: SERIAL_LIMITS.metaKeys * 2
+        },
+        "webgpu:adapter:non_whitelisted_property": {
+          depth: SERIAL_LIMITS.depth + 2,
+          keys: SERIAL_LIMITS.keys,
+          array: SERIAL_LIMITS.array,
+          string: SERIAL_LIMITS.string,
+          metaKeys: SERIAL_LIMITS.metaKeys * 2
+        },
+        "webgpu:device:non_whitelisted_property": {
+          depth: SERIAL_LIMITS.depth + 2,
+          keys: SERIAL_LIMITS.keys,
+          array: SERIAL_LIMITS.array,
+          string: SERIAL_LIMITS.string,
+          metaKeys: SERIAL_LIMITS.metaKeys * 2
         }
       };
     }, function (v) {
@@ -1647,25 +1691,6 @@ const LOGGingModule = function LOGGingModule() {
           return outArr;
         }
 
-        // TypedArray/DataView snapshots are centralized here so access emitters
-        // can pass raw results without per-module resultMeta summarizers.
-        if (typeof ArrayBuffer !== "undefined" && typeof ArrayBuffer.isView === "function" && ArrayBuffer.isView(value)) {
-          const out = metadataSnapshotWithLimits(value, tag, limits);
-          const viewLength = (typeof value.length === "number" && isFinite(value.length)) ? value.length : null;
-          if (viewLength !== null) {
-            const lim = Math.min(viewLength, limits.array);
-            const sample = new Array(lim);
-            for (let i = 0; i < lim; i++) {
-              sample[i] = normalizeForJSONWithLimits(value[i], limits, seen, lvl + 1);
-            }
-            out.sample = sample;
-            if (viewLength > lim) out.sample_truncated = viewLength - lim;
-          } else if (typeof value.byteLength === "number" && isFinite(value.byteLength)) {
-            out.byteLength = value.byteLength;
-          }
-          return out;
-        }
-
         if (!isPlainObject(value)) return metadataSnapshotWithLimits(value, tag, limits);
 
         const out = {};
@@ -1702,86 +1727,6 @@ const LOGGingModule = function LOGGingModule() {
       }
     }
 
-    const WEBGL_MONITOR_LIMIT = toPosInt(global.__WEBGL_MONITOR_LIMIT, 200);
-    __ensureLoggerHiddenValue("__WEBGL_MONITOR_STATE__", function () {
-      return {
-        limit: WEBGL_MONITOR_LIMIT,
-        entries: []
-      };
-    }, function (v) {
-      return !!(v && typeof v === "object" && Array.isArray(v.entries));
-    }, true);
-
-    function getWebGLMonitorState() {
-      const state = __loggerRoot.__WEBGL_MONITOR_STATE__;
-      if (state && typeof state === "object" && Array.isArray(state.entries)) {
-        if (!Number.isFinite(state.limit) || state.limit <= 0) state.limit = WEBGL_MONITOR_LIMIT;
-        return state;
-      }
-      return __ensureLoggerHiddenValue("__WEBGL_MONITOR_STATE__", function () {
-        return {
-          limit: WEBGL_MONITOR_LIMIT,
-          entries: []
-        };
-      }, function (v) {
-        return !!(v && typeof v === "object" && Array.isArray(v.entries));
-      }, true);
-    }
-
-    function shapeWebGLMonitorEntry(entry, idx) {
-      const safeEntry = (entry && typeof entry === "object") ? entry : {};
-      return {
-        idx: idx,
-        timestamp: (typeof safeEntry.timestamp === "string" && safeEntry.timestamp) ? safeEntry.timestamp : "",
-        eventType: (typeof safeEntry.eventType === "string" && safeEntry.eventType) ? safeEntry.eventType : "",
-        method: (typeof safeEntry.method === "string" && safeEntry.method) ? safeEntry.method : "",
-        hook: (typeof safeEntry.hook === "string" && safeEntry.hook) ? safeEntry.hook : "",
-        stage: (typeof safeEntry.stage === "string" && safeEntry.stage) ? safeEntry.stage : "",
-        message: (typeof safeEntry.message === "string" && safeEntry.message) ? safeEntry.message : "",
-        args: Object.prototype.hasOwnProperty.call(safeEntry, "args") ? normalizeForJSON(safeEntry.args) : [],
-        result: Object.prototype.hasOwnProperty.call(safeEntry, "result") ? normalizeForJSON(safeEntry.result) : null,
-        error: safeEntry.error instanceof Error ? {
-          name: safeEntry.error.name,
-          message: safeEntry.error.message,
-          stack: safeEntry.error.stack || null
-        } : (safeEntry.error ? normalizeForJSON(safeEntry.error) : null),
-        extra: Object.prototype.hasOwnProperty.call(safeEntry, "extra") ? normalizeForJSON(safeEntry.extra) : null
-      };
-    }
-
-    __defineLoggerHiddenValue("__pushWebGLMonitor__", function (entry) {
-      try {
-        const state = getWebGLMonitorState();
-        const safeEntry = shapeWebGLMonitorEntry(entry, state.entries.length);
-        state.entries.push(safeEntry);
-        if (state.entries.length > state.limit) {
-          state.entries.splice(0, state.entries.length - state.limit);
-        }
-      } catch (e) {
-        try { recordLoggerError(e, "__pushWebGLMonitor__"); } catch (_) {}
-      }
-    }, false);
-
-    __defineLoggerHiddenValue("__getWebGLMonitor__", function () {
-      try {
-        const state = getWebGLMonitorState();
-        return state.entries.slice();
-      } catch (e) {
-        try { recordLoggerError(e, "__getWebGLMonitor__"); } catch (_) {}
-        return [];
-      }
-    }, false);
-
-    __defineLoggerHiddenValue("__clearWebGLMonitor__", function () {
-      try {
-        const state = getWebGLMonitorState();
-        state.entries.length = 0;
-        return true;
-      } catch (e) {
-        try { recordLoggerError(e, "__clearWebGLMonitor__"); } catch (_) {}
-        return false;
-      }
-    }, false);
 
     function pushEntry(entry) {
       try {
@@ -2057,7 +2002,6 @@ const LOGGingModule = function LOGGingModule() {
 
     // ===== 3) Keep public console.* native =====
     // Pipeline diagnostics must stay inside __DEGRADE__/private logger state.
-    // Do not wrap or mirror public console methods here.
 
     // ===== 4) Module logger C.__logger.log (no double logging) =====
     __ensureLoggerHiddenValue("_logConfig", function () { return {

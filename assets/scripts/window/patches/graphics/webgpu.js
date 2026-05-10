@@ -52,6 +52,24 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       type: x.type
     }, err || null);
   }
+  function emitWebGPUAccess(code, payload, key) {
+    try {
+      const eventCode = (typeof code === 'string' && code) ? code : 'webgpu:access';
+      const p = (payload && typeof payload === 'object') ? payload : {};
+      degrade('info', eventCode, null, {
+        stage: 'runtime',
+        type: 'pipeline telemetry',
+        key: (typeof key === 'string' || key === null) ? key : ((typeof p.property === 'string' && p.property) ? p.property : ((typeof p.method === 'string' && p.method) ? p.method : null)),
+        message: 'webgpu access',
+        data: {
+          outcome: 'return',
+          reason: 'webgpu_access',
+          extra: p
+        }
+      });
+    } catch (_) {}
+  }
+
 
   const __core = window && window.Core;
   let __guardToken = null;
@@ -427,7 +445,8 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     const __WL_LIMITS__ = new Set(__webgpuLimitsWhitelist);
 
     const __MaskedLimitsCache__ = new WeakMap();
-    function __maskLimits(nativeLimits) {
+    function __maskLimits(nativeLimits, objectName) {
+      const accessObject = (typeof objectName === 'string' && objectName) ? objectName : 'limits';
       if (!nativeLimits || typeof nativeLimits !== 'object' || __WL_LIMITS__.size === 0) return nativeLimits;
       if (__MaskedLimitsCache__.has(nativeLimits)) return __MaskedLimitsCache__.get(nativeLimits);
 
@@ -446,6 +465,14 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             if (!Reflect.isExtensible(target) || (desc && desc.configurable === false)) {
               return Reflect.get(target, prop, target);
             }
+            emitWebGPUAccess('webgpu:' + accessObject + ':non_whitelisted_property', {
+              eventType: 'non_whitelisted_property',
+              object: accessObject,
+              objectType: 'limits',
+              property: prop,
+              whitelisted: false,
+              result: undefined
+            }, prop);
             return undefined;
           }
           return Reflect.get(target, prop, target);
@@ -758,7 +785,15 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               });
               throw e;
             }
-            return __maskFeatures(nativeFeatures);
+            const maskedFeatures = __maskFeatures(nativeFeatures);
+            emitWebGPUAccess('webgpu:device:access', {
+              eventType: 'property_access',
+              object: 'device',
+              objectType: 'GPUDevice',
+              property: 'features',
+              result: maskedFeatures
+            }, 'GPUDevice.features');
+            return maskedFeatures;
           }
         },
         {
@@ -786,7 +821,15 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               });
               throw e;
             }
-            return __maskLimits(nativeLimits);
+            const maskedLimits = __maskLimits(nativeLimits, 'device');
+            emitWebGPUAccess('webgpu:device:access', {
+              eventType: 'property_access',
+              object: 'device',
+              objectType: 'GPUDevice',
+              property: 'limits',
+              result: maskedLimits
+            }, 'GPUDevice.limits');
+            return maskedLimits;
           }
         }
       ];
@@ -890,6 +933,14 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               });
               throw e;
             }
+            emitWebGPUAccess('webgpu:requestDevice:access', {
+              eventType: 'promise_method',
+              object: 'adapter',
+              objectType: 'GPUAdapter',
+              method: 'requestDevice',
+              args: nextArgs,
+              result: out
+            }, 'GPUAdapter.requestDevice');
             return out.then(function onDevice(device) {
               if (!device) return null;
               patchDevicePrototype(device);
@@ -975,7 +1026,16 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           invalidThis: 'native',
           getImpl: function webgpuAdapterInfoGet(origGet) {
             if (__adapterInfoValueCache__.has(this)) {
-              return __adapterInfoValueCache__.get(this);
+              const cachedInfo = __adapterInfoValueCache__.get(this);
+              emitWebGPUAccess('webgpu:adapter:access', {
+                eventType: 'property_access',
+                object: 'adapter',
+                objectType: 'GPUAdapter',
+                property: 'info',
+                cached: true,
+                result: cachedInfo
+              }, 'GPUAdapter.info');
+              return cachedInfo;
             }
             let nativeInfo = {};
             if (typeof origGet === 'function') {
@@ -983,6 +1043,13 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
             }
             const built = buildAdapterInfo(nativeInfo);
             __adapterInfoValueCache__.set(this, built);
+            emitWebGPUAccess('webgpu:adapter:access', {
+              eventType: 'property_access',
+              object: 'adapter',
+              objectType: 'GPUAdapter',
+              property: 'info',
+              result: built
+            }, 'GPUAdapter.info');
             return built;
           }
         });
@@ -1015,6 +1082,13 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               });
               throw e;
             }
+            emitWebGPUAccess('webgpu:adapter:access', {
+              eventType: 'property_access',
+              object: 'adapter',
+              objectType: 'GPUAdapter',
+              property: 'features',
+              result: nativeFeatures
+            }, 'GPUAdapter.features');
             return nativeFeatures;
           }
         });
@@ -1047,6 +1121,13 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
               });
               throw e;
             }
+            emitWebGPUAccess('webgpu:adapter:access', {
+              eventType: 'property_access',
+              object: 'adapter',
+              objectType: 'GPUAdapter',
+              property: 'limits',
+              result: nativeLimits
+            }, 'GPUAdapter.limits');
             return nativeLimits;
           }
         });
