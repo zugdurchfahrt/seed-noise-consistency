@@ -220,12 +220,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
-  const __screenCanvasModuleState = (__screenStateRoot.__CANVAS__ && typeof __screenStateRoot.__CANVAS__ === 'object')
-    ? __screenStateRoot.__CANVAS__
-    : null;
-  const __screenCanvasState = (__screenCanvasModuleState && __screenCanvasModuleState.__STATE__ && typeof __screenCanvasModuleState.__STATE__ === 'object')
-    ? __screenCanvasModuleState.__STATE__
-    : null;
   if (!(__screenState.__RUNTIME_STATE__ && typeof __screenState.__RUNTIME_STATE__ === 'object')) {
     Object.defineProperty(__screenState, '__RUNTIME_STATE__', {
       value: Object.create(null),
@@ -970,9 +964,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   function __screenCloneList(list) {
     return Array.isArray(list) ? list.slice() : [];
   }
-  function __screenHasCanvasHost() {
-    return !!(__screenCanvasState && __screenCanvasState.domCanvasHost && typeof __screenCanvasState.domCanvasHost === 'object');
-  }
   function __screenHasVisualViewport() {
     return !!(visualViewportObj && visualViewportProto);
   }
@@ -1007,7 +998,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const out = Object.assign({}, (data && typeof data === 'object') ? data : null);
     const normalizedGroup = (typeof groupName === 'string' && groupName) ? groupName : (out.group || null);
     if (normalizedGroup != null) out.group = normalizedGroup;
-    if (!Object.prototype.hasOwnProperty.call(out, 'hasCanvasHost')) out.hasCanvasHost = __screenHasCanvasHost();
     if (!Object.prototype.hasOwnProperty.call(out, 'hasVisualViewport')) out.hasVisualViewport = __screenHasVisualViewport();
     if (!Object.prototype.hasOwnProperty.call(out, 'documentReadyState')) out.documentReadyState = __screenCurrentReadyState();
     if (!Object.prototype.hasOwnProperty.call(out, 'appliedTargets')) out.appliedTargets = __screenGroupModes.appliedTargets;

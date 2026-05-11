@@ -18,196 +18,115 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 }
 
 const C  = G.FernwehContext;
-// === CanvasEnvBus phase ===
-// 1) reading FernwehContext.state
-// 2) reading logger/env/screen/prng roots
-// 3) validating dependencies
-// 4) preparing helper functions
-// 5) writing hidden init-state into FernwehContext
-const __canvasEnvBus = (function initCanvasEnvBus() {
-  if (!C) throw new Error('[FernwehContext] FernwehContext is undefined — registratio not available');
+if (!C) throw new Error('[FernwehContext] FernwehContext is undefined — registratio not available');
 
-  const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-  const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
-  const envProfileState = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
-    ? stateRoot.__ENV_PROFILE__
+const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
+const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+const envProfileState = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+  ? stateRoot.__ENV_PROFILE__
+  : null;
+const __canvasDpr = Number(envProfileState && envProfileState.dpr);
+
+if (!stateRoot) {
+  throw new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available');
+}
+const canvasModuleSlot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
+  ? stateRoot.__CANVAS__
+  : null;
+if (!canvasModuleSlot) {
+  throw new Error('[FernwehContext] FernwehContext.state.__CANVAS__ is undefined — module registration is not available');
+}
+const __canvasState = (canvasModuleSlot.__STATE__ && typeof canvasModuleSlot.__STATE__ === 'object')
+  ? canvasModuleSlot.__STATE__
+  : null;
+if (!__canvasState) {
+  throw new Error('[FernwehContext] FernwehContext.state.__CANVAS__.__STATE__ is undefined — module registration is not available');
+}
+
+function emitDiag(level, code, err, extra) {
+  const d = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
+  if (typeof d !== 'function') return;
+  const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
+  const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
+  const ctx = Object.assign({
+    module: 'canvas',
+    diagTag: 'canvas',
+    surface: 'canvas',
+    key: 'canvas',
+    stage: 'runtime',
+    message: eventCode,
+    type: 'pipeline missing data',
+    data: null
+  }, (extra && typeof extra === 'object') ? extra : null);
+  if (ctx.key === null || typeof ctx.key === 'undefined' || ctx.key === '') {
+    ctx.key = (typeof ctx.diagTag === 'string' && ctx.diagTag) ? ctx.diagTag : 'canvas';
+  }
+  if (typeof d.diag === 'function') {
+    d.diag(level, eventCode, ctx, e);
+    return;
+  }
+  d(eventCode, e, ctx);
+}
+
+function __resolvePrngState() {
+  const __core = G && G.Core;
+  const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
+    ? __core.__internal
     : null;
-  const envScreenState = (envProfileState && envProfileState.__SCREEN__ && typeof envProfileState.__SCREEN__ === 'object')
-    ? envProfileState.__SCREEN__
+  const state = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
+    ? __coreInternal.prng
     : null;
-  const screenWidth = Number(envScreenState && envScreenState.width);
-  const screenHeight = Number(envScreenState && envScreenState.height);
-  const dpr = Number(envProfileState && envProfileState.dpr);
+  return {
+    seed: (state && typeof state.seed === 'string' && state.seed)
+      ? state.seed
+      : '',
+    strToSeed: (state && typeof state.strToSeed === 'function') ? state.strToSeed : null,
+    mulberry32: (state && typeof state.mulberry32 === 'function') ? state.mulberry32 : null
+  };
+}
 
-  function emitDiag(level, code, err, extra) {
-    const d = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
-    if (typeof d !== 'function') return;
-    const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
-    const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
-    const ctx = Object.assign({
-      module: 'canvas',
-      diagTag: 'canvas',
-      surface: 'canvas',
-      key: 'canvas',
-      stage: 'runtime',
-      message: eventCode,
-      type: 'pipeline missing data',
-      data: null
-    }, (extra && typeof extra === 'object') ? extra : null);
-    if (ctx.key === null || typeof ctx.key === 'undefined' || ctx.key === '') {
-      ctx.key = (typeof ctx.diagTag === 'string' && ctx.diagTag) ? ctx.diagTag : 'canvas';
-    }
-    if (typeof d.diag === 'function') {
-      d.diag(level, eventCode, ctx, e);
-      return;
-    }
-    d(eventCode, e, ctx);
-  }
-
-  if (
-    Number.isFinite(screenWidth) &&
-    Number.isFinite(screenHeight) &&
-    Number.isFinite(dpr)
-  ) {
-    if (
-      screenWidth <= 0 ||
-      screenHeight <= 0 ||
-      dpr <= 0
-    ) {
-      emitDiag('warn', 'canvas:preflight:screen_metrics_invalid', null, {
-        stage: 'preflight',
-        key: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__.width/height/dpr',
-        message: 'screen metrics invalid',
-        data: {
-          outcome: 'skip',
-          reason: 'screen_metrics_invalid',
-          width: screenWidth,
-          height: screenHeight,
-          dpr: dpr
-        }
-      });
-    }
-  }
-
-  function resolvePrngState() {
-    const __core = G && G.Core;
-    const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
-      ? __core.__internal
-      : null;
-    const state = (__coreInternal && __coreInternal.prng && typeof __coreInternal.prng === 'object')
-      ? __coreInternal.prng
-      : null;
-    return {
-      seed: (state && typeof state.seed === 'string' && state.seed)
-        ? state.seed
-        : '',
-      strToSeed: (state && typeof state.strToSeed === 'function') ? state.strToSeed : null,
-      mulberry32: (state && typeof state.mulberry32 === 'function') ? state.mulberry32 : null
-    };
-  }
-
-  if (!stateRoot) {
-    throw new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available');
-  }
-  const canvasModuleSlot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
-    ? stateRoot.__CANVAS__
-    : null;
-  if (!canvasModuleSlot) {
-    throw new Error('[FernwehContext] FernwehContext.state.__CANVAS__ is undefined — module registration is not available');
-  }
-  const fernwehState = (canvasModuleSlot.__STATE__ && typeof canvasModuleSlot.__STATE__ === 'object')
-    ? canvasModuleSlot.__STATE__
-    : null;
-  if (!fernwehState) {
-    throw new Error('[FernwehContext] FernwehContext.state.__CANVAS__.__STATE__ is undefined — module registration is not available');
-  }
-
-  function defineHidden(obj, prop, value, diagCode, diagKey, message) {
-    const stage = (typeof diagCode === 'string' && diagCode.indexOf(':guard:') !== -1)
-      ? 'guard'
-      : ((typeof diagCode === 'string' && diagCode.indexOf(':preflight:') !== -1) ? 'preflight' : 'apply');
+function __defineHiddenLocal(obj, prop, value, diagCode, diagKey, message) {
+  const stage = (typeof diagCode === 'string' && diagCode.indexOf(':guard:') !== -1)
+    ? 'guard'
+    : ((typeof diagCode === 'string' && diagCode.indexOf(':preflight:') !== -1) ? 'preflight' : 'apply');
+  try {
+    Object.defineProperty(obj, prop, {
+      value,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return true;
+  } catch (eSet) {
+    emitDiag('warn', diagCode, eSet, {
+      stage,
+      key: diagKey || prop,
+      type: 'browser structure missing data',
+      message: message || 'defineProperty failed; fallback assign used'
+    });
     try {
-      Object.defineProperty(obj, prop, {
-        value,
-        writable: true,
-        configurable: true,
-        enumerable: false
-      });
+      obj[prop] = value;
       return true;
-    } catch (eSet) {
-      emitDiag('warn', diagCode, eSet, {
+    } catch (eAssign) {
+      emitDiag('warn', diagCode, eAssign, {
         stage,
         key: diagKey || prop,
         type: 'browser structure missing data',
-        message: message || 'defineProperty failed; fallback assign used'
+        message: 'fallback assign failed'
       });
-      try {
-        obj[prop] = value;
-        return true;
-      } catch (eAssign) {
-        emitDiag('warn', diagCode, eAssign, {
-          stage,
-          key: diagKey || prop,
-          type: 'browser structure missing data',
-          message: 'fallback assign failed'
-        });
-        return false;
-      }
+      return false;
     }
   }
+}
 
-  defineHidden(
-    fernwehState,
-    'willReadFrequently',
-    true,
-    'canvas:apply:will_read_frequently_define_failed',
-    'FernwehContext.state.__CANVAS__.__STATE__.willReadFrequently',
-    'willReadFrequently defineProperty failed; fallback assign used'
-  );
-
-  defineHidden(
-    canvasModuleSlot,
-    '__ENV_BUS__',
-    Object.freeze({
-      phase: 'CanvasEnvBus',
-      hasLogger: !!loggerRoot,
-      hasEnvProfile: !!envProfileState,
-      hasEnvScreen: !!envScreenState,
-      screenWidth: Number.isFinite(screenWidth) ? screenWidth : null,
-      screenHeight: Number.isFinite(screenHeight) ? screenHeight : null,
-      dpr: Number.isFinite(dpr) ? dpr : null
-    }),
-    'canvas:apply:env_bus_state_define_failed',
-    'FernwehContext.state.__CANVAS__.__ENV_BUS__',
-    'CanvasEnvBus init-state defineProperty failed; fallback assign used'
-  );
-
-  return {
-    loggerRoot,
-    stateRoot,
-    envProfileState,
-    envScreenState,
-    screenWidth,
-    screenHeight,
-    dpr,
-    canvasModuleSlot,
-    fernwehState,
-    emitDiag,
-    resolvePrngState,
-    defineHidden
-  };
-})();
-const __loggerRoot = __canvasEnvBus.loggerRoot;
-const __canvasStateRoot = __canvasEnvBus.stateRoot;
-const __canvasEnvProfileState = __canvasEnvBus.envProfileState;
-const __canvasEnvScreenState = __canvasEnvBus.envScreenState;
-const __canvasDpr = __canvasEnvBus.dpr;
-const __stateRoot = __canvasEnvBus.stateRoot;
-const __canvasModuleSlot = __canvasEnvBus.canvasModuleSlot;
-const __canvasState = __canvasEnvBus.fernwehState;
-const emitDiag = __canvasEnvBus.emitDiag;
-const __resolvePrngState = __canvasEnvBus.resolvePrngState;
-const __defineHidden__ = __canvasEnvBus.defineHidden;
+__defineHiddenLocal(
+  __canvasState,
+  'willReadFrequently',
+  true,
+  'canvas:apply:will_read_frequently_define_failed',
+  'FernwehContext.state.__CANVAS__.__STATE__.willReadFrequently',
+  'willReadFrequently defineProperty failed; fallback assign used'
+);
 
   function __readSharedDefaultCtx2dFont__() {
     const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string')
