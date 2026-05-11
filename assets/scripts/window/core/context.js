@@ -172,56 +172,42 @@ const ContextPatchModule = function ContextPatchModule(window) {
     }
   }
 
-
-  function isWebGLAccessLoggerEnabled() {
-    try {
-      const cfg = (__loggerRoot && __loggerRoot._logConfig && typeof __loggerRoot._logConfig === 'object')
-        ? __loggerRoot._logConfig.WEBGLlogger
-        : null;
-      if (cfg === false) return false;
-      if (cfg && typeof cfg === 'object' && cfg.enabled === false) return false;
-    } catch (_) {}
-    return true;
-  }
-
-
   function shouldLogWebGLAccess(method) {
     const methods = Array.isArray(GATEWAY_METHODS.webgl) ? GATEWAY_METHODS.webgl : [];
     return methods.indexOf(method) !== -1;
   }
 
   function emitWebGLAccess(method, args, result, extra) {
-    try {
-      if (!isWebGLAccessLoggerEnabled()) return;
-      if (!shouldLogWebGLAccess(method)) return;
-      const x = (extra && typeof extra === 'object') ? extra : {};
-      const safeArgs = Array.isArray(args) ? args : [];
-      const request = safeArgs.length ? safeArgs[0] : null;
-      const source = (typeof x.source === 'string' && x.source) ? x.source : 'native';
-      const hook = (typeof x.hook === 'string' && x.hook) ? x.hook : null;
-      const access = {
-        method: method,
-        source: source,
-        hook: hook,
-        path: (typeof x.path === 'string' && x.path) ? x.path : 'issued',
-        eventType: (typeof x.eventType === 'string' && x.eventType) ? x.eventType : (source.indexOf('override') !== -1 ? 'override' : 'native'),
-        request: request,
-        args: safeArgs,
-        result: result
-      };
-      emitContextDiag('info', 'context:webgl:access', null, {
-        module: 'webgl',
-        stage: 'runtime',
-        surface: 'webgl',
-        key: method,
-        message: 'webgl access',
-        data: {
-          outcome: 'return',
-          reason: 'webgl_access',
-          extra: access
-        }
-      });
-    } catch (_) {}
+    if (!shouldLogWebGLAccess(method)) return;
+
+    const x = (extra && typeof extra === 'object') ? extra : {};
+    const safeArgs = Array.isArray(args) ? args : [];
+    const request = safeArgs.length ? safeArgs[0] : null;
+    const source = (typeof x.source === 'string' && x.source) ? x.source : 'native';
+    const hook = (typeof x.hook === 'string' && x.hook) ? x.hook : null;
+    const access = {
+      method: method,
+      source: source,
+      hook: hook,
+      path: (typeof x.path === 'string' && x.path) ? x.path : 'issued',
+      eventType: (typeof x.eventType === 'string' && x.eventType) ? x.eventType : (source.indexOf('override') !== -1 ? 'override' : 'native'),
+      request: request,
+      args: safeArgs,
+      result: result
+    };
+
+    emitContextDiag('info', 'context:webgl:access', null, {
+      module: 'webgl',
+      stage: 'runtime',
+      surface: 'webgl',
+      key: method,
+      message: 'webgl access',
+      data: {
+        outcome: 'return',
+        reason: 'webgl_access',
+        extra: access
+      }
+    });
   }
 
   function emitCanvasAccess(method, args, result, source, phase, hook, count) {
@@ -318,9 +304,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
     out[1] = nextOptions;
     return out;
   }
-
-
-
 
 
   const patchedMethods = new WeakSet();
@@ -609,8 +592,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   // === 3. Patch utilities ===
 
-  // === WEBGL PATCHING ===
-
   function installIssuedSerializationMethods(owner) {
     if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return 0;
     if (issuedSerializationPatchedOwners && issuedSerializationPatchedOwners.has(owner)) return 0;
@@ -791,18 +772,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
     return applied;
   }
 
-  // WebGL method gateway intentionally uses issued-instance installation after getContext().
+  // WebGL method gateway intentionally uses issued-instance installation after getContext()
   //
-  // This is a deliberate deviation from the usual prototype-owner route. WebGL
-  // methods are brand/receiver-sensitive surfaces; moving this hook to
-  // WebGLRenderingContext.prototype/WebGL2RenderingContext.prototype was tested
-  // and produced worse observability on Function.prototype.toString, proxy/reflect
-  // and prototype-chain checks. The current issued path has a known advanced
-  // own-property observability trade-off on the concrete ctx instance, but keeps
-  // the broader prototype surface closer to Chromium behavior and is the stable
-  // baseline for this method family. Do not replace this with prototype patching
-  // or Core.applyTargets carrier without explicit runtime proof for descriptor,
-  // receiver, bad-receiver, Function.prototype.toString and proxy observability.
+  // This is a deliberate deviation from the usual prototype-owner route.
+  // As WebGL methods are brand/receiver-sensitive surfaces, this keeps the broader prototype
+  // surface closer to Chromium behavior and is the only one stable baseline for this method family.
+  // Moving this hook to WebGLRenderingContext.prototype/WebGL2RenderingContext.prototype follows
+  // to worse observability on Function.prototype.toString, proxy/reflect and prototype-chain checks. 
+
   function installIssuedWebGLMethods(ctx) {
     if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) {
       emitContextDiag('warn', 'context:issued_webgl:preflight:ctx_missing', null, {
