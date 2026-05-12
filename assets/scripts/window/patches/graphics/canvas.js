@@ -20,22 +20,20 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 const C  = G.FernwehContext;
 if (!C) throw new Error('[FernwehContext] FernwehContext is undefined — registratio not available');
 
+const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+
 const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
 if (!stateRoot) {
   throw new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available');
 }
 
-const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+const __canvasScreenState = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
+  ? stateRoot.__SCREEN__
+  : null;
 
-const envProfileState = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
-  ? stateRoot.__ENV_PROFILE__
-  : null;
-const __canvasEnvScreenState = (envProfileState && envProfileState.__SCREEN__ && typeof envProfileState.__SCREEN__ === 'object')
-  ? envProfileState.__SCREEN__
-  : null;
-const __canvasScreenWidth = Number(__canvasEnvScreenState && __canvasEnvScreenState.width);
-const __canvasScreenHeight = Number(__canvasEnvScreenState && __canvasEnvScreenState.height);
-const __canvasDpr = Number(__canvasEnvScreenState && __canvasEnvScreenState.dpr);
+const __canvasScreenWidth = Number(__canvasScreenState && __canvasScreenState.width);
+const __canvasScreenHeight = Number(__canvasScreenState && __canvasScreenState.height);
+const __canvasDpr = Number(__canvasScreenState && __canvasScreenState.dpr);
 
 const canvasModuleSlot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
   ? stateRoot.__CANVAS__
@@ -82,14 +80,13 @@ if (
 ) {
   emitDiag('warn', 'canvas:preflight:screen_metrics_missing', null, {
     stage: 'preflight',
-    key: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__.width/height/dpr',
+    key: 'FernwehContext.state.__SCREEN__.width/height/dpr',
     type: 'pipeline missing data',
     message: 'screen metrics missing for canvas module',
     data: {
       outcome: 'skip',
       reason: 'screen_metrics_missing',
-      hasEnvProfile: !!envProfileState,
-      hasEnvScreen: !!__canvasEnvScreenState,
+      hasScreenState: !!__canvasScreenState,
       width: Number.isFinite(__canvasScreenWidth) ? __canvasScreenWidth : null,
       height: Number.isFinite(__canvasScreenHeight) ? __canvasScreenHeight : null,
       dpr: Number.isFinite(__canvasDpr) ? __canvasDpr : null
@@ -98,7 +95,7 @@ if (
 } else if (__canvasScreenWidth <= 0 || __canvasScreenHeight <= 0 || __canvasDpr <= 0) {
   emitDiag('warn', 'canvas:preflight:screen_metrics_invalid', null, {
     stage: 'preflight',
-    key: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__.width/height/dpr',
+    key: 'FernwehContext.state.__SCREEN__.width/height/dpr',
     type: 'pipeline missing data',
     message: 'screen metrics invalid',
     data: {
@@ -796,5 +793,35 @@ __CanvasPatchHooks__.fillTextNoiseHook = fillTextNoiseHook;
 __CanvasPatchHooks__.strokeTextNoiseHook = strokeTextNoiseHook;
 __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
+
+
+
+// emitDiag('info', 'canvas:ready', null, {
+//   stage: 'apply',
+//   key: 'canvas',
+//   type: 'ok',
+//   message: 'canvas hooks exported',
+//   data: {
+//     outcome: 'return',
+//     reason: 'ready',
+//     exports: {
+//       patchToDataURLInjectNoise: typeof __CanvasPatchHooks__.patchToDataURLInjectNoise === 'function',
+//       masterToDataURLHook: typeof __CanvasPatchHooks__.masterToDataURLHook === 'function',
+//       patchToBlobInjectNoise: typeof __CanvasPatchHooks__.patchToBlobInjectNoise === 'function',
+//       patchConvertToBlobInjectNoise: typeof __CanvasPatchHooks__.patchConvertToBlobInjectNoise === 'function',
+//       measureTextNoiseHook: typeof __CanvasPatchHooks__.measureTextNoiseHook === 'function',
+//       applyMeasureTextHook: typeof __CanvasPatchHooks__.applyMeasureTextHook === 'function',
+//       fillTextNoiseHook: typeof __CanvasPatchHooks__.fillTextNoiseHook === 'function',
+//       strokeTextNoiseHook: typeof __CanvasPatchHooks__.strokeTextNoiseHook === 'function',
+//       fillRectNoiseHook: typeof __CanvasPatchHooks__.fillRectNoiseHook === 'function',
+//       applyDrawImageHook: typeof __CanvasPatchHooks__.applyDrawImageHook === 'function'
+//     }
+//   }
+// });
+
+
+
+
+
 
 }

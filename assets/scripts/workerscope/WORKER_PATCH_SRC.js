@@ -240,10 +240,11 @@
       if (typeof s.webgl.unmaskedVendor !== 'string' || !s.webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
       if (typeof s.webgl.unmaskedRenderer !== 'string' || !s.webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
       if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
+      if (!s.screen || typeof s.screen !== 'object') throw new Error('UACHPatch: missing screen');
+      if (!Number.isFinite(Number(s.screen.width))) throw new Error('UACHPatch: bad screen.width');
+      if (!Number.isFinite(Number(s.screen.height))) throw new Error('UACHPatch: bad screen.height');
+      if (!Number.isFinite(Number(s.screen.dpr)) || Number(s.screen.dpr) <= 0) throw new Error('UACHPatch: bad screen.dpr');
       if (!s.envProfile || typeof s.envProfile !== 'object') throw new Error('UACHPatch: missing envProfile');
-      if (!Number.isFinite(Number(s.envProfile.width))) throw new Error('UACHPatch: bad envProfile.width');
-      if (!Number.isFinite(Number(s.envProfile.height))) throw new Error('UACHPatch: bad envProfile.height');
-      if (!Number.isFinite(Number(s.envProfile.dpr)) || Number(s.envProfile.dpr) <= 0) throw new Error('UACHPatch: bad envProfile.dpr');
       if (!s.envProfile.__PLATFORM__ || typeof s.envProfile.__PLATFORM__ !== 'object') throw new Error('UACHPatch: missing envProfile.__PLATFORM__');
       if (typeof s.envProfile.__PLATFORM__.domPlatform !== 'string' || !s.envProfile.__PLATFORM__.domPlatform) throw new Error('UACHPatch: bad envProfile.__PLATFORM__.domPlatform');
       if (typeof s.envProfile.__PLATFORM__.uaPlatform !== 'string' || !s.envProfile.__PLATFORM__.uaPlatform) throw new Error('UACHPatch: bad envProfile.__PLATFORM__.uaPlatform');
@@ -1668,7 +1669,7 @@
       const inlineCoreWindow = runtimeRoot && runtimeRoot.inlineCoreWindow;
       const inlinePrng = runtimeRoot && runtimeRoot.inlinePrng;
       const inlineCanvasPatch = runtimeRoot && runtimeRoot.inlineCanvasPatch;
-      const inlineContextPatch = runtimeRoot && runtimeRoot.inlineContextPatch;
+      const inlineFernwehContext = runtimeRoot && runtimeRoot.inlineFernwehContext;
       if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) {
         throw new Error('UACHPatch: inlineCoreWindow missing');
       }
@@ -1678,15 +1679,15 @@
       if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) {
         throw new Error('UACHPatch: inlineCanvasPatch missing');
       }
-      if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) {
-        throw new Error('UACHPatch: inlineContextPatch missing');
+      if (typeof inlineFernwehContext !== 'string' || !inlineFernwehContext) {
+        throw new Error('UACHPatch: inlineFernwehContext missing');
       }
       return {
         runtimeRoot,
         inlineCoreWindow,
         inlinePrng,
         inlineCanvasPatch,
-        inlineContextPatch
+        inlineFernwehContext
       };
     };
 
@@ -1746,6 +1747,55 @@
       }
       return envProfileRoot;
     };
+
+    const syncWorkerScreenState = stateRoot => {
+      if (!stateRoot || typeof stateRoot !== 'object') {
+        throw new Error('UACHPatch: FernwehContext.state missing for screen sync');
+      }
+
+      const snap = requireSnap(cache.snap, 'screen_sync');
+      const screenSnap = snap.screen;
+
+      const screenRoot = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
+        ? stateRoot.__SCREEN__
+        : null;
+
+      if (!(screenRoot && typeof screenRoot === 'object')) {
+        throw new Error('UACHPatch: FernwehContext.state.__SCREEN__ missing');
+      }
+
+      const cloneScreenValue = value => {
+        if (Array.isArray(value)) {
+          const out = [];
+          for (let i = 0; i < value.length; i++) out.push(cloneScreenValue(value[i]));
+          return out;
+        }
+        if (value && typeof value === 'object') {
+          const out = Object.create(null);
+          const keys = Object.keys(value);
+          for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            out[key] = cloneScreenValue(value[key]);
+          }
+          return out;
+        }
+        return value;
+      };
+
+      const prevKeys = Object.keys(screenRoot);
+      for (let i = 0; i < prevKeys.length; i++) {
+        delete screenRoot[prevKeys[i]];
+      }
+
+      const nextKeys = Object.keys(screenSnap);
+      for (let i = 0; i < nextKeys.length; i++) {
+        const key = nextKeys[i];
+        screenRoot[key] = cloneScreenValue(screenSnap[key]);
+      }
+
+      return screenRoot;
+    };
+
     const restoreWorkerFontsState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
         throw new Error('UACHPatch: FernwehContext.state missing for fonts restore');
@@ -1901,13 +1951,15 @@
       if (!(stateRoot && typeof stateRoot === 'object')) {
         throw new Error('UACHPatch: FernwehContext.state missing');
       }
+
       syncWorkerEnvProfileState(stateRoot);
+      syncWorkerScreenState(stateRoot);
       restoreWorkerFontsState(stateRoot);
 
       executeWorkerInlineModule(sources.inlineCoreWindow, 'CoreWindowModule', 'inlineCoreWindow');
       executeWorkerInlineModule(sources.inlinePrng, 'RNGsetModule', 'inlinePrng');
       executeWorkerInlineModule(sources.inlineCanvasPatch, 'CanvasPatchModule', 'inlineCanvasPatch');
-      executeWorkerInlineModule(sources.inlineContextPatch, 'ContextPatchModule', 'inlineContextPatch');
+      executeWorkerInlineModule(sources.inlineFernwehContext, 'ContextPatchModule', 'inlineFernwehContext');
 
       const Core = (self.Core && typeof self.Core === 'object')
         ? self.Core
@@ -2060,6 +2112,7 @@
       // Worker runtime consumes cache.snap; do not rewrite the canonical
       // __WORKER_ENV_SNAPSHOT__ owner-store from the consumer apply path.
       syncWorkerEnvProfileState(stateRoot);
+      syncWorkerScreenState(stateRoot);
       restoreWorkerFontsState(stateRoot);
       // Paradigm: seed is immutable within session.
       const curSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;

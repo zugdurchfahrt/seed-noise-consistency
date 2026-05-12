@@ -638,27 +638,27 @@ function __ensureEnvPlatformState__(envProfileState) {
   return state;
 }
 
-function __ensureEnvScreenState__(envProfileState) {
-  const owner = (envProfileState && typeof envProfileState === 'object')
-    ? envProfileState
-    : __ensureEnvProfileState__();
-  let state = (owner.__SCREEN__ && typeof owner.__SCREEN__ === 'object')
-    ? owner.__SCREEN__
+function __ensureScreenTransitState__() {
+  let state = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
+    ? stateRoot.__SCREEN__
     : null;
+
   if (!state) {
     state = Object.create(null);
-    state.width = null;
-    state.height = null;
-    state.dpr = null;
-    state.colorDepth = null;
-    state.orientationDom = null;
-    Object.defineProperty(owner, '__SCREEN__', {
+    Object.defineProperty(stateRoot, '__SCREEN__', {
       value: state,
       writable: true,
       configurable: true,
       enumerable: false
     });
   }
+
+  if (!Object.prototype.hasOwnProperty.call(state, 'width')) state.width = null;
+  if (!Object.prototype.hasOwnProperty.call(state, 'height')) state.height = null;
+  if (!Object.prototype.hasOwnProperty.call(state, 'dpr')) state.dpr = null;
+  if (!Object.prototype.hasOwnProperty.call(state, 'colorDepth')) state.colorDepth = null;
+  if (!Object.prototype.hasOwnProperty.call(state, 'orientationDom')) state.orientationDom = null;
+
   return state;
 }
 
@@ -711,9 +711,9 @@ function __setBootstrapTransferStatus__(slot, ready, reason, extraData) {
 // Seed input transfer into hidden owner state.
 const __geoTransitState__ = __ensureGeoTransitState__();
 const __langTransitState__ = __ensureLangTransitState__();
+const __screenTransitState__ = __ensureScreenTransitState__();
 const __envProfileState__ = __ensureEnvProfileState__();
 const __envPlatformState__ = __ensureEnvPlatformState__(__envProfileState__);
-const __envScreenState__ = __ensureEnvScreenState__(__envProfileState__);
 const __bootstrapLatitude__ = __bootstrapInputs__.__LATITUDE__;
 const __bootstrapLongitude__ = __bootstrapInputs__.__LONGITUDE__;
 const __bootstrapTimezone__ = __bootstrapInputs__.__TIMEZONE__;
@@ -812,15 +812,14 @@ if (!__isFiniteNumber__(__bootstrapScreenHeight__)) __screenMissingKeys__.push('
 if (!__isFiniteNumber__(__bootstrapScreenDpr__)) __screenMissingKeys__.push('__DPR');
 if (!__isFiniteNumber__(__bootstrapScreenColorDepth__)) __screenMissingKeys__.push('__COLOR_DEPTH');
 if (__screenMissingKeys__.length === 0) {
-  __envScreenState__.width = __bootstrapScreenWidth__;
-  __envScreenState__.height = __bootstrapScreenHeight__;
-  __envScreenState__.dpr = __bootstrapScreenDpr__;
-  __envScreenState__.colorDepth = __bootstrapScreenColorDepth__;
-  __envScreenState__.orientationDom = ((__envScreenState__.height >= __envScreenState__.width))
+  __screenTransitState__.width = __bootstrapScreenWidth__;
+  __screenTransitState__.height = __bootstrapScreenHeight__;
+  __screenTransitState__.dpr = __bootstrapScreenDpr__;
+  __screenTransitState__.colorDepth = __bootstrapScreenColorDepth__;
+  __screenTransitState__.orientationDom = ((__screenTransitState__.height >= __screenTransitState__.width))
     ? 'portrait-primary'
     : 'landscape-primary';
-  __envProfileState__.dpr = __bootstrapScreenDpr__;
-  __envProfileState__.colorDepth = __bootstrapScreenColorDepth__;
+
   __setBootstrapTransferStatus__('screen', true, 'owner_ready', { source: 'window_transit' });
 } else {
   __setBootstrapTransferStatus__('screen', false, 'bootstrap_input_incomplete', { missingKeys: __screenMissingKeys__.slice() });
@@ -841,7 +840,6 @@ __envProfileState__.vendor = __bootstrapInputs__.__VENDOR;
 __envProfileState__.mem = Number(__bootstrapInputs__.__memory);
 __envProfileState__.cpu = Number(__bootstrapInputs__.__cpu);
 __envProfileState__.devicesLabels = __cloneProfileValue__(__bootstrapInputs__.__DEVICES_LABELS);
-
 __envProfileState__.webglRenderer = __bootstrapInputs__.__WEBGL_RENDERER__;
 __envProfileState__.webglVendor = __bootstrapInputs__.__WEBGL_VENDOR__;
 __envProfileState__.webglUnmaskedVendor = __bootstrapInputs__.__WEBGL_UNMASKED_VENDOR__;
@@ -917,7 +915,7 @@ function __platformTransitOwnerReady__() {
 }
 
 function __screenTransitOwnerReady__() {
-  const state = __ensureEnvScreenState__(__envProfileState__);
+  const state = __ensureScreenTransitState__();
   return !!state &&
     __isFiniteNumber__(state.width) &&
     __isFiniteNumber__(state.height) &&

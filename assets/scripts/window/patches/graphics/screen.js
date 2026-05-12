@@ -107,6 +107,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
+
   const __screenStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__screenStateRoot) {
     const stateMissingErr = new Error('[FernwehContext] FernwehContext.state is undefined - module registration is not available');
@@ -142,51 +143,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
-  const __envProfileState = (__screenStateRoot.__ENV_PROFILE__ && typeof __screenStateRoot.__ENV_PROFILE__ === 'object')
-    ? __screenStateRoot.__ENV_PROFILE__
-    : null;
-  const __envScreenState = (__envProfileState && __envProfileState.__SCREEN__ && typeof __envProfileState.__SCREEN__ === 'object')
-    ? __envProfileState.__SCREEN__
-    : null;
-  if (!__envScreenState) {
-    __screenDiag('warn', 'screen:env_screen_state_missing', {
-      stage: 'preflight',
-      type: __screenTypePipeline,
-      diagTag: 'screen',
-      key: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__',
-      message: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__ unavailable',
-      data: {
-        outcome: 'skip',
-        reason: 'env_screen_state_missing',
-        missing: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__'
-      }
-    }, new Error('[ScreenPatch] FernwehContext.state.__ENV_PROFILE__.__SCREEN__ unavailable'));
-    try {
-      if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
-      }
-    } catch (releaseErr) {
-      __screenDiag('warn', 'screen:guard_release_failed', {
-        stage: 'preflight',
-        type: __screenTypePipeline,
-        diagTag: 'screen',
-        key: 'entry_guard',
-        message: 'guard release failed after env screen state missing skip',
-        data: {
-          outcome: 'skip',
-          reason: 'guard_release_failed',
-          substage: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__'
-        }
-      }, releaseErr);
-    }
-    return;
-  }
-  const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
-    ? __envProfileState.profile
-    : null;
-  let __screenState = (__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')
+
+  const __screenState = (__screenStateRoot.__SCREEN__ && typeof __screenStateRoot.__SCREEN__ === 'object')
     ? __screenStateRoot.__SCREEN__
     : null;
+
   if (!__screenState) {
     __screenDiag('warn', 'screen:screen_state_missing', {
       stage: 'preflight',
@@ -220,6 +181,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
     return;
   }
+
   if (!(__screenState.__RUNTIME_STATE__ && typeof __screenState.__RUNTIME_STATE__ === 'object')) {
     Object.defineProperty(__screenState, '__RUNTIME_STATE__', {
       value: Object.create(null),
@@ -275,12 +237,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     });
   }
 
-  const SCREEN_WIDTH  = Number(__envScreenState.width);
-  const SCREEN_HEIGHT = Number(__envScreenState.height);
-  const COLOR_DEPTH   = Number(__envProfileState.colorDepth);
-  const DPR           = Number(__envProfileState.dpr);
-  const ORIENTATION_DOM = (typeof __envScreenState.orientationDom === 'string' && __envScreenState.orientationDom)
-    ? __envScreenState.orientationDom
+  const SCREEN_WIDTH  = Number(__screenState.width);
+  const SCREEN_HEIGHT = Number(__screenState.height);
+  const COLOR_DEPTH   = Number(__screenState.colorDepth);
+  const DPR           = Number(__screenState.dpr);
+  const ORIENTATION_DOM = (typeof __screenState.orientationDom === 'string' && __screenState.orientationDom)
+    ? __screenState.orientationDom
     : null;
 
   try {
@@ -487,7 +449,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
     try {
-      plans = __coreApplyTargets(targets, __profile, []);
+      plans = __coreApplyTargets(targets);
     } catch (e) {
       __screenDiag('error', groupTag + ':preflight_failed', {
         stage: 'preflight',

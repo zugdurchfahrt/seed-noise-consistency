@@ -632,7 +632,7 @@ def init_driver(
                 defineHidden(wrkRuntime, 'inlineCoreWindow', {json.dumps(worker_core_window_src)});
                 defineHidden(wrkRuntime, 'inlinePrng', {json.dumps(worker_prng_src)});
                 defineHidden(wrkRuntime, 'inlineCanvasPatch', {json.dumps(worker_canvas_src)});
-                defineHidden(wrkRuntime, 'inlineContextPatch', {json.dumps(worker_context_src)});
+                defineHidden(wrkRuntime, 'inlineFernwehContext', {json.dumps(worker_context_src)});
             }})(window);
             """,
             Path(PATCH_OUT).read_text("utf-8"),

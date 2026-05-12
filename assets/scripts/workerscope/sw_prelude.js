@@ -960,12 +960,12 @@
       const inlineCoreWindow = (typeof __SW_INLINE_CORE_WINDOW__ === 'string') ? __SW_INLINE_CORE_WINDOW__ : '';
       const inlinePrng = (typeof __SW_INLINE_PRNG__ === 'string') ? __SW_INLINE_PRNG__ : '';
       const inlineCanvasPatch = (typeof __SW_INLINE_CANVAS_PATCH__ === 'string') ? __SW_INLINE_CANVAS_PATCH__ : '';
-      const inlineContextPatch = (typeof __SW_INLINE_CONTEXT_PATCH__ === 'string') ? __SW_INLINE_CONTEXT_PATCH__ : '';
+      const inlineFernwehContext = (typeof __SW_INLINE_CONTEXT_PATCH__ === 'string') ? __SW_INLINE_CONTEXT_PATCH__ : '';
 
       __executeSwInlineModule(inlineCoreWindow, 'CoreWindowModule', 'inlineCoreWindow');
       __executeSwInlineModule(inlinePrng, 'RNGsetModule', 'inlinePrng');
       __executeSwInlineModule(inlineCanvasPatch, 'CanvasPatchModule', 'inlineCanvasPatch');
-      __executeSwInlineModule(inlineContextPatch, 'ContextPatchModule', 'inlineContextPatch');
+      __executeSwInlineModule(inlineFernwehContext, 'ContextPatchModule', 'inlineFernwehContext');
 
       const hooks = (G.FernwehHooks && typeof G.FernwehHooks === 'object')
         ? G.FernwehHooks

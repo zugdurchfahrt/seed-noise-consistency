@@ -90,7 +90,7 @@ const WrkModule = function WrkModule(window) {
     return v;
   }
 
-  function __resolveCanvasPatchContext__() {
+  function __resolveFernwehContext__() {
     const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
       ? G.FernwehContext
       : null;
@@ -98,7 +98,7 @@ const WrkModule = function WrkModule(window) {
   }
 
   function __ensureWrkStateRoot__() {
-    const C = __resolveCanvasPatchContext__();
+    const C = __resolveFernwehContext__();
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
       : null;
@@ -205,14 +205,14 @@ const WrkModule = function WrkModule(window) {
     const inlineCoreWindow = __wrkRuntimeGet__('inlineCoreWindow');
     const inlinePrng = __wrkRuntimeGet__('inlinePrng');
     const inlineCanvasPatch = __wrkRuntimeGet__('inlineCanvasPatch');
-    const inlineContextPatch = __wrkRuntimeGet__('inlineContextPatch');
+    const inlineFernwehContext = __wrkRuntimeGet__('inlineFernwehContext');
     if (typeof workerPatchClassic === 'string' && workerPatchClassic
         && typeof workerPatchModule === 'string' && workerPatchModule
         && typeof inlineReflect === 'string' && inlineReflect
         && typeof inlineCoreWindow === 'string' && inlineCoreWindow
         && typeof inlinePrng === 'string' && inlinePrng
         && typeof inlineCanvasPatch === 'string' && inlineCanvasPatch
-        && typeof inlineContextPatch === 'string' && inlineContextPatch) {
+        && typeof inlineFernwehContext === 'string' && inlineFernwehContext) {
       return {
         workerPatchClassic,
         workerPatchModule,
@@ -220,7 +220,7 @@ const WrkModule = function WrkModule(window) {
         inlineCoreWindow,
         inlinePrng,
         inlineCanvasPatch,
-        inlineContextPatch
+        inlineFernwehContext
       };
     }
     const err = new Error('[WrkModule] FAIL_FAST: worker patch runtime not ready');
@@ -656,28 +656,39 @@ function EnvBus(G){
       throw new Error('EnvBus: __ENV_PROFILE__.__PLATFORM__.platformVersion missing');
     }
     envProfile.__PLATFORM__ = __cloneEnvValue(envPlatform);
-    const envScreen = (envProfileSource.__SCREEN__ && typeof envProfileSource.__SCREEN__ === 'object')
-      ? envProfileSource.__SCREEN__
+
+    const envScreenState = (stateRoot && stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
+      ? stateRoot.__SCREEN__
       : null;
-    if (!envScreen || typeof envScreen !== 'object') {
-      throw new Error('EnvBus: __ENV_PROFILE__.__SCREEN__ missing');
+
+    if (!envScreenState || typeof envScreenState !== 'object') {
+      throw new Error('EnvBus: __SCREEN__ missing');
     }
-    envProfile.__SCREEN__ = __cloneEnvValue(envScreen);
-    envProfile.width = Number(envScreen.width);
-    envProfile.height = Number(envScreen.height);
-    envProfile.dpr = Number(envProfileSource.dpr);
-    envProfile.colorDepth = Number(envProfileSource.colorDepth);
-    envProfile.orientationDom = envScreen.orientationDom;
-    if (!Number.isFinite(Number(envProfile.width))) {
-      throw new Error('EnvBus: __ENV_PROFILE__.__SCREEN__.width missing');
+
+    const envScreen = {
+      width: Number(envScreenState.width),
+      height: Number(envScreenState.height),
+      dpr: Number(envScreenState.dpr),
+      colorDepth: Number(envScreenState.colorDepth),
+      orientationDom: envScreenState.orientationDom
+    };
+
+    if (!Number.isFinite(Number(envScreen.width))) {
+      throw new Error('EnvBus: __SCREEN__.width missing');
     }
-    if (!Number.isFinite(Number(envProfile.height))) {
-      throw new Error('EnvBus: __ENV_PROFILE__.__SCREEN__.height missing');
+    if (!Number.isFinite(Number(envScreen.height))) {
+      throw new Error('EnvBus: __SCREEN__.height missing');
     }
-    if (!Number.isFinite(Number(envProfile.dpr)) || Number(envProfile.dpr) <= 0) {
-      throw new Error('EnvBus: __ENV_PROFILE__.dpr missing');
+    if (!Number.isFinite(Number(envScreen.dpr)) || Number(envScreen.dpr) <= 0) {
+      throw new Error('EnvBus: __SCREEN__.dpr missing');
     }
-    const dpr = Number(envProfile.dpr);
+    if (!Number.isFinite(Number(envScreen.colorDepth))) {
+      throw new Error('EnvBus: __SCREEN__.colorDepth missing');
+    }
+
+    const dpr = Number(envScreen.dpr);
+
+
     snap.uaData = uaData;
     snap.highEntropy = he;
     snap.webgl = __cloneEnvValue(snap.webgl);
@@ -687,6 +698,7 @@ function EnvBus(G){
     snap.mem = mem;
     snap.dpr = dpr;
     snap.timeZone = timeZone;
+    snap.screen = __cloneEnvValue(envScreen);
     snap.envProfile = envProfile;
     (() => {
       const existing = __wrkRuntimeGet__('windowKeys');
@@ -790,7 +802,7 @@ function mkWorkerBootstrapCore(opts){
   const inlineCoreWindow = opts.inlineCoreWindow;
   const inlinePrng = opts.inlinePrng;
   const inlineCanvasPatch = opts.inlineCanvasPatch;
-  const inlineContextPatch = opts.inlineContextPatch;
+  const inlineFernwehContext = opts.inlineFernwehContext;
   const patchUrlMissingMessage = opts.patchUrlMissingMessage;
   const prePatchOwnerSource = typeof opts.prePatchOwnerSource === 'string' ? opts.prePatchOwnerSource : '';
   const patchLoaderSource = opts.patchLoaderSource;
@@ -804,7 +816,7 @@ function mkWorkerBootstrapCore(opts){
   if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkWorkerBootstrapCore bad inlineCoreWindow');
   if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkWorkerBootstrapCore bad inlinePrng');
   if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkWorkerBootstrapCore bad inlineCanvasPatch');
-  if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkWorkerBootstrapCore bad inlineContextPatch');
+  if (typeof inlineFernwehContext !== 'string' || !inlineFernwehContext) throw new Error('wrk: mkWorkerBootstrapCore bad inlineFernwehContext');
   if (typeof patchUrlMissingMessage !== 'string' || !patchUrlMissingMessage) throw new Error('wrk: mkWorkerBootstrapCore bad patchUrlMissingMessage');
   if (typeof patchLoaderSource !== 'string' || !patchLoaderSource) throw new Error('wrk: mkWorkerBootstrapCore bad patchLoaderSource');
   if (typeof userLoaderSource !== 'string' || !userLoaderSource) throw new Error('wrk: mkWorkerBootstrapCore bad userLoaderSource');
@@ -816,7 +828,7 @@ function mkWorkerBootstrapCore(opts){
   const INLINE_CORE_WINDOW = JSON.stringify(inlineCoreWindow);
   const INLINE_PRNG = JSON.stringify(inlinePrng);
   const INLINE_CANVAS_PATCH = JSON.stringify(inlineCanvasPatch);
-  const INLINE_CONTEXT_PATCH = JSON.stringify(inlineContextPatch);
+  const INLINE_CONTEXT_PATCH = JSON.stringify(inlineFernwehContext);
   return `
     (async function(){
       'use strict';
@@ -1151,6 +1163,9 @@ function mkWorkerBootstrapCore(opts){
         var envProfileRoot = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
           ? stateRoot.__ENV_PROFILE__
           : __defineWorkerHiddenValue__(stateRoot, '__ENV_PROFILE__', Object.create(null));
+        var screenRoot = (stateRoot.__SCREEN__ && typeof stateRoot.__SCREEN__ === 'object')
+          ? stateRoot.__SCREEN__
+          : __defineWorkerHiddenValue__(stateRoot, '__SCREEN__', Object.create(null));
         var fontsRoot = (stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
           ? stateRoot.__FONTS__
           : __defineWorkerHiddenValue__(stateRoot, '__FONTS__', Object.create(null));
@@ -1204,6 +1219,9 @@ function mkWorkerBootstrapCore(opts){
         if (!envProfileRoot || typeof envProfileRoot !== 'object') {
           throw new Error('UACHPatch: FernwehContext.state.__ENV_PROFILE__ missing');
         }
+        if (!screenRoot || typeof screenRoot !== 'object') {
+          throw new Error('UACHPatch: FernwehContext.state.__SCREEN__ missing');
+        }
         if (!fontsRoot || typeof fontsRoot !== 'object') {
           throw new Error('UACHPatch: FernwehContext.state.__FONTS__ missing');
         }
@@ -1239,6 +1257,7 @@ function mkWorkerBootstrapCore(opts){
           dataStoreState: dataStoreState,
           workerEnvSnapshot: workerEnvSnapshot,
           envProfileRoot: envProfileRoot,
+          screenRoot: screenRoot,
           fontsRoot: fontsRoot,
           fontsState: fontsState,
           fontsConfig: fontsConfig,
@@ -1409,7 +1428,7 @@ function mkWorkerBootstrapCore(opts){
         __defineWorkerHiddenValue__(wrkRuntime, 'inlineCoreWindow', ${INLINE_CORE_WINDOW});
         __defineWorkerHiddenValue__(wrkRuntime, 'inlinePrng', ${INLINE_PRNG});
         __defineWorkerHiddenValue__(wrkRuntime, 'inlineCanvasPatch', ${INLINE_CANVAS_PATCH});
-        __defineWorkerHiddenValue__(wrkRuntime, 'inlineContextPatch', ${INLINE_CONTEXT_PATCH});
+        __defineWorkerHiddenValue__(wrkRuntime, 'inlineFernwehContext', ${INLINE_CONTEXT_PATCH});
       })();
 ${prePatchOwnerSource}
       let __patchOK = false;
@@ -1465,12 +1484,12 @@ function mkModuleWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
   const inlineCoreWindow = runtime && runtime.inlineCoreWindow;
   const inlinePrng = runtime && runtime.inlinePrng;
   const inlineCanvasPatch = runtime && runtime.inlineCanvasPatch;
-  const inlineContextPatch = runtime && runtime.inlineContextPatch;
+  const inlineFernwehContext = runtime && runtime.inlineFernwehContext;
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkModuleWorkerSource bad workerPatchModule url');
   if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkModuleWorkerSource bad inlineCoreWindow');
   if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkModuleWorkerSource bad inlinePrng');
   if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkModuleWorkerSource bad inlineCanvasPatch');
-  if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkModuleWorkerSource bad inlineContextPatch');
+  if (typeof inlineFernwehContext !== 'string' || !inlineFernwehContext) throw new Error('wrk: mkModuleWorkerSource bad inlineFernwehContext');
   const USER = JSON.stringify(absUrl);
   return mkWorkerBootstrapCore({
     snapshot: snapshot,
@@ -1480,7 +1499,7 @@ function mkModuleWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
     inlineCoreWindow: inlineCoreWindow,
     inlinePrng: inlinePrng,
     inlineCanvasPatch: inlineCanvasPatch,
-    inlineContextPatch: inlineContextPatch,
+    inlineFernwehContext: inlineFernwehContext,
     patchUrlMissingMessage: 'UACHPatch: missing workerPatchModule URL',
     prePatchOwnerSource: `
       (function __installWorkerCoreOwners__(){
@@ -1528,12 +1547,12 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
   const inlineCoreWindow = runtime && runtime.inlineCoreWindow;
   const inlinePrng = runtime && runtime.inlinePrng;
   const inlineCanvasPatch = runtime && runtime.inlineCanvasPatch;
-  const inlineContextPatch = runtime && runtime.inlineContextPatch;
+  const inlineFernwehContext = runtime && runtime.inlineFernwehContext;
   if (typeof patchUrl !== 'string' || !patchUrl) throw new Error('wrk: mkClassicWorkerSource bad workerPatchClassic url');
   if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) throw new Error('wrk: mkClassicWorkerSource bad inlineCoreWindow');
   if (typeof inlinePrng !== 'string' || !inlinePrng) throw new Error('wrk: mkClassicWorkerSource bad inlinePrng');
   if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) throw new Error('wrk: mkClassicWorkerSource bad inlineCanvasPatch');
-  if (typeof inlineContextPatch !== 'string' || !inlineContextPatch) throw new Error('wrk: mkClassicWorkerSource bad inlineContextPatch');
+  if (typeof inlineFernwehContext !== 'string' || !inlineFernwehContext) throw new Error('wrk: mkClassicWorkerSource bad inlineFernwehContext');
   const USER = JSON.stringify(absUrl);
   return mkWorkerBootstrapCore({
     snapshot: snapshot,
@@ -1543,7 +1562,7 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
     inlineCoreWindow: inlineCoreWindow,
     inlinePrng: inlinePrng,
     inlineCanvasPatch: inlineCanvasPatch,
-    inlineContextPatch: inlineContextPatch,
+    inlineFernwehContext: inlineFernwehContext,
     patchUrlMissingMessage: 'UACHPatch: missing workerPatchClassic URL',
     prePatchOwnerSource: `
       (function __installWorkerCoreOwners__(){

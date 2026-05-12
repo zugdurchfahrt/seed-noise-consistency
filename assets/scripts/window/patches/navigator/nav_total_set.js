@@ -268,31 +268,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'scalar_state_missing');
       return;
     }
-    if (
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'platform') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'vendor') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'appVersion') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'productSub') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'vendorSub') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'maxTouchPoints') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'deviceMemory') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'hardwareConcurrency') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'language') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'languages') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'buildID') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'globalPrivacyControl') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'oscpu') ||
-      !Object.prototype.hasOwnProperty.call(__navScalarState, 'devicePixelRatio')
-    ) {
-      __navDiagPipeline('warn', 'nav_total_set:scalar_state_slot_missing', {
-        stage: 'preflight',
-        key: 'FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__',
-        message: 'FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ scalar slot missing',
-        data: { outcome: 'skip', reason: 'scalar_state_slot_missing' }
-      });
-      __navReleaseEntryGuard(true, 'preflight', 'scalar_state_slot_missing');
-      return;
-    }
     let __navObjectState = (__navModuleState.__OBJECT_STATE__ && typeof __navModuleState.__OBJECT_STATE__ === 'object')
       ? __navModuleState.__OBJECT_STATE__
       : null;
@@ -396,6 +371,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(true, 'preflight', 'env_profile_missing');
       return;
     }
+
+    const __screenState = (__stateRoot.__SCREEN__ && typeof __stateRoot.__SCREEN__ === 'object')
+      ? __stateRoot.__SCREEN__
+      : null;
+
+    if (!__screenState) {
+      __navDiagPipeline('error', 'nav_total_set:screen_state_missing', {
+        stage: 'preflight',
+        key: 'FernwehContext.state.__SCREEN__',
+        message: 'FernwehContext.state.__SCREEN__ missing',
+        data: { outcome: 'skip', reason: 'screen_state_missing' }
+      });
+      __navReleaseEntryGuard(true, 'preflight', 'screen_state_missing');
+      return;
+    }
+
     const __envPlatformState = (__envProfileState.__PLATFORM__ && typeof __envProfileState.__PLATFORM__ === 'object')
       ? __envProfileState.__PLATFORM__
       : null;
@@ -514,10 +505,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const vendor        = __envProfileState.vendor;
     const mem           = Number(__envProfileState.mem);
     const cpu           = Number(__envProfileState.cpu);
-    const dpr           = Number(__envProfileState.dpr);
+    const dpr           = Number(__screenState.dpr);
+    const colorDepth    = Number(__screenState.colorDepth);
     const devicesLabels = __navCloneStateValue(__envProfileState.devicesLabels);
-    const colorDepth    = Number(__envProfileState.colorDepth);
-    const storageQuotaMb = __envProfileState.storageQuotaMb;
+     const storageQuotaMb = __envProfileState.storageQuotaMb;
     const storageUsedPct = __envProfileState.storageUsedPct;
     const pluginProfiles = __navCloneStateValue(Array.isArray(__envProfileState.pluginProfiles) ? __envProfileState.pluginProfiles : []);
     // strictness & diagnostics
@@ -1780,7 +1771,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         safeDefineAcc(navProto, prop, getter);
       });
 
-    // ——— D. devicePixelRatio & screen.* ———
+    // ——— D. devicePixelRatio ———
     (function () {
       const windowProto = (window.Window && Window.prototype) ? Window.prototype : null;
       if (!windowProto) {

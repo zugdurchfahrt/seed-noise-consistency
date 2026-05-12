@@ -314,7 +314,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     ? coreWindow.__registerToStringWrapper
     : null;
   if (typeof registerToStringWrapper !== 'function') {
-    throw new Error('[ContextPatch] Core.__registerToStringWrapper missing');
+    throw new Error('[FernwehContext] Core.__registerToStringWrapper missing');
   }
 
   function guardInstance(proto, self){
@@ -385,7 +385,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       if (liveFont) return liveFont;
       const sharedFont = __readSharedDefaultCtx2dFont__();
       if (sharedFont) return sharedFont;
-      throw new Error('[ContextPatch] shared default ctx2d font missing');
+      throw new Error('[FernwehContext] shared default ctx2d font missing');
     } catch (e) {
       emitContextDiag('warn', 'context:ctx2d:runtime:font_read_failed', e, {
         stage: 'runtime',
@@ -462,7 +462,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     if (!wrapLayer) {
       if (kind === 'data') wrapLayer = 'descriptor_only';
       else if (kind === 'accessor') {
-        throw new Error(`[ContextPatch] accessor wrapLayer required for ${String(key)}`);
+        throw new Error(`[FernwehContext] accessor wrapLayer required for ${String(key)}`);
       }
       else wrapLayer = 'named_wrapper';
     }
@@ -471,7 +471,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       : ((kind === 'accessor' && (wrapLayer === 'strict_accessor_gateway' || wrapLayer === 'object_return_gateway')) ? 'strict' : 'throw');
     const core = global && global.Core;
     if (!core || typeof core.preflightTarget !== 'function') {
-      throw new Error('[ContextPatch] Core.preflightTarget missing');
+      throw new Error('[FernwehContext] Core.preflightTarget missing');
     }
     const target = {
       owner: owner,
@@ -487,7 +487,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     }
     const preflight = core.preflightTarget(target);
     if (!preflight || preflight.ok !== true) {
-      throw (preflight && preflight.error) ? preflight.error : new Error('[ContextPatch] preflight failed');
+      throw (preflight && preflight.error) ? preflight.error : new Error('[FernwehContext] preflight failed');
     }
     return preflight;
   }
@@ -502,7 +502,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'missing_wrapLayer' }
       });
-      throw new Error(`[ContextPatch] definePatchedMethod missing wrapLayer for ${method}`);
+      throw new Error(`[FernwehContext] definePatchedMethod missing wrapLayer for ${method}`);
     }
     const preflightContract = {
       wrapLayer,
@@ -514,7 +514,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const preflight = corePreflight(proto, method, 'method', 'context:definePatchedMethod', preflightContract);
     const d = preflight.desc || Object.getOwnPropertyDescriptor(proto, method);
     if (!d) {
-      throw new Error(`[ContextPatch] descriptor missing for ${method}`);
+      throw new Error(`[FernwehContext] descriptor missing for ${method}`);
     }
     Object.defineProperty(proto, method, {
       value,
@@ -1092,7 +1092,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       wrappedGetContextRaw,
       orig,
       'getContext',
-      'ContextPatch:getContext'
+      'FernwehContext:getContext'
     );
     if (!defineIssuedMethod(owner, proto, 'getContext', wrapped)) return 0;
     patchedMethods.add(wrapped);
@@ -1144,7 +1144,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         wrappedCreateElementRaw,
         createElementOrig,
         'createElement',
-        'ContextPatch:createElement'
+        'FernwehContext:createElement'
       );
       if (defineIssuedMethod(doc, createElementProto, 'createElement', wrappedCreateElement)) {
         patchedMethods.add(wrappedCreateElement);
@@ -1172,7 +1172,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         wrappedCreateElementNSRaw,
         createElementNSOrig,
         'createElementNS',
-        'ContextPatch:createElementNS'
+        'FernwehContext:createElementNS'
       );
       if (defineIssuedMethod(doc, createElementNSProto, 'createElementNS', wrappedCreateElementNS)) {
         patchedMethods.add(wrappedCreateElementNS);
@@ -1240,7 +1240,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       WrappedOffscreenCanvasRaw,
       NativeOffscreenCanvas,
       'OffscreenCanvas',
-      'ContextPatch:OffscreenCanvas'
+      'FernwehContext:OffscreenCanvas'
     );
 
     Object.defineProperty(global, 'OffscreenCanvas', {
