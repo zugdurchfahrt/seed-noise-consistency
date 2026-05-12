@@ -21,15 +21,22 @@ const C  = G.FernwehContext;
 if (!C) throw new Error('[FernwehContext] FernwehContext is undefined — registratio not available');
 
 const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
-const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
-const envProfileState = (stateRoot && stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
-  ? stateRoot.__ENV_PROFILE__
-  : null;
-const __canvasDpr = Number(envProfileState && envProfileState.dpr);
-
 if (!stateRoot) {
   throw new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available');
 }
+
+const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+
+const envProfileState = (stateRoot.__ENV_PROFILE__ && typeof stateRoot.__ENV_PROFILE__ === 'object')
+  ? stateRoot.__ENV_PROFILE__
+  : null;
+const __canvasEnvScreenState = (envProfileState && envProfileState.__SCREEN__ && typeof envProfileState.__SCREEN__ === 'object')
+  ? envProfileState.__SCREEN__
+  : null;
+const __canvasScreenWidth = Number(__canvasEnvScreenState && __canvasEnvScreenState.width);
+const __canvasScreenHeight = Number(__canvasEnvScreenState && __canvasEnvScreenState.height);
+const __canvasDpr = Number(__canvasEnvScreenState && __canvasEnvScreenState.dpr);
+
 const canvasModuleSlot = (stateRoot.__CANVAS__ && typeof stateRoot.__CANVAS__ === 'object')
   ? stateRoot.__CANVAS__
   : null;
@@ -66,6 +73,42 @@ function emitDiag(level, code, err, extra) {
     return;
   }
   d(eventCode, e, ctx);
+}
+
+if (
+  !Number.isFinite(__canvasScreenWidth) ||
+  !Number.isFinite(__canvasScreenHeight) ||
+  !Number.isFinite(__canvasDpr)
+) {
+  emitDiag('warn', 'canvas:preflight:screen_metrics_missing', null, {
+    stage: 'preflight',
+    key: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__.width/height/dpr',
+    type: 'pipeline missing data',
+    message: 'screen metrics missing for canvas module',
+    data: {
+      outcome: 'skip',
+      reason: 'screen_metrics_missing',
+      hasEnvProfile: !!envProfileState,
+      hasEnvScreen: !!__canvasEnvScreenState,
+      width: Number.isFinite(__canvasScreenWidth) ? __canvasScreenWidth : null,
+      height: Number.isFinite(__canvasScreenHeight) ? __canvasScreenHeight : null,
+      dpr: Number.isFinite(__canvasDpr) ? __canvasDpr : null
+    }
+  });
+} else if (__canvasScreenWidth <= 0 || __canvasScreenHeight <= 0 || __canvasDpr <= 0) {
+  emitDiag('warn', 'canvas:preflight:screen_metrics_invalid', null, {
+    stage: 'preflight',
+    key: 'FernwehContext.state.__ENV_PROFILE__.__SCREEN__.width/height/dpr',
+    type: 'pipeline missing data',
+    message: 'screen metrics invalid',
+    data: {
+      outcome: 'skip',
+      reason: 'screen_metrics_invalid',
+      width: __canvasScreenWidth,
+      height: __canvasScreenHeight,
+      dpr: __canvasDpr
+    }
+  });
 }
 
 function __resolvePrngState() {
@@ -128,6 +171,7 @@ __defineHiddenLocal(
   'willReadFrequently defineProperty failed; fallback assign used'
 );
 
+
   function __readSharedDefaultCtx2dFont__() {
     const cached = (__canvasState && typeof __canvasState.defaultCtx2dFont === 'string')
       ? __canvasState.defaultCtx2dFont.trim()
@@ -145,6 +189,9 @@ __defineHiddenLocal(
   // Page/issued canvases are handled by context.js factories; this module only
   // owns Canvas hooks/state and does not wait for DOM readiness.
 
+  // === HELPER FUNCTIONS ===
+
+  // Stable string hash function, sufficient for deterministic noise generation
   function stringHash(str) {
     let h = 2166136261;
     for (let i = 0; i < str.length; i++) {
@@ -154,7 +201,7 @@ __defineHiddenLocal(
     return h >>> 0;
   }
 
-
+//  The ONLY source of variability, which is included in the input string. This ensures that noise values are consistent across calls and contexts as long as the Core PRNG seed is unchanged.
   function stableNoiseFromString(str, min, max) {
   // The ONLY source: Core.__internal.prng + key.
   const __prng = __resolvePrngState();
@@ -174,14 +221,60 @@ __defineHiddenLocal(
   }
 
 
+  // Quantize to 1/256th of a pixel;
   function q256(v){ return Math.round(v * 256) / 256; }
 
-
-
+  // Shared configuration for text jitter hooks; not a public export.
   const __CNV_CFG__ = {
     dxPx: 0.10,      // амплитуда X (px)
     dyPx: 0.10,      // амплитуда Y (px)
   };
+
+
+
+function readDrawTargetBitmapSize(ctx, stageKey) {
+  const canvas = ctx && ctx.canvas;
+  const width = Number(canvas && canvas.width);
+  const height = Number(canvas && canvas.height);
+
+  if (
+    !canvas ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    Math.floor(width) !== width ||
+    Math.floor(height) !== height
+  ) {
+    emitDiag('warn', 'canvas:drawImage:target_bitmap_size_invalid', null, {
+      stage: 'hook',
+      key: stageKey || 'drawImage',
+      type: 'browser structure missing data',
+      message: 'drawImage target canvas bitmap size invalid; stamp skipped',
+      data: {
+        outcome: 'return_native',
+        reason: 'target_bitmap_size_invalid',
+        hasCanvas: !!canvas,
+        width: Number.isFinite(width) ? width : null,
+        height: Number.isFinite(height) ? height : null
+      }
+    });
+    return null;
+  }
+
+  return {
+    canvas: canvas,
+    width: width,
+    height: height
+  };
+}
+
+
+
+
+
+
+  // === HOOK FUNCTIONS ===
 
   // TEXT / FONTS: TextMetrics proxy/cache plus draw-argument jitter.
   // Keep width noise local to `applyMeasureTextHook`; do not mutate shared metric state.
@@ -505,15 +598,165 @@ __defineHiddenLocal(
   }
     
 
-  // === HOOK FUNCTIONS ===
+
+
+
+
   function applyDrawImageHook(origDrawImage, ...args) {
-    const a = args.slice();
-    if (a.length === 3) { a[1] = q256(a[1]); a[2] = q256(a[2]); }
-    else if (a.length === 5) { a[1] = q256(a[1]); a[2] = q256(a[2]); a[3] = q256(a[3]); a[4] = q256(a[4]); }
-    else if (a.length === 9) { a[5] = q256(a[5]); a[6] = q256(a[6]); a[7] = q256(a[7]); a[8] = q256(a[8]); }
-    return origDrawImage.apply(this, a);
+    const beforeSize = readDrawTargetBitmapSize(this, 'drawImage:pre');
+    const out = origDrawImage.apply(this, args);
+    const afterSize = readDrawTargetBitmapSize(this, 'drawImage:post');
+
+    try {
+      const ctx = this;
+
+      if (!(Number.isFinite(__canvasScreenWidth) && __canvasScreenWidth > 0) ||
+          !(Number.isFinite(__canvasScreenHeight) && __canvasScreenHeight > 0) ||
+          !(Number.isFinite(__canvasDpr) && __canvasDpr > 0)) {
+        emitDiag('warn', 'canvas:drawImage:screen_metrics_missing', null, {
+          stage: 'hook',
+          key: 'drawImage',
+          type: 'pipeline missing data',
+          message: 'bootstrap screen metrics missing for drawImage stamp; stamp skipped',
+          data: {
+            outcome: 'return_native',
+            reason: 'screen_metrics_missing',
+            width: Number.isFinite(__canvasScreenWidth) ? __canvasScreenWidth : null,
+            height: Number.isFinite(__canvasScreenHeight) ? __canvasScreenHeight : null,
+            dpr: Number.isFinite(__canvasDpr) ? __canvasDpr : null
+          }
+        });
+        return out;
+      }
+
+      if (!beforeSize || !afterSize) return out;
+
+      if (
+        beforeSize.canvas !== afterSize.canvas ||
+        beforeSize.width !== afterSize.width ||
+        beforeSize.height !== afterSize.height
+      ) {
+        emitDiag('warn', 'canvas:drawImage:target_bitmap_size_changed', null, {
+          stage: 'hook',
+          key: 'drawImage',
+          type: 'browser structure missing data',
+          message: 'drawImage target bitmap size changed during native call; stamp skipped',
+          data: {
+            outcome: 'return_native',
+            reason: 'target_bitmap_size_changed',
+            beforeWidth: beforeSize.width,
+            beforeHeight: beforeSize.height,
+            afterWidth: afterSize.width,
+            afterHeight: afterSize.height
+          }
+        });
+        return out;
+      }
+
+      const targetWidth = afterSize.width;
+      const targetHeight = afterSize.height;
+
+      if (!ctx || typeof ctx.putImageData !== 'function') return out;
+
+      const __prng = __resolvePrngState();
+      if (typeof __prng.seed !== 'string' || !__prng.seed) {
+        emitDiag('warn', 'canvas:drawImage:stamp_seed_missing', null, {
+          stage: 'hook',
+          key: 'drawImage',
+          data: { outcome: 'return_native', reason: 'core_prng_seed_missing' }
+        });
+        return out;
+      }
+
+      let dx = 0;
+      let dy = 0;
+      let dw = targetWidth;
+      let dh = targetHeight;
+
+      if (args.length === 3) {
+        dx = Number(args[1]);
+        dy = Number(args[2]);
+        dw = targetWidth;
+        dh = targetHeight;
+      } else if (args.length === 5) {
+        dx = Number(args[1]);
+        dy = Number(args[2]);
+        dw = Number(args[3]);
+        dh = Number(args[4]);
+      } else if (args.length === 9) {
+        dx = Number(args[5]);
+        dy = Number(args[6]);
+        dw = Number(args[7]);
+        dh = Number(args[8]);
+      }
+
+      if (
+        !Number.isFinite(dx) || !Number.isFinite(dy) ||
+        !Number.isFinite(dw) || !Number.isFinite(dh) ||
+        dw === 0 || dh === 0
+      ) {
+        return out;
+      }
+
+      const x0 = Math.max(0, Math.min(targetWidth - 1, Math.floor(Math.min(dx, dx + dw))));
+      const y0 = Math.max(0, Math.min(targetHeight - 1, Math.floor(Math.min(dy, dy + dh))));
+      const x1 = Math.max(0, Math.min(targetWidth - 1, Math.ceil(Math.max(dx, dx + dw)) - 1));
+      const y1 = Math.max(0, Math.min(targetHeight - 1, Math.ceil(Math.max(dy, dy + dh)) - 1));
+
+      if (x1 < x0 || y1 < y0) return out;
+
+      const key = __prng.seed + '|drawImage|stamp|' + String(args.length) + '|' +
+        String(__canvasScreenWidth) + 'x' + String(__canvasScreenHeight) + '@' + String(__canvasDpr) + '|' +
+        String(targetWidth) + 'x' + String(targetHeight) + '|' +
+        String(Math.round(dx * 256)) + ',' +
+        String(Math.round(dy * 256)) + ',' +
+        String(Math.round(dw * 256)) + ',' +
+        String(Math.round(dh * 256));
+
+      const h = stringHash(key);
+      const px = x0 + (h % Math.max(1, (x1 - x0 + 1)));
+      const py = y0 + (((h >>> 8) % Math.max(1, (y1 - y0 + 1))));
+
+      const img = new ImageData(
+        new Uint8ClampedArray([
+          (h >>> 16) & 255,
+          (h >>> 8) & 255,
+          h & 255,
+          255
+        ]),
+        1,
+        1
+      );
+
+      ctx.putImageData(img, px, py);
+    } catch (e) {
+      emitDiag('warn', 'canvas:drawImage:stamp_failed', e, {
+        stage: 'hook',
+        key: 'drawImage',
+        data: { outcome: 'return_native', reason: 'drawImage_stamp_failed' }
+      });
+    }
+
+    return out;
   }
 
+  // function applyDrawImageHook(origDrawImage, ...args) {
+  //   const source = args[0];
+
+  //   if (
+  //     (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) ||
+  //     (typeof OffscreenCanvas !== 'undefined' && source instanceof OffscreenCanvas)
+  //   ) {
+  //     return origDrawImage.apply(this, args);
+  //   }
+
+  //   const a = args.slice();
+  //   if (a.length === 3) { a[1] = q256(a[1]); a[2] = q256(a[2]); }
+  //   else if (a.length === 5) { a[1] = q256(a[1]); a[2] = q256(a[2]); a[3] = q256(a[3]); a[4] = q256(a[4]); }
+  //   else if (a.length === 9) { a[5] = q256(a[5]); a[6] = q256(a[6]); a[7] = q256(a[7]); a[8] = q256(a[8]); }
+
+  //   return origDrawImage.apply(this, a);
+  // }
 
   // master-хук toDataURL: один post-process (без дополнительного IHDR-прохода)
   function masterToDataURLHook(res, type, quality) {
