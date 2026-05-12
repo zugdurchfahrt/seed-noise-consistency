@@ -596,12 +596,7 @@ function readDrawTargetBitmapSize(ctx, stageKey) {
       return res;
     }
   }
-    
-
-
-
-
-
+  // drawImage hook: read target bitmap size before and after native call to detect invalidation; if stable, applies a single-pixel noise stamp based on the current PRNG seed, screen/canvas metrics, and drawImage arguments. 
   function applyDrawImageHook(origDrawImage, ...args) {
     const beforeSize = readDrawTargetBitmapSize(this, 'drawImage:pre');
     const out = origDrawImage.apply(this, args);
@@ -739,24 +734,6 @@ function readDrawTargetBitmapSize(ctx, stageKey) {
 
     return out;
   }
-
-  // function applyDrawImageHook(origDrawImage, ...args) {
-  //   const source = args[0];
-
-  //   if (
-  //     (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) ||
-  //     (typeof OffscreenCanvas !== 'undefined' && source instanceof OffscreenCanvas)
-  //   ) {
-  //     return origDrawImage.apply(this, args);
-  //   }
-
-  //   const a = args.slice();
-  //   if (a.length === 3) { a[1] = q256(a[1]); a[2] = q256(a[2]); }
-  //   else if (a.length === 5) { a[1] = q256(a[1]); a[2] = q256(a[2]); a[3] = q256(a[3]); a[4] = q256(a[4]); }
-  //   else if (a.length === 9) { a[5] = q256(a[5]); a[6] = q256(a[6]); a[7] = q256(a[7]); a[8] = q256(a[8]); }
-
-  //   return origDrawImage.apply(this, a);
-  // }
 
   // master-хук toDataURL: один post-process (без дополнительного IHDR-прохода)
   function masterToDataURLHook(res, type, quality) {
