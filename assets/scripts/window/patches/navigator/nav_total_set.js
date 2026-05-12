@@ -1,48 +1,21 @@
 const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
-  {
-    let __navGuardToken = null;
     const G = (typeof globalThis !== 'undefined' && globalThis)
       || (typeof self !== 'undefined' && self)
       || {};
     const __tag = 'nav_total_set';
     const __surface = 'navigator';
     const __flagKey = '__PATCH_NAVTOTALSET__';
-    const __windowRef = (window && (typeof window === 'object' || typeof window === 'function'))
+    const W = (window && (typeof window === 'object' || typeof window === 'function'))
       ? window
+      : G;
+    const C = (W && W.FernwehContext && (typeof W.FernwehContext === 'object' || typeof W.FernwehContext === 'function'))
+      ? W.FernwehContext
       : null;
-    const C = (__windowRef && __windowRef.FernwehContext && (typeof __windowRef.FernwehContext === 'object' || typeof __windowRef.FernwehContext === 'function'))
-      ? __windowRef.FernwehContext
+    const __core = (W && W.Core && (typeof W.Core === 'object' || typeof W.Core === 'function'))
+      ? W.Core
       : null;
-    const __core = (__windowRef && __windowRef.Core && (typeof __windowRef.Core === 'object' || typeof __windowRef.Core === 'function'))
-      ? __windowRef.Core
-      : null;
-    const __navTypePipeline = 'pipeline diagnostic';
-    const __navTypeBrowser = 'browser diagnostic';
-    function __navResolveDiagType(code, x) {
-      const safe = (x && typeof x === 'object') ? x : {};
-      const data = (safe.data && typeof safe.data === 'object') ? safe.data : null;
-      const reason = (data && typeof data.reason === 'string') ? data.reason : '';
-      const outcome = (data && typeof data.outcome === 'string') ? data.outcome : '';
-      const stage = (typeof safe.stage === 'string') ? safe.stage : '';
-      const rawType = (typeof safe.type === 'string' && safe.type) ? safe.type : null;
-      const codeValue = String(code || '');
-      if (reason === 'rollback_failed' || /:rollback_failed$/.test(codeValue)) return 'rollback_failed';
-      if (reason === 'apply_failed' || /:apply_failed$/.test(codeValue)) return 'apply_failed';
-      if (reason === 'native_throw' || /:native_throw$/.test(codeValue)) return 'native_throw';
-      if (reason === 'mark_failed' || /:mark_failed$/.test(codeValue)) return 'mark_failed';
-      if (reason === 'preflight_failed' || reason === 'preflight_exception' || /:preflight_failed$/.test(codeValue)) return 'preflight_failed';
-      if (
-        reason === 'guard_failed'
-        || reason === 'guard_exception'
-        || reason === 'guard_write_failed'
-        || reason === 'guard_release_failed'
-        || reason === 'guard_release_exception'
-        || /:guard_(failed|exception|write_failed|release_failed|release_exception)$/.test(codeValue)
-      ) return 'guard_failed';
-      if (stage === 'preflight' && (outcome === 'skip' || outcome === 'throw')) return 'preflight_failed';
-      if (stage === 'guard' && (outcome === 'skip' || outcome === 'throw')) return reason === 'already_patched' ? 'guard_exit' : 'guard_failed';
-      return rawType;
-    }
+    const __navTypePipeline = 'pipeline missing data';
+    const __navTypeBrowser = 'browser structure missing data';
 
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
     const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object')
@@ -66,14 +39,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     function __navDiag(level, code, extra, err) {
       try {
         const x = (extra && typeof extra === 'object') ? extra : {};
+        const key = Object.prototype.hasOwnProperty.call(x, 'key')
+          ? ((typeof x.key === 'string' || x.key === null)
+            ? x.key
+            : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey))
+          : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey);
         const ctx = {
           module: __tag,
           diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag,
           surface: __surface,
-          key: (typeof x.key === 'string' && x.key) ? x.key : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey),
+          key: key,
           stage: x.stage,
           message: x.message,
-          type: __navResolveDiagType(code, x),
+          type: (typeof x.type === 'string' && x.type) ? x.type : __navTypePipeline,
           data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null
         };
         return __emit(level, code, ctx, err);
@@ -95,20 +73,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag
       }), err);
     }
+    let __navGuardToken = null;
     function __navReleaseEntryGuard(rollbackOk, stage, substage) {
       try {
         if (__navGuardToken && __core && typeof __core.releaseGuardFlag === 'function') {
           __core.releaseGuardFlag(__flagKey, __navGuardToken, rollbackOk === true, __tag);
         }
       } catch (e) {
-        __navDiagPipeline('warn', __tag + ':guard_release_failed', {
-          stage: stage === 'rollback' ? 'rollback' : 'preflight',
+        __navDiagPipeline('warn', __tag + ':guard_release_exception', {
+          stage: 'guard',
           key: __flagKey,
           message: 'releaseGuardFlag threw',
           data: {
-            outcome: stage === 'rollback' ? 'throw' : 'skip',
-            reason: stage === 'rollback' ? 'rollback_failed' : 'guard_release_failed',
+            outcome: 'skip',
+            reason: 'guard_release_exception',
             rollbackOk: false,
+            releaseStage: (typeof stage === 'string' && stage) ? stage : null,
             substage: (typeof substage === 'string' && substage) ? substage : null
           }
         }, e);
@@ -141,7 +121,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     if (!__navGuardToken) return; // already_patched: Core emits nav_total_set:already_patched
     // Must run in Window realm (not Worker)
-    if (typeof document === 'undefined' || !__windowRef || __windowRef.document !== document) {
+    if (typeof document === 'undefined' || !W || W.document !== document) {
       __navDiagBrowser('warn', 'nav_total_set:not_window_realm', {
         stage: 'preflight',
         message: 'not in Window realm',
@@ -152,22 +132,22 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     if (!C) {
-      __navDiagPipeline('warn', 'nav_total_set:canvas_patch_context_missing', {
+      __navDiagPipeline('warn', 'nav_total_set:fernweh_context_missing', {
         stage: 'preflight',
         message: 'FernwehContext missing',
-        data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
+        data: { outcome: 'skip', reason: 'fernweh_context_missing' }
       });
-      __navReleaseEntryGuard(true, 'preflight', 'canvas_patch_context_missing');
+      __navReleaseEntryGuard(true, 'preflight', 'fernweh_context_missing');
       return;
     }
     const __stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
     if (!__stateRoot) {
-      __navDiagPipeline('warn', 'nav_total_set:canvas_patch_state_missing', {
+      __navDiagPipeline('warn', 'nav_total_set:fernweh_context_state_missing', {
         stage: 'preflight',
         message: 'FernwehContext.state missing',
-        data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
+        data: { outcome: 'skip', reason: 'fernweh_context_state_missing' }
       });
-      __navReleaseEntryGuard(true, 'preflight', 'canvas_patch_state_missing');
+      __navReleaseEntryGuard(true, 'preflight', 'fernweh_context_state_missing');
       return;
     }
     const __navModuleState = (__stateRoot.__NAV_TOTAL_SET__ && typeof __stateRoot.__NAV_TOTAL_SET__ === 'object')
@@ -1235,6 +1215,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           type: __navTypePipeline,
           diagTag: groupTag,
           key: groupKey,
+          message: 'Core.applyTargets preflight failed',
           data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'preflight_exception' }
         }, e);
         if (groupPolicy === 'throw') throw e;
@@ -1247,6 +1228,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           type: __navTypePipeline,
           diagTag: groupTag,
           key: groupKey,
+          message: 'Core.applyTargets returned no apply plan',
           data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: String(reason) }
         }, null);
         if (groupPolicy === 'throw') {
@@ -1293,6 +1275,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               type: __navTypeBrowser,
               diagTag: groupTag,
               key: p.key || null,
+              message: 'apply failed and group rollback failed',
               data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceReason: 'apply_failed' }
             }, re);
           }
@@ -4212,6 +4195,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       stage: 'apply',
       type: __navTypePipeline,
       diagTag: 'nav_total_set',
+      message: 'nav_total_set applied',
       data: { outcome: 'return', reason: 'patched' }
     });
 
@@ -4269,5 +4253,4 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       __navReleaseEntryGuard(!finalRollbackErr, 'rollback', 'module_catch');
       throw (finalRollbackErr || e);
     }
-  }
 }

@@ -740,7 +740,6 @@ function readDrawTargetBitmapSize(ctx, stageKey) {
     return res;
   }
 
-
 // --- final export ---
 // IMPORTANT: do not replace the FernwehHooks object identity.
 // Other modules may hold a reference to the existing object and/or keep config fields on it.
@@ -793,35 +792,11 @@ __CanvasPatchHooks__.fillTextNoiseHook = fillTextNoiseHook;
 __CanvasPatchHooks__.strokeTextNoiseHook = strokeTextNoiseHook;
 __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
-
-
-
-// emitDiag('info', 'canvas:ready', null, {
-//   stage: 'apply',
-//   key: 'canvas',
-//   type: 'ok',
-//   message: 'canvas hooks exported',
-//   data: {
-//     outcome: 'return',
-//     reason: 'ready',
-//     exports: {
-//       patchToDataURLInjectNoise: typeof __CanvasPatchHooks__.patchToDataURLInjectNoise === 'function',
-//       masterToDataURLHook: typeof __CanvasPatchHooks__.masterToDataURLHook === 'function',
-//       patchToBlobInjectNoise: typeof __CanvasPatchHooks__.patchToBlobInjectNoise === 'function',
-//       patchConvertToBlobInjectNoise: typeof __CanvasPatchHooks__.patchConvertToBlobInjectNoise === 'function',
-//       measureTextNoiseHook: typeof __CanvasPatchHooks__.measureTextNoiseHook === 'function',
-//       applyMeasureTextHook: typeof __CanvasPatchHooks__.applyMeasureTextHook === 'function',
-//       fillTextNoiseHook: typeof __CanvasPatchHooks__.fillTextNoiseHook === 'function',
-//       strokeTextNoiseHook: typeof __CanvasPatchHooks__.strokeTextNoiseHook === 'function',
-//       fillRectNoiseHook: typeof __CanvasPatchHooks__.fillRectNoiseHook === 'function',
-//       applyDrawImageHook: typeof __CanvasPatchHooks__.applyDrawImageHook === 'function'
-//     }
-//   }
-// });
-
-
-
-
-
-
+emitDiag('info', 'canvas:applied', null, {
+  stage: 'apply',
+  key: 'canvas',
+  type: 'pipeline missing data',
+  message: 'canvas hooks exported',
+  data: { outcome: 'return', reason: 'hooks_exported' }
+});
 }
