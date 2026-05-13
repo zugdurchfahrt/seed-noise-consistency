@@ -45,23 +45,23 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   const C = window.FernwehContext;
   if (!C) {
-    degrade('hide_webdriver:canvas_patch_context_missing', new Error('[HideWebdriverPatchModule] FernwehContext missing'), {
+    degrade('hide_webdriver:fernweh_context_missing', new Error('[HideWebdriverPatchModule] FernwehContext missing'), {
       level: 'warn',
       stage: 'preflight',
       message: 'FernwehContext missing',
       type: __typePipeline,
-      data: { outcome: 'skip', reason: 'canvas_patch_context_missing', missing: 'FernwehContext' }
+      data: { outcome: 'skip', reason: 'fernweh_context_missing', missing: 'FernwehContext' }
     });
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    degrade('hide_webdriver:canvas_patch_state_missing', new Error('[HideWebdriverPatchModule] FernwehContext.state missing'), {
+    degrade('hide_webdriver:fernweh_context_state_missing', new Error('[HideWebdriverPatchModule] FernwehContext.state missing'), {
       level: 'warn',
       stage: 'preflight',
       message: 'FernwehContext.state missing',
       type: __typePipeline,
-      data: { outcome: 'skip', reason: 'canvas_patch_state_missing', missing: 'FernwehContext.state' }
+      data: { outcome: 'skip', reason: 'fernweh_context_state_missing', missing: 'FernwehContext.state' }
     });
     return;
   }

@@ -339,7 +339,7 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
 
   const C = window.FernwehContext;
   if (!C) {
-    emitDegrade('warn', 'headers_interceptor:init:preflight:canvas_context_missing', null, {
+    emitDegrade('warn', 'headers_interceptor:init:preflight:fernweh_context_missing', null, {
       stage: 'preflight',
       surface: 'FernwehContext',
       key: 'FernwehContext',
@@ -347,17 +347,17 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       message: 'FernwehContext missing',
       data: {
         outcome: 'skip',
-        reason: 'canvas_patch_context_missing',
+        reason: 'fernweh_context_missing',
         missing: 'FernwehContext'
       }
     });
-    releaseGuard(true, 'preflight', 'canvas_patch_context_missing');
+    releaseGuard(true, 'preflight', 'fernweh_context_missing');
     return; // API уже экспортирован
   }
 
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    emitDegrade('warn', 'headers_interceptor:init:preflight:canvas_state_missing', null, {
+    emitDegrade('warn', 'headers_interceptor:init:preflight:fernweh_context_state_missing', null, {
       stage: 'preflight',
       surface: 'FernwehContext.state',
       key: 'FernwehContext.state',
@@ -365,11 +365,11 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       message: 'FernwehContext.state missing',
       data: {
         outcome: 'skip',
-        reason: 'canvas_patch_state_missing',
+        reason: 'fernweh_context_state_missing',
         missing: 'FernwehContext.state'
       }
     });
-    releaseGuard(true, 'preflight', 'canvas_patch_state_missing');
+    releaseGuard(true, 'preflight', 'fernweh_context_state_missing');
     return;
   }
 

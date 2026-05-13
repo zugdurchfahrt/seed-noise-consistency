@@ -9,7 +9,7 @@
   const __MODULE = 'worker_bootstrap';
   const __SURFACE = 'worker_bootstrap';
 
-  function __resolveCanvasPatchContext() {
+  function __resolveFernwehContext() {
     const C = (W && W.FernwehContext && (typeof W.FernwehContext === 'object' || typeof W.FernwehContext === 'function'))
       ? W.FernwehContext
       : null;
@@ -17,7 +17,7 @@
   }
 
   function __resolveLoggerDegrade() {
-    const C = __resolveCanvasPatchContext();
+    const C = __resolveFernwehContext();
     const loggerRoot = (C && C.__logger && typeof C.__logger === 'object')
       ? C.__logger
       : null;
@@ -43,7 +43,7 @@
   }
 
   function __ensureWrkStateRoot() {
-    const C = __resolveCanvasPatchContext();
+    const C = __resolveFernwehContext();
     const stateRoot = (C && C.state && typeof C.state === 'object')
       ? C.state
       : null;

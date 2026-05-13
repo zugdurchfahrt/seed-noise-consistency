@@ -69,7 +69,7 @@
     return value;
   }
 
-  function __ensureWorkerCanvasPatchContext() {
+  function __ensureWorkerFernwehContext() {
     const existing = (self && self.FernwehContext && typeof self.FernwehContext === 'object')
       ? self.FernwehContext
       : null;
@@ -77,7 +77,7 @@
   }
 
   function __ensureWorkerWrkRuntimeRoot() {
-    const C = __ensureWorkerCanvasPatchContext();
+    const C = __ensureWorkerFernwehContext();
     if (!C) return null;
     const stateRoot = (C.state && typeof C.state === 'object')
       ? C.state

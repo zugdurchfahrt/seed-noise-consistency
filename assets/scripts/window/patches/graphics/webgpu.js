@@ -115,24 +115,24 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
 
   const C = window.FernwehContext;
   if (!C) {
-    degrade('fatal', 'webgpu:canvas_patch_context_missing', new Error('[FernwehContext] FernwehContext is undefined - module registration is not available'), {
+    degrade('fatal', 'webgpu:fernweh_context_missing', new Error('[FernwehContext] FernwehContext is undefined - module registration is not available'), {
       stage: 'preflight',
       type: __webgpuTypePipeline,
       key: 'FernwehContext',
       message: 'FernwehContext is undefined',
-      data: { outcome: 'skip', reason: 'missing_canvas_patch_context' }
+      data: { outcome: 'skip', reason: 'fernweh_context_missing' }
     });
     releaseEntryGuard(true);
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    degrade('fatal', 'webgpu:canvas_patch_state_missing', new Error('[FernwehContext] FernwehContext.state is undefined - module registration is not available'), {
+    degrade('fatal', 'webgpu:fernweh_context_state_missing', new Error('[FernwehContext] FernwehContext.state is undefined - module registration is not available'), {
       stage: 'preflight',
       type: __webgpuTypePipeline,
       key: 'FernwehContext.state',
       message: 'FernwehContext.state is undefined',
-      data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
+      data: { outcome: 'skip', reason: 'fernweh_context_state_missing' }
     });
     releaseEntryGuard(true);
     return;

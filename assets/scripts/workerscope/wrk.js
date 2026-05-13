@@ -396,7 +396,7 @@ function EnvBus(G){
   function __cloneEnvValue(v) {
     return __wrkCloneEnvValue__(v);
   }
-  function __resolveCanvasPatchStateRoot() {
+  function __resolveFernwehContextStateRoot() {
     const C = (G && G.FernwehContext && typeof G.FernwehContext === 'object')
       ? G.FernwehContext
       : null;
@@ -406,7 +406,7 @@ function EnvBus(G){
     return stateRoot;
   }
   function __requireWorkerEnvSnapshot() {
-    const stateRoot = __resolveCanvasPatchStateRoot();
+    const stateRoot = __resolveFernwehContextStateRoot();
     if (!stateRoot) throw new Error('EnvBus: FernwehContext.state missing');
     const navModuleState = (stateRoot && stateRoot.__NAV_TOTAL_SET__ && typeof stateRoot.__NAV_TOTAL_SET__ === 'object')
       ? stateRoot.__NAV_TOTAL_SET__
@@ -566,7 +566,7 @@ function EnvBus(G){
     return out;
   }
   function __cloneFontsStateForWorker__() {
-    const stateRoot = __resolveCanvasPatchStateRoot();
+    const stateRoot = __resolveFernwehContextStateRoot();
     const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
       ? stateRoot.__FONTS__
       : null;
@@ -589,7 +589,7 @@ function EnvBus(G){
     };
   }
   function __cloneFontsConfigForWorker__() {
-    const stateRoot = __resolveCanvasPatchStateRoot();
+    const stateRoot = __resolveFernwehContextStateRoot();
     const fontsRoot = (stateRoot && stateRoot.__FONTS__ && typeof stateRoot.__FONTS__ === 'object')
       ? stateRoot.__FONTS__
       : null;
@@ -618,7 +618,7 @@ function EnvBus(G){
     if (!snap || typeof snap !== 'object') {
       throw new Error('EnvBus: worker env snapshot missing');
     }
-    const stateRoot = __resolveCanvasPatchStateRoot();
+    const stateRoot = __resolveFernwehContextStateRoot();
     const cpu = Number(snap.hardwareConcurrency);
     const mem = Number(snap.deviceMemory);
     const timeZone = __envTimeZone;

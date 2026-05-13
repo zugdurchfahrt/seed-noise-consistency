@@ -105,12 +105,12 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
 
   if (!C) {
-    __rtcDiag('fatal', 'rtc:canvas_patch_context_missing', {
+    __rtcDiag('fatal', 'rtc:fernweh_context_missing', {
       stage: 'preflight',
       key: 'FernwehContext',
       message: 'FernwehContext missing',
       type: 'pipeline missing data',
-      data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
+      data: { outcome: 'skip', reason: 'fernweh_context_missing' }
     }, new Error('[RTC] FernwehContext missing'));
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
@@ -129,12 +129,12 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
   }
   const __rtcStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__rtcStateRoot) {
-    __rtcDiag('fatal', 'rtc:canvas_patch_state_missing', {
+    __rtcDiag('fatal', 'rtc:fernweh_context_state_missing', {
       stage: 'preflight',
       key: 'FernwehContext.state',
       message: 'FernwehContext.state missing',
       type: 'pipeline missing data',
-      data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
+      data: { outcome: 'skip', reason: 'fernweh_context_state_missing' }
     }, new Error('[RTC] FernwehContext.state missing'));
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
