@@ -1110,20 +1110,20 @@ function mkWorkerBootstrapCore(opts){
       const __onEarlyMsg__ = ev => { if (__MSG_BUF__) __MSG_Q__.push(ev && ev.data); };
       try { self.addEventListener('message', __onEarlyMsg__); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'early_message_listener_install' }); }
       const __requireSnap = s => {
-        if (!s || typeof s !== 'object') throw new Error('UACHPatch: no snapshot');
-        if (typeof s.language !== 'string' || !s.language) throw new Error('UACHPatch: bad language');
-        if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
-        if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
-        if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
-        if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
+        if (!s || typeof s !== 'object') throw new Error('Ubergabe: no snapshot');
+        if (typeof s.language !== 'string' || !s.language) throw new Error('Ubergabe: bad language');
+        if (!Array.isArray(s.languages)) throw new Error('Ubergabe: bad languages');
+        if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('Ubergabe: bad deviceMemory');
+        if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('Ubergabe: bad hardwareConcurrency');
+        if (!s.uaData) throw new Error('Ubergabe: missing userAgentData');
         const he = (s.uaData && s.uaData.he) || s.highEntropy;
-        if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
+        if (!he || typeof he !== 'object') throw new Error('Ubergabe: missing highEntropy');
         const KEYS = ['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64','formFactors'];
         for (const k of KEYS) {
-          if (!(k in he)) throw new Error('UACHPatch: missing highEntropy.' + k);
+          if (!(k in he)) throw new Error('Ubergabe: missing highEntropy.' + k);
           const v = he[k];
-          if (v === undefined || v === null) throw new Error('UACHPatch: bad highEntropy.' + k);
-          if (Array.isArray(v) && !v.length) throw new Error('UACHPatch: bad highEntropy.' + k);
+          if (v === undefined || v === null) throw new Error('Ubergabe: bad highEntropy.' + k);
+          if (Array.isArray(v) && !v.length) throw new Error('Ubergabe: bad highEntropy.' + k);
         }
         return s;
       };
@@ -1214,40 +1214,40 @@ function mkWorkerBootstrapCore(opts){
           ? wrkState.runtime
           : __defineWorkerHiddenValue__(wrkState, 'runtime', Object.create(null));
         if (!workerEnvSnapshot || typeof workerEnvSnapshot !== 'object') {
-          throw new Error('UACHPatch: __WORKER_ENV_SNAPSHOT__ owner route missing');
+          throw new Error('Ubergabe: __WORKER_ENV_SNAPSHOT__ owner route missing');
         }
         if (!envProfileRoot || typeof envProfileRoot !== 'object') {
-          throw new Error('UACHPatch: FernwehContext.state.__ENV_PROFILE__ missing');
+          throw new Error('Ubergabe: FernwehContext.state.__ENV_PROFILE__ missing');
         }
         if (!screenRoot || typeof screenRoot !== 'object') {
-          throw new Error('UACHPatch: FernwehContext.state.__SCREEN__ missing');
+          throw new Error('Ubergabe: FernwehContext.state.__SCREEN__ missing');
         }
         if (!fontsRoot || typeof fontsRoot !== 'object') {
-          throw new Error('UACHPatch: FernwehContext.state.__FONTS__ missing');
+          throw new Error('Ubergabe: FernwehContext.state.__FONTS__ missing');
         }
         if (!fontsState || typeof fontsState !== 'object') {
-          throw new Error('UACHPatch: FernwehContext.state.__FONTS__.__STATE__ missing');
+          throw new Error('Ubergabe: FernwehContext.state.__FONTS__.__STATE__ missing');
         }
         if (!fontsConfig || typeof fontsConfig !== 'object') {
-          throw new Error('UACHPatch: FernwehContext.state.__FONTS__.__CONFIG__ missing');
+          throw new Error('Ubergabe: FernwehContext.state.__FONTS__.__CONFIG__ missing');
         }
         if (!canvasRoot || typeof canvasRoot !== 'object') {
-          throw new Error('UACHPatch: FernwehContext.state.__CANVAS__ missing');
+          throw new Error('Ubergabe: FernwehContext.state.__CANVAS__ missing');
         }
         if (!fernwehState || typeof fernwehState !== 'object') {
-          throw new Error('UACHPatch: FernwehContext.state.__CANVAS__.__STATE__ missing');
+          throw new Error('Ubergabe: FernwehContext.state.__CANVAS__.__STATE__ missing');
         }
         if (!Core || (typeof Core !== 'object' && typeof Core !== 'function')) {
-          throw new Error('UACHPatch: Core missing');
+          throw new Error('Ubergabe: Core missing');
         }
         if (!coreInternal || typeof coreInternal !== 'object') {
-          throw new Error('UACHPatch: Core.__internal missing');
+          throw new Error('Ubergabe: Core.__internal missing');
         }
         if (!prngRoot || typeof prngRoot !== 'object') {
-          throw new Error('UACHPatch: Core.__internal.prng missing');
+          throw new Error('Ubergabe: Core.__internal.prng missing');
         }
         if (!wrkRuntime || typeof wrkRuntime !== 'object') {
-          throw new Error('UACHPatch: FernwehContext.state.__WRK__.runtime missing');
+          throw new Error('Ubergabe: FernwehContext.state.__WRK__.runtime missing');
         }
         return {
           C: C,
@@ -1299,15 +1299,15 @@ function mkWorkerBootstrapCore(opts){
       }
       var __requireWebGLSnap__ = function(){
         var snap = __LAST_SNAP__;
-        if (!snap || typeof snap !== 'object') throw new Error('UACHPatch: no snapshot');
+        if (!snap || typeof snap !== 'object') throw new Error('Ubergabe: no snapshot');
         var webgl = snap.webgl;
-        if (!webgl || typeof webgl !== 'object') throw new Error('UACHPatch: missing webgl');
-        if (typeof webgl.vendor !== 'string' || !webgl.vendor) throw new Error('UACHPatch: bad webgl.vendor');
-        if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
-        if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
-        if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
+        if (!webgl || typeof webgl !== 'object') throw new Error('Ubergabe: missing webgl');
+        if (typeof webgl.vendor !== 'string' || !webgl.vendor) throw new Error('Ubergabe: bad webgl.vendor');
+        if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('Ubergabe: bad webgl.renderer');
+        if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('Ubergabe: bad webgl.unmaskedVendor');
+        if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('Ubergabe: bad webgl.unmaskedRenderer');
         if (Object.prototype.hasOwnProperty.call(webgl, 'compressedTextureFormats') && !Array.isArray(webgl.compressedTextureFormats)) {
-          throw new Error('UACHPatch: bad webgl.compressedTextureFormats');
+          throw new Error('Ubergabe: bad webgl.compressedTextureFormats');
         }
         return webgl;
       };
@@ -1317,7 +1317,7 @@ function mkWorkerBootstrapCore(opts){
         var oscProto = OffscreenCanvas.prototype;
         var dGetContext = Object.getOwnPropertyDescriptor(oscProto, 'getContext');
         if (!dGetContext || typeof dGetContext.value !== 'function' || dGetContext.configurable === false) {
-          throw new Error('UACHPatch: OffscreenCanvas.getContext descriptor missing');
+          throw new Error('Ubergabe: OffscreenCanvas.getContext descriptor missing');
         }
         var nativeGetContext = dGetContext.value;
         var patchedContexts = new WeakSet();
@@ -1330,7 +1330,7 @@ function mkWorkerBootstrapCore(opts){
           var nativeGetParameter = (dGetParameter && typeof dGetParameter.value === 'function')
             ? dGetParameter.value
             : (typeof ctx.getParameter === 'function' ? ctx.getParameter : null);
-          if (!nativeGetParameter) throw new Error('UACHPatch: worker WebGL getParameter missing');
+          if (!nativeGetParameter) throw new Error('Ubergabe: worker WebGL getParameter missing');
           var dGetExtension = Object.getOwnPropertyDescriptor(ctx, 'getExtension');
           var nativeGetExtension = (dGetExtension && typeof dGetExtension.value === 'function')
             ? dGetExtension.value
@@ -1438,7 +1438,7 @@ ${prePatchOwnerSource}
 ${patchLoaderSource}
         const __runtimeRoot = __materializeWorkerOwnerGraph__().wrkRuntime;
         const installWorkerUACHMirror = __runtimeRoot && __runtimeRoot.installWorkerUACHMirror;
-        if (typeof installWorkerUACHMirror !== 'function') throw new Error('UACHPatch: installWorkerUACHMirror missing');
+        if (typeof installWorkerUACHMirror !== 'function') throw new Error('Ubergabe: installWorkerUACHMirror missing');
         installWorkerUACHMirror();
         __patchOK = true;
       } catch (e) {
@@ -1448,7 +1448,7 @@ ${patchLoaderSource}
       }
       if (__patchOK) {
         try {
-          if (!__LAST_SNAP__) throw new Error('UACHPatch: snapshot not applied');
+          if (!__LAST_SNAP__) throw new Error('Ubergabe: snapshot not applied');
           ['__WORKER_WEBGL_MIRROR_INSTALLED__','__SCOPE_CONSISTENCY_PATCHED__','__ensureMarkAsNative','__CORE_TOSTRING_STATE__','__wrapNativeApply','__wrapNativeAccessor','__wrapStrictAccessor','__wrapNativeCtor','__ENV_PATCH_ERROR__','__ENV_PATCH_APPLY_ERROR__','__ENV_SNAP_ERROR__','__ENV_DIAG_ERROR__','__ENV_DIAG_STORE_ERROR__'].forEach(function(key){
             if (!Object.prototype.hasOwnProperty.call(self, key)) return;
             try {
@@ -1458,7 +1458,7 @@ ${patchLoaderSource}
               throw _e;
             }
             if (Object.prototype.hasOwnProperty.call(self, key)) {
-              var __cleanupErr = new Error('UACHPatch: ' + key + ' visible after patch apply');
+              var __cleanupErr = new Error('Ubergabe: ' + key + ' visible after patch apply');
               __emitDiag('wrk:worker_bootstrap:apply:cleanup_failed', __cleanupErr, { transport: 'cleanup_visible', key: key });
               throw __cleanupErr;
             }
@@ -1500,11 +1500,11 @@ function mkModuleWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
     inlinePrng: inlinePrng,
     inlineCanvasPatch: inlineCanvasPatch,
     inlineFernwehContext: inlineFernwehContext,
-    patchUrlMissingMessage: 'UACHPatch: missing workerPatchModule URL',
+    patchUrlMissingMessage: 'Ubergabe: missing workerPatchModule URL',
     prePatchOwnerSource: `
       (function __installWorkerCoreOwners__(){
         var __runInlineModule__ = function(source, exportName, label) {
-          if (typeof source !== 'string' || !source) throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
+          if (typeof source !== 'string' || !source) throw new Error('Ubergabe: ' + String(label || exportName || 'inlineModule') + ' source missing');
           var runner = new Function('window', source + '\\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
           try {
             return runner(self);
@@ -1517,15 +1517,15 @@ function mkModuleWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
         };
         __runInlineModule__(${JSON.stringify(inlineCoreWindow)}, 'CoreWindowModule', 'inlineCoreWindow');
         __runInlineModule__(${JSON.stringify(inlinePrng)}, 'RNGsetModule', 'inlinePrng');
-        if (!self.Core || typeof self.Core !== 'object') throw new Error('UACHPatch: worker Core missing after bootstrap owner install');
-        if (!self.Core.__internal || typeof self.Core.__internal !== 'object') throw new Error('UACHPatch: worker Core.__internal missing after bootstrap owner install');
-        if (!self.Core.__internal.prng || typeof self.Core.__internal.prng !== 'object') throw new Error('UACHPatch: worker Core.__internal.prng missing after bootstrap owner install');
+        if (!self.Core || typeof self.Core !== 'object') throw new Error('Ubergabe: worker Core missing after bootstrap owner install');
+        if (!self.Core.__internal || typeof self.Core.__internal !== 'object') throw new Error('Ubergabe: worker Core.__internal missing after bootstrap owner install');
+        if (!self.Core.__internal.prng || typeof self.Core.__internal.prng !== 'object') throw new Error('Ubergabe: worker Core.__internal.prng missing after bootstrap owner install');
       })();`,
     patchLoaderSource: `
         await import(PATCH_URL);`,
     userLoaderSource: `
       const USER = ${USER};
-      if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user module URL');
+      if (!USER || typeof USER !== 'string') throw new Error('Ubergabe: missing user module URL');
       await import(USER);
       __finalizeBootstrapReady__(USER);`,
     bootstrapSuffixSource: `.catch(function(e){
@@ -1563,11 +1563,11 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
     inlinePrng: inlinePrng,
     inlineCanvasPatch: inlineCanvasPatch,
     inlineFernwehContext: inlineFernwehContext,
-    patchUrlMissingMessage: 'UACHPatch: missing workerPatchClassic URL',
+    patchUrlMissingMessage: 'Ubergabe: missing workerPatchClassic URL',
     prePatchOwnerSource: `
       (function __installWorkerCoreOwners__(){
         var __runInlineModule__ = function(source, exportName, label) {
-          if (typeof source !== 'string' || !source) throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
+          if (typeof source !== 'string' || !source) throw new Error('Ubergabe: ' + String(label || exportName || 'inlineModule') + ' source missing');
           var runner = new Function('window', source + '\\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
           try {
             return runner(self);
@@ -1580,9 +1580,9 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
         };
         __runInlineModule__(${JSON.stringify(inlineCoreWindow)}, 'CoreWindowModule', 'inlineCoreWindow');
         __runInlineModule__(${JSON.stringify(inlinePrng)}, 'RNGsetModule', 'inlinePrng');
-        if (!self.Core || typeof self.Core !== 'object') throw new Error('UACHPatch: worker Core missing after bootstrap owner install');
-        if (!self.Core.__internal || typeof self.Core.__internal !== 'object') throw new Error('UACHPatch: worker Core.__internal missing after bootstrap owner install');
-        if (!self.Core.__internal.prng || typeof self.Core.__internal.prng !== 'object') throw new Error('UACHPatch: worker Core.__internal.prng missing after bootstrap owner install');
+        if (!self.Core || typeof self.Core !== 'object') throw new Error('Ubergabe: worker Core missing after bootstrap owner install');
+        if (!self.Core.__internal || typeof self.Core.__internal !== 'object') throw new Error('Ubergabe: worker Core.__internal missing after bootstrap owner install');
+        if (!self.Core.__internal.prng || typeof self.Core.__internal.prng !== 'object') throw new Error('Ubergabe: worker Core.__internal.prng missing after bootstrap owner install');
       })();`,
     patchLoaderSource: `
         importScripts(PATCH_URL);`,
@@ -1599,7 +1599,7 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
         return false;
       };
       var USER = ${USER};
-      if (!USER || typeof USER !== 'string') throw new Error('UACHPatch: missing user script URL');
+      if (!USER || typeof USER !== 'string') throw new Error('Ubergabe: missing user script URL');
       if (__isModuleURL(USER)) {
         import(USER).then(function(){
           __finalizeBootstrapReady__(USER);

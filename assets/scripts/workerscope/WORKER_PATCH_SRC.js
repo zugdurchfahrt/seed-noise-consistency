@@ -6,7 +6,7 @@
       || (typeof global     !== 'undefined' && global)
       || {};
   if (typeof self==='undefined' || typeof WorkerGlobalScope==='undefined' || !(self instanceof WorkerGlobalScope)) {
-    throw new Error('UACHPatch: not in WorkerGlobalScope');
+    throw new Error('Ubergabe: not in WorkerGlobalScope');
   }
   const W = self;
   const __resolveBootstrapWorkerRuntimeRoot__ = () => {
@@ -42,14 +42,14 @@
 
   const __installWorkerUACHMirror__ = function installWorkerUACHMirror(){
     if (__uachMirrorInstalled__) {
-      throw new Error('UACHPatch: already installed');
+      throw new Error('Ubergabe: already installed');
     }
     const bootstrapRuntimeRoot = __resolveBootstrapWorkerRuntimeRoot__();
     if (!(bootstrapRuntimeRoot && typeof bootstrapRuntimeRoot === 'object')) {
-      throw new Error('UACHPatch: worker runtime root missing');
+      throw new Error('Ubergabe: worker runtime root missing');
     }
     if (bootstrapRuntimeRoot.bootstrapActive !== true) {
-      throw new Error('UACHPatch: bootstrap marker missing');
+      throw new Error('Ubergabe: bootstrap marker missing');
     }
     const __workerScopeMarker__ = (() => {
       const runtimeScope = (typeof bootstrapRuntimeRoot.workerScope === 'string' && bootstrapRuntimeRoot.workerScope)
@@ -65,7 +65,7 @@
     const nav = self.navigator;
     const proto = (typeof WorkerNavigator!=='undefined' && WorkerNavigator.prototype) || Object.getPrototypeOf(nav);
     if (!proto && !nav) {
-      throw new Error('UACHPatch: WorkerNavigator unavailable');
+      throw new Error('Ubergabe: WorkerNavigator unavailable');
     }
     const cache = { snap:null };
     let __bootstrapSnapshotConsumed__ = false;
@@ -139,10 +139,10 @@
       const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
       const runtimeKind = runtimeRoot && runtimeRoot.workerScopeKind;
       if (__isWorkerScopeKind__(runtimeKind)) return runtimeKind;
-      throw new Error('UACHPatch: worker scope kind missing');
+      throw new Error('Ubergabe: worker scope kind missing');
     };
     if (__isServiceWorkerScope__()) {
-      const e = new Error('UACHPatch: service worker requires separate lane');
+      const e = new Error('Ubergabe: service worker requires separate lane');
       emitDegrade('error', 'worker_patch_src:scope_kind:contract:service_lane_required', {
         type: 'pipeline missing data',
         stage: 'contract',
@@ -193,7 +193,7 @@
     const verifyRollbackRepeatApply = () => {
       const probeKey = '__WORKER_PATCH_SELFTEST__';
       if (Object.prototype.hasOwnProperty.call(__rollbackProbeRoot__, probeKey)) {
-        throw new Error('UACHPatch: rollback selftest residue');
+        throw new Error('Ubergabe: rollback selftest residue');
       }
       const runAttempt = () => {
         let forced = null;
@@ -204,16 +204,16 @@
             configurable: true,
             enumerable: false
           });
-          throw new Error('UACHPatch: rollback selftest trigger');
+          throw new Error('Ubergabe: rollback selftest trigger');
         } catch (e) {
           forced = e;
           rollbackAppliedDescriptors();
         }
         if (!forced) {
-          throw new Error('UACHPatch: rollback selftest missing forced failure');
+          throw new Error('Ubergabe: rollback selftest missing forced failure');
         }
         if (Object.prototype.hasOwnProperty.call(__rollbackProbeRoot__, probeKey)) {
-          throw new Error('UACHPatch: rollback selftest failed');
+          throw new Error('Ubergabe: rollback selftest failed');
         }
       };
       runAttempt();
@@ -227,37 +227,37 @@
     const LE_KEYS = ['brands','mobile','platform'];
     const requireSnap = (s, where) => {
       if (!s || typeof s !== 'object') {
-        const msg = where ? `UACHPatch: no snapshot (${where})` : 'UACHPatch: no snapshot';
+        const msg = where ? `Ubergabe: no snapshot (${where})` : 'Ubergabe: no snapshot';
         throw new Error(msg);
       }
-      if (typeof s.language !== 'string' || s.language.trim() === '') throw new Error('UACHPatch: bad language');
-      if (!Array.isArray(s.languages)) throw new Error('UACHPatch: bad languages');
-      if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('UACHPatch: bad deviceMemory');
-      if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('UACHPatch: bad hardwareConcurrency');
-      if (!s.webgl || typeof s.webgl !== 'object') throw new Error('UACHPatch: missing webgl');
-      if (typeof s.webgl.vendor !== 'string' || !s.webgl.vendor) throw new Error('UACHPatch: bad webgl.vendor');
-      if (typeof s.webgl.renderer !== 'string' || !s.webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
-      if (typeof s.webgl.unmaskedVendor !== 'string' || !s.webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
-      if (typeof s.webgl.unmaskedRenderer !== 'string' || !s.webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
-      if (!s.uaData) throw new Error('UACHPatch: missing userAgentData');
-      if (!s.screen || typeof s.screen !== 'object') throw new Error('UACHPatch: missing screen');
-      if (!Number.isFinite(Number(s.screen.width))) throw new Error('UACHPatch: bad screen.width');
-      if (!Number.isFinite(Number(s.screen.height))) throw new Error('UACHPatch: bad screen.height');
-      if (!Number.isFinite(Number(s.screen.dpr)) || Number(s.screen.dpr) <= 0) throw new Error('UACHPatch: bad screen.dpr');
-      if (!s.envProfile || typeof s.envProfile !== 'object') throw new Error('UACHPatch: missing envProfile');
-      if (!s.envProfile.__PLATFORM__ || typeof s.envProfile.__PLATFORM__ !== 'object') throw new Error('UACHPatch: missing envProfile.__PLATFORM__');
-      if (typeof s.envProfile.__PLATFORM__.domPlatform !== 'string' || !s.envProfile.__PLATFORM__.domPlatform) throw new Error('UACHPatch: bad envProfile.__PLATFORM__.domPlatform');
-      if (typeof s.envProfile.__PLATFORM__.uaPlatform !== 'string' || !s.envProfile.__PLATFORM__.uaPlatform) throw new Error('UACHPatch: bad envProfile.__PLATFORM__.uaPlatform');
-      if (typeof s.envProfile.__PLATFORM__.platformVersion !== 'string' || !s.envProfile.__PLATFORM__.platformVersion) throw new Error('UACHPatch: bad envProfile.__PLATFORM__.platformVersion');
+      if (typeof s.language !== 'string' || s.language.trim() === '') throw new Error('Ubergabe: bad language');
+      if (!Array.isArray(s.languages)) throw new Error('Ubergabe: bad languages');
+      if (!Number.isFinite(Number(s.deviceMemory))) throw new Error('Ubergabe: bad deviceMemory');
+      if (!Number.isFinite(Number(s.hardwareConcurrency))) throw new Error('Ubergabe: bad hardwareConcurrency');
+      if (!s.webgl || typeof s.webgl !== 'object') throw new Error('Ubergabe: missing webgl');
+      if (typeof s.webgl.vendor !== 'string' || !s.webgl.vendor) throw new Error('Ubergabe: bad webgl.vendor');
+      if (typeof s.webgl.renderer !== 'string' || !s.webgl.renderer) throw new Error('Ubergabe: bad webgl.renderer');
+      if (typeof s.webgl.unmaskedVendor !== 'string' || !s.webgl.unmaskedVendor) throw new Error('Ubergabe: bad webgl.unmaskedVendor');
+      if (typeof s.webgl.unmaskedRenderer !== 'string' || !s.webgl.unmaskedRenderer) throw new Error('Ubergabe: bad webgl.unmaskedRenderer');
+      if (!s.uaData) throw new Error('Ubergabe: missing userAgentData');
+      if (!s.screen || typeof s.screen !== 'object') throw new Error('Ubergabe: missing screen');
+      if (!Number.isFinite(Number(s.screen.width))) throw new Error('Ubergabe: bad screen.width');
+      if (!Number.isFinite(Number(s.screen.height))) throw new Error('Ubergabe: bad screen.height');
+      if (!Number.isFinite(Number(s.screen.dpr)) || Number(s.screen.dpr) <= 0) throw new Error('Ubergabe: bad screen.dpr');
+      if (!s.envProfile || typeof s.envProfile !== 'object') throw new Error('Ubergabe: missing envProfile');
+      if (!s.envProfile.__PLATFORM__ || typeof s.envProfile.__PLATFORM__ !== 'object') throw new Error('Ubergabe: missing envProfile.__PLATFORM__');
+      if (typeof s.envProfile.__PLATFORM__.domPlatform !== 'string' || !s.envProfile.__PLATFORM__.domPlatform) throw new Error('Ubergabe: bad envProfile.__PLATFORM__.domPlatform');
+      if (typeof s.envProfile.__PLATFORM__.uaPlatform !== 'string' || !s.envProfile.__PLATFORM__.uaPlatform) throw new Error('Ubergabe: bad envProfile.__PLATFORM__.uaPlatform');
+      if (typeof s.envProfile.__PLATFORM__.platformVersion !== 'string' || !s.envProfile.__PLATFORM__.platformVersion) throw new Error('Ubergabe: bad envProfile.__PLATFORM__.platformVersion');
       const he = (s.uaData && s.uaData.he) || s.highEntropy;
-      if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing highEntropy');
+      if (!he || typeof he !== 'object') throw new Error('Ubergabe: missing highEntropy');
       for (const k of HE_KEYS) {
-        if (!(k in he)) throw new Error(`UACHPatch: missing highEntropy.${k}`);
+        if (!(k in he)) throw new Error(`Ubergabe: missing highEntropy.${k}`);
         const v = he[k];
-        if (v === undefined || v === null) throw new Error(`UACHPatch: bad highEntropy.${k}`);
-        // if (typeof v === 'string' && !v) throw new Error(`UACHPatch: bad highEntropy.${k}`);
-        if (typeof v === 'string' && !v && k !== 'model' && k !== 'uaFullVersion') throw new Error(`UACHPatch: bad highEntropy.${k}`);
-        if (Array.isArray(v) && !v.length) throw new Error(`UACHPatch: bad highEntropy.${k}`);
+        if (v === undefined || v === null) throw new Error(`Ubergabe: bad highEntropy.${k}`);
+        // if (typeof v === 'string' && !v) throw new Error(`Ubergabe: bad highEntropy.${k}`);
+        if (typeof v === 'string' && !v && k !== 'model' && k !== 'uaFullVersion') throw new Error(`Ubergabe: bad highEntropy.${k}`);
+        if (Array.isArray(v) && !v.length) throw new Error(`Ubergabe: bad highEntropy.${k}`);
       }
       return s;
     };
@@ -269,19 +269,19 @@
       const envPlatform = envProfile && envProfile.__PLATFORM__ && typeof envProfile.__PLATFORM__ === 'object'
         ? envProfile.__PLATFORM__
         : null;
-      if (!envPlatform) throw new Error('UACHPatch: missing envProfile.__PLATFORM__');
+      if (!envPlatform) throw new Error('Ubergabe: missing envProfile.__PLATFORM__');
       return envPlatform;
     };
     const bootstrapSnapshotOwner = __resolveWorkerSnapshotOwner__();
     if (!bootstrapSnapshotOwner) {
-      throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+      throw new Error('Ubergabe: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
     }
     cache.snap = requireSnap(bootstrapSnapshotOwner, 'init');
 
     // Seed must be provided inside the worker realm (e.g. via CDP prelude).
     const seedInit = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
     if (seedInit == null || seedInit === '') {
-      const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
+      const e = new Error('Ubergabe: CDP_GLOBAL_SEED missing');
       emitDegrade('error', 'worker_patch_src:seed:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
@@ -303,7 +303,7 @@
           ? runtimeRoot.__wrapNativeApply
           : null);
     if (typeof wrapNativeApply !== 'function') {
-      const e = new Error('UACHPatch: __wrapNativeApply missing');
+      const e = new Error('Ubergabe: __wrapNativeApply missing');
       emitDegrade('error', 'worker_patch_src:wrap_native_apply:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
@@ -324,7 +324,7 @@
           ? runtimeRoot.__wrapNativeAccessor
           : null);
     if (typeof wrapNativeAccessor !== 'function') {
-      const e = new Error('UACHPatch: __wrapNativeAccessor missing');
+      const e = new Error('Ubergabe: __wrapNativeAccessor missing');
       emitDegrade('error', 'worker_patch_src:wrap_native_accessor:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
@@ -345,7 +345,7 @@
           ? runtimeRoot.__wrapNativeCtor
           : null);
     if (typeof wrapNativeCtor !== 'function') {
-      const e = new Error('UACHPatch: __wrapNativeCtor missing');
+      const e = new Error('Ubergabe: __wrapNativeCtor missing');
       emitDegrade('error', 'worker_patch_src:wrap_native_ctor:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
@@ -366,7 +366,7 @@
           ? runtimeRoot.__applyAccessorTargets
           : null);
     if (typeof applyAccessorTargets !== 'function') {
-      const e = new Error('UACHPatch: worker accessor target executor missing');
+      const e = new Error('Ubergabe: worker accessor target executor missing');
       emitDegrade('error', 'worker_patch_src:apply_accessor_targets:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
@@ -384,7 +384,7 @@
       const st = __resolveCoreToStringState__();
       const ok = __isCoreToStringStateOk__(st);
       if (!ok) {
-        const e = new Error('UACHPatch: __CORE_TOSTRING_STATE__ missing/invalid');
+        const e = new Error('Ubergabe: __CORE_TOSTRING_STATE__ missing/invalid');
         emitDegrade('error', 'worker_patch_src:tostring_state:preflight:missing', {
           type: 'pipeline missing data',
           stage: 'preflight',
@@ -403,7 +403,7 @@
       ? toStringDesc.value
       : ((typeof Function.prototype.toString === 'function') ? Function.prototype.toString : null);
     if (typeof nativeToString !== 'function') {
-      const e = new Error('UACHPatch: Function.prototype.toString missing');
+      const e = new Error('Ubergabe: Function.prototype.toString missing');
       emitDegrade('error', 'worker_patch_src:tostring:preflight:missing', {
         type: 'pipeline missing data',
         stage: 'preflight',
@@ -422,7 +422,7 @@
       const expectedNative = Reflect.apply(nativeToString, directProbe, []);
       const actualNative = Reflect.apply(Function.prototype.toString, directProbe, []);
       if (actualNative !== expectedNative) {
-        const e = new Error('UACHPatch: toString native forwarding mismatch');
+        const e = new Error('Ubergabe: toString native forwarding mismatch');
         emitDegrade('error', 'worker_patch_src:tostring:contract:forwarding_mismatch', {
           type: 'pipeline missing data',
           stage: 'contract',
@@ -439,11 +439,11 @@
 
     try {
     const getDevicePixelRatioRaw = function getDevicePixelRatio(){
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
-      if (!('dpr' in cache.snap)) throw new Error('UACHPatch: no dpr');
+      if (!cache.snap) throw new Error('Ubergabe: no snap');
+      if (!('dpr' in cache.snap)) throw new Error('Ubergabe: no dpr');
       const snapVal = Number(cache.snap.dpr);
       if (validDpr(snapVal)) return snapVal;
-      throw new Error('UACHPatch: bad dpr');
+      throw new Error('Ubergabe: bad dpr');
     };
     const dprOwn = Object.getOwnPropertyDescriptor(self, 'devicePixelRatio');
     const dprProto = (!dprOwn && Object.getPrototypeOf(self))
@@ -506,19 +506,19 @@
     const stateRootForUAD = (self.FernwehContext && typeof self.FernwehContext === 'object' && self.FernwehContext.state && typeof self.FernwehContext.state === 'object')
       ? self.FernwehContext.state
       : null;
-    if (!stateRootForUAD) throw new Error('UACHPatch: FernwehContext.state missing');
+    if (!stateRootForUAD) throw new Error('Ubergabe: FernwehContext.state missing');
     const navModuleStateForUAD = (stateRootForUAD.__NAV_TOTAL_SET__ && typeof stateRootForUAD.__NAV_TOTAL_SET__ === 'object')
       ? stateRootForUAD.__NAV_TOTAL_SET__
       : null;
-    if (!navModuleStateForUAD) throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__ missing');
+    if (!navModuleStateForUAD) throw new Error('Ubergabe: FernwehContext.state.__NAV_TOTAL_SET__ missing');
     const dataStoreStateForUAD = (navModuleStateForUAD.__DATA_STORE_STATE__ && typeof navModuleStateForUAD.__DATA_STORE_STATE__ === 'object')
       ? navModuleStateForUAD.__DATA_STORE_STATE__
       : null;
-    if (!dataStoreStateForUAD) throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing');
+    if (!dataStoreStateForUAD) throw new Error('Ubergabe: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing');
     const workerEnvSnapshotOwner = (dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__ && typeof dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__ === 'object')
       ? dataStoreStateForUAD.__WORKER_ENV_SNAPSHOT__
       : null;
-    if (!workerEnvSnapshotOwner) throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+    if (!workerEnvSnapshotOwner) throw new Error('Ubergabe: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
     const uadState = (workerEnvSnapshotOwner.workerNavigatorUADataState && typeof workerEnvSnapshotOwner.workerNavigatorUADataState === 'object')
       ? workerEnvSnapshotOwner.workerNavigatorUADataState
       : Object.create(null);
@@ -631,9 +631,9 @@
                           throw new TypeError('Illegal invocation');
                         }
                         try {
-                          if (!cache.snap) throw new Error('UACHPatch: no snap');
+                          if (!cache.snap) throw new Error('Ubergabe: no snap');
                           const le = cache.snap.uaData;
-                          if (!le) throw new Error('UACHPatch: missing userAgentData');
+                          if (!le) throw new Error('Ubergabe: missing userAgentData');
                           return toBrands(le && le.brands);
                         } catch (e) {
                           emitDegrade('warn', 'worker_patch_src:uadata:getter_native_fallback', {
@@ -677,9 +677,9 @@
                           throw new TypeError('Illegal invocation');
                         }
                         try {
-                          if (!cache.snap) throw new Error('UACHPatch: no snap');
+                          if (!cache.snap) throw new Error('Ubergabe: no snap');
                           const le = cache.snap.uaData;
-                          if (!le) throw new Error('UACHPatch: missing userAgentData');
+                          if (!le) throw new Error('Ubergabe: missing userAgentData');
                           if (typeof le.mobile !== 'boolean') throw new Error('worker_patch_src: uaData.mobile missing');
                           return le.mobile;
                         } catch (e) {
@@ -724,7 +724,7 @@
                           throw new TypeError('Illegal invocation');
                         }
                         try {
-                          if (!cache.snap) throw new Error('UACHPatch: no snap');
+                          if (!cache.snap) throw new Error('Ubergabe: no snap');
                           const envPlatform = requirePlatformTransit(cache.snap, 'uadata.platform');
                           return envPlatform.uaPlatform;
                         } catch (e) {
@@ -780,10 +780,10 @@
         throw new TypeError('Illegal invocation');
       }
       try {
-        if (!cache.snap) throw new Error('UACHPatch: no snap');
+        if (!cache.snap) throw new Error('Ubergabe: no snap');
         const le = cache.snap.uaData;
-        if (!le || !le.he) throw new Error('UACHPatch: missing userAgentData.he');
-        if (!Array.isArray(le.he.fullVersionList)) throw new Error('UACHPatch: bad highEntropy.fullVersionList');
+        if (!le || !le.he) throw new Error('Ubergabe: missing userAgentData.he');
+        if (!Array.isArray(le.he.fullVersionList)) throw new Error('Ubergabe: bad highEntropy.fullVersionList');
         return deep(le.he.fullVersionList);
       } catch (e) {
         emitDegrade('warn', 'worker_patch_src:uadata:getter_native_fallback', {
@@ -873,7 +873,7 @@
           throw new TypeError('Illegal invocation');
         }
         try {
-          if (!cache.snap) throw new Error('UACHPatch: no snap');
+          if (!cache.snap) throw new Error('Ubergabe: no snap');
           if (!Array.isArray(keys)) {
             emitDegrade('error', 'worker_patch_src:get_high_entropy_values_bad_keys', {
               stage: 'runtime',
@@ -912,9 +912,9 @@
           }
           const s = cache.snap;
           const le = s.uaData;
-          if (!le || typeof le !== 'object') throw new Error('UACHPatch: missing userAgentData');
+          if (!le || typeof le !== 'object') throw new Error('Ubergabe: missing userAgentData');
           const he = le.he;
-          if (!he || typeof he !== 'object') throw new Error('UACHPatch: missing userAgentData.he');
+          if (!he || typeof he !== 'object') throw new Error('Ubergabe: missing userAgentData.he');
           const envPlatform = requirePlatformTransit(s, 'uadata.getHighEntropyValues');
             const map = {
             architecture: he.architecture,
@@ -988,17 +988,17 @@
     });
 
     const applyWorkerNavigatorAccessorTarget = (k, getter, diagTag) => {
-      if (!nav) throw new Error(`UACHPatch: cannot define ${k} (no navigator)`);
+      if (!nav) throw new Error(`Ubergabe: cannot define ${k} (no navigator)`);
       if (typeof getter !== 'function') {
-        throw new Error(`UACHPatch: ${k} getter implementation missing`);
+        throw new Error(`Ubergabe: ${k} getter implementation missing`);
       }
       const resolved = resolveWorkerNavigatorNativeDescriptor(k);
       const d = resolved.desc;
       if (!d || typeof d.get !== 'function' || Object.prototype.hasOwnProperty.call(d, 'value')) {
-        throw new Error(`UACHPatch: ${k} native accessor getter missing`);
+        throw new Error(`Ubergabe: ${k} native accessor getter missing`);
       }
       if (d.configurable === false) {
-        throw new Error(`UACHPatch: ${k} not configurable on proto-chain`);
+        throw new Error(`Ubergabe: ${k} not configurable on proto-chain`);
       }
       const groupTag = (typeof diagTag === 'string' && diagTag) ? diagTag : `worker_patch_src:${k}`;
       const applied = applyAccessorTargets(groupTag, [{
@@ -1021,7 +1021,7 @@
         }
       }], 'strict');
       if (applied !== 1) {
-        throw new Error(`UACHPatch: ${k} accessor target apply failed`);
+        throw new Error(`Ubergabe: ${k} accessor target apply failed`);
       }
       __workerNavigatorPatchedOwners__[k] = resolved.owner;
       __workerNavigatorDescriptorModes__[k] = 'patched';
@@ -1031,7 +1031,7 @@
     const resolveWorkerNavigatorNativeDescriptor = (k) => {
       const targetOwner = (typeof WorkerNavigator !== 'undefined' && WorkerNavigator.prototype) || proto || null;
       if (!targetOwner) {
-        throw new Error(`UACHPatch: cannot resolve ${k} (no WorkerNavigator.prototype)`);
+        throw new Error(`Ubergabe: cannot resolve ${k} (no WorkerNavigator.prototype)`);
       }
       let d = null;
       let resolvedOwner = null;
@@ -1056,7 +1056,7 @@
         }
       }
       if (!d || !resolvedOwner) {
-        throw new Error(`UACHPatch: ${k} native descriptor missing on proto-chain`);
+        throw new Error(`Ubergabe: ${k} native descriptor missing on proto-chain`);
       }
       return { owner: resolvedOwner, desc: d };
     };
@@ -1073,7 +1073,7 @@
           && !d.set) {
         return { owner: resolved.owner, desc: d, value: d.value };
       }
-      throw new Error(`UACHPatch: ${k} missing native getter on proto-chain`);
+      throw new Error(`Ubergabe: ${k} missing native getter on proto-chain`);
     };
 
     const failWorkerNavigatorSanity = (code, key, message, data) => {
@@ -1121,7 +1121,7 @@
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator_descriptor:sanity:owner_missing',
           k,
-          `UACHPatch: ${k} descriptor owner missing`
+          `Ubergabe: ${k} descriptor owner missing`
         );
       }
       let d = null;
@@ -1143,7 +1143,7 @@
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator_descriptor:sanity:missing',
           k,
-          `UACHPatch: ${k} descriptor missing after apply`
+          `Ubergabe: ${k} descriptor missing after apply`
         );
       }
       const hasGetter = typeof d.get === 'function';
@@ -1155,7 +1155,7 @@
           failWorkerNavigatorSanity(
             'worker_patch_src:workernavigator_descriptor:sanity:mismatch',
             k,
-            `UACHPatch: ${k} descriptor shape mismatch`,
+            `Ubergabe: ${k} descriptor shape mismatch`,
             {
               mode,
               hasGetter,
@@ -1173,7 +1173,7 @@
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator_descriptor:sanity:mismatch',
           k,
-          `UACHPatch: ${k} descriptor shape mismatch`,
+          `Ubergabe: ${k} descriptor shape mismatch`,
           {
             mode,
             hasGetter,
@@ -1279,7 +1279,7 @@
     }
     const getLanguages = function getLanguages(){
       const snap = requireSnap(cache.snap, 'getLanguages');
-      if (!Array.isArray(snap.languages)) throw new Error('UACHPatch: bad languages');
+      if (!Array.isArray(snap.languages)) throw new Error('Ubergabe: bad languages');
       return snap.languages.slice();
     };
     let __patchLanguages = false;
@@ -1392,9 +1392,9 @@
 
 
     const getDeviceMemory = function getDeviceMemory(){
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      if (!cache.snap) throw new Error('Ubergabe: no snap');
       const v = Number(cache.snap.deviceMemory);
-      if (!Number.isFinite(v)) throw new Error('UACHPatch: bad deviceMemory');
+      if (!Number.isFinite(v)) throw new Error('Ubergabe: bad deviceMemory');
       return v;
     };
     let __patchDeviceMemory = true;
@@ -1443,9 +1443,9 @@
     }
 
     const getHardwareConcurrency = function getHardwareConcurrency(){
-      if (!cache.snap) throw new Error('UACHPatch: no snap');
+      if (!cache.snap) throw new Error('Ubergabe: no snap');
       const v = Number(cache.snap.hardwareConcurrency);
-      if (!Number.isFinite(v)) throw new Error('UACHPatch: bad hardwareConcurrency');
+      if (!Number.isFinite(v)) throw new Error('Ubergabe: bad hardwareConcurrency');
       return v;
     };
     let __patchHardwareConcurrency = false;
@@ -1537,11 +1537,11 @@
     const requireWebGLSnapshot = (s, where) => {
       const snap = requireSnap(s, where);
       const webgl = snap && snap.webgl;
-      if (!webgl || typeof webgl !== 'object') throw new Error('UACHPatch: missing webgl');
-      if (typeof webgl.vendor !== 'string' || !webgl.vendor) throw new Error('UACHPatch: bad webgl.vendor');
-      if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('UACHPatch: bad webgl.renderer');
-      if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('UACHPatch: bad webgl.unmaskedVendor');
-      if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('UACHPatch: bad webgl.unmaskedRenderer');
+      if (!webgl || typeof webgl !== 'object') throw new Error('Ubergabe: missing webgl');
+      if (typeof webgl.vendor !== 'string' || !webgl.vendor) throw new Error('Ubergabe: bad webgl.vendor');
+      if (typeof webgl.renderer !== 'string' || !webgl.renderer) throw new Error('Ubergabe: bad webgl.renderer');
+      if (typeof webgl.unmaskedVendor !== 'string' || !webgl.unmaskedVendor) throw new Error('Ubergabe: bad webgl.unmaskedVendor');
+      if (typeof webgl.unmaskedRenderer !== 'string' || !webgl.unmaskedRenderer) throw new Error('Ubergabe: bad webgl.unmaskedRenderer');
       return webgl;
     };
 
@@ -1560,13 +1560,13 @@
       const oscProto = OffscreenCanvasCtor.prototype;
       const dGetContext = Object.getOwnPropertyDescriptor(oscProto, 'getContext');
       if (!dGetContext || dGetContext.configurable === false || typeof dGetContext.value !== 'function') {
-        throw new Error('UACHPatch: OffscreenCanvas.getContext descriptor missing');
+        throw new Error('Ubergabe: OffscreenCanvas.getContext descriptor missing');
       }
       const nativeGetContext = dGetContext.value;
       const patchedContexts = (typeof WeakSet === 'function') ? new WeakSet() : null;
       const debugInfoCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
       if (!patchedContexts || !debugInfoCache) {
-        throw new Error('UACHPatch: worker WebGL weak structures missing');
+        throw new Error('Ubergabe: worker WebGL weak structures missing');
       }
 
       const patchContextInstance = (ctx) => {
@@ -1578,7 +1578,7 @@
         const origGetParameter = (dGetParameter && typeof dGetParameter.value === 'function')
           ? dGetParameter.value
           : (typeof ctx.getParameter === 'function' ? ctx.getParameter : null);
-        if (!origGetParameter) throw new Error('UACHPatch: worker WebGL getParameter missing');
+        if (!origGetParameter) throw new Error('Ubergabe: worker WebGL getParameter missing');
 
         const dGetExtension = Object.getOwnPropertyDescriptor(ctx, 'getExtension');
         const origGetExtension = (dGetExtension && typeof dGetExtension.value === 'function')
@@ -1671,16 +1671,16 @@
       const inlineCanvasPatch = runtimeRoot && runtimeRoot.inlineCanvasPatch;
       const inlineFernwehContext = runtimeRoot && runtimeRoot.inlineFernwehContext;
       if (typeof inlineCoreWindow !== 'string' || !inlineCoreWindow) {
-        throw new Error('UACHPatch: inlineCoreWindow missing');
+        throw new Error('Ubergabe: inlineCoreWindow missing');
       }
       if (typeof inlinePrng !== 'string' || !inlinePrng) {
-        throw new Error('UACHPatch: inlinePrng missing');
+        throw new Error('Ubergabe: inlinePrng missing');
       }
       if (typeof inlineCanvasPatch !== 'string' || !inlineCanvasPatch) {
-        throw new Error('UACHPatch: inlineCanvasPatch missing');
+        throw new Error('Ubergabe: inlineCanvasPatch missing');
       }
       if (typeof inlineFernwehContext !== 'string' || !inlineFernwehContext) {
-        throw new Error('UACHPatch: inlineFernwehContext missing');
+        throw new Error('Ubergabe: inlineFernwehContext missing');
       }
       return {
         runtimeRoot,
@@ -1693,7 +1693,7 @@
 
     const executeWorkerInlineModule = (source, exportName, label) => {
       if (typeof source !== 'string' || !source) {
-        throw new Error('UACHPatch: ' + String(label || exportName || 'inlineModule') + ' source missing');
+        throw new Error('Ubergabe: ' + String(label || exportName || 'inlineModule') + ' source missing');
       }
       const runner = new Function('window', source + '\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
       try {
@@ -1709,7 +1709,7 @@
     };
     const syncWorkerEnvProfileState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
-        throw new Error('UACHPatch: FernwehContext.state missing for envProfile sync');
+        throw new Error('Ubergabe: FernwehContext.state missing for envProfile sync');
       }
       const snap = requireSnap(cache.snap, 'env_profile_sync');
       const envProfileSnap = snap.envProfile;
@@ -1717,7 +1717,7 @@
         ? stateRoot.__ENV_PROFILE__
         : null;
       if (!(envProfileRoot && typeof envProfileRoot === 'object')) {
-        throw new Error('UACHPatch: FernwehContext.state.__ENV_PROFILE__ missing');
+        throw new Error('Ubergabe: FernwehContext.state.__ENV_PROFILE__ missing');
       }
       const cloneEnvProfileValue = value => {
         if (Array.isArray(value)) {
@@ -1750,7 +1750,7 @@
 
     const syncWorkerScreenState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
-        throw new Error('UACHPatch: FernwehContext.state missing for screen sync');
+        throw new Error('Ubergabe: FernwehContext.state missing for screen sync');
       }
 
       const snap = requireSnap(cache.snap, 'screen_sync');
@@ -1761,7 +1761,7 @@
         : null;
 
       if (!(screenRoot && typeof screenRoot === 'object')) {
-        throw new Error('UACHPatch: FernwehContext.state.__SCREEN__ missing');
+        throw new Error('Ubergabe: FernwehContext.state.__SCREEN__ missing');
       }
 
       const cloneScreenValue = value => {
@@ -1798,7 +1798,7 @@
 
     const restoreWorkerFontsState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
-        throw new Error('UACHPatch: FernwehContext.state missing for fonts restore');
+        throw new Error('Ubergabe: FernwehContext.state missing for fonts restore');
       }
       const snap = (cache.snap && cache.snap.fontsState && typeof cache.snap.fontsState === 'object')
         ? cache.snap.fontsState
@@ -1811,14 +1811,14 @@
         ? stateRoot.__FONTS__
         : null;
       if (!(fontsRoot && typeof fontsRoot === 'object')) {
-        throw new Error('UACHPatch: FernwehContext.state.__FONTS__ missing');
+        throw new Error('Ubergabe: FernwehContext.state.__FONTS__ missing');
       }
       const ensureFontsSubSlot = key => {
         const existing = (fontsRoot[key] && typeof fontsRoot[key] === 'object')
           ? fontsRoot[key]
           : null;
         if (!existing) {
-          throw new Error('UACHPatch: FernwehContext.state.__FONTS__.' + key + ' missing');
+          throw new Error('Ubergabe: FernwehContext.state.__FONTS__.' + key + ' missing');
         }
         return existing;
       };
@@ -1946,10 +1946,10 @@
 
       const seed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '';
       if (!seed) {
-        throw new Error('UACHPatch: worker canvas seed missing');
+        throw new Error('Ubergabe: worker canvas seed missing');
       }
       if (!(stateRoot && typeof stateRoot === 'object')) {
-        throw new Error('UACHPatch: FernwehContext.state missing');
+        throw new Error('Ubergabe: FernwehContext.state missing');
       }
 
       syncWorkerEnvProfileState(stateRoot);
@@ -1965,19 +1965,19 @@
         ? self.Core
         : null;
       if (!Core) {
-        throw new Error('UACHPatch: worker Core missing after inline install');
+        throw new Error('Ubergabe: worker Core missing after inline install');
       }
       const coreInternal = (Core.__internal && typeof Core.__internal === 'object')
         ? Core.__internal
         : null;
       if (!coreInternal) {
-        throw new Error('UACHPatch: worker Core.__internal missing after inline install');
+        throw new Error('Ubergabe: worker Core.__internal missing after inline install');
       }
       const prngRoot = (coreInternal.prng && typeof coreInternal.prng === 'object')
         ? coreInternal.prng
         : null;
       if (!prngRoot) {
-        throw new Error('UACHPatch: worker Core.__internal.prng missing after inline install');
+        throw new Error('Ubergabe: worker Core.__internal.prng missing after inline install');
       }
       if (runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__ && coreInternal.coreToStringState !== runtimeRoot.__CORE_TOSTRING_STATE__) {
         trackedDefineProperty(coreInternal, 'coreToStringState', {
@@ -1991,13 +1991,13 @@
         ? stateRoot.__CANVAS__
         : null;
       if (!(canvasRoot && typeof canvasRoot === 'object')) {
-        throw new Error('UACHPatch: FernwehContext.state.__CANVAS__ missing');
+        throw new Error('Ubergabe: FernwehContext.state.__CANVAS__ missing');
       }
       const fernwehState = (canvasRoot.__STATE__ && typeof canvasRoot.__STATE__ === 'object')
         ? canvasRoot.__STATE__
         : null;
       if (!(fernwehState && typeof fernwehState === 'object')) {
-        throw new Error('UACHPatch: FernwehContext.state.__CANVAS__.__STATE__ missing');
+        throw new Error('Ubergabe: FernwehContext.state.__CANVAS__.__STATE__ missing');
       }
 
       const hooks = (self.FernwehHooks && typeof self.FernwehHooks === 'object')
@@ -2007,10 +2007,10 @@
         ? self.FernwehContext
         : null;
       if (!patchCtx) {
-        throw new Error('UACHPatch: worker FernwehContext missing after install');
+        throw new Error('Ubergabe: worker FernwehContext missing after install');
       }
       if (!hooks) {
-        throw new Error('UACHPatch: worker FernwehHooks missing after install');
+        throw new Error('Ubergabe: worker FernwehHooks missing after install');
       }
 
       if (typeof patchCtx.registerOffscreenConvertToBlobHook === 'function' && typeof hooks.patchConvertToBlobInjectNoise === 'function') {
@@ -2078,22 +2078,22 @@
       const hasType = !!(opts && (typeof opts === 'object' || typeof opts === 'function') && ('type' in opts));
       const t = hasType ? opts.type : undefined;
       if (hasType && t !== 'module' && t !== 'classic') {
-        throw new Error('UACHPatch: invalid worker type');
+        throw new Error('Ubergabe: invalid worker type');
       }
       const isModuleURL = isProbablyModuleWorkerURL(absUrl);
       if (t === 'classic' && isModuleURL) {
-        throw new Error('UACHPatch: module worker URL with classic type');
+        throw new Error('Ubergabe: module worker URL with classic type');
       }
       return (t === 'module' || (!hasType && isModuleURL)) ? 'module' : 'classic';
     };
 
     const applyWorkerSnapshot = s => {
-      if (!s || typeof s !== 'object') throw new Error('UACHPatch: invalid snapshot');
+      if (!s || typeof s !== 'object') throw new Error('Ubergabe: invalid snapshot');
       if (cache.snap === s && __bootstrapSnapshotConsumed__ === true) return;
       const prevSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
       cache.snap = requireSnap(s, 'apply');
       if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
-        const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
+        const e = new Error('Ubergabe: CDP_GLOBAL_SEED missing');
         emitDegrade('error', 'worker_patch_src:seed:runtime:missing', {
           type: 'pipeline missing data',
           stage: 'runtime',
@@ -2108,7 +2108,7 @@
       const stateRoot = (self.FernwehContext && typeof self.FernwehContext === 'object' && self.FernwehContext.state && typeof self.FernwehContext.state === 'object')
         ? self.FernwehContext.state
         : null;
-      if (!stateRoot) throw new Error('UACHPatch: FernwehContext.state missing');
+      if (!stateRoot) throw new Error('Ubergabe: FernwehContext.state missing');
       // Worker runtime consumes cache.snap; do not rewrite the canonical
       // __WORKER_ENV_SNAPSHOT__ owner-store from the consumer apply path.
       syncWorkerEnvProfileState(stateRoot);
@@ -2117,7 +2117,7 @@
       // Paradigm: seed is immutable within session.
       const curSeed = (self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : null;
       if (prevSeed != null && curSeed != null && prevSeed !== curSeed) {
-        throw new Error('UACHPatch: seed mutation is not allowed');
+        throw new Error('Ubergabe: seed mutation is not allowed');
       }
       __bootstrapSnapshotConsumed__ = true;
     };
@@ -2135,10 +2135,10 @@
     };
     const bootstrapSnap = __resolveWorkerSnapshotOwner__();
     if (!bootstrapSnap) {
-      throw new Error('UACHPatch: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
+      throw new Error('Ubergabe: FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__.__WORKER_ENV_SNAPSHOT__ missing');
     }
     if (self.CDP_GLOBAL_SEED == null || String(self.CDP_GLOBAL_SEED) === '') {
-      const e = new Error('UACHPatch: CDP_GLOBAL_SEED missing');
+      const e = new Error('Ubergabe: CDP_GLOBAL_SEED missing');
       emitDegrade('error', 'worker_patch_src:seed:contract:missing_bootstrap', {
         type: 'pipeline missing data',
         stage: 'contract',
@@ -2153,7 +2153,7 @@
     applyWorkerSnapshot(bootstrapSnap);
     consumePendingEnvSnapshots();
     if (typeof BroadcastChannel !== 'function') {
-      throw new Error('UACHPatch: BroadcastChannel missing');
+      throw new Error('Ubergabe: BroadcastChannel missing');
     }
     const bc = new BroadcastChannel('__ENV_SYNC__');
     bc.onmessage = ev => {
@@ -2166,7 +2166,7 @@
     if (self.Worker && !self.Worker.__ENV_WRAPPED__) {
       const NativeWorker = self.Worker;
       const dWorker = Object.getOwnPropertyDescriptor(self, 'Worker');
-      if (!dWorker) throw new Error('UACHPatch: Worker descriptor missing');
+      if (!dWorker) throw new Error('Ubergabe: Worker descriptor missing');
       const WrappedWorker = wrapNativeCtor(NativeWorker, 'Worker', function(argList) {
         const nextArgs = Array.isArray(argList) ? argList : [];
         const url = nextArgs[0];
@@ -2178,8 +2178,8 @@
         const SEED = JSON.stringify((self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '');
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'
-          ? `(async function(){'use strict';const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});const SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('UACHPatch: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');await import(USER);} )();export {};`
-          : `(function(){'use strict';var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('UACHPatch: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});var SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('UACHPatch: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('UACHPatch: BroadcastChannel missing');var bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('UACHPatch: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
+          ? `(async function(){'use strict';const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('Ubergabe: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});const SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('Ubergabe: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('Ubergabe: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('Ubergabe: missing user import');await import(USER);} )();export {};`
+          : `(function(){'use strict';var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('Ubergabe: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});var SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('Ubergabe: invalid nested worker snapshot');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('Ubergabe: BroadcastChannel missing');var bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('Ubergabe: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
         return [blobURL, { ...(opts || {}), type: workerType }];
       });
@@ -2206,7 +2206,7 @@
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'language',
-        'UACHPatch: language mismatch',
+        'Ubergabe: language mismatch',
         { actual: sanity.language, expected: cache.snap.language }
       );
     }
@@ -2235,7 +2235,7 @@
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator:sanity:mismatch',
           'languages',
-          'UACHPatch: languages mismatch',
+          'Ubergabe: languages mismatch',
           {
             actual: Array.isArray(sanity.languages) ? sanity.languages.slice() : sanity.languages,
             expected: Array.isArray(cache.snap.languages) ? cache.snap.languages.slice() : cache.snap.languages
@@ -2247,7 +2247,7 @@
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'deviceMemory',
-        'UACHPatch: deviceMemory mismatch',
+        'Ubergabe: deviceMemory mismatch',
         { actual: sanity.deviceMemory, expected: cache.snap.deviceMemory }
       );
     }
@@ -2255,7 +2255,7 @@
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'hardwareConcurrency',
-        'UACHPatch: hardwareConcurrency mismatch',
+        'Ubergabe: hardwareConcurrency mismatch',
         { actual: sanity.hardwareConcurrency, expected: cache.snap.hardwareConcurrency }
       );
     }
@@ -2264,7 +2264,7 @@
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'userAgentData',
-        'UACHPatch: userAgentData missing',
+        'Ubergabe: userAgentData missing',
         { actual: sanityUAD, expected: cache.snap.uaData }
       );
     }
@@ -2273,7 +2273,7 @@
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'userAgentData.brands',
-        'UACHPatch: brands mismatch',
+        'Ubergabe: brands mismatch',
         { actual: sanityUAD.brands, expected: expectedBrands }
       );
     }
@@ -2281,7 +2281,7 @@
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'userAgentData.mobile',
-        'UACHPatch: mobile mismatch',
+        'Ubergabe: mobile mismatch',
         { actual: sanityUAD.mobile, expected: cache.snap.uaData.mobile }
       );
     }
@@ -2290,7 +2290,7 @@
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'userAgentData.platform',
-        'UACHPatch: platform mismatch',
+        'Ubergabe: platform mismatch',
         { actual: sanityUAD.platform, expected: expectedPlatformTransit.uaPlatform }
       );
     }
@@ -2315,7 +2315,7 @@
       failWorkerNavigatorSanity(
         'worker_patch_src:workernavigator:sanity:mismatch',
         'userAgentData.fullVersionList',
-        'UACHPatch: fullVersionList mismatch',
+        'Ubergabe: fullVersionList mismatch',
         { actual: sanityFullVersionList, expected: cache.snap.uaData.he.fullVersionList }
       );
     }
@@ -2327,7 +2327,7 @@
         failWorkerNavigatorSanity(
           'worker_patch_src:workernavigator:sanity:mismatch',
           'userAgentData.getHighEntropyValues',
-          'UACHPatch: high entropy promise contract failed',
+          'Ubergabe: high entropy promise contract failed',
           { actual: sanityHePromise, expected: expectedHe }
         );
       }
@@ -2336,7 +2336,7 @@
           failWorkerNavigatorSanity(
             'worker_patch_src:workernavigator:sanity:mismatch',
             'userAgentData.getHighEntropyValues',
-            'UACHPatch: high entropy snapshot missing',
+            'Ubergabe: high entropy snapshot missing',
             { actual: sanityHe, expected: expectedHe }
           );
         }
@@ -2356,7 +2356,7 @@
           failWorkerNavigatorSanity(
             'worker_patch_src:workernavigator:sanity:mismatch',
             'userAgentData.getHighEntropyValues',
-            'UACHPatch: high entropy mismatch',
+            'Ubergabe: high entropy mismatch',
             { actual: actualHeValues, expected: expectedHeValues }
           );
         }
@@ -2419,7 +2419,7 @@
   };
   const __bootstrapRuntimeRoot = __resolveBootstrapWorkerRuntimeRoot__();
   if (!__bootstrapRuntimeRoot) {
-    throw new Error('UACHPatch: worker runtime root missing before install export');
+    throw new Error('Ubergabe: worker runtime root missing before install export');
   }
   __defineHiddenWorkerRuntimeValue__(__bootstrapRuntimeRoot, 'installWorkerUACHMirror', __installWorkerUACHMirror__);
 })();

@@ -196,7 +196,7 @@
       || resolveToStringBridgeTarget(currentRealmToString, toStringProxyTargetMap)
       || null;
     if (typeof nativeToString !== 'function') {
-      throw new Error('UACHPatch: Function.prototype.toString missing');
+      throw new Error('Ubergabe: Function.prototype.toString missing');
     }
 
     function publishCoreToStringState() {
@@ -640,7 +640,7 @@
     }
 
       if (!__wrkRuntimeRoot || typeof __wrkRuntimeRoot !== 'object') {
-        throw new Error('UACHPatch: FernwehContext.state.__WRK__.runtime missing');
+        throw new Error('Ubergabe: FernwehContext.state.__WRK__.runtime missing');
       }
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeApply', __wrapNativeApply);
       __setHiddenValue(__wrkRuntimeRoot, '__wrapNativeAccessor', __wrapNativeAccessor);
