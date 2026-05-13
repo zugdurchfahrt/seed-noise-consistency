@@ -668,23 +668,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     }
   }
   
-
   const __screenGroupModes = __screenRuntimeState.groupModes = {
-    displayMode: 'pending',
-    displayReason: 'pending',
-    displayDetails: [],
-    displayMismatches: [],
-    displaySubstage: 'apply',
-    viewportMode: 'pending',
-    viewportReason: 'pending',
-    viewportDetails: [],
-    viewportMismatches: [],
-    viewportSubstage: 'apply',
-    hostWindowMode: 'native_observed',
-    hostWindowReason: 'native_host_window',
-    hostWindowDetails: [],
-    hostWindowMismatches: [],
-    hostWindowSubstage: 'apply',
     coordinationPatched: false,
     appliedTargets: ZERO,
     deferredViewportRetryScheduled: false,
@@ -1687,7 +1671,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const __screenCoordinationComplete = (
       __screenGroupModes.displayMode !== 'skip' &&
       __screenGroupModes.viewportMode !== 'skip' &&
-      __screenGroupModes.hostWindowMode !== 'read_failed' &&
       __screenGroupModes.hostWindowMode !== 'skip'
     );
     const __screenSummaryCode = __screenCoordinationComplete
