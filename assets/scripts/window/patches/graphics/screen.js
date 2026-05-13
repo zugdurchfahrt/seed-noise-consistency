@@ -898,7 +898,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     visualViewportPageTop: ZERO,
     visualViewportScale: ONE
   };
-  const nativeScreenAccessorsOnly = true;
   const expectedCssViewportOrientation = (viewportExpected.innerWidth > viewportExpected.innerHeight)
     ? 'landscape'
     : 'portrait';
@@ -1261,14 +1260,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   };
   const viewportObserved = { window: [], visualViewport: [], mediaQueries: __screenCollectViewportQueries() };
   const hostWindowObserved = [];
-  const displayTargets = [];
-  const viewportTargets = [];
   const hostWindowTargets = [];
   const displayReasons = [];
   const viewportReasons = [];
   const hostWindowReasons = [];
-  let displayAppliedCount = ZERO;
-  let viewportAppliedCount = ZERO;
+  const displayAppliedCount = ZERO;
+  const viewportAppliedCount = ZERO;
   let hostWindowAppliedCount = ZERO;
   if (!(mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')) {
     displayReasons.push('matchMedia:descriptor_invalid');
@@ -1288,13 +1285,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = screenExpected[key];
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      if (nativeScreenAccessorsOnly) {
-        displayReasons.push('screen.' + key + ':native_profile_mismatch_keep_native_getter');
-      } else {
-        const targetPlan = __screenBuildAccessorTarget(screenObj, screenProto, key, screenExpected[key], 'screen:display_group');
-        if (!targetPlan.ok) displayReasons.push('screen.' + key + ':' + targetPlan.reason);
-        else displayTargets.push(targetPlan.target);
-      }
+      displayReasons.push('screen.' + key + ':native_profile_mismatch_keep_native_getter');
     }
   }
   const orientationKeys = Object.keys(orientationExpected);
@@ -1312,13 +1303,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = orientationExpected[key];
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      if (nativeScreenAccessorsOnly) {
-        displayReasons.push('screen.orientation.' + key + ':native_profile_mismatch_keep_native_getter');
-      } else {
-        const targetPlan = __screenBuildAccessorTarget(orientationObj, orientationProto, key, orientationExpected[key], 'screen:display_group');
-        if (!targetPlan.ok) displayReasons.push('screen.orientation.' + key + ':' + targetPlan.reason);
-        else displayTargets.push(targetPlan.target);
-      }
+      displayReasons.push('screen.orientation.' + key + ':native_profile_mismatch_keep_native_getter');
     }
   }
   let needsMqlCoordination = false;
@@ -1342,13 +1327,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = viewportExpected[key];
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      if (nativeScreenAccessorsOnly) {
-        viewportReasons.push('window.' + key + ':native_profile_mismatch_keep_native_getter');
-      } else {
-        const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, viewportExpected[key], 'screen:viewport_group');
-        if (!targetPlan.ok) viewportReasons.push('window.' + key + ':' + targetPlan.reason);
-        else viewportTargets.push(targetPlan.target);
-      }
+      viewportReasons.push('window.' + key + ':native_profile_mismatch_keep_native_getter');
     }
   }
   const hostWindowMap = [
@@ -1402,37 +1381,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       fact.expected = item.expected;
       fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, item.expected);
       if (!fact.readFailed && !fact.matchesExpected) {
-        if (nativeScreenAccessorsOnly) {
-          viewportReasons.push('visualViewport.' + item.key + ':native_profile_mismatch_keep_native_getter');
-        } else {
-          const targetPlan = __screenBuildAccessorTarget(visualViewportObj, visualViewportProto, item.key, item.expected, 'screen:viewport_group');
-          if (!targetPlan.ok) viewportReasons.push('visualViewport.' + item.key + ':' + targetPlan.reason);
-          else viewportTargets.push(targetPlan.target);
-        }
+        viewportReasons.push('visualViewport.' + item.key + ':native_profile_mismatch_keep_native_getter');
       }
     }
-  }
-  if (displayTargets.length && displayReasons.length === ZERO) {
-    displayAppliedCount = applyCoreTargetsGroup('screen:display_group', displayTargets, 'strict');
-    __screenGroupModes.coordinationPatched = __screenGroupModes.coordinationPatched || (displayAppliedCount > ZERO);
-    __screenGroupModes.appliedTargets += displayAppliedCount;
   }
   let displayPostcheck = null;
   if (displayReasons.length === ZERO) {
     displayPostcheck = __screenCheckDisplayCoherence();
     if (!displayPostcheck.ok) {
-      if (displayAppliedCount > ZERO) {
-        __screenDiag('error', 'screen:coordination_postcheck_failed', {
-          stage: 'apply',
-          type: __screenTypeBrowser,
-          diagTag: 'screen',
-          key: 'display_group',
-          message: 'display coordination post-check failed',
-          data: __screenAugmentData('display', { outcome: 'rollback', reason: 'display_postcheck_failed', substage: 'apply', details: ['display_postcheck_failed'], mismatches: displayPostcheck.mismatches })
-        }, null);
-        rollbackAppliedCoreGroup('screen:display_group', 'display_postcheck_failed');
-        displayAppliedCount = ZERO;
-      }
       displayReasons.push('display_postcheck_failed');
     }
   }
@@ -1459,27 +1415,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       data: __screenAugmentData('display', { outcome: 'skip', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', observed: displayObserved, details: displayReasons, mismatches: displayPostcheck ? displayPostcheck.mismatches : [] })
     }, null);
   }
-  if (viewportTargets.length && viewportReasons.length === ZERO) {
-    viewportAppliedCount = applyCoreTargetsGroup('screen:viewport_group', viewportTargets, 'strict');
-    __screenGroupModes.coordinationPatched = __screenGroupModes.coordinationPatched || (viewportAppliedCount > ZERO);
-    __screenGroupModes.appliedTargets += viewportAppliedCount;
-  }
   let viewportPostcheck = null;
   if (viewportReasons.length === ZERO) {
     viewportPostcheck = __screenCheckViewportCoherence();
     if (!viewportPostcheck.ok) {
-      if (viewportAppliedCount > ZERO) {
-        __screenDiag('error', 'screen:coordination_postcheck_failed', {
-          stage: 'apply',
-          type: __screenTypeBrowser,
-          diagTag: 'screen',
-          key: 'viewport_group',
-          message: 'viewport coordination post-check failed',
-          data: __screenAugmentData('viewport', { outcome: 'rollback', reason: 'viewport_postcheck_failed', substage: 'apply', details: ['viewport_postcheck_failed'], mismatches: viewportPostcheck.mismatches })
-        }, null);
-        rollbackAppliedCoreGroup('screen:viewport_group', 'viewport_postcheck_failed');
-        viewportAppliedCount = ZERO;
-      }
       viewportReasons.push('viewport_postcheck_failed');
     }
   }
