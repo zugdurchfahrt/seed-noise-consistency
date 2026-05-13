@@ -1264,8 +1264,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const displayReasons = [];
   const viewportReasons = [];
   const hostWindowReasons = [];
-  const displayAppliedCount = ZERO;
-  const viewportAppliedCount = ZERO;
   let hostWindowAppliedCount = ZERO;
   if (!(mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')) {
     displayReasons.push('matchMedia:descriptor_invalid');
@@ -1394,14 +1392,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   if (displayReasons.length === ZERO) {
     __screenSetGroupEvidence('display', 'apply', [], displayPostcheck ? displayPostcheck.mismatches : []);
-    __screenSetGroupOutcome('display', displayAppliedCount > ZERO ? 'patched' : 'native_observed', displayAppliedCount > ZERO ? 'coordinated_apply' : 'native_coherent');
-    __screenDiag('info', displayAppliedCount > ZERO ? 'screen:display_group_applied' : 'screen:display_group_ready', {
+    __screenSetGroupOutcome('display', 'native_observed', 'native_coherent');
+    __screenDiag('info', 'screen:display_group_ready', {
       stage: 'apply',
-      type: displayAppliedCount > ZERO ? 'ok' : __screenTypePipeline,
+      type: __screenTypePipeline,
       diagTag: 'screen',
       key: 'display_group',
-      message: displayAppliedCount > ZERO ? 'display group coordinated' : 'display group already coherent',
-      data: __screenAugmentData('display', { outcome: 'return', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', details: [], mismatches: displayPostcheck ? displayPostcheck.mismatches : [], applied: displayAppliedCount, snapshot: displayPostcheck ? displayPostcheck.snapshot : null })
+      message: 'display group already coherent',
+      data: __screenAugmentData('display', { outcome: 'return', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', details: [], mismatches: displayPostcheck ? displayPostcheck.mismatches : [], applied: ZERO, snapshot: displayPostcheck ? displayPostcheck.snapshot : null })
     }, null);
   } else {
     __screenSetGroupEvidence('display', 'apply', displayReasons, displayPostcheck ? displayPostcheck.mismatches : []);
@@ -1424,14 +1422,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   }
   if (viewportReasons.length === ZERO) {
     __screenSetGroupEvidence('viewport', 'apply', [], viewportPostcheck ? viewportPostcheck.mismatches : []);
-    __screenSetGroupOutcome('viewport', viewportAppliedCount > ZERO ? 'patched' : 'native_observed', viewportAppliedCount > ZERO ? 'coordinated_apply' : 'native_coherent');
-    __screenDiag('info', viewportAppliedCount > ZERO ? 'screen:viewport_group_applied' : 'screen:viewport_group_ready', {
+    __screenSetGroupOutcome('viewport', 'native_observed', 'native_coherent');
+    __screenDiag('info', 'screen:viewport_group_ready', {
       stage: 'apply',
-      type: viewportAppliedCount > ZERO ? 'ok' : __screenTypePipeline,
+      type: __screenTypePipeline,
       diagTag: 'screen',
       key: 'viewport_group',
-      message: viewportAppliedCount > ZERO ? 'viewport group coordinated' : 'viewport group already coherent',
-      data: __screenAugmentData('viewport', { outcome: 'return', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: 'apply', details: [], mismatches: viewportPostcheck ? viewportPostcheck.mismatches : [], applied: viewportAppliedCount, snapshot: viewportPostcheck ? viewportPostcheck.snapshot : null })
+      message: 'viewport group already coherent',
+      data: __screenAugmentData('viewport', { outcome: 'return', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: 'apply', details: [], mismatches: viewportPostcheck ? viewportPostcheck.mismatches : [], applied: ZERO, snapshot: viewportPostcheck ? viewportPostcheck.snapshot : null })
     }, null);
   } else {
     __screenSetGroupEvidence('viewport', 'apply', viewportReasons, viewportPostcheck ? viewportPostcheck.mismatches : []);
