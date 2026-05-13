@@ -74,8 +74,8 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   // Read-only preflight: required dependency check, separate from guard semantics.
   const C = window.FernwehContext;
   if (!C) {
-    const canvasMissingErr = new Error('[FernwehContext] FernwehContext is undefined - module registration is not available');
-    __screenDiag('warn', 'screen:canvas_patch_context_missing', {
+    const contextMissingErr = new Error('[FernwehContext] FernwehContext is undefined - module registration is not available');
+    __screenDiag('warn', 'screen:fernweh_context_missing', {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -83,10 +83,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       message: 'FernwehContext is undefined - module registration is not available',
       data: {
         outcome: 'skip',
-        reason: 'canvas_patch_context_missing',
+        reason: 'fernweh_context_missing',
         missing: 'FernwehContext'
       }
-    }, canvasMissingErr);
+    }, contextMissingErr);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
@@ -111,7 +111,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__screenStateRoot) {
     const stateMissingErr = new Error('[FernwehContext] FernwehContext.state is undefined - module registration is not available');
-    __screenDiag('warn', 'screen:canvas_patch_state_missing', {
+    __screenDiag('warn', 'screen:fernweh_context_state_missing', {
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -119,7 +119,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       message: 'FernwehContext.state is undefined - module registration is not available',
       data: {
         outcome: 'skip',
-        reason: 'canvas_patch_state_missing',
+        reason: 'fernweh_context_state_missing',
         missing: 'FernwehContext.state'
       }
     }, stateMissingErr);
@@ -960,9 +960,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     const out = Object.assign({}, (data && typeof data === 'object') ? data : null);
     const normalizedGroup = (typeof groupName === 'string' && groupName) ? groupName : (out.group || null);
     if (normalizedGroup != null) out.group = normalizedGroup;
-    if (!Object.prototype.hasOwnProperty.call(out, 'hasVisualViewport')) out.hasVisualViewport = __screenHasVisualViewport();
-    if (!Object.prototype.hasOwnProperty.call(out, 'documentReadyState')) out.documentReadyState = __screenCurrentReadyState();
-    if (!Object.prototype.hasOwnProperty.call(out, 'appliedTargets')) out.appliedTargets = __screenGroupModes.appliedTargets;
+    out.hasVisualViewport = __screenHasVisualViewport();
+    out.documentReadyState = __screenCurrentReadyState();
+    out.appliedTargets = __screenGroupModes.appliedTargets;
     return out;
   }
   function __screenDescribeAccessorSurface(owner, proto, key) {
