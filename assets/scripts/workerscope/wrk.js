@@ -847,19 +847,43 @@ function mkWorkerBootstrapCore(opts){
       var __isServiceWorkerScope__ = function(){
         try {
           return typeof ServiceWorkerGlobalScope === 'function' && self instanceof ServiceWorkerGlobalScope;
-        } catch(_e) {}
+        } catch(_e) {
+          __emitDiag('wrk:worker_bootstrap:preflight:service_scope_detect_failed', _e, {
+            stage: 'preflight',
+            key: 'ServiceWorkerGlobalScope',
+            message: 'service worker scope detection failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'service_worker_scope_detect_failed' }
+          });
+        }
         return false;
       };
       var __detectWorkerScopeKind__ = function(){
         try {
           if (typeof SharedWorkerGlobalScope === 'function' && self instanceof SharedWorkerGlobalScope) return 'shared';
-        } catch(_e) {}
+        } catch(_e) {
+          __emitDiag('wrk:worker_bootstrap:preflight:shared_scope_detect_failed', _e, {
+            stage: 'preflight',
+            key: 'SharedWorkerGlobalScope',
+            message: 'shared worker scope detection failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'shared_worker_scope_detect_failed' }
+          });
+        }
         try {
           if (typeof DedicatedWorkerGlobalScope === 'function' && self instanceof DedicatedWorkerGlobalScope) return 'dedicated';
-        } catch(_e) {}
+        } catch(_e) {
+          __emitDiag('wrk:worker_bootstrap:preflight:dedicated_scope_detect_failed', _e, {
+            stage: 'preflight',
+            key: 'DedicatedWorkerGlobalScope',
+            message: 'dedicated worker scope detection failed',
+            type: 'browser structure missing data',
+            data: { outcome: 'skip', reason: 'dedicated_worker_scope_detect_failed' }
+          });
+        }
         return null;
       };
-      var __ENV_WORKER_SCOPE_KIND__ = __detectWorkerScopeKind__();
+      var __ENV_WORKER_SCOPE_KIND__ = null;
       var __serializeDiagErr = function(err){
         if (!err) return null;
         var out = {};
@@ -946,6 +970,7 @@ function mkWorkerBootstrapCore(opts){
         }
         __relayDiag('error', code, ctx, e);
       };
+      __ENV_WORKER_SCOPE_KIND__ = __detectWorkerScopeKind__();
       var __emit = function(msg){
         var sent = false;
         try {
