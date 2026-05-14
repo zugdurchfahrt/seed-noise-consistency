@@ -20,7 +20,7 @@ import selenium.webdriver.chromium.service as selenium_chromium_service
 from selenium.common.exceptions import WebDriverException
 import undetected_chromedriver as uc
 
-# -----------------------CONSTANT VARIABLES-----------------------
+# ----------------------- FOLDERS -----------------------
 OPENVPN_PATH             = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
 PROJECT_ROOT             = pathlib.Path(__file__).resolve().parent
 TOOLS                    = PROJECT_ROOT / 'tools'
@@ -63,7 +63,7 @@ MITMPROXY_HOST = "127.0.0.1"
 MITMPROXY_PORT = 8082
 MITMPROXY_ADDRESS = f"{MITMPROXY_HOST}:{MITMPROXY_PORT}"
 
-# LOCAL MODULES PATHS
+# LOCAL PYTHON MODULES PATHS
 PY_MODULE_DIRS = [
     PROJECT_ROOT / "tools" / "tools_infra",
     PROJECT_ROOT / "tools" / "tools_runtime",
@@ -76,7 +76,7 @@ for d in PY_MODULE_DIRS:
         raise FileNotFoundError(d)
     sys.path.insert(0, str(d))
     
-# ----------------------- DICTS-----------------------
+# ----------------------- SOURCE -----------------------
 from profile_data_source.depo_browser import chrome_versions, edge_versions, safari_versions, firefox_versions
 from profile_data_source.datashell_win32 import data_4_win32
 from profile_data_source.macintel import macintel_data
@@ -86,7 +86,6 @@ import tools.generators.cdp_worker_env as cdp_worker_env
 import tools.tools_runtime.helpers as helpers_module
 import tools.tools_runtime.headers_adapter as headers_adapter_module
 import tools.tools_infra.vpn_utils as vpn_utils_module
-
 import tools.generators.rand_met as rand_met_module
 import profile_data_source.plugins_dict as plugins_dict_module
 import profile_data_source.permissions_dict as permissions_dict_module
@@ -114,7 +113,6 @@ setup_logger(child_levels={
     "cdp_worker_env": logging.INFO,
 })
 
-
 # ----------------------- RNG POOLS -----------------------
 def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
     if not isinstance(global_seed, str) or not global_seed.strip():
@@ -139,7 +137,7 @@ def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
 # ----------------------- RNG POOLS FOR FONT GENERATION -----------------------
 # main injects one rand_met-specific derivative, and rand_met derives
 # its internal manifest/meta/cache branches from that single seam.
-#
+
 def _derive_rand_met_seed_material(global_seed: str, label: str) -> str:
     if not isinstance(global_seed, str) or not global_seed.strip():
         raise ValueError("global_seed must be a non-empty string")
@@ -366,7 +364,7 @@ def init_driver(
     # Disable it to avoid double canvas noise on top of our controlled pipeline.
     chrome_options.add_argument("--disable-features=CanvasNoise")
     # navigator.deviceMemory is a read-only native accessor; patching it breaks native shape.
-    # ReduceDeviceMemory makes Chrome return 8 natively, without a JS accessor patch.
+    # ReduceDeviceMemory makes Chrome return value for 8 gb RAM natively, without a JS accessor patch.
     chrome_options.add_argument("--enable-features=ReduceDeviceMemory")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--no-sandbox")
@@ -580,7 +578,7 @@ def init_driver(
             # --- logger after bootstrap owner-space ---
             Path(SCRIPTS_CORE / "set_log.js").read_text("utf-8"),
             "LOGGingModule(window);",
-            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),
+            # Path(SCRIPTS_CORE / "probe.js").read_text("utf-8"),// --- probe for debugging, not used in production ---
             Path(SCRIPTS_CORE / "core_window.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_STEALTH / "hide_webdriver.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_MEDIA / "RTCPeerConnection.js").read_text("utf-8"),
@@ -1106,8 +1104,8 @@ def main():
             "platform_weights": [1, 0],
             # Probabilities of browser selection for each platform:
             "browser_weights": {
-                "Win32": (["chrome", "firefox", "edge"], [0.8, 0.01, 0.19]),
-                "MacIntel": (["chrome", "firefox", "safari"], [0.8, 0.01, 0.19]),
+                "Win32": (["chrome", "firefox", "edge"], [0.8, 0.001, 0.199]),
+                "MacIntel": (["chrome", "firefox", "safari"], [0.8, 0.001, 0.199]),
             },
         }
         # --------PLATFORM selection -------------------
