@@ -924,8 +924,6 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         }
         for c in temp_configs
     ]
-    should_refresh_transport_artifacts = signature_changed or not PATCH_OUT.exists()
-
     # === Step 5: create fonts-manifest.json for fingerprint_files =====
     os.makedirs(manifest_path.parent, exist_ok=True)
     with open(manifest_path, "w", encoding="utf-8") as mf:
@@ -933,23 +931,20 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     logger.info(f"fonts-manifest.json generated: ({len(manifest_payload)} fonts)")
 
     # === Step 5: render Jinja-template font_patch.generated.js =====
-    if should_refresh_transport_artifacts:
-        env = Environment(loader=FileSystemLoader(TEMPLATES), trim_blocks=True)
-        template = env.get_template('font_patch.template.j2')
-        # Data preparation for JS (with the right fields) from configs_json
-        configs_json = json.dumps(configs_for_js, ensure_ascii=False)
+    env = Environment(loader=FileSystemLoader(TEMPLATES), trim_blocks=True)
+    template = env.get_template('font_patch.template.j2')
+    # Data preparation for JS (with the right fields) from configs_json
+    configs_json = json.dumps(configs_for_js, ensure_ascii=False)
 
-        output = template.render(
-            configs_json=configs_json,
-            PLATFORM=platform
-        )
+    output = template.render(
+        configs_json=configs_json,
+        PLATFORM=platform
+    )
 
-        os.makedirs(PATCH_OUT.parent, exist_ok=True)
-        with open(PATCH_OUT, "w", encoding="utf-8") as outf:
-            outf.write(output)
-        logger.info(f" File is generated {PATCH_OUT.name}")
-    else:
-        logger.info(f" File is kept as-is {PATCH_OUT.name} (unchanged transport_signature)")
+    os.makedirs(PATCH_OUT.parent, exist_ok=True)
+    with open(PATCH_OUT, "w", encoding="utf-8") as outf:
+        outf.write(output)
+    logger.info(f" File is generated {PATCH_OUT.name}")
 
     if signature_changed:
         idx["transport_signature"] = next_transport_signature
