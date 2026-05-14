@@ -1365,6 +1365,40 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
 
   // ===  window branch (DOM exist here) ====
   if (__fontDocument && __fontFontFaceSet && typeof __fontFontFaceSet.add === 'function') {
+    function __applyFontPatchCss() {
+      let css = '';
+      for (const f of fonts) {
+        if (!f || typeof f !== 'object') continue;
+        const fam = (f.cssFamily || f.family);
+        const url = f.url;
+        if (!fam || typeof fam !== 'string') continue;
+        if (!url || typeof url !== 'string') continue;
+
+        const famCss = JSON.stringify(String(fam));
+        const urlCss = JSON.stringify(String(url));
+        css += `@font-face{font-family:${famCss};src:url(${urlCss}) format("woff2");font-weight:${f.weight||"normal"};font-style:${f.style||"normal"};font-display:swap;}`;
+      }
+      const tagId = 'font-patch-styles';
+      const apply = () => {
+        let styleEl = __fontDocument.getElementById(tagId) || __fontDocument.createElement('style');
+        styleEl.id = tagId;
+        (__fontDocument.head || __fontDocument.documentElement || __fontDocument.body).appendChild(styleEl);
+        styleEl.textContent = css;
+      };
+
+      if (__fontDocument.readyState === 'loading') {
+        const tryApply = () => {
+          if (__fontDocument.head || __fontDocument.documentElement || __fontDocument.body) apply();
+          else requestAnimationFrame(tryApply);
+        };
+        tryApply();
+      } else {
+        apply();
+      }
+    }
+
+    __applyFontPatchCss();
+
     Promise.allSettled(
       fonts.map((f) => {
         try {
@@ -1418,40 +1452,40 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       const loaded = results.filter((r) => r.status === 'fulfilled').length;
       const failed = results.filter((r) => r.status === 'rejected').length;
 
+      if (failed > 0) {
+        const first = results.find((r) => r.status === 'rejected');
+        const err = first && ('reason' in first) ? first.reason : new Error('font load failed');
+
+        __setFontsRuntimeState(false, null);
+        try {
+          __fontsState.error = String((err && (err.stack || err.message)) || err);
+          __refreshFontsEpochState();
+        } catch (eSet) {
+          __fontDiagPipeline('warn', 'fonts:data:set_error_failed', {
+            stage: 'runtime',
+            key: 'FernwehContext.state.__FONTS__.error',
+            message: 'font error state write failed',
+            type: __fontTypePipeline,
+            data: { outcome: 'skip', reason: 'set_error_failed' }
+          }, eSet);
+        }
+
+        __settleAwaitFontsReady('rejected', err);
+        __fontDiagBrowser('warn', 'fonts:load_settled_with_failures', {
+          stage: 'runtime',
+          diagTag: 'fonts',
+          key: 'document.fonts',
+          message: 'font load settled with failures',
+          data: { outcome: 'skip', reason: 'load_settled_with_failures', loaded: loaded, failed: failed }
+        }, err);
+        return;
+      }
+
       // strict settle: wait for native document.fonts.ready + double RAF before exposing fontsready
       return Promise.resolve()
         .then(() => (__fontFontFaceSet && __fontFontFaceSet.ready) || Promise.resolve())
         .then(() => __doubleRafBarrier())
         .then(() => {
-          if (failed > 0) {
-            const first = results.find((r) => r.status === 'rejected');
-            const err = first && ('reason' in first) ? first.reason : new Error('font load failed');
-
-            __setFontsRuntimeState(false, null);
-            try {
-              __fontsState.error = String((err && (err.stack || err.message)) || err);
-              __refreshFontsEpochState();
-            } catch (eSet) {
-              __fontDiagPipeline('warn', 'fonts:data:set_error_failed', {
-                stage: 'runtime',
-                key: 'FernwehContext.state.__FONTS__.error',
-                message: 'font error state write failed',
-                type: __fontTypePipeline,
-                data: { outcome: 'skip', reason: 'set_error_failed' }
-              }, eSet);
-            }
-
-            __settleAwaitFontsReady('rejected', err);
-            __fontDiagBrowser('warn', 'fonts:load_settled_with_failures', {
-              stage: 'runtime',
-              diagTag: 'fonts',
-              key: 'document.fonts',
-              message: 'font load settled with failures',
-              data: { outcome: 'skip', reason: 'load_settled_with_failures', loaded: loaded, failed: failed }
-            }, err);
-            return;
-          }
-
           __setFontsRuntimeState(true, null);
           __settleAwaitFontsReady('resolved');
           try {
@@ -1507,40 +1541,6 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         data: { outcome: 'skip', reason: 'unexpected_rejection' }
       }, e);
     });
-  
-      // CSS @font-face →Only in the window
-  (function injectCss(){
-    let css = '';
-    for (const f of fonts) {
-      if (!f || typeof f !== 'object') continue;
-      const fam = (f.cssFamily || f.family);
-      const url = f.url;
-      if (!fam || typeof fam !== 'string') continue;
-      if (!url || typeof url !== 'string') continue;
-
-      const famCss = JSON.stringify(String(fam));
-      const urlCss = JSON.stringify(String(url));
-      css += `@font-face{font-family:${famCss};src:url(${urlCss}) format("woff2");font-weight:${f.weight||"normal"};font-style:${f.style||"normal"};font-display:swap;}`;
-    }
-    const tagId = 'font-patch-styles';
-    const apply = () => {
-      let styleEl = __fontDocument.getElementById(tagId) || __fontDocument.createElement('style');
-      styleEl.id = tagId;
-      (__fontDocument.head || __fontDocument.documentElement || __fontDocument.body).appendChild(styleEl);
-      styleEl.textContent = css;
-    };
-
-    // НОВОЕ: не ждём строго DOMContentLoaded — пробуем как только появляется контейнер
-    if (__fontDocument.readyState === 'loading') {
-      const tryApply = () => {
-        if (__fontDocument.head || __fontDocument.documentElement || __fontDocument.body) apply();
-        else requestAnimationFrame(tryApply);
-      };
-      tryApply();
-    } else {
-      apply();
-    }
-  })();
   }
   } catch (e) {
     let rollbackErr = null;
