@@ -1218,73 +1218,16 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     }
   }, null);
 
-  // promise_method group: load
-  applyTargetGroup('fonts:promise', [{
-    owner: proto,
-    key: 'load',
-    kind: 'promise_method',
-    wrapLayer: 'core_wrapper',
-    invokeClass: 'brand_strict',
-    validThis: isFontFaceSetThis,
-    invalidThis: 'throw',
-    policy: 'skip',
-      diagTag: 'fonts:promise:load',
-      invoke(orig, args) {
-        const query = args[0];
-        const text = args[1];
-        if (throttled()) return Promise.resolve([]);
-        if (query != null && typeof query !== 'string') {
-          try {
-            return Reflect.apply(orig, this, args);
-          } catch (e) {
-            __fontDiagBrowser('warn', 'fonts:promise:load:native_throw', {
-              stage: 'runtime',
-              key: 'FontFaceSet.load',
-              message: 'FontFaceSet.load threw',
-              data: { outcome: 'throw', reason: 'native_throw' }
-            }, e);
-            throw e;
-          }
-        }
-        if (!validFontQuery(query)) {
-          try {
-            return Reflect.apply(orig, this, args);
-          } catch (e) {
-            __fontDiagBrowser('warn', 'fonts:promise:load:native_throw', {
-              stage: 'runtime',
-              key: 'FontFaceSet.load',
-              message: 'FontFaceSet.load threw',
-              data: { outcome: 'throw', reason: 'native_throw' }
-            }, e);
-            throw e;
-          }
-        }
-        if (text != null && typeof text !== 'string') {
-          try {
-            return Reflect.apply(orig, this, args);
-          } catch (e) {
-            __fontDiagBrowser('warn', 'fonts:promise:load:native_throw', {
-              stage: 'runtime',
-              key: 'FontFaceSet.load',
-              message: 'FontFaceSet.load threw',
-              data: { outcome: 'throw', reason: 'native_throw' }
-            }, e);
-            throw e;
-          }
-        }
-        try {
-          return Reflect.apply(orig, this, args);
-        } catch (e) {
-          __fontDiagBrowser('warn', 'fonts:promise:load:native_throw', {
-            stage: 'runtime',
-            key: 'FontFaceSet.load',
-            message: 'FontFaceSet.load threw',
-            data: { outcome: 'throw', reason: 'native_throw' }
-          }, e);
-          throw e;
-        }
-      }
-  }], 'skip');
+  __fontDiagBrowser('warn', 'fonts:promise:load:no_admissible_public_method_carrier', {
+    stage: 'preflight',
+    diagTag: 'fonts:promise:load',
+    key: 'FontFaceSet.load',
+    message: 'FontFaceSet.load public method wrapper skipped to preserve native abuse/error path',
+    data: {
+      outcome: 'skip',
+      reason: 'no_admissible_public_method_carrier'
+    }
+  }, null);
 })();
 
   const domPlat = __fontDomPlatform;
