@@ -1104,8 +1104,8 @@ def main():
             "platform_weights": [1, 0],
             # Probabilities of browser selection for each platform:
             "browser_weights": {
-                "Win32": (["chrome", "firefox", "edge"], [0.8, 0.001, 0.199]),
-                "MacIntel": (["chrome", "firefox", "safari"], [0.8, 0.001, 0.199]),
+                "Win32": (["chrome", "firefox", "edge"], [0.8, 0, 0.2]),
+                "MacIntel": (["chrome", "firefox", "safari"], [0.8, 0, 0.2]),
             },
         }
         # --------PLATFORM selection -------------------
