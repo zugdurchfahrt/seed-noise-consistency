@@ -1196,59 +1196,27 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     return true;
   };
 
-  // method group: check + forEach(declare-only)
-  applyTargetGroup('fonts:method', [
-    {
-      owner: proto,
-      key: 'check',
-      kind: 'method',
-      wrapLayer: 'core_wrapper',
-      invokeClass: 'brand_strict',
-      validThis: isFontFaceSetThis,
-      invalidThis: 'throw',
-      policy: 'skip',
-      diagTag: 'fonts:method:check',
-      invoke(orig, args) {
-        const query = args[0];
-        if (throttled()) return false;
-        if (query != null && typeof query !== 'string') {
-          try {
-            return Reflect.apply(orig, this, args);
-          } catch (e) {
-            __fontDiagBrowser('warn', 'fonts:method:check:native_throw', {
-              stage: 'runtime',
-              key: 'FontFaceSet.check',
-              message: 'FontFaceSet.check threw',
-              data: { outcome: 'throw', reason: 'native_throw' }
-            }, e);
-            throw e;
-          }
-        }
-        if (!validFontQuery(query)) return false;
-        try {
-          return Reflect.apply(orig, this, args);
-        } catch (e) {
-          __fontDiagBrowser('warn', 'fonts:method:check:native_throw', {
-            stage: 'runtime',
-            key: 'FontFaceSet.check',
-            message: 'FontFaceSet.check threw',
-            data: { outcome: 'throw', reason: 'native_throw' }
-          }, e);
-          throw e;
-        }
-      }
-    },
-    {
-      owner: proto,
-      key: 'forEach',
-      kind: 'method',
-      wrapLayer: 'named_wrapper',
-      mode: 'declare_only',
-      enabled: false,
-      policy: 'skip',
-      diagTag: 'fonts:method:forEach'
+  __fontDiagBrowser('warn', 'fonts:method:check:no_admissible_public_method_carrier', {
+    stage: 'preflight',
+    diagTag: 'fonts:method:check',
+    key: 'FontFaceSet.check',
+    message: 'FontFaceSet.check public method wrapper skipped to preserve native abuse/error path',
+    data: {
+      outcome: 'skip',
+      reason: 'no_admissible_public_method_carrier'
     }
-  ], 'skip');
+  }, null);
+
+  __fontDiagBrowser('warn', 'fonts:method:forEach:no_admissible_public_method_carrier', {
+    stage: 'preflight',
+    diagTag: 'fonts:method:forEach',
+    key: 'FontFaceSet.forEach',
+    message: 'FontFaceSet.forEach public method wrapper skipped to preserve native abuse/error path',
+    data: {
+      outcome: 'skip',
+      reason: 'no_admissible_public_method_carrier'
+    }
+  }, null);
 
   // promise_method group: load
   applyTargetGroup('fonts:promise', [{
@@ -1278,7 +1246,19 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
             throw e;
           }
         }
-        if (!validFontQuery(query)) return Promise.resolve([]);
+        if (!validFontQuery(query)) {
+          try {
+            return Reflect.apply(orig, this, args);
+          } catch (e) {
+            __fontDiagBrowser('warn', 'fonts:promise:load:native_throw', {
+              stage: 'runtime',
+              key: 'FontFaceSet.load',
+              message: 'FontFaceSet.load threw',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            }, e);
+            throw e;
+          }
+        }
         if (text != null && typeof text !== 'string') {
           try {
             return Reflect.apply(orig, this, args);
