@@ -444,7 +444,10 @@ const AudioContextModule = function AudioContextModule(window) {
     const maxValue = Number(detune.maxValue);
     const hasBounds = Number.isFinite(minValue) && Number.isFinite(maxValue) && maxValue > minValue;
     const span = hasBounds ? (maxValue - minValue) : Math.max(1, Math.abs(Number(detune.value) || 0));
-    const delta = (R() < 0.5 ? -1 : 1) * Math.max(Number.EPSILON, span / Math.max(1, safeSampleRate * safeSampleRate));
+    const noiseUnit = (R() * 2) - 1;
+    const baseMagnitude = span / Math.max(1, safeSampleRate * safeSampleRate);
+    const dspResolutionLift = Math.max(1, Math.sqrt(Math.log2(safeSampleRate)));
+    const delta = noiseUnit * Math.max(Number.EPSILON, baseMagnitude * dspResolutionLift);
     const nextValue = detune.value + delta;
     if (!Number.isFinite(nextValue)) return false;
     if (hasBounds && (nextValue < minValue || nextValue > maxValue)) return false;
@@ -1066,6 +1069,4 @@ const AudioContextModule = function AudioContextModule(window) {
     }
     throw rollbackErr;
   }
-
-  // Snapshot variant: do not touch OfflineAudioContext.startRendering.
 };

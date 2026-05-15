@@ -146,7 +146,7 @@ def _derive_rand_met_seed_material(global_seed: str, label: str) -> str:
     material = f"__RAND_SEED_POOL__|{label}|{global_seed}".encode("utf-8")
     return hashlib.sha256(material).hexdigest()
 
-# ----------------------- PIPELINE INIT ЫABILISATION -----------------------                                                                                                                                                                                                                                                                                            # ----------------------- GLOBAL VARIABLES -----------------------
+# ----------------------- PIPELINE INIT STABILISATION -----------------------                                                                                                                                                                                                                                                                                            # ----------------------- GLOBAL VARIABLES -----------------------
 country_data = None
 # ----------------------- PROFILE FUNCTION -----------------------
 def get_random_profile(country_data, platform):
@@ -360,10 +360,11 @@ def init_driver(
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
     chrome_options.add_argument(f"--user-agent={user_agent}")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    # it keeps Chromium audio service inside the browser process
+    chrome_options.add_argument("--disable-features=AudioServiceOutOfProcess")
     # Chrome enables CanvasNoise by default in Incognito/testing flows.
     # Disable it to avoid double canvas noise on top of our controlled pipeline.
     chrome_options.add_argument("--disable-features=CanvasNoise")
-    # navigator.deviceMemory is a read-only native accessor; patching it breaks native shape.
     # ReduceDeviceMemory makes Chrome return value for 8 gb RAM natively, without a JS accessor patch.
     chrome_options.add_argument("--enable-features=ReduceDeviceMemory")
     chrome_options.add_argument("--disable-infobars")
