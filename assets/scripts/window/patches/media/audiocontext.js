@@ -53,23 +53,23 @@ const AudioContextModule = function AudioContextModule(window) {
 
   const C = window.FernwehContext;
   if (!C) {
-    degrade('audiocontext:canvas_patch_context_missing', new Error('[FernwehContext] FernwehContext is undefined — module registration is not available'), {
+    degrade('audiocontext:pipeline_context_missing', new Error('[FernwehContext] FernwehContext is undefined — module registration is not available'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
       key: 'FernwehContext',
-      data: { outcome: 'skip', reason: 'canvas_patch_context_missing' }
+      data: { outcome: 'skip', reason: 'pipeline_context_missing' }
     });
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    degrade('audiocontext:canvas_patch_state_missing', new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available'), {
+    degrade('audiocontext:pipeline_state_missing', new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available'), {
       stage: 'preflight',
       level: 'fatal',
       type: __audioTypePipeline,
       key: 'FernwehContext.state',
-      data: { outcome: 'skip', reason: 'canvas_patch_state_missing' }
+      data: { outcome: 'skip', reason: 'pipeline_state_missing' }
     });
     return;
   }
@@ -132,45 +132,9 @@ const AudioContextModule = function AudioContextModule(window) {
     return;
   }
 
-  const safeDefine = (__core && typeof __core.__safeDefine === 'function') ? __core.__safeDefine : null;
-  const __wrapNativeApply = (__core && typeof __core.__wrapNativeApply === 'function') ? __core.__wrapNativeApply : null;
-  const __wrapNativeAccessor = (__core && typeof __core.__wrapNativeAccessor === 'function') ? __core.__wrapNativeAccessor : null;
-  const __corePreflightTarget = (__core && typeof __core.preflightTarget === 'function')
-    ? __core.preflightTarget
-    : null;
   const __coreApplyTargets = (__core && typeof __core.applyTargets === 'function')
     ? __core.applyTargets
     : null;
-  if (typeof safeDefine !== 'function') {
-    degrade('audiocontext:safe_define_missing', new Error('[AudioContextPatch] Core.__safeDefine missing'), {
-      stage: 'preflight',
-      level: 'fatal',
-      type: __audioTypePipeline,
-      key: 'Core.__safeDefine',
-      data: { outcome: 'skip', reason: 'safe_define_missing' }
-    });
-    return;
-  }
-  if (typeof __wrapNativeApply !== 'function') {
-    degrade('audiocontext:wrap_native_apply_missing', new Error('[AudioContextPatch] Core.__wrapNativeApply missing'), {
-      stage: 'preflight',
-      level: 'fatal',
-      type: __audioTypePipeline,
-      key: 'Core.__wrapNativeApply',
-      data: { outcome: 'skip', reason: 'wrap_native_apply_missing' }
-    });
-    return;
-  }
-  if (typeof __wrapNativeAccessor !== 'function') {
-    degrade('audiocontext:wrap_native_accessor_missing', new Error('[AudioContextPatch] Core.__wrapNativeAccessor missing'), {
-      stage: 'preflight',
-      level: 'fatal',
-      type: __audioTypePipeline,
-      key: 'Core.__wrapNativeAccessor',
-      data: { outcome: 'skip', reason: 'wrap_native_accessor_missing' }
-    });
-    return;
-  }
   if (typeof __coreApplyTargets !== 'function') {
     degrade('audiocontext:core_apply_targets_missing', new Error('[AudioContextPatch] Core.applyTargets is required'), {
       stage: 'preflight',
@@ -181,7 +145,6 @@ const AudioContextModule = function AudioContextModule(window) {
     });
     return;
   }
-  const AUDIO_NOISE_ENABLED = true;
 
   // ===== MODULE: canonical guard client (GuardFlag.md) =====
   const __flagKey = '__PATCH_AUDIOCONTEXT__';
@@ -271,18 +234,6 @@ const AudioContextModule = function AudioContextModule(window) {
     // not an own property: allow shadowing if method exists on prototype chain
     const inherited = getPropDescriptorDeep(proto, method);
     if (!inherited) { noteIssue(`missing_method:${method}`, ctxName); return false; }
-    return true;
-  }
-
-  function isSameDescriptor(actual, expected) {
-    if (!actual || !expected) return false;
-    const keys = ['configurable', 'enumerable', 'writable', 'value', 'get', 'set'];
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i];
-      if (Object.prototype.hasOwnProperty.call(expected, k)) {
-        if (actual[k] !== expected[k]) return false;
-      }
-    }
     return true;
   }
 
@@ -404,7 +355,7 @@ const AudioContextModule = function AudioContextModule(window) {
     return applied.length;
   }
 
-  // 1. lazy native values for sampleRate/baseLatency (avoid eager AudioContext init)// let sampleRateSource =;  0=default, 1=offline, 2=audio
+  // 1. lazy native values for sampleRate/baseLatency (avoid eager AudioContext init)
   let nativeSampleRate = 44100, nativeBaseLatency = 0.0029;
   let sampleRateSource = 0;
   let baseLatencySource = 0;
@@ -583,7 +534,7 @@ const AudioContextModule = function AudioContextModule(window) {
 
   // 5. patch AnalyserNode (preserveing invariants)
   const dCreateAnalyser = Object.getOwnPropertyDescriptor(proto, 'createAnalyser') || getPropDescriptorDeep(proto, 'createAnalyser');
-  if (AUDIO_NOISE_ENABLED && dCreateAnalyser && typeof dCreateAnalyser.value === 'function' && canReplaceMethod(proto, 'createAnalyser', CTX_NAME)) {
+  if (dCreateAnalyser && typeof dCreateAnalyser.value === 'function' && canReplaceMethod(proto, 'createAnalyser', CTX_NAME)) {
     targets.push({
       owner: proto,
       key: 'createAnalyser',
@@ -657,7 +608,6 @@ const AudioContextModule = function AudioContextModule(window) {
               });
               throw e;
             }
-            if (!AUDIO_NOISE_ENABLED) return result;
             try {
               let delta = 0;
               const n = array.length | 0;
@@ -727,7 +677,6 @@ const AudioContextModule = function AudioContextModule(window) {
               });
               throw e;
             }
-            if (!AUDIO_NOISE_ENABLED) return result;
             try {
               const lo = (typeof this.minDecibels === 'number') ? this.minDecibels : -100;
               const hi = (typeof this.maxDecibels === 'number') ? this.maxDecibels : -30;
@@ -805,7 +754,6 @@ const AudioContextModule = function AudioContextModule(window) {
               });
               throw e;
             }
-            if (!AUDIO_NOISE_ENABLED) return result;
             try {
               const n = array.length | 0;
               for (let i = 0, j = n - 1; i < j; i++, j--) {
@@ -876,7 +824,6 @@ const AudioContextModule = function AudioContextModule(window) {
               });
               throw e;
             }
-            if (!AUDIO_NOISE_ENABLED) return result;
             const n = array.length | 0;
             if (!n) return result;
 
@@ -939,7 +886,7 @@ const AudioContextModule = function AudioContextModule(window) {
     };
     const targets = [];
     const dCreateOscillator = Object.getOwnPropertyDescriptor(proto, 'createOscillator') || getPropDescriptorDeep(proto, 'createOscillator');
-    if (AUDIO_NOISE_ENABLED && dCreateOscillator && typeof dCreateOscillator.value === 'function' && canReplaceMethod(proto, 'createOscillator', CTX_NAME)) {
+    if (dCreateOscillator && typeof dCreateOscillator.value === 'function' && canReplaceMethod(proto, 'createOscillator', CTX_NAME)) {
       targets.push({
         owner: proto,
         key: 'createOscillator',
@@ -973,7 +920,7 @@ const AudioContextModule = function AudioContextModule(window) {
           return oscillator;
         }
       });
-    } else if (AUDIO_NOISE_ENABLED) {
+    } else {
       noteIssue('missing_method:createOscillator', CTX_NAME);
     }
     __totalTargets += targets.length;
@@ -986,7 +933,7 @@ const AudioContextModule = function AudioContextModule(window) {
   const oscillatorStartDesc = oscillatorStartOwner
     ? (Object.getOwnPropertyDescriptor(oscillatorStartOwner, 'start') || getPropDescriptorDeep(oscillatorStartOwner, 'start'))
     : null;
-  if (AUDIO_NOISE_ENABLED && oscillatorStartOwner && oscillatorStartDesc && typeof oscillatorStartDesc.value === 'function' && canReplaceMethod(oscillatorStartOwner, 'start', 'AudioScheduledSourceNode')) {
+  if (oscillatorStartOwner && oscillatorStartDesc && typeof oscillatorStartDesc.value === 'function' && canReplaceMethod(oscillatorStartOwner, 'start', 'AudioScheduledSourceNode')) {
     const validScheduledSourceThis = function validScheduledSourceThis(self) {
       return !!self && oscillatorStartOwner.isPrototypeOf(self);
     };
@@ -1032,7 +979,7 @@ const AudioContextModule = function AudioContextModule(window) {
     }];
     __totalTargets += targets.length;
     __totalApplied += applyCoreTargetsGroup('audiocontext:AudioScheduledSourceNode:proto', targets, 'skip');
-  } else if (AUDIO_NOISE_ENABLED) {
+  } else {
     noteIssue('missing_method:start', 'AudioScheduledSourceNode');
   }
 
