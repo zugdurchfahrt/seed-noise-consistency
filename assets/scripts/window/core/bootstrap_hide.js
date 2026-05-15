@@ -205,6 +205,42 @@ if (typeof fernwehState.defaultCtx2dFont !== 'string' || !fernwehState.defaultCt
   __defineHiddenValue__(fernwehState, 'defaultCtx2dFont', null);
 }
 
+// FernwehContext.state.__AUDIOCONTEXT__
+const audioContextRoot = __ensureHiddenObjectSlot__(
+  stateRoot,
+  '__AUDIOCONTEXT__',
+  '[module] FernwehContext.state.__AUDIOCONTEXT__ bootstrap failed',
+  () => Object.create(null)
+);
+
+const audioContextState = __ensureHiddenObjectSlot__(
+  audioContextRoot,
+  '__STATE__',
+  '[module] FernwehContext.state.__AUDIOCONTEXT__.__STATE__ bootstrap failed',
+  () => ({
+    ready: false,
+    status: 'bootstrap',
+    error: null,
+    reason: null,
+    ctxClasses: 0,
+    offlineCtxClasses: 0,
+    targets: 0,
+    applied: 0,
+    nativeSampleRate: null,
+    nativeBaseLatency: null
+  })
+);
+if (audioContextState.ready !== true) audioContextState.ready = false;
+if (typeof audioContextState.status !== 'string') audioContextState.status = 'bootstrap';
+if (!Object.prototype.hasOwnProperty.call(audioContextState, 'error')) audioContextState.error = null;
+if (!Object.prototype.hasOwnProperty.call(audioContextState, 'reason')) audioContextState.reason = null;
+if (!Number.isFinite(Number(audioContextState.ctxClasses))) audioContextState.ctxClasses = 0;
+if (!Number.isFinite(Number(audioContextState.offlineCtxClasses))) audioContextState.offlineCtxClasses = 0;
+if (!Number.isFinite(Number(audioContextState.targets))) audioContextState.targets = 0;
+if (!Number.isFinite(Number(audioContextState.applied))) audioContextState.applied = 0;
+if (!Object.prototype.hasOwnProperty.call(audioContextState, 'nativeSampleRate')) audioContextState.nativeSampleRate = null;
+if (!Object.prototype.hasOwnProperty.call(audioContextState, 'nativeBaseLatency')) audioContextState.nativeBaseLatency = null;
+
 // FernwehContext.state.__WEBGL_STATE__
 const webglState = __ensureHiddenObjectSlot__(
   stateRoot,

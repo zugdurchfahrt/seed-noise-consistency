@@ -1,9 +1,8 @@
 const AudioContextModule = function AudioContextModule(window) {
-  const __audioTypePipeline = 'pipeline missing data';
-  const __audioTypeBrowser = 'browser structure missing data';
-
   const __MODULE = 'audiocontext';
   const __SURFACE = 'audio';
+  const __audioTypePipeline = 'pipeline missing data';
+  const __audioTypeBrowser = 'browser structure missing data';
 
   const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
     ? window.FernwehContext.__logger
@@ -39,55 +38,50 @@ const AudioContextModule = function AudioContextModule(window) {
     return __emit(level, code, ctx, err);
   }
 
-  function emitDegrade(level, code, err, extra) {
-    return __moduleDiag(level, code, extra, err);
-  }
-
-  function degrade(code, err, extra) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const lvl = (x.level === 'info' || x.level === 'warn' || x.level === 'error' || x.level === 'fatal')
-      ? x.level
-      : 'warn';
-    emitDegrade(lvl, code, err, x);
-  }
-
   const C = window.FernwehContext;
   if (!C) {
-    degrade('audiocontext:pipeline_context_missing', new Error('[FernwehContext] FernwehContext is undefined — module registration is not available'), {
+    __moduleDiag('fatal', 'audiocontext:pipeline_context_missing', {
       stage: 'preflight',
-      level: 'fatal',
       type: __audioTypePipeline,
       key: 'FernwehContext',
       data: { outcome: 'skip', reason: 'pipeline_context_missing' }
-    });
+    }, new Error('[FernwehContext] FernwehContext is undefined — module registration is not available'));
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    degrade('audiocontext:pipeline_state_missing', new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available'), {
+    __moduleDiag('fatal', 'audiocontext:pipeline_state_missing', {
       stage: 'preflight',
-      level: 'fatal',
       type: __audioTypePipeline,
       key: 'FernwehContext.state',
       data: { outcome: 'skip', reason: 'pipeline_state_missing' }
-    });
+    }, new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available'));
     return;
   }
-  const __envProfileState = (__stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
-    ? __stateRoot.__ENV_PROFILE__
+  const __audioContextRoot = (__stateRoot.__AUDIOCONTEXT__ && typeof __stateRoot.__AUDIOCONTEXT__ === 'object')
+    ? __stateRoot.__AUDIOCONTEXT__
     : null;
-  const __profile = (__envProfileState && __envProfileState.profile && typeof __envProfileState.profile === 'object')
-    ? __envProfileState.profile
-    : null;
-  if (!(__stateRoot.__AUDIOCONTEXT__ && typeof __stateRoot.__AUDIOCONTEXT__ === 'object')) {
-    Object.defineProperty(__stateRoot, '__AUDIOCONTEXT__', {
-      value: Object.create(null),
-      writable: true,
-      configurable: true,
-      enumerable: false
-    });
+  if (!__audioContextRoot) {
+    __moduleDiag('fatal', 'audiocontext:module_state_missing', {
+      stage: 'preflight',
+      type: __audioTypePipeline,
+      key: 'FernwehContext.state.__AUDIOCONTEXT__',
+      data: { outcome: 'skip', reason: 'module_state_missing', missing: 'FernwehContext.state.__AUDIOCONTEXT__' }
+    }, new Error('[AudioContextPatch] FernwehContext.state.__AUDIOCONTEXT__ missing'));
+    return;
   }
-
+  const __audioContextState = (__audioContextRoot.__STATE__ && typeof __audioContextRoot.__STATE__ === 'object')
+    ? __audioContextRoot.__STATE__
+    : null;
+  if (!__audioContextState) {
+    __moduleDiag('fatal', 'audiocontext:module_state_missing', {
+      stage: 'preflight',
+      type: __audioTypePipeline,
+      key: 'FernwehContext.state.__AUDIOCONTEXT__.__STATE__',
+      data: { outcome: 'skip', reason: 'module_state_missing', missing: 'FernwehContext.state.__AUDIOCONTEXT__.__STATE__' }
+    }, new Error('[AudioContextPatch] FernwehContext.state.__AUDIOCONTEXT__.__STATE__ missing'));
+    return;
+  }
   const __core = window.Core;
   const __coreInternal = (__core && __core.__internal && typeof __core.__internal === 'object')
     ? __core.__internal
@@ -99,36 +93,33 @@ const AudioContextModule = function AudioContextModule(window) {
     ? __prngState.rand
     : null;
   if (!__randSource || typeof __randSource.use !== 'function') {
-    degrade('audiocontext:rand_missing', new Error('[AudioContextPatch] rand.use missing'), {
+    __moduleDiag('fatal', 'audiocontext:rand_missing', {
       stage: 'preflight',
-      level: 'fatal',
       type: __audioTypePipeline,
       key: 'rand.use',
       data: { outcome: 'skip', reason: 'rand_missing' }
-    });
+    }, new Error('[AudioContextPatch] rand.use missing'));
     return;
   }
   let R = null;
   try {
     R = __randSource.use('audio');
   } catch (e) {
-    degrade('audiocontext:rand_use_failed', e, {
+    __moduleDiag('fatal', 'audiocontext:rand_use_failed', {
       stage: 'preflight',
-      level: 'fatal',
       type: __audioTypePipeline,
       key: 'rand.use(audio)',
       data: { outcome: 'skip', reason: 'rand_use_failed' }
-    });
+    }, e);
     return;
   }
   if (typeof R !== 'function') {
-    degrade('audiocontext:rand_use_not_function', new Error('[AudioContextPatch] rand.use("audio") is not a function'), {
+    __moduleDiag('fatal', 'audiocontext:rand_use_not_function', {
       stage: 'preflight',
-      level: 'fatal',
       type: __audioTypePipeline,
       key: 'rand.use(audio)',
       data: { outcome: 'skip', reason: 'rand_use_not_function' }
-    });
+    }, new Error('[AudioContextPatch] rand.use("audio") is not a function'));
     return;
   }
 
@@ -136,17 +127,16 @@ const AudioContextModule = function AudioContextModule(window) {
     ? __core.applyTargets
     : null;
   if (typeof __coreApplyTargets !== 'function') {
-    degrade('audiocontext:core_apply_targets_missing', new Error('[AudioContextPatch] Core.applyTargets is required'), {
+    __moduleDiag('fatal', 'audiocontext:core_apply_targets_missing', {
       stage: 'preflight',
-      level: 'fatal',
       type: __audioTypePipeline,
       key: 'Core.applyTargets',
       data: { outcome: 'skip', reason: 'core_apply_targets_missing' }
-    });
+    }, new Error('[AudioContextPatch] Core.applyTargets is required'));
     return;
   }
 
-  // ===== MODULE: canonical guard client (GuardFlag.md) =====
+  // ===== MODULE: canonical guard client =====
   const __flagKey = '__PATCH_AUDIOCONTEXT__';
   const __tag = 'audiocontext';
   const __surface = 'audio';
@@ -177,40 +167,29 @@ const AudioContextModule = function AudioContextModule(window) {
   }
   if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
 
+  __audioContextState.ready = false;
+  __audioContextState.status = 'applying';
+  __audioContextState.reason = null;
+
+  function __releaseAudioGuard(rollbackOk, reason) {
+    try {
+      if (__core && typeof __core.releaseGuardFlag === 'function') {
+        return __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __tag);
+      }
+    } catch (eRelease) {
+      __moduleDiag('warn', __tag + ':guard_release_exception', {
+        diagTag: __tag,
+        key: 'entry_guard',
+        stage: 'rollback',
+        message: 'releaseGuardFlag threw',
+        type: __audioTypePipeline,
+        data: { outcome: 'skip', reason: 'guard_release_exception', sourceReason: reason || null }
+      }, eRelease);
+    }
+    return false;
+  }
+
   try {
-
-  const GUARD = {
-    counts: {},
-    last: null
-  };
-
-  function noteIssue(code, detail) {
-    const key = String(code);
-    GUARD.counts[key] = (GUARD.counts[key] || 0) + 1;
-    GUARD.last = { code: key, detail: detail || null, at: Date.now() };
-    const type = (key.indexOf('missing_proto:') === 0 || key.indexOf('missing_method:') === 0 || key.indexOf('non_extensible:') === 0 || key.indexOf('non_configurable:') === 0 || key.indexOf('non_writable:') === 0)
-      ? __audioTypeBrowser
-      : __audioTypePipeline;
-    emitDegrade('warn', 'audiocontext:' + key, null, {
-      diagTag: 'audiocontext:guard',
-      surface: 'audio',
-      key,
-      stage: 'guard',
-      message: key,
-      data: { outcome: 'skip', detail: detail || null },
-      type
-    });
-  }
-
-
-  function canRedefine(proto, prop, ctxName) {
-    if (!proto) { noteIssue(`missing_proto:${prop}`, ctxName); return false; }
-    if (!Object.isExtensible(proto)) { noteIssue(`non_extensible:${prop}`, ctxName); return false; }
-    const d = Object.getOwnPropertyDescriptor(proto, prop);
-    if (d && d.configurable === false) { noteIssue(`non_configurable:${prop}`, ctxName); return false; }
-    return true;
-  }
-
   function getPropDescriptorDeep(obj, prop) {
     for (let o = obj; o; o = Object.getPrototypeOf(o)) {
       const d = Object.getOwnPropertyDescriptor(o, prop);
@@ -219,38 +198,19 @@ const AudioContextModule = function AudioContextModule(window) {
     return null;
   }
 
-
-  function canReplaceMethod(proto, method, ctxName) {
-    if (!proto) { noteIssue(`missing_proto:${method}`, ctxName); return false; }
-    if (!Object.isExtensible(proto)) { noteIssue(`non_extensible:${method}`, ctxName); return false; }
-    const own = Object.getOwnPropertyDescriptor(proto, method);
-    if (own) {
-      if (own.writable === false && own.configurable === false) {
-        noteIssue(`non_writable:${method}`, ctxName);
-        return false;
-      }
-      return true;
-    }
-    // not an own property: allow shadowing if method exists on prototype chain
-    const inherited = getPropDescriptorDeep(proto, method);
-    if (!inherited) { noteIssue(`missing_method:${method}`, ctxName); return false; }
-    return true;
-  }
-
   function applyCoreTargetsGroup(groupTag, targets, policy) {
     const groupPolicy = policy === 'throw' ? 'throw' : 'skip';
     let plans = [];
     try {
-      plans = __coreApplyTargets(targets, __profile, []);
+      plans = __coreApplyTargets(targets, null, []);
     } catch (e) {
-      degrade(groupTag + ':preflight_failed', e, {
+      __moduleDiag('error', groupTag + ':preflight_failed', {
         stage: 'preflight',
-        level: 'error',
         type: __audioTypePipeline,
         diagTag: groupTag,
         key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
-      });
+      }, e);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
@@ -258,14 +218,13 @@ const AudioContextModule = function AudioContextModule(window) {
     if (!Array.isArray(plans) || !plans.length) {
       const reason = plans && plans.reason ? plans.reason : 'group_skipped';
       const err = new Error('[AudioContextPatch] target group skipped: ' + reason);
-      degrade(groupTag + ':' + reason, err, {
+      __moduleDiag('warn', groupTag + ':' + reason, {
         stage: 'preflight',
-        level: 'warn',
         type: __audioTypeBrowser,
         diagTag: groupTag,
         key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: reason, policy: groupPolicy }
-      });
+      }, err);
       if (groupPolicy === 'throw') throw err;
       return 0;
     }
@@ -292,36 +251,33 @@ const AudioContextModule = function AudioContextModule(window) {
           try {
             coreRegisterPatchedTarget(p.owner, p.key);
           } catch (e) {
-            degrade(groupTag + ':register_failed', e, {
+            __moduleDiag('error', groupTag + ':register_failed', {
               stage: 'apply',
-              level: 'error',
               type: __audioTypePipeline,
               diagTag: groupTag,
               key: p.key,
               data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'register_failed', policy: groupPolicy }
-            });
+            }, e);
             if (groupPolicy === 'throw') throw e;
           }
         }
       } else {
-        degrade(groupTag + ':missing_core_registerPatchedTarget', null, {
+        __moduleDiag('warn', groupTag + ':missing_core_registerPatchedTarget', {
           stage: 'preflight',
-          level: 'warn',
           type: __audioTypePipeline,
           diagTag: groupTag,
           key: groupTag,
           data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'missing_core_registerPatchedTarget', policy: groupPolicy }
-        });
+        }, null);
       }
     } catch (e) {
-      degrade(groupTag + ':rollback', null, {
+      __moduleDiag('warn', groupTag + ':rollback', {
         stage: 'rollback',
-        level: 'warn',
         type: __audioTypeBrowser,
         diagTag: groupTag,
         key: groupTag,
         data: { outcome: 'rollback', policy: groupPolicy }
-      });
+      }, null);
       let rollbackErr = null;
       for (let i = applied.length - 1; i >= 0; i--) {
         const p = applied[i];
@@ -330,24 +286,22 @@ const AudioContextModule = function AudioContextModule(window) {
           p.rollback();
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
-          degrade(groupTag + ':rollback_failed', re, {
+          __moduleDiag('error', groupTag + ':rollback_failed', {
             stage: 'rollback',
-            level: 'error',
             type: __audioTypeBrowser,
             diagTag: groupTag,
             key: p.key,
             data: { outcome: 'throw', policy: groupPolicy, reason: 'rollback_failed' }
-          });
+          }, re);
         }
       }
-      degrade(groupTag + ':apply_failed', e, {
+      __moduleDiag('error', groupTag + ':apply_failed', {
         stage: 'apply',
-        level: 'error',
         type: __audioTypeBrowser,
         diagTag: groupTag,
         key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
-      });
+      }, e);
       if (rollbackErr) throw rollbackErr;
       if (groupPolicy === 'throw') throw e;
       return 0;
@@ -355,12 +309,9 @@ const AudioContextModule = function AudioContextModule(window) {
     return applied.length;
   }
 
-  // 1. lazy native values for sampleRate/baseLatency (avoid eager AudioContext init)
-  let nativeSampleRate = 44100, nativeBaseLatency = 0.0029;
-  let sampleRateSource = 0;
-  let baseLatencySource = 0;
+  let sampleRateMissingNoted = false;
 
-  // 2. Actual list of classes for patch (AudioContext + webkit aliases)
+  // 1. Actual list of classes for patch (AudioContext + webkit aliases)
   const CTX_CLASSES = [
     window.AudioContext,
     window.webkitAudioContext,
@@ -390,7 +341,20 @@ const AudioContextModule = function AudioContextModule(window) {
     const detune = node.detune;
     if (!detune || typeof detune.value !== 'number') return false;
     const sampleRate = Number(node.context && node.context.sampleRate);
-    const safeSampleRate = Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : nativeSampleRate;
+    const safeSampleRate = Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : null;
+    if (!(safeSampleRate > 0)) {
+      if (!sampleRateMissingNoted) {
+        sampleRateMissingNoted = true;
+        __moduleDiag('warn', 'audiocontext:oscillator:sample_rate_missing', {
+          stage: 'hook',
+          type: __audioTypeBrowser,
+          diagTag: 'audio:OfflineAudioContext:createOscillator',
+          key: 'OfflineAudioContext.sampleRate',
+          data: { outcome: 'skip', reason: 'sample_rate_missing' }
+        }, new Error('[AudioContextPatch] sampleRate unavailable for offline oscillator adjustment'));
+      }
+      return false;
+    }
     const minValue = Number(detune.minValue);
     const maxValue = Number(detune.maxValue);
     const hasBounds = Number.isFinite(minValue) && Number.isFinite(maxValue) && maxValue > minValue;
@@ -408,13 +372,16 @@ const AudioContextModule = function AudioContextModule(window) {
   }
 
   if (!__offlineOscillators__ || !__offlineOscillatorsAdjusted__) {
-    degrade('audiocontext:offline_oscillator_state_missing', new Error('[AudioContextPatch] WeakSet state is required'), {
+    __audioContextState.ready = false;
+    __audioContextState.status = 'failed';
+    __audioContextState.reason = 'weakset_missing';
+    __moduleDiag('fatal', 'audiocontext:offline_oscillator_state_missing', {
       stage: 'preflight',
-      level: 'fatal',
       type: __audioTypePipeline,
       key: 'WeakSet',
       data: { outcome: 'skip', reason: 'weakset_missing' }
-    });
+    }, new Error('[AudioContextPatch] WeakSet state is required'));
+    __releaseAudioGuard(true, 'weakset_missing');
     return;
   }
 
@@ -431,7 +398,7 @@ const AudioContextModule = function AudioContextModule(window) {
 
     // 3. patch sampleRate/baseLatency: accessor patch via CORE targets
     const sampleRateDesc = Object.getOwnPropertyDescriptor(proto, 'sampleRate') || getPropDescriptorDeep(proto, 'sampleRate');
-    if (sampleRateDesc && typeof sampleRateDesc.get === 'function' && canRedefine(proto, 'sampleRate', CTX_NAME)) {
+    if (sampleRateDesc && typeof sampleRateDesc.get === 'function') {
       targets.push({
         owner: proto,
         key: 'sampleRate',
@@ -448,24 +415,22 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               v = Reflect.apply(origGet, this, []);
             } catch (e) {
-              degrade('audiocontext:sampleRate:native_throw', e, {
+              __moduleDiag('warn', 'audiocontext:sampleRate:native_throw', {
                 stage: 'runtime',
-                level: 'warn',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:sampleRate`,
                 key: 'sampleRate',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              });
+              }, e);
               throw e;
             }
-            if (Number.isFinite(v) && priority >= sampleRateSource) { nativeSampleRate = v; sampleRateSource = priority; }
             return v;
           }
         });
     }
     if ('baseLatency' in proto) {
       const baseLatencyDesc = Object.getOwnPropertyDescriptor(proto, 'baseLatency') || getPropDescriptorDeep(proto, 'baseLatency');
-      if (baseLatencyDesc && typeof baseLatencyDesc.get === 'function' && canRedefine(proto, 'baseLatency', CTX_NAME)) {
+      if (baseLatencyDesc && typeof baseLatencyDesc.get === 'function') {
         targets.push({
           owner: proto,
           key: 'baseLatency',
@@ -482,17 +447,15 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               v = Reflect.apply(origGet, this, []);
             } catch (e) {
-              degrade('audiocontext:baseLatency:native_throw', e, {
+              __moduleDiag('warn', 'audiocontext:baseLatency:native_throw', {
                 stage: 'runtime',
-                level: 'warn',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:baseLatency`,
                 key: 'baseLatency',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              });
+              }, e);
               throw e;
             }
-            if (Number.isFinite(v) && priority >= baseLatencySource) { nativeBaseLatency = v; baseLatencySource = priority; }
             return v;
           }
         });
@@ -501,7 +464,7 @@ const AudioContextModule = function AudioContextModule(window) {
 
 
     const dCreateBuffer = Object.getOwnPropertyDescriptor(proto, 'createBuffer') || getPropDescriptorDeep(proto, 'createBuffer');
-    if (dCreateBuffer && typeof dCreateBuffer.value === 'function' && canReplaceMethod(proto, 'createBuffer', CTX_NAME)) {
+    if (dCreateBuffer && typeof dCreateBuffer.value === 'function') {
       targets.push({
         owner: proto,
         key: 'createBuffer',
@@ -518,14 +481,13 @@ const AudioContextModule = function AudioContextModule(window) {
           try {
             return Reflect.apply(orig, this, input);
           } catch (e) {
-            degrade('audiocontext:createBuffer:native_throw', e, {
+            __moduleDiag('warn', 'audiocontext:createBuffer:native_throw', {
               stage: 'runtime',
-              level: 'warn',
               type: __audioTypeBrowser,
               diagTag: `audio:${CTX_NAME}:createBuffer`,
               key: 'createBuffer',
               data: { outcome: 'throw', reason: 'native_throw' }
-            });
+            }, e);
             throw e;
           }
         }
@@ -534,7 +496,7 @@ const AudioContextModule = function AudioContextModule(window) {
 
   // 5. patch AnalyserNode (preserveing invariants)
   const dCreateAnalyser = Object.getOwnPropertyDescriptor(proto, 'createAnalyser') || getPropDescriptorDeep(proto, 'createAnalyser');
-  if (dCreateAnalyser && typeof dCreateAnalyser.value === 'function' && canReplaceMethod(proto, 'createAnalyser', CTX_NAME)) {
+  if (dCreateAnalyser && typeof dCreateAnalyser.value === 'function') {
     targets.push({
       owner: proto,
       key: 'createAnalyser',
@@ -552,14 +514,13 @@ const AudioContextModule = function AudioContextModule(window) {
         try {
           analyser = Reflect.apply(orig, this, input);
         } catch (e) {
-          degrade('audiocontext:createAnalyser:native_throw', e, {
+          __moduleDiag('warn', 'audiocontext:createAnalyser:native_throw', {
             stage: 'runtime',
-            level: 'warn',
             type: __audioTypeBrowser,
             diagTag: `audio:${CTX_NAME}:createAnalyser`,
             key: 'createAnalyser',
             data: { outcome: 'throw', reason: 'native_throw' }
-          });
+          }, e);
           throw e;
         }
         if (!analyser || (typeof analyser !== 'object' && typeof analyser !== 'function')) return analyser;
@@ -598,14 +559,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               result = Reflect.apply(orig, this, input);
             } catch (e) {
-              degrade('audiocontext:analyser:byte_freq_native_throw', e, {
+              __moduleDiag('warn', 'audiocontext:analyser:byte_freq_native_throw', {
                 stage: 'runtime',
-                level: 'warn',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getByteFrequencyData',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              });
+              }, e);
               throw e;
             }
             try {
@@ -626,20 +586,17 @@ const AudioContextModule = function AudioContextModule(window) {
                 }
               }
             } catch (e) {
-              degrade('audiocontext:analyser:byte_freq_noise_failed', e, {
+              __moduleDiag('warn', 'audiocontext:analyser:byte_freq_noise_failed', {
                 stage: 'hook',
-                level: 'warn',
                 type: __audioTypePipeline,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getByteFrequencyData',
                 data: { outcome: 'skip', reason: 'byte_freq_noise_failed' }
-              });
+              }, e);
             }
             return result;
           }
         }], 'skip');
-      } else {
-        noteIssue('missing_method:getByteFrequencyData', CTX_NAME);
       }
       }
 
@@ -667,14 +624,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               result = Reflect.apply(orig, this, input);
             } catch (e) {
-              degrade('audiocontext:analyser:float_freq_native_throw', e, {
+              __moduleDiag('warn', 'audiocontext:analyser:float_freq_native_throw', {
                 stage: 'runtime',
-                level: 'warn',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getFloatFrequencyData',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              });
+              }, e);
               throw e;
             }
             try {
@@ -703,20 +659,17 @@ const AudioContextModule = function AudioContextModule(window) {
                 if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
               }
             } catch (e) {
-              degrade('audiocontext:analyser:float_freq_noise_failed', e, {
+              __moduleDiag('warn', 'audiocontext:analyser:float_freq_noise_failed', {
                 stage: 'hook',
-                level: 'warn',
                 type: __audioTypePipeline,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getFloatFrequencyData',
                 data: { outcome: 'skip', reason: 'float_freq_noise_failed' }
-              });
+              }, e);
             }
             return result;
           }
         }], 'skip');
-      } else {
-        noteIssue('missing_method:getFloatFrequencyData', CTX_NAME);
       }
       }
 
@@ -744,14 +697,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               result = Reflect.apply(orig, this, input);
             } catch (e) {
-              degrade('audiocontext:analyser:byte_time_native_throw', e, {
+              __moduleDiag('warn', 'audiocontext:analyser:byte_time_native_throw', {
                 stage: 'runtime',
-                level: 'warn',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getByteTimeDomainData',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              });
+              }, e);
               throw e;
             }
             try {
@@ -775,14 +727,13 @@ const AudioContextModule = function AudioContextModule(window) {
                 }
               }
             } catch (e) {
-              degrade('audiocontext:analyser:byte_time_noise_failed', e, {
+              __moduleDiag('warn', 'audiocontext:analyser:byte_time_noise_failed', {
                 stage: 'hook',
-                level: 'warn',
                 type: __audioTypePipeline,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getByteTimeDomainData',
                 data: { outcome: 'skip', reason: 'byte_time_noise_failed' }
-              });
+              }, e);
             }
             return result;
           }
@@ -814,14 +765,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               result = Reflect.apply(orig, this, input);
             } catch (e) {
-              degrade('audiocontext:analyser:float_time_native_throw', e, {
+              __moduleDiag('warn', 'audiocontext:analyser:float_time_native_throw', {
                 stage: 'runtime',
-                level: 'warn',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getFloatTimeDomainData',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              });
+              }, e);
               throw e;
             }
             const n = array.length | 0;
@@ -851,14 +801,13 @@ const AudioContextModule = function AudioContextModule(window) {
                 if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
               }
             } catch (e) {
-              degrade('audiocontext:analyser:float_time_noise_failed', e, {
+              __moduleDiag('warn', 'audiocontext:analyser:float_time_noise_failed', {
                 stage: 'hook',
-                level: 'warn',
                 type: __audioTypePipeline,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getFloatTimeDomainData',
                 data: { outcome: 'skip', reason: 'float_time_noise_failed' }
-              });
+              }, e);
             }
             return result;
           }
@@ -886,7 +835,7 @@ const AudioContextModule = function AudioContextModule(window) {
     };
     const targets = [];
     const dCreateOscillator = Object.getOwnPropertyDescriptor(proto, 'createOscillator') || getPropDescriptorDeep(proto, 'createOscillator');
-    if (dCreateOscillator && typeof dCreateOscillator.value === 'function' && canReplaceMethod(proto, 'createOscillator', CTX_NAME)) {
+    if (dCreateOscillator && typeof dCreateOscillator.value === 'function') {
       targets.push({
         owner: proto,
         key: 'createOscillator',
@@ -904,14 +853,13 @@ const AudioContextModule = function AudioContextModule(window) {
           try {
             oscillator = Reflect.apply(orig, this, input);
           } catch (e) {
-            degrade('audiocontext:createOscillator:native_throw', e, {
+            __moduleDiag('warn', 'audiocontext:createOscillator:native_throw', {
               stage: 'runtime',
-              level: 'warn',
               type: __audioTypeBrowser,
               diagTag: `audio:${CTX_NAME}:createOscillator`,
               key: 'createOscillator',
               data: { outcome: 'throw', reason: 'native_throw' }
-            });
+            }, e);
             throw e;
           }
           if (oscillator && (typeof oscillator === 'object' || typeof oscillator === 'function')) {
@@ -920,8 +868,6 @@ const AudioContextModule = function AudioContextModule(window) {
           return oscillator;
         }
       });
-    } else {
-      noteIssue('missing_method:createOscillator', CTX_NAME);
     }
     __totalTargets += targets.length;
     __totalApplied += applyCoreTargetsGroup(`audiocontext:${CTX_NAME}:proto`, targets, 'skip');
@@ -933,7 +879,7 @@ const AudioContextModule = function AudioContextModule(window) {
   const oscillatorStartDesc = oscillatorStartOwner
     ? (Object.getOwnPropertyDescriptor(oscillatorStartOwner, 'start') || getPropDescriptorDeep(oscillatorStartOwner, 'start'))
     : null;
-  if (oscillatorStartOwner && oscillatorStartDesc && typeof oscillatorStartDesc.value === 'function' && canReplaceMethod(oscillatorStartOwner, 'start', 'AudioScheduledSourceNode')) {
+  if (oscillatorStartOwner && oscillatorStartDesc && typeof oscillatorStartDesc.value === 'function') {
     const validScheduledSourceThis = function validScheduledSourceThis(self) {
       return !!self && oscillatorStartOwner.isPrototypeOf(self);
     };
@@ -953,45 +899,71 @@ const AudioContextModule = function AudioContextModule(window) {
         try {
           adjustOfflineOscillatorBeforeStart(this);
         } catch (e) {
-          degrade('audiocontext:oscillator:pre_start_adjust_failed', e, {
+          __moduleDiag('warn', 'audiocontext:oscillator:pre_start_adjust_failed', {
             stage: 'hook',
-            level: 'warn',
             type: __audioTypePipeline,
             diagTag: 'audio:AudioScheduledSourceNode:start',
             key: 'AudioScheduledSourceNode.start',
             data: { outcome: 'skip', reason: 'pre_start_adjust_failed' }
-          });
+          }, e);
         }
         try {
           return Reflect.apply(orig, this, input);
         } catch (e) {
-          degrade('audiocontext:scheduled_source:start_native_throw', e, {
+          __moduleDiag('warn', 'audiocontext:scheduled_source:start_native_throw', {
             stage: 'runtime',
-            level: 'warn',
             type: __audioTypeBrowser,
             diagTag: 'audio:AudioScheduledSourceNode:start',
             key: 'AudioScheduledSourceNode.start',
             data: { outcome: 'throw', reason: 'native_throw' }
-          });
+          }, e);
           throw e;
         }
       }
     }];
     __totalTargets += targets.length;
     __totalApplied += applyCoreTargetsGroup('audiocontext:AudioScheduledSourceNode:proto', targets, 'skip');
-  } else {
-    noteIssue('missing_method:start', 'AudioScheduledSourceNode');
   }
 
-    emitDegrade('info', __tag + ':ready', null, {
+    if (__totalApplied <= 0) {
+      __audioContextState.ready = false;
+      __audioContextState.status = 'failed';
+      __audioContextState.reason = 'no_targets_applied';
+      __moduleDiag('fatal', __tag + ':no_targets_applied', {
+        stage: 'preflight',
+        type: __audioTypeBrowser,
+        key: __tag,
+        data: { outcome: 'skip', reason: 'no_targets_applied', targets: __totalTargets, applied: __totalApplied }
+      }, new Error('[AudioContextPatch] no targets applied'));
+      __releaseAudioGuard(true, 'no_targets_applied');
+      return;
+    }
+
+    const readyStateData = {
+      ctxClasses: CTX_CLASSES.length,
+      offlineCtxClasses: OFFLINE_CTX_CLASSES.length,
+      targets: __totalTargets,
+      applied: __totalApplied
+    };
+    __audioContextState.ready = true;
+    __audioContextState.status = 'ready';
+    __audioContextState.reason = 'ready';
+    __audioContextState.ctxClasses = readyStateData.ctxClasses;
+    __audioContextState.offlineCtxClasses = readyStateData.offlineCtxClasses;
+    __audioContextState.targets = readyStateData.targets;
+    __audioContextState.applied = readyStateData.applied;
+    __moduleDiag('info', __tag + ':ready', {
       stage: 'apply',
       key: __tag,
       message: 'ok',
       type: 'ok',
-      data: { outcome: 'return', ctxClasses: CTX_CLASSES.length, targets: __totalTargets, applied: __totalApplied }
-    });
+      data: Object.assign({ outcome: 'return' }, readyStateData)
+    }, null);
   } catch (e) {
     const rollbackErr = e;
+    __audioContextState.ready = false;
+    __audioContextState.status = 'failed';
+    __audioContextState.reason = 'fatal';
     __moduleDiag('error', __tag + ':fatal', {
       diagTag: __tag,
       key: __tag,
@@ -1000,20 +972,7 @@ const AudioContextModule = function AudioContextModule(window) {
       type: __audioTypeBrowser,
       data: { outcome: 'throw', reason: 'fatal', rollbackOk: false }
     }, rollbackErr);
-    try {
-      if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__flagKey, __guardToken, false, __tag);
-      }
-    } catch (eRelease) {
-      __moduleDiag('warn', __tag + ':guard_release_failed', {
-        diagTag: __tag,
-        key: 'entry_guard',
-        stage: 'rollback',
-        message: 'releaseGuardFlag threw after apply failure',
-        type: __audioTypePipeline,
-        data: { outcome: 'skip', reason: 'guard_release_failed' }
-      }, eRelease);
-    }
+    __releaseAudioGuard(false, 'fatal');
     throw rollbackErr;
   }
 };
