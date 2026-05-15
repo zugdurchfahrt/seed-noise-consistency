@@ -414,10 +414,55 @@ const AudioContextModule = function AudioContextModule(window) {
     window.AudioContext,
     window.webkitAudioContext,
   ].filter(Boolean);
+  const OFFLINE_CTX_CLASSES = [
+    window.OfflineAudioContext,
+    window.webkitOfflineAudioContext,
+  ].filter(Boolean);
 
   const __seenProtos = new WeakSet();
+  const __seenOfflineProtos = new WeakSet();
+  const __offlineOscillators__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  const __offlineOscillatorsAdjusted__ = (typeof WeakSet === 'function') ? new WeakSet() : null;
   let __totalTargets = 0;
   let __totalApplied = 0;
+
+  const AUDIO_SCHEDULED_SOURCE_PROTO = (window.AudioScheduledSourceNode && window.AudioScheduledSourceNode.prototype)
+    ? window.AudioScheduledSourceNode.prototype
+    : null;
+  const OSCILLATOR_PROTO = (window.OscillatorNode && window.OscillatorNode.prototype)
+    ? window.OscillatorNode.prototype
+    : null;
+
+  function adjustOfflineOscillatorBeforeStart(node) {
+    if (!node || !__offlineOscillators__ || !__offlineOscillators__.has(node)) return false;
+    if (__offlineOscillatorsAdjusted__ && __offlineOscillatorsAdjusted__.has(node)) return false;
+    const detune = node.detune;
+    if (!detune || typeof detune.value !== 'number') return false;
+    const sampleRate = Number(node.context && node.context.sampleRate);
+    const safeSampleRate = Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : nativeSampleRate;
+    const minValue = Number(detune.minValue);
+    const maxValue = Number(detune.maxValue);
+    const hasBounds = Number.isFinite(minValue) && Number.isFinite(maxValue) && maxValue > minValue;
+    const span = hasBounds ? (maxValue - minValue) : Math.max(1, Math.abs(Number(detune.value) || 0));
+    const delta = (R() < 0.5 ? -1 : 1) * Math.max(Number.EPSILON, span / Math.max(1, safeSampleRate * safeSampleRate));
+    const nextValue = detune.value + delta;
+    if (!Number.isFinite(nextValue)) return false;
+    if (hasBounds && (nextValue < minValue || nextValue > maxValue)) return false;
+    detune.value = nextValue;
+    if (__offlineOscillatorsAdjusted__) __offlineOscillatorsAdjusted__.add(node);
+    return true;
+  }
+
+  if (!__offlineOscillators__ || !__offlineOscillatorsAdjusted__) {
+    degrade('audiocontext:offline_oscillator_state_missing', new Error('[AudioContextPatch] WeakSet state is required'), {
+      stage: 'preflight',
+      level: 'fatal',
+      type: __audioTypePipeline,
+      key: 'WeakSet',
+      data: { outcome: 'skip', reason: 'weakset_missing' }
+    });
+    return;
+  }
 
   for (const CTX of CTX_CLASSES) {
     const proto = CTX.prototype;
@@ -879,6 +924,113 @@ const AudioContextModule = function AudioContextModule(window) {
 
     __totalTargets += targets.length;
     __totalApplied += applyCoreTargetsGroup(`audiocontext:${CTX_NAME}:proto`, targets, 'skip');
+  }
+
+  for (const CTX of OFFLINE_CTX_CLASSES) {
+    const proto = CTX.prototype;
+    if (!proto || __seenOfflineProtos.has(proto)) continue;
+    __seenOfflineProtos.add(proto);
+    const CTX_NAME = CTX && CTX.name ? CTX.name : 'OfflineAudioContext';
+    const validOfflineAudioContextThis = function validOfflineAudioContextThis(self) {
+      return !!self && proto.isPrototypeOf(self);
+    };
+    const targets = [];
+    const dCreateOscillator = Object.getOwnPropertyDescriptor(proto, 'createOscillator') || getPropDescriptorDeep(proto, 'createOscillator');
+    if (AUDIO_NOISE_ENABLED && dCreateOscillator && typeof dCreateOscillator.value === 'function' && canReplaceMethod(proto, 'createOscillator', CTX_NAME)) {
+      targets.push({
+        owner: proto,
+        key: 'createOscillator',
+        kind: 'method',
+        wrapLayer: 'core_wrapper',
+        resolve: 'proto_chain',
+        invokeClass: 'brand_strict',
+        policy: 'skip',
+        diagTag: `audio:${CTX_NAME}:createOscillator`,
+        validThis: validOfflineAudioContextThis,
+        invalidThis: 'throw',
+        invoke: function audioOfflineCreateOscillatorInvoke(orig, args) {
+          const input = Array.isArray(args) ? args : [];
+          let oscillator;
+          try {
+            oscillator = Reflect.apply(orig, this, input);
+          } catch (e) {
+            degrade('audiocontext:createOscillator:native_throw', e, {
+              stage: 'runtime',
+              level: 'warn',
+              type: __audioTypeBrowser,
+              diagTag: `audio:${CTX_NAME}:createOscillator`,
+              key: 'createOscillator',
+              data: { outcome: 'throw', reason: 'native_throw' }
+            });
+            throw e;
+          }
+          if (oscillator && (typeof oscillator === 'object' || typeof oscillator === 'function')) {
+            __offlineOscillators__.add(oscillator);
+          }
+          return oscillator;
+        }
+      });
+    } else if (AUDIO_NOISE_ENABLED) {
+      noteIssue('missing_method:createOscillator', CTX_NAME);
+    }
+    __totalTargets += targets.length;
+    __totalApplied += applyCoreTargetsGroup(`audiocontext:${CTX_NAME}:proto`, targets, 'skip');
+  }
+
+  const oscillatorStartOwner = (AUDIO_SCHEDULED_SOURCE_PROTO && Object.getOwnPropertyDescriptor(AUDIO_SCHEDULED_SOURCE_PROTO, 'start'))
+    ? AUDIO_SCHEDULED_SOURCE_PROTO
+    : OSCILLATOR_PROTO;
+  const oscillatorStartDesc = oscillatorStartOwner
+    ? (Object.getOwnPropertyDescriptor(oscillatorStartOwner, 'start') || getPropDescriptorDeep(oscillatorStartOwner, 'start'))
+    : null;
+  if (AUDIO_NOISE_ENABLED && oscillatorStartOwner && oscillatorStartDesc && typeof oscillatorStartDesc.value === 'function' && canReplaceMethod(oscillatorStartOwner, 'start', 'AudioScheduledSourceNode')) {
+    const validScheduledSourceThis = function validScheduledSourceThis(self) {
+      return !!self && oscillatorStartOwner.isPrototypeOf(self);
+    };
+    const targets = [{
+      owner: oscillatorStartOwner,
+      key: 'start',
+      kind: 'method',
+      wrapLayer: 'core_wrapper',
+      resolve: 'proto_chain',
+      invokeClass: 'brand_strict',
+      policy: 'skip',
+      diagTag: 'audio:AudioScheduledSourceNode:start',
+      validThis: validScheduledSourceThis,
+      invalidThis: 'throw',
+      invoke: function audioScheduledSourceStartInvoke(orig, args) {
+        const input = Array.isArray(args) ? args : [];
+        try {
+          adjustOfflineOscillatorBeforeStart(this);
+        } catch (e) {
+          degrade('audiocontext:oscillator:pre_start_adjust_failed', e, {
+            stage: 'hook',
+            level: 'warn',
+            type: __audioTypePipeline,
+            diagTag: 'audio:AudioScheduledSourceNode:start',
+            key: 'AudioScheduledSourceNode.start',
+            data: { outcome: 'skip', reason: 'pre_start_adjust_failed' }
+          });
+        }
+        try {
+          return Reflect.apply(orig, this, input);
+        } catch (e) {
+          degrade('audiocontext:scheduled_source:start_native_throw', e, {
+            stage: 'runtime',
+            level: 'warn',
+            type: __audioTypeBrowser,
+            diagTag: 'audio:AudioScheduledSourceNode:start',
+            key: 'AudioScheduledSourceNode.start',
+            data: { outcome: 'throw', reason: 'native_throw' }
+          });
+          throw e;
+        }
+      }
+    }];
+    __totalTargets += targets.length;
+    __totalApplied += applyCoreTargetsGroup('audiocontext:AudioScheduledSourceNode:proto', targets, 'skip');
+  } else if (AUDIO_NOISE_ENABLED) {
+    noteIssue('missing_method:start', 'AudioScheduledSourceNode');
   }
 
     emitDegrade('info', __tag + ':ready', null, {
