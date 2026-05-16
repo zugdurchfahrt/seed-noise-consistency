@@ -360,11 +360,9 @@ def init_driver(
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
     chrome_options.add_argument(f"--user-agent={user_agent}")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    # it keeps Chromium audio service inside the browser process
-    chrome_options.add_argument("--disable-features=AudioServiceOutOfProcess")
+    # AudioServiceOutOfProcess keeps Chromium audio service inside the browser process
     # Chrome enables CanvasNoise by default in Incognito/testing flows.
-    # Disable it to avoid double canvas noise on top of our controlled pipeline.
-    chrome_options.add_argument("--disable-features=CanvasNoise")
+    chrome_options.add_argument("--disable-features=CanvasNoise,AudioServiceOutOfProcess")
     # ReduceDeviceMemory makes Chrome return value for 8 gb RAM natively, without a JS accessor patch.
     chrome_options.add_argument("--enable-features=ReduceDeviceMemory")
     chrome_options.add_argument("--disable-infobars")

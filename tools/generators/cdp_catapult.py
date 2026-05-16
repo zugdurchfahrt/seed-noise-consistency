@@ -345,6 +345,163 @@ def _build_sw_bootstrap_prelude(sw_env: dict) -> str:
     ])
     sw_inline_canvas = canvas_path.read_text("utf-8")
     sw_inline_context = context_path.read_text("utf-8")
+
+    def __cut_required(src: str, start: str, end: str, label: str) -> str:
+        a = src.find(start)
+        if a < 0:
+            raise ValueError(f"SW inject: {label} start marker missing")
+        b = src.find(end, a)
+        if b < 0:
+            raise ValueError(f"SW inject: {label} end marker missing")
+        return src[:a] + src[b:]
+
+    def __replace_required(src: str, old: str, new: str, label: str) -> str:
+        if old not in src:
+            raise ValueError(f"SW inject: {label} marker missing")
+        return src.replace(old, new, 1)
+
+    def __replace_range_required(src: str, start: str, end: str, new: str, label: str) -> str:
+        a = src.find(start)
+        if a < 0:
+            raise ValueError(f"SW inject: {label} start marker missing")
+        b = src.find(end, a)
+        if b < 0:
+            raise ValueError(f"SW inject: {label} end marker missing")
+        return src[:a] + new + src[b:]
+
+    sw_inline_canvas = __cut_required(
+        sw_inline_canvas,
+        "  // Blob export path uses the shared PNG ancillary byte-builder.",
+        "  // Offscreen convertToBlob path uses the same PNG byte-builder as toBlob/toDataURL.",
+        "canvas_dom_to_blob_branch"
+    )
+    sw_inline_canvas = __replace_required(
+        sw_inline_canvas,
+        "  // Offscreen convertToBlob path uses the same PNG byte-builder as toBlob/toDataURL.",
+        "  // Offscreen convertToBlob path uses the shared PNG byte-builder.",
+        "canvas_offscreen_comment"
+    )
+    sw_inline_canvas = __cut_required(
+        sw_inline_canvas,
+        "  // toDataURL path uses the same PNG ancillary byte-builder as Blob exports.",
+        "  // drawImage hook:",
+        "canvas_dom_to_data_url_branch"
+    )
+    sw_inline_canvas = __cut_required(
+        sw_inline_canvas,
+        "  // master-хук toDataURL:",
+        "// --- final export ---",
+        "canvas_dom_master_to_data_url_branch"
+    )
+    for __dead_canvas_export in (
+        "__CanvasPatchHooks__.patchToDataURLInjectNoise = patchToDataURLInjectNoise;\n",
+        "__CanvasPatchHooks__.masterToDataURLHook = masterToDataURLHook;\n",
+        "__CanvasPatchHooks__.patchToBlobInjectNoise = patchToBlobInjectNoise;\n",
+    ):
+        sw_inline_canvas = sw_inline_canvas.replace(__dead_canvas_export, "")
+
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "        htmlCanvas: Object.freeze(['getContext', 'toDataURL', 'toBlob']),\n        offscreenCanvas: Object.freeze(['getContext', 'convertToBlob']),",
+        "        offscreenCanvas: Object.freeze(['getContext', 'convertToBlob']),",
+        "context_keep_native_sw_offscreen"
+    )
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "        htmlCanvasSync: Object.freeze(['toDataURL']),\n        htmlCanvasAsync: Object.freeze(['toBlob']),\n        htmlCanvasFactory: Object.freeze(['getContext']),\n        offscreenAsync: Object.freeze(['convertToBlob']),",
+        "        offscreenAsync: Object.freeze(['convertToBlob']),",
+        "context_gateway_sw_offscreen"
+    )
+    sw_inline_context = __cut_required(
+        sw_inline_context,
+        "    if (typeof HTMLCanvasElement !== 'undefined' && HTMLCanvasElement.prototype) {",
+        "    if (typeof OffscreenCanvas !== 'undefined' && OffscreenCanvas.prototype) {",
+        "context_capture_html_canvas"
+    )
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "  C.htmlCanvasGetContextHooks           = C.htmlCanvasGetContextHooks          || [];\n  C.htmlCanvasToDataURLHooks            = C.htmlCanvasToDataURLHooks           || [];\n  C.htmlCanvasToBlobHooks               = C.htmlCanvasToBlobHooks              || [];\n\n",
+        "",
+        "context_html_hook_registries"
+    )
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "  C.registerHtmlCanvasGetContextHook          = fn => registerOnce(C.htmlCanvasGetContextHooks, fn);\n  C.registerHtmlCanvasToDataURLHook           = fn => registerOnce(C.htmlCanvasToDataURLHooks, fn);\n  C.registerHtmlCanvasToBlobHook              = fn => registerOnce(C.htmlCanvasToBlobHooks, fn);\n\n",
+        "",
+        "context_html_hook_registrars"
+    )
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "    let proto = null;\n    let plan = null;\n    if (typeof HTMLCanvasElement !== 'undefined' && owner instanceof HTMLCanvasElement) {\n      proto = HTMLCanvasElement.prototype;\n      plan = [\n        { method: 'toDataURL', hooks: () => C.htmlCanvasToDataURLHooks || [] },\n        { method: 'toBlob', hooks: () => C.htmlCanvasToBlobHooks || [] }\n      ];\n    } else if (typeof OffscreenCanvas !== 'undefined' && owner instanceof OffscreenCanvas) {\n      proto = OffscreenCanvas.prototype;\n      plan = [\n        { method: 'convertToBlob', hooks: () => C.offscreenConvertToBlobHooks || [] }\n      ];\n    }",
+        "    let proto = null;\n    let plan = null;\n    if (typeof OffscreenCanvas !== 'undefined' && owner instanceof OffscreenCanvas) {\n      proto = OffscreenCanvas.prototype;\n      plan = [\n        { method: 'convertToBlob', hooks: () => C.offscreenConvertToBlobHooks || [] }\n      ];\n    }",
+        "context_serialization_plan_sw_offscreen"
+    )
+    sw_inline_context = __cut_required(
+        sw_inline_context,
+        "      if (method === 'toDataURL') {",
+        "      } else if (method === 'convertToBlob') {",
+        "context_dom_serialization_wrappers"
+    )
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "      } else if (method === 'convertToBlob') {",
+        "      if (method === 'convertToBlob') {",
+        "context_convert_to_blob_wrapper"
+    )
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "    if (typeof HTMLCanvasElement !== 'undefined' && owner instanceof HTMLCanvasElement) {\n      proto = HTMLCanvasElement.prototype;\n    } else if (typeof OffscreenCanvas !== 'undefined' && owner instanceof OffscreenCanvas) {\n      proto = OffscreenCanvas.prototype;\n    }",
+        "    if (typeof OffscreenCanvas !== 'undefined' && owner instanceof OffscreenCanvas) {\n      proto = OffscreenCanvas.prototype;\n    }",
+        "context_get_context_owner_sw_offscreen"
+    )
+    sw_inline_context = __cut_required(
+        sw_inline_context,
+        "        issuedHookCount += (htmlHooks && htmlHooks.length) || 0;",
+        "        if (ctx && issuedHookCount) {",
+        "context_get_context_html_hooks"
+    )
+    sw_inline_context = __cut_required(
+        sw_inline_context,
+        "  function installIssuedCanvasFactory(htmlHooks, ctx2dHooks, webglHooks) {",
+        "  function installIssuedOffscreenFactory(htmlHooks, ctx2dHooks, webglHooks) {",
+        "context_dom_canvas_factory"
+    )
+    sw_inline_context = __replace_range_required(
+        sw_inline_context,
+        "  C.applyCanvasElementPatches = function(){",
+        "  C.applyOffscreenPatches = function(){",
+        "  C.applyCanvasElementPatches = function(){\n    return 0;\n  };\n\n",
+        "context_dom_canvas_apply"
+    )
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "      'patchToDataURLInjectNoise','masterToDataURLHook', 'fillTextNoiseHook','strokeTextNoiseHook', 'patchToBlobInjectNoise', 'patchConvertToBlobInjectNoise',\n      'measureTextNoiseHook','applyMeasureTextHook', 'fillRectNoiseHook', 'applyDrawImageHook',",
+        "      'fillTextNoiseHook','strokeTextNoiseHook', 'patchConvertToBlobInjectNoise',\n      'measureTextNoiseHook','applyMeasureTextHook', 'fillRectNoiseHook', 'applyDrawImageHook',",
+        "context_register_all_required_hooks"
+    )
+    sw_inline_context = __replace_required(
+        sw_inline_context,
+        "    if (C.registerHtmlCanvasToDataURLHook)    C.registerHtmlCanvasToDataURLHook(H.masterToDataURLHook);\n    if (C.registerHtmlCanvasToBlobHook)       C.registerHtmlCanvasToBlobHook(H.patchToBlobInjectNoise);\n",
+        "",
+        "context_register_all_html_serialization"
+    )
+
+    for __required_sw_symbol in (
+        "patchConvertToBlobInjectNoise",
+        "registerOffscreenConvertToBlobHook",
+        "applyOffscreenPatches",
+        "convertToBlob",
+    ):
+        if __required_sw_symbol not in sw_inline_canvas + sw_inline_context:
+            raise ValueError(f"SW inject: required offscreen symbol missing: {__required_sw_symbol}")
+    for __forbidden_sw_symbol in (
+        "HTMLCanvasElement",
+        "toDataURL",
+        "patchToBlobInjectNoise",
+    ):
+        if __forbidden_sw_symbol in sw_inline_canvas + sw_inline_context:
+            raise ValueError(f"SW inject: DOM canvas branch still present: {__forbidden_sw_symbol}")
+
     inline_sources = "\n".join([
         "const __SW_BOOTSTRAP_ENV__ = " + sw_env_json + ";",
         "const __SW_INLINE_CORE_WINDOW__ = " + json.dumps(sw_inline_core_window, ensure_ascii=False) + ";",
