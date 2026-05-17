@@ -1427,7 +1427,6 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         if (loadedCount <= 0) {
           throw new Error('document.fonts.load returned no managed faces');
         }
-        rememberRuntimeFamily(fam);
         return fam;
       });
     }

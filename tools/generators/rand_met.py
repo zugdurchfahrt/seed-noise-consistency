@@ -41,8 +41,8 @@ SYS_FONTS_WIN = [
     'Lucida Console', 'Lucida Sans Unicode', 'Malgun Gothic', 'Microsoft Himalaya', 'Microsoft New Tai Lue', 'Microsoft PhagsPa',
     'Microsoft Tai Le', 'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Modern', 'Mongolian Baiti', 'Montserrat', 'MS Sans Serif', 'MS Serif',
     'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection', 'Bookman Old Style', 'Arno Pro',
-    'Script', 'Segoe UI', 'Segoe Print', 'Segoe Script', 'Segoe UI Symbol', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol', 'Bodoni MT', 'Niagara Solid',
-    'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings', 'Century Gothic', 'Helvetica Neue',
+    'Script', 'Segoe UI', 'Segoe Print', 'Segoe Script', 'Segoe UI Symbol', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol', 'Bodoni MT',
+    'Niagara Solid', 'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings', 'Century Gothic',
     'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic']
 
 SYS_FONTS_MAC = [
@@ -616,10 +616,10 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     'Impact', 'Ink Free', 'Inter', 'Javanese Text', 'Leelawadee UI', 'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
     'Lucida Console', 'Lucida Sans Unicode', 'Malgun Gothic', 'Microsoft Himalaya', 'Microsoft New Tai Lue', 'Microsoft PhagsPa',
     'Microsoft Tai Le', 'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Modern', 'Mongolian Baiti', 'Montserrat', 'MS Sans Serif', 'MS Serif',
-    'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection', 'Bookman Old Style', 'Arno Pro',
-    'Script', 'Segoe UI', 'Segoe Print', 'Segoe Script', 'Segoe UI Symbol', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol', 'Bodoni MT', 'Niagara Solid',
-    'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings', 'Century Gothic', 'Helvetica Neue',
-    'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic']
+    'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection', 'Bookman Old Style',
+    'Arno Pro', 'Script', 'Segoe UI', 'Segoe Print', 'Segoe Script', 'Segoe UI Symbol', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen',
+    'Symbol', 'Bodoni MT', 'Niagara Solid', 'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings',
+    'Century Gothic', 'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic']
 
     if platform == "MacIntel":
         family_names = SYS_FONTS_MAC + common_families
@@ -778,8 +778,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
 
     # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
-    MIN_N = int(os.environ.get("FONTS_MIN_N", "44"))
-    MAX_N = int(os.environ.get("FONTS_MAX_N", "47"))
+    MIN_N = int(os.environ.get("FONTS_MIN_N", "59"))
+    MAX_N = int(os.environ.get("FONTS_MAX_N", "61"))
     max_n = len(all_names)
 
     if max_n == 0:
@@ -798,6 +798,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     max_family_repeats = 4
     family_counter = defaultdict(int)
     used_families = set()
+    used_css_load_queries = set()
+    used_md5s = set()
     temp_configs = []
     skip_stats = defaultdict(int)
     
@@ -817,6 +819,14 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             # If _get_data_url returned empty (no-woff2/error) - skip the font
             if not data_url:
                 logger.warning(f"[fonts] Пропуск {fname}: пустой data URL")
+                continue
+
+            font_md5 = rec.get("md5")
+            if not font_md5:
+                raise RuntimeError(f"[fonts] md5 missing after data URL build: {fname}")
+            if font_md5 in used_md5s:
+                skip_stats["duplicate_md5"] += 1
+                logger.debug(f"[fonts] Step 4 skip {fname}: duplicate md5={font_md5}")
                 continue
 
             file_path = target_dir / fname
@@ -840,9 +850,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         # Dedup: drop duplicates; do not mutate/tag font fields.
             uniq_triple = (resolved_family, full_name, postscript)
             if uniq_triple in used_families:
-                skip_stats["duplicate_uniq_triple"] += 1
-                logger.debug(f"[fonts] Step4 skip {fname}: duplicate uniq_triple={uniq_triple}")
-                continue
+                logger.debug(f"[fonts] Step 4 keep {fname}: duplicate uniq_triple={uniq_triple}")
             if family_counter[resolved_family] >= max_family_repeats:
                 skip_stats["family_repeat_limit"] += 1
                 logger.debug(f"[fonts] Step4 skip {fname}: family_repeat_limit family={resolved_family} limit={max_family_repeats}")
@@ -854,28 +862,32 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
             css_family = _derive_css_family(resolved_family, name_no_ext)
             css_load_query = _derive_css_load_query(css_family, style, weight)
+            if css_load_query in used_css_load_queries:
+                logger.debug(f"[fonts] Step 4 keep {fname}: duplicate cssLoadQuery={css_load_query!r}")
 
             cfg = {
                 "name": name_no_ext,
                 "url": data_url,
-                "md5": rec.get("md5", ""),
+                "md5": font_md5,
                 "family": resolved_family,
                 "cssFamily": css_family,
                 "cssLoadQuery": css_load_query,
                 "subfamily": subfamily,
                 "weight": weight,
                 "style": style,
-                "unique_id": meta_values.get(3, ""),
-                "full_name": meta_values.get(4, ""),
-                "version": meta_values.get(5, ""),
-                "postscript_name": meta_values.get(6, ""),
-                "designer": meta_values.get(9, ""),
-                "license": meta_values.get(13, ""),
+                "unique_id": meta_values.get(3),
+                "full_name": meta_values.get(4),
+                "version": meta_values.get(5),
+                "postscript_name": meta_values.get(6),
+                "designer": meta_values.get(9),
+                "license": meta_values.get(13),
                 "platform_id": PLATFORM_ID_MAP[platform][0],
                 "platform_dom": platform  # 'Win32' | 'MacIntel'
             }
             temp_configs.append(cfg)
             used_families.add(uniq_triple)
+            used_css_load_queries.add(css_load_query)
+            used_md5s.add(font_md5)
             family_counter[resolved_family] += 1
 
             logger.debug(
@@ -885,19 +897,25 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
     finally:
         _META_RNG = _prev_meta_rng
 
+    if len(temp_configs) < N:
+        raise RuntimeError(
+            f"[fonts] unable to build target font manifest: target={N}, "
+            f"built={len(temp_configs)}, available={max_n}, skips={dict(skip_stats)}"
+        )
+
     runtime_font_metadata = [
         {
             "name": c["name"],
             "family": c["family"],
             "cssFamily": c.get("cssFamily") or c.get("family"),
-            "cssLoadQuery": c.get("cssLoadQuery", ""),
-            "full_name": c.get("full_name", ""),
-            "postscript_name": c.get("postscript_name", ""),
+            "cssLoadQuery": c.get("cssLoadQuery"),
+            "full_name": c.get("full_name"),
+            "postscript_name": c.get("postscript_name"),
             "platform_id": c["platform_id"],
             "platform_dom": c.get("platform_dom"),
-            "weight": c.get("weight", "normal"),
-            "style": c.get("style", "normal"),
-            "md5": c.get("md5", ""),
+            "weight": c.get("weight"),
+            "style": c.get("style"),
+            "md5": c.get("md5"),
         }
         for c in temp_configs
     ]
@@ -908,8 +926,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "family": meta["family"],
             "cssFamily": meta["cssFamily"],  # runtime CSS family (prefer generated cssFamily)
             "cssLoadQuery": meta["cssLoadQuery"],
-            "full_name": meta.get("full_name", ""),
-            "postscript_name": meta.get("postscript_name", ""),
+            "full_name": meta.get("full_name"),
+            "postscript_name": meta.get("postscript_name"),
             "url": c["url"],
             "platform_id": meta["platform_id"],
             "platform_dom": meta["platform_dom"],
@@ -927,19 +945,19 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "name": c["name"],
             "family": c["family"],
             "cssFamily": c.get("cssFamily") or c.get("family"),
-            "cssLoadQuery": c.get("cssLoadQuery", ""),
-            "subfamily": c.get("subfamily", ""),
-            "weight": c.get("weight", "normal"),
-            "style": c.get("style", "normal"),
-            "unique_id": c.get("unique_id", ""),
-            "full_name": c.get("full_name", ""),
-            "version": c.get("version", ""),
-            "postscript_name": c.get("postscript_name", ""),
-            "designer": c.get("designer", ""),
-            "license": c.get("license", ""),
-            "platform_id": c.get("platform_id", ""),
-            "platform_dom": c.get("platform_dom", ""),
-            "md5": c.get("md5", ""),
+            "cssLoadQuery": c.get("cssLoadQuery"),
+            "subfamily": c.get("subfamily"),
+            "weight": c.get("weight"),
+            "style": c.get("style"),
+            "unique_id": c.get("unique_id"),
+            "full_name": c.get("full_name"),
+            "version": c.get("version"),
+            "postscript_name": c.get("postscript_name"),
+            "designer": c.get("designer"),
+            "license": c.get("license"),
+            "platform_id": c.get("platform_id"),
+            "platform_dom": c.get("platform_dom"),
+            "md5": c.get("md5"),
         }
         for c in temp_configs
     ]
