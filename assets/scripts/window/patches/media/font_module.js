@@ -1364,7 +1364,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
 
 
   // ===  window branch (DOM exist here) ====
-  if (__fontDocument && __fontFontFaceSet && typeof __fontFontFaceSet.add === 'function') {
+  if (__fontDocument && __fontFontFaceSet && typeof __fontFontFaceSet.load === 'function') {
     function __applyFontPatchCss() {
       let css = '';
       for (const f of fonts) {
@@ -1379,76 +1379,78 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         css += `@font-face{font-family:${famCss};src:url(${urlCss}) format("woff2");font-weight:${f.weight||"normal"};font-style:${f.style||"normal"};font-display:swap;}`;
       }
       const tagId = 'font-patch-styles';
-      const apply = () => {
-        let styleEl = __fontDocument.getElementById(tagId) || __fontDocument.createElement('style');
-        styleEl.id = tagId;
-        (__fontDocument.head || __fontDocument.documentElement || __fontDocument.body).appendChild(styleEl);
-        styleEl.textContent = css;
-      };
+      return new Promise((resolve, reject) => {
+        const apply = (parent) => {
+          try {
+            let styleEl = __fontDocument.getElementById(tagId) || __fontDocument.createElement('style');
+            styleEl.id = tagId;
+            parent.appendChild(styleEl);
+            styleEl.textContent = css;
+            resolve(styleEl);
+          } catch (eApplyCss) {
+            reject(eApplyCss);
+          }
+        };
 
-      if (__fontDocument.readyState === 'loading') {
         const tryApply = () => {
-          if (__fontDocument.head || __fontDocument.documentElement || __fontDocument.body) apply();
+          const parent = __fontDocument.head || __fontDocument.body;
+          if (parent) apply(parent);
           else requestAnimationFrame(tryApply);
         };
-        tryApply();
-      } else {
-        apply();
-      }
+
+        if (__fontDocument.readyState === 'loading') {
+          tryApply();
+        } else {
+          tryApply();
+        }
+      });
     }
 
-    __applyFontPatchCss();
-
-    Promise.allSettled(
-      fonts.map((f) => {
-        try {
-          if (!f || typeof f !== 'object') {
-            return Promise.reject(new TypeError('font entry must be object'));
-          }
-          const fam = (f.cssFamily || f.family);
-          if (!fam || typeof fam !== 'string') {
-            return Promise.reject(new TypeError('font.family missing/invalid'));
-          }
-          const url = f.url;
-          if (!url || typeof url !== 'string') {
-            return Promise.reject(new TypeError('font.url missing/invalid'));
-          }
-
-          const src = `url(${JSON.stringify(url)}) format("woff2")`;
-
-          const ff = new FontFace(fam, src, {
-            weight: f.weight || 'normal',
-            style:  f.style  || 'normal',
-            display: 'swap',
-          });
-
-          return ff.load().then((loaded) => {
-            try {
-              __fontFontFaceSet.add(loaded);
-            } catch (eAdd) {
-              __fontDiagBrowser('warn', 'fonts:document_fonts_add_failed', {
-                stage: 'runtime',
-                diagTag: 'fonts',
-                key: 'document.fonts',
-                message: 'document.fonts.add failed',
-                data: { outcome: 'throw', reason: 'document_fonts_add_failed', family: fam }
-              }, eAdd);
-              throw eAdd;
-            }
-            return fam;
-          });
-        } catch (e) {
-          __fontDiagBrowser('warn', 'fonts:load_item_failed', {
-            stage: 'runtime',
-            diagTag: 'fonts',
-            key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
-            message: 'font item build failed',
-            data: { outcome: 'skip', reason: 'font_item_build_failed' }
-          }, e);
-          return Promise.reject(e);
+    function __loadManagedCssFontFace(f) {
+      if (!f || typeof f !== 'object') {
+        return Promise.reject(new TypeError('font entry must be object'));
+      }
+      const fam = (f.cssFamily || f.family);
+      if (!fam || typeof fam !== 'string') {
+        return Promise.reject(new TypeError('font.family missing/invalid'));
+      }
+      const loadQuery = (typeof f.cssLoadQuery === 'string' && f.cssLoadQuery.trim())
+        ? f.cssLoadQuery.trim()
+        : '';
+      if (!loadQuery) {
+        return Promise.reject(new TypeError('font.cssLoadQuery missing/invalid'));
+      }
+      return Reflect.apply(__fontFontFaceSet.load, __fontFontFaceSet, [loadQuery]).then((loadedFaces) => {
+        const loadedCount = (loadedFaces && typeof loadedFaces.length === 'number')
+          ? loadedFaces.length
+          : 0;
+        if (loadedCount <= 0) {
+          throw new Error('document.fonts.load returned no managed faces');
         }
-      })
-    ).then((results) => {
+        rememberRuntimeFamily(fam);
+        return fam;
+      });
+    }
+
+    Promise.resolve()
+      .then(() => __applyFontPatchCss())
+      .then(() => Promise.allSettled(
+        fonts.map((f) => {
+          try {
+            return __loadManagedCssFontFace(f);
+          } catch (e) {
+            __fontDiagBrowser('warn', 'fonts:load_item_failed', {
+              stage: 'runtime',
+              diagTag: 'fonts',
+              key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
+              message: 'font item build failed',
+              data: { outcome: 'skip', reason: 'font_item_build_failed' }
+            }, e);
+            return Promise.reject(e);
+          }
+        })
+      ))
+      .then((results) => {
       const loaded = results.filter((r) => r.status === 'fulfilled').length;
       const failed = results.filter((r) => r.status === 'rejected').length;
 
@@ -1541,6 +1543,20 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         data: { outcome: 'skip', reason: 'unexpected_rejection' }
       }, e);
     });
+  } else {
+    __fontDiagPipeline('warn', 'fonts:css_load_unavailable', {
+      stage: 'preflight',
+      diagTag: 'fonts',
+      key: 'document.fonts.load',
+      message: 'CSS font load path unavailable',
+      data: {
+        outcome: 'skip',
+        reason: 'css_load_unavailable',
+        hasDocument: !!__fontDocument,
+        hasFontFaceSet: !!__fontFontFaceSet,
+        hasLoad: !!(__fontFontFaceSet && typeof __fontFontFaceSet.load === 'function')
+      }
+    }, null);
   }
   } catch (e) {
     let rollbackErr = null;

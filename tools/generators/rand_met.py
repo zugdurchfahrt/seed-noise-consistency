@@ -236,6 +236,18 @@ def _derive_css_family(family: str, fallback: str) -> str:
     return ""
 
 
+def _derive_css_load_query(css_family: str, style: str, weight: str) -> str:
+    family_norm = _normalize_whitespace(css_family)
+    style_norm = _normalize_whitespace(style) or "normal"
+    weight_norm = _normalize_whitespace(weight) or "normal"
+    size_norm = "16px"
+    if not family_norm:
+        raise RuntimeError("[fonts] css load query family missing")
+    if not re.fullmatch(r"-?\d+(?:\.\d+)?(?:px|pt|em|rem|%)", size_norm):
+        raise RuntimeError(f"[fonts] invalid CSS font load size: {size_norm!r}")
+    return f"{style_norm} {weight_norm} {size_norm} {json.dumps(family_norm, ensure_ascii=False)}"
+
+
 
 def get_target_dir_for(p: str) -> pathlib.Path:
     """determines the catalog according the selected platform"""
@@ -840,12 +852,16 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             weight = "bold" if any(k in _sf for k in ("bold","black","heavy","semibold","demibold","extrabold","ultrabold")) else "normal"
             style  = "italic" if ("italic" in _sf or "oblique" in _sf) else "normal"
 
+            css_family = _derive_css_family(resolved_family, name_no_ext)
+            css_load_query = _derive_css_load_query(css_family, style, weight)
+
             cfg = {
                 "name": name_no_ext,
                 "url": data_url,
                 "md5": rec.get("md5", ""),
                 "family": resolved_family,
-                "cssFamily": _derive_css_family(resolved_family, name_no_ext),
+                "cssFamily": css_family,
+                "cssLoadQuery": css_load_query,
                 "subfamily": subfamily,
                 "weight": weight,
                 "style": style,
@@ -874,6 +890,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "name": c["name"],
             "family": c["family"],
             "cssFamily": c.get("cssFamily") or c.get("family"),
+            "cssLoadQuery": c.get("cssLoadQuery", ""),
             "full_name": c.get("full_name", ""),
             "postscript_name": c.get("postscript_name", ""),
             "platform_id": c["platform_id"],
@@ -890,6 +907,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "name": meta["name"],
             "family": meta["family"],
             "cssFamily": meta["cssFamily"],  # runtime CSS family (prefer generated cssFamily)
+            "cssLoadQuery": meta["cssLoadQuery"],
             "full_name": meta.get("full_name", ""),
             "postscript_name": meta.get("postscript_name", ""),
             "url": c["url"],
@@ -909,6 +927,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             "name": c["name"],
             "family": c["family"],
             "cssFamily": c.get("cssFamily") or c.get("family"),
+            "cssLoadQuery": c.get("cssLoadQuery", ""),
             "subfamily": c.get("subfamily", ""),
             "weight": c.get("weight", "normal"),
             "style": c.get("style", "normal"),
