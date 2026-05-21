@@ -321,24 +321,10 @@ const navObjectUserAgentDataState = __ensureHiddenObjectSlot__(
   () => Object.create(null)
 );
 
-const navObjectUserAgentDataLowEntropyState = __ensureHiddenObjectSlot__(
-  navObjectUserAgentDataState,
-  'lowEntropy',
-  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.lowEntropy bootstrap failed',
-  () => Object.create(null)
-);
-
 const navObjectUserAgentDataHighEntropyState = __ensureHiddenObjectSlot__(
   navObjectUserAgentDataState,
   'highEntropy',
   '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.highEntropy bootstrap failed',
-  () => Object.create(null)
-);
-
-const navObjectUserAgentDataToJSONState = __ensureHiddenObjectSlot__(
-  navObjectUserAgentDataState,
-  'toJSON',
-  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.userAgentData.toJSON bootstrap failed',
   () => Object.create(null)
 );
 
@@ -405,38 +391,10 @@ const navObjectStorageEstimateState = __ensureHiddenObjectSlot__(
   () => Object.create(null)
 );
 
-const navObjectStorageWebkitTemporaryStorageState = __ensureHiddenObjectSlot__(
-  navObjectStorageState,
-  'webkitTemporaryStorage',
-  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.webkitTemporaryStorage bootstrap failed',
-  () => Object.create(null)
-);
-
-const navObjectStoragePersistenceState = __ensureHiddenObjectSlot__(
-  navObjectStorageState,
-  'persistence',
-  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.storage.persistence bootstrap failed',
-  () => Object.create(null)
-);
-
 const navObjectPerformanceState = __ensureHiddenObjectSlot__(
   navObjectState,
   'performance',
   '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.performance bootstrap failed',
-  () => Object.create(null)
-);
-
-const navObjectPerformanceMemoryState = __ensureHiddenObjectSlot__(
-  navObjectPerformanceState,
-  'memory',
-  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.performance.memory bootstrap failed',
-  () => Object.create(null)
-);
-
-const navObjectCredentialsState = __ensureHiddenObjectSlot__(
-  navObjectState,
-  'credentials',
-  '[module] FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__.credentials bootstrap failed',
   () => Object.create(null)
 );
 
