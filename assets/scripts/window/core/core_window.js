@@ -76,12 +76,18 @@ const CoreWindowModule = function CoreWindowModule(window) {
     ? existingToString
     : Function.prototype.toString;
 
-  function __isCoreToStringStateOk(state) {
+  function __isCoreToStringPublishedStateOk(state) {
     return !!(state
       && state.__CORE_TOSTRING_STATE__ === true
       && typeof state.nativeToString === 'function'
-      && (state.overrideMap instanceof WeakMap)
-      && (state.proxyTargetMap instanceof WeakMap));
+      && !Object.prototype.hasOwnProperty.call(state, 'overrideMap')
+      && !Object.prototype.hasOwnProperty.call(state, 'proxyTargetMap')
+      && !Object.prototype.hasOwnProperty.call(state, 'toStringOverrideMap')
+      && !Object.prototype.hasOwnProperty.call(state, 'toStringProxyTargetMap')
+      && !(state.overrideMap instanceof WeakMap)
+      && !(state.proxyTargetMap instanceof WeakMap)
+      && !(state.toStringOverrideMap instanceof WeakMap)
+      && !(state.toStringProxyTargetMap instanceof WeakMap));
   }
 
   let toStringOverrideMap = null;
@@ -116,66 +122,12 @@ const CoreWindowModule = function CoreWindowModule(window) {
     return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
   }
 
-  function validateCoreToStringStateCandidate(state, sourceName) {
-    if (!__isCoreToStringStateOk(state)) return null;
-    const source = (typeof sourceName === 'string' && sourceName) ? sourceName : 'coreToStringState';
-    const stateBridgeTarget = resolveToStringBridgeTarget(state.nativeToString, state.proxyTargetMap);
-    const currentBridgeTarget = resolveToStringBridgeTarget(currentRealmToString, state.proxyTargetMap)
-      || ((typeof currentRealmToString === 'function') ? currentRealmToString : null);
-    if (typeof stateBridgeTarget !== 'function' || typeof currentBridgeTarget !== 'function') {
-      __emit('warn', 'core_window:toString_state_rejected', {
-        module: 'core',
-        diagTag: 'core_window',
-        surface: 'core',
-        key: 'Function.prototype.toString',
-        stage: 'preflight',
-        message: 'shared toString state rejected because bridge target is missing',
-        type: 'contract violation',
-        data: {
-          outcome: 'return',
-          source: source,
-          reason: 'bridge_target_missing'
-        }
-      }, new Error('[CoreWindow] shared toString state bridge target missing'));
-      return null;
-    }
-    if (stateBridgeTarget !== currentBridgeTarget) {
-      __emit('warn', 'core_window:toString_state_rejected', {
-        module: 'core',
-        diagTag: 'core_window',
-        surface: 'core',
-        key: 'Function.prototype.toString',
-        stage: 'preflight',
-        message: 'shared toString state rejected because realm baseline mismatched',
-        type: 'contract violation',
-        data: {
-          outcome: 'return',
-          source: source,
-          reason: 'realm_baseline_mismatch'
-        }
-      }, new Error('[CoreWindow] shared toString state realm mismatch'));
-      return null;
-    }
-    return state;
-  }
+  let sharedCoreToStringState = null;
 
-  const existingOwnedCoreToStringState = (window.Core
-      && window.Core.__internal
-      && typeof window.Core.__internal === 'object')
-    ? validateCoreToStringStateCandidate(window.Core.__internal.coreToStringState, 'Core.__internal.coreToStringState')
-    : null;
-  let sharedCoreToStringState = existingOwnedCoreToStringState || null;
+  toStringOverrideMap = new WeakMap();
+  toStringProxyTargetMap = new WeakMap();
 
-  toStringOverrideMap = sharedCoreToStringState
-    ? sharedCoreToStringState.overrideMap
-    : new WeakMap();
-  toStringProxyTargetMap = sharedCoreToStringState
-    ? sharedCoreToStringState.proxyTargetMap
-    : new WeakMap();
-
-  const nativeToStringCandidate = sharedCoreToStringState
-    ? sharedCoreToStringState.nativeToString
-    : currentRealmToString;
+  const nativeToStringCandidate = currentRealmToString;
 
   const nativeToString = resolveToStringBridgeTarget(nativeToStringCandidate)
     || resolveToStringBridgeTarget(currentRealmToString)
@@ -188,9 +140,7 @@ const CoreWindowModule = function CoreWindowModule(window) {
   function publishCoreToStringState() {
     return {
       __CORE_TOSTRING_STATE__: true,
-      nativeToString: nativeToString,
-      overrideMap: toStringOverrideMap,
-      proxyTargetMap: toStringProxyTargetMap
+      nativeToString: nativeToString
     };
   }
 
@@ -781,8 +731,8 @@ const CoreWindowModule = function CoreWindowModule(window) {
         configurable: true,
         enumerable: false
       });
-      if (!__isCoreToStringStateOk(__internal.coreToStringState)) {
-        const nextCoreToStringState = sharedCoreToStringState || publishCoreToStringState();
+      if (!__isCoreToStringPublishedStateOk(__internal.coreToStringState)) {
+        const nextCoreToStringState = publishCoreToStringState();
         safeDefine(__internal, 'coreToStringState', {
           value: nextCoreToStringState,
           writable: false,

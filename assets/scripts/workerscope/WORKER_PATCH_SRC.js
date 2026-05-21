@@ -157,15 +157,21 @@
     }
     const workerScopeKind = __resolveBootstrapWorkerScopeKind__();
     const __workerScopeName__ = __scopeNameFromKind__(workerScopeKind);
-    const __isCoreToStringStateOk__ = (st) => !!(st
+    const __isCoreToStringOwnerMarkerOk__ = (st) => !!(st
       && st.__CORE_TOSTRING_STATE__ === true
       && typeof st.nativeToString === 'function'
-      && (st.overrideMap instanceof WeakMap)
-      && (st.proxyTargetMap instanceof WeakMap));
+      && !Object.prototype.hasOwnProperty.call(st, 'overrideMap')
+      && !Object.prototype.hasOwnProperty.call(st, 'proxyTargetMap')
+      && !Object.prototype.hasOwnProperty.call(st, 'toStringOverrideMap')
+      && !Object.prototype.hasOwnProperty.call(st, 'toStringProxyTargetMap')
+      && !(st.overrideMap instanceof WeakMap)
+      && !(st.proxyTargetMap instanceof WeakMap)
+      && !(st.toStringOverrideMap instanceof WeakMap)
+      && !(st.toStringProxyTargetMap instanceof WeakMap));
     const __resolveCoreToStringState__ = () => {
       const runtimeRoot = __resolveWorkerWrkRuntimeRoot__();
       const ownedState = runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__;
-      if (__isCoreToStringStateOk__(ownedState)) return ownedState;
+      if (__isCoreToStringOwnerMarkerOk__(ownedState)) return ownedState;
       return null;
     };
     const trackedDefineProperty = (obj, key, desc) => {
@@ -358,6 +364,27 @@
       }, e);
       throw e;
     }
+    const registerToStringWrapperDesc = runtimeRoot
+      ? Object.getOwnPropertyDescriptor(runtimeRoot, '__registerToStringWrapper')
+      : null;
+    const registerToStringWrapper = (registerToStringWrapperDesc && typeof registerToStringWrapperDesc.value === 'function')
+      ? registerToStringWrapperDesc.value
+      : (runtimeRoot && typeof runtimeRoot.__registerToStringWrapper === 'function'
+          ? runtimeRoot.__registerToStringWrapper
+          : null);
+    if (typeof registerToStringWrapper !== 'function') {
+      const e = new Error('Ubergabe: __registerToStringWrapper missing');
+      emitDegrade('error', 'worker_patch_src:register_tostring_wrapper:preflight:missing', {
+        type: 'pipeline missing data',
+        stage: 'preflight',
+        module: 'WORKER_PATCH_SRC',
+        surface: '__registerToStringWrapper',
+        key: '__registerToStringWrapper',
+        policy: 'throw',
+        action: 'throw'
+      }, e);
+      throw e;
+    }
     const applyAccessorTargetsDesc = runtimeRoot
       ? Object.getOwnPropertyDescriptor(runtimeRoot, '__applyAccessorTargets')
       : null;
@@ -380,17 +407,21 @@
       throw e;
     }
 
-    // [NORMATIVE] use unified core toString bridge state (no module-local WeakMap holders).
+    // [NORMATIVE] use unified core toString bridge route without exposing WeakMap holders.
     {
       const st = __resolveCoreToStringState__();
-      const ok = __isCoreToStringStateOk__(st);
+      const ok = __isCoreToStringOwnerMarkerOk__(st)
+        && typeof registerToStringWrapper === 'function'
+        && typeof wrapNativeApply === 'function'
+        && typeof wrapNativeAccessor === 'function'
+        && typeof wrapNativeCtor === 'function';
       if (!ok) {
-        const e = new Error('Ubergabe: __CORE_TOSTRING_STATE__ missing/invalid');
+        const e = new Error('Ubergabe: __CORE_TOSTRING_STATE__ owner marker/API missing');
         emitDegrade('error', 'worker_patch_src:tostring_state:preflight:missing', {
           type: 'pipeline missing data',
           stage: 'preflight',
           module: 'WORKER_PATCH_SRC',
-          surface: 'FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
+          surface: 'FernwehContext.state.__WRK__.runtime',
           key: 'FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__',
           policy: 'throw',
           action: 'throw'
@@ -1697,16 +1728,39 @@
         throw new Error('Ubergabe: ' + String(label || exportName || 'inlineModule') + ' source missing');
       }
       const runner = new Function('window', source + '\nreturn (typeof ' + exportName + ' === "function") ? ' + exportName + '(window) : null;');
+      let runnerResult;
+      let runnerError = null;
       try {
-        return runner(self);
-      } finally {
-        try {
-          const d = Object.getOwnPropertyDescriptor(self, exportName);
-          if (d && d.configurable !== false) {
-            delete self[exportName];
-          }
-        } catch (_) {}
+        runnerResult = runner(self);
+      } catch (e) {
+        runnerError = e;
       }
+      let cleanupError = null;
+      try {
+        const d = Object.getOwnPropertyDescriptor(self, exportName);
+        if (d && d.configurable !== false) {
+          delete self[exportName];
+        }
+      } catch (eCleanup) {
+        cleanupError = eCleanup;
+        emitDegrade('error', 'worker_patch_src:inline_module:cleanup_failed', {
+          type: 'pipeline missing data',
+          stage: 'cleanup',
+          module: 'WORKER_PATCH_SRC',
+          surface: 'worker_inline_module',
+          key: (typeof exportName === 'string' && exportName) ? exportName : null,
+          policy: 'throw',
+          action: 'throw',
+          data: {
+            outcome: 'throw',
+            reason: 'cleanup_delete_failed',
+            label: (typeof label === 'string' && label) ? label : null
+          }
+        }, eCleanup);
+      }
+      if (runnerError) throw runnerError;
+      if (cleanupError) throw cleanupError;
+      return runnerResult;
     };
     const syncWorkerEnvProfileState = stateRoot => {
       if (!stateRoot || typeof stateRoot !== 'object') {
@@ -1980,10 +2034,14 @@
       if (!prngRoot) {
         throw new Error('Ubergabe: worker Core.__internal.prng missing after inline install');
       }
-      if (runtimeRoot && runtimeRoot.__CORE_TOSTRING_STATE__ && coreInternal.coreToStringState !== runtimeRoot.__CORE_TOSTRING_STATE__) {
+      if (runtimeRoot && __isCoreToStringOwnerMarkerOk__(runtimeRoot.__CORE_TOSTRING_STATE__) && !__isCoreToStringOwnerMarkerOk__(coreInternal.coreToStringState)) {
+        const runtimeToStringState = runtimeRoot.__CORE_TOSTRING_STATE__;
         trackedDefineProperty(coreInternal, 'coreToStringState', {
-          value: runtimeRoot.__CORE_TOSTRING_STATE__,
-          writable: true,
+          value: {
+            __CORE_TOSTRING_STATE__: true,
+            nativeToString: runtimeToStringState.nativeToString
+          },
+          writable: false,
           configurable: true,
           enumerable: false
         });
@@ -2179,8 +2237,8 @@
         const SEED = JSON.stringify((self.CDP_GLOBAL_SEED != null) ? String(self.CDP_GLOBAL_SEED) : '');
         const USER = JSON.stringify(String(abs));
         const src = workerType === 'module'
-          ? `(async function(){'use strict';const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('Ubergabe: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});const SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));var screenRoot=(state.__SCREEN__&&typeof state.__SCREEN__==='object')?state.__SCREEN__:__defHidden(state,'__SCREEN__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot,screenRoot:screenRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('Ubergabe: invalid nested worker snapshot');if(!s.screen||typeof s.screen!=='object') throw new Error('Ubergabe: invalid nested worker screen');if(!Number.isFinite(Number(s.screen.width))) throw new Error('Ubergabe: bad nested screen.width');if(!Number.isFinite(Number(s.screen.height))) throw new Error('Ubergabe: bad nested screen.height');if(!Number.isFinite(Number(s.screen.dpr))||Number(s.screen.dpr)<=0) throw new Error('Ubergabe: bad nested screen.dpr');if(!Number.isFinite(Number(s.screen.colorDepth))) throw new Error('Ubergabe: bad nested screen.colorDepth');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}var screen=owner.screenRoot;var prevScreenKeys=Object.keys(screen);for(var si=0;si<prevScreenKeys.length;si++){delete screen[prevScreenKeys[si]];}var nextScreenKeys=Object.keys(s.screen);for(var sj=0;sj<nextScreenKeys.length;sj++){var screenKey=nextScreenKeys[sj];screen[screenKey]=s.screen[screenKey];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('Ubergabe: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('Ubergabe: missing user import');await import(USER);} )();export {};`
-          : `(function(){'use strict';var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('Ubergabe: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:true,configurable:true,enumerable:false});var SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));var screenRoot=(state.__SCREEN__&&typeof state.__SCREEN__==='object')?state.__SCREEN__:__defHidden(state,'__SCREEN__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot,screenRoot:screenRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('Ubergabe: invalid nested worker snapshot');if(!s.screen||typeof s.screen!=='object') throw new Error('Ubergabe: invalid nested worker screen');if(!Number.isFinite(Number(s.screen.width))) throw new Error('Ubergabe: bad nested screen.width');if(!Number.isFinite(Number(s.screen.height))) throw new Error('Ubergabe: bad nested screen.height');if(!Number.isFinite(Number(s.screen.dpr))||Number(s.screen.dpr)<=0) throw new Error('Ubergabe: bad nested screen.dpr');if(!Number.isFinite(Number(s.screen.colorDepth))) throw new Error('Ubergabe: bad nested screen.colorDepth');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}var screen=owner.screenRoot;var prevScreenKeys=Object.keys(screen);for(var si=0;si<prevScreenKeys.length;si++){delete screen[prevScreenKeys[si]];}var nextScreenKeys=Object.keys(s.screen);for(var sj=0;sj<nextScreenKeys.length;sj++){var screenKey=nextScreenKeys[sj];screen[screenKey]=s.screen[screenKey];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('Ubergabe: BroadcastChannel missing');var bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('Ubergabe: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
+          ? `(async function(){'use strict';const SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('Ubergabe: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:false,configurable:true,enumerable:false});var SEED_DESC=Object.getOwnPropertyDescriptor(self,'CDP_GLOBAL_SEED');if(!SEED_DESC||SEED_DESC.value!==SEED||SEED_DESC.writable!==false||SEED_DESC.enumerable!==false) throw new Error('Ubergabe: invalid nested worker seed descriptor');const SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));var screenRoot=(state.__SCREEN__&&typeof state.__SCREEN__==='object')?state.__SCREEN__:__defHidden(state,'__SCREEN__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot,screenRoot:screenRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('Ubergabe: invalid nested worker snapshot');if(!s.screen||typeof s.screen!=='object') throw new Error('Ubergabe: invalid nested worker screen');if(!Number.isFinite(Number(s.screen.width))) throw new Error('Ubergabe: bad nested screen.width');if(!Number.isFinite(Number(s.screen.height))) throw new Error('Ubergabe: bad nested screen.height');if(!Number.isFinite(Number(s.screen.dpr))||Number(s.screen.dpr)<=0) throw new Error('Ubergabe: bad nested screen.dpr');if(!Number.isFinite(Number(s.screen.colorDepth))) throw new Error('Ubergabe: bad nested screen.colorDepth');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}var screen=owner.screenRoot;var prevScreenKeys=Object.keys(screen);for(var si=0;si<prevScreenKeys.length;si++){delete screen[prevScreenKeys[si]];}var nextScreenKeys=Object.keys(s.screen);for(var sj=0;sj<nextScreenKeys.length;sj++){var screenKey=nextScreenKeys[sj];screen[screenKey]=s.screen[screenKey];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('Ubergabe: BroadcastChannel missing');const bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=ev=>{const s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};const USER=${USER};if(!USER||typeof USER!=='string') throw new Error('Ubergabe: missing user import');await import(USER);} )();export {};`
+          : `(function(){'use strict';var SEED=${SEED};if(!SEED||typeof SEED!=='string') throw new Error('Ubergabe: missing nested worker seed');Object.defineProperty(self,'CDP_GLOBAL_SEED',{value:SEED,writable:false,configurable:true,enumerable:false});var SEED_DESC=Object.getOwnPropertyDescriptor(self,'CDP_GLOBAL_SEED');if(!SEED_DESC||SEED_DESC.value!==SEED||SEED_DESC.writable!==false||SEED_DESC.enumerable!==false) throw new Error('Ubergabe: invalid nested worker seed descriptor');var SNAP=${SNAP};var __defHidden=function(obj,key,value){if(!obj||(typeof obj!=='object'&&typeof obj!=='function')) return value;var desc=Object.getOwnPropertyDescriptor(obj,key);if(desc&&desc.configurable===false){return Object.prototype.hasOwnProperty.call(desc,'value')?desc.value:value;}Object.defineProperty(obj,key,{value:value,writable:true,configurable:true,enumerable:false});return value;};var __ensureOwner=function(){var C=(self.FernwehContext&&typeof self.FernwehContext==='object')?self.FernwehContext:__defHidden(self,'FernwehContext',Object.create(null));var state=(C.state&&typeof C.state==='object')?C.state:__defHidden(C,'state',Object.create(null));var wrk=(state.__WRK__&&typeof state.__WRK__==='object')?state.__WRK__:__defHidden(state,'__WRK__',Object.create(null));var runtime=(wrk.runtime&&typeof wrk.runtime==='object')?wrk.runtime:__defHidden(wrk,'runtime',Object.create(null));var nav=(state.__NAV_TOTAL_SET__&&typeof state.__NAV_TOTAL_SET__==='object')?state.__NAV_TOTAL_SET__:__defHidden(state,'__NAV_TOTAL_SET__',Object.create(null));var data=(nav.__DATA_STORE_STATE__&&typeof nav.__DATA_STORE_STATE__==='object')?nav.__DATA_STORE_STATE__:__defHidden(nav,'__DATA_STORE_STATE__',Object.create(null));var snapRoot=(data.__WORKER_ENV_SNAPSHOT__&&typeof data.__WORKER_ENV_SNAPSHOT__==='object')?data.__WORKER_ENV_SNAPSHOT__:__defHidden(data,'__WORKER_ENV_SNAPSHOT__',Object.create(null));var screenRoot=(state.__SCREEN__&&typeof state.__SCREEN__==='object')?state.__SCREEN__:__defHidden(state,'__SCREEN__',Object.create(null));return{runtime:runtime,snapRoot:snapRoot,screenRoot:screenRoot};};var __applyOwnerSnapshot=function(s){if(!s||typeof s!=='object') throw new Error('Ubergabe: invalid nested worker snapshot');if(!s.screen||typeof s.screen!=='object') throw new Error('Ubergabe: invalid nested worker screen');if(!Number.isFinite(Number(s.screen.width))) throw new Error('Ubergabe: bad nested screen.width');if(!Number.isFinite(Number(s.screen.height))) throw new Error('Ubergabe: bad nested screen.height');if(!Number.isFinite(Number(s.screen.dpr))||Number(s.screen.dpr)<=0) throw new Error('Ubergabe: bad nested screen.dpr');if(!Number.isFinite(Number(s.screen.colorDepth))) throw new Error('Ubergabe: bad nested screen.colorDepth');var owner=__ensureOwner();var root=owner.snapRoot;var prevKeys=Object.keys(root);for(var i=0;i<prevKeys.length;i++){delete root[prevKeys[i]];}var nextKeys=Object.keys(s);for(var j=0;j<nextKeys.length;j++){var key=nextKeys[j];root[key]=s[key];}var screen=owner.screenRoot;var prevScreenKeys=Object.keys(screen);for(var si=0;si<prevScreenKeys.length;si++){delete screen[prevScreenKeys[si]];}var nextScreenKeys=Object.keys(s.screen);for(var sj=0;sj<nextScreenKeys.length;sj++){var screenKey=nextScreenKeys[sj];screen[screenKey]=s.screen[screenKey];}__defHidden(owner.runtime,'bootstrapActive',true);__defHidden(owner.runtime,'consumeEnvSnapshot',__applyOwnerSnapshot);return root;};__applyOwnerSnapshot(SNAP);if(typeof BroadcastChannel!=='function') throw new Error('Ubergabe: BroadcastChannel missing');var bc=new BroadcastChannel('__ENV_SYNC__');bc.onmessage=function(ev){var s=ev&&ev.data&&ev.data.__ENV_SYNC__&&ev.data.__ENV_SYNC__.envSnapshot;if(s) __applyOwnerSnapshot(s);};var USER=${USER};if(!USER||typeof USER!=='string') throw new Error('Ubergabe: missing user import');var __isModuleURL=function(u){if(typeof u!=='string'||!u) return false; if(/\\.mjs(?:$|[?#])/i.test(u)) return true; if(/[?&]type=module(?:&|$)/i.test(u)) return true; if(/[?&]module(?:&|$)/i.test(u)) return true; if(/#module\\b/i.test(u)) return true; if(u.slice(0,5)==='data:'){ return /;module\\b/i.test(u) || /\\bmodule\\b/i.test(u.slice(0,80)); } return false;}; if(__isModuleURL(USER)) { return import(USER); } try { importScripts(USER); } catch(e) { return import(USER); }})();`;
         const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
         return [blobURL, { ...(opts || {}), type: workerType }];
       });

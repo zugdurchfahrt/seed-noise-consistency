@@ -179,20 +179,12 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
     const register = (Core && typeof Core.__registerToStringWrapper === 'function')
       ? Core.__registerToStringWrapper
       : null;
-    const internal = (Core && Core.__internal && typeof Core.__internal === 'object')
-      ? Core.__internal
-      : null;
-    const state = (internal && internal.coreToStringState && internal.coreToStringState.__CORE_TOSTRING_STATE__ === true)
-      ? internal.coreToStringState
-      : null;
-    const overrideMap = state && state.overrideMap instanceof WeakMap ? state.overrideMap : null;
-    const proxyTargetMap = state && state.proxyTargetMap instanceof WeakMap ? state.proxyTargetMap : null;
-    if (!overrideMap || !proxyTargetMap) {
-      degrade('fatal', 'webgpu:toString_bridge_missing', new Error('[WebGPUPatchModule] Core.__internal.coreToStringState missing'), {
+    if (typeof register !== 'function') {
+      degrade('fatal', 'webgpu:toString_bridge_missing', new Error('[WebGPUPatchModule] Core.__registerToStringWrapper missing'), {
         stage: 'preflight',
         type: __webgpuTypePipeline,
-        key: 'Core.__internal.coreToStringState',
-        message: 'Core.__internal.coreToStringState missing',
+        key: 'Core.__registerToStringWrapper',
+        message: 'Core.__registerToStringWrapper missing',
         data: { outcome: 'skip', reason: 'missing_dep_toStringBridge' }
       });
       return null;
@@ -201,23 +193,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
       if (typeof wrapped !== 'function' || typeof nativeFn !== 'function') {
         throw new TypeError('[WebGPUPatchModule] bridgeToStringWrapper requires functions');
       }
-      if (typeof register === 'function' && Object.getPrototypeOf(wrapped) === Object.getPrototypeOf(nativeFn)) {
-        return register(wrapped, nativeFn, wrappedName, wrapperTag);
-      }
-      const bridgeTarget = (typeof nativeFn.__coreBridgeTarget__ === 'function')
-        ? nativeFn.__coreBridgeTarget__
-        : nativeFn;
-      const wrappedLabel = wrappedName
-        ? `function ${wrappedName}() { [native code] }`
-        : 'function () { [native code] }';
-      const bridgeName = bridgeTarget.name || '';
-      const bridgeLabel = bridgeName
-        ? `function ${bridgeName}() { [native code] }`
-        : 'function () { [native code] }';
-      overrideMap.set(bridgeTarget, bridgeLabel);
-      proxyTargetMap.set(wrapped, bridgeTarget);
-      overrideMap.set(wrapped, wrappedLabel);
-      return wrapped;
+      return register(wrapped, nativeFn, wrappedName, wrapperTag);
     };
   })();
   if (!bridgeToStringWrapper) {

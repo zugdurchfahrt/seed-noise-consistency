@@ -20,9 +20,7 @@ const __probeRun = async function(){
   const __probeCoreToStringState = (__probeCoreInternal && __probeCoreInternal.coreToStringState && typeof __probeCoreInternal.coreToStringState === "object")
     ? __probeCoreInternal.coreToStringState
     : null;
-  const __probeProxyTargetMap = (__probeCoreToStringState && __probeCoreToStringState.proxyTargetMap instanceof WeakMap)
-    ? __probeCoreToStringState.proxyTargetMap
-    : null;
+  const __probeProxyTargetMap = null;
   const __probeLoggerRoot = (W && W.FernwehContext && W.FernwehContext.__logger && typeof W.FernwehContext.__logger === "object")
     ? W.FernwehContext.__logger
     : null;
@@ -1888,13 +1886,15 @@ const __probeRun = async function(){
         const state = internal && internal.coreToStringState && internal.coreToStringState.__CORE_TOSTRING_STATE__ === true
           ? internal.coreToStringState
           : null;
-        if (!state || typeof state.nativeToString !== "function" || !(state.overrideMap instanceof WeakMap) || !(state.proxyTargetMap instanceof WeakMap)) {
+        if (!state || state.__CORE_TOSTRING_STATE__ !== true || typeof state.nativeToString !== "function") {
           throw new Error("Core.__internal.coreToStringState missing");
         }
         return {
           ok: true,
           legacyExportPresent: !!(core && Object.prototype.hasOwnProperty.call(core, "__ensureMarkAsNative")),
-          statePresent: true
+          statePresent: true,
+          weakMapsExposed: Object.prototype.hasOwnProperty.call(state, "overrideMap")
+            || Object.prototype.hasOwnProperty.call(state, "proxyTargetMap")
         };
       } catch (error) {
         return {
@@ -1931,52 +1931,31 @@ const __probeRun = async function(){
           if (!runtime) {
             throw new Error("FernwehContext.state.__WRK__.runtime missing");
           }
-          const ensureMarkAsNative = typeof runtime.__ensureMarkAsNative === "function"
-            ? runtime.__ensureMarkAsNative
-            : null;
           const state = runtime.__CORE_TOSTRING_STATE__ && runtime.__CORE_TOSTRING_STATE__.__CORE_TOSTRING_STATE__ === true
             ? runtime.__CORE_TOSTRING_STATE__
             : null;
-          if (typeof ensureMarkAsNative !== "function") {
-            throw new Error("FernwehContext.state.__WRK__.runtime.__ensureMarkAsNative missing");
+          if (typeof runtime.__registerToStringWrapper !== "function"
+              || typeof runtime.__wrapNativeApply !== "function"
+              || typeof runtime.__wrapNativeAccessor !== "function"
+              || typeof runtime.__wrapNativeCtor !== "function") {
+            throw new Error("FernwehContext.state.__WRK__.runtime toString bridge APIs missing");
           }
-          if (!state || typeof state.nativeToString !== "function" || !(state.overrideMap instanceof WeakMap) || !(state.proxyTargetMap instanceof WeakMap)) {
+          if (!state || state.__CORE_TOSTRING_STATE__ !== true || typeof state.nativeToString !== "function") {
             throw new Error("FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__ missing");
           }
-          const markAsNative = ensureMarkAsNative();
-          if (typeof markAsNative !== "function") {
-            throw new Error("markAsNative seed missing");
-          }
-          const toStringOverrideMap = state.overrideMap;
-          const toStringProxyTargetMap = state.proxyTargetMap;
           const nativeToString = state.nativeToString;
           const seedProbe = function seedProbe(){};
-          Object.defineProperty(seedProbe, "__coreBridgeTarget__", {
-            value: nativeToString,
-            writable: true,
-            configurable: true,
-            enumerable: false
-          });
           const seedProbeSource = Reflect.apply(nativeToString, seedProbe, []);
-          let leakedLabel = false;
-          let actualSource = null;
-          try {
-            markAsNative(seedProbe, "toString");
-            leakedLabel = typeof toStringOverrideMap.get(seedProbe) === "string";
-            actualSource = Reflect.apply(Function.prototype.toString, seedProbe, []);
-          } finally {
-            toStringProxyTargetMap.delete(seedProbe);
-            toStringOverrideMap.delete(seedProbe);
-          }
-          if (leakedLabel) {
-            throw new Error("source-text toString probe must stay unlabeled");
+          const actualSource = Reflect.apply(Function.prototype.toString, seedProbe, []);
+          if (Object.prototype.hasOwnProperty.call(state, "overrideMap") || Object.prototype.hasOwnProperty.call(state, "proxyTargetMap")) {
+            throw new Error("worker toString bridge WeakMap state is public");
           }
           if (actualSource !== seedProbeSource) {
             throw new Error("source-text toString probe forwarding mismatch");
           }
           return {
             ok: true,
-            labelLeaked: false,
+            weakMapsExposed: false,
             forwardingMatch: true
           };
         } catch (error) {
@@ -2535,7 +2514,7 @@ const __probeRun = async function(){
           const state = runtime && runtime.__CORE_TOSTRING_STATE__ && runtime.__CORE_TOSTRING_STATE__.__CORE_TOSTRING_STATE__ === true
             ? runtime.__CORE_TOSTRING_STATE__
             : null;
-          return (state && state.proxyTargetMap instanceof WeakMap) ? state.proxyTargetMap : null;
+          return null;
         } catch (_) {
           return null;
         }

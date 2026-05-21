@@ -93,12 +93,18 @@
     return wrkRuntime || __setHiddenValue(wrkState, 'runtime', Object.create(null));
   }
 
-  function __isCoreToStringStateOk(state) {
+  function __isCoreToStringPublishedStateOk(state) {
     return !!(state
       && state.__CORE_TOSTRING_STATE__ === true
       && typeof state.nativeToString === 'function'
-      && (state.overrideMap instanceof WeakMap)
-      && (state.proxyTargetMap instanceof WeakMap));
+      && !Object.prototype.hasOwnProperty.call(state, 'overrideMap')
+      && !Object.prototype.hasOwnProperty.call(state, 'proxyTargetMap')
+      && !Object.prototype.hasOwnProperty.call(state, 'toStringOverrideMap')
+      && !Object.prototype.hasOwnProperty.call(state, 'toStringProxyTargetMap')
+      && !(state.overrideMap instanceof WeakMap)
+      && !(state.proxyTargetMap instanceof WeakMap)
+      && !(state.toStringOverrideMap instanceof WeakMap)
+      && !(state.toStringProxyTargetMap instanceof WeakMap));
   }
 
       
@@ -139,59 +145,12 @@
       return (typeof bridgeTarget === 'function') ? bridgeTarget : null;
     }
 
-    function validateCoreToStringStateCandidate(state, sourceName) {
-      if (!__isCoreToStringStateOk(state)) return null;
-      const source = (typeof sourceName === 'string' && sourceName) ? sourceName : 'coreToStringState';
-      const stateBridgeTarget = resolveToStringBridgeTarget(state.nativeToString, state.proxyTargetMap);
-      const currentBridgeTarget = resolveToStringBridgeTarget(currentRealmToString, state.proxyTargetMap)
-        || ((typeof currentRealmToString === 'function') ? currentRealmToString : null);
-      if (typeof stateBridgeTarget !== 'function' || typeof currentBridgeTarget !== 'function') {
-        __wrkDiag('warn', 'wrk:toString_state_rejected', {
-          stage: 'preflight',
-          key: 'Function.prototype.toString',
-          message: 'shared toString state rejected because bridge target is missing',
-          type: 'contract violation',
-          data: {
-            outcome: 'return',
-            source: source,
-            reason: 'bridge_target_missing'
-          }
-        }, new Error('[WrkBridge] shared toString state bridge target missing'));
-        return null;
-      }
-      if (stateBridgeTarget !== currentBridgeTarget) {
-        __wrkDiag('warn', 'wrk:toString_state_rejected', {
-          stage: 'preflight',
-          key: 'Function.prototype.toString',
-          message: 'shared toString state rejected because realm baseline mismatched',
-          type: 'contract violation',
-          data: {
-            outcome: 'return',
-            source: source,
-            reason: 'realm_baseline_mismatch'
-          }
-        }, new Error('[WrkBridge] shared toString state realm mismatch'));
-        return null;
-      }
-      return state;
-    }
+    let sharedCoreToStringState = null;
 
-    const ownedCoreToStringState = validateCoreToStringStateCandidate(
-      (__wrkRuntimeRoot && __wrkRuntimeRoot.__CORE_TOSTRING_STATE__) ? __wrkRuntimeRoot.__CORE_TOSTRING_STATE__ : null,
-      'FernwehContext.state.__WRK__.runtime.__CORE_TOSTRING_STATE__'
-    );
-    let sharedCoreToStringState = ownedCoreToStringState || null;
+    const toStringOverrideMap = new WeakMap();
+    const toStringProxyTargetMap = new WeakMap();
 
-    const toStringOverrideMap = sharedCoreToStringState
-      ? sharedCoreToStringState.overrideMap
-      : new WeakMap();
-    const toStringProxyTargetMap = sharedCoreToStringState
-      ? sharedCoreToStringState.proxyTargetMap
-      : new WeakMap();
-
-    const nativeToStringCandidate = sharedCoreToStringState
-      ? sharedCoreToStringState.nativeToString
-      : currentRealmToString;
+    const nativeToStringCandidate = currentRealmToString;
     const nativeToString = resolveToStringBridgeTarget(nativeToStringCandidate, toStringProxyTargetMap)
       || resolveToStringBridgeTarget(currentRealmToString, toStringProxyTargetMap)
       || null;
@@ -202,15 +161,15 @@
     function publishCoreToStringState() {
       const nextState = {
         __CORE_TOSTRING_STATE__: true,
-        nativeToString: nativeToString,
-        overrideMap: toStringOverrideMap,
-        proxyTargetMap: toStringProxyTargetMap
+        nativeToString: nativeToString
       };
       try {
         if (!__wrkRuntimeRoot) {
           throw new Error('worker bridge runtime root missing');
         }
-        __setHiddenValue(__wrkRuntimeRoot, '__CORE_TOSTRING_STATE__', nextState);
+        if (!__isCoreToStringPublishedStateOk(__wrkRuntimeRoot.__CORE_TOSTRING_STATE__)) {
+          __setHiddenValue(__wrkRuntimeRoot, '__CORE_TOSTRING_STATE__', nextState);
+        }
       } catch (eState) {
         __wrkDiag('error', 'wrk:core_tostring_state_owner_define_failed', {
           stage: 'apply',
@@ -281,7 +240,7 @@
     {
       const currentProto = Object.getPrototypeOf(currentRealmToString);
       const nativeProto = Object.getPrototypeOf(nativeToString);
-      const shouldPublishCoreToStringState = !sharedCoreToStringState || ownedCoreToStringState !== sharedCoreToStringState;
+      const shouldPublishCoreToStringState = !sharedCoreToStringState;
       try {
         if (currentProto !== nativeProto) {
           throw new Error('[WrkBridge] Function.prototype.toString prototype bridge mismatch');
