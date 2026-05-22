@@ -65,17 +65,12 @@ SUBFAMILIES = [
     'Italic', 'Oblique', 'Bold Oblique',
     'Condensed', 'SemiCondensed']
 
-
-
 PLATFORM_ID_MAP = {
     "Win32": (3, 1, 1033),
     "MacIntel": (1, 0, 0)
 }
 
-ACCEPT_EXTS = {".woff2", ".woff", ".ttf", ".otf"}
-
-# Third-party icon-font packs are filtered by name here. Do not put OS-shipped
-# emoji/symbol font names here: color/emoji tables are normal for emoji fonts.
+# Third-party icon-font packs are filtered by name here
 ICON_KEYWORDS = {
     "awesome", "material", "fontello", "ionicons", "bootstrap-icons", "octicons",
     "simpleicons", "remixicon", "feather", "weather"
@@ -173,9 +168,6 @@ def _family_mapping_value(path: pathlib.Path, cache_name: str, family: str) -> s
         raise RuntimeError(f"[fonts] family mapping value must be a string for {family_norm}: {path}")
     value_norm = _normalize_whitespace(value)
     return value_norm or None
-
-
-
 
 
 def _normalize_postscript_name(value: str) -> str:
@@ -514,7 +506,6 @@ def _normalize_subfamilies(src):
     return SUBFAMILIES
 
 
-
 def get_font_compare(woff2_path):
     try:
         font = TTFont(woff2_path)
@@ -527,11 +518,6 @@ def get_font_compare(woff2_path):
         logger.warning(f"Ошибка чтения метаданных {woff2_path}: {e}")
         return (None, None)
 
-
-def path_iter_fonts(root: pathlib.Path):
-    for p in sorted(root.rglob("*")):
-        if p.suffix.lower() in ACCEPT_EXTS and p.is_file():
-            yield p
 
 def get_best_cmap(tt: TTFont) -> Dict[int, str]:
     try:
@@ -582,8 +568,8 @@ def has_symbol_emoji_traits(tt: TTFont, cmap: Dict[int, str]) -> bool:
     names = name_strings(tt)
     if any(k in names for k in ICON_KEYWORDS):
         return True
-    # PUA dominance is a structural icon-font signal. Color tables alone are
-    # not rejected: normative emoji fonts need them.
+    
+    # PUA dominance is a structural icon-font signal. 
     total = max(1, len(cmap))
     pua = 0
     for cp in cmap.keys():

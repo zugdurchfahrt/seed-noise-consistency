@@ -1,6 +1,5 @@
 import atexit
 import json
-import threading
 import pathlib
 from pathlib import Path
 from websocket import WebSocketApp

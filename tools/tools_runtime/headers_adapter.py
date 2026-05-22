@@ -135,7 +135,6 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
     family = _accept_language_family(browser_brand=active_brand, user_agent=active_user_agent)
     # Use profile DeviceMemory for header emission because the pipeline relies on
     # the browser flag path to keep the outbound Device-Memory surface stable.
-    # Do not source this header from runtime patch state.
     device_memory = str(profile["deviceMemory"])
     if family in ("firefox", "safari"):
         cdp_outbound_headers = {
@@ -187,14 +186,6 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
     }
 
 
-def build_safelisted_headers(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):
-    return _build_header_sets(
-        profile,
-        expected_client_hints=expected_client_hints,
-        user_agent=user_agent,
-        browser_brand=browser_brand,
-    )["js_safelisted_headers"]
-
 # ===== Accept-HEADER FORGE=====
 def _brand_key(browser_brand: str) -> str:
     b = (browser_brand or "").strip().lower()
@@ -224,15 +215,6 @@ def generate_accept_header(browser_brand: str, major_version: int, kind: str = "
     if kind == "fetch":  return "*/*"
     # navigate (по умолчанию)
     return ",".join(_pick_nav_template(key, int(major_version)))
-
-# ===== OUTBOUND CLNIENT HINTS  HEADERS HANDLING=====
-def outbound_headers_forge(profile, expected_client_hints, user_agent):
-    return _build_header_sets(
-        profile,
-        expected_client_hints=expected_client_hints,
-        user_agent=user_agent,
-        browser_brand=profile.get("browser_brand"),
-    )["cdp_outbound_headers"]
 
 
 def build_runtime_header_sets(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):

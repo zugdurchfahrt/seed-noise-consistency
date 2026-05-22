@@ -6,7 +6,6 @@ import shutil
 import requests
 import psutil
 import subprocess
-import requests
 import pathlib
 from datetime import datetime
 import pytz

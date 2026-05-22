@@ -262,21 +262,6 @@ def enable_seed_inject(global_seed: str):
     SEED_INJECT_ENABLED = True
 
 
-
-def _canonicalize_language_list_for_compare(value):
-    if not isinstance(value, list):
-        return None
-    out = []
-    seen = set()
-    for entry in value:
-        if not isinstance(entry, str) or not entry.strip():
-            return None
-        if entry not in seen:
-            seen.add(entry)
-            out.append(entry)
-    return out
-
-
 def stop():
     global _SW_STOPPING
     ws = _SW_WS
