@@ -74,12 +74,15 @@ PLATFORM_ID_MAP = {
 
 ACCEPT_EXTS = {".woff2", ".woff", ".ttf", ".otf"}
 
-# --- Keyword heuristics for icon/emoji fonts ---
+# Third-party icon-font packs are filtered by name here. Do not put OS-shipped
+# emoji/symbol font names here: color/emoji tables are normal for emoji fonts.
 ICON_KEYWORDS = {
     "awesome", "material", "fontello", "ionicons", "bootstrap-icons", "octicons",
-    "simpleicons", "remixicon", "feather", "weather", "dingbat", "dingbats", "seguiemj" 
+    "simpleicons", "remixicon", "feather", "weather"
 }
 
+# Private Use Area dominance is a strong signal for icon-font packs. Normal
+# emoji fonts map glyphs mostly to Unicode emoji codepoints, not to PUA.
 PUA_RANGES = [
     (0xE000, 0xF8FF),       # BMP PUA
     (0xF0000, 0xFFFFD),     # Plane 15 PUA
@@ -575,15 +578,12 @@ def name_strings(tt: TTFont) -> str:
     return " ".join(vals)
 
 def has_symbol_emoji_traits(tt: TTFont, cmap: Dict[int, str]) -> bool:
-    # keyword hit
+    # Third-party icon font names are explicit rejects.
     names = name_strings(tt)
     if any(k in names for k in ICON_KEYWORDS):
         return True
-    # color/emoji tables presence
-    for tab in ("COLR", "CPAL", "CBDT", "CBLC", "sbix", "SVG "):
-        if tab in tt:
-            return True
-    # PUA dominance
+    # PUA dominance is a structural icon-font signal. Color tables alone are
+    # not rejected: normative emoji fonts need them.
     total = max(1, len(cmap))
     pua = 0
     for cp in cmap.keys():
@@ -725,7 +725,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
                 continue
 
             ok_ascii, missing_ascii = has_ascii_letters_and_digits(cmap)
-            if not ok_ascii:
+            has_color_tables = any(tab in tt for tab in ("COLR", "CPAL", "CBDT", "CBLC", "sbix", "SVG "))
+            if not ok_ascii and not has_color_tables:
                 logger.warning(f"[Skipped] {src_path.name} — no basic ASCII (skipped: {len(missing_ascii)}).")
                 continue
 
@@ -740,6 +741,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
             if has_symbol_emoji_traits(tt, cmap):
                 logger.warning(f"[Skipped] {src_path.name} — seems to be icon/emoji (PUA/colored/kyy words/no latin letters)")
                 continue
+            if not ok_ascii and has_color_tables:
+                logger.info(f"[fonts] Keep color/emoji font without full ASCII: {src_path.name}")
 
             if fsType_restricts(tt):
                 logger.warning(f"[Skipped] {src_path.name} — licence constraints (OS/2 fsType).")
