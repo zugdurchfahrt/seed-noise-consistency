@@ -34,16 +34,21 @@ CACHE_NAMESPACE_LIMIT = 10
 
 # ----------------------- DICTIONARIES -----------------------
 SYS_FONTS_WIN = [
-    'Aptos', 'Arial', 'Bahnschrift', 'Calibri', 'Cambria', 'Candara', 'Cascadia Code', 'Cascadia Mono', 'Helvetica', 'News Gothic MT',
-    'Comic Sans MS', 'Consolas', 'Constantia', 'Corbel', 'Courier', 'Courier New', 'DejaVu Sans', 'DejaVu Sans Mono',
-    'DejaVu Serif', 'Ebrima', 'Fixedsys', 'Franklin Gothic Medium', 'Gabriola', 'Gadugi', 'Gentium', 'Georgia', 'Lucida Console',
-    'Impact', 'Ink Free', 'Inter', 'Javanese Text', 'Leelawadee UI', 'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
-    'Lucida Console', 'Lucida Sans Unicode', 'Malgun Gothic', 'Microsoft Himalaya', 'Microsoft New Tai Lue', 'Microsoft PhagsPa',
-    'Microsoft Tai Le', 'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Modern', 'Mongolian Baiti', 'Montserrat', 'MS Sans Serif', 'MS Serif',
-    'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection', 'Bookman Old Style', 'Arno Pro',
-    'Script', 'Segoe UI', 'Segoe Print', 'Segoe Script', 'Segoe UI Symbol', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen', 'Symbol', 'Bodoni MT',
-    'Niagara Solid', 'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings', 'Century Gothic',
-    'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic']
+    'Arial', 'Arial Black', 'Bahnschrift', 'Calibri', 'Cambria',
+    'Cambria Math', 'Candara', 'Cascadia Code', 'Cascadia Mono', 'Comic Sans MS',
+    'Consolas', 'Constantia', 'Corbel', 'Courier New', 'Ebrima',
+    'Franklin Gothic Medium', 'Gabriola', 'Gadugi', 'Georgia', 'HoloLens MDL2 Assets',
+    'Impact', 'Ink Free', 'Javanese Text', 'Leelawadee UI', 'Lucida Console',
+    'Lucida Sans Unicode', 'Malgun Gothic', 'Marlett', 'Microsoft Himalaya', 'Microsoft JhengHei',
+    'Microsoft New Tai Lue', 'Microsoft PhagsPa', 'Microsoft Sans Serif', 'Microsoft Tai Le', 'Microsoft YaHei',
+    'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Mongolian Baiti', 'MS Gothic', 'MV Boli',
+    'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Segoe Fluent Icons', 'Segoe MDL2 Assets',
+    'Segoe Print', 'Segoe Script', 'Segoe UI', 'Segoe UI Emoji', 'Segoe UI Historic',
+    'Segoe UI Symbol', 'Segoe UI Variable', 'SimSun', 'Sitka', 'Sylfaen',
+    'Symbol', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana',
+    'Webdings', 'Wingdings', 'Yu Gothic'
+]
+
 
 SYS_FONTS_MAC = [
     'Helvetica', 'Geneva', 'Lucida Grande', 'Palatino', 'Menlo', 'Monaco',
@@ -71,9 +76,8 @@ ACCEPT_EXTS = {".woff2", ".woff", ".ttf", ".otf"}
 
 # --- Keyword heuristics for icon/emoji fonts ---
 ICON_KEYWORDS = {
-    "emoji", "emojis", "awesome", "material", "fontello",
-    "ionicons", "bootstrap-icons", "octicons", "simpleicons", "remixicon",
-    "feather", "weather", "dingbat", "dingbats", "seguiemj", "seguiemoji", "segoe ui emoji"
+    "awesome", "material", "fontello", "ionicons", "bootstrap-icons", "octicons",
+    "simpleicons", "remixicon", "feather", "weather", "dingbat", "dingbats", "seguiemj" 
 }
 
 PUA_RANGES = [
@@ -610,16 +614,20 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
     Returns the dictionary like {1: family, 2: subfamily, 3: unique_id, 4: full_name, 5: version, 6: ps_name, 9: designer, 13: license_desc}
     """
     common_families = [
-    'Aptos', 'Arial', 'Bahnschrift', 'Calibri', 'Cambria', 'Candara', 'Cascadia Code', 'Cascadia Mono', 'Helvetica', 'News Gothic MT',
-    'Comic Sans MS', 'Consolas', 'Constantia', 'Corbel', 'Courier', 'Courier New', 'DejaVu Sans', 'DejaVu Sans Mono',
-    'DejaVu Serif', 'Ebrima', 'Fixedsys', 'Franklin Gothic Medium', 'Gabriola', 'Gadugi', 'Gentium', 'Georgia', 'Lucida Console',
-    'Impact', 'Ink Free', 'Inter', 'Javanese Text', 'Leelawadee UI', 'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
-    'Lucida Console', 'Lucida Sans Unicode', 'Malgun Gothic', 'Microsoft Himalaya', 'Microsoft New Tai Lue', 'Microsoft PhagsPa',
-    'Microsoft Tai Le', 'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Modern', 'Mongolian Baiti', 'Montserrat', 'MS Sans Serif', 'MS Serif',
-    'MS Gothic', 'MV Boli', 'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Roboto', 'Roman', 'Sans Serif Collection', 'Bookman Old Style',
-    'Arno Pro', 'Script', 'Segoe UI', 'Segoe Print', 'Segoe Script', 'Segoe UI Symbol', 'SimSun', 'SimSun-ExtB', 'SimSun-ExtG', 'Sitka', 'Sylfaen',
-    'Symbol', 'Bodoni MT', 'Niagara Solid', 'System', 'Tahoma', 'Terminal', 'Times New Roman', 'Tinos', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Webdings',
-    'Century Gothic', 'Yu Gothic Bold', 'Yu Gothic Light', 'Yu Gothic Medium', 'Yu Gothic']
+    'Arial', 'Arial Black', 'Bahnschrift', 'Calibri', 'Cambria',
+    'Cambria Math', 'Candara', 'Cascadia Code', 'Cascadia Mono', 'Comic Sans MS',
+    'Consolas', 'Constantia', 'Corbel', 'Courier New', 'Ebrima',
+    'Franklin Gothic Medium', 'Gabriola', 'Gadugi', 'Georgia', 'HoloLens MDL2 Assets',
+    'Impact', 'Ink Free', 'Javanese Text', 'Leelawadee UI', 'Lucida Console',
+    'Lucida Sans Unicode', 'Malgun Gothic', 'Marlett', 'Microsoft Himalaya', 'Microsoft JhengHei',
+    'Microsoft New Tai Lue', 'Microsoft PhagsPa', 'Microsoft Sans Serif', 'Microsoft Tai Le', 'Microsoft YaHei',
+    'Microsoft Yi Baiti', 'MingLiU-ExtB', 'Mongolian Baiti', 'MS Gothic', 'MV Boli',
+    'Myanmar Text', 'Nirmala UI', 'Palatino Linotype', 'Segoe Fluent Icons', 'Segoe MDL2 Assets',
+    'Segoe Print', 'Segoe Script', 'Segoe UI', 'Segoe UI Emoji', 'Segoe UI Historic',
+    'Segoe UI Symbol', 'Segoe UI Variable', 'SimSun', 'Sitka', 'Sylfaen',
+    'Symbol', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana',
+    'Webdings', 'Wingdings', 'Yu Gothic'
+    ]
 
     if platform == "MacIntel":
         family_names = SYS_FONTS_MAC + common_families
