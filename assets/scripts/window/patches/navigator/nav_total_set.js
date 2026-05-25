@@ -467,7 +467,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     try {
-    // ---- Hard consistency for platform ----
     // ——— A. Input/meta ———
     const meta          = (__envProfileState.meta && typeof __envProfileState.meta === 'object') ? __envProfileState.meta : {};
     const navPlat       = __envPlatformState.domPlatform;     // 'Win32' | 'MacIntel'
@@ -618,7 +617,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return;
     }
 
-    // --- Navigator patch registry + logging (filter noise) ---
+    // --- Navigator patch registry + logging  ---
     const __navPatchedFns = (typeof WeakSet === 'function') ? new WeakSet() : null;
     const __navPatchedKeys = new Set();
     function __navRegisterKey(key) {
@@ -665,7 +664,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       return (domPlatform === 'Win32' && osPlatform === 'Windows')
         || (domPlatform === 'MacIntel' && osPlatform === 'macOS');
     }
-    // guards (inputs must be present)
+    // guards
     if (!uaPlatform) {
       __navDiag('error', 'nav_total_set:ua_platform_missing', {
         stage: 'preflight',
@@ -1559,7 +1558,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
 
     // Important: like native - not enumerable
-    // [REGISTRY] userAgent is handled in `override_ua_data.js` (opt-in gate).
     // Here we keep only strict scalar accessor surfaces on Navigator.prototype.
     const strictScalarKeys = new Set(['platform','vendor','appVersion','productSub','maxTouchPoints','vendorSub','deviceMemory','hardwareConcurrency','language','languages']);
     const objectReturnKeys = new Set(['plugins','mimeTypes','userAgentData']);
@@ -2109,9 +2107,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 }
               }], 'throw');
             }
-            // `fullVersionList` is a high-entropy key returned by
-            // `getHighEntropyValues()`, not stable NavigatorUAData properties across Chromium.
-            // Do not create synthetic descriptors on `NavigatorUAData` here (avoid shape drift).
+
+        // Do not create synthetic descriptors on `NavigatorUAData` here (avoid shape drift).
         function dropOwnIfConfigurable(obj, key) {
           const ownDesc = Object.getOwnPropertyDescriptor(obj, key);
           if (ownDesc && ownDesc.configurable) {
@@ -2664,8 +2661,6 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }, 'nav_total_set:languages');
       }
     }
-
-  
    
     // ——— H. permissions.query ———
     if ('permissions' in navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
