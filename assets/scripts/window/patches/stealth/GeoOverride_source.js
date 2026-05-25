@@ -513,7 +513,7 @@
   }
   if (typeof Core.guardFlag !== 'function') {
     degrade('geo:guard_missing', null, {
-      key: 'entry_guard',
+      key: 'guard',
       stage: 'guard',
       message: 'Core.guardFlag missing',
       type: 'pipeline missing data',
@@ -537,7 +537,7 @@
     __guardToken = Core.guardFlag(__flagKey, __tag);
   } catch (e) {
     degrade('geo:guard_failed', e, {
-      key: 'entry_guard',
+      key: 'guard',
       stage: 'guard',
       message: 'guardFlag threw',
       type: 'pipeline missing data',
@@ -554,7 +554,7 @@
       }
     } catch (e) {
       degrade('geo:guard_release_exception', e, {
-        key: 'entry_guard',
+        key: 'guard',
         stage: 'rollback',
         message: 'releaseGuardFlag failed',
         type: 'pipeline missing data',

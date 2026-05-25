@@ -44,7 +44,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: 'entry_guard',
+      key: 'guard',
       message: 'Core.guardFlag missing',
       data: {
         outcome: 'skip',
@@ -60,7 +60,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
-      key: 'entry_guard',
+      key: 'guard',
       message: 'guardFlag threw',
       data: {
         outcome: 'skip',
@@ -96,7 +96,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: 'entry_guard',
+        key: 'guard',
         message: 'guard release failed after preflight skip',
         data: {
           outcome: 'skip',
@@ -132,7 +132,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: 'entry_guard',
+        key: 'guard',
         message: 'guard release failed after state registration skip',
         data: {
           outcome: 'skip',
@@ -170,7 +170,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: 'entry_guard',
+        key: 'guard',
         message: 'guard release failed after screen state missing skip',
         data: {
           outcome: 'skip',
@@ -1805,7 +1805,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         stage: 'rollback',
         type: __screenTypePipeline,
         diagTag: 'screen',
-        key: 'entry_guard',
+        key: 'guard',
         message: 'guard release failed in fatal catch',
         data: {
           outcome: 'skip',

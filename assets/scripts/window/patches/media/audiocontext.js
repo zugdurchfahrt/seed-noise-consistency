@@ -145,7 +145,7 @@ const AudioContextModule = function AudioContextModule(window) {
     if (!__core || typeof __core.guardFlag !== 'function') {
       __moduleDiag('warn', __tag + ':guard_missing', {
         diagTag: __tag,
-        key: 'entry_guard',
+        key: 'guard',
         stage: 'guard',
         message: 'Core.guardFlag missing',
         type: __audioTypePipeline,
@@ -157,7 +157,7 @@ const AudioContextModule = function AudioContextModule(window) {
   } catch (e) {
     __moduleDiag('warn', __tag + ':guard_failed', {
       diagTag: __tag,
-      key: 'entry_guard',
+      key: 'guard',
       stage: 'guard',
       message: 'guardFlag threw',
       type: __audioTypePipeline,
@@ -179,7 +179,7 @@ const AudioContextModule = function AudioContextModule(window) {
     } catch (eRelease) {
       __moduleDiag('warn', __tag + ':guard_release_exception', {
         diagTag: __tag,
-        key: 'entry_guard',
+        key: 'guard',
         stage: 'rollback',
         message: 'releaseGuardFlag threw',
         type: __audioTypePipeline,

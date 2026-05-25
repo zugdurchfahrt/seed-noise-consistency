@@ -2801,6 +2801,13 @@ function ServiceWorkerOverride(G){
       type: 'browser structure missing data',
       data: { outcome: 'throw', reason: 'module_init_failed', rollbackOk: false }
     }, e);
+    __wrkDiag('warn', 'wrk:guard_release_skipped', {
+      stage: 'rollback',
+      key: 'guard',
+      message: 'guard release skipped because rollback failed',
+      type: 'pipeline missing data',
+      data: { outcome: 'skip', reason: 'rollback_failed', rollbackOk: false }
+    }, null);
     __wrkBestEffort('wrk:guard_release_failed', {
       stage: 'guard',
       key: 'guard',

@@ -41,7 +41,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   if (!__core || typeof __core.guardFlag !== 'function') {
     __moduleDiag('warn', __module + ':guard_missing', {
       stage: 'guard',
-      key: 'entry_guard',
+      key: 'guard',
       message: 'Core.guardFlag missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
@@ -53,7 +53,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
   } catch (e) {
     __moduleDiag('warn', __module + ':guard_failed', {
       stage: 'guard',
-      key: 'entry_guard',
+      key: 'guard',
       message: 'guardFlag threw',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'guard_failed' }
@@ -70,7 +70,7 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
     } catch (e) {
       __moduleDiag('warn', __module + ':guard_release_exception', {
         stage: 'rollback',
-        key: 'entry_guard',
+        key: 'guard',
         message: 'releaseGuardFlag failed',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_exception' }

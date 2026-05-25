@@ -61,7 +61,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
       if (!__core || typeof __core.guardFlag !== 'function') {
         __webglDiagPipeline('fatal', 'webgl:guard_missing', {
           stage: 'guard',
-          key: 'entry_guard',
+          key: 'guard',
           message: 'Core.guardFlag missing',
           data: { outcome: 'throw' }
         }, null);
@@ -71,7 +71,7 @@ const WebglPatchModule = function WebglPatchModule(window) {
     } catch (e) {
       __webglDiagPipeline('fatal', 'webgl:guard_failed', {
         stage: 'guard',
-        key: 'entry_guard',
+        key: 'guard',
         message: 'guardFlag failed',
         data: { outcome: 'throw' }
       }, e);
@@ -82,12 +82,12 @@ const WebglPatchModule = function WebglPatchModule(window) {
     function releaseEntryGuard(rollbackOk) {
       try {
         if (__core && typeof __core.releaseGuardFlag === 'function') {
-          __core.releaseGuardFlag(__flagKey, __guardToken, !!rollbackOk, 'webgl');
+          __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, 'webgl');
         }
       } catch (e) {
         __webglDiagPipeline('warn', 'webgl:guard_release_failed', {
           stage: 'rollback',
-          key: 'entry_guard',
+          key: 'guard',
           message: 'releaseGuardFlag failed',
           data: { outcome: 'skip', reason: 'guard_release_failed' }
         }, e);

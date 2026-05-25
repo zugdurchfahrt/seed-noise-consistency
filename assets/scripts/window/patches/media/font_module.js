@@ -455,7 +455,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         stage: 'guard',
         diagTag: __tag,
         surface: __surface,
-        key: 'entry_guard',
+        key: 'guard',
         message: 'Core.guardFlag missing',
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
       }, null);
@@ -467,7 +467,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       stage: 'guard',
       diagTag: __tag,
       surface: __surface,
-      key: 'entry_guard',
+      key: 'guard',
       message: 'guardFlag threw',
       data: { outcome: 'skip', reason: 'guard_failed' }
     }, e);
@@ -485,7 +485,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         stage: stage || 'preflight',
         diagTag: __tag,
         surface: __surface,
-        key: 'entry_guard',
+        key: 'guard',
         message: message,
         data: { outcome: 'skip', reason: reason || 'guard_release_failed' }
       }, eRelease);
@@ -1592,7 +1592,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         stage: 'rollback',
         diagTag: __tag,
         surface: __surface,
-        key: 'entry_guard',
+        key: 'guard',
         message: 'releaseGuardFlag threw after apply failure',
         data: { outcome: rollbackOk ? 'rollback' : 'skip', reason: 'guard_release_failed' }
       }, eRelease);

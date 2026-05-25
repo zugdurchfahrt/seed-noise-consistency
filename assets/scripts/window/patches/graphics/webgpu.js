@@ -100,7 +100,7 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
   function releaseEntryGuard(rollbackOk) {
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
-        __core.releaseGuardFlag(__flagKey, __guardToken, !!rollbackOk, __tag);
+        __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __tag);
       }
     } catch (e) {
       degrade('warn', __tag + ':guard_release_exception', e, {

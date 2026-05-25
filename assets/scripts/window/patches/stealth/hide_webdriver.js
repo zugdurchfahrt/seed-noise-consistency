@@ -562,6 +562,14 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       type: __typeBrowser,
       data: { outcome: 'skip', reason: 'fatal_unhandled', rollbackOk: false }
     }, e);
+    __moduleDiag('warn', __tag + ':guard_release_skipped', {
+      diagTag: __tag,
+      key: 'guard',
+      stage: 'rollback',
+      message: 'guard release skipped because rollback failed',
+      type: __typePipeline,
+      data: { outcome: 'skip', reason: 'rollback_failed', rollbackOk: false }
+    }, null);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, false, __tag);
@@ -569,7 +577,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     } catch (eRelease) {
       __moduleDiag('warn', __tag + ':guard_release_failed', {
         diagTag: __tag,
-        key: __flagKey,
+        key: 'guard',
         stage: 'rollback',
         message: 'releaseGuardFlag threw after fatal_unhandled',
         type: __typePipeline,
