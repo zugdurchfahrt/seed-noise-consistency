@@ -147,57 +147,6 @@ const LOGGingModule = function LOGGingModule() {
     const DIAG_DUP_LIMIT = toPosInt(global.__DIAG_DUP_LIMIT, 2);
     const DIAG_DUP_MAP_MAX = toPosInt(global.__DIAG_DUP_MAP_MAX, 2048);
     const DIAG_DUP_COUNTS = new Map();
-    const LOGGER_MODULE_AUDIT_SLOTS = [
-      { module: "set_log", diagTag: "set_log", codePrefix: "set_log", source: "bundle", emitter: "diag", functions: "none", critical: true, requiresEmission: false },
-      { module: "bootstrap_hide", diagTag: "bootstrap_hide", codePrefix: "bootstrap_hide", source: "bundle", emitter: "diag", functions: "none", critical: true, requiresEmission: false },
-      { module: "core_window", diagTag: "core_window", codePrefix: "core_window", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "ready", summaryCodes: ["core_window:ready"] },
-      { module: "probe", diagTag: "probe", codePrefix: "probe", source: "bundle", emitter: "diag", functions: "none", critical: true, requiresEmission: false },
-      { module: "rtc", diagTag: "rtc", codePrefix: "rtc", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["rtc:patched"] },
-      { module: "hide_webdriver", diagTag: "hide_webdriver", codePrefix: "hide_webdriver", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["hide_webdriver:ready", "hide_webdriver:webdriver_native_skip"] },
-      { module: "rng_set", diagTag: "rng_set", codePrefix: "rng_set", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "ready", summaryCodes: ["rng_set:ready"] },
-      { module: "nav_total_set", diagTag: "nav_total_set", codePrefix: "nav_total_set", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["nav_total_set:applied"] },
-      { module: "screen", diagTag: "screen", codePrefix: "screen", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["screen:patches_applied", "screen:coordination_ready"], issueCodes: ["screen:coordination_incomplete"], nonTerminalCodes: ["screen:display_group_ready", "screen:viewport_group_ready", "screen:host_window_group_ready", "screen:display_group_applied", "screen:viewport_group_applied", "screen:host_window_group_applied", "screen:patched_viewport", "screen:deferred_viewport_reconcile_scheduled"] },
-      { module: "fonts", diagTag: "fonts", codePrefix: "fonts", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "ready", summaryCodes: ["fonts:load_settled"] },
-      { module: "canvas", diagTag: "canvas", codePrefix: "canvas", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["canvas:applied"], nonTerminalCodes: ["canvas:preflight:dom_deferred"] },
-      { module: "webgl", diagTag: "webgl", codePrefix: "webgl", source: "bundle", emitter: "diag", functions: "auto", aliases: ["webglstorage"], critical: true, summaryKind: "applied", summaryCodes: ["webgl:patches_applied"] },
-      { module: "webgpu_wl", diagTag: "webgpu_wl", codePrefix: "webgpu_wl", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "ready", summaryCodes: ["webgpu_wl:ready"] },
-      { module: "webgpu", diagTag: "webgpu", codePrefix: "webgpu", source: "bundle", emitter: "diag", functions: "auto", critical: true, summaryKind: "ready", summaryCodes: ["webgpu:ready"] },
-      { module: "audiocontext", diagTag: "audiocontext", codePrefix: "audiocontext", source: "bundle", emitter: "diag", functions: "auto", aliases: ["audio"], critical: true, summaryKind: "ready", summaryCodes: ["audiocontext:ready"] },
-      { module: "context", diagTag: "context", codePrefix: "context", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "applied", summaryCodes: ["context:webgl:apply:patches_applied", "context:canvas:apply:patches_applied", "context:offscreen:apply:patches_applied"], nonTerminalCodes: ["context:webgl:access", "context:canvas:access"] },
-      { module: "tz", diagTag: "tz", codePrefix: "tz", source: "cdp", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["tz:applied"] },
-      { module: "GeoOverride", diagTag: "geo", codePrefix: "geo", source: "cdp", emitter: "diag", functions: "auto", critical: true, summaryKind: "applied", summaryCodes: ["geo:patched"] },
-      { module: "override_ua_data", diagTag: "override_ua_data", codePrefix: "override_ua_data", source: "bundle", emitter: "diag", functions: "auto", critical: false, optional: true, summaryKind: "applied", summaryCodes: ["override_ua_data:applied"], nonTerminalCodes: ["override_ua_data:disabled"] },
-      { module: "headers_interceptor", diagTag: "headers_interceptor", codePrefix: "headers_interceptor", source: "disabled", emitter: "diag", functions: "auto", critical: false },
-      { module: "headers_bridge", diagTag: "headers_bridge", codePrefix: "headers_bridge", source: "disabled", emitter: "diag", functions: "auto", critical: false },
-      { module: "wrk", diagTag: "wrk", codePrefix: "wrk", source: "bundle", emitter: "diag", functions: "none", critical: true, summaryKind: "ready", summaryCodes: ["wrk:ready"] },
-      { module: "WORKER_PATCH_SRC", diagTag: "worker_patch", codePrefix: "worker_patch_src", source: "cdp", emitter: "diag", functions: "none", aliases: ["WORKER_PATCH_SRC"], critical: true, summaryKind: "applied", summaryCodes: ["worker_patch_src:applied"] },
-      { module: "worker_bootstrap", diagTag: "worker_bootstrap", codePrefix: "worker_bootstrap", source: "cdp", emitter: "diag", functions: "none", critical: true, summaryKind: "ready", summaryCodes: ["worker_bootstrap:ready"] }
-    ];
-    __defineLoggerHiddenValue("__MODULE_DIAG_SLOTS__", LOGGER_MODULE_AUDIT_SLOTS, true);
-    const LOGGER_MODULE_AUDIT_PROOF = Object.freeze({
-      WORKER_PATCH_SRC: {
-        requiresResultProof: true,
-        locate: {
-          file: "sunami/assets/scripts/workerscope/WORKER_PATCH_SRC.js",
-          triggerCode: "worker_patch_src:applied",
-          expected: {
-            level: "info",
-            code: "worker_patch_src:applied",
-            stage: "apply",
-            key: "installWorkerUACHMirror",
-            message: "worker patch applied",
-            data: { outcome: "return", reason: "applied" }
-          }
-        }
-      }
-    });
-    __defineLoggerHiddenValue("__MODULE_DIAG_PROOF__", LOGGER_MODULE_AUDIT_PROOF, true);
-    const __moduleAuditState = {
-      timerId: null,
-      lastSignalByModule: Object.create(null),
-      lastStatusByModule: Object.create(null),
-      armed: false
-    };
 
     // Signature defines what "same event" means for dedup.
     // If these fields match, event copies after DIAG_DUP_LIMIT are suppressed.
@@ -374,75 +323,11 @@ const LOGGingModule = function LOGGingModule() {
       return next <= DIAG_DUP_LIMIT;
     }
 
-    function moduleAuditProof(slot) {
-      if (!slot || typeof slot !== "object") return null;
-      const moduleName = (typeof slot.module === "string" && slot.module) ? slot.module : null;
-      if (!moduleName) return null;
-      return Object.prototype.hasOwnProperty.call(LOGGER_MODULE_AUDIT_PROOF, moduleName)
-        ? LOGGER_MODULE_AUDIT_PROOF[moduleName]
-        : null;
-    }
-
-    function moduleAuditLocate(slot) {
-      const proof = moduleAuditProof(slot);
-      if (proof && proof.locate && typeof proof.locate === "object") return proof.locate;
-      return (slot && slot.locate && typeof slot.locate === "object") ? slot.locate : null;
-    }
-
-    function moduleSummaryCodes(slot) {
-      if (!slot || typeof slot !== "object") return [];
-      if (Array.isArray(slot.summaryCodes)) return slot.summaryCodes.filter((v) => typeof v === "string" && v);
-      const locate = moduleAuditLocate(slot);
-      return (locate && typeof locate.triggerCode === "string" && locate.triggerCode) ? [locate.triggerCode] : [];
-    }
-
-    function moduleNonTerminalCodes(slot) {
-      if (!slot || typeof slot !== "object" || !Array.isArray(slot.nonTerminalCodes)) return [];
-      return slot.nonTerminalCodes.filter((v) => typeof v === "string" && v);
-    }
-
-    function moduleIssueCodes(slot) {
-      if (!slot || typeof slot !== "object" || !Array.isArray(slot.issueCodes)) return [];
-      return slot.issueCodes.filter((v) => typeof v === "string" && v);
-    }
-
-    function moduleSummaryKind(slot, code) {
-      if (typeof code !== "string" || !code || !slot || typeof slot !== "object") return null;
-      const summaryCodes = moduleSummaryCodes(slot);
-      if (!summaryCodes.length) return null;
-      for (let i = 0; i < summaryCodes.length; i++) {
-        if (summaryCodes[i] !== code) continue;
-        return (typeof slot.summaryKind === "string" && slot.summaryKind) ? slot.summaryKind : "ok";
-      }
-      return null;
-    }
-
-    function isSummaryCode(code, slot) {
-      return moduleSummaryKind(slot || null, code) !== null;
-    }
-
-    function isNonTerminalCode(code, slot) {
-      if (typeof code !== "string" || !code || !slot || typeof slot !== "object") return false;
-      const nonTerminalCodes = moduleNonTerminalCodes(slot);
-      for (let i = 0; i < nonTerminalCodes.length; i++) {
-        if (nonTerminalCodes[i] === code) return true;
-      }
-      return false;
-    }
-
-    function isIssueCode(code, slot) {
-      if (typeof code !== "string" || !code || !slot || typeof slot !== "object") return false;
-      const issueCodes = moduleIssueCodes(slot);
-      for (let i = 0; i < issueCodes.length; i++) {
-        if (issueCodes[i] === code) return true;
-      }
-      return false;
-    }
-
     function modulePrefixes(slot) {
       const out = [];
       if (slot && typeof slot.diagTag === "string" && slot.diagTag) out.push(slot.diagTag);
       if (slot && typeof slot.codePrefix === "string" && slot.codePrefix) out.push(slot.codePrefix);
+      if (slot && typeof slot.module === "string" && slot.module) out.push(slot.module);
       if (slot && Array.isArray(slot.aliases)) {
         for (let i = 0; i < slot.aliases.length; i++) {
           const v = slot.aliases[i];
@@ -472,35 +357,52 @@ const LOGGingModule = function LOGGingModule() {
       return false;
     }
 
+    function moduleSummaryKind(slot, code) {
+      const codeValue = (typeof code === "string" && code) ? code : "";
+      if (!codeValue) return null;
+      if (/:ready$|_ready$/.test(codeValue)) return "ready";
+      if (/:applied$|_applied$|:patched$|_patched$|:patches_applied$|_patches_applied$/.test(codeValue)) return "applied";
+      if (/:load_settled$|_load_settled$/.test(codeValue)) return "ready";
+      if (/_native_passthrough$|:native_passthrough$|_native_getter_kept$|_native_skip$/.test(codeValue)) return "native";
+      return null;
+    }
+
+    function isSummaryCode(code, slot) {
+      return moduleSummaryKind(slot || null, code) !== null;
+    }
+
+    function moduleEventStatus(entry) {
+      if (!entry || typeof entry !== "object") return { status: "not_emitted", reason: "no_event" };
+      const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
+      const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+      const code = (typeof entry.code === "string" && entry.code) ? entry.code : "";
+      const level = (extra && typeof extra.level === "string" && extra.level) ? extra.level : "";
+      const reason = (data && typeof data.reason === "string" && data.reason) ? data.reason : "";
+      const outcome = (data && typeof data.outcome === "string" && data.outcome) ? data.outcome : "";
+      if (level === "fatal" || level === "error" || outcome === "throw" || /:(fatal|error|apply_failed|rollback_failed)$/.test(code)) {
+        return { status: "error", reason: reason || "runtime_issue" };
+      }
+      if (level === "warn") {
+        return { status: "warn", reason: reason || "runtime_warning" };
+      }
+      const summaryKind = moduleSummaryKind(null, code);
+      if (summaryKind) return { status: "ok", reason: summaryKind };
+      if (outcome === "return" || outcome === "skip" || outcome === "rollback") {
+        return { status: "ok", reason: reason || outcome };
+      }
+      if (level === "info") return { status: "ok", reason: reason || "observed" };
+      return { status: "not_emitted", reason: reason || "no_signal" };
+    }
+
     function moduleAuditEvaluate(slot, events) {
-      if (!slot || typeof slot !== "object") {
-        return { entry: null, status: "warn", reason: "invalid_slot" };
-      }
-      if (slot.emitter === "missing") {
-        return { entry: null, status: "error", reason: "missing_emitter" };
-      }
       const arr = Array.isArray(events) ? events : [];
-      if (slot.source === "disabled") {
-        return { entry: arr.length ? arr[arr.length - 1] : null, status: "disabled", reason: "disabled" };
-      }
-      if (slot.optional === true) {
-        if (!arr.length) return { entry: null, status: "optional", reason: "optional" };
-      }
-      if (!arr.length) {
-        if (slot.requiresEmission === false) return { entry: null, status: "not_required", reason: "not_required" };
-        return { entry: null, status: "warn", reason: "not_emitted" };
-      }
-      const proof = moduleAuditProof(slot);
-      const requiresResultProof = !!(proof && proof.requiresResultProof === true);
+      if (!arr.length) return { entry: null, status: "not_emitted", reason: "no_events" };
       let latestIssue = null;
       let latestExactIssue = null;
-      let latestSummary = null;
-      let latestExactSummary = null;
-      let latestNonTerminal = null;
-      let latestExactNonTerminal = null;
+      let latestOk = null;
+      let latestExactOk = null;
       let latestOther = null;
-      let latestApplied = null;
-      const scopeSeen = requiresResultProof ? Object.create(null) : null;
+      const slotObj = (slot && typeof slot === "object") ? slot : null;
 
       for (let i = 0; i < arr.length; i++) {
         const entry = arr[i];
@@ -509,110 +411,36 @@ const LOGGingModule = function LOGGingModule() {
         const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
         const diagTag = (extra && typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null;
         const moduleName = (extra && typeof extra.module === "string" && extra.module) ? extra.module : null;
-        const exact = ((diagTag && diagTag === slot.diagTag) || (moduleName && moduleName === slot.module));
-        const code = (typeof entry.code === "string" && entry.code) ? entry.code : "";
-        const level = (extra && typeof extra.level === "string" && extra.level) ? extra.level : "";
-        const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
-        if (isNativePublicPassthroughDiagnostic(code, extra, data)) {
-          latestNonTerminal = entry;
-          if (exact) latestExactNonTerminal = entry;
-        } else if (isIssueCode(code, slot) || level === "warn" || level === "error" || level === "fatal") {
+        const exact = !!(slotObj && ((diagTag && diagTag === slotObj.diagTag) || (moduleName && moduleName === slotObj.module)));
+        const status = moduleEventStatus(entry);
+        if (status.status === "error" || status.status === "warn") {
           latestIssue = entry;
           if (exact) latestExactIssue = entry;
-        } else if (isSummaryCode(code, slot)) {
-          latestSummary = entry;
-          if (exact) latestExactSummary = entry;
-        } else if (isNonTerminalCode(code, slot)) {
-          latestNonTerminal = entry;
-          if (exact) latestExactNonTerminal = entry;
-        }
-        if (requiresResultProof && slot.module === "WORKER_PATCH_SRC" && code === "worker_patch_src:applied") {
-          if (extra && extra.key === "installWorkerUACHMirror" && data && data.outcome === "return" && data.reason === "applied") {
-            latestApplied = entry;
-            if (typeof data.scope === "string" && data.scope) {
-              scopeSeen[data.scope] = true;
-            }
-          }
+        } else if (status.status === "ok") {
+          latestOk = entry;
+          if (exact) latestExactOk = entry;
         }
       }
 
       const baseEntry = latestExactIssue
         || latestIssue
-        || latestExactSummary
-        || latestSummary
-        || latestExactNonTerminal
-        || latestNonTerminal
+        || latestExactOk
+        || latestOk
         || latestOther
         || null;
 
-      if (requiresResultProof) {
-        if (slot.module === "WORKER_PATCH_SRC") {
-          const hasWorker = scopeSeen.DedicatedWorker === true;
-          const hasSharedWorker = scopeSeen.SharedWorker === true;
-          const matchCount = Object.keys(scopeSeen).length;
-          if (hasWorker && hasSharedWorker) {
-            return {
-              entry: latestApplied || baseEntry,
-              status: "ok",
-              reason: "result_proof_scope_pair_complete"
-            };
-          }
-          if (matchCount > 0) {
-            return {
-              entry: latestApplied || baseEntry,
-              status: "pending",
-              reason: "result_proof_scope_pair_partial"
-            };
-          }
-          return {
-            entry: baseEntry,
-            status: "pending",
-            reason: "result_proof_scope_pair_pending"
-          };
-        }
-        return {
-          entry: baseEntry,
-          status: "pending",
-          reason: "result_proof_pending"
-        };
-      }
-
       if (latestExactIssue || latestIssue) {
         const issueEntry = latestExactIssue || latestIssue;
-        const issueExtra = (issueEntry && issueEntry.extra && typeof issueEntry.extra === "object") ? issueEntry.extra : null;
-        const issueLevel = (issueExtra && typeof issueExtra.level === "string" && issueExtra.level) ? issueExtra.level : "";
-        return {
-          entry: issueEntry,
-          status: issueLevel === "warn" ? "warn" : "error",
-          reason: "runtime_issue"
-        };
+        const issueStatus = moduleEventStatus(issueEntry);
+        return { entry: issueEntry, status: issueStatus.status, reason: issueStatus.reason };
       }
-      if (latestExactSummary || latestSummary) {
-        return {
-          entry: latestExactSummary || latestSummary,
-          status: "ok",
-          reason: (typeof slot.summaryKind === "string" && slot.summaryKind) ? slot.summaryKind : "ok"
-        };
+      if (latestExactOk || latestOk) {
+        const okEntry = latestExactOk || latestOk;
+        const okStatus = moduleEventStatus(okEntry);
+        return { entry: okEntry, status: "ok", reason: okStatus.reason };
       }
-      if (latestExactNonTerminal || latestNonTerminal) {
-        if (slot.optional === true) {
-          return {
-            entry: latestExactNonTerminal || latestNonTerminal,
-            status: "optional",
-            reason: "optional"
-          };
-        }
-        return {
-          entry: latestExactNonTerminal || latestNonTerminal,
-          status: "pending",
-          reason: "non_terminal_expected"
-        };
-      }
-      return {
-        entry: baseEntry,
-        status: "warn",
-        reason: "unclassified_module_event"
-      };
+      const otherStatus = moduleEventStatus(baseEntry);
+      return { entry: baseEntry, status: otherStatus.status, reason: otherStatus.reason };
     }
     __defineLoggerHiddenValue("__MODULE_DIAG_AUDIT__", Object.freeze({
       isSummaryCode,
@@ -620,207 +448,6 @@ const LOGGingModule = function LOGGingModule() {
       matchEntry: moduleEventMatchesSlot,
       evaluate: moduleAuditEvaluate
     }), true);
-
-    function isModuleAuditSyntheticCode(code) {
-      return typeof code === "string"
-        && (
-          code.indexOf("degrade:module_status:") === 0
-        );
-    }
-
-    function emitModuleAuditSignal(slot, entry, status, reasonOverride) {
-      try {
-        if (!slot || slot.critical !== true) return;
-        if (status !== "error" && status !== "warn") return;
-        const locate = moduleAuditLocate(slot);
-        const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
-        const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
-        const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
-        const auditReason = (typeof reasonOverride === "string" && reasonOverride)
-          ? reasonOverride
-          : ((status === "warn") ? "not_emitted" : "runtime_issue");
-        const code = "degrade:module_status:" + String(status);
-        const observedReason = (data && typeof data.reason === "string" && data.reason) ? data.reason : null;
-        const message =
-          "module audit status=" + String(status)
-          + (entry && typeof entry.code === "string" && entry.code ? "; observedCode=" + entry.code : "")
-          + ((auditReason && auditReason !== status) ? "; auditReason=" + auditReason : "")
-          + (observedReason ? "; observedReason=" + observedReason : "");
-        const entryCode = (entry && typeof entry.code === "string") ? entry.code : null;
-        __degradeApi.diag((status === "warn") ? "warn" : "error", code, {
-          module: (slot && typeof slot.module === "string" && slot.module) ? slot.module : "set_log",
-          diagTag: "degrade:module_check",
-          surface: (extra && typeof extra.surface === "string" && extra.surface)
-            ? extra.surface
-            : (slot && typeof slot.diagTag === "string" && slot.diagTag ? slot.diagTag : "logger"),
-          key: (extra && typeof extra.key === "string" && extra.key)
-            ? extra.key
-            : (expected && typeof expected.key === "string" && expected.key)
-              ? expected.key
-              : ((slot && typeof slot.module === "string" && slot.module) ? slot.module : null),
-          stage: "audit",
-          message,
-          type: "pipeline missing data",
-          data: {
-            outcome: "return",
-            reason: auditReason,
-            status: status,
-            module: slot && slot.module ? slot.module : null,
-            code: entryCode,
-            auditedBy: "set_log",
-            observedStage: extra && typeof extra.stage === "string"
-              ? extra.stage
-              : (expected && typeof expected.stage === "string" ? expected.stage : null),
-            observedKey: extra && (typeof extra.key === "string" || extra.key === null)
-              ? extra.key
-              : (expected && (typeof expected.key === "string" || expected.key === null) ? expected.key : null),
-            observedData: data || (expected && Object.prototype.hasOwnProperty.call(expected, "data") ? expected.data : null),
-            source: slot && slot.source ? slot.source : null,
-            file: locate && typeof locate.file === "string" ? locate.file : null,
-            triggerCode: locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null
-          }
-        }, null);
-      } catch (_) {}
-    }
-
-    function isModuleAuditIssueStatus(status) {
-      return status === "error" || status === "warn";
-    }
-
-    function emitModuleAuditResolution(slot, entry, previousStatus, reasonOverride) {
-      try {
-        if (!slot || slot.critical !== true) return;
-        if (!previousStatus || previousStatus === "ok") return;
-        const locate = moduleAuditLocate(slot);
-        const expected = (locate && locate.expected && typeof locate.expected === "object") ? locate.expected : null;
-        const extra = (entry && entry.extra && typeof entry.extra === "object") ? entry.extra : null;
-        const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
-        const entryCode = (entry && typeof entry.code === "string") ? entry.code : null;
-        __degradeApi.diag("info", "degrade:module_status:ok_after_recheck", {
-          module: (slot && typeof slot.module === "string" && slot.module) ? slot.module : "set_log",
-          diagTag: "degrade:module_check",
-          surface: (extra && typeof extra.surface === "string" && extra.surface)
-            ? extra.surface
-            : (slot && typeof slot.diagTag === "string" && slot.diagTag ? slot.diagTag : "logger"),
-          key: (extra && typeof extra.key === "string" && extra.key)
-            ? extra.key
-              : (expected && typeof expected.key === "string" && expected.key)
-                ? expected.key
-                : ((slot && typeof slot.module === "string" && slot.module) ? slot.module : null),
-          stage: "audit",
-          message: "module audit status=ok_after_recheck; previousStatus=" + String(previousStatus)
-            + (entryCode ? "; observedCode=" + entryCode : ""),
-          type: "pipeline telemetry",
-          data: {
-            outcome: "return",
-            reason: (typeof reasonOverride === "string" && reasonOverride) ? reasonOverride : "ok_after_recheck",
-            status: "ok_after_recheck",
-            previousReason: previousStatus,
-            module: slot && slot.module ? slot.module : null,
-            code: entryCode,
-            auditedBy: "set_log",
-            observedStage: extra && typeof extra.stage === "string"
-              ? extra.stage
-              : (expected && typeof expected.stage === "string" ? expected.stage : null),
-            observedKey: extra && (typeof extra.key === "string" || extra.key === null)
-              ? extra.key
-              : (expected && (typeof expected.key === "string" || expected.key === null) ? expected.key : null),
-            observedData: data || (expected && Object.prototype.hasOwnProperty.call(expected, "data") ? expected.data : null),
-            source: slot && slot.source ? slot.source : null,
-            file: locate && typeof locate.file === "string" ? locate.file : null,
-            triggerCode: locate && typeof locate.triggerCode === "string" ? locate.triggerCode : null
-          }
-        }, null);
-      } catch (_) {}
-    }
-
-    function runModuleAuditProducer() {
-      try {
-        const buf = _buf();
-        const arr = Array.isArray(buf)
-          ? buf.filter((entry) => {
-              if (!entry || entry.type !== "degrade") return false;
-              const code = (typeof entry.code === "string") ? entry.code : "";
-              return !isModuleAuditSyntheticCode(code);
-            })
-          : [];
-        for (let i = 0; i < LOGGER_MODULE_AUDIT_SLOTS.length; i++) {
-          const slot = LOGGER_MODULE_AUDIT_SLOTS[i];
-          const events = [];
-          for (let j = 0; j < arr.length; j++) {
-            const entry = arr[j];
-            if (moduleEventMatchesSlot(slot, entry)) events.push(entry);
-          }
-          const evaluation = moduleAuditEvaluate(slot, events);
-          const moduleEvent = (evaluation && typeof evaluation === "object") ? evaluation.entry : null;
-          const status = (evaluation && typeof evaluation.status === "string" && evaluation.status) ? evaluation.status : "warn";
-          const auditReasonOverride = (evaluation && typeof evaluation.reason === "string" && evaluation.reason)
-            ? evaluation.reason
-            : ((evaluation && typeof evaluation === "object") ? null : "invalid_evaluation");
-          const previousStatus = Object.prototype.hasOwnProperty.call(__moduleAuditState.lastStatusByModule, slot.module)
-            ? __moduleAuditState.lastStatusByModule[slot.module]
-            : null;
-          __moduleAuditState.lastStatusByModule[slot.module] = status;
-          const signalKey = [
-            status,
-            auditReasonOverride || "",
-            moduleEvent && typeof moduleEvent.code === "string" ? moduleEvent.code : "",
-            moduleEvent && typeof moduleEvent.timestamp === "string" ? moduleEvent.timestamp : ""
-          ].join("|");
-          if (__moduleAuditState.lastSignalByModule[slot.module] === signalKey) continue;
-          __moduleAuditState.lastSignalByModule[slot.module] = signalKey;
-          if (isModuleAuditIssueStatus(status)) {
-            emitModuleAuditSignal(slot, moduleEvent, status, auditReasonOverride);
-          } else if (status === "ok") {
-            emitModuleAuditResolution(slot, moduleEvent, previousStatus, auditReasonOverride);
-          }
-        }
-      } catch (_) {}
-    }
-
-    function shouldRescheduleModuleAudit(entry) {
-      try {
-        if (!entry || entry.type !== "degrade") return false;
-        const code = (typeof entry.code === "string") ? entry.code : "";
-        if (!code || isModuleAuditSyntheticCode(code)) return false;
-        for (let i = 0; i < LOGGER_MODULE_AUDIT_SLOTS.length; i++) {
-          if (moduleEventMatchesSlot(LOGGER_MODULE_AUDIT_SLOTS[i], entry)) return true;
-        }
-      } catch (_) {}
-      return false;
-    }
-
-    function queueModuleAuditRun() {
-      try {
-        if (__moduleAuditState.timerId != null) return;
-        __moduleAuditState.timerId = global.setTimeout(function() {
-          __moduleAuditState.timerId = null;
-          runModuleAuditProducer();
-        }, 0);
-      } catch (_) {}
-    }
-
-    function scheduleModuleAuditProducer() {
-      try {
-        if (__moduleAuditState.armed) return;
-        __moduleAuditState.armed = true;
-        const doc = (global.document && typeof global.document === "object") ? global.document : null;
-        if (!doc || doc.readyState === "complete") {
-          queueModuleAuditRun();
-          return;
-        }
-        if (typeof global.addEventListener === "function") {
-          global.addEventListener("load", queueModuleAuditRun, { once: true });
-          return;
-        }
-        if (typeof doc.addEventListener === "function") {
-          doc.addEventListener("DOMContentLoaded", queueModuleAuditRun, { once: true });
-          return;
-        }
-        queueModuleAuditRun();
-      } catch (_) {}
-    }
-    scheduleModuleAuditProducer();
 
     function toPosInt(v, defVal) {
       const n = Number(v);
@@ -839,31 +466,7 @@ const LOGGingModule = function LOGGingModule() {
       return (typeof entry.timestamp === "string" && entry.timestamp) ? entry.timestamp : new Date().toISOString();
     }
 
-    function isNativePublicPassthroughDiagnostic(codeValue, extra, data) {
-      try {
-        const code = (typeof codeValue === "string" && codeValue) ? codeValue : "";
-        const x = (extra && typeof extra === "object") ? extra : null;
-        const d = (data && typeof data === "object") ? data : ((x && x.data && typeof x.data === "object") ? x.data : null);
-        const reason = (d && typeof d.reason === "string" && d.reason) ? d.reason : "";
-        const action = (d && typeof d.action === "string" && d.action) ? d.action : "";
-        const policy = (d && typeof d.policy === "string" && d.policy) ? d.policy : "";
-        return reason === "native_passthrough"
-          || reason === "native_getter_kept"
-          || reason === "native_skip"
-          || action === "native_passthrough"
-          || action === "keep_native_getter"
-          || policy === "keep_native_getter"
-          || code.indexOf("_native_passthrough") !== -1
-          || code.indexOf(":native_passthrough") !== -1
-          || code.indexOf("_native_getter_kept") !== -1
-          || code.indexOf("_native_skip") !== -1;
-      } catch (_) {
-        return false;
-      }
-    }
-
     function isDiagIncidentCritical(level, codeValue, extra, data) {
-      if (isNativePublicPassthroughDiagnostic(codeValue, extra, data)) return false;
       return !!DIAG_CRITICAL_LEVELS[String(level)];
     }
 
@@ -962,26 +565,6 @@ const LOGGingModule = function LOGGingModule() {
         pad2(parsed.getUTCMinutes()),
         pad2(parsed.getUTCSeconds())
       ].join(":") + "." + centis;
-    }
-
-    function resolveModuleAuditObservedData(triggerCode) {
-      try {
-        if (typeof triggerCode !== "string" || !triggerCode) return null;
-        const arr = _buf();
-        if (!Array.isArray(arr)) return null;
-        for (let i = arr.length - 1; i >= 0; i--) {
-          const entry = arr[i];
-          if (!entry || entry.type !== "degrade") continue;
-          const code = (typeof entry.code === "string") ? entry.code : "";
-          if (!code || isModuleAuditSyntheticCode(code)) continue;
-          if (code !== triggerCode) continue;
-          const extra = (entry.extra && typeof entry.extra === "object") ? entry.extra : null;
-          const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
-          if (!data) continue;
-          return normalizeForJSON(data);
-        }
-      } catch (_) {}
-      return null;
     }
 
     function reshapeAccessDataForView(codeValue, extra) {
@@ -1108,50 +691,6 @@ const LOGGingModule = function LOGGingModule() {
       const scopeKindValue = (typeof extra.scopeKind === "string" && extra.scopeKind)
         ? extra.scopeKind
         : ((incident && typeof incident.scopeKind === "string" && incident.scopeKind) ? incident.scopeKind : null);
-      if (
-        extra
-        && typeof extra === "object"
-        && isModuleAuditSyntheticCode(codeValue)
-        && extra.data
-        && typeof extra.data === "object"
-      ) {
-        const data = Object.assign({}, extra.data);
-        const observed = (data.observedData && typeof data.observedData === "object") ? data.observedData : null;
-        const looksThinObserved = !observed || (
-          Object.keys(observed).length <= 1
-          && Object.prototype.hasOwnProperty.call(observed, "outcome")
-        );
-        if (looksThinObserved) {
-          const hydratedObserved = resolveModuleAuditObservedData(data.triggerCode);
-          if (hydratedObserved && typeof hydratedObserved === "object") {
-            data.observedData = hydratedObserved;
-          }
-        }
-        const nextObserved = (data.observedData && typeof data.observedData === "object") ? data.observedData : null;
-        if (nextObserved) {
-          const workerKeys = [
-            "scope",
-            "scopeKind",
-            "relatedScope",
-            "relatedScopeKind",
-            "workerFamily",
-            "serviceWorkerLane",
-            "expectedWorkerScopeKind",
-            "language",
-            "languages",
-            "deviceMemory",
-            "hardwareConcurrency",
-            "uaData"
-          ];
-          for (let i = 0; i < workerKeys.length; i++) {
-            const k = workerKeys[i];
-            if (!Object.prototype.hasOwnProperty.call(data, k) && Object.prototype.hasOwnProperty.call(nextObserved, k)) {
-              data[k] = nextObserved[k];
-            }
-          }
-        }
-        extra.data = data;
-      }
       const shapedExtra = reshapeAccessDataForView(codeValue, extra);
       return {
         idx: (typeof idx === "number") ? idx : null,
@@ -1771,9 +1310,6 @@ const LOGGingModule = function LOGGingModule() {
           return;
         }
         _buf().push(entry);
-        if (shouldRescheduleModuleAudit(entry)) {
-          queueModuleAuditRun();
-        }
       } catch (e) {
         // ВАЖНО: не вызывать __DEGRADE__ отсюда, если __DEGRADE__ пишет через pushEntry,
         // иначе рекурсия по пути ошибок (само-логирование логгера).
