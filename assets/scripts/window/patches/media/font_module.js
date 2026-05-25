@@ -1196,36 +1196,42 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     return true;
   };
 
-  __fontDiagBrowser('warn', 'fonts:method:check:no_admissible_public_method_carrier', {
+  __fontDiagBrowser('info', 'fonts:method:check_native_passthrough', {
     stage: 'preflight',
+    type: __fontTypePipeline,
     diagTag: 'fonts:method:check',
     key: 'FontFaceSet.check',
-    message: 'FontFaceSet.check public method wrapper skipped to preserve native abuse/error path',
+    message: 'FontFaceSet.check left native to preserve native abuse/error path',
     data: {
-      outcome: 'skip',
-      reason: 'no_admissible_public_method_carrier'
+      outcome: 'return',
+      reason: 'native_passthrough',
+      carrierReason: 'no_admissible_public_method_carrier'
     }
   }, null);
 
-  __fontDiagBrowser('warn', 'fonts:method:forEach:no_admissible_public_method_carrier', {
+  __fontDiagBrowser('info', 'fonts:method:forEach_native_passthrough', {
     stage: 'preflight',
+    type: __fontTypePipeline,
     diagTag: 'fonts:method:forEach',
     key: 'FontFaceSet.forEach',
-    message: 'FontFaceSet.forEach public method wrapper skipped to preserve native abuse/error path',
+    message: 'FontFaceSet.forEach left native to preserve native abuse/error path',
     data: {
-      outcome: 'skip',
-      reason: 'no_admissible_public_method_carrier'
+      outcome: 'return',
+      reason: 'native_passthrough',
+      carrierReason: 'no_admissible_public_method_carrier'
     }
   }, null);
 
-  __fontDiagBrowser('warn', 'fonts:promise:load:no_admissible_public_method_carrier', {
+  __fontDiagBrowser('info', 'fonts:promise:load_native_passthrough', {
     stage: 'preflight',
+    type: __fontTypePipeline,
     diagTag: 'fonts:promise:load',
     key: 'FontFaceSet.load',
-    message: 'FontFaceSet.load public method wrapper skipped to preserve native abuse/error path',
+    message: 'FontFaceSet.load left native to preserve native abuse/error path',
     data: {
-      outcome: 'skip',
-      reason: 'no_admissible_public_method_carrier'
+      outcome: 'return',
+      reason: 'native_passthrough',
+      carrierReason: 'no_admissible_public_method_carrier'
     }
   }, null);
 })();

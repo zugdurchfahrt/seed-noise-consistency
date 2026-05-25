@@ -512,7 +512,11 @@ const LOGGingModule = function LOGGingModule() {
         const exact = ((diagTag && diagTag === slot.diagTag) || (moduleName && moduleName === slot.module));
         const code = (typeof entry.code === "string" && entry.code) ? entry.code : "";
         const level = (extra && typeof extra.level === "string" && extra.level) ? extra.level : "";
-        if (isIssueCode(code, slot) || level === "warn" || level === "error" || level === "fatal") {
+        const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
+        if (isNativePublicPassthroughDiagnostic(code, extra, data)) {
+          latestNonTerminal = entry;
+          if (exact) latestExactNonTerminal = entry;
+        } else if (isIssueCode(code, slot) || level === "warn" || level === "error" || level === "fatal") {
           latestIssue = entry;
           if (exact) latestExactIssue = entry;
         } else if (isSummaryCode(code, slot)) {
@@ -523,7 +527,6 @@ const LOGGingModule = function LOGGingModule() {
           if (exact) latestExactNonTerminal = entry;
         }
         if (requiresResultProof && slot.module === "WORKER_PATCH_SRC" && code === "worker_patch_src:applied") {
-          const data = (extra && extra.data && typeof extra.data === "object") ? extra.data : null;
           if (extra && extra.key === "installWorkerUACHMirror" && data && data.outcome === "return" && data.reason === "applied") {
             latestApplied = entry;
             if (typeof data.scope === "string" && data.scope) {
@@ -836,6 +839,34 @@ const LOGGingModule = function LOGGingModule() {
       return (typeof entry.timestamp === "string" && entry.timestamp) ? entry.timestamp : new Date().toISOString();
     }
 
+    function isNativePublicPassthroughDiagnostic(codeValue, extra, data) {
+      try {
+        const code = (typeof codeValue === "string" && codeValue) ? codeValue : "";
+        const x = (extra && typeof extra === "object") ? extra : null;
+        const d = (data && typeof data === "object") ? data : ((x && x.data && typeof x.data === "object") ? x.data : null);
+        const reason = (d && typeof d.reason === "string" && d.reason) ? d.reason : "";
+        const action = (d && typeof d.action === "string" && d.action) ? d.action : "";
+        const policy = (d && typeof d.policy === "string" && d.policy) ? d.policy : "";
+        return reason === "native_passthrough"
+          || reason === "native_getter_kept"
+          || reason === "native_skip"
+          || action === "native_passthrough"
+          || action === "keep_native_getter"
+          || policy === "keep_native_getter"
+          || code.indexOf("_native_passthrough") !== -1
+          || code.indexOf(":native_passthrough") !== -1
+          || code.indexOf("_native_getter_kept") !== -1
+          || code.indexOf("_native_skip") !== -1;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function isDiagIncidentCritical(level, codeValue, extra, data) {
+      if (isNativePublicPassthroughDiagnostic(codeValue, extra, data)) return false;
+      return !!DIAG_CRITICAL_LEVELS[String(level)];
+    }
+
     function normalizeDiagIncident(entry, idx) {
       try {
         if (!entry || typeof entry !== "object") return null;
@@ -850,6 +881,8 @@ const LOGGingModule = function LOGGingModule() {
           const errMessage = (errObj && typeof errObj.message === "string")
             ? errObj.message
             : (typeof entry.error === "string" ? entry.error : null);
+          const codeValue = (typeof entry.code === "string" && entry.code) ? entry.code : null;
+          const dataValue = Object.prototype.hasOwnProperty.call(extra, "data") ? extra.data : null;
           return {
             idx: (typeof idx === "number") ? idx : null,
             diagTag: (typeof extra.diagTag === "string" && extra.diagTag) ? extra.diagTag : null,
@@ -858,8 +891,8 @@ const LOGGingModule = function LOGGingModule() {
             timestamp: safeEntryTimestamp(entry),
             entryType: "degrade",
             level: String(level),
-            critical: !!DIAG_CRITICAL_LEVELS[String(level)],
-            code: (typeof entry.code === "string" && entry.code) ? entry.code : null,
+            critical: isDiagIncidentCritical(level, codeValue, extra, dataValue),
+            code: codeValue,
             stage: (typeof extra.stage === "string" && extra.stage) ? extra.stage : null,
             scope: (typeof extra.scope === "string" && extra.scope) ? extra.scope : null,
             scopeKind: (typeof extra.scopeKind === "string" && extra.scopeKind) ? extra.scopeKind : null,
@@ -867,7 +900,7 @@ const LOGGingModule = function LOGGingModule() {
             errName: errName,
             errMessage: errMessage,
             diagType: (typeof extra.type === "string" && extra.type) ? extra.type : null,
-            data: Object.prototype.hasOwnProperty.call(extra, "data") ? extra.data : null
+            data: dataValue
           };
         }
 
