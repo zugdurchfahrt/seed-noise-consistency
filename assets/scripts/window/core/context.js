@@ -1107,6 +1107,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const docProto = Object.getPrototypeOf(doc);
     if (!docProto) return 0;
     let applied = 0;
+    let createElementWrapped = false;
+    let createElementNSWrapped = false;
+    let existingCanvasCount = 0;
 
     const resolveDocumentMethodOwner = function(method) {
       let owner = docProto;
@@ -1126,15 +1129,15 @@ const ContextPatchModule = function ContextPatchModule(window) {
         const fernwehState = __resolveCanvasStateForFont__();
         if (fernwehState && !(fernwehState.domReady === true && fernwehState.domCanvas)) {
           if (fernwehState.domCanvas || fernwehState.domCanvasHost || fernwehState.domReady === true) {
-            emitContextDiag('error', 'canvas:dom_state:contract_inconsistent', null, {
+            emitContextDiag('error', 'canvas:dom_state:apply_failed', null, {
               module: 'canvas',
               diagTag: 'canvas',
               surface: 'canvas',
-              stage: 'contract',
+              stage: 'apply',
               key: 'FernwehContext.state.__CANVAS__.__STATE__.domCanvas',
-              type: 'contract violation',
-              message: 'canvas DOM state is partially assigned',
-              data: { outcome: 'skip', reason: 'state_inconsistent' }
+              type: 'pipeline missing data',
+              message: 'canvas DOM state sync failed',
+              data: { outcome: 'skip', reason: 'apply_failed', detail: 'state_inconsistent' }
             });
             return;
           }
@@ -1207,6 +1210,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       );
       if (defineIssuedMethod(doc, createElementProto, 'createElement', wrappedCreateElement)) {
         patchedMethods.add(wrappedCreateElement);
+        createElementWrapped = true;
         applied++;
       }
     }
@@ -1235,6 +1239,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       );
       if (defineIssuedMethod(doc, createElementNSProto, 'createElementNS', wrappedCreateElementNS)) {
         patchedMethods.add(wrappedCreateElementNS);
+        createElementNSWrapped = true;
         applied++;
       }
     }
@@ -1243,6 +1248,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       try {
         const existing = doc.getElementsByTagName('canvas');
         for (let i = 0; existing && i < existing.length; i++) {
+          existingCanvasCount++;
           installCanvasOwner(existing[i]);
         }
       } catch (e) {
@@ -1254,7 +1260,25 @@ const ContextPatchModule = function ContextPatchModule(window) {
       }
     }
 
-    if (applied > 0 && issuedDocumentFactoryPatchedDocs) issuedDocumentFactoryPatchedDocs.add(doc);
+    if (applied > 0 && issuedDocumentFactoryPatchedDocs) {
+      issuedDocumentFactoryPatchedDocs.add(doc);
+      emitContextDiag('info', 'canvas:dom_factory:ready', null, {
+        module: 'canvas',
+        diagTag: 'canvas',
+        surface: 'canvas',
+        stage: 'apply',
+        key: 'Document.createElement',
+        type: 'pipeline telemetry',
+        message: 'canvas DOM factory ready; native createElement path controlled',
+        data: {
+          outcome: 'return',
+          reason: 'dom_factory_ready',
+          createElementWrapped: createElementWrapped,
+          createElementNSWrapped: createElementNSWrapped,
+          existingCanvasCount: existingCanvasCount
+        }
+      });
+    }
     return applied;
   }
 

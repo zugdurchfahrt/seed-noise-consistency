@@ -792,11 +792,11 @@ __CanvasPatchHooks__.fillTextNoiseHook = fillTextNoiseHook;
 __CanvasPatchHooks__.strokeTextNoiseHook = strokeTextNoiseHook;
 __CanvasPatchHooks__.fillRectNoiseHook = fillRectNoiseHook;
 __CanvasPatchHooks__.applyDrawImageHook = applyDrawImageHook;
-emitDiag('info', 'canvas:applied', null, {
+emitDiag('info', 'canvas:module:ready', null, {
   stage: 'apply',
-  key: 'canvas',
-  type: 'pipeline missing data',
-  message: 'canvas hooks exported',
-  data: { outcome: 'return', reason: 'hooks_exported' }
+  key: 'CanvasPatchModule',
+  type: 'pipeline telemetry',
+  message: 'canvas module ready; hooks exported',
+  data: { outcome: 'return', reason: 'canvas_hooks_exported' }
 });
 }
