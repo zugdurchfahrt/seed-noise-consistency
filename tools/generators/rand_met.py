@@ -775,8 +775,8 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
 
 
     # === Step 3: Select a random amount n fonts for fingerprint_names (seeded) check README if have issues ===
-    MIN_N = int(os.environ.get("FONTS_MIN_N", "59"))
-    MAX_N = int(os.environ.get("FONTS_MAX_N", "61"))
+    MIN_N = int(os.environ.get("FONTS_MIN_N", "56"))
+    MAX_N = int(os.environ.get("FONTS_MAX_N", "58"))
     max_n = len(all_names)
 
     if max_n == 0:
@@ -792,7 +792,7 @@ def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamili
         fingerprint_names.sort()  # fix the order in the manifest
         
     # === Step 4: collect temp_configs for Jinja ===
-    max_family_repeats = 4
+    max_family_repeats = 5
     family_counter = defaultdict(int)
     used_families = set()
     used_css_load_queries = set()
