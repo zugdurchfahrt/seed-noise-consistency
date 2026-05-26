@@ -1122,6 +1122,65 @@ const ContextPatchModule = function ContextPatchModule(window) {
       if (!canvas) return;
       installIssuedSerializationMethods(canvas);
       installIssuedGetContextMethod(canvas, htmlHooks, ctx2dHooks, webglHooks);
+      if (typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement) {
+        const fernwehState = __resolveCanvasStateForFont__();
+        if (fernwehState && !(fernwehState.domReady === true && fernwehState.domCanvas)) {
+          if (fernwehState.domCanvas || fernwehState.domCanvasHost || fernwehState.domReady === true) {
+            emitContextDiag('error', 'canvas:dom_state:contract_inconsistent', null, {
+              module: 'canvas',
+              diagTag: 'canvas',
+              surface: 'canvas',
+              stage: 'contract',
+              key: 'FernwehContext.state.__CANVAS__.__STATE__.domCanvas',
+              type: 'contract violation',
+              message: 'canvas DOM state is partially assigned',
+              data: { outcome: 'skip', reason: 'state_inconsistent' }
+            });
+            return;
+          }
+          try {
+            if (
+              !Object.prototype.hasOwnProperty.call(canvas, 'getContext') ||
+              !Object.prototype.hasOwnProperty.call(canvas, 'toDataURL') ||
+              !Object.prototype.hasOwnProperty.call(canvas, 'toBlob')
+            ) {
+              throw new Error('[FernwehContext] canvas DOM issued methods incomplete');
+            }
+            __defineHiddenValue__(fernwehState, 'domCanvasHost', canvas.parentNode || null);
+            __defineHiddenValue__(fernwehState, 'domCanvas', canvas);
+            __defineHiddenValue__(fernwehState, 'domReady', true);
+            emitContextDiag('info', 'canvas:dom_state:exists', null, {
+              module: 'canvas',
+              diagTag: 'canvas',
+              surface: 'canvas',
+              stage: 'apply',
+              key: 'FernwehContext.state.__CANVAS__.__STATE__.domCanvas',
+              type: 'pipeline telemetry',
+              message: 'domCanvas exists in canvas owner-state',
+              data: {
+                outcome: 'return',
+                reason: 'dom_canvas_state_exists',
+                statePath: 'C.state.__CANVAS__.__STATE__.domCanvas',
+                hasHost: !!canvas.parentNode,
+                ownGetContext: Object.prototype.hasOwnProperty.call(canvas, 'getContext'),
+                ownToDataURL: Object.prototype.hasOwnProperty.call(canvas, 'toDataURL'),
+                ownToBlob: Object.prototype.hasOwnProperty.call(canvas, 'toBlob')
+              }
+            });
+          } catch (e) {
+            emitContextDiag('error', 'canvas:dom_state:apply_failed', e, {
+              module: 'canvas',
+              diagTag: 'canvas',
+              surface: 'canvas',
+              stage: 'apply',
+              key: 'FernwehContext.state.__CANVAS__.__STATE__.domCanvas',
+              type: 'pipeline missing data',
+              message: 'canvas DOM state sync failed',
+              data: { outcome: 'skip', reason: 'apply_failed' }
+            });
+          }
+        }
+      }
     };
 
     const createElementProto = resolveDocumentMethodOwner('createElement');
