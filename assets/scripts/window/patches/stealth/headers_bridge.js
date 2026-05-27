@@ -41,7 +41,7 @@
     return __emit(level, code, ctx, err);
   }
   // Starting ignore list for CDP interceptor: challenge domains are not touched
-  const CH_PASS = ['.cloudflare.com','.challenge.cloudflare.com','.akamaihd.net','.perimeterx.net','.hcaptcha.com','.recaptcha.net'];
+  const CH_PASS = ['.cloudflare.com','.challenge.cloudflare.com','.challenges.cloudflare.com','.akamaihd.net','.perimeterx.net','.hcaptcha.com','.recaptcha.net'];
   function norm(s){ return !s ? s : (s[0] === "." ? s : "." + s); }
   function ensureHeadersState() {
     const C = (g && g.FernwehContext && typeof g.FernwehContext === 'object')
@@ -69,7 +69,20 @@
   }
   function wire(){
     const api = g.HeadersInterceptor;
-    if (!api) return;
+    if (!api) {
+      emitDegrade('warn', 'headers_bridge:init:preflight:headers_interceptor_missing', null, {
+        stage: 'preflight',
+        surface: 'window.HeadersInterceptor',
+        key: 'HeadersInterceptor',
+        message: 'window.HeadersInterceptor missing',
+        data: {
+          outcome: 'skip',
+          reason: 'headers_interceptor_missing',
+          missing: 'window.HeadersInterceptor'
+        }
+      });
+      return;
+    }
     let headersState;
     try {
       headersState = ensureHeadersState();

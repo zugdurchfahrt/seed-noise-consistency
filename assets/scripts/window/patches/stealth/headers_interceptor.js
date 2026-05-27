@@ -204,8 +204,25 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     'accept-language',
   ]);
 
-  // Эти заголовки допускаем ТОЛЬКО от движка/CDP, не из JS
-  const CDP_ONLY = new Set(['accept', 'accept-language']);
+  // Эти заголовки допускаем ТОЛЬКО от движка/CDP, не из JS.
+  // Accept-Language намеренно не входит в CDP_ONLY: это CORS-safelisted
+  // request header и единственный JS-кандидат при ручном profile=full.
+  const CDP_ONLY = new Set([
+    'accept',
+    'user-agent',
+    'device-memory',
+    'dpr',
+    'viewport-width',
+    'sec-ch-dpr',
+    'sec-ch-viewport-width',
+    'sec-ch-viewport-height',
+    'sec-ch-width',
+  ]);
+
+  function isCdpOnlyHeader(name) {
+    const n = String(name || '').toLowerCase();
+    return CDP_ONLY.has(n) || n.startsWith('sec-ch-');
+  }
 
   const IGNORED_SUFFIXES = new Set([
     '.google.com', '.yandex.ru', '.github.io', '.gstatic.com', '.chatgpt.com',
@@ -459,7 +476,7 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     min: [],
     // By default inject nothing from JS — headers come natively through CDP
     default: [],
-    // Полный можно включать вручную; Accept/Accept-Language игнорируются (см. CDP_ONLY)
+    // Полный можно включать вручную; CDP-only keys игнорируются.
     full: Object.keys(RAW_H),
   };
 
@@ -470,7 +487,7 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     for (const k of allowKeys) {
       if (k in RAW_H) {
         const kl = String(k).toLowerCase();
-        if (!CDP_ONLY.has(kl)) out[k] = RAW_H[k];
+        if (!isCdpOnlyHeader(kl)) out[k] = RAW_H[k];
       }
     }
     return out;
@@ -515,18 +532,49 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
     return headersObj;
   }
 
-  function buildMergedHeaders(target, baseHeaders, profileHeaders) {
-    const normalizedBase = new Headers(baseHeaders || undefined);
-    const toInject = filterHeadersForCors(target, profileHeaders);
+  function collectInjectableHeaders(target, headersObj, surface) {
+    const toInject = filterHeadersForCors(target, headersObj);
+    const probe = new Headers();
+    const entries = [];
     for (const k in toInject) {
       if (Object.prototype.hasOwnProperty.call(toInject, k)) {
-        try { normalizedBase.set(k, String(toInject[k])); } catch (e) {
+        const value = String(toInject[k]);
+        try {
+          probe.set(k, value);
+        } catch (e) {
+          emitDegrade('warn', 'headers_interceptor:headers:apply:set_failed', e, {
+            stage: 'apply',
+            surface: surface || 'collectInjectableHeaders',
+            key: String(k),
+            data: {
+              outcome: 'skip',
+              reason: 'header_preflight_failed'
+            }
+          });
+          return null;
+        }
+        entries.push([k, value]);
+      }
+    }
+    return entries;
+  }
+
+  function buildMergedHeaders(target, baseHeaders, profileHeaders) {
+    const normalizedBase = new Headers(baseHeaders || undefined);
+    const entries = collectInjectableHeaders(target, profileHeaders, 'buildMergedHeaders');
+    if (!entries) return null;
+    for (const [k, v] of entries) {
+      try { normalizedBase.set(k, v); } catch (e) {
           emitDegrade('warn', 'headers_interceptor:headers:apply:set_failed', e, {
             stage: 'apply',
             surface: 'buildMergedHeaders',
-            key: String(k)
+            key: String(k),
+            data: {
+              outcome: 'skip',
+              reason: 'header_apply_failed'
+            }
           });
-        }
+          return null;
       }
     }
     return normalizedBase;
@@ -550,6 +598,7 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       if (!Object.keys(profiled).length) return _fetch.call(this, baseReq);
 
       const mergedHeaders = buildMergedHeaders(baseReq.url, baseReq.headers, profiled);
+      if (!mergedHeaders) return _fetch.call(this, baseReq);
 
       // если ничего реально не поменялось — короткий путь
       let changed = false;
@@ -564,7 +613,12 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       emitDegrade('warn', 'headers_interceptor:fetch:apply:failed', e, {
         stage: 'apply',
         surface: 'fetch',
-        key: 'fetch'
+        key: 'fetch',
+        data: {
+          outcome: 'skip',
+          reason: 'fetch_header_apply_failed',
+          action: 'native'
+        }
       });
       return _fetch.apply(this, arguments);
     }
@@ -598,24 +652,34 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
       if (isIgnoredHost(host)) return XHRSend.apply(this, arguments);
 
       const profiled = getProfiledHeaders(headerProfile);
-      const allowedToInject = filterHeadersForCors(url, profiled);
+      const entries = collectInjectableHeaders(url, profiled, 'XMLHttpRequest.send');
+      if (!entries) return XHRSend.apply(this, arguments);
 
-      for (const k in allowedToInject) {
-        if (Object.prototype.hasOwnProperty.call(allowedToInject, k)) {
-          try { this.setRequestHeader(k, String(allowedToInject[k])); } catch (e) {
+      for (const [k, v] of entries) {
+          try { this.setRequestHeader(k, v); } catch (e) {
             emitDegrade('warn', 'headers_interceptor:xhr:apply:set_header_failed', e, {
               stage: 'apply',
               surface: 'XMLHttpRequest.send',
-              key: String(k)
+              key: String(k),
+              data: {
+                outcome: 'skip',
+                reason: 'xhr_set_header_failed',
+                action: 'native'
+              }
             });
-          }
+            return XHRSend.apply(this, arguments);
         }
       }
     } catch (e) {
       emitDegrade('warn', 'headers_interceptor:xhr:apply:failed', e, {
         stage: 'apply',
         surface: 'XMLHttpRequest.send',
-        key: 'send'
+        key: 'send',
+        data: {
+          outcome: 'skip',
+          reason: 'xhr_header_apply_failed',
+          action: 'native'
+        }
       });
     }
     return XHRSend.apply(this, arguments);

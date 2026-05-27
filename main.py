@@ -109,6 +109,7 @@ setup_logger(child_levels={
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
     "permissions_dict": logging.INFO,
+    "headers_adapter": logging.INFO,
     "helpers_runtime": logging.INFO,
     "cdp_worker_env": logging.INFO,
 })
@@ -159,9 +160,17 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
     Domain lists are taken dynamically from the page hidden state
     (FernwehContext.state.__HEADERS__.__STATE__.allowSuffixes / ignoreSuffixes),
     which are synchronized with window.HeadersInterceptor.addAllow/addIgnore.
-    If rules is empty (as in the current build), Fetch interception is not active; header injection is performed only at the level of Network.setExtraHTTPHeaders (CDP) and JS patch.
+    If rules is empty (as in the current build), Fetch interception is not installed.
+    Header injection is performed only at Network.setExtraHTTPHeaders (CDP) and JS patch.
     """
-    driver.execute_cdp_cmd("Fetch.enable", {"patterns": (rules or [])})
+    if not rules:
+        logger.info(
+            "headers_stage: Fetch interceptor not installed: empty Fetch patterns; "
+            "headers are handled by Network.setExtraHTTPHeaders and JS stage"
+        )
+        return
+
+    driver.execute_cdp_cmd("Fetch.enable", {"patterns": rules})
     blocked = {h.lower() for h in (blocked_headers or [])}
 
     def _is_blocked(name: str) -> bool:
@@ -213,7 +222,12 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
             allow = [str(x).lower() for x in val.get("allow", [])]
             ignore = [str(x).lower() for x in val.get("ignore", [])]
             return allow, ignore
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "headers_stage: Fetch allow/ignore Runtime.evaluate failed; "
+                "using empty suffix lists",
+                exc_info=True,
+            )
             return [], []
 
     # SINGLE SAFELISTED POLICY FOR not-allowed (use only safelisted - same keys as in JS SAFE_LISTED)
@@ -249,9 +263,17 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
                 "headers": _to_header_list(base),
             })
         except Exception:
-            logger.exception("Fetch.requestPaused handler failed")
+            logger.exception(
+                "headers_stage: Fetch.requestPaused handler failed; "
+                "continuing request without header mutation"
+            )
             if rid:
-                driver.execute_cdp_cmd("Fetch.continueRequest", {"requestId": rid})
+                try:
+                    driver.execute_cdp_cmd("Fetch.continueRequest", {"requestId": rid})
+                except Exception:
+                    logger.exception(
+                        "headers_stage: Fetch.continueRequest failed after handler error"
+                    )
     driver.add_cdp_listener("Fetch.requestPaused", _on_paused)
 
 
@@ -845,6 +867,7 @@ def init_driver(
     }});
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
+    
     # ---  CDP PROCESSING STAGE---
     # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
@@ -857,7 +880,6 @@ def init_driver(
     profile["deviceMemory"] = device_memory_value
     expected_client_hints["deviceMemory"] = device_memory_value
        
-    
     # Connect page_js (core + targets + wrk.js and so on)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
     # =========================
@@ -910,6 +932,10 @@ def init_driver(
         ? headersRoot.__STATE__
         : defHidden(headersRoot, '__STATE__', Object.create(null));
       if (!headersState || typeof headersState !== 'object') throw new Error('HeadersStage: FernwehContext.state.__HEADERS__.__STATE__ missing');
+      const headersDesc = Object.getOwnPropertyDescriptor(headersState, 'headers');
+      if (headersDesc && headersDesc.configurable !== true) {{
+        throw new Error('HeadersStage: FernwehContext.state.__HEADERS__.__STATE__.headers non-configurable');
+      }}
       defHidden(headersState, 'headers', {json.dumps(safelisted_headers, ensure_ascii=False)});
       if (!Array.isArray(headersState.allowSuffixes)) defHidden(headersState, 'allowSuffixes', []);
       if (!Array.isArray(headersState.ignoreSuffixes)) defHidden(headersState, 'ignoreSuffixes', []);
@@ -933,7 +959,8 @@ def init_driver(
     # --- [HDR/04] CDP: register bridge for every NEW DOCUMENT ---
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
 
-    # modification via Fetch.enable/Fetch.requestPaused  prepared, but in this build rules=[], so interception is disabled (no-op)
+    # Fetch.enable/Fetch.requestPaused path is prepared but not installed while rules=[].
+    # This avoids relying on unspecified empty-pattern CDP behavior.
     fetch_rules = []
 
     _install_fetch_interceptor(
@@ -1328,7 +1355,7 @@ def main():
             "deviceMemory": device_memory_value,
             "hardwareConcurrency": hardware_concurrency_value,
             "plugins": plugins_final,
-            "accept_language": None,
+            "http_accept_language": None,
         }
 
         dom_platform = profile.get("platform")
@@ -1343,7 +1370,7 @@ def main():
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
         profile["browser_brand"] = browser_brand
         profile["browser_major_version"] = major_version
-        profile["accept_language"] = headers_adapter_module.derive_accept_language(
+        profile["http_accept_language"] = headers_adapter_module.derive_accept_language(
             profile,
             user_agent=user_agent,
             browser_brand=browser_brand,

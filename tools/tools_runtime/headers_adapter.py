@@ -1,5 +1,8 @@
 from functools import lru_cache
 import random
+from tools.tools_infra.overseer import logger as _ROOT_LOGGER
+
+logger = _ROOT_LOGGER.getChild("headers_adapter")
 
 # ======= ACCEPT HEADER GENERATOR =======
 ACCEPT_TEMPLATES = {
@@ -92,7 +95,7 @@ def _ordered_accept_language_entries(languages, browser_brand: str | None = None
                 _append(fallback)
     if ordered:
         return ordered
-    return ["en-GB"]
+    raise ValueError("HeadersStage: Accept-Language source missing")
 
 
 def build_accept_language(languages, browser_brand: str | None = None, user_agent: str | None = None):
@@ -126,7 +129,7 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
     expected_client_hints = expected_client_hints if isinstance(expected_client_hints, dict) else {}
     active_user_agent = user_agent or str(profile.get("user_agent") or "")
     active_brand = browser_brand or profile.get("browser_brand")
-    accept_language = profile.get("accept_language") or derive_accept_language(
+    http_accept_language_header = profile.get("http_accept_language") or derive_accept_language(
         profile,
         expected_client_hints=expected_client_hints,
         user_agent=active_user_agent,
@@ -141,16 +144,15 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
             "Sec-CH-UA": "",
             "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
             "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
-            "Accept-Language": str(accept_language),
+            "Accept-Language": str(http_accept_language_header),
         }
         js_safelisted_headers = {
-            "Accept-Language": str(accept_language),
-            "Sec-CH-UA": "",
+            "Accept-Language": str(http_accept_language_header),
         }
     else:
         cdp_outbound_headers = {
             "Accept": str(expected_client_hints["accept"]),
-            "Accept-Language": str(accept_language),
+            "Accept-Language": str(http_accept_language_header),
             "User-Agent": str(profile["user_agent"]),
             "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
             "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
@@ -174,9 +176,7 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
             "DPR": str(profile["device_dpr_value"]),
         }
         js_safelisted_headers = {
-            "Accept-Language": str(accept_language),
-            "Sec-CH-Device-Memory": device_memory,
-            "Device-Memory": device_memory,
+            "Accept-Language": str(http_accept_language_header),
         }
 
     return {
@@ -234,7 +234,15 @@ def build_runtime_header_sets(profile, expected_client_hints=None, user_agent: s
     }
 
 def import_headers(headers, keys, flow):
+    if not isinstance(headers, dict):
+        logger.error("headers_stage: import_headers failed: headers must be dict")
+        raise TypeError("HeadersStage: import_headers headers must be dict")
     for k in keys:
+        if k not in headers:
+            logger.error("headers_stage: import_headers missing header %s", k)
+            raise KeyError(f"HeadersStage: import_headers missing header {k!r}")
         v = headers.get(k)
-        if v:
-            flow.request.headers[k] = v
+        if v is None:
+            logger.error("headers_stage: import_headers header %s is None", k)
+            raise ValueError(f"HeadersStage: import_headers header {k!r} is None")
+        flow.request.headers[k] = str(v)
