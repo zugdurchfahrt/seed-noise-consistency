@@ -1,8 +1,8 @@
 from functools import lru_cache
 import random
-from tools.tools_infra.overseer import logger as _ROOT_LOGGER
+from tools.tools_infra.overseer import logger
 
-logger = _ROOT_LOGGER.getChild("headers_adapter")
+logger = logger.getChild("headers_adapter")
 
 # ======= ACCEPT HEADER GENERATOR =======
 ACCEPT_TEMPLATES = {
@@ -129,12 +129,6 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
     expected_client_hints = expected_client_hints if isinstance(expected_client_hints, dict) else {}
     active_user_agent = user_agent or str(profile.get("user_agent") or "")
     active_brand = browser_brand or profile.get("browser_brand")
-    http_accept_language_header = profile.get("http_accept_language") or derive_accept_language(
-        profile,
-        expected_client_hints=expected_client_hints,
-        user_agent=active_user_agent,
-        browser_brand=active_brand,
-    )
     family = _accept_language_family(browser_brand=active_brand, user_agent=active_user_agent)
     # Use profile DeviceMemory for header emission because the pipeline relies on
     # the browser flag path to keep the outbound Device-Memory surface stable.
@@ -144,15 +138,12 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
             "Sec-CH-UA": "",
             "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
             "Sec-CH-UA-Platform": f'"{expected_client_hints["platform"]}"',
-            "Accept-Language": str(http_accept_language_header),
         }
         js_safelisted_headers = {
-            "Accept-Language": str(http_accept_language_header),
         }
     else:
         cdp_outbound_headers = {
             "Accept": str(expected_client_hints["accept"]),
-            "Accept-Language": str(http_accept_language_header),
             "User-Agent": str(profile["user_agent"]),
             "Sec-CH-UA": expected_client_hints["sec_ch_ua"],
             "Sec-CH-UA-Mobile": expected_client_hints.get("sec_ch_ua_mobile", ""),
@@ -176,7 +167,6 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
             "DPR": str(profile["device_dpr_value"]),
         }
         js_safelisted_headers = {
-            "Accept-Language": str(http_accept_language_header),
         }
 
     return {

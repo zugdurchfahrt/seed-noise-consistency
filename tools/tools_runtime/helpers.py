@@ -65,8 +65,9 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
     Rules:
     - The first entry element is the primary language (we leave it as is in terms of meaning).
     - We add the rest of the entries in the order they appear, canonizing the register.
-    - No synthetic base-language expansion is performed here. This function returns
-      the canonical seed list for navigator.language/navigator.languages.
+    - For a regional primary language, add its language-only fallback after it
+      (`de-DE -> ["de-DE", "de"]`) so Chromium can build native HTTP weights
+      from a q-free preference list.
     - Accept-Language is derived separately from the canonical profile list and may
       be tuned independently for browser-specific network behavior.
     Returns: `(language, languages)`.
@@ -74,14 +75,14 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
     items = [t for t in (base_languages or []) if t]
     if not items:
         logger.warning("[LANG] Empty or invalid base_languages: %r", base_languages)
-        return "en-GB", ["en-GB"] # en-GB set here on a purpuse to check the language distinction success, you can change it to "en-US" or whatever
+        return "en-GB", ["en-GB", "en"] # en-GB set here on a purpuse to check the language distinction success, you can change it to "en-US" or whatever
 
     # We canonize all input
     canon = [_canonical_bcp47(x) for x in items]
     canon = [x for x in canon if x]  # We discard empty after canonization
     if not canon:
         logger.warning("[LANG] Canonicalized base_languages are empty: %r", base_languages)
-        return "en-GB", ["en-GB"]
+        return "en-GB", ["en-GB", "en"]
 
     language = canon[0]
     result: List[str] = []
@@ -94,12 +95,18 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
 
     # 1) primary
     _add(language)
+    primary_base = language.split("-", 1)[0].lower() if "-" in language else None
+    if primary_base:
+        _add(primary_base)
 
     # 2) rest
     for tag in canon[1:]:
         if not tag:
             continue
         _add(tag)
+        base = tag.split("-", 1)[0].lower() if "-" in tag else None
+        if base:
+            _add(base)
     
     logger.info("[LANG] Languages after normalisation: %s", result)
     return language, result

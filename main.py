@@ -161,12 +161,13 @@ def _install_fetch_interceptor(driver, rules, extra_headers_fn=None, blocked_hea
     (FernwehContext.state.__HEADERS__.__STATE__.allowSuffixes / ignoreSuffixes),
     which are synchronized with window.HeadersInterceptor.addAllow/addIgnore.
     If rules is empty (as in the current build), Fetch interception is not installed.
-    Header injection is performed only at Network.setExtraHTTPHeaders (CDP) and JS patch.
+    Non-language header injection is performed at Network.setExtraHTTPHeaders (CDP)
+    and JS patch. Accept-Language is owned by Chrome language preferences.
     """
     if not rules:
         logger.info(
             "headers_stage: Fetch interceptor not installed: empty Fetch patterns; "
-            "headers are handled by Network.setExtraHTTPHeaders and JS stage"
+            "non-language headers are handled by Network.setExtraHTTPHeaders and JS stage"
         )
         return
 
@@ -379,8 +380,18 @@ def init_driver(
         logger.info("MITMPROXY: ON, Chrome uses proxy %s", MITMPROXY_ADDRESS)
     else:
         logger.info("MITMPROXY: OFF, Chrome uses direct connection")
+    if not isinstance(normalized_languages, list) or not normalized_languages:
+        raise ValueError("init_driver: normalized_languages must be a non-empty list")
+    chrome_accept_languages = ",".join(str(lang) for lang in normalized_languages if str(lang).strip())
+    if not chrome_accept_languages:
+        raise ValueError("init_driver: chrome_accept_languages is empty")
     chrome_options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
     chrome_options.add_argument(f"--user-agent={user_agent}")
+    chrome_options.add_argument(f"--lang={language}")
+    chrome_options.add_experimental_option("prefs", {
+        "intl.accept_languages": chrome_accept_languages,
+    })
+    logger.info("Chrome language preferences submitted: %s", chrome_accept_languages)
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     # AudioServiceOutOfProcess keeps Chromium audio service inside the browser process
     # Chrome enables CanvasNoise by default in Incognito/testing flows.
@@ -512,7 +523,6 @@ def init_driver(
         accuracy=100,
         blocked_urls=["stun:*", "turn:*"] ,
         device_metrics=build_bootstrap_device_metrics(),
-
     )
 
     permissions_profile = devices_conf if isinstance(devices_conf, dict) else {}
@@ -529,10 +539,8 @@ def init_driver(
         })
         logger.info("[permissions.profile] Browser.setPermission %s=%s", permission_name, setting)
 
-
     # --- Initial fonts patch ---
     rand_met_module.generate_font_manifest(MANIFEST_PATH, dom_platform)
-    
     
     # --- SE CDP-injection ---
     # ServiceWorker uses its own early bootstrap snapshot, separate from later worker env sync.
@@ -897,7 +905,7 @@ def init_driver(
     cdp_outbound_headers = runtime_header_sets["cdp_outbound_headers"]
     safelisted_headers = runtime_header_sets["js_safelisted_headers"]
 
-    # --- [CH/02] CDP: apply HTTP headers for requests (affects navigation after this call) ---
+    # --- [CH/02] CDP: apply non-language HTTP headers for requests (affects navigation after this call) ---
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": cdp_outbound_headers})
 
     # =========================
@@ -906,8 +914,8 @@ def init_driver(
     # =========================
 
     # --- [HDR/01] prepare JS for NEW DOCUMENT: hidden headers owner-state ---
-    # Basic set for JS patch. На cross-origin safelisted (accept-language).
-    # Keys like sec-ch-* will be ignored by JS (CDP-only).
+    # Accept-Language is owned by Chrome language preferences, not by JS injection.
+    # Keys like sec-ch-* remain CDP-only and are ignored by JS if re-enabled later.
         
     headers_window_js = f"""
     (function() {{
@@ -1355,7 +1363,6 @@ def main():
             "deviceMemory": device_memory_value,
             "hardwareConcurrency": hardware_concurrency_value,
             "plugins": plugins_final,
-            "http_accept_language": None,
         }
 
         dom_platform = profile.get("platform")
@@ -1370,11 +1377,6 @@ def main():
         browser_brand, major_version, browser_version = determine_browser_brand_and_versions(user_agent, profile)
         profile["browser_brand"] = browser_brand
         profile["browser_major_version"] = major_version
-        profile["http_accept_language"] = headers_adapter_module.derive_accept_language(
-            profile,
-            user_agent=user_agent,
-            browser_brand=browser_brand,
-        )
         expected_client_hints = build_expected_client_hints(
             profile, ua_platform, browser_brand, major_version, browser_version
         )
@@ -1461,7 +1463,7 @@ def main():
         configure_profile(driver, profile["language"], profile["languages"], country_data)
       
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://abrahamjuliot.github.io/creepjs")
+        driver.get("https://browserleaks.com/ip")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
