@@ -130,6 +130,11 @@ def _build_header_sets(profile, expected_client_hints=None, user_agent: str | No
     active_user_agent = user_agent or str(profile.get("user_agent") or "")
     active_brand = browser_brand or profile.get("browser_brand")
     family = _accept_language_family(browser_brand=active_brand, user_agent=active_user_agent)
+    logger.info(
+        "headers_stage: building runtime header sets family=%s brand=%s accept_language_owner=chrome_preferences",
+        family,
+        active_brand or "",
+    )
     # Use profile DeviceMemory for header emission because the pipeline relies on
     # the browser flag path to keep the outbound Device-Memory surface stable.
     device_memory = str(profile["deviceMemory"])
@@ -218,6 +223,12 @@ def build_runtime_header_sets(profile, expected_client_hints=None, user_agent: s
         full_version_header = header_sets["cdp_outbound_headers"].get("Sec-CH-UA-Full-Version")
         if not isinstance(full_version_header, str) or not full_version_header:
             raise ValueError("HeadersStage: outbound Sec-CH-UA-Full-Version missing")
+    logger.info(
+        "headers_stage: runtime header sets ready cdp_count=%d js_count=%d accept_language_in_cdp=%s",
+        len(header_sets["cdp_outbound_headers"]),
+        len(header_sets["js_safelisted_headers"]),
+        "Accept-Language" in header_sets["cdp_outbound_headers"],
+    )
     return {
         "cdp_outbound_headers": header_sets["cdp_outbound_headers"],
         "js_safelisted_headers": header_sets["js_safelisted_headers"],
