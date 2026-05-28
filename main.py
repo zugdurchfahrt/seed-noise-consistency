@@ -17,7 +17,7 @@ from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chromium.service import ChromiumService
 import selenium.webdriver.chromium.service as selenium_chromium_service
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import WebDriverException, NoSuchWindowException
 import undetected_chromedriver as uc
 
 # ----------------------- FOLDERS -----------------------
@@ -286,7 +286,8 @@ def apply_hardware_override(driver, hardware_concurrency_value):
         )
         logger.info("Direct page-side hardwareConcurrency override applied: %s", hardware_concurrency_value)
     except Exception as e:
-        logger.warning("Direct page-side hardwareConcurrency override failed: %s", e)
+        logger.error("Direct page-side hardwareConcurrency override failed: %s", e, exc_info=True)
+        raise
 
 
 def read_page_device_memory(driver, device_memory_value):
@@ -305,21 +306,27 @@ def apply_page_locale_override(driver, language):
     try:
         driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": str(language).replace("-", "_")})
         logger.info("Direct page-side locale override applied: %s", language)
+    except WebDriverException as e:
+        msg = str(e)
+        if "Another locale override is already in effect" in msg:
+            logger.warning("Locale override already in effect; preserving existing override")
+            return
+        logger.error("Direct page-side locale override failed: %s", e, exc_info=True)
+        raise
     except Exception as e:
-        logger.warning("Direct page-side locale override failed: %s", e)
+        logger.error("Direct page-side locale override failed: %s", e, exc_info=True)
+        raise
 
 
 def apply_window_bounds_override(driver, device_metrics, stage):
     try:
         if not isinstance(device_metrics, dict):
-            logger.warning("[windowBounds.%s] skipped: invalid device_metrics", stage)
-            return
+            raise TypeError(f"[windowBounds.{stage}] invalid device_metrics: {device_metrics!r}")
 
         width = device_metrics.get("windowBoundsWidth")
         height = device_metrics.get("windowBoundsHeight")
         if width is None or height is None:
-            logger.warning("[windowBounds.%s] skipped: missing bounds in device_metrics=%r", stage, device_metrics)
-            return
+            raise ValueError(f"[windowBounds.{stage}] missing bounds in device_metrics={device_metrics!r}")
 
         win = driver.execute_cdp_cmd("Browser.getWindowForTarget", {})
         payload = {
@@ -338,7 +345,33 @@ def apply_window_bounds_override(driver, device_metrics, stage):
         logger.info("[windowBounds.%s] Browser.getWindowBounds actual=%r", stage, actual)
 
     except Exception as e:
-        logger.warning("[windowBounds.%s] Browser.setWindowBounds failed: %s", stage, e)
+        logger.error("[windowBounds.%s] Browser.setWindowBounds failed: %s", stage, e, exc_info=True)
+        raise
+
+
+def build_timegeo_bundle():
+    tz_src = Path(SCRIPTS_PATCHES_STEALTH / "TimezoneOverride_source.js").read_text("utf-8")
+    geo_src = Path(SCRIPTS_PATCHES_STEALTH / "GeoOverride_source.js").read_text("utf-8")
+    call_tz = "Promise.resolve().then(() => { if (typeof __patchTimeZone === \"function\") __patchTimeZone(); });"
+    return "\n;\n".join([tz_src, "const __patchTimeZone = TimezonePatchModule(window);", call_tz, geo_src]) + "\n//# sourceURL=timegeo_bundle.js"
+
+
+def apply_profile_target_overrides(driver, language, country_data, profile, stage):
+    timezone = country_data["timezone"]
+    latitude = country_data["latitude"]
+    longitude = country_data["longitude"]
+    driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": timezone})
+    logger.info("[profile.%s] Setting timezone: %s, %s", stage, timezone, country_data["offset_minutes"])
+    driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {"latitude": latitude, "longitude": longitude, "accuracy": 100})
+    logger.info("[profile.%s] Setting geolocation: %.4f,%.4f", stage, latitude, longitude)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": build_timegeo_bundle()})
+    device_metrics = build_device_metrics(profile)
+    emulation_metrics = {key: device_metrics[key] for key in (
+        "width", "height", "deviceScaleFactor", "mobile", "screenWidth", "screenHeight", "screenOrientation"
+    ) if key in device_metrics}
+    driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", emulation_metrics)
+    apply_window_bounds_override(driver, device_metrics, stage)
+    apply_page_locale_override(driver, language=language)
 
 
 def build_bootstrap_device_metrics():
@@ -356,6 +389,356 @@ def build_bootstrap_device_metrics():
         "screenHeight": height,
         "screenOrientation": {"type": "landscapePrimary", "angle": 0},
     }
+
+
+def _target_setup_steps(driver):
+    steps = getattr(driver, "_sunami_target_setup_steps", None)
+    if steps is None:
+        setattr(driver, "_sunami_target_setup_steps", [])
+        steps = driver._sunami_target_setup_steps
+    if not isinstance(steps, list):
+        raise RuntimeError("target setup registry is invalid")
+    return steps
+
+
+def _register_target_setup_step(driver, name, apply_fn):
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("target setup step name must be a non-empty string")
+    if not callable(apply_fn):
+        raise TypeError(f"target setup step {name!r} must be callable")
+    _target_setup_steps(driver).append((name, apply_fn))
+
+
+def _policy_event(driver, level, code, stage, message, type_value, data=None, key=None, err=None):
+    ctx = {
+        "module": "BrowserSessionPolicy",
+        "surface": "webdriver_session",
+        "key": key,
+        "stage": stage,
+        "message": message,
+        "type": type_value,
+        "data": data if isinstance(data, dict) else {},
+    }
+    log_fn = logger.error if level in {"error", "fatal"} else logger.warning if level == "warn" else logger.info
+    log_fn("[sessionPolicy] %s ctx=%s", code, ctx, exc_info=bool(err) if level != "info" else False)
+
+
+def _is_window_gone_exception(exc):
+    if isinstance(exc, NoSuchWindowException):
+        return True
+    message = str(exc).lower()
+    return (
+        "no such window" in message
+        or "target window already closed" in message
+        or "web view not found" in message
+    )
+
+
+def _apply_registered_target_setup(driver, reason, handle):
+    steps = list(_target_setup_steps(driver))
+    if not steps:
+        raise RuntimeError("target setup registry is empty")
+
+    for name, apply_fn in steps:
+        try:
+            if handle not in set(driver.window_handles):
+                raise NoSuchWindowException(f"target window disappeared before setup step {name!r}: {handle!r}")
+            apply_fn(driver)
+        except Exception as exc:
+            window_gone = _is_window_gone_exception(exc)
+            _policy_event(
+                driver,
+                "warn" if window_gone else "error",
+                "session_policy_target_setup_window_gone" if window_gone else "session_policy_target_setup_apply_failed",
+                "apply",
+                "target window disappeared during target-scoped setup" if window_gone else "target-scoped setup step failed",
+                "pipeline telemetry" if window_gone else "pipeline missing data",
+                {
+                    "outcome": "throw",
+                    "reason": "target_closed_before_enrollment" if window_gone else "apply_failed",
+                    "setupStep": name,
+                    "handle": handle,
+                    "policyReason": reason,
+                },
+                key=handle,
+                err=exc,
+            )
+            raise
+
+
+def _validate_managed_window_runtime(driver, handle, reason):
+    result = driver.execute_script(
+        """
+        return (function() {
+          const C = (window.FernwehContext && typeof window.FernwehContext === 'object')
+            ? window.FernwehContext
+            : null;
+          const Core = (window.Core && typeof window.Core === 'object') ? window.Core : null;
+          const internal = Core && typeof Core.__internal === 'object' ? Core.__internal : null;
+          const checks = [
+            ['FernwehContext', C],
+            ['FernwehContext.state', C && C.state && typeof C.state === 'object'],
+            ['FernwehContext.__logger', C && C.__logger && typeof C.__logger === 'object'],
+            ['Core', Core],
+            ['Core.__internal', internal],
+            ['Core.__internal.prng', internal && internal.prng && typeof internal.prng === 'object'],
+            ['FernwehContext.__patchState', C && C.__patchState && typeof C.__patchState === 'object']
+          ];
+          const missing = checks.filter(([, ok]) => !ok).map(([name]) => name);
+          return { ok: missing.length === 0, missing };
+        })();
+        """
+    )
+    if not isinstance(result, dict) or not result.get("ok"):
+        missing = result.get("missing") if isinstance(result, dict) else result
+        raise RuntimeError(
+            f"managed window runtime validation failed handle={handle!r} "
+            f"reason={reason!r} missing={missing!r}"
+        )
+
+
+class BrowserSessionPolicy:
+    def __init__(self, driver):
+        self.driver = driver
+        self.primary = driver.current_window_handle
+        handles = list(driver.window_handles)
+        if not _target_setup_steps(driver):
+            raise RuntimeError("session policy preflight failed: target setup registry is empty")
+        if self.primary not in handles:
+            raise RuntimeError(f"session policy preflight failed: primary handle missing {self.primary!r}")
+        if set(handles) != {self.primary}:
+            raise RuntimeError(f"session policy preflight failed: unmanaged startup handles {handles!r}")
+        self.known = set(handles)
+        self.managed = {self.primary}
+        self.active_managed = self.primary
+
+    def navigate(self, url):
+        if not isinstance(url, str) or not url.strip():
+            raise ValueError("session policy navigation url must be a non-empty string")
+        self._restore_active_managed()
+        self.driver.get(url)
+        _validate_managed_window_runtime(self.driver, self.active_managed, "policy_navigation")
+        self.tick()
+
+    def tick(self):
+        handles = list(self.driver.window_handles)
+        current = set(handles)
+        self._promote_primary_if_needed(current)
+        for handle in list(self.managed - current):
+            self.managed.discard(handle)
+            self.known.discard(handle)
+            if self.active_managed == handle:
+                self.active_managed = self.primary
+        for handle in [h for h in handles if h not in self.known]:
+            self._enroll(handle)
+
+        current = set(self.driver.window_handles)
+        unmanaged = current - self.managed
+        if unmanaged:
+            raise RuntimeError(f"session policy violation: unmanaged handles remain {sorted(unmanaged)!r}")
+        self.known = current
+        try:
+            current_handle = self._current_handle()
+        except Exception as exc:
+            if not _is_window_gone_exception(exc):
+                raise
+            _policy_event(
+                self.driver,
+                "warn",
+                "session_policy_current_window_closed",
+                "runtime",
+                "current window handle disappeared; restoring managed window",
+                "pipeline telemetry",
+                {"outcome": "return", "reason": "current_window_closed"},
+                err=exc,
+            )
+            self._restore_active_managed()
+            return
+        if current_handle in self.managed:
+            self.active_managed = current_handle
+
+    def _promote_primary_if_needed(self, current):
+        if self.primary in current:
+            return
+        for handle in [self.active_managed, *self.managed, *self.known]:
+            if handle in current:
+                previous_primary = self.primary
+                self.primary = handle
+                self.managed.add(handle)
+                self.known.add(handle)
+                self.active_managed = handle
+                _policy_event(
+                    self.driver,
+                    "warn",
+                    "session_policy_primary_handle_promoted",
+                    "runtime",
+                    "primary handle lost; promoted an existing managed handle",
+                    "pipeline telemetry",
+                    {"outcome": "return", "reason": "primary_lost", "previousPrimary": previous_primary, "primary": handle},
+                    key=handle,
+                )
+                return
+        raise RuntimeError(f"session policy violation: primary handle lost {self.primary!r}")
+
+    def _current_handle(self):
+        try:
+            return self.driver.current_window_handle
+        except Exception as exc:
+            _policy_event(
+                self.driver,
+                "warn",
+                "session_policy_current_handle_failed",
+                "runtime",
+                "failed to read current window handle",
+                "pipeline missing data",
+                {"outcome": "throw", "reason": "preflight_failed"},
+                err=exc,
+            )
+            raise
+
+    def _restore_active_managed(self):
+        handles = set(self.driver.window_handles)
+        candidates = [self.active_managed, self.primary]
+        for handle in candidates:
+            if handle in handles and handle in self.managed:
+                self.driver.switch_to.window(handle)
+                self.active_managed = handle
+                return
+        raise RuntimeError("session policy violation: no active managed window can be restored")
+
+    def _enroll(self, handle):
+        previous = self._current_handle()
+        _policy_event(
+            self.driver,
+            "info",
+            "session_policy_new_window_detected",
+            "runtime",
+            "new window handle detected",
+            "pipeline telemetry",
+            {"outcome": "return", "handle": handle, "previousHandle": previous},
+            key=handle,
+        )
+        try:
+            self.driver.switch_to.window(handle)
+            _apply_registered_target_setup(self.driver, "window_enrollment", handle)
+            enrollment_url = self.driver.current_url
+            if not isinstance(enrollment_url, str) or not enrollment_url.strip():
+                raise RuntimeError(f"new window has invalid current_url: {enrollment_url!r}")
+            self.driver.get(enrollment_url)
+            _validate_managed_window_runtime(self.driver, handle, "window_enrollment")
+            self.managed.add(handle)
+            self.known.add(handle)
+            self.active_managed = handle
+            _policy_event(
+                self.driver,
+                "info",
+                "session_policy_window_enrolled",
+                "runtime",
+                "new window enrolled into managed pipeline",
+                "ok",
+                {"outcome": "return", "handle": handle, "enrollmentUrl": enrollment_url},
+                key=handle,
+            )
+        except Exception as exc:
+            if _is_window_gone_exception(exc):
+                try:
+                    handle_present = handle in set(self.driver.window_handles)
+                except Exception as handles_exc:
+                    _policy_event(
+                        self.driver,
+                        "error",
+                        "session_policy_window_handles_read_failed",
+                        "rollback",
+                        "failed to inspect window handles after enrollment target disappeared",
+                        "pipeline missing data",
+                        {"outcome": "throw", "reason": "rollback_preflight_failed", "handle": handle},
+                        key=handle,
+                        err=handles_exc,
+                    )
+                else:
+                    if not handle_present:
+                        self.managed.discard(handle)
+                        self.known.discard(handle)
+                        try:
+                            self._restore_after_enrollment(previous)
+                        except Exception as restore_exc:
+                            _policy_event(
+                                self.driver,
+                                "fatal",
+                                "session_policy_window_disappeared_restore_failed",
+                                "rollback",
+                                "failed to restore managed window after enrollment target disappeared",
+                                "pipeline missing data",
+                                {"outcome": "throw", "reason": "rollback_failed", "handle": handle, "previousHandle": previous},
+                                key=handle,
+                                err=restore_exc,
+                            )
+                            raise
+                        _policy_event(
+                            self.driver,
+                            "warn",
+                            "session_policy_window_disappeared_during_enrollment",
+                            "rollback",
+                            "new window target disappeared before enrollment completed",
+                            "pipeline telemetry",
+                            {"outcome": "return", "reason": "target_closed_before_enrollment", "handle": handle, "previousHandle": previous},
+                            key=handle,
+                            err=exc,
+                        )
+                        return
+            _policy_event(
+                self.driver,
+                "error",
+                "session_policy_window_enrollment_failed",
+                "apply",
+                "new window enrollment failed",
+                "pipeline missing data",
+                {"outcome": "throw", "reason": "apply_failed", "handle": handle},
+                key=handle,
+                err=exc,
+            )
+            self._rollback_failed_enrollment(handle, previous, exc)
+            raise RuntimeError(f"window enrollment failed for handle={handle!r}") from exc
+
+    def _rollback_failed_enrollment(self, handle, previous, original_exc):
+        rollback_error = None
+        try:
+            if handle in set(self.driver.window_handles):
+                if handle == self.primary:
+                    raise RuntimeError("refusing to close primary handle during enrollment rollback")
+                self.driver.switch_to.window(handle)
+                self.driver.close()
+        except Exception as exc:
+            rollback_error = exc
+            _policy_event(
+                self.driver,
+                "fatal",
+                "session_policy_window_enrollment_rollback_failed",
+                "rollback",
+                "failed to close rejected window after enrollment failure",
+                "pipeline missing data",
+                {"outcome": "throw", "reason": "rollback_failed", "handle": handle, "originalError": repr(original_exc)},
+                key=handle,
+                err=exc,
+            )
+        finally:
+            self.managed.discard(handle)
+            self.known.discard(handle)
+        self._restore_after_enrollment(previous)
+        if rollback_error is not None:
+            raise RuntimeError(f"window enrollment rollback failed for handle={handle!r}") from rollback_error
+
+    def _restore_after_enrollment(self, previous):
+        handles = set(self.driver.window_handles)
+        if previous in handles and previous in self.managed:
+            self.driver.switch_to.window(previous)
+            self.active_managed = previous
+            return
+        if self.primary in handles and self.primary in self.managed:
+            self.driver.switch_to.window(self.primary)
+            self.active_managed = self.primary
+            return
+        raise RuntimeError("session policy violation: failed to restore active managed window")
 
 # ----------------------- function init_driver -----------------------
 def init_driver(
@@ -510,20 +893,23 @@ def init_driver(
             driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", emulation_metrics)
             apply_window_bounds_override(driver, device_metrics, "bootstrap")
     
-    apply_hardware_override(
-        driver,
-        hardware_concurrency_value=hardware_concurrency_value,
-    )
+    def _apply_target_engine_setup(stage):
+        logger.info("[windowPolicy.%s] applying target engine setup", stage)
+        apply_hardware_override(
+            driver,
+            hardware_concurrency_value=hardware_concurrency_value,
+        )
+        setup_engine(
+            driver,
+            timezone="Arctic/Longyearbyen",
+            latitude=90.0,
+            longitude=135.0,
+            accuracy=100,
+            blocked_urls=["stun:*", "turn:*"] ,
+            device_metrics=build_bootstrap_device_metrics(),
+        )
 
-    setup_engine(
-        driver,
-        timezone="Arctic/Longyearbyen",
-        latitude=90.0,
-        longitude=135.0,
-        accuracy=100,
-        blocked_urls=["stun:*", "turn:*"] ,
-        device_metrics=build_bootstrap_device_metrics(),
-    )
+    _apply_target_engine_setup("primary")
 
     permissions_profile = devices_conf if isinstance(devices_conf, dict) else {}
     for item in permissions_profile.get("cdp", []):
@@ -875,27 +1261,11 @@ def init_driver(
     }});
     """
     page_js = build_page_bundle(init_params) + "\n//# sourceURL=page_bundle.js"
-    
-    # ---  CDP PROCESSING STAGE---
-    # --- patch userAgent and userAgentMetadata via CDP ---
     browser_brand, _, _ = determine_browser_brand_and_versions(user_agent, profile)
     apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, dom_platform)
-    
-    device_memory_value = read_page_device_memory(
-        driver,
-        device_memory_value=device_memory_value,
-    )
-    profile["deviceMemory"] = device_memory_value
-    expected_client_hints["deviceMemory"] = device_memory_value
-       
-    # Connect page_js (core + targets + wrk.js and so on)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
-    # =========================
-    # [CH] Setting up Client hints (CDP-only) + hidden headers state (JS, NEW DOCUMENT)
-    #  No Runtime.evaluate here. Everything below applies on the next document created by driver.get().
-    # =========================
+    device_memory_value = read_page_device_memory(driver, device_memory_value=device_memory_value)
+    profile["deviceMemory"] = expected_client_hints["deviceMemory"] = device_memory_value
 
-    # --- [CH/01] build runtime header sets in headers module ---
     runtime_header_sets = headers_adapter_module.build_runtime_header_sets(
         profile,
         expected_client_hints=expected_client_hints,
@@ -904,19 +1274,6 @@ def init_driver(
     )
     cdp_outbound_headers = runtime_header_sets["cdp_outbound_headers"]
     safelisted_headers = runtime_header_sets["js_safelisted_headers"]
-
-    # --- [CH/02] CDP: apply non-language HTTP headers for requests (affects navigation after this call) ---
-    driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": cdp_outbound_headers})
-
-    # =========================
-    # [HDR] FernwehContext.state.__HEADERS__.__STATE__ + bridge (NEW DOCUMENT)
-    # IMPORTANT: register hidden headers owner-state BEFORE anything that may rely on it.
-    # =========================
-
-    # --- [HDR/01] prepare JS for NEW DOCUMENT: hidden headers owner-state ---
-    # Accept-Language is owned by Chrome language preferences, not by JS injection.
-    # Keys like sec-ch-* remain CDP-only and are ignored by JS if re-enabled later.
-        
     headers_window_js = f"""
     (function() {{
       const C = (window.FernwehContext && typeof window.FernwehContext === 'object') ? window.FernwehContext : null;
@@ -924,12 +1281,7 @@ def init_driver(
       const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
       if (!stateRoot) throw new Error('HeadersStage: FernwehContext.state missing');
       const defHidden = function(owner, key, value) {{
-        Object.defineProperty(owner, key, {{
-          value: value,
-          writable: true,
-          configurable: true,
-          enumerable: false
-        }});
+        Object.defineProperty(owner, key, {{ value, writable: true, configurable: true, enumerable: false }});
         return owner[key];
       }};
       const headersRoot = (stateRoot.__HEADERS__ && typeof stateRoot.__HEADERS__ === 'object')
@@ -941,9 +1293,7 @@ def init_driver(
         : defHidden(headersRoot, '__STATE__', Object.create(null));
       if (!headersState || typeof headersState !== 'object') throw new Error('HeadersStage: FernwehContext.state.__HEADERS__.__STATE__ missing');
       const headersDesc = Object.getOwnPropertyDescriptor(headersState, 'headers');
-      if (headersDesc && headersDesc.configurable !== true) {{
-        throw new Error('HeadersStage: FernwehContext.state.__HEADERS__.__STATE__.headers non-configurable');
-      }}
+      if (headersDesc && headersDesc.configurable !== true) throw new Error('HeadersStage: FernwehContext.state.__HEADERS__.__STATE__.headers non-configurable');
       defHidden(headersState, 'headers', {json.dumps(safelisted_headers, ensure_ascii=False)});
       if (!Array.isArray(headersState.allowSuffixes)) defHidden(headersState, 'allowSuffixes', []);
       if (!Array.isArray(headersState.ignoreSuffixes)) defHidden(headersState, 'ignoreSuffixes', []);
@@ -955,27 +1305,48 @@ def init_driver(
 
     //# sourceURL=headers_stage.js
     """
-    # --- [HDR/02] CDP: register hidden headers owner-state for every NEW DOCUMENT ---
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
-    
- 
-    # --- [HDR/03] load bridge JS (text) ---
-    # Headers interceptor bridge to sync allow/ignore CDP with Fetch interceptor
-    headers_bridge_path = (SCRIPTS_PATCHES_STEALTH / "headers_bridge.js")
-    headers_bridge_js = headers_bridge_path.read_text("utf-8")
-
-    # --- [HDR/04] CDP: register bridge for every NEW DOCUMENT ---
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
-
-    # Fetch.enable/Fetch.requestPaused path is prepared but not installed while rules=[].
-    # This avoids relying on unspecified empty-pattern CDP behavior.
+    headers_bridge_js = (SCRIPTS_PATCHES_STEALTH / "headers_bridge.js").read_text("utf-8")
     fetch_rules = []
 
-    _install_fetch_interceptor(
+    def _apply_target_new_document_setup(stage):
+        if not isinstance(stage, str) or not stage.strip():
+            raise ValueError("target new-document setup stage must be a non-empty string")
+        stable_device_memory = profile.get("deviceMemory", device_memory_value)
+        if not isinstance(stable_device_memory, (int, float)) or stable_device_memory <= 0:
+            raise RuntimeError(f"target setup deviceMemory state invalid: {stable_device_memory!r}")
+        expected_client_hints["deviceMemory"] = stable_device_memory
+        logger.info("[windowPolicy.%s] applying target new-document setup", stage)
+        if stage != "primary":
+            apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, dom_platform)
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": page_js})
+        driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": cdp_outbound_headers})
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_window_js})
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": headers_bridge_js})
+        _install_fetch_interceptor(
+            driver,
+            fetch_rules,
+            extra_headers_fn=lambda url, method, rtype: safelisted_headers,
+            blocked_headers=[],
+        )
+        logger.info("[windowPolicy.%s] target new-document setup applied", stage)
+
+    def _apply_target_scoped_setup(stage):
+        if not isinstance(stage, str) or not stage.strip():
+            raise ValueError("target scoped setup stage must be a non-empty string")
+        _apply_target_engine_setup(stage)
+        _apply_target_new_document_setup(stage)
+
+    _apply_target_new_document_setup("primary")
+
+    def _registered_bootstrap_target_setup(target_driver):
+        if target_driver is not driver:
+            raise RuntimeError("registered target setup received unexpected driver")
+        _apply_target_scoped_setup("window_enrollment")
+
+    _register_target_setup_step(
         driver,
-        fetch_rules,
-        extra_headers_fn=lambda url, method, rtype: safelisted_headers,
-        blocked_headers=[]
+        "bootstrap_target_scoped_setup",
+        _registered_bootstrap_target_setup,
     )
 
     logger.info("All fingerprint stealth  patches successfully injected into new document")
@@ -1004,57 +1375,10 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
     """
     try:
         timezone = country_data["timezone"]
-        offset_minutes = country_data["offset_minutes"]
-        latitude = country_data["latitude"]
-        longitude = country_data["longitude"]
         domain = country_data["domain"]
         language = primary_language
         normalized_languages = normalized_languages
-        # ----------------------- Regional setting setup--------------------------------
-
-        # Timezone override
-        driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": timezone})
-        logger.info(f"[profile] Setting timezone: {timezone}, {offset_minutes}")
-
-
-        # Geolocation override
-        logger.info("[profile] Setting geolocation: %.4f,%.4f", latitude, longitude)
-        driver.execute_cdp_cmd(
-            "Emulation.setGeolocationOverride",
-            {"latitude": latitude, "longitude": longitude, "accuracy": 100}
-        )
-
-        def _inject_time_machine(driver):
-            tz_src = Path(SCRIPTS_PATCHES_STEALTH / "TimezoneOverride_source.js").read_text("utf-8")
-            geo_src = Path(SCRIPTS_PATCHES_STEALTH / "GeoOverride_source.js").read_text("utf-8")
-            init_tz = "const __patchTimeZone = TimezonePatchModule(window);"
-            call_tz = r'''
-            
-        Promise.resolve().then(() => {
-        if (typeof __patchTimeZone === "function") __patchTimeZone();
-        });
-        '''.strip()
-            timegeo_js = "\n;\n".join([
-                tz_src,
-                init_tz,
-                call_tz,
-                geo_src,
-            ]) + "\n//# sourceURL=timegeo_bundle.js"
-
-            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": timegeo_js})
-        _inject_time_machine(driver)
-
-        device_metrics = build_device_metrics(profile)
-        emulation_metrics = {key: device_metrics[key] for key in (
-            "width", "height", "deviceScaleFactor", "mobile", "screenWidth", "screenHeight", "screenOrientation"
-        ) if key in device_metrics}
-        driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", emulation_metrics)
-        apply_window_bounds_override(driver, device_metrics, "final")
-
-        apply_page_locale_override(
-            driver,
-            language=language,
-        )
+        apply_profile_target_overrides(driver, language, country_data, profile, "final")
         # ----------------------- Regional Cookies setup--------------------------------
         google_url = f"https://www.google.{domain}" if language != "en" else "https://www.google.com"
         youtube_url = f"https://www.youtube.{domain}" if language != "en" else "https://www.youtube.com"
@@ -1069,7 +1393,8 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
                 driver.execute_cdp_cmd("Network.setCookie", cookie)
                 logger.info(f"Google Cookies set: {cookie['name']} for {google_url}")
             except Exception as e:
-                logger.error(f"Error setting Google cookies {cookie['name']}: {e}")
+                logger.error(f"Error setting Google cookies {cookie['name']}: {e}", exc_info=True)
+                raise
         youtube_domain_str = f".youtube.{domain}" if language != "en" else ".youtube.com"
         youtube_cookies = [
             {"name": "PREF", "value": f"f1=50000000&hl={language}&tz={timezone.replace('/', '.')}", "domain": youtube_domain_str, "path": "/"},
@@ -1080,10 +1405,12 @@ def configure_profile(driver, primary_language: str, normalized_languages: list[
                 driver.execute_cdp_cmd("Network.setCookie", cookie)
                 logger.info(f"Youtube Cookies set: {cookie['name']} для {youtube_url}")
             except Exception as e:
-                logger.error(f"Error setting Youtube cookies {cookie['name']}: {e}")
+                logger.error(f"Error setting Youtube cookies {cookie['name']}: {e}", exc_info=True)
+                raise
         logger.info(f"Regional alignment done: {country_data}")
     except Exception as e:
         logger.error(f"configure_profile error: {e}", exc_info=True)
+        raise
 
 # ----------------------- Thr main function -----------------------
 def main():
@@ -1452,7 +1779,20 @@ def main():
                 "Page.addScriptToEvaluateOnNewDocument",
                 {"source": override_js}
             )
-            inject_uach_strip_window(driver, user_agent)
+            _register_target_setup_step(
+                driver,
+                "safari_override_ua_data",
+                lambda target_driver, source=override_js: target_driver.execute_cdp_cmd(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    {"source": source},
+                ),
+            )
+            if inject_uach_strip_window(driver, user_agent):
+                _register_target_setup_step(
+                    driver,
+                    "uach_strip_window",
+                    lambda target_driver, ua=user_agent: inject_uach_strip_window(target_driver, ua),
+                )
         
         elif browser_brand == "Firefox":
             logger.info("UA data submitted via CDP for Firefox/Safari")
@@ -1461,17 +1801,27 @@ def main():
             pass
         # ----------------------- Call local setting def  -----------------------
         configure_profile(driver, profile["language"], profile["languages"], country_data)
-      
+        _register_target_setup_step(
+            driver,
+            "profile_target_scoped_setup",
+            lambda target_driver: apply_profile_target_overrides(
+                target_driver, profile["language"], country_data, profile, "window_enrollment"
+            ),
+        )
+
+        # ----------------------- SESSION WINDOW POLICY -------------------------------------------
+        session_window_policy = BrowserSessionPolicy(driver)
+
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        driver.get("https://browserleaks.com/ip")
+        session_window_policy.navigate("https://browserleaks.com/ip")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
             logger.warning("stdin is unavailable; keepalive mode is active (Ctrl+C to exit)")
             while True:
                 try:
-                    driver.execute_script("return 1")
-                except Exception:
+                    session_window_policy.tick()
+                except WebDriverException:
                     logger.info("Driver session ended; keepalive loop finished")
                     break
                 time.sleep(1.0)
@@ -1479,7 +1829,8 @@ def main():
         time.sleep(0.5)
         try:
             if sys.stdin is not None and sys.stdin.isatty():
-                input("press Enter for exit...")
+                logger.warning("interactive stdin detected; session policy loop is active (Ctrl+C to exit)")
+                _hold_until_driver_end()
             else:
                 _hold_until_driver_end()
         except EOFError:
@@ -1490,6 +1841,7 @@ def main():
     except Exception as e:
         logger.error(f"Error in main block: {e}", exc_info=True)
         logger.info(f"Error: {e}")
+        raise
 
     # ----------------------- THAT'S ALL, FOLKS!  -----------------------
     finally:
