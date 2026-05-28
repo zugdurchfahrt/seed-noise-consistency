@@ -370,7 +370,10 @@ def apply_profile_target_overrides(driver, language, country_data, profile, stag
         "width", "height", "deviceScaleFactor", "mobile", "screenWidth", "screenHeight", "screenOrientation"
     ) if key in device_metrics}
     driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", emulation_metrics)
-    apply_window_bounds_override(driver, device_metrics, stage)
+    if stage == "window_enrollment":
+        logger.info("[windowBounds.%s] Browser window bounds preserved during target enrollment", stage)
+    else:
+        apply_window_bounds_override(driver, device_metrics, stage)
     apply_page_locale_override(driver, language=language)
 
 
@@ -895,6 +898,7 @@ def init_driver(
     
     def _apply_target_engine_setup(stage):
         logger.info("[windowPolicy.%s] applying target engine setup", stage)
+        device_metrics = build_bootstrap_device_metrics()
         apply_hardware_override(
             driver,
             hardware_concurrency_value=hardware_concurrency_value,
@@ -906,8 +910,14 @@ def init_driver(
             longitude=135.0,
             accuracy=100,
             blocked_urls=["stun:*", "turn:*"] ,
-            device_metrics=build_bootstrap_device_metrics(),
+            device_metrics=device_metrics if stage == "primary" else None,
         )
+        if stage != "primary":
+            emulation_metrics = {key: device_metrics[key] for key in (
+                "width", "height", "deviceScaleFactor", "mobile", "screenWidth", "screenHeight", "screenOrientation"
+            ) if key in device_metrics}
+            driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", emulation_metrics)
+            logger.info("[windowBounds.%s] Browser window bounds preserved during target enrollment", stage)
 
     _apply_target_engine_setup("primary")
 
