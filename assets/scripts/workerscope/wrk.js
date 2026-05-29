@@ -835,6 +835,7 @@ function mkWorkerBootstrapCore(opts){
       var __ENV_BOOTSTRAP_ACTIVE__ = true;
       var __ENV_EMIT_Q__ = [];
       var __ENV_DIAG_RELAY_ACTIVE__ = false;
+      var __ENV_LAST_RELAY_ERROR__ = null;
       var __ENV_SHARED_PORTS__ = [];
       var __ENV_CONNECT_Q__ = [];
       var __ENV_CONNECT_BUF__ = true;
@@ -887,32 +888,42 @@ function mkWorkerBootstrapCore(opts){
       var __serializeDiagErr = function(err){
         if (!err) return null;
         var out = {};
-        try { if (typeof err.name === 'string' && err.name) out.name = err.name; } catch(_e) {}
-        try { if (typeof err.message === 'string' && err.message) out.message = err.message; } catch(_e) {}
-        try { if (typeof err.stack === 'string' && err.stack) out.stack = err.stack; } catch(_e) {}
+        try { if (typeof err.name === 'string' && err.name) out.name = err.name; } catch(_e) { out.nameReadError = String((_e && (_e.stack || _e.message)) || _e); }
+        try { if (typeof err.message === 'string' && err.message) out.message = err.message; } catch(_e) { out.messageReadError = String((_e && (_e.stack || _e.message)) || _e); }
+        try { if (typeof err.stack === 'string' && err.stack) out.stack = err.stack; } catch(_e) { out.stackReadError = String((_e && (_e.stack || _e.message)) || _e); }
         if (!Object.keys(out).length) {
           try { out.message = String(err); } catch(_e) { out.message = 'worker bootstrap relay error'; }
         }
         return out;
       };
-      var __sendRelayMsg = function(msg){
-        var sent = false;
-        try {
-          if (__ENV_WORKER_SCOPE_KIND__ !== 'shared' && typeof self.postMessage === 'function') {
-            self.postMessage(msg);
-            sent = true;
-          }
-        } catch(_e) {}
-        try {
-          if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
-            for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
-              try { __ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) {}
-            }
-          }
-        } catch(_e) {}
-        if (!sent) {
-          try { __ENV_EMIT_Q__.push(msg); } catch(_e) {}
+      var __deferRelayDelivery = function(fn){
+        if (typeof fn !== 'function') return;
+        if (typeof setTimeout === 'function') {
+          setTimeout(fn, 0);
+          return;
         }
+        fn();
+      };
+      var __sendRelayMsg = function(msg){
+        __deferRelayDelivery(function(){
+          var sent = false;
+          try {
+            if (__ENV_WORKER_SCOPE_KIND__ !== 'shared' && typeof self.postMessage === 'function') {
+              self.postMessage(msg);
+              sent = true;
+            }
+          } catch(_e) { __ENV_LAST_RELAY_ERROR__ = String((_e && (_e.stack || _e.message)) || _e); }
+          try {
+            if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
+              for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
+                try { __ENV_SHARED_PORTS__[i].postMessage(msg); sent = true; } catch(_e) { __ENV_LAST_RELAY_ERROR__ = String((_e && (_e.stack || _e.message)) || _e); }
+              }
+            }
+          } catch(_e) { __ENV_LAST_RELAY_ERROR__ = String((_e && (_e.stack || _e.message)) || _e); }
+          if (!sent) {
+            try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __ENV_LAST_RELAY_ERROR__ = String((_e && (_e.stack || _e.message)) || _e); }
+          }
+        });
       };
       var __relayDiag = function(level, code, ctx, err){
         if (__ENV_DIAG_RELAY_ACTIVE__) return;
@@ -972,33 +983,35 @@ function mkWorkerBootstrapCore(opts){
       };
       __ENV_WORKER_SCOPE_KIND__ = __detectWorkerScopeKind__();
       var __emit = function(msg){
-        var sent = false;
-        try {
-          if (__ENV_WORKER_SCOPE_KIND__ !== 'shared' && typeof self.postMessage === 'function') {
-            self.postMessage(msg);
-            sent = true;
-          }
-        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
-        try {
-          if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
-            for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
-              try { __ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
+        __deferRelayDelivery(function(){
+          var sent = false;
+          try {
+            if (__ENV_WORKER_SCOPE_KIND__ !== 'shared' && typeof self.postMessage === 'function') {
+              self.postMessage(msg);
+              sent = true;
             }
-            sent = true;
+          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'worker_postMessage' }); }
+          try {
+            if (__ENV_SHARED_PORTS__ && __ENV_SHARED_PORTS__.length) {
+              for (var i = 0; i < __ENV_SHARED_PORTS__.length; i++) {
+                try { __ENV_SHARED_PORTS__[i].postMessage(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port' }); }
+              }
+              sent = true;
+            }
+          } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_ports_enumeration' }); }
+          if (!sent) {
+            try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue' }); }
           }
-        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_ports_enumeration' }); }
-        if (!sent) {
-          try { __ENV_EMIT_Q__.push(msg); } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'emit_queue' }); }
-        }
+        });
       };
       var __closeBootstrapScope__ = function(){
         try {
           if (typeof setTimeout === 'function') {
-            setTimeout(function(){ try { self.close(); } catch(_e) {} });
+            setTimeout(function(){ try { self.close(); } catch(_e) { __emitDiag('wrk:worker_bootstrap:cleanup:close_failed', _e, { transport: 'close_timeout' }); } });
           } else {
             self.close();
           }
-        } catch(_e) {}
+        } catch(_e) { __emitDiag('wrk:worker_bootstrap:cleanup:close_failed', _e, { transport: 'close_scope' }); }
       };
       function __resolveWorkerRuntimeApplyFn__(){
         try {
@@ -1006,23 +1019,21 @@ function mkWorkerBootstrapCore(opts){
           var __wrkRuntime = __materialized && __materialized.wrkRuntime;
           if (!__wrkRuntime || typeof __wrkRuntime !== 'object') return null;
           if (typeof __wrkRuntime.consumeEnvSnapshot === 'function') return __wrkRuntime.consumeEnvSnapshot;
-        } catch(_e) {}
+        } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:runtime_consumer_resolve_failed', _e, { transport: 'resolve_runtime_apply' }); }
         return null;
       }
-      function __queueWorkerRuntimeSnapshot__(s){
+      function __syncWorkerRuntimeSnapshotRoute__(s, transport){
         try {
           if (!s || typeof s !== 'object') return false;
-          var __materialized = __materializeWorkerOwnerGraph__();
-          var __wrkRuntime = __materialized && __materialized.wrkRuntime;
-          if (!__wrkRuntime || typeof __wrkRuntime !== 'object') return false;
-          var q = Array.isArray(__wrkRuntime.pendingEnvSnapshots) ? __wrkRuntime.pendingEnvSnapshots : null;
-          if (!q) {
-            q = [];
-            __defineWorkerHiddenValue__(__wrkRuntime, 'pendingEnvSnapshots', q);
-          }
-          q.push(s);
+          __LAST_SNAP__ = __requireSnap(s);
+          __syncWorkerOwnerSnapshotRoute__(__LAST_SNAP__);
+          __ENV_SNAP_APPLIED__ = s;
           return true;
-        } catch(_e) {}
+        } catch(_e) {
+          __emitDiag('wrk:worker_bootstrap:apply:owner_snapshot_sync_failed', _e, {
+            transport: (typeof transport === 'string' && transport) ? transport : 'owner_snapshot_sync'
+          });
+        }
         return false;
       }
       if (__isServiceWorkerScope__()) {
@@ -1070,7 +1081,7 @@ function mkWorkerBootstrapCore(opts){
               var syncApply = __resolveWorkerRuntimeApplyFn__();
               if (syncSnap && syncApply) {
                 syncApply(syncSnap);
-              } else if (syncSnap && !syncApply && !__queueWorkerRuntimeSnapshot__(syncSnap)) {
+              } else if (syncSnap && !syncApply && !__syncWorkerRuntimeSnapshotRoute__(syncSnap, 'broadcast_env_sync')) {
                 throw new Error('WorkerBootstrap: env sync consumer missing');
               }
             } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'broadcast_env_sync' }); }
@@ -1102,7 +1113,7 @@ function mkWorkerBootstrapCore(opts){
                         var syncApply = __resolveWorkerRuntimeApplyFn__();
                         if (syncSnap && syncApply) {
                           syncApply(syncSnap);
-                        } else if (syncSnap && !syncApply && !__queueWorkerRuntimeSnapshot__(syncSnap)) {
+                        } else if (syncSnap && !syncApply && !__syncWorkerRuntimeSnapshotRoute__(syncSnap, 'shared_port_env_sync')) {
                           throw new Error('WorkerBootstrap: shared env sync consumer missing');
                         }
                       } catch(_e) { __emitDiag('wrk:worker_bootstrap:apply:emit_failed', _e, { transport: 'shared_port_env_sync' }); }
@@ -1308,14 +1319,12 @@ function mkWorkerBootstrapCore(opts){
         }
         return workerEnvSnapshot;
       };
-      var __bootstrapApplyEnvSnapshot__ = function(s){
-        if (__ENV_SNAP_APPLIED__ === s) return;
-        __LAST_SNAP__ = __requireSnap(s);
-        __syncWorkerOwnerSnapshotRoute__(__LAST_SNAP__);
-        __ENV_SNAP_APPLIED__ = s;
-      };
       try {
-        __bootstrapApplyEnvSnapshot__(${SNAP});
+        if (__ENV_SNAP_APPLIED__ !== ${SNAP}) {
+          __LAST_SNAP__ = __requireSnap(${SNAP});
+          __syncWorkerOwnerSnapshotRoute__(__LAST_SNAP__);
+          __ENV_SNAP_APPLIED__ = ${SNAP};
+        }
       } catch (e) {
         __LAST_SNAP__ = ${SNAP};
         self.__ENV_SNAP_ERROR__ = String((e && (e.stack || e.message)) || e);
@@ -1537,7 +1546,7 @@ function mkModuleWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
             try {
               var d = Object.getOwnPropertyDescriptor(self, exportName);
               if (d && d.configurable !== false) delete self[exportName];
-            } catch (_) {}
+            } catch (eCleanup) { __emitDiag('wrk:worker_bootstrap:cleanup:inline_module_failed', eCleanup, { transport: 'inline_module_cleanup', key: (typeof exportName === 'string' && exportName) ? exportName : null, label: (typeof label === 'string' && label) ? label : null }); throw eCleanup; }
           }
         };
         __runInlineModule__(${JSON.stringify(inlineCoreWindow)}, 'CoreWindowModule', 'inlineCoreWindow');
@@ -1600,7 +1609,7 @@ function mkClassicWorkerSource(snapshot, absUrl, expectedWorkerScopeKind){
             try {
               var d = Object.getOwnPropertyDescriptor(self, exportName);
               if (d && d.configurable !== false) delete self[exportName];
-            } catch (_) {}
+            } catch (eCleanup) { __emitDiag('wrk:worker_bootstrap:cleanup:inline_module_failed', eCleanup, { transport: 'inline_module_cleanup', key: (typeof exportName === 'string' && exportName) ? exportName : null, label: (typeof label === 'string' && label) ? label : null }); throw eCleanup; }
           }
         };
         __runInlineModule__(${JSON.stringify(inlineCoreWindow)}, 'CoreWindowModule', 'inlineCoreWindow');

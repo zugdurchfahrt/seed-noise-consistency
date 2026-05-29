@@ -437,6 +437,40 @@ def _is_window_gone_exception(exc):
     )
 
 
+def _is_devtools_url(url):
+    if not isinstance(url, str):
+        return False
+    value = url.strip().lower()
+    return value.startswith((
+        "devtools://",
+        "about:devtools",
+    ))
+
+
+def _is_deferred_start_url(url):
+    if not isinstance(url, str):
+        return False
+    value = url.strip().lower()
+    return (
+        value == ""
+        or value == "about:blank"
+        or value.startswith("chrome://new-tab-page")
+        or value.startswith("chrome://newtab")
+        or value.startswith("edge://newtab")
+    )
+
+
+def _is_browser_internal_url(url):
+    if not isinstance(url, str):
+        return False
+    value = url.strip().lower()
+    return value.startswith((
+        "chrome://",
+        "chrome-untrusted://",
+        "edge://",
+    ))
+
+
 def _apply_registered_target_setup(driver, reason, handle):
     steps = list(_target_setup_steps(driver))
     if not steps:
@@ -513,6 +547,8 @@ class BrowserSessionPolicy:
             raise RuntimeError(f"session policy preflight failed: unmanaged startup handles {handles!r}")
         self.known = set(handles)
         self.managed = {self.primary}
+        self.ignored = set()
+        self.pending = set()
         self.active_managed = self.primary
 
     def navigate(self, url):
@@ -527,16 +563,22 @@ class BrowserSessionPolicy:
         handles = list(self.driver.window_handles)
         current = set(handles)
         self._promote_primary_if_needed(current)
+        self.ignored.intersection_update(current)
+        self.pending.intersection_update(current)
         for handle in list(self.managed - current):
             self.managed.discard(handle)
             self.known.discard(handle)
             if self.active_managed == handle:
                 self.active_managed = self.primary
+        for handle in list(self.known - current):
+            self.known.discard(handle)
         for handle in [h for h in handles if h not in self.known]:
             self._enroll(handle)
+        for handle in [h for h in handles if h in self.pending]:
+            self._try_enroll_pending(handle)
 
         current = set(self.driver.window_handles)
-        unmanaged = current - self.managed
+        unmanaged = current - self.managed - self.ignored - self.pending
         if unmanaged:
             raise RuntimeError(f"session policy violation: unmanaged handles remain {sorted(unmanaged)!r}")
         self.known = current
@@ -564,7 +606,7 @@ class BrowserSessionPolicy:
         if self.primary in current:
             return
         for handle in [self.active_managed, *self.managed, *self.known]:
-            if handle in current:
+            if handle in current and handle not in self.ignored:
                 previous_primary = self.primary
                 self.primary = handle
                 self.managed.add(handle)
@@ -623,8 +665,53 @@ class BrowserSessionPolicy:
         )
         try:
             self.driver.switch_to.window(handle)
-            _apply_registered_target_setup(self.driver, "window_enrollment", handle)
             enrollment_url = self.driver.current_url
+            if _is_devtools_url(enrollment_url):
+                self.ignored.add(handle)
+                self.known.add(handle)
+                _policy_event(
+                    self.driver,
+                    "info",
+                    "session_policy_internal_window_ignored",
+                    "runtime",
+                    "browser-internal window ignored by managed pipeline",
+                    "pipeline telemetry",
+                    {"outcome": "return", "reason": "browser_internal_target", "handle": handle, "url": enrollment_url},
+                    key=handle,
+                )
+                self._restore_after_enrollment(previous)
+                return
+            if _is_deferred_start_url(enrollment_url):
+                self.pending.add(handle)
+                self.known.add(handle)
+                _policy_event(
+                    self.driver,
+                    "info",
+                    "session_policy_window_enrollment_deferred",
+                    "runtime",
+                    "window enrollment deferred until navigated away from startup URL",
+                    "pipeline telemetry",
+                    {"outcome": "defer", "reason": "startup_url", "handle": handle, "url": enrollment_url},
+                    key=handle,
+                )
+                self._restore_after_enrollment(previous)
+                return
+            if _is_browser_internal_url(enrollment_url):
+                self.ignored.add(handle)
+                self.known.add(handle)
+                _policy_event(
+                    self.driver,
+                    "info",
+                    "session_policy_internal_window_ignored",
+                    "runtime",
+                    "browser-internal window ignored by managed pipeline",
+                    "pipeline telemetry",
+                    {"outcome": "return", "reason": "browser_internal_target", "handle": handle, "url": enrollment_url},
+                    key=handle,
+                )
+                self._restore_after_enrollment(previous)
+                return
+            _apply_registered_target_setup(self.driver, "window_enrollment", handle)
             if not isinstance(enrollment_url, str) or not enrollment_url.strip():
                 raise RuntimeError(f"new window has invalid current_url: {enrollment_url!r}")
             self.driver.get(enrollment_url)
@@ -703,6 +790,80 @@ class BrowserSessionPolicy:
             self._rollback_failed_enrollment(handle, previous, exc)
             raise RuntimeError(f"window enrollment failed for handle={handle!r}") from exc
 
+    def _try_enroll_pending(self, handle):
+        previous = self._current_handle()
+        try:
+            self.driver.switch_to.window(handle)
+            enrollment_url = self.driver.current_url
+            if _is_deferred_start_url(enrollment_url):
+                self._restore_after_enrollment(previous)
+                return
+            if _is_devtools_url(enrollment_url) or _is_browser_internal_url(enrollment_url):
+                self.pending.discard(handle)
+                self.ignored.add(handle)
+                self.known.add(handle)
+                _policy_event(
+                    self.driver,
+                    "info",
+                    "session_policy_pending_internal_window_ignored",
+                    "runtime",
+                    "pending window became browser-internal and was ignored",
+                    "pipeline telemetry",
+                    {"outcome": "return", "reason": "browser_internal_target", "handle": handle, "url": enrollment_url},
+                    key=handle,
+                )
+                self._restore_after_enrollment(previous)
+                return
+            _apply_registered_target_setup(self.driver, "pending_window_enrollment", handle)
+            if not isinstance(enrollment_url, str) or not enrollment_url.strip():
+                raise RuntimeError(f"pending window has invalid current_url: {enrollment_url!r}")
+            self.driver.get(enrollment_url)
+            _validate_managed_window_runtime(self.driver, handle, "pending_window_enrollment")
+            self.pending.discard(handle)
+            self.managed.add(handle)
+            self.known.add(handle)
+            self.active_managed = handle
+            _policy_event(
+                self.driver,
+                "info",
+                "session_policy_pending_window_enrolled",
+                "runtime",
+                "pending window enrolled into managed pipeline",
+                "ok",
+                {"outcome": "return", "handle": handle, "enrollmentUrl": enrollment_url},
+                key=handle,
+            )
+        except Exception as exc:
+            if _is_window_gone_exception(exc):
+                self.pending.discard(handle)
+                self.known.discard(handle)
+                self._restore_after_enrollment(previous)
+                _policy_event(
+                    self.driver,
+                    "warn",
+                    "session_policy_pending_window_disappeared",
+                    "rollback",
+                    "pending window disappeared before enrollment completed",
+                    "pipeline telemetry",
+                    {"outcome": "return", "reason": "target_closed_before_enrollment", "handle": handle},
+                    key=handle,
+                    err=exc,
+                )
+                return
+            _policy_event(
+                self.driver,
+                "error",
+                "session_policy_pending_window_enrollment_failed",
+                "apply",
+                "pending window enrollment failed",
+                "pipeline missing data",
+                {"outcome": "throw", "reason": "apply_failed", "handle": handle},
+                key=handle,
+                err=exc,
+            )
+            self._rollback_failed_enrollment(handle, previous, exc)
+            raise RuntimeError(f"pending window enrollment failed for handle={handle!r}") from exc
+
     def _rollback_failed_enrollment(self, handle, previous, original_exc):
         rollback_error = None
         try:
@@ -727,6 +888,8 @@ class BrowserSessionPolicy:
         finally:
             self.managed.discard(handle)
             self.known.discard(handle)
+            self.pending.discard(handle)
+            self.ignored.discard(handle)
         self._restore_after_enrollment(previous)
         if rollback_error is not None:
             raise RuntimeError(f"window enrollment rollback failed for handle={handle!r}") from rollback_error
