@@ -114,21 +114,16 @@ def normalize_languages(base_languages: Iterable[str]) -> Tuple[str, List[str]]:
 
 def choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac):
     """
-    Selects device memory and CPU concurrency values based on platform and weighted options.
+    Pick profile deviceMemory and hardwareConcurrency from weighted pools.
 
-    Args:
-        platform (str): The platform identifier string (e.g., "Windows", "macOS").
-        mem_win (list of tuple): List of (memory_value, weight) tuples for Windows memory options.
-        cpu_win (list of tuple): List of (cpu_value, weight) tuples for Windows CPU options.
-        mem_mac (list of tuple): List of (memory_value, weight) tuples for macOS memory options.
-        cpu_mac (list of tuple): List of (cpu_value, weight) tuples for macOS CPU options.
-    Returns:
-        tuple: A tuple (device_memory, hardware_concurrency) where:
-            - device_memory: Selected memory value based on weighted random choice.
-            - hardware_concurrency: Selected CPU concurrency value based on weighted random choice.
-    Notes:
-        - The function uses weighted random selection to choose memory and CPU values.
-        - If "mac" is found in the platform string (case-insensitive), macOS options are used; otherwise, Windows options are used.
+    A platform string containing "mac" selects the macOS pools; every other
+    platform selects the Windows pools. Each pool contains (value, weight)
+    pairs and is consumed through the module RNG, which main.py replaces with
+    the profile-specific deterministic RNG.
+
+    Returns (device_memory, hardware_concurrency). If floating-point boundary
+    behavior leaves no selected item, the first value from the corresponding
+    pool is used as the local fallback.
     """
     mem_opts, cpu_opts = (mem_mac, cpu_mac) if "mac" in platform.lower() else (mem_win, cpu_win)
     total_mem = sum(weight for _, weight in mem_opts)
@@ -156,21 +151,14 @@ def choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac):
 # === browser_brand и brouser version definition ===
 def determine_browser_brand_and_versions(user_agent, profile):
     """
-    Determines the browser brand and extracts the major and full version numbers from the given user agent and profile.
-    Args:
-        user_agent (str): The user agent string to analyze.
-        profile (dict): A dictionary containing browser information, must include the key 'browser_version'.
-    Returns:
-        tuple: A tuple containing:
-            - browser_brand (str): The detected browser brand (e.g., 'Google Chrome', 'Microsoft Edge', 'Firefox', 'Safari', or 'Unknown').
-            - major_version (str): The major version number of the browser.
-            - browser_version (str): The full browser version string.
-    Example:
-        determine_browser_brand_and_versions(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        {"browser_version": "91.0.4472.124"}
-        )
-        ('Google Chrome', '91', '91.0.4472.124')
+    Resolve browser brand and version tuple from UA string plus profile.
+
+    Brand is inferred from the UA tokens: Chrome, Edge, Firefox, Safari, or
+    Unknown. The major and full versions are both taken from
+    profile["browser_version"], not parsed out of the UA string, so UA and
+    UA-CH version material stay tied to the profile source of truth.
+
+    Returns (browser_brand, major_version, browser_version).
     """
     if "chrome" in user_agent.lower() and "edg/" not in user_agent.lower():
         browser_brand = "Google Chrome"
@@ -189,15 +177,12 @@ def determine_browser_brand_and_versions(user_agent, profile):
 # ===Forming expected_client_hints through a single brands-source ===
 def build_expected_client_hints(profile, ua_platform, browser_brand, major_version, browser_version):
     """
-    Builds a dictionary of expected client hints based on the provided profile and browser information.
-    Args:
-        profile (dict): A dictionary containing user profile information such as platform version, device memory, hardware concurrency, languages, and language.
-        ua_platform (str): The OS-string platform for UA-CH/User-Agent Data (e.g., "Windows", "Linux", "macOS").
-        browser_brand (str): The browser brand (e.g., "Chrome", "Firefox").
-        major_version (str): The major version of the browser.
-        browser_version (str): The full browser version string.
-    Returns:
-        dict: A dictionary containing expected client hints, including platform details, browser brands, version information, device capabilities, language preferences, and HTTP accept header.
+    Build the internal expected UA-CH/profile dictionary.
+
+    The result is the single structured source consumed by CDP UA override,
+    headers generation and diagnostics. It combines brand lists, full-version
+    lists, UA platform fields, device capabilities, language material and the
+    browser-specific Accept header.
     """
     brands, full_version_list, sec_ch_ua, sec_ch_ua_full_version_list =  build_brands_and_related(
         browser_brand, major_version, browser_version
@@ -241,26 +226,14 @@ def build_expected_client_hints(profile, ua_platform, browser_brand, major_versi
 # =====  Building browser brand/version lists and corresponding header strings=====
 def build_brands_and_related(browser_brand, major_version, browser_version):
     """
-    Builds browser brand/version lists and corresponding Sec-CH-UA header strings.
-    Args:
-        browser_brand (str): The name of the browser (e.g., "Firefox", "Safari", "Google Chrome", "Microsoft Edge").
-        major_version (str): The major version of the browser (e.g., "123").
-        browser_version (str): The full browser version (e.g., "123.0.6312.86").
-        tuple:
-            brands (list of dict): List of dictionaries with "brand" and "version" for Sec-CH-UA.
-            full_version_list (list of dict): List of dictionaries with "brand" and "version" for Sec-CH-UA-Full-Version-List.
-            sec_ch_ua (str): Formatted Sec-CH-UA header string.
-            sec_ch_ua_full_version_list (str): Formatted Sec-CH-UA-Full-Version-List header string.
-    Notes:
-        - For Chromium-based browsers, includes "Not)A;Brand" (with version "8.0.0.0"), "Chromium", and the actual browser brand.
-        - For Firefox and Safari, only the respective brand is included.
-        - The version for "Not)A;Brand" is always "8.0.0.0" in full_version_list.
-    Returns:
-    - brands: list {"brand":…, "version": major_version} для Sec-CH-UA
-    - full_version_list: list {"brand":…, "version": browser_version}
-        (for Not)A;Brand is always "8.0.0.0")
-    - sec_ch_ua: format-string for  Sec-CH-UA
-    - sec_ch_ua_full_version_list: format-string for Sec-CH-UA-Full-Version-List
+    Build brand lists and serialized Sec-CH-UA strings from profile versions.
+
+    Firefox/Safari profiles produce a single-brand list. Chromium-family
+    profiles produce Not)A;Brand, Chromium, and the concrete browser brand.
+    Major versions are used for Sec-CH-UA; full product versions are used for
+    Sec-CH-UA-Full-Version-List, except Not)A;Brand, which uses 8.0.0.0.
+
+    Returns (brands, full_version_list, sec_ch_ua, sec_ch_ua_full_version_list).
     """
     # 1) List of brands by engine type
     if browser_brand == "Firefox":
@@ -303,18 +276,13 @@ def format_full_version_list(full_version_list):
 # ===== Override the User-Agent and User-Agent Metadata=====
 def apply_ua_overrides(driver, profile, expected_client_hints, browser_brand, navigator_platform):
     """
-    Overrides the User-Agent and User-Agent Metadata for the Chromium browsers driver using Chrome DevTools Protocol (CDP).
-    Args:
-        driver: The browser driver instance (e.g., Selenium WebDriver) to apply the overrides to.
-        profile (dict): A dictionary containing the 'user_agent' string to be set.
-        expected_client_hints (dict): A dictionary of client hints to construct the UserAgentMetadata, including keys such as
-            'platform', 'brands', 'mobile', 'architecture', 'bitness', 'model', 'platformVersion', 'uaFullVersion',
-            'fullVersionList', 'deviceMemory', 'hardwareConcurrency', 'wow64', and 'formFactors'.
-        browser_brand (str): The browser brand name (e.g., "chrome", "edge") to determine if the override should be applied.
-        navigator_platform (str): DOM-form platform for the top-level CDP navigator.platform slot.
-    Side Effects:
-        Modifies the browser's user agent and user agent metadata via CDP if the browser brand is supported.
-    It may be utilised as a backup option in the event that the driver is set to 'None', or to guarantee additional parameter alterations. This is not obligatory. Logs an informational message upon successful override.
+    Submit User-Agent and UA-CH metadata through CDP for Chromium brands.
+
+    navigator_platform must be the DOM platform value used by the profile
+    ("Win32" or "MacIntel"). expected_client_hints supplies the structured
+    UserAgentMetadata payload. The CDP override is sent only for Google Chrome
+    and Microsoft Edge brands; Firefox/Safari UA profiles are handled by the
+    UA-CH strip path instead of advertising Chromium UA-CH JS surface.
     """
     if navigator_platform not in ("Win32", "MacIntel"):
         raise ValueError(f"apply_ua_overrides: invalid navigator_platform {navigator_platform!r}")
@@ -369,12 +337,16 @@ def should_strip_uach_window(user_agent: str) -> bool:
 
 def inject_uach_strip_window(driver, user_agent: str) -> bool:
     """
-    For Firefox/Safari UA profiles running on Chromium, remove UA-CH JS surface in window:
-      - delete Navigator.prototype.userAgentData
-      - delete window.NavigatorUAData
-    Workers are intentionally out of scope here.
+    Install the window UA-CH strip for Firefox/Safari UA profiles on Chromium.
 
-    Fail-fast if properties exist but are non-configurable (cannot be removed -> inconsistent surface).
+    When the UA string is Firefox-like or Safari-like, the helper registers a
+    new-document script and immediately evaluates the same script in the
+    current document. The script deletes Navigator.prototype.userAgentData and
+    globalThis.NavigatorUAData. Existing non-configurable properties are a hard
+    failure because they would leave an inconsistent public JS surface.
+
+    Returns True when the strip was installed/evaluated, False when the UA does
+    not need stripping. Workers are intentionally out of scope here.
     """
     if not should_strip_uach_window(user_agent):
         return False

@@ -1024,9 +1024,12 @@ def init_driver(
 
     def setup_engine(driver, timezone, latitude, longitude, accuracy=100, blocked_urls=None, device_metrics=None):
         """
-        Centralized module for setting browser engine parameters via CDP.
-        device_metrics — dict: {screen_width, screen_height, deviceScaleFactor, mobile, screenWidth, screenHeight, screenOrientation}
-        Patching the browser engine's operating principles and initial patching of objects
+        Apply target-scoped browser engine overrides through CDP.
+
+        Enables Network, optionally blocks URL patterns, applies timezone and
+        geolocation overrides, and applies device metrics/window bounds when a
+        bootstrap metrics dict is provided. Object/API patching is handled
+        later by the injected JavaScript bundle, not by this helper.
         """
         # 1. Net setting commands
         driver.execute_cdp_cmd("Network.enable", {})
@@ -1525,9 +1528,13 @@ def init_driver(
 # ----------------------- Function configure_profile --------------------------------
 def configure_profile(driver, primary_language: str, normalized_languages: list[str], country_data: dict):
     """
-    Configures the browser profile for a given driver based on language and country-specific data.
-    This function finally sets up timezone, geolocation, device metrics, after initial setting ealier, and adds relevant cookies for Google and YouTube
-    based on the provided primary country data. It also setup the
+    Apply final profile-level regional alignment for the active browser target.
+
+    The function delegates timezone/geolocation/profile overrides to
+    apply_profile_target_overrides(..., stage="final"), then sets regional
+    Google and YouTube cookies through CDP using the selected primary language
+    and country domain.
+
     Args:
         driver: The browser driver instance supporting the `execute_cdp_cmd` method (e.g., Selenium WebDriver).
         primary_language (str): The primary language code to use for the profile (e.g., 'en', 'ru').
@@ -1700,9 +1707,11 @@ def main():
 
         def pick_product_version(src: list[str], major: str) -> str:
             """
-            src        — list of Chrome or Edge
-            major      — major Chromium version (string, for exmp "134")
-            return     — full_version (string "134.0.6998.43")
+            Pick a deterministic full Chrome/Edge version for one Chromium major.
+
+            The source list must contain full product versions such as
+            "134.0.6998.43". If the selected major is not present, fail fast so
+            Chrome/Edge UA and UA-CH versions cannot silently diverge.
             """
             filt = [v for v in src if v.startswith(major + ".")]
             if not filt:

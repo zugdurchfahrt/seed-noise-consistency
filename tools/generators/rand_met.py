@@ -184,8 +184,12 @@ def _normalize_postscript_name(value: str) -> str:
 
 def _normalize_subfamily_value(value: str) -> str:
     """
-    Canonicalize any incoming subfamily string to the project's known set.
-    Empty values degrade to Regular; unknown values stay cleaned.
+    Normalize one subfamily string for metadata generation.
+
+    Empty values fall back to the project's default subfamily, preferring
+    Regular when it exists in SUBFAMILIES. Known values are returned in the
+    canonical spelling from SUBFAMILIES; unknown values are whitespace-cleaned
+    and left as-is for the caller.
     """
     default_sub = "Regular" if "Regular" in SUBFAMILIES else (SUBFAMILIES[0] if SUBFAMILIES else "")
     s0 = _normalize_whitespace(value)
@@ -249,15 +253,15 @@ def _derive_css_load_query(css_family: str, style: str, weight: str) -> str:
 
 
 def get_target_dir_for(p: str) -> pathlib.Path:
-    """determines the catalog according the selected platform"""
+    """Return the generated-font catalog for the normalized DOM platform."""
     return ASSETS/ 'generated_fonts' / ('Win32' if p == 'Win32' else 'MacIntel')
 
 def _index_path_for(platform: str) -> pathlib.Path:
-    """The path to the font index for the platform (use only get_target_dir_for)"""
+    """Return the platform font index path under the generated-font catalog."""
     return get_target_dir_for(platform) / INDEX_NAME
 
 def _atomic_write_json(path: pathlib.Path, obj: dict) -> None:
-    """Atomic Json (without semi -files)"""
+    """Atomically write JSON by replacing the target with a flushed temp file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=str(path.parent)) as tmp:
         json.dump(obj, tmp, ensure_ascii=False, separators=(",", ":"))
@@ -267,7 +271,7 @@ def _atomic_write_json(path: pathlib.Path, obj: dict) -> None:
     os.replace(tmp_name, path)
 
 def _cache_dir_for(platform: str) -> pathlib.Path:
-    """Catalog for per-file base64-cache"""
+    """Return the derivative-scoped base64 cache directory for one platform."""
     return get_target_dir_for(platform) / "cache_data" / _cache_namespace_token()
 
 def _b64_path_for(platform: str, md5: str) -> pathlib.Path:
@@ -297,7 +301,13 @@ def _atomic_write_text(path: pathlib.Path, data: str) -> None:
     os.replace(tmp_name, path)
 
 def _get_data_url(platform: str, target_dir: pathlib.Path, fname: str, rec: dict) -> str:
-    """Return data:font/woff2;base64,... through side cache with md5; In the absence - encode and cache"""
+    """
+    Return the managed WOFF2 data URL for a generated font.
+
+    The md5 from the platform index selects a derivative-scoped side-cache
+    entry. A missing cache entry is rebuilt from the .woff2 payload after the
+    wOF2 header check, then stored as ASCII base64.
+    """
     md5 = rec.get("md5")
     if not md5:
         with open(target_dir / fname, "rb") as rf:
@@ -318,8 +328,10 @@ def _get_data_url(platform: str, target_dir: pathlib.Path, fname: str, rec: dict
 
 def _cleanup_cache(platform: str, valid_md5s: _Set[str]) -> int:
     """
-    Removes .b64, whose MD5 is not found in the index (orphaned files).
-    It is called once for starting after updating the index.
+    Remove .b64 cache entries whose md5 is no longer present in the index.
+
+    Called after the platform index is synchronized, so stale cache files do
+    not survive deleted or replaced generated fonts.
     """
     cdir = _cache_dir_for(platform)
     if not cdir.exists():
@@ -337,7 +349,7 @@ def _cleanup_cache(platform: str, valid_md5s: _Set[str]) -> int:
 
 
 def _load_index(path: pathlib.Path, platform: str) -> dict:
-    """Download/initialize the file, indexing fonts for the platform"""
+    """Load the platform index or return a fresh empty index skeleton."""
     if not path.exists():
         return {"version": 1, "platform": platform, "files": {}}
     try:
@@ -373,8 +385,12 @@ def _transport_signature_for(configs: list[dict]) -> str:
 
 def ensure_platform_index(platform: str) -> dict:
     """
-    Updates the platform index.
-    Important: we take the catalog only through get_target_dir_for(platform) — A single point of definition
+    Synchronize fonts_index.json with the generated-font catalog.
+
+    The catalog path is resolved only through get_target_dir_for(platform).
+    The index keeps file size, mtime and md5; obsolete inline data is removed,
+    missing files are dropped, changed files are rehashed, and orphaned base64
+    cache entries are cleaned.
     """
     plat_dir = get_target_dir_for(platform) 
     plat_dir.mkdir(parents=True, exist_ok=True)
@@ -446,9 +462,11 @@ def random_string(length=12):
 
 def _normalize_subfamilies(src):
     """
-    forms a sourcesubfamilies as the list of strings.
-    Supports: list/tuple/set[str], dict[str, str|list[str]].
-    Empty/incorrect source -> Return of globalSUBFAMILIES.
+    Normalize an optional subfamily source into the project order.
+
+    Supports list/tuple/set[str] and dict[str, str|list[str]]. Keys and values
+    are both considered for mappings. Unknown values are ignored; empty,
+    unsupported or fully invalid inputs return the global SUBFAMILIES list.
     """
     try:
         allowed = {re.sub(r"\s+", " ", s.strip().lower()): s for s in SUBFAMILIES}
@@ -596,8 +614,13 @@ def fsType_restricts(tt: TTFont) -> bool:
 
 def generate_font_metadata(platform: str, subfamilies_src=None):
     """
-    Generates font metadata: family, subfamily, unique_id и т.д.
-    Returns the dictionary like {1: family, 2: subfamily, 3: unique_id, 4: full_name, 5: version, 6: ps_name, 9: designer, 13: license_desc}
+    Generate deterministic name-table-like metadata for one runtime font entry.
+
+    Uses the rand_met metadata RNG, platform family pools, optional normalized
+    subfamily source, and family mapping JSON for designer/license overrides.
+    Returns numeric name IDs:
+    {1: family, 2: subfamily, 3: unique_id, 4: full_name, 5: version,
+     6: postscript_name, 9: designer, 13: license_desc}.
     """
     common_families = [
     'Arial', 'Arial Black', 'Bahnschrift', 'Calibri', 'Cambria',
@@ -655,17 +678,21 @@ def generate_font_metadata(platform: str, subfamilies_src=None):
 
 def generate_font_manifest(manifest_path: pathlib.Path, platform: str, subfamilies_src=None):
     """
-    1) Copies new .woff2 from FONTS_SOURCE_DIR to target_dir
-    2) Updates fonts_index.json (list of names of all files in target_dir)
-    3) Takes list of all .woff2 from target_dir → all_files
-    4) Randomly selects N fonts (from MIN_N to MAX_N) from all_files → fingerprint_names
-    5) For each file in fingerprint_names:
-    a) Encodes to Base64 (data:URI)
-    b) Generates metadata via generate_font_metadata(platform)
-    c) Collects temp_configs (for Jinja)
-    6) Writes fonts-manifest.json, but only for fingerprint_names (can leave if needed)
-    7) Renders font_patch.generated.js
-    8) Returns temp_configs (or manifest if needed)
+    Build the fonts manifest and generated JS transport for one DOM platform.
+
+    Pipeline:
+    1) Normalize platform to Win32/MacIntel and require RAND_MET_DERIVATIVE.
+    2) Move valid raw .woff2 files from FONTS_SOURCE_DIR into the platform
+       generated-font catalog.
+    3) Synchronize fonts_index.json and cleanup orphan base64 cache entries.
+    4) Deterministically select N indexed files using the rand_met derivative,
+       platform inventory and FONTS_MIN_N/FONTS_MAX_N.
+    5) For each selected file, build/reuse the md5-keyed data URL, generate
+       metadata, derive cssFamily/cssLoadQuery, and collect temp_configs.
+    6) Write fonts-manifest.json as metadata/diagnostic payload without url.
+    7) Render font_patch.generated.js as the runtime transport with url.
+    8) Update the transport signature in the platform index when it changed.
+    9) Return temp_configs.
     """
 
     # Step 0: Normalize to the DOM form ('Win32'|'MacIntel') and crash if something is wrong

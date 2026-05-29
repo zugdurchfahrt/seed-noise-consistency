@@ -66,11 +66,13 @@ def _language_only_fallback(tag: str) -> str | None:
 
 def _ordered_accept_language_entries(languages, browser_brand: str | None = None, user_agent: str | None = None):
     """
-    Build Accept-Language from the canonical profile list.
+    Build ordered Accept-Language entries from the canonical profile list.
 
-    Chromium/Safari network behavior may add language-only fallback tags after
-    specific locale entries. navigator.languages remains untouched and is
-    normalized separately.
+    Firefox keeps the profile language order as-is. Chromium-family and Safari
+    network behavior may append language-only fallback tags after regional
+    locale entries, for example de-DE -> de-DE, de. This function prepares only
+    the network header order; navigator.languages is normalized separately and
+    is not mutated here.
     """
     family = _accept_language_family(browser_brand=browser_brand, user_agent=user_agent)
     ordered = []
@@ -100,7 +102,11 @@ def _ordered_accept_language_entries(languages, browser_brand: str | None = None
 
 def build_accept_language(languages, browser_brand: str | None = None, user_agent: str | None = None):
     """
-    Формирует строку Accept-Language с q-метками, как делает Chrome/Edge/Firefox.
+    Serialize Accept-Language entries with descending q weights.
+
+    The first language is emitted without q. Subsequent entries use 0.9, 0.8,
+    ... down to 0.1 and then stop. Browser family only affects the ordered
+    entry list built by _ordered_accept_language_entries().
     """
     parts = []
     for i, lang in enumerate(_ordered_accept_language_entries(languages, browser_brand=browser_brand, user_agent=user_agent)):
@@ -125,6 +131,15 @@ def derive_accept_language(profile, expected_client_hints=None, user_agent: str 
 
 
 def _build_header_sets(profile, expected_client_hints=None, user_agent: str | None = None, browser_brand: str | None = None):
+    """
+    Build runtime outbound header sets from profile and expected client hints.
+
+    Chromium-family profiles emit the full UA-CH/header surface, including
+    Device-Memory twin headers synchronized to the profile value. Firefox and
+    Safari UA profiles running on Chromium intentionally suppress Sec-CH-UA and
+    keep only the minimal UA-CH headers that remain part of the current CDP
+    path. JavaScript safelisted headers are currently empty for both branches.
+    """
     profile = profile or {}
     expected_client_hints = expected_client_hints if isinstance(expected_client_hints, dict) else {}
     active_user_agent = user_agent or str(profile.get("user_agent") or "")

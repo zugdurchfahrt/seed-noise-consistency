@@ -52,8 +52,12 @@ def _is_ws_disconnect_error(err) -> bool:
 
 def _collect_cdp_tcp_clients(port: int):
     """
-    Best-effort OS snapshot of TCP clients connected to the CDP port.
-    Returns (listener_pid, clients_by_pid) or None if unavailable.
+    Collect a best-effort Windows netstat snapshot for the CDP TCP port.
+
+    Returns (listener_pid, clients_by_pid), where clients_by_pid maps each
+    established peer PID to its remote endpoints. Returns None when netstat or
+    parsing is unavailable; this is diagnostic-only and must not affect patch
+    application.
     """
     try:
         raw = subprocess.check_output(
@@ -160,10 +164,14 @@ def enable_sw_bootstrap_env(
     navigator_platform: str,
 ):
     """
-    Enable ServiceWorker bootstrap env.
-    Call this BEFORE starting run().
+    Validate and store the ServiceWorker bootstrap environment for run().
 
-    No logging, no writers, no Debugger/Network hooks.
+    Must be called before run(). The snapshot contains language, languages,
+    hardwareConcurrency, deviceMemory, expected UA-CH metadata, WebGL identity,
+    userAgent and navigator.platform material. Values are copied into
+    SW_BOOTSTRAP_ENV and later serialized into the service-worker prelude and
+    CDP Emulation overrides. This function only prepares state; it does not
+    connect to CDP or install any runtime hooks.
     """
     global SW_BOOTSTRAP_ENABLED, SW_PRIMARY, SW_LANGS, SW_HC, SW_DM, SW_META, SW_WEBGL, SW_BOOTSTRAP_ENV
     if not isinstance(language, str) or not language.strip():
@@ -597,12 +605,17 @@ def get_ws_url():
 
 def run():
     """
-    Lightweight SW injector loop:
-    - connects to CDP
-    - auto-attaches to service_worker targets with waitForDebuggerOnStart=true
-    - uses "flatten" protocol (required for browser-level auto-attach)
-    - resumes non-service_worker targets immediately
-    - for service_worker targets: Runtime.enable + Runtime.evaluate(prelude) + sanity + (optional) resume
+    Run the browser-level CDP ServiceWorker bootstrap injector.
+
+    The loop connects to the browser websocket, enables service_worker-only
+    auto-attach with waitForDebuggerOnStart=true and flatten=true, and keeps
+    non-ServiceWorker targets out of scope. For each ServiceWorker target it
+    applies CDP UA/UA-CH and hardwareConcurrency overrides, enables Runtime,
+    registers the SW diag binding, evaluates the bootstrap prelude, verifies
+    seed and Function.prototype.toString state, then resumes the paused worker.
+
+    Fatal CDP command errors close the websocket and surface as RuntimeError.
+    Explicit stop()/disconnect shutdown paths are treated as controlled exits.
     """
     global _RUNNING, _SW_WS, _SW_STOPPING
     if _RUNNING:
