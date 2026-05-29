@@ -679,22 +679,22 @@ class BrowserSessionPolicy:
                     {"outcome": "return", "reason": "browser_internal_target", "handle": handle, "url": enrollment_url},
                     key=handle,
                 )
-                self._restore_after_enrollment(previous)
                 return
             if _is_deferred_start_url(enrollment_url):
+                _apply_registered_target_setup(self.driver, "startup_window_enrollment", handle)
                 self.pending.add(handle)
                 self.known.add(handle)
+                self.active_managed = handle
                 _policy_event(
                     self.driver,
                     "info",
-                    "session_policy_window_enrollment_deferred",
+                    "session_policy_startup_window_armed",
                     "runtime",
-                    "window enrollment deferred until navigated away from startup URL",
+                    "startup window armed with target setup before first navigation",
                     "pipeline telemetry",
-                    {"outcome": "defer", "reason": "startup_url", "handle": handle, "url": enrollment_url},
+                    {"outcome": "return", "reason": "startup_url_armed", "handle": handle, "url": enrollment_url},
                     key=handle,
                 )
-                self._restore_after_enrollment(previous)
                 return
             if _is_browser_internal_url(enrollment_url):
                 self.ignored.add(handle)
@@ -709,7 +709,6 @@ class BrowserSessionPolicy:
                     {"outcome": "return", "reason": "browser_internal_target", "handle": handle, "url": enrollment_url},
                     key=handle,
                 )
-                self._restore_after_enrollment(previous)
                 return
             _apply_registered_target_setup(self.driver, "window_enrollment", handle)
             if not isinstance(enrollment_url, str) or not enrollment_url.strip():
@@ -796,7 +795,6 @@ class BrowserSessionPolicy:
             self.driver.switch_to.window(handle)
             enrollment_url = self.driver.current_url
             if _is_deferred_start_url(enrollment_url):
-                self._restore_after_enrollment(previous)
                 return
             if _is_devtools_url(enrollment_url) or _is_browser_internal_url(enrollment_url):
                 self.pending.discard(handle)
@@ -812,12 +810,9 @@ class BrowserSessionPolicy:
                     {"outcome": "return", "reason": "browser_internal_target", "handle": handle, "url": enrollment_url},
                     key=handle,
                 )
-                self._restore_after_enrollment(previous)
                 return
-            _apply_registered_target_setup(self.driver, "pending_window_enrollment", handle)
             if not isinstance(enrollment_url, str) or not enrollment_url.strip():
                 raise RuntimeError(f"pending window has invalid current_url: {enrollment_url!r}")
-            self.driver.get(enrollment_url)
             _validate_managed_window_runtime(self.driver, handle, "pending_window_enrollment")
             self.pending.discard(handle)
             self.managed.add(handle)
@@ -1997,7 +1992,7 @@ def main():
                 except WebDriverException:
                     logger.info("Driver session ended; keepalive loop finished")
                     break
-                time.sleep(1.0)
+                time.sleep(0.1)
 
         time.sleep(0.5)
         try:
