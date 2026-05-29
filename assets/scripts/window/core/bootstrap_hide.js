@@ -820,7 +820,7 @@ if (__screenMissingKeys__.length === 0) {
   __emitBootstrapTransferDiag__(
     'warn',
     'bootstrap_hide:screen_transfer_incomplete',
-    'state.__ENV_PROFILE__.__SCREEN__',
+    'state.__SCREEN__',
     'screen owner-transfer incomplete',
     'bootstrap_input_incomplete',
     null,

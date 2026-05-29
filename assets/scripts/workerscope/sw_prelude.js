@@ -839,8 +839,8 @@
       const stateRoot = __ensureSwHiddenObject(C, 'state');
       const wrkState = __ensureSwHiddenObject(stateRoot, '__WRK__');
       const runtimeRoot = __ensureSwHiddenObject(wrkState, 'runtime');
-      const envProfileRoot = __ensureSwHiddenObject(stateRoot, '__ENV_PROFILE__');
-      __ensureSwHiddenObject(envProfileRoot, '__SCREEN__');
+      __ensureSwHiddenObject(stateRoot, '__ENV_PROFILE__');
+      __ensureSwHiddenObject(stateRoot, '__SCREEN__');
       const fontsRoot = __ensureSwHiddenObject(stateRoot, '__FONTS__');
       const fontsState = __ensureSwHiddenObject(fontsRoot, '__STATE__');
       const fontsConfig = __ensureSwHiddenObject(fontsRoot, '__CONFIG__');
