@@ -2,7 +2,7 @@
 Canvas patch module contract:
 - `FernwehContext` owns internal state and hook registries.
 - `FernwehHooks` is the function export surface consumed by `context.js`.
-- Do not replace the `FernwehHooks` object; update properties on the existing identity.
+- Reuse the existing `FernwehHooks` identity when present; create the export container only when absent.
 - Required exports must match `context.js::registerAllHooks()`.
 - Disabled exports below are kept as commented operational switches.
 */
@@ -221,7 +221,7 @@ __defineHiddenLocal(
   // Quantize to 1/256th of a pixel;
   function q256(v){ return Math.round(v * 256) / 256; }
 
-  // Shared configuration for text jitter hooks; not a public export.
+  // Shared configuration for deterministic text coordinate offsets; not a public export.
   const __CNV_CFG__ = {
     dxPx: 0.10,      // амплитуда X (px)
     dyPx: 0.10,      // амплитуда Y (px)
@@ -273,7 +273,7 @@ function readDrawTargetBitmapSize(ctx, stageKey) {
 
   // === HOOK FUNCTIONS ===
 
-  // TEXT / FONTS: TextMetrics proxy/cache plus draw-argument jitter.
+  // TEXT / FONTS: TextMetrics proxy/cache plus deterministic draw-argument coordinate offsets.
   // Keep width noise local to `applyMeasureTextHook`; do not mutate shared metric state.
   function measureTextNoiseHook(res, text, font) {
     if (!res) return null;
@@ -741,8 +741,9 @@ function readDrawTargetBitmapSize(ctx, stageKey) {
   }
 
 // --- final export ---
-// IMPORTANT: do not replace the FernwehHooks object identity.
-// Other modules may hold a reference to the existing object and/or keep config fields on it.
+// IMPORTANT: reuse the FernwehHooks object identity when it already exists.
+// Create the export container only when absent. Other modules may hold a reference
+// to an existing object and/or keep config fields on it.
 const __CanvasPatchHooksExisting__ = window.FernwehHooks;
 const __CanvasPatchHooks__ =
   (__CanvasPatchHooksExisting__ && (typeof __CanvasPatchHooksExisting__ === 'object' || typeof __CanvasPatchHooksExisting__ === 'function'))
