@@ -756,36 +756,37 @@ const CoreWindowModule = function CoreWindowModule(window) {
         const raw = normStr((prngState && typeof prngState.seed === 'string' && prngState.seed) ? prngState.seed : '');
         const mixed = 'ok|' + raw;
 
-        try {
-          const seedHasher = (prngState && typeof prngState.strToSeed === 'function')
-            ? prngState.strToSeed
-            : null;
-          if (typeof seedHasher === 'function') {
-            const tag = String(seedHasher(mixed) >>> 0).toString(36).slice(0, 8);
-            if (__prngRoot && typeof __prngRoot === 'object') __prngRoot.__guardSeedTag = tag;
-            return tag;
-          }
-        } catch (e) {
-          __emit('warn', 'core_window:guard_seed_hash_failed', {
+        const seedHasher = (prngState && typeof prngState.strToSeed === 'function')
+          ? prngState.strToSeed
+          : null;
+        if (typeof seedHasher !== 'function') {
+          __throw('core_window:guard_seed_hash_failed', {
             module: 'core',
             diagTag: 'core_window',
             surface: 'core',
             key: 'Core.__internal.prng.strToSeed',
             stage: 'guard',
-            message: 'guard seed hash provider failed; using local hash fallback',
+            message: 'guard seed hash provider missing',
             type: 'pipeline missing data',
-            data: { outcome: 'return', fallback: 'local_hash' }
+            data: { outcome: 'throw' }
+          }, new Error('[CoreWindow] Core.__internal.prng.strToSeed missing'));
+        }
+        try {
+          const tag = String(seedHasher(mixed) >>> 0).toString(36).slice(0, 8);
+          if (__prngRoot && typeof __prngRoot === 'object') __prngRoot.__guardSeedTag = tag;
+          return tag;
+        } catch (e) {
+          __throw('core_window:guard_seed_hash_failed', {
+            module: 'core',
+            diagTag: 'core_window',
+            surface: 'core',
+            key: 'Core.__internal.prng.strToSeed',
+            stage: 'guard',
+            message: 'guard seed hash provider failed',
+            type: 'pipeline missing data',
+            data: { outcome: 'throw' }
           }, e);
         }
-
-        let h = 2166136261 >>> 0;
-        for (let i = 0; i < mixed.length; i++) {
-          h ^= mixed.charCodeAt(i);
-          h = Math.imul(h, 16777619);
-        }
-        const tag = String(h >>> 0).toString(36).slice(0, 8);
-        if (__prngRoot && typeof __prngRoot === 'object') __prngRoot.__guardSeedTag = tag;
-        return tag;
       }
 
       function nextGuardToken(flagKey) {
