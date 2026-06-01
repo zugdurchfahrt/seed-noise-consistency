@@ -18,23 +18,25 @@ Python (Selenium + undetected_chromedriver) + инъекция JavaScript-пат
 
 ### Архитектура и владение состоянием
 - [FernwehContext hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/2._Hidden_State_FernwehContext_Contract.md) - описывает canonical hidden state, module slots и owner routes.
-- [Pipeline entity typology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/8._Entity_typology.md) - классифицирует containers, state owners, wrappers, carriers и diagnostic entities.
+- [Core apply methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/11._CORE_METHODOLOGY_v3.md) - описывает preflight, wrapper, apply, rollback и работу с native references.
+- [Function.prototype.toString essentials](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/7._FuctiontoString_ESSENTIALS_CUT.md) - задаёт native-looking форму функций и realm-local synchronization rules.
+
 
 ### Патчинг public API
 - [Public API implementation policy](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/1._Policy_implement_reg.md) - сохраняет descriptor shape, receiver checks, native error paths и proxy observability.
+- [Pipeline entity typology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/8._Entity_typology.md) - классифицирует containers, state owners, wrappers, carriers и diagnostic entities.
 - [Method surfaces methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/10._METHOD_SURFACES.md) - связывает method/accessor surfaces с нормативными routes установки.
 - [Promise and entry/result accessor methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/10.1_METHOD_PROMISE_AND_ENTRY_ACCESSOR_EXTENDED.md) - расширяет правила surface для asynchronous и accessor-driven paths.
-- [Core apply methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/11._CORE_METHODOLOGY_v3.md) - описывает preflight, wrapper, apply, rollback и работу с native references.
 - [Hooks methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/6._Hooks_Methodology_v1.15.md) - описывает регистрацию Canvas/WebGL hooks и границы их выполнения.
-- [Function.prototype.toString essentials](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/7._FuctiontoString_ESSENTIALS_CUT.md) - задаёт native-looking форму функций и realm-local synchronization rules.
+
 
 ### Runtime-домены
 - [WebGL critical paths](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/9._WEBGL-CRITICAL.md) - описывает WebGL values, hooks и diagnostic routes.
 - [Headers pipeline](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/12._HEADERS_CONTRACT.md) - координирует browser preferences, CDP, JavaScript и опциональный mitmproxy headers path.
 - [Fonts compound](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/14._FONTS_CONTRACT.md) - описывает generated font assets, runtime loading, Canvas interaction и deterministic behavior.
+- [Guard flag](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - определяет guard lifecycle.
 
 ### Детерминизм и worker scopes
-- [Guard flag and seed vocabulary](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - определяет guard lifecycle и общую seed terminology.
 - [PRNG seed and global_seed](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/15._PRNG_SEED_CONTRACT.md) - описывает seed creation, transfer, canonical PRNG ownership и consumer rules.
 - [Worker scope hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/13_.WRK_SCOPE_HIDDEN_UNIFIED.md) - задаёт parity для Dedicated, Shared и Service Worker без cross-realm object sharing.
 

@@ -18,25 +18,27 @@ Detailed rules live in the external contracts repository; this README keeps only
 
 ### Architecture and ownership
 - [FernwehContext hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/2._Hidden_State_FernwehContext_Contract.md) - Defines canonical hidden state, module slots, and owner routes.
-- [Pipeline entity typology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/8._Entity_typology.md) - Classifies containers, state owners, wrappers, carriers, and diagnostic entities.
+- [Core apply methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/11._CORE_METHODOLOGY_v3.md) - Documents preflight, wrapper, apply, rollback, and native-reference handling.
+- [Function.prototype.toString essentials](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/7._FuctiontoString_ESSENTIALS_CUT.md) - Defines native-looking function shape and realm-local synchronization rules.
 
 ### Public API patching
 - [Public API implementation policy](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/1._Policy_implement_reg.md) - Preserves descriptor shape, receiver checks, native error paths, and proxy observability.
+- [Pipeline entity typology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/8._Entity_typology.md) - Classifies containers, state owners, wrappers, carriers, and diagnostic entities.
 - [Method surfaces methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/10._METHOD_SURFACES.md) - Maps method and accessor surfaces to their normative installation routes.
 - [Promise and entry/result accessor methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/10.1_METHOD_PROMISE_AND_ENTRY_ACCESSOR_EXTENDED.md) - Extends the surface rules for asynchronous and accessor-driven paths.
-- [Core apply methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/11._CORE_METHODOLOGY_v3.md) - Documents preflight, wrapper, apply, rollback, and native-reference handling.
 - [Hooks methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/6._Hooks_Methodology_v1.15.md) - Describes Canvas/WebGL hook registration and execution boundaries.
-- [Function.prototype.toString essentials](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/7._FuctiontoString_ESSENTIALS_CUT.md) - Defines native-looking function shape and realm-local synchronization rules.
+
 
 ### Runtime domains
 - [WebGL critical paths](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/9._WEBGL-CRITICAL.md) - Maps WebGL values, hooks, and diagnostic routes.
 - [Headers pipeline](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/12._HEADERS_CONTRACT.md) - Coordinates browser preferences, CDP, JavaScript, and optional mitmproxy headers.
 - [Fonts compound](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/14._FONTS_CONTRACT.md) - Documents generated font assets, runtime loading, Canvas interaction, and deterministic behavior.
+- [Guard flag](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - Defines guard lifecycle.
 
 ### Determinism and worker scopes
-- [Guard flag and seed vocabulary](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - Defines guard lifecycle and the shared seed terminology.
 - [PRNG seed and global_seed](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/15._PRNG_SEED_CONTRACT.md) - Documents seed creation, transfer, canonical PRNG ownership, and consumer rules.
 - [Worker scope hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/13_.WRK_SCOPE_HIDDEN_UNIFIED.md) - Defines Dedicated, Shared, and Service Worker parity without cross-realm object sharing.
+
 
 ### Diagnostics
 - [DEGRADE diagnostics](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/3._DEGRADE_Contract.md) - Defines the unified observable diagnostics channel and failure classes.
