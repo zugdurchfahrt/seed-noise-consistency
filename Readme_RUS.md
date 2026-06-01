@@ -1,79 +1,100 @@
-# Readme_RUS.md
-
-**Коротко (TL;DR):** исследовательский anti-fingerprinting pipeline (Python + JavaScript) с детерминированными seed-based патчами Canvas/WebGL/WebGPU/Fonts/Headers через CDP.  
+**Коротко (TL;DR)**: исследовательский anti-fingerprinting pipeline на Python + JavaScript, который через CDP внедряет детерминированные seed-based патчи для Canvas/WebGL/WebGPU/Fonts/Headers.
 **Работает на Windows с VPN** (ProtonVPN/OpenVPN) + опциональный proxy.
 
 Browser Anti-Fingerprinting: Python + JavaScript
 
-English version: see README.md.
+English version: see [README.md](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/README.md).
 
-## О чем этот проект
-
+## Что это за проект
 Система предназначена для оценки и смягчения современных browser fingerprinting surfaces: Canvas 2D/OffscreenCanvas, WebGL/WebGPU, Fonts, UA-CH/Headers.
 
 ## Архитектура
+Python (Selenium + undetected_chromedriver) + инъекция JavaScript-патчей/модулей через CDP для управления fingerprint surfaces. Mitmproxy опционален и переключается прямо в [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py).
 
-Python (Selenium + undetected_chromedriver) + инъекция JavaScript-патчей/модулей через CDP для управления fingerprint surfaces. Mitmproxy теперь опционален и переключается прямо в `main.py`.
+<!-- PIPELINE_CONTRACT_MAP_START -->
+## Карта контрактов pipeline
+
+Подробные правила живут во внешнем репозитории контрактов; этот README оставляет только проектную карту.
+
+### Архитектура и владение состоянием
+- [FernwehContext hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/2._Hidden_State_FernwehContext_Contract.md) - описывает canonical hidden state, module slots и owner routes.
+- [Pipeline entity typology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/8._Entity_typology.md) - классифицирует containers, state owners, wrappers, carriers и diagnostic entities.
+
+### Патчинг public API
+- [Public API implementation policy](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/1._Policy_implement_reg.md) - сохраняет descriptor shape, receiver checks, native error paths и proxy observability.
+- [Method surfaces methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/10._METHOD_SURFACES.md) - связывает method/accessor surfaces с нормативными routes установки.
+- [Promise and entry/result accessor methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/10.1_METHOD_PROMISE_AND_ENTRY_ACCESSOR_EXTENDED.md) - расширяет правила surface для asynchronous и accessor-driven paths.
+- [Core apply methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/11._CORE_METHODOLOGY_v3.md) - описывает preflight, wrapper, apply, rollback и работу с native references.
+- [Hooks methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/6._Hooks_Methodology_v1.15.md) - описывает регистрацию Canvas/WebGL hooks и границы их выполнения.
+- [Function.prototype.toString essentials](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/7._FuctiontoString_ESSENTIALS_CUT.md) - задаёт native-looking форму функций и realm-local synchronization rules.
+
+### Runtime-домены
+- [WebGL critical paths](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/9._WEBGL-CRITICAL.md) - описывает WebGL values, hooks и diagnostic routes.
+- [Headers pipeline](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/12._HEADERS_CONTRACT.md) - координирует browser preferences, CDP, JavaScript и опциональный mitmproxy headers path.
+- [Fonts compound](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/14._FONTS_CONTRACT.md) - описывает generated font assets, runtime loading, Canvas interaction и deterministic behavior.
+
+### Детерминизм и worker scopes
+- [Guard flag and seed vocabulary](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - определяет guard lifecycle и общую seed terminology.
+- [PRNG seed and global_seed](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/15._PRNG_SEED_CONTRACT.md) - описывает seed creation, transfer, canonical PRNG ownership и consumer rules.
+- [Worker scope hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/13_.WRK_SCOPE_HIDDEN_UNIFIED.md) - задаёт parity для Dedicated, Shared и Service Worker без cross-realm object sharing.
+
+### Диагностика
+- [DEGRADE diagnostics](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/3._DEGRADE_Contract.md) - определяет единый observable diagnostics channel и failure classes.
+- [DEGRADE module template](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/3.1_DEGRADE_APPENDIX_MODULE_CODE_TEMPLATE.md) - даёт module-level diagnostic projection template.
+- [DEGRADE calls summary](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/3.2_DEGRADE_CALLS_SUMMARY.md) - инвентаризирует текущие diagnostic call sites по pipeline.
+<!-- PIPELINE_CONTRACT_MAP_END -->
 
 ## Этика и область применения
-
-Инструменты предназначены только для тестирования, отладки и исследований. Не используйте их для обхода защитных механизмов, нарушения правил сайтов или законов.  
+Инструменты предназначены только для тестирования, отладки и исследований. Не используйте их для обхода защитных механизмов, нарушения правил сайтов или законов.
 Это инструмент для исследования приватности и устойчивости детекторов. Ответственность за применение лежит на пользователе.
 
 ## Важный дисклеймер
-
-Это не "silver bullet" и не набор средств для полной анонимности. Современные техники fingerprinting (TLS fingerprints, behavioral checks, WebGL/WebGPU constraints, AudioContext API updates и т.д.) могут коррелировать сессии и деанонимизировать окружение даже при наличии патчей. Частичный контроль поверхности не дает полной анонимности.
+Это не "silver bullet" и не набор средств для полной анонимности. Современные техники fingerprinting (TLS fingerprints, behavioral checks, WebGL/WebGPU constraints, AudioContext API updates и т.д.) могут коррелировать сессии и деанонимизировать окружение даже при наличии патчей. Частичный контроль surface не даёт полной анонимности.
 
 ## Цели проекта
-
-Основная цель проекта - исследовать браузер изнутри, понять, какие API используются и где могут быть каналы утечки данных.  
-Понять, как шрифты, `WebGL`, `Client Hints`, plug-ins и другие компоненты влияют на fingerprint.  
-Сохранять наблюдаемость fingerprinting-поверхностей и их воспроизводимость через профилирование и управление сетевой прослойкой.
+Основная цель проекта - комплексно исследовать браузер изнутри, понять, какие API используются и где могут быть каналы утечки данных.
+Понять, как fonts, `WebGL`, `Client Hints`, plug-ins и другие компоненты влияют на fingerprint.
+Сохранять наблюдаемость fingerprinting-поверхностей и их воспроизводимость через profiling и управление network layer.
 
 ## Конфигурация и принципы
-
-Без хардкода: значения профиля собираются из словарей/profile data и попадают в `window.__*` только как входные bootstrap/bridge-значения. Реальная patch-логика, helpers и промежуточное состояние постепенно переносятся в module-local closure state, а не хранятся как долгоживущие public globals.  
-Совместимость с MDN/Chromium: hooks остаются внутри native API boundaries; closure-owned routing/helpers используются для сохранения receiver/owner contracts и предотвращения Illegal invocation.  
+Без хардкода: значения профиля собираются из dictionaries/profile data и попадают в `window.__*` только как входные bootstrap/bridge-значения. Реальная patch-логика, helpers и промежуточное состояние постепенно переносятся в module-local closure state, а не хранятся как долгоживущие public globals.
+Совместимость с MDN/Chromium: hooks остаются внутри native API boundaries; closure-owned routing/helpers используются для сохранения receiver/owner contracts и предотвращения Illegal invocation.
 `__GLOBAL_SEED` / DPR / device metrics синхронизируются через initialization variables.
 
 ## Статус проекта
-
-Исследовательский и некоммерческий проект; публикуется "as is". Гарантий стабильности нет.  
-Проект разрабатывается одним автором, поэтому охват сценариев и окружений ограничен. Forks и contributions приветствуются.  
-Границы применимости см. в Issues/TODO.  
-Проверялось только на Windows + ProtonVPN (OpenVPN CLI). Другие OS/VPN не тестировались.  
-В целом pipeline инициализируется, скрипт запускается и выполняет назначенные задачи.
+Исследовательский и некоммерческий проект; публикуется "as is". Гарантий стабильности нет.
+Проект разрабатывается одним автором, поэтому охват сценариев и окружений ограничен. Forks и contributions приветствуются.
+Границы применимости см. в Issues/TODO.
+Проверялось только на Windows + ProtonVPN (OpenVPN CLI). Другие OS/VPN не тестировались.
+В целом pipeline инициализируется, скрипт запускается и выполняет назначенные задачи; пропатчена только часть surfaces.
 
 ## Лицензия
-
-The Unlicense (Public Domain). Авторские и смежные права waived  
-to the extent possible. Разрешено копировать, изменять, публиковать, использовать, компилировать, продавать  
-и распространять проект, с attribution или без нее. Software provided "AS IS".
+The Unlicense (Public Domain). Авторские и смежные права waived
+to the extent possible. Разрешено копировать, изменять, публиковать, использовать, компилировать, продавать
+и распространять проект, с attribution или без неё. Software is provided "AS IS".
 
 ## Требования
-
-OS: Windows 10/11 (путь OpenVPN рассчитан на Windows).  
+OS: Windows 10/11 (путь OpenVPN рассчитан на Windows).
 Python: 3.12 (рекомендуется 3.11+).
 
 ## Сторонние компоненты
-
-OpenVPN установлен локально (дефолтный путь определен в `vpn_utils.py`, может быть изменен).  
-`mitmproxy` (есть в `requirements.txt`, нужен только когда переключатель mitmproxy включен).  
-Chrome/Chromium - локальная копия Chrome for Testing; путь настроен в `main.py`.  
-Все Python-зависимости указаны в `requirements.txt`.
+OpenVPN установлен локально (дефолтный путь задан в [vpn_utils.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/vpn_utils.py), может быть изменён).
+`mitmproxy` (есть в [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt), нужен только когда переключатель mitmproxy включён).
+Chrome/Chromium - локальная копия Chrome for Testing; путь настроен в [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py).
+Все Python-зависимости закреплены в [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt).
 
 ## Режимы запуска
 
-Есть одна точка входа: `main.py`.
+Есть одна точка входа: [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py).
 
-Mitmproxy управляется маленьким видимым переключателем возле начала `main.py`:
+Mitmproxy управляется маленьким видимым переключателем возле начала [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py):
 
 ```python
 MITMPROXY_ON = True
 # MITMPROXY_OFF = True
 ```
 
-Это значит: запуск **с mitmproxy**. `main.py` сам запускает `mitmdump`, направляет Chrome через `127.0.0.1:8082` и останавливает процесс при выходе.
+Это значит: запуск **с mitmproxy**. [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) сам запускает `mitmdump`, направляет Chrome через `127.0.0.1:8082` и останавливает процесс при выходе.
 
 Чтобы запустить **без mitmproxy**, поменяйте активную строку:
 
@@ -82,31 +103,30 @@ MITMPROXY_ON = True
 MITMPROXY_OFF = True
 ```
 
-В этом режиме `main.py` не запускает `mitmdump`, не ставит proxy options для Chrome, и Chrome подключается напрямую.
+В этом режиме [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) не запускает `mitmdump`, не ставит proxy options для Chrome, и Chrome подключается напрямую.
 
 Активной должна быть только одна строка. Если активны обе или обе закомментированы, запуск сразу завершится понятной ошибкой.
 
 ### С mitmproxy
 
-✔ Проще ходить по сайтам без немедленных CORS/header challenges.  
-✔ Есть прямой доступ к CORS/headers/`Client Hints`.  
-✖ Требуется `mitmproxy`.  
+✔ Проще ходить по сайтам без немедленных CORS/header challenges.
+✔ Есть прямой доступ к CORS/headers/`Client Hints`.
+✖ Требуется `mitmproxy`.
 ✖ Детекторы могут видеть TLS fingerprint mitmproxy как не "native".
 
 ### Без mitmproxy
 
-✔ Более простой и легкий запуск.  
-✔ Нет локальной proxy-прослойки.  
+✔ Более простой и лёгкий запуск.
+✔ Нет локальной proxy-прослойки.
 ✖ Ограничения CORS могут снижать эффективность для реального browsing; этот режим лучше подходит как прямой browser/CDP/JS pipeline.
 
 Примечание: VPN используется в обоих режимах, если отдельно не отключить VPN calls.
 
 ### Использование без встроенного VPN-клиента
-
-Скрипт можно запускать без управления OpenVPN изнутри. В этом случае можно:  
-✔ Использовать любой другой VPN-клиент, включая управляемый через GUI.  
-✔ Или работать вообще без VPN.  
-Для этого достаточно закомментировать в `def main():` вызовы методов `VPNClient`, отвечающие за проверку, подготовку и подключение:
+Скрипт можно запускать без управления OpenVPN изнутри. В этом случае можно:
+✔ Использовать любой другой VPN-клиент, включая управляемый через GUI.
+✔ Или работать вообще без VPN.
+Для этого достаточно закомментировать в `def main():` вызовы методов `VPNClient`, отвечающие за VPN authentication, setup и connection:
 
 ```python
 # client.verify()
@@ -116,145 +136,94 @@ MITMPROXY_OFF = True
 client.post()
 ```
 
-В этом режиме скрипт работает как раньше: все последующие шаги выполняются, но VPN-процессы не останавливаются и не запускаются.  
+В этом режиме скрипт работает как раньше: все последующие шаги выполняются, но VPN-процессы не останавливаются и не запускаются.
 Если VPN уже поднят любым другим способом, скрипт просто использует текущее сетевое окружение.
 
 ## Структура репозитория
 
-```text
-├── assets/
-│   ├── JS_fonts_patch/
-│   ├── Manifest/
-│   ├── fonts_raw/
-│   ├── generated_fonts/
-│   │   ├── MacIntel/
-│   │   │   ├── cache_data/
-│   │   └── Win32/
-│   │       ├── cache_data/
-│   ├── scripts/
-│   │   ├── window/
-│   │   │   ├── core/
-│   │   │   │   ├── bootstrap_hide.js
-│   │   │   │   ├── context.js
-│   │   │   │   ├── core_window.js
-│   │   │   │   ├── prng_seed.js
-│   │   │   │   ├── probe.js
-│   │   │   │   └── set_log.js
-│   │   │   └── patches/
-│   │   │       ├── graphics/
-│   │   │       ├── media/
-│   │   │       ├── navigator/
-│   │   │       └── stealth/
-│   │   └── workerscope/
-│   │       ├── set_reflect.js
-│   │       ├── sw_prelude.js
-│   │       ├── worker_bootstrap.js
-│   │       ├── WORKER_PATCH_SRC.js
-│   │       └── wrk.js
-│   └── templates/
-│       └── font_patch.template.j2
-├── cfg_vpn/
-├── logs/
-├── profile_data_source/
-│   ├── datashell_win32.py
-│   ├── depo_browser.py
-│   ├── FONTS_DESIGNER_BY_FAMILY_JSON.json
-│   ├── FONTS_LICENSE_BY_FAMILY_JSON.json
-│   ├── macintel.py
-│   ├── permissions_dict.py
-│   ├── plugins_dict.py
-│   └── profile.json
-├── profiles/
-├── tools/
-│   ├── generators/
-│   │   ├── cdp_catapult.py
-│   │   ├── cdp_worker_env.py
-│   │   └── rand_met.py
-│   ├── tools_infra/
-│   │   ├── overseer.py
-│   │   └── vpn_utils.py
-│   └── tools_runtime/
-│       ├── handle_cors_addon.py
-│       ├── headers_adapter.py
-│       └── helpers.py
-├── user_data/
-├── main.py
-├── Readme_RUS.md
-├── requirements.txt
-└── README.md
-```
+- [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) - runtime entrypoint и orchestration layer.
+- [assets/scripts/window/core](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/core) - window bootstrap, Core, context, PRNG, logging и probes.
+- [assets/scripts/window/patches](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/patches) - window-side graphics, media, navigator и stealth patches.
+- [assets/scripts/workerscope](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/workerscope) - bootstrap и patching для Dedicated, Shared и Service Worker.
+- [assets/generated_fonts](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/generated_fonts) - bundled generated font assets и indexes.
+- [assets/templates/font_patch.template.j2](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/templates/font_patch.template.j2) - template для generated font patch output.
+- [profile_data_source](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/profile_data_source) - profile dictionaries и platform/browser data.
+- [tools/generators](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/generators) - font generation и CDP worker/service-worker helpers.
+- [tools/tools_runtime](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/tools_runtime) - runtime helper modules и header/CORS support.
+- [tools/tools_infra](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/tools_infra) - VPN и Python-side diagnostic helpers.
+- [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt) - pinned Python dependency list.
 
 ## Обзор модулей (кратко)
 
 ### Python
 
-- `main.py` - главный оркестратор и точка входа: собирает/загружает данные профиля, готовит CDP payload для инъекции, запускает Selenium + undetected-chromedriver, подключает runtime helpers и применяет staged JS pipeline к window и worker scopes.
-- `profile_data_source/` - словари и базовые данные профиля для сборки платформы и браузера: Win32/MacIntel shells, карты версий браузеров, наборы plugins, настройки permissions и profile defaults.
-- `tools/generators/rand_met.py` - шрифтовой pipeline: готовит generated fonts для платформ, cache metadata и `assets/JS_fonts_patch/font_patch.generated.js` из Jinja2-шаблона.
-- `tools/generators/cdp_catapult.py` - собирает CDP-side payload и содержит helper для доставки в `ServiceWorker`, используемый runtime injection flow.
-- `tools/generators/cdp_worker_env.py` - подключается к `DedicatedWorker` и `SharedWorker` targets через CDP и применяет те же environment overrides, что и main page; поддерживает согласованность worker-side поверхностей `userAgent`, `language`, `languages`, `platform` и `hardwareConcurrency` до возобновления выполнения.
-- `tools/tools_runtime/handle_cors_addon.py` - runtime addon для mitmproxy: CORS/preflight handling, фильтрация служебных доменов и координация request/response-side headers.
-- `tools/tools_runtime/headers_adapter.py` - формирует реалистичные `Accept`/header-наборы под бренд и версию браузера.
-- `tools/tools_runtime/helpers.py` - общие runtime/profile helpers для `main.py` и injection pipeline.
-- `tools/tools_infra/vpn_utils.py` - управление жизненным циклом VPN и region-aligned setup с использованием `.ovpn` файлов из `cfg_vpn/`.
-- `tools/tools_infra/overseer.py` - helper для логирования и диагностики на стороне Python.
-- `tools/tools_native_check/` - helpers для нормативной проверки proxy/native-surface механики, включая registry checks и bridge-firewall tooling.
+- [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) - главный orchestration entrypoint: собирает/загружает profile data, готовит CDP injection payloads, запускает Selenium + undetected-chromedriver, подключает runtime helpers и применяет staged JS pipeline к window и worker scopes.
+- [profile_data_source](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/profile_data_source) - source dictionaries и базовые profile data для platform/browser composition: Win32/MacIntel shells, browser-version maps, plugin sets, permissions setting и profile defaults.
+- [rand_met.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/generators/rand_met.py) - fonts pipeline: готовит per-platform generated fonts, cache metadata и [font_patch.generated.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/JS_fonts_patch/font_patch.generated.js) из Jinja2 template.
+- [cdp_catapult.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/generators/cdp_catapult.py) - CDP-side payload assembly и `ServiceWorker` delivery helper, используемый runtime injection flow.
+- [cdp_worker_env.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/generators/cdp_worker_env.py) - подключается к `DedicatedWorker` и `SharedWorker` targets через CDP и применяет те же environment overrides, что и main page, сохраняя worker-side `userAgent`, `language`, `languages`, `platform` и `hardwareConcurrency` accessor variables согласованными до возобновления выполнения.
+- [handle_cors_addon.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/handle_cors_addon.py) - mitmproxy runtime addon для CORS/preflight handling, service-domain filtering и request/response-side header coordination.
+- [headers_adapter.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/headers_adapter.py) - realistic Accept/header shaping по browser brand/version.
+- [helpers.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/helpers.py) - общие runtime/profile helpers, используемые [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) и injection pipeline.
+- [vpn_utils.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/vpn_utils.py) - VPN lifecycle и region-aligned setup с `.ovpn` файлами из [cfg_vpn](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/cfg_vpn).
+- [overseer.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/overseer.py) - Python-side logging/diagnostic helper.
 
-### JavaScript (`assets/scripts/window/core`)
+### JavaScript ([assets/scripts/window/core](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/core))
 
-- `core_window.js` - базовый слой для window-модулей и общей инфраструктуры `Core`. Здесь находятся общие wrappers, `Core.applyTargets`, безопасная установка дескрипторов, native shaping, маскировка `toString`, `invalid-this` contract и диагностические утилиты. Модуль задает contract-driven patching engine: downstream modules используют его как общий слой, который сохраняет native behavior/appearance, корректно обрабатывает `invalid receiver` и другие engine-level errors, не ломая ожидаемую native pass-through semantics.
-- `context.js` - оркестрационный модуль для хуков и `Canvas`/`WebGL`: собирает `FernwehHooks`, проверяет наличие экспортированных хуков из модулей и регистрирует их в unified hook queue. Также это patching gateway: он оборачивает `getContext`, `toDataURL`, `toBlob`, `convertToBlob`, методы `CanvasRenderingContext2D` и `WebGL` prototypes, чтобы downstream modules проходили через одну точку применения, без proxy leaks, потери `this` и поломки нативной механики дескрипторов.
-- `prng_seed.js` - gateway для `__GLOBAL_SEED` от Python backend к JavaScript environment. Модуль устанавливает seed-driven PRNG state и предоставляет deterministic seed context, который используется ниже по цепочке graphics/media patches.
-- `bootstrap_hide.js` - инициализирует внутренний bootstrap-контекст и переносит значения из публичной поверхности `window` в hidden state. Создает и поддерживает `FernwehContext`, переносит bootstrap data во внутренние state objects, скрывает служебные поля от enumeration и удаляет временные global values после подготовки required owners and retention snapshots.
-- `set_log.js` - JS-side logging/diagnostic emitter. Создает JS-side logger/diag buffer и unified `__DEGRADE__` channel, через который pipeline incidents собираются и нормализуются.
-- `probe.js` - слой внутренней наблюдаемости и self-checking. Проверяет critical APIs после загрузки патчей и валидирует runtime invariants, descriptor integrity, call semantics и timeout behavior. Findings пишутся в тот же diagnostic stream.
+- [core_window.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/core_window.js) - базовый слой для всех window-related modules и общей инфраструктуры `Core`. Здесь находятся common wrappers, `Core.applyTargets`, safe descriptor installation, native shaping и `toString` masking, `invalid-this` contract и diagnostic utilities. Здесь же реализованы `safeDefine`, wrapper factory для `method` / `accessor` / `ctor` и логика сохранения native-looking public API surface.
+Задаёт contract-driven patching engine через `Core.applyTargets`. Downstream modules опираются на него как на support layer, который сохраняет native behavior and appearance, корректную обработку `invalid receiver` и других engine-level errors, не ломая expected native pass-through semantics.
+- [context.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/context.js) - orchestration layer для `Canvas`/`WebGL`: собирает `FernwehHooks`, проверяет наличие hooks, экспортированных соответствующими модулями, и регистрирует их в unified hook queue. Также это patching gateway: он оборачивает `getContext`, `toDataURL`, `toBlob`, `convertToBlob`, методы `CanvasRenderingContext2D` и `WebGL` prototypes, чтобы downstream modules проходили через одну точку применения без proxy leaks, потери `this` и поломки native descriptor mechanics.
+- [prng_seed.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/prng_seed.js) - gateway для `__GLOBAL_SEED` от Python backend к JavaScript environment. Модуль устанавливает seed-driven PRNG state и exposes deterministic seed context, который используется downstream graphics/media patches.
+- [bootstrap_hide.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/bootstrap_hide.js) - инициализирует internal bootstrap context и переносит startup values из public window surface в private pipeline state. Создаёт и поддерживает `FernwehContext`, переносит bootstrap data во internal state objects, скрывает service fields от enumeration и удаляет temporary global values после подготовки required owners и retention snapshots.
+- [set_log.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/set_log.js) - JS-side logging/diagnostic emitter. Создаёт JS-side logger/diag buffer и unified `__DEGRADE__` channel.
+- [probe.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/probe.js) - pipeline observability и self-checking layer. Валидирует runtime invariants, descriptor integrity, call semantics и timeout behavior после загрузки patches.
 
-### JavaScript (`assets/scripts/window/patches/*`)
+### JavaScript ([assets/scripts/window/patches](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/patches))
 
-- `graphics/canvas.js` - Canvas 2D/Offscreen hooks с seed-based noise и обертками, сохраняющими инварианты.
-- `graphics/webgl.js`, `graphics/WEBGL_DICKts.js` - перехват `WebGL` плюс статические whitelist/parameter data.
-- `graphics/webgpu.js`, `graphics/WebgpuWL.js` - перехват `WebGPU` плюс whitelist/limits data.
-- `graphics/screen.js` - patching поверхностей `screen` и `visualViewport`.
-- `media/audiocontext.js` - seed-based/media adjustments, согласованные с AudioContext.
-- `media/font_module.js` - потребляет generated font configs, регистрирует `@font-face` и инжектит CSS/font-loading glue.
-- `media/RTCPeerConnection.js` - нормализация ICE servers и non-relay/network-shaping logic.
-- `navigator/nav_total_set.js`, `navigator/override_ua_data.js` - выравнивание navigator, UA-CH, language и client-hint surfaces на стороне window.
-- `stealth/hide_webdriver.js` - маскировка webdriver и связанное native-surface hardening.
-- `stealth/headers_interceptor.js`, `stealth/headers_bridge.js` - shaping request/header на JS-стороне, синхронизированный с CDP/mitmproxy path.
-- `stealth/GeoOverride_source.js`, `stealth/TimezoneOverride_source.js` - geo/timezone overrides.
+- [canvas.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/canvas.js) - Canvas 2D/Offscreen hooks с seeded noise и invariant-preserving wrapping.
+- [webgl.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/webgl.js), [WEBGL_DICKts.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/WEBGL_DICKts.js) - `WebGL` interception плюс static whitelist/parameter support.
+- [webgpu.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/webgpu.js), [WebgpuWL.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/WebgpuWL.js) - `WebGPU` interception плюс whitelist/limits data.
+- [screen.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/screen.js) - patching для `screen` и `visualViewport` surfaces.
+- [audiocontext.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/audiocontext.js) - AudioContext-aligned seeded/media surface adjustments.
+- [font_module.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/font_module.js) - потребляет generated font configs, регистрирует `@font-face` и инжектит CSS/font-loading glue.
+- [RTCPeerConnection.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/RTCPeerConnection.js) - ICE-server normalization и non-relay/network-shaping logic.
+- [nav_total_set.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/navigator/nav_total_set.js), [override_ua_data.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/navigator/override_ua_data.js) - window-side alignment для navigator, UA-CH, language и client-hint surfaces.
+- [hide_webdriver.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/stealth/hide_webdriver.js) - webdriver masking и related native-surface hardening.
+- [headers_interceptor.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/stealth/headers_interceptor.js), [headers_bridge.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/stealth/headers_bridge.js) - JS-side request/header shaping, синхронизированный с CDP/mitmproxy path.
+- [GeoOverride_source.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/stealth/GeoOverride_source.js), [TimezoneOverride_source.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/stealth/TimezoneOverride_source.js) - geo/timezone overrides.
 
-### JavaScript (`assets/scripts/workerscope`)
+### JavaScript ([assets/scripts/workerscope](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/workerscope))
 
-- `wrk.js` - координатор worker-scope: отвечает за перенос окружения и установку патчей в `DedicatedWorker`, `SharedWorker` и `ServiceWorker`.
-- `WORKER_PATCH_SRC.js` - основной набор worker-side патчей, который применяется внутри worker-контекста после bootstrap/prelude этапов.
-- `worker_bootstrap.js` - ранняя связка для `Worker`: перехватывает создание worker и передает туда подготовленный patch payload до выполнения пользовательского worker-кода.
-- `sw_prelude.js` - prelude для `ServiceWorker`: подготавливает окружение перед применением worker-патчей.
-- `set_reflect.js` - worker-side helper для reflection/native-surface механики: помогает сохранять ожидаемый вид функций, `toString`-поведение и совместимость с native-like поверхностью.
+- [wrk.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/workerscope/wrk.js) - worker-scope coordinator для environment propagation и patch installation across Dedicated/Shared/Service Workers.
+- [WORKER_PATCH_SRC.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/workerscope/WORKER_PATCH_SRC.js) - worker-side patch source bundle, потребляемый bootstrap/prelude stages.
+- [worker_bootstrap.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/workerscope/worker_bootstrap.js) - early worker bootstrap glue, который связывает worker creation с injected patch payload.
+- [sw_prelude.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/workerscope/sw_prelude.js) - Service Worker prelude для установления environment до worker patch application.
+- [set_reflect.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/workerscope/set_reflect.js) - worker-side reflection/native-surface helper.
 
 ### Генерируемые файлы и шаблоны
 
-- `assets/Manifest/fonts-manifest.json` - диагностический манифест (большой JSON); не является прямым runtime-источником, а служит диагностическим артефактом.
-- `assets/JS_fonts_patch/font_patch.generated.js` - авто-генерируемый fonts patch, который потребляет `font_module.js`.
-- `assets/templates/font_patch.template.j2` - Jinja2-шаблон, который `rand_met.py` использует для генерации JS patch.
+- [fonts-manifest.json](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/Manifest/fonts-manifest.json) - diagnostic manifest (large JSON).
+- [font_patch.generated.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/JS_fonts_patch/font_patch.generated.js) - auto-generated fonts patch, потребляемый [font_module.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/font_module.js).
+- [font_patch.template.j2](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/templates/font_patch.template.j2) - Jinja2 template, который [rand_met.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/generators/rand_met.py) использует для генерации JS patch.
 
 ### Шрифты
 
-Готовые generated fonts уже лежат в `assets/generated_fonts/Win32` и `assets/generated_fonts/MacIntel` вместе со своими `fonts_index.json`. Для обычного запуска ничего докладывать и перекладывать не нужно.
+Ready-to-use generated fonts уже лежат в [assets/generated_fonts/Win32](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/generated_fonts/Win32) и [assets/generated_fonts/MacIntel](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/generated_fonts/MacIntel), вместе со своими generated font indexes. Для обычного запуска ничего докладывать и перекладывать не нужно.
 
-В проект уже добавлен набор шрифтов, скачанных из Google Fonts и затем переименованных pipeline-ом проекта для runtime-использования. Это сделано специально, чтобы проект запускался без необходимости сначала искать и подготавливать свои шрифты.
+Bundled fonts взяты из Google Fonts и затем переименованы pipeline-ом проекта для runtime use. Это сделано специально, чтобы проект запускался без необходимости сначала искать собственный набор шрифтов.
 
-Если хотите использовать свои шрифты, кладите только `.woff2` файлы в `assets/fonts_raw/` и запускайте проект обычным способом. При старте `rand_met.py` воспринимает `fonts_raw` как входную папку: проверяет файлы, пропускает неподходящие, переносит принятые шрифты в платформенную generated-папку, обновляет индекс и пересобирает runtime font patch. После принятия файл удаляется из `fonts_raw`.
+Если хотите использовать свои шрифты, кладите только `.woff2` files в [assets/fonts_raw](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/fonts_raw) и запускайте проект обычным способом. Во время startup [rand_met.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/generators/rand_met.py) воспринимает [assets/fonts_raw](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/fonts_raw) как intake folder: валидирует файлы, пропускает unsuitable fonts, копирует принятые файлы в platform-specific generated folder, обновляет index и пересобирает runtime font patch. После принятия файл удаляется из этой intake folder.
 
-Для своих шрифтов лучше использовать обычные текстовые шрифты. Не подходят icon fonts, emoji fonts, пустые/битые файлы, шрифты без базового ASCII, шрифты с ограничительными embedding flags и шрифты с экстремальными метриками.
+Для своих шрифтов лучше использовать обычные text fonts. Не подходят icon fonts, emoji fonts, empty/broken files, fonts без basic ASCII coverage, fonts с restrictive embedding flags или extreme metrics.
 
 ### Логирование
 
 - В консоли можно вызвать:
-- `L.__PROBE__();` - вывод результатов probe-диагностики из `probe.js` в консоль DevTools; данные также сохраняются в JSON/HTML для чтения и обработки.
+- `L.__PROBE__();` - [probe.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/probe.js) выводит probe diagnostics в console, JSON и HTML files.
 
-- `L.__DEGRADE__.getBuffer();` - вывод буфера `set_log.js` в консоль DevTools.
+- `L.__DEGRADE__.getBuffer();` - [set_log.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/set_log.js) выводит buffer в console.
 
-- Сохранение лога `set_log.js` в JSON:
+- [set_log.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/core/set_log.js) JSON log file saving:
 
   ```js
   (() => {
@@ -266,12 +235,12 @@ client.post()
     URL.revokeObjectURL(url);
   })();
   ```
-  
-Вы также можете просто ввести `L.exportMyDebugLog()` в консоли DevTools, чтобы получить тот же результат.
+
+Можно также просто ввести `L.exportMyDebugLog()` в DevTools console, чтобы получить тот же результат.
 
 ### Переключатель mitmproxy
 
-Откройте `main.py`, выберите один активный профиль и нажмите Play/F5 в VS Code.
+Откройте [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py), выберите один active profile и нажмите Play/F5 в VS Code.
 
 С mitmproxy:
 
@@ -291,18 +260,18 @@ MITMPROXY_OFF = True
 
 Установить зависимости:
 
-```pwsh
+```powershell
 python -m venv venv
 venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Положить `.ovpn` в `configs\`.
+Положите `.ovpn` files в [cfg_vpn](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/cfg_vpn).
 
-Шрифты уже подготовлены в `assets\generated_fonts\`; для обычного запуска ничего делать не нужно. Если хотите добавить свои шрифты, положите `.woff2` файлы в `assets\fonts_raw\`, а startup font pipeline сам их обработает.
+Шрифты уже подготовлены в [assets/generated_fonts](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/generated_fonts); для обычного запуска ничего делать не нужно. Если хотите добавить свои шрифты, положите `.woff2` files в [assets/fonts_raw](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/fonts_raw), и startup font pipeline сам их обработает.
 
-Запустить `main.py` из VS Code или терминала. Активный профиль mitmproxy выбирается внутри `main.py` переключателем выше.
+Запустите [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) из VS Code или терминала. Активный профиль mitmproxy выбирается внутри [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) переключателем выше.
 
 * Если при установке возникает ошибка "permission denied", выполните:
   `pip install --no-cache-dir -r requirements.txt`
@@ -311,7 +280,5 @@ pip install -r requirements.txt
 
 - Интегрировать proxying для `getClientRects` / `getBoundingClientRect`.
 - Реализовать ротацию TLS fingerprint через OpenSSL.
-- События `success/ready` из мест, где фиксируется только факт установки hooks, считать только `applied`: механизм установлен, но результат еще не доказан.
-- Эмитить финальный `success` только после postcondition на observable surface:
+- События `success/ready` из мест, где фиксируется только факт установки hooks, считать только `applied`: механизм установлен, но результат ещё не доказан.
 - Для font module эмитить `success` только если состояние наблюдаемо после текущей цепочки через `DOM/CSS/font-measurement surface`, а не только через внутренние структуры; иначе помечать `applied_but_not_effective` или не эмитить `success`.
-
