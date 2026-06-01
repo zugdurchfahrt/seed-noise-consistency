@@ -8,13 +8,14 @@ Russian version: see [Readme_RUS.md](https://github.com/zugdurchfahrt/seed-noise
 ## What this project is about
 The system has been designed to evaluate and mitigate modern browser fingerprinting surfaces (Canvas 2D/OffscreenCanvas, WebGL/WebGPU, Fonts, UA-CH/Headers).
 
+The project demonstrates that isolated fingerprint randomization is largely ineffective. Browser fingerprint mitigation only becomes meaningful when multiple observable surfaces are controlled as a consistent system rather than patched independently.
+
+
 ## Architecture
 Python (Selenium + undetected_chromedriver) + JavaScript patches (modules) injection via CDP to control fingerprint surfaces. Mitmproxy is optional and is switched directly in [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py).
 
 <!-- PIPELINE_CONTRACT_MAP_START -->
 ## Pipeline Contract Map
-
-Detailed rules live in the external contracts repository; this README keeps only the project-level map.
 
 ### Architecture and ownership
 - [FernwehContext hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/2._Hidden_State_FernwehContext_Contract.md) - Defines canonical hidden state, module slots, and owner routes.

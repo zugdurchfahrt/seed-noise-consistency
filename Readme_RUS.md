@@ -8,13 +8,14 @@ English version: see [README.md](https://github.com/zugdurchfahrt/seed-noise-con
 ## Что это за проект
 Система предназначена для оценки и смягчения современных browser fingerprinting surfaces: Canvas 2D/OffscreenCanvas, WebGL/WebGPU, Fonts, UA-CH/Headers.
 
+Проект показывает, что изолированная рандомизация отдельных fingerprint-поверхностей практически бессмысленна. Осмысленная защита начинается только тогда, когда наблюдаемые поверхности браузера контролируются как единая согласованная система, а не патчатся по отдельности.
+
+
 ## Архитектура
 Python (Selenium + undetected_chromedriver) + инъекция JavaScript-патчей/модулей через CDP для управления fingerprint surfaces. Mitmproxy опционален и переключается прямо в [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py).
 
 <!-- PIPELINE_CONTRACT_MAP_START -->
 ## Карта контрактов pipeline
-
-Подробные правила живут во внешнем репозитории контрактов; этот README оставляет только проектную карту.
 
 ### Архитектура и владение состоянием
 - [FernwehContext hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/2._Hidden_State_FernwehContext_Contract.md) - описывает canonical hidden state, module slots и owner routes.
