@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Iterable, Tuple, List
 import random
 
-from headers_adapter import generate_accept_header
+from tools.tools_runtime.headers_adapter import generate_accept_header
 from tools.tools_infra.overseer import logger
 logger = logger.getChild("helpers_runtime")
 

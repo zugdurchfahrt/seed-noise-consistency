@@ -1623,9 +1623,8 @@ def main():
         permissions_dict_module.random = permissions_rng
         rand_met_module.RAND_MET_DERIVATIVE = _derive_rand_met_seed_material(global_seed, "rand_met")
         
-        if hasattr(headers_adapter_module, "_pick_nav_template"):
-            headers_adapter_module._pick_nav_template.cache_clear()
         headers_adapter_module.random = headers_rng
+        headers_adapter_module._pick_nav_template.cache_clear()
         
         # -------- Your PLATFORM and BROWSER preferences for random selection -------------------
         profile = get_random_profile(country_data, None)
