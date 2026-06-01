@@ -25,41 +25,9 @@
       } catch (_) {}
     };
 
-    // ===== MODULE: canonical guard client (GuardFlag.md) =====
     const __core = window && window.Core;
-    const __flagKey = '__PATCH_RNG_SET__';
     const __tag = 'rng_set';
     const __surface = 'rng_set';
-    let __guardToken = null;
-    try {
-      if (!__core || typeof __core.guardFlag !== 'function') {
-        __emit('warn', 'rng_set:guard_missing', {
-          module: __tag,
-          diagTag: __tag,
-          surface: __surface,
-          key: __flagKey,
-          stage: 'guard',
-          message: 'Core.guardFlag missing',
-          type: 'pipeline missing data',
-          data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
-        }, null);
-        return;
-      }
-      __guardToken = __core.guardFlag(__flagKey, __tag);
-    } catch (e) {
-      __emit('warn', 'rng_set:guard_failed', {
-        module: __tag,
-        diagTag: __tag,
-        surface: __surface,
-        key: __flagKey,
-        stage: 'guard',
-        message: 'guardFlag threw',
-        type: 'pipeline missing data',
-        data: { outcome: 'skip', reason: 'guard_failed' }
-      }, e);
-      return;
-    }
-    if (!__guardToken) return; // already_patched: Core emits rng_set:already_patched
 
     // Utilities
     function toBool(v) {
@@ -131,6 +99,20 @@
       return state;
     }
     const __prngState = ensurePrngState();
+    if (!__prngState) return;
+    if (__prngState.__rngSetSeedMissingLocked === true) {
+      __emit('warn', 'rng_set:preflight:global_seed_missing_locked', {
+        module: __tag,
+        diagTag: __tag,
+        surface: __surface,
+        key: 'Core.__internal.prng',
+        stage: 'preflight',
+        message: 'bootstrap seed was previously missing; rand install remains locked',
+        type: 'pipeline missing data',
+        data: { outcome: 'return', reason: 'bootstrap_seed_missing_locked', action: 'native', producerLock: 'locked' }
+      }, null);
+      return;
+    }
 
     function installRand() {
       if (!__prngState) return false;
@@ -262,16 +244,17 @@
           }, null);
           return; // Everything is ready
         }
+        const missingSeedMeta = resolveBootstrapSeedMeta();
+        __prngState.__rngSetSeedMissingLocked = true;
         __emit('warn', 'rng_set:preflight:global_seed_missing', {
           module: __tag,
           diagTag: __tag,
           surface: __surface,
-          key: bootstrapSeedMeta.key,
+          key: missingSeedMeta.key,
           stage: 'preflight',
-          message: bootstrapSeedMeta.source + ' missing; rand not installed',
+          message: missingSeedMeta.source + ' missing; rand not installed',
           type: 'pipeline missing data',
-          // Policy exception: for seed we keep the guard (do NOT release) to prevent late seed replacement.
-          data: { outcome: 'return', reason: 'bootstrap_seed_missing', action: 'native', guard: 'locked' }
+          data: { outcome: 'return', reason: 'bootstrap_seed_missing', action: 'native', producerLock: 'locked' }
         }, null);
       } catch (e) {
         __emit('fatal', 'rng_set:boot_failed', {

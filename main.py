@@ -1179,6 +1179,7 @@ def init_driver(
             Path(SCRIPTS_PATCHES_GRAPHICS / "webgpu.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_MEDIA / "audiocontext.js").read_text("utf-8"),
             Path(SCRIPTS_CORE / "context.js").read_text("utf-8"),
+            Path(PATCH_OUT).read_text("utf-8"),
             # --- execute phase ---
             f"""
             CoreWindowModule(window);
@@ -1218,11 +1219,10 @@ def init_driver(
                 defineHidden(wrkRuntime, 'inlineFernwehContext', {json.dumps(worker_context_src)});
             }})(window);
             """,
-            Path(PATCH_OUT).read_text("utf-8"),
             f"""
+            RNGsetModule(window);
             HideWebdriverPatchModule(window);
             RtcpeerconnectionPatchModule(window);
-            RNGsetModule(window);
             NavTotalSetPatchModule(window);
             ScreenPatchModule(window);
             FontPatchModule(window);
