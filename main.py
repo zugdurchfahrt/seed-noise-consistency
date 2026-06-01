@@ -130,7 +130,6 @@ def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
 
     return {
         "profile": _rng_for("profile"),
-        "plugins": _rng_for("plugins"),
         "permissions": _rng_for("permissions"),
         "headers": _rng_for("headers"),
         "vpn": _rng_for("vpn"),
@@ -1618,11 +1617,9 @@ def main():
        
         # -------- Getting PRNG random for each module -------------------
         profile_rng = seed_int["profile"]
-        plugins_rng = seed_int["plugins"]
         permissions_rng = seed_int["permissions"]
         headers_rng = seed_int["headers"]
         helpers_module.random = profile_rng
-        plugins_dict_module.random = plugins_rng
         permissions_dict_module.random = permissions_rng
         rand_met_module.RAND_MET_DERIVATIVE = _derive_rand_met_seed_material(global_seed, "rand_met")
         
@@ -1783,7 +1780,7 @@ def main():
         cpu_win = [(2, 10), (4, 40), (6, 20), (8, 20), (12, 10)]
         device_memory_value, hardware_concurrency_value = choose_device_memory_and_cpu(platform, mem_win, cpu_win, mem_mac, cpu_mac)
         # -----------------------  navigator.plugins source profile (mimeTypes are derived in JS) -----------------------
-        plugins_final = build_plugins_profile(browser_choice, rng=plugins_rng, strict=False)
+        plugins_final = build_plugins_profile(browser_choice, strict=False)
 
         # ----------------------- permissions.query / Browser.setPermission source profile -----------------------
         devices_conf = permissions_dict_module.build_permissions_profile(browser_choice, rng=permissions_rng, strict=True)

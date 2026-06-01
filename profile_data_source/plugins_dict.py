@@ -273,13 +273,13 @@ def _allowed_names(variants: Iterable) -> set[str]:
 
 
 def _choose_raw(variants: Iterable, *, rng: Optional[random.Random] = None) -> List[Dict]:
-    rng = rng or random
     vs = list(variants or [])
     if not vs:
         return []
     if isinstance(vs[0], dict):
         return [dict(p) for p in vs if isinstance(p, dict)]
-    pick = rng.choice(vs)
+    # Plugin profiles are canonical per browser family; keep rng only for call compatibility.
+    pick = vs[0]
     if isinstance(pick, dict):
         return [dict(pick)]
     if isinstance(pick, list):
@@ -336,7 +336,7 @@ def build_plugins_profile(browser_choice: str, *, rng: Optional[random.Random] =
                 raw = candidate
                 best_len = len(candidate)
     else:
-        raw = _choose_raw(variants, rng=rng)
+        raw = _choose_raw(variants)
     filtered = [p for p in raw if isinstance(p, dict) and p.get("name") in names_whitelist]
     cleaned = _dedup_norm(filtered)
 
