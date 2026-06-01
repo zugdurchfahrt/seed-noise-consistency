@@ -22,6 +22,11 @@ Python (Selenium + undetected_chromedriver) + инъекция JavaScript-пат
 - [Function.prototype.toString essentials](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/7._FuctiontoString_ESSENTIALS_CUT.md) - задаёт native-looking форму функций и realm-local synchronization rules.
 
 
+### Детерминизм и worker scopes
+- [PRNG seed and global_seed](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/15._PRNG_SEED_CONTRACT.md) - описывает seed creation, transfer, canonical PRNG ownership и consumer rules.
+- [Worker scope hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/13_.WRK_SCOPE_HIDDEN_UNIFIED.md) - задаёт parity для Dedicated, Shared и Service Worker без cross-realm object sharing.
+
+
 ### Патчинг public API
 - [Public API implementation policy](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/1._Policy_implement_reg.md) - сохраняет descriptor shape, receiver checks, native error paths и proxy observability.
 - [Pipeline entity typology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/8._Entity_typology.md) - классифицирует containers, state owners, wrappers, carriers и diagnostic entities.
@@ -36,9 +41,6 @@ Python (Selenium + undetected_chromedriver) + инъекция JavaScript-пат
 - [Fonts compound](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/14._FONTS_CONTRACT.md) - описывает generated font assets, runtime loading, Canvas interaction и deterministic behavior.
 - [Guard flag](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - определяет guard lifecycle.
 
-### Детерминизм и worker scopes
-- [PRNG seed and global_seed](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/15._PRNG_SEED_CONTRACT.md) - описывает seed creation, transfer, canonical PRNG ownership и consumer rules.
-- [Worker scope hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/13_.WRK_SCOPE_HIDDEN_UNIFIED.md) - задаёт parity для Dedicated, Shared и Service Worker без cross-realm object sharing.
 
 ### Диагностика
 - [DEGRADE diagnostics](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/3._DEGRADE_Contract.md) - определяет единый observable diagnostics channel и failure classes.

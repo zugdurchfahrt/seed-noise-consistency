@@ -21,6 +21,12 @@ Detailed rules live in the external contracts repository; this README keeps only
 - [Core apply methodology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/11._CORE_METHODOLOGY_v3.md) - Documents preflight, wrapper, apply, rollback, and native-reference handling.
 - [Function.prototype.toString essentials](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/7._FuctiontoString_ESSENTIALS_CUT.md) - Defines native-looking function shape and realm-local synchronization rules.
 
+
+### Determinism and worker scopes
+- [PRNG seed and global_seed](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/15._PRNG_SEED_CONTRACT.md) - Documents seed creation, transfer, canonical PRNG ownership, and consumer rules.
+- [Worker scope hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/13_.WRK_SCOPE_HIDDEN_UNIFIED.md) - Defines Dedicated, Shared, and Service Worker parity without cross-realm object sharing.
+
+
 ### Public API patching
 - [Public API implementation policy](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/1._Policy_implement_reg.md) - Preserves descriptor shape, receiver checks, native error paths, and proxy observability.
 - [Pipeline entity typology](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/8._Entity_typology.md) - Classifies containers, state owners, wrappers, carriers, and diagnostic entities.
@@ -34,10 +40,6 @@ Detailed rules live in the external contracts repository; this README keeps only
 - [Headers pipeline](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/12._HEADERS_CONTRACT.md) - Coordinates browser preferences, CDP, JavaScript, and optional mitmproxy headers.
 - [Fonts compound](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/14._FONTS_CONTRACT.md) - Documents generated font assets, runtime loading, Canvas interaction, and deterministic behavior.
 - [Guard flag](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - Defines guard lifecycle.
-
-### Determinism and worker scopes
-- [PRNG seed and global_seed](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/15._PRNG_SEED_CONTRACT.md) - Documents seed creation, transfer, canonical PRNG ownership, and consumer rules.
-- [Worker scope hidden state](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/13_.WRK_SCOPE_HIDDEN_UNIFIED.md) - Defines Dedicated, Shared, and Service Worker parity without cross-realm object sharing.
 
 
 ### Diagnostics
