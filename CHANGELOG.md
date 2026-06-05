@@ -1,5 +1,11 @@
 # Changelog
 
+05.06.2026
+
+Rects layout influence may affect visible glyph/layout nodes on arbitrary pages; no fix until a reproducible non-fixture page regression is observed.
+
+
+
 16.04.2026
 
 - `deviceMemory`: aligned the public behavior across `window`, `WorkerNavigator`, and `ServiceWorkerGlobalScope` with  `navigator.deviceMemory` variable nativet regime.
