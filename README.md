@@ -40,6 +40,7 @@ Python (Selenium + undetected_chromedriver) + JavaScript patches (modules) injec
 - [WebGL critical paths](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/9._WEBGL-CRITICAL.md) - Maps WebGL values, hooks, and diagnostic routes.
 - [Headers pipeline](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/12._HEADERS_CONTRACT.md) - Coordinates browser preferences, CDP, JavaScript, and optional mitmproxy headers.
 - [Fonts compound](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/14._FONTS_CONTRACT.md) - Documents generated font assets, runtime loading, Canvas interaction, and deterministic behavior.
+- [RectsPatchModule](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/16._RectsPatchModule.md) is a window-realm module that influences DOM/SVG layout and rendering inputs, which are subsequently measured by native Chromium via `DOMRect`, `DOMRectList`, `Element.getBoundingClientRect()`, `Element.getClientRects()`, `Range.getBoundingClientRect()`, `Range.getClientRects()`, and SVG layout/geometry APIs.
 - [Guard flag](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - Defines guard lifecycle.
 
 
@@ -187,6 +188,7 @@ Defines the contract-driven patching engine through `Core.applyTargets`. Downstr
 - [screen.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/screen.js) - `screen` and `visualViewport` surface patching.
 - [audiocontext.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/audiocontext.js) - AudioContext-aligned seeded/media surface adjustments.
 - [font_module.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/font_module.js) - consumes generated font configs, registers `@font-face`, and injects CSS/font-loading glue.
+- [rects.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/rects.js) is a window-realm module that influences DOM/SVG layout and rendering inputs, which are subsequently measured by native Chromium via and `Rect`/SVG layout/geometry APIs.
 - [RTCPeerConnection.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/RTCPeerConnection.js) - ICE-server normalization and non-relay/network-shaping logic.
 - [nav_total_set.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/navigator/nav_total_set.js), [override_ua_data.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/navigator/override_ua_data.js) - navigator, UA-CH, language, and client-hint surface alignment on the window side.
 - [hide_webdriver.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/stealth/hide_webdriver.js) - webdriver masking and related native-surface hardening.

@@ -40,6 +40,7 @@ Python (Selenium + undetected_chromedriver) + инъекция JavaScript-пат
 - [WebGL critical paths](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/9._WEBGL-CRITICAL.md) - описывает WebGL values, hooks и diagnostic routes.
 - [Headers pipeline](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/12._HEADERS_CONTRACT.md) - координирует browser preferences, CDP, JavaScript и опциональный mitmproxy headers path.
 - [Fonts compound](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/14._FONTS_CONTRACT.md) - описывает generated font assets, runtime loading, Canvas interaction и deterministic behavior.
+- [RectsPatchModule](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/16._RectsPatchModule.md) является window-realm модулем влияния на DOM/SVG layout и rendering inputs, которые затем измеряются нативным Chromium через `DOMRect`, `DOMRectList`, `Element.getBoundingClientRect()`, `Element.getClientRects()`, `Range.getBoundingClientRect()`, `Range.getClientRects()` и SVG layout/geometry APIs.
 - [Guard flag](https://github.com/zugdurchfahrt/seed-noise-consistency-contracts/blob/main/5._GuardFlagSEED.md) - определяет guard lifecycle.
 
 
@@ -191,6 +192,7 @@ client.post()
 - [screen.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/screen.js) - patching для `screen` и `visualViewport` surfaces.
 - [audiocontext.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/audiocontext.js) - AudioContext-aligned seeded/media surface adjustments.
 - [font_module.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/font_module.js) - потребляет generated font configs, регистрирует `@font-face` и инжектит CSS/font-loading glue.
+- [rects.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/graphics/rects.js) — это window-realm модуль, влияющий на параметры компоновки и отрисовки DOM/SVG, которые впоследствии измеряются нативным кодом Chromium с помощью API для работы с `Rect` и геометрией/компоновкой SVG.
 - [RTCPeerConnection.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/media/RTCPeerConnection.js) - ICE-server normalization и non-relay/network-shaping logic.
 - [nav_total_set.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/navigator/nav_total_set.js), [override_ua_data.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/navigator/override_ua_data.js) - window-side alignment для navigator, UA-CH, language и client-hint surfaces.
 - [hide_webdriver.js](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/assets/scripts/window/patches/stealth/hide_webdriver.js) - webdriver masking и related native-surface hardening.
