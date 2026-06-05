@@ -469,17 +469,6 @@ const rectsConfig = __ensureHiddenObjectSlot__(
   '[module] FernwehContext.state.__RECTS__.__CONFIG__ bootstrap failed',
   () => Object.create(null)
 );
-__defineHiddenValue__(
-  rectsConfig,
-  'layoutTargets',
-  (rectsConfig.layoutTargets && typeof rectsConfig.layoutTargets === 'object') ? rectsConfig.layoutTargets : null
-);
-__defineHiddenValue__(
-  rectsConfig,
-  'layoutInfluenceSeedLabels',
-  (rectsConfig.layoutInfluenceSeedLabels && typeof rectsConfig.layoutInfluenceSeedLabels === 'object') ? rectsConfig.layoutInfluenceSeedLabels : null
-);
-
 // FernwehContext runtime helpers and patch state.
 const patchStateRoot = __ensureHiddenObjectSlot__(
   C,
