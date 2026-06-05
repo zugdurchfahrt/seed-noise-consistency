@@ -279,7 +279,6 @@ Run [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borde
 
 ## Issues/TODO
 
-- Integrate `getClientRects` / `getBoundingClientRect` proxying.
 - Implement TLS fingerprint rotation via OpenSSL.
 - Treat `success/ready` events from places that only record hook installation only as `applied`: the mechanism is installed, but the result is not yet proven.
 - For the font module, emit `success` only if the state is observable after the current chain through the `DOM/CSS/font-measurement surface`, not only through internal structures; otherwise mark `applied_but_not_effective` or emit no `success`.

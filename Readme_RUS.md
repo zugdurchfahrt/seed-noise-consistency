@@ -283,7 +283,6 @@ pip install -r requirements.txt
 
 ## Issues/TODO
 
-- Интегрировать proxying для `getClientRects` / `getBoundingClientRect`.
 - Реализовать ротацию TLS fingerprint через OpenSSL.
 - События `success/ready` из мест, где фиксируется только факт установки hooks, считать только `applied`: механизм установлен, но результат ещё не доказан.
 - Для font module эмитить `success` только если состояние наблюдаемо после текущей цепочки через `DOM/CSS/font-measurement surface`, а не только через внутренние структуры; иначе помечать `applied_but_not_effective` или не эмитить `success`.

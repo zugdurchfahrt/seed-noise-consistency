@@ -1,0 +1,451 @@
+const RectsPatchModule = function RectsPatchModule(window) {
+  const __MODULE = 'rects';
+  const __SURFACE = 'DOM/SVG layout influence for native rect measurements';
+  const __FLAG_KEY = '__PATCH_RECTS__';
+  const __TYPE_PIPELINE = 'pipeline missing data';
+  const C = window && window.FernwehContext;
+  const Core = window && window.Core;
+  const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
+  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+
+  function __emit(level, code, extra, err) {
+    try {
+      const x = (extra && typeof extra === 'object') ? extra : {};
+      const ctx = {
+        module: __MODULE,
+        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
+        surface: __SURFACE,
+        key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
+        stage: x.stage,
+        message: x.message,
+        type: x.type,
+        data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null
+      };
+      if (__diag) return __diag(level, code, ctx, err === undefined ? null : err);
+      if (typeof __D === 'function') {
+        return __D(code, err === undefined ? null : err, Object.assign({}, ctx, { level }));
+      }
+    } catch (emitErr) {
+      return undefined;
+    }
+    return undefined;
+  }
+
+  let __guardToken = null;
+  function __releaseGuard(rollbackOk) {
+    try {
+      if (Core && typeof Core.releaseGuardFlag === 'function') {
+        return Core.releaseGuardFlag(__FLAG_KEY, __guardToken, rollbackOk === true, __MODULE);
+      }
+    } catch (e) {
+      __emit('error', 'rects:guard_release_failed', {
+        key: 'guard',
+        stage: 'rollback',
+        message: 'releaseGuardFlag threw',
+        type: __TYPE_PIPELINE,
+        data: { outcome: 'throw', reason: 'guard_release_failed', rollbackOk: false }
+      }, e);
+      throw e;
+    }
+    return false;
+  }
+
+  function __fatal(code, key, message, err) {
+    const e = err || new Error('[RectsPatchModule] ' + message);
+    __emit('fatal', code, {
+      key,
+      stage: 'preflight',
+      message,
+      type: __TYPE_PIPELINE,
+      data: { outcome: 'throw', reason: code }
+    }, e);
+    __releaseGuard(true);
+    throw e;
+  }
+
+  if (!Core || typeof Core.guardFlag !== 'function') {
+    const e = new Error('[RectsPatchModule] Core.guardFlag missing');
+    __emit('fatal', 'rects:guard_missing', {
+      key: 'guard',
+      stage: 'guard',
+      message: 'Core.guardFlag missing',
+      type: __TYPE_PIPELINE,
+      data: { outcome: 'throw', reason: 'missing_dep_core_guard' }
+    }, e);
+    throw e;
+  }
+
+  try {
+    __guardToken = Core.guardFlag(__FLAG_KEY, __MODULE);
+  } catch (e) {
+    __emit('fatal', 'rects:guard_failed', {
+      key: 'guard',
+      stage: 'guard',
+      message: 'guardFlag threw',
+      type: __TYPE_PIPELINE,
+      data: { outcome: 'throw', reason: 'guard_failed' }
+    }, e);
+    throw e;
+  }
+  if (!__guardToken) return 0;
+
+  if (!C || !C.state || typeof C.state !== 'object') {
+    __fatal('rects:fernweh_context_state_missing', 'FernwehContext.state', 'FernwehContext.state missing');
+  }
+  if (!window || !window.document || typeof window.document !== 'object') {
+    __fatal('rects:document_missing', 'document', 'document missing');
+  }
+
+  const __screenState = (C.state.__SCREEN__ && typeof C.state.__SCREEN__ === 'object')
+    ? C.state.__SCREEN__
+    : null;
+  if (!__screenState) {
+    __fatal('rects:screen_state_missing', 'FernwehContext.state.__SCREEN__', 'screen state missing');
+  }
+  const __screenWidth = Number(__screenState.width);
+  const __screenHeight = Number(__screenState.height);
+  const __screenDpr = Number(__screenState.dpr);
+  if (!Number.isFinite(__screenWidth) || __screenWidth <= 0 ||
+      !Number.isFinite(__screenHeight) || __screenHeight <= 0 ||
+      !Number.isFinite(__screenDpr) || __screenDpr <= 0) {
+    __fatal('rects:screen_metrics_invalid', 'FernwehContext.state.__SCREEN__.width/height/dpr', 'screen metrics invalid');
+  }
+
+  const __prngRoot = (Core && Core.__internal && Core.__internal.prng && typeof Core.__internal.prng === 'object')
+    ? Core.__internal.prng
+    : null;
+  if (!__prngRoot || typeof __prngRoot.seed !== 'string' || !__prngRoot.seed ||
+      typeof __prngRoot.strToSeed !== 'function' || typeof __prngRoot.mulberry32 !== 'function') {
+    __fatal('rects:prng_missing', 'Core.__internal.prng', 'Core PRNG state missing');
+  }
+
+  const __stateRoot = C.state;
+  const __fontsRoot = (__stateRoot.__FONTS__ && typeof __stateRoot.__FONTS__ === 'object')
+    ? __stateRoot.__FONTS__
+    : null;
+  const __fontsConfig = (__fontsRoot && __fontsRoot.__CONFIG__ && typeof __fontsRoot.__CONFIG__ === 'object')
+    ? __fontsRoot.__CONFIG__
+    : null;
+  const __fontConfigs = (__fontsConfig && Array.isArray(__fontsConfig.configs))
+    ? __fontsConfig.configs
+    : null;
+  if (!__fontConfigs) {
+    __fatal('rects:fonts_config_missing', 'FernwehContext.state.__FONTS__.__CONFIG__.configs', 'fonts config missing');
+  }
+
+  const __envProfileState = (__stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
+    ? __stateRoot.__ENV_PROFILE__
+    : null;
+  const __envPlatformState = (__envProfileState && __envProfileState.__PLATFORM__ && typeof __envProfileState.__PLATFORM__ === 'object')
+    ? __envProfileState.__PLATFORM__
+    : null;
+  const __domPlatform = (__envPlatformState && typeof __envPlatformState.domPlatform === 'string' && __envPlatformState.domPlatform)
+    ? __envPlatformState.domPlatform
+    : null;
+
+  function __unit(label) {
+    const seed = __prngRoot.strToSeed('rects-layout|' + String(label) + '|' + __prngRoot.seed) >>> 0;
+    const rng = __prngRoot.mulberry32(seed);
+    if (typeof rng !== 'function') {
+      throw new Error('[RectsPatchModule] Core.__internal.prng.mulberry32 returned non-function');
+    }
+    return rng();
+  }
+
+  function __roundCssPx(value) {
+    return Math.round(Number(value) * 10000) / 10000;
+  }
+
+  function __normalizeFamilyName(family) {
+    return String(family == null ? '' : family)
+      .trim()
+      .replace(/^["']|["']$/g, '');
+  }
+
+  function __quoteCssString(value) {
+    return "'" + String(value)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r/g, '\\d ')
+      .replace(/\n/g, '\\a ')
+      .replace(/\f/g, '\\c ')
+      + "'";
+  }
+
+  function __resolveRectFontFamily() {
+    const hasPlatformDom = __fontConfigs.some(function hasPlatformFontConfig(cfg) {
+      return cfg && typeof cfg.platform_dom === 'string';
+    });
+    const scoped = (__domPlatform && hasPlatformDom)
+      ? __fontConfigs.filter(function filterPlatformFontConfig(cfg) {
+          return cfg && cfg.platform_dom === __domPlatform;
+        })
+      : __fontConfigs.slice();
+    const names = scoped
+      .map(function mapFontConfig(cfg) {
+        return __normalizeFamilyName(cfg && (cfg.cssFamily || cfg.family || cfg.full_name || cfg.postscript_name));
+      })
+      .filter(Boolean);
+    if (!names.length) {
+      __fatal('rects:font_family_missing', 'FernwehContext.state.__FONTS__.__CONFIG__.configs', 'font family list empty');
+    }
+    const index = Math.floor(__unit('font-family') * names.length) % names.length;
+    return names[index];
+  }
+
+  const __layoutTargetAdapter = {
+    rectContainerId: 'rect-container',
+    emojiContainerId: 'emoji-container',
+    pixelEmojiContainerId: 'pixel-emoji-container',
+    svgContainerId: 'svg-container',
+    domRectEmojiClass: 'domrect-emoji',
+    pixelEmojiClass: 'pixel-emoji',
+    svgRectEmojiClass: 'svgrect-emoji',
+    svgTagName: 'svg'
+  };
+  const __layoutInfluenceSeedLabels = {
+    rectWidth: 'rect-container-width',
+    textFontSize: 'rect-font-size',
+    textLetterSpacing: 'rect-letter-spacing'
+  };
+
+  function __buildLayoutInfluence(fontFamily) {
+    const rectWidthDelta = __roundCssPx((1 + Math.floor(__unit(__layoutInfluenceSeedLabels.rectWidth) * 4)) / __screenDpr);
+    const fontSizeDelta = __roundCssPx((1 + Math.floor(__unit(__layoutInfluenceSeedLabels.textFontSize) * 3)) / __screenDpr);
+    const letterDelta = __roundCssPx((Math.floor(__unit(__layoutInfluenceSeedLabels.textLetterSpacing) * 3) - 1) / (__screenDpr * 10));
+    return {
+      fontFamily: __quoteCssString(fontFamily),
+      rectContainerWidth: 'calc(1000.099% + ' + rectWidthDelta + 'px)',
+      textFontSize: 'calc(200px + ' + fontSizeDelta + 'px)',
+      textLetterSpacing: String(letterDelta) + 'px'
+    };
+  }
+
+  const __layoutInfluence = __buildLayoutInfluence(__resolveRectFontFamily());
+  const __layoutStyleRules = {
+    rectContainer: [
+      { key: 'width', value: __layoutInfluence.rectContainerWidth }
+    ],
+    text: [
+      { key: 'font-family', value: __layoutInfluence.fontFamily },
+      { key: 'font-size', value: __layoutInfluence.textFontSize },
+      { key: 'letter-spacing', value: __layoutInfluence.textLetterSpacing }
+    ],
+    svg: [
+      { key: 'overflow', value: 'visible' }
+    ]
+  };
+  const __styleNodeId = '__fernweh_rects_layout_influence__';
+  let __styleAnchorDeferredReported = false;
+  let __targetDiscoveryReported = false;
+
+  function __buildLayoutInfluenceCss(targets, styles) {
+    return [
+      '#' + targets.rectContainerId + '{',
+      'width:' + styles.rectContainer[0].value + '!important;',
+      '}',
+      '#' + targets.emojiContainerId + ' .' + targets.domRectEmojiClass + ',',
+      '#' + targets.svgContainerId + ' .' + targets.svgRectEmojiClass + ',',
+      '#' + targets.pixelEmojiContainerId + ' .' + targets.pixelEmojiClass + '{',
+      'font-family:' + styles.text[0].value + '!important;',
+      'font-size:' + styles.text[1].value + '!important;',
+      'letter-spacing:' + styles.text[2].value + '!important;',
+      '}',
+      '#' + targets.svgContainerId + ' ' + targets.svgTagName + '{',
+      'overflow:' + styles.svg[0].value + '!important;',
+      '}'
+    ].join('');
+  }
+
+  function __installLayoutInfluenceStyle() {
+    const doc = window.document;
+    const anchor = doc.head || doc.documentElement || doc.body;
+    if (typeof doc.createElement !== 'function') {
+      __fatal('rects:create_element_missing', 'document.createElement', 'document.createElement missing');
+    }
+    if (!anchor) {
+      if (!__styleAnchorDeferredReported) {
+        __styleAnchorDeferredReported = true;
+        __emit('warn', 'rects:style_anchor_deferred', {
+          stage: 'apply',
+          key: 'document.head/documentElement/body',
+          message: 'rects style anchor not ready; deferred until document root appears',
+          type: __TYPE_PIPELINE,
+          data: { outcome: 'return', reason: 'style_anchor_deferred' }
+        }, null);
+      }
+      return 0;
+    }
+    let styleNode = (typeof doc.getElementById === 'function') ? doc.getElementById(__styleNodeId) : null;
+    if (!styleNode) {
+      styleNode = doc.createElement('style');
+      styleNode.setAttribute('id', __styleNodeId);
+      styleNode.setAttribute('data-fernweh', 'rects');
+      anchor.appendChild(styleNode);
+    }
+    const cssText = __buildLayoutInfluenceCss(__layoutTargetAdapter, __layoutStyleRules);
+    if (styleNode.textContent !== cssText) {
+      styleNode.textContent = cssText;
+    }
+    return 1;
+  }
+
+  function __applyStyleRules(el, rules) {
+    if (!el || !rules || !rules.length) return 0;
+    let applied = 0;
+    for (let i = 0; i < rules.length; i++) {
+      applied += __setImportantStyle(el, rules[i].key, rules[i].value);
+    }
+    return applied;
+  }
+
+  function __countClassTargets(root, className) {
+    if (!root || typeof root.getElementsByClassName !== 'function') return 0;
+    const nodes = root.getElementsByClassName(className);
+    return nodes ? nodes.length : 0;
+  }
+
+  function __setImportantStyle(el, key, value) {
+    if (!el || !el.style || typeof el.style.setProperty !== 'function') return 0;
+    const current = el.style.getPropertyValue(key);
+    const priority = el.style.getPropertyPriority(key);
+    if (current === value && priority === 'important') return 0;
+    el.style.setProperty(key, value, 'important');
+    return 1;
+  }
+
+  function __applyStyleRulesToClass(root, className, rules) {
+    if (!root || typeof root.getElementsByClassName !== 'function') return 0;
+    const nodes = root.getElementsByClassName(className);
+    let applied = 0;
+    for (let i = 0; nodes && i < nodes.length; i++) {
+      applied += __applyStyleRules(nodes[i], rules);
+    }
+    return applied;
+  }
+
+  function __applyStyleRulesToTag(root, tagName, rules) {
+    if (!root || typeof root.getElementsByTagName !== 'function') return 0;
+    const nodes = root.getElementsByTagName(tagName);
+    let applied = 0;
+    for (let i = 0; nodes && i < nodes.length; i++) {
+      applied += __applyStyleRules(nodes[i], rules);
+    }
+    return applied;
+  }
+
+  function __applyLayoutInfluence(targets, styles) {
+    const doc = window.document;
+    let applied = 0;
+    const rectContainer = (typeof doc.getElementById === 'function') ? doc.getElementById(targets.rectContainerId) : null;
+    if (rectContainer) {
+      applied += __applyStyleRules(rectContainer, styles.rectContainer);
+    }
+    const emojiContainer = (typeof doc.getElementById === 'function') ? doc.getElementById(targets.emojiContainerId) : null;
+    const domRectEmojiCount = __countClassTargets(emojiContainer, targets.domRectEmojiClass);
+    applied += __applyStyleRulesToClass(emojiContainer, targets.domRectEmojiClass, styles.text);
+    const pixelEmojiContainer = (typeof doc.getElementById === 'function') ? doc.getElementById(targets.pixelEmojiContainerId) : null;
+    const pixelEmojiCount = __countClassTargets(pixelEmojiContainer, targets.pixelEmojiClass);
+    applied += __applyStyleRulesToClass(pixelEmojiContainer, targets.pixelEmojiClass, styles.text);
+    const svgContainer = (typeof doc.getElementById === 'function') ? doc.getElementById(targets.svgContainerId) : null;
+    const svgRectEmojiCount = __countClassTargets(svgContainer, targets.svgRectEmojiClass);
+    applied += __applyStyleRulesToClass(svgContainer, targets.svgRectEmojiClass, styles.text);
+    const svgCount = (svgContainer && typeof svgContainer.getElementsByTagName === 'function')
+      ? svgContainer.getElementsByTagName(targets.svgTagName).length
+      : 0;
+    applied += __applyStyleRulesToTag(svgContainer, targets.svgTagName, styles.svg);
+    if (!__targetDiscoveryReported && (rectContainer || domRectEmojiCount || pixelEmojiCount || svgRectEmojiCount || svgCount)) {
+      __targetDiscoveryReported = true;
+      __emit('info', 'rects:layout_targets_discovered', {
+        stage: 'runtime',
+        key: 'document rect layout targets',
+        message: 'rects layout targets discovered',
+        type: 'ok',
+        data: {
+          outcome: 'return',
+          rectContainer: !!rectContainer,
+          emojiContainer: !!emojiContainer,
+          pixelEmojiContainer: !!pixelEmojiContainer,
+          svgContainer: !!svgContainer,
+          domRectEmojiCount,
+          pixelEmojiCount,
+          svgRectEmojiCount,
+          svgCount,
+          applied
+        }
+      }, null);
+    }
+    return applied;
+  }
+
+  function __applyLayoutInfluenceToTargets() {
+    return __applyLayoutInfluence(__layoutTargetAdapter, __layoutStyleRules);
+  }
+
+  function __installLayoutObserver() {
+    const doc = window.document;
+    if (typeof window.MutationObserver !== 'function') {
+      __fatal('rects:mutation_observer_missing', 'MutationObserver', 'MutationObserver missing');
+    }
+    let appliedTotal = __applyLayoutInfluenceToTargets();
+    const observer = new window.MutationObserver(function rectsLayoutMutationObserver() {
+      try {
+        __installLayoutInfluenceStyle();
+        appliedTotal += __applyLayoutInfluenceToTargets();
+      } catch (e) {
+        __emit('error', 'rects:layout_influence_apply_failed', {
+          stage: 'runtime',
+          key: 'MutationObserver',
+          message: 'rects target layout influence apply failed',
+          type: __TYPE_PIPELINE,
+          data: { outcome: 'throw', reason: 'layout_influence_apply_failed' }
+        }, e);
+        throw e;
+      }
+    });
+    const observeTarget = doc.documentElement || doc;
+    observer.observe(observeTarget, { childList: true, subtree: true });
+    try {
+      if (typeof window.queueMicrotask === 'function') {
+        window.queueMicrotask(function rectsLayoutInfluenceMicrotask() {
+          __installLayoutInfluenceStyle();
+          __applyLayoutInfluenceToTargets();
+        });
+      }
+      if (typeof window.setTimeout === 'function') {
+        window.setTimeout(function rectsLayoutInfluenceTimeout() {
+          __installLayoutInfluenceStyle();
+          __applyLayoutInfluenceToTargets();
+        }, 0);
+      }
+    } catch (e) {
+      __emit('error', 'rects:layout_influence_schedule_failed', {
+        stage: 'apply',
+        key: 'MutationObserver',
+        message: 'rects target scan scheduling failed',
+        type: __TYPE_PIPELINE,
+        data: { outcome: 'throw', reason: 'layout_influence_schedule_failed' }
+      }, e);
+      throw e;
+    }
+    return appliedTotal;
+  }
+
+  try {
+    const styleApplied = __installLayoutInfluenceStyle();
+    const applied = __installLayoutObserver();
+    __emit('info', 'rects:layout_influence_applied', {
+      stage: 'apply',
+      key: 'MutationObserver',
+      message: 'rects target observer installed; native rect method surfaces preserved',
+      type: 'ok',
+      data: { outcome: 'return', styleApplied, applied }
+    }, null);
+    __releaseGuard(true);
+    return applied;
+  } catch (e) {
+    __releaseGuard(false);
+    throw e;
+  }
+};

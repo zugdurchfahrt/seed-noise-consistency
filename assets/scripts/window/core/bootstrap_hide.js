@@ -442,6 +442,44 @@ const wrkHooksState = __ensureHiddenObjectSlot__(
   () => Object.create(null)
 );
 
+// FernwehContext.state.__RECTS__
+const rectsRoot = __ensureHiddenObjectSlot__(
+  stateRoot,
+  '__RECTS__',
+  '[module] FernwehContext.state.__RECTS__ bootstrap failed',
+  () => Object.create(null)
+);
+
+const rectsState = __ensureHiddenObjectSlot__(
+  rectsRoot,
+  '__STATE__',
+  '[module] FernwehContext.state.__RECTS__.__STATE__ bootstrap failed',
+  () => Object.create(null)
+);
+__defineHiddenValue__(rectsState, 'ready', rectsState.ready === true);
+__defineHiddenValue__(rectsState, 'status', (typeof rectsState.status === 'string' && rectsState.status) ? rectsState.status : 'bootstrap');
+__defineHiddenValue__(rectsState, 'reason', (typeof rectsState.reason === 'string' || rectsState.reason === null) ? rectsState.reason : null);
+__defineHiddenValue__(rectsState, 'error', Object.prototype.hasOwnProperty.call(rectsState, 'error') ? rectsState.error : null);
+__defineHiddenValue__(rectsState, 'applied', Number.isFinite(Number(rectsState.applied)) ? Number(rectsState.applied) : 0);
+__defineHiddenValue__(rectsState, 'targets', Number.isFinite(Number(rectsState.targets)) ? Number(rectsState.targets) : 0);
+
+const rectsConfig = __ensureHiddenObjectSlot__(
+  rectsRoot,
+  '__CONFIG__',
+  '[module] FernwehContext.state.__RECTS__.__CONFIG__ bootstrap failed',
+  () => Object.create(null)
+);
+__defineHiddenValue__(
+  rectsConfig,
+  'layoutTargets',
+  (rectsConfig.layoutTargets && typeof rectsConfig.layoutTargets === 'object') ? rectsConfig.layoutTargets : null
+);
+__defineHiddenValue__(
+  rectsConfig,
+  'layoutInfluenceSeedLabels',
+  (rectsConfig.layoutInfluenceSeedLabels && typeof rectsConfig.layoutInfluenceSeedLabels === 'object') ? rectsConfig.layoutInfluenceSeedLabels : null
+);
+
 // FernwehContext runtime helpers and patch state.
 const patchStateRoot = __ensureHiddenObjectSlot__(
   C,

@@ -1170,6 +1170,7 @@ def init_driver(
             Path(SCRIPTS_CORE / "prng_seed.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_NAV / "nav_total_set.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_GRAPHICS / "screen.js").read_text("utf-8"),
+            Path(SCRIPTS_PATCHES_GRAPHICS / "rects.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_MEDIA / "font_module.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_GRAPHICS / "canvas.js").read_text("utf-8"),
             Path(SCRIPTS_PATCHES_GRAPHICS / "WEBGL_DICKts.js").read_text("utf-8"),
@@ -1225,6 +1226,7 @@ def init_driver(
             RtcpeerconnectionPatchModule(window);
             NavTotalSetPatchModule(window);
             ScreenPatchModule(window);
+            RectsPatchModule(window);
             FontPatchModule(window);
             CanvasPatchModule(window);
             WEBglDICKts(window);
@@ -1986,7 +1988,7 @@ def main():
         session_window_policy = BrowserSessionPolicy(driver)
 
         # ----------------------- YOUR DESTINATION POINT, PLEASE MIND THE GAP -----------------------
-        session_window_policy.navigate("https://browserleaks.com/ip")
+        session_window_policy.navigate("https://abrahamjuliot.github.io/creepjs/")
 
         # Keep main thread alive; otherwise daemon CDP threads die on process exit.
         def _hold_until_driver_end():
