@@ -207,21 +207,16 @@ const RectsPatchModule = function RectsPatchModule(window) {
     __fatal('rects:state_missing', 'FernwehContext.state.__RECTS__', 'rects state missing');
   }
 
-  const __measurementFixtureBinding = {
-    htmlLayoutGeometryRootId: 'rect-container',
-    textGlyphMetricsRootId: 'emoji-container',
-    pixelGlyphRenderingRootId: 'pixel-emoji-container',
-    svgLayoutGeometryRootId: 'svg-container',
-    textGlyphMetricsClass: 'domrect-emoji',
-    pixelGlyphRenderingClass: 'pixel-emoji',
-    svgTextGlyphMetricsClass: 'svgrect-emoji',
-    svgLayoutGeometryTagName: 'svg'
-  };
+  const __measurementScanLimit = Math.floor(Number(__rectsConfig.maxMeasurementScan));
+  if (!Number.isFinite(__measurementScanLimit) || __measurementScanLimit <= 0) {
+    __fatal('rects:measurement_scan_limit_invalid', 'FernwehContext.state.__RECTS__.__CONFIG__.maxMeasurementScan', 'measurement scan limit invalid');
+  }
   const __measurementSeedKeys = {
-    htmlLayoutGeometryWidth: 'rect-container-width',
-    textGlyphMetricsFontSize: 'rect-font-size',
-    textGlyphMetricsLetterSpacing: 'rect-letter-spacing'
+    htmlLayoutGeometryWidth: 'html-layout-geometry-width',
+    textGlyphMetricsFontSize: 'text-glyph-metrics-font-size',
+    textGlyphMetricsLetterSpacing: 'text-glyph-metrics-letter-spacing'
   };
+  const __glyphTextPattern = /[\u00A9\u00AE\u203C-\u3299]|[\uD83C-\uDBFF][\uDC00-\uDFFF]/;
 
   function __buildLayoutInfluence(fontFamily) {
     const htmlLayoutWidthDelta = __roundCssPx((1 + Math.floor(__unit(__measurementSeedKeys.htmlLayoutGeometryWidth) * 4)) / __screenDpr);
@@ -249,60 +244,8 @@ const RectsPatchModule = function RectsPatchModule(window) {
       { key: 'overflow', value: 'visible' }
     ]
   };
-  const __styleNodeId = '__fernweh_rects_layout_influence__';
-  let __styleAnchorDeferredReported = false;
   let __measurementFixtureDiscoveryReported = false;
-
-  function __buildLayoutInfluenceCss(binding, styles) {
-    let css = '';
-    css += '#' + binding.htmlLayoutGeometryRootId + '{';
-    css += 'width:' + styles.htmlLayoutGeometry[0].value + ';';
-    css += '}';
-    css += '#' + binding.textGlyphMetricsRootId + ' .' + binding.textGlyphMetricsClass + ',';
-    css += '#' + binding.svgLayoutGeometryRootId + ' .' + binding.svgTextGlyphMetricsClass + ',';
-    css += '#' + binding.pixelGlyphRenderingRootId + ' .' + binding.pixelGlyphRenderingClass + '{';
-    css += 'font-family:' + styles.textGlyphMetrics[0].value + ';';
-    css += 'font-size:' + styles.textGlyphMetrics[1].value + ';';
-    css += 'letter-spacing:' + styles.textGlyphMetrics[2].value + ';';
-    css += '}';
-    css += '#' + binding.svgLayoutGeometryRootId + ' ' + binding.svgLayoutGeometryTagName + '{';
-    css += 'overflow:' + styles.svgLayoutGeometry[0].value + ';';
-    css += '}';
-    return css;
-  }
-
-  function __installLayoutInfluenceStyle() {
-    const doc = window.document;
-    const anchor = doc.head || doc.documentElement || doc.body;
-    if (typeof doc.createElement !== 'function') {
-      __fatal('rects:create_element_missing', 'document.createElement', 'document.createElement missing');
-    }
-    if (!anchor) {
-      if (!__styleAnchorDeferredReported) {
-        __styleAnchorDeferredReported = true;
-        __emit('warn', 'rects:style_anchor_deferred', {
-          stage: 'apply',
-          key: 'document.head/documentElement/body',
-          message: 'rects style anchor not ready; deferred until document root appears',
-          type: __TYPE_PIPELINE,
-          data: { outcome: 'return', reason: 'style_anchor_deferred' }
-        }, null);
-      }
-      return 0;
-    }
-    let styleNode = (typeof doc.getElementById === 'function') ? doc.getElementById(__styleNodeId) : null;
-    if (!styleNode) {
-      styleNode = doc.createElement('style');
-      styleNode.setAttribute('id', __styleNodeId);
-      styleNode.setAttribute('data-fernweh', 'rects');
-      anchor.appendChild(styleNode);
-    }
-    const cssText = __buildLayoutInfluenceCss(__measurementFixtureBinding, __layoutStyleRules);
-    if (styleNode.textContent !== cssText) {
-      styleNode.textContent = cssText;
-    }
-    return 1;
-  }
+  let __visibleRectReadFailureReported = false;
 
   function __applyStyleRules(el, rules) {
     if (!el || !rules || !rules.length) return 0;
@@ -311,12 +254,6 @@ const RectsPatchModule = function RectsPatchModule(window) {
       applied += __setStyleValue(el, rules[i].key, rules[i].value);
     }
     return applied;
-  }
-
-  function __countClassTargets(root, className) {
-    if (!root || typeof root.getElementsByClassName !== 'function') return 0;
-    const nodes = root.getElementsByClassName(className);
-    return nodes ? nodes.length : 0;
   }
 
   function __setStyleValue(el, key, value) {
@@ -328,52 +265,127 @@ const RectsPatchModule = function RectsPatchModule(window) {
     return 1;
   }
 
-  function __applyStyleRulesToClass(root, className, rules) {
-    if (!root || typeof root.getElementsByClassName !== 'function') return 0;
-    const nodes = root.getElementsByClassName(className);
+  function __applyStyleRulesToElements(nodes, rules) {
     let applied = 0;
-    for (let i = 0; nodes && i < nodes.length; i++) {
+    for (let i = 0; Array.isArray(nodes) && i < nodes.length; i++) {
       applied += __applyStyleRules(nodes[i], rules);
     }
     return applied;
   }
 
-  function __applyStyleRulesToTag(root, tagName, rules) {
-    if (!root || typeof root.getElementsByTagName !== 'function') return 0;
-    const nodes = root.getElementsByTagName(tagName);
-    let applied = 0;
-    for (let i = 0; nodes && i < nodes.length; i++) {
-      applied += __applyStyleRules(nodes[i], rules);
-    }
-    return applied;
+  function __pushUnique(list, value) {
+    if (!value || !Array.isArray(list) || list.indexOf(value) !== -1) return 0;
+    list.push(value);
+    return 1;
   }
 
-  function __applyLayoutInfluence(binding, styles) {
+  function __hasVisibleLayoutRect(el) {
+    if (!el || typeof el.getClientRects !== 'function') return false;
+    try {
+      const rects = el.getClientRects();
+      for (let i = 0; rects && i < rects.length; i++) {
+        const rect = rects[i];
+        if (rect && Number(rect.width) > 0 && Number(rect.height) > 0) return true;
+      }
+    } catch (e) {
+      if (!__visibleRectReadFailureReported) {
+        __visibleRectReadFailureReported = true;
+        __emit('warn', 'rects:measurement_candidate_rect_read_failed', {
+          stage: 'runtime',
+          key: 'Element.getClientRects',
+          message: 'measurement candidate visible rect read failed',
+          type: __TYPE_PIPELINE,
+          data: { outcome: 'return', reason: 'candidate_rect_read_failed' }
+        }, e);
+      }
+      return false;
+    }
+    return false;
+  }
+
+  function __hasGlyphText(el) {
+    if (!el || typeof el.textContent !== 'string' || !el.textContent) return false;
+    return __glyphTextPattern.test(el.textContent);
+  }
+
+  function __isDeepestGlyphElement(el) {
+    if (!__hasGlyphText(el)) return false;
+    const children = el.children;
+    for (let i = 0; children && i < children.length; i++) {
+      if (__hasGlyphText(children[i])) return false;
+    }
+    return true;
+  }
+
+  function __nearestLayoutContainer(el) {
+    if (!el) return null;
+    let parent = el.parentElement || null;
+    for (let depth = 0; parent && depth < 4; depth++) {
+      if (__hasVisibleLayoutRect(parent)) return parent;
+      parent = parent.parentElement || null;
+    }
+    const offsetParent = el.offsetParent || null;
+    if (offsetParent && __hasVisibleLayoutRect(offsetParent)) return offsetParent;
+    return (el.parentElement && __hasVisibleLayoutRect(el.parentElement)) ? el.parentElement : null;
+  }
+
+  function __collectMeasurementFixtureCandidates() {
     const doc = window.document;
-    let applied = 0;
-    const htmlLayoutGeometryRoot = (typeof doc.getElementById === 'function') ? doc.getElementById(binding.htmlLayoutGeometryRootId) : null;
-    if (htmlLayoutGeometryRoot) {
-      applied += __applyStyleRules(htmlLayoutGeometryRoot, styles.htmlLayoutGeometry);
+    if (!doc || typeof doc.getElementsByTagName !== 'function') {
+      __fatal('rects:get_elements_by_tag_name_missing', 'document.getElementsByTagName', 'document.getElementsByTagName missing');
     }
-    const textGlyphMetricsRoot = (typeof doc.getElementById === 'function') ? doc.getElementById(binding.textGlyphMetricsRootId) : null;
-    const textGlyphMetricsCount = __countClassTargets(textGlyphMetricsRoot, binding.textGlyphMetricsClass);
-    applied += __applyStyleRulesToClass(textGlyphMetricsRoot, binding.textGlyphMetricsClass, styles.textGlyphMetrics);
-    const pixelGlyphRenderingRoot = (typeof doc.getElementById === 'function') ? doc.getElementById(binding.pixelGlyphRenderingRootId) : null;
-    const pixelGlyphRenderingCount = __countClassTargets(pixelGlyphRenderingRoot, binding.pixelGlyphRenderingClass);
-    applied += __applyStyleRulesToClass(pixelGlyphRenderingRoot, binding.pixelGlyphRenderingClass, styles.textGlyphMetrics);
-    const svgLayoutGeometryRoot = (typeof doc.getElementById === 'function') ? doc.getElementById(binding.svgLayoutGeometryRootId) : null;
-    const svgTextGlyphMetricsCount = __countClassTargets(svgLayoutGeometryRoot, binding.svgTextGlyphMetricsClass);
-    applied += __applyStyleRulesToClass(svgLayoutGeometryRoot, binding.svgTextGlyphMetricsClass, styles.textGlyphMetrics);
-    const svgLayoutGeometryCount = (svgLayoutGeometryRoot && typeof svgLayoutGeometryRoot.getElementsByTagName === 'function')
-      ? svgLayoutGeometryRoot.getElementsByTagName(binding.svgLayoutGeometryTagName).length
-      : 0;
-    applied += __applyStyleRulesToTag(svgLayoutGeometryRoot, binding.svgLayoutGeometryTagName, styles.svgLayoutGeometry);
-    const measurementTargetCount = (htmlLayoutGeometryRoot ? 1 : 0) + textGlyphMetricsCount + pixelGlyphRenderingCount + svgTextGlyphMetricsCount + svgLayoutGeometryCount;
+    const candidates = {
+      htmlLayoutGeometry: [],
+      textGlyphMetrics: [],
+      pixelGlyphRendering: [],
+      svgLayoutGeometry: [],
+      scanned: 0,
+      svgScanned: 0,
+      elementScanned: 0
+    };
+    const svgNodes = doc.getElementsByTagName('svg');
+    for (let i = 0; svgNodes && i < svgNodes.length; i++) {
+      candidates.scanned++;
+      candidates.svgScanned++;
+      const svgNode = svgNodes[i];
+      if (__hasVisibleLayoutRect(svgNode)) {
+        __pushUnique(candidates.svgLayoutGeometry, svgNode);
+        __pushUnique(candidates.htmlLayoutGeometry, __nearestLayoutContainer(svgNode));
+      }
+    }
+    const elements = doc.getElementsByTagName('*');
+    for (let i = 0; elements && i < elements.length && candidates.elementScanned < __measurementScanLimit; i++) {
+      candidates.scanned++;
+      candidates.elementScanned++;
+      const el = elements[i];
+      if (!__isDeepestGlyphElement(el) || !__hasVisibleLayoutRect(el)) continue;
+      __pushUnique(candidates.textGlyphMetrics, el);
+      __pushUnique(candidates.pixelGlyphRendering, el);
+      __pushUnique(candidates.htmlLayoutGeometry, __nearestLayoutContainer(el));
+    }
+    return candidates;
+  }
+
+  function __applyLayoutInfluence(styles) {
+    const candidates = __collectMeasurementFixtureCandidates();
+    let applied = 0;
+    applied += __applyStyleRulesToElements(candidates.htmlLayoutGeometry, styles.htmlLayoutGeometry);
+    applied += __applyStyleRulesToElements(candidates.textGlyphMetrics, styles.textGlyphMetrics);
+    applied += __applyStyleRulesToElements(candidates.pixelGlyphRendering, styles.textGlyphMetrics);
+    applied += __applyStyleRulesToElements(candidates.svgLayoutGeometry, styles.svgLayoutGeometry);
+    const channels = ['htmlLayoutGeometry', 'textGlyphMetrics', 'pixelGlyphRendering', 'svgLayoutGeometry'];
+    const channelCounts = {
+      htmlLayoutGeometry: candidates.htmlLayoutGeometry.length,
+      textGlyphMetrics: candidates.textGlyphMetrics.length,
+      pixelGlyphRendering: candidates.pixelGlyphRendering.length,
+      svgLayoutGeometry: candidates.svgLayoutGeometry.length
+    };
+    const measurementTargetCount = channelCounts.htmlLayoutGeometry + channelCounts.textGlyphMetrics + channelCounts.pixelGlyphRendering + channelCounts.svgLayoutGeometry;
     __rectsState.targets = measurementTargetCount;
     if (applied) {
       __rectsState.applied = Number(__rectsState.applied || 0) + applied;
     }
-    if (!__measurementFixtureDiscoveryReported && (htmlLayoutGeometryRoot || textGlyphMetricsCount || pixelGlyphRenderingCount || svgTextGlyphMetricsCount || svgLayoutGeometryCount)) {
+    if (!__measurementFixtureDiscoveryReported && measurementTargetCount > 0) {
       __measurementFixtureDiscoveryReported = true;
       __emit('info', 'rects:measurement_fixtures_discovered', {
         stage: 'runtime',
@@ -382,14 +394,11 @@ const RectsPatchModule = function RectsPatchModule(window) {
         type: 'ok',
         data: {
           outcome: 'return',
-          htmlLayoutGeometryRoot: !!htmlLayoutGeometryRoot,
-          textGlyphMetricsRoot: !!textGlyphMetricsRoot,
-          pixelGlyphRenderingRoot: !!pixelGlyphRenderingRoot,
-          svgLayoutGeometryRoot: !!svgLayoutGeometryRoot,
-          textGlyphMetricsCount,
-          pixelGlyphRenderingCount,
-          svgTextGlyphMetricsCount,
-          svgLayoutGeometryCount,
+          candidates: channelCounts,
+          channels,
+          scanned: candidates.scanned,
+          svgScanned: candidates.svgScanned,
+          elementScanned: candidates.elementScanned,
           measurementTargetCount,
           applied
         }
@@ -398,8 +407,8 @@ const RectsPatchModule = function RectsPatchModule(window) {
     return applied;
   }
 
-  function __applyLayoutInfluenceToTargets() {
-    return __applyLayoutInfluence(__measurementFixtureBinding, __layoutStyleRules);
+  function __applyLayoutInfluenceToCandidates() {
+    return __applyLayoutInfluence(__layoutStyleRules);
   }
 
   function __installLayoutObserver() {
@@ -407,16 +416,15 @@ const RectsPatchModule = function RectsPatchModule(window) {
     if (typeof window.MutationObserver !== 'function') {
       __fatal('rects:mutation_observer_missing', 'MutationObserver', 'MutationObserver missing');
     }
-    let appliedTotal = __applyLayoutInfluenceToTargets();
+    let appliedTotal = __applyLayoutInfluenceToCandidates();
     const observer = new window.MutationObserver(function rectsLayoutMutationObserver() {
       try {
-        __installLayoutInfluenceStyle();
-        appliedTotal += __applyLayoutInfluenceToTargets();
+        appliedTotal += __applyLayoutInfluenceToCandidates();
       } catch (e) {
         __emit('error', 'rects:layout_influence_apply_failed', {
           stage: 'runtime',
           key: 'MutationObserver',
-          message: 'rects target layout influence apply failed',
+          message: 'rects measurement fixture layout influence apply failed',
           type: __TYPE_PIPELINE,
           data: { outcome: 'throw', reason: 'layout_influence_apply_failed' }
         }, e);
@@ -428,21 +436,19 @@ const RectsPatchModule = function RectsPatchModule(window) {
     try {
       if (typeof window.queueMicrotask === 'function') {
         window.queueMicrotask(function rectsLayoutInfluenceMicrotask() {
-          __installLayoutInfluenceStyle();
-          __applyLayoutInfluenceToTargets();
+          __applyLayoutInfluenceToCandidates();
         });
       }
       if (typeof window.setTimeout === 'function') {
         window.setTimeout(function rectsLayoutInfluenceTimeout() {
-          __installLayoutInfluenceStyle();
-          __applyLayoutInfluenceToTargets();
+          __applyLayoutInfluenceToCandidates();
         }, 0);
       }
     } catch (e) {
       __emit('error', 'rects:layout_influence_schedule_failed', {
         stage: 'apply',
         key: 'MutationObserver',
-        message: 'rects target scan scheduling failed',
+        message: 'rects measurement fixture scan scheduling failed',
         type: __TYPE_PIPELINE,
         data: { outcome: 'throw', reason: 'layout_influence_schedule_failed' }
       }, e);
@@ -456,11 +462,9 @@ const RectsPatchModule = function RectsPatchModule(window) {
     __rectsState.status = 'applying';
     __rectsState.reason = 'layout_influence';
     __rectsState.error = null;
-    const styleApplied = __installLayoutInfluenceStyle();
     const applied = __installLayoutObserver();
     __rectsState.ready = true;
     __rectsState.status = 'ready';
-    __rectsState.reason = 'layout_influence';
     if (!__rectsState.applied) {
       __rectsState.applied = applied;
     }
@@ -468,9 +472,9 @@ const RectsPatchModule = function RectsPatchModule(window) {
     __emit('info', 'rects:layout_influence_applied', {
       stage: 'apply',
       key: 'MutationObserver',
-      message: 'rects target observer installed; native rect method surfaces preserved',
+      message: 'rects measurement fixture observer installed; native rect method surfaces preserved',
       type: 'ok',
-      data: { outcome: 'return', styleApplied, applied }
+      data: { outcome: 'return', applied }
     }, null);
     __releaseGuard(true);
     return applied;

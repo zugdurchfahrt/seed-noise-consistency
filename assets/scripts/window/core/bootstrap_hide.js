@@ -469,6 +469,12 @@ const rectsConfig = __ensureHiddenObjectSlot__(
   '[module] FernwehContext.state.__RECTS__.__CONFIG__ bootstrap failed',
   () => Object.create(null)
 );
+const rectsMaxMeasurementScan = Number(rectsConfig.maxMeasurementScan);
+__defineHiddenValue__(
+  rectsConfig,
+  'maxMeasurementScan',
+  (Number.isFinite(rectsMaxMeasurementScan) && rectsMaxMeasurementScan > 0) ? Math.floor(rectsMaxMeasurementScan) : 2048
+);
 // FernwehContext runtime helpers and patch state.
 const patchStateRoot = __ensureHiddenObjectSlot__(
   C,
