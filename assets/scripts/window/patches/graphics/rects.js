@@ -194,6 +194,19 @@ const RectsPatchModule = function RectsPatchModule(window) {
     return names[index];
   }
 
+  const __rectsRoot = (__stateRoot.__RECTS__ && typeof __stateRoot.__RECTS__ === 'object')
+    ? __stateRoot.__RECTS__
+    : null;
+  const __rectsState = (__rectsRoot && __rectsRoot.__STATE__ && typeof __rectsRoot.__STATE__ === 'object')
+    ? __rectsRoot.__STATE__
+    : null;
+  const __rectsConfig = (__rectsRoot && __rectsRoot.__CONFIG__ && typeof __rectsRoot.__CONFIG__ === 'object')
+    ? __rectsRoot.__CONFIG__
+    : null;
+  if (!__rectsRoot || !__rectsState || !__rectsConfig) {
+    __fatal('rects:state_missing', 'FernwehContext.state.__RECTS__', 'rects state missing');
+  }
+
   const __layoutTargetAdapter = {
     rectContainerId: 'rect-container',
     emojiContainerId: 'emoji-container',
@@ -209,6 +222,8 @@ const RectsPatchModule = function RectsPatchModule(window) {
     textFontSize: 'rect-font-size',
     textLetterSpacing: 'rect-letter-spacing'
   };
+  __rectsConfig.layoutTargets = __layoutTargetAdapter;
+  __rectsConfig.layoutInfluenceSeedLabels = __layoutInfluenceSeedLabels;
 
   function __buildLayoutInfluence(fontFamily) {
     const rectWidthDelta = __roundCssPx((1 + Math.floor(__unit(__layoutInfluenceSeedLabels.rectWidth) * 4)) / __screenDpr);
@@ -243,17 +258,17 @@ const RectsPatchModule = function RectsPatchModule(window) {
   function __buildLayoutInfluenceCss(targets, styles) {
     return [
       '#' + targets.rectContainerId + '{',
-      'width:' + styles.rectContainer[0].value + '!important;',
+      'width:' + styles.rectContainer[0].value + ';',
       '}',
       '#' + targets.emojiContainerId + ' .' + targets.domRectEmojiClass + ',',
       '#' + targets.svgContainerId + ' .' + targets.svgRectEmojiClass + ',',
       '#' + targets.pixelEmojiContainerId + ' .' + targets.pixelEmojiClass + '{',
-      'font-family:' + styles.text[0].value + '!important;',
-      'font-size:' + styles.text[1].value + '!important;',
-      'letter-spacing:' + styles.text[2].value + '!important;',
+      'font-family:' + styles.text[0].value + ';',
+      'font-size:' + styles.text[1].value + ';',
+      'letter-spacing:' + styles.text[2].value + ';',
       '}',
       '#' + targets.svgContainerId + ' ' + targets.svgTagName + '{',
-      'overflow:' + styles.svg[0].value + '!important;',
+      'overflow:' + styles.svg[0].value + ';',
       '}'
     ].join('');
   }
@@ -295,7 +310,7 @@ const RectsPatchModule = function RectsPatchModule(window) {
     if (!el || !rules || !rules.length) return 0;
     let applied = 0;
     for (let i = 0; i < rules.length; i++) {
-      applied += __setImportantStyle(el, rules[i].key, rules[i].value);
+      applied += __setStyleValue(el, rules[i].key, rules[i].value);
     }
     return applied;
   }
@@ -306,12 +321,12 @@ const RectsPatchModule = function RectsPatchModule(window) {
     return nodes ? nodes.length : 0;
   }
 
-  function __setImportantStyle(el, key, value) {
+  function __setStyleValue(el, key, value) {
     if (!el || !el.style || typeof el.style.setProperty !== 'function') return 0;
     const current = el.style.getPropertyValue(key);
     const priority = el.style.getPropertyPriority(key);
-    if (current === value && priority === 'important') return 0;
-    el.style.setProperty(key, value, 'important');
+    if (current === value && priority === '') return 0;
+    el.style.setProperty(key, value, '');
     return 1;
   }
 
@@ -355,6 +370,11 @@ const RectsPatchModule = function RectsPatchModule(window) {
       ? svgContainer.getElementsByTagName(targets.svgTagName).length
       : 0;
     applied += __applyStyleRulesToTag(svgContainer, targets.svgTagName, styles.svg);
+    const targetCount = (rectContainer ? 1 : 0) + domRectEmojiCount + pixelEmojiCount + svgRectEmojiCount + svgCount;
+    __rectsState.targets = targetCount;
+    if (applied) {
+      __rectsState.applied = Number(__rectsState.applied || 0) + applied;
+    }
     if (!__targetDiscoveryReported && (rectContainer || domRectEmojiCount || pixelEmojiCount || svgRectEmojiCount || svgCount)) {
       __targetDiscoveryReported = true;
       __emit('info', 'rects:layout_targets_discovered', {
@@ -372,6 +392,7 @@ const RectsPatchModule = function RectsPatchModule(window) {
           pixelEmojiCount,
           svgRectEmojiCount,
           svgCount,
+          targetCount,
           applied
         }
       }, null);
@@ -433,8 +454,19 @@ const RectsPatchModule = function RectsPatchModule(window) {
   }
 
   try {
+    __rectsState.ready = false;
+    __rectsState.status = 'applying';
+    __rectsState.reason = 'layout_influence';
+    __rectsState.error = null;
     const styleApplied = __installLayoutInfluenceStyle();
     const applied = __installLayoutObserver();
+    __rectsState.ready = true;
+    __rectsState.status = 'ready';
+    __rectsState.reason = 'layout_influence';
+    if (!__rectsState.applied) {
+      __rectsState.applied = applied;
+    }
+    __rectsState.error = null;
     __emit('info', 'rects:layout_influence_applied', {
       stage: 'apply',
       key: 'MutationObserver',
@@ -445,6 +477,10 @@ const RectsPatchModule = function RectsPatchModule(window) {
     __releaseGuard(true);
     return applied;
   } catch (e) {
+    __rectsState.ready = false;
+    __rectsState.status = 'error';
+    __rectsState.reason = 'layout_influence_failed';
+    __rectsState.error = e && e.message ? String(e.message) : String(e);
     __releaseGuard(false);
     throw e;
   }
