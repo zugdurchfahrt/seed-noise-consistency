@@ -1,6 +1,5 @@
-# vpn_utils.py
+# network_utils.py
 import os
-import random
 import time
 import shutil
 import requests
@@ -10,132 +9,33 @@ import pathlib
 from datetime import datetime
 import pytz
 from overseer import logger
-logger = logger.getChild("vpn_utils")
+logger = logger.getChild("network_utils")
 
-# List of VPN processors for safe removal
-PN_PROCESSES = {
-    "openvpn.exe",
-    "openvpnserv.exe",
-    "openvpn-gui.exe",
-    "openvpnconnect.exe",
-    "protonvpn.exe",
-    "protonvpnservice.exe",
-    "protonvpn-update.exe",
-    "protonvpntap.exe",
-    "wireguard.exe",
-    "wg-quick.exe",
-    "openvpnserv2.exe",
-    "openvpnservice.exe",
-    "tap-windows.exe",
-    "tun2socks.exe",
-}
 
 # === Constants and Settings ====
-# Paths to VPN Directory and Data
 PROJECT_ROOT        = pathlib.Path(__file__).resolve().parents[2]
 USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
-CONFIG_DIR          = PROJECT_ROOT / 'cfg_vpn'
-TEMP_AUTH_FILE      = os.path.join(CONFIG_DIR, "temp_auth.txt")
-OPENVPN_PATH        = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
 POLL_INTERVAL       = 0.25          # poll Interval in seconds
 MAX_ATTEMPTS        = 6             # Connecting attempts
 TIMEOUT_SECONDS     = 120           # VPN  initialization Timesout 
 API_TIMEOUT_SECONDS = 5
 
 
-class VPNClient:
-    """VPN connection orchestrator"""
-    def __init__(self, config_dir: str, openvpn_path: str, timeout: int = 60):
-        self.config_dir = config_dir
-        self.temp_auth = TEMP_AUTH_FILE
-        self.openvpn_path = openvpn_path
+class Client:
+    """connection orchestrator"""
+    def __init__(self, timeout: int = 60):
         self.timeout = timeout
     
-    def verify(self):
-        """Step 1: Obtaining pre-VPN IP"""
-        try:
-            r = requests.get("http://ip-api.com/json/", timeout=2, proxies={'http': None, 'https': None})
-            r.raise_for_status()
-            data = r.json()
-            if data.get('status') != 'success':
-                raise RuntimeError(f"Error pre-VPN API: {data}")
-            self.pre_ip = data.get('query')
-            logger.info(f"pre-VPN IP: {self.pre_ip}")
-        except Exception as e:
-            logger.error(f"Error obtaining pre-VPN IP: {e}")
-            raise
-        return self.pre_ip
-
     def prepare(self):
-        """Step 1: Cleaning processes, directories and generation of the Auth file"""
-        logger.info("Step 2: environment preparation(cleanup + DNS + auth)")
+        """Step 1: Cleaning processes, directories"""
+        logger.info("Step 2: environment preparation(cleanup + DNS flush)")
 
-        self._terminate_vpn_processes()
-
+  
         subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
         self._kill_old_processes()
         
         self._clean_directories()
-
-        self._create_auth_file()
-
-        
-    def connect(self) -> bool:
-
-        # 1) Checking for .OVPN files
-        configs = [f for f in os.listdir(self.config_dir) if f.endswith('.ovpn')]
-        if not configs:
-            logger.error(f"[VPN] we have no .ovpn-files in {self.config_dir}")
-            return False
-        choice = random.choice(configs)
-        config_path = os.path.join(self.config_dir, choice)
-        logger.info(f"[VPN] configuration selected: {choice}")
-
-        # 2) Establish main VPN settings
-        cmd = [
-            self.openvpn_path,
-            "--config", config_path,
-            "--auth-user-pass", self.temp_auth,
-            "--tun-ipv6",
-            "--redirect-gateway", "def1", "ipv6",       
-            # "--route-nopull",                         # AN OPTION TO SWITCH OPERATING MODE TO MANUAL step-by-step onroute-nopull
-            "--auth-nocache",
-            "--dhcp-option", "DNS", "1.1.1.1",
-            "--dhcp-option", "DNS", "1.0.0.1",
-            "--block-outside-dns",
-        ]
-        logger.debug("[VPN] Launch command: %s", ' '.join(cmd))
-
-        # 3) Starting the process
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        self.openvpn_process = proc
-        start_time = time.time()
-        for line in proc.stdout:
-            logger.debug(f"[VPN] {line.strip()}")
-            if "Initialization Sequence Completed" in line:
-                logger.info("VPN is successfully connected(stdout)")
-                # routes stabilization - IP does not wait for DNS
-                time.sleep(1.0)
-                try:
-                    requests.get("http://1.1.1.1", timeout=2, proxies={'http': None, 'https': None})
-                except Exception:
-                    logger.warning("[VPN] tunnel up, network not ready yet (IP probe) — wait 2s")
-                    time.sleep(2.0)
-                # DNS Could be replaced by a server - we will unconditionally flush
-                subprocess.run(["ipconfig", "/flushdns"], check=False)
-                try:
-                    os.remove(self.temp_auth)
-                except Exception:
-                    pass
-                return True
-            if time.time() - start_time > TIMEOUT_SECONDS:
-                proc.kill()
-                logger.error(f"[VPN] VPN did not connect in {self.timeout}s")
-                raise TimeoutError(f"VPN did not connect in {self.timeout}s")
-        # If the output flow is closed without a successful message
-        logger.error("[VPN] VPN process ended without connection")
-        return False
 
     def post(self):
         """Step 4: Obtaining post-VPN IP"""
@@ -199,63 +99,6 @@ class VPNClient:
             "data": data,
             "country_data": country_data,
         }
-
-    def _create_auth_file(self):
-        """
-        Creates a temporary auth file for OpenVPN (or another VPN provider), taking login/password from PROTONVPN_USERNAME / PROTONVPN_PASSWORD environment variables.
-        Usage:
-        1) Recommended: set these environment variables before starting the process.
-        2) Alternative: implement another way to transfer credentials
-        Note: do not hardcode credentials in the code.
-        """
-        usr = os.getenv("PROTONVPN_USERNAME")
-        pwd = os.getenv("PROTONVPN_PASSWORD")
-        with open(self.temp_auth,'w') as f:
-            f.write(f"{usr}\n{pwd}\n")
-        logger.debug("temp auth file created: %s", self.temp_auth)
-    
-    def _cleanup(self):
-        """Step 4: Removing  auth file """
-        logger.info("Step 4:Removing the auth file")
-        try:
-            if os.path.exists(self.temp_auth):
-                os.remove(self.temp_auth)
-                logger.debug(f"temp auth file deleted during cleanup: {self.temp_auth}")
-        except Exception as e:
-                logger.warning(f"Failed to delete temp auth file in cleanup: {e}")
-
-    def _terminate_vpn_processes(self):
-        for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
-            try:
-                name = (proc.info.get('name') or '').lower()
-                if name in PN_PROCESSES or 'openvpn' in name or 'protonvpn' in name:
-                    logger.debug(
-                        "[cleanup] terminate PID=%s name=%s exe=%s cmd=%s",
-                        proc.pid, name, proc.info.get('exe'),
-                        ' '.join(proc.info.get('cmdline') or [])[:200]
-                    )
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=2)
-                        logger.debug("Terminated VPN process %s (PID %d)", name, proc.pid)
-                    except psutil.TimeoutExpired:
-                        logger.debug("[cleanup] kill PID=%s (timeout on terminate)", proc.pid)
-                        proc.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-            except Exception as e:
-                logger.debug("[cleanup] error on PID=%s: %s", getattr(proc, "pid", "?"), e)
-
-        # local OpenVPN process, if still alive
-        op = getattr(self, 'openvpn_process', None)
-        if op:
-            try:
-                if op.poll() is None:
-                    op.terminate()
-                    op.wait(timeout=2)
-                    logger.debug("Terminated local OpenVPN process (PID %d)", op.pid)
-            except Exception as e:
-                logger.warning("Error terminating local OpenVPN process: %s", e)
 
     def _clean_directories(self):
         """

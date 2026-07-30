@@ -1,5 +1,9 @@
 # Changelog
 
+30.07.2026
+
+Since VPN technology has made significant developments over the past two years, i decided to remove the feature for configuring a custom VPN, and the script now runs without managing the VPN internally. This means that VPN processes are not stopped or started.If a VPN is already running via any other method, the script simply uses the current network environment.
+
 05.06.2026
 
 Rects layout influence may affect visible glyph/layout nodes on arbitrary pages; no fix until a reproducible non-fixture page regression is observed.

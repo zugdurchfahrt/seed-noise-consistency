@@ -21,7 +21,6 @@ from selenium.common.exceptions import WebDriverException, NoSuchWindowException
 import undetected_chromedriver as uc
 
 # ----------------------- FOLDERS -----------------------
-OPENVPN_PATH             = r"C:\YOUR\FOLDER\PATH\openvpn.exe"
 PROJECT_ROOT             = pathlib.Path(__file__).resolve().parent
 TOOLS                    = PROJECT_ROOT / 'tools'
 GENERATORS               = TOOLS / 'generators'
@@ -30,7 +29,6 @@ TOOLS_INFRA              = TOOLS / 'tools_infra'
 PROFILE_DATA_SRC         = PROJECT_ROOT / 'profile_data_source'
 CORS_ADDON               = TOOLS_RUNTIME / 'handle_cors_addon.py'
 USER_DATA_DIR            = PROJECT_ROOT / 'user_data'
-CONFIG_DIR               = PROJECT_ROOT / 'configs'
 ASSETS                   = PROJECT_ROOT / 'assets'
 SCRIPTS                  = ASSETS / 'scripts'
 SCRIPTS_WINDOW           = SCRIPTS / 'window'
@@ -85,7 +83,7 @@ import tools.generators.cdp_catapult as cdp
 import tools.generators.cdp_worker_env as cdp_worker_env
 import tools.tools_runtime.helpers as helpers_module
 import tools.tools_runtime.headers_adapter as headers_adapter_module
-import tools.tools_infra.vpn_utils as vpn_utils_module
+import tools.tools_infra.network_utils as network_utils_module
 import tools.generators.rand_met as rand_met_module
 import profile_data_source.plugins_dict as plugins_dict_module
 import profile_data_source.permissions_dict as permissions_dict_module
@@ -99,13 +97,13 @@ from tools.tools_runtime.helpers import (
     apply_ua_overrides,
     inject_uach_strip_window,
 )
-from tools.tools_infra.vpn_utils import VPNClient
+from tools.tools_infra.network_utils import Client
 from tools.tools_infra.overseer import logger, setup_logger
 
 # ----------------------- LOGGING SETUP -----------------------
 setup_logger(child_levels={
     "main": logging.INFO,
-    "vpn_utils": logging.DEBUG,
+    "network_utils": logging.DEBUG,
     "rand_met": logging.INFO,
     "plugins_dict": logging.DEBUG,
     "permissions_dict": logging.INFO,
@@ -132,7 +130,6 @@ def _build_rng_pools(global_seed: str) -> dict[str, random.Random]:
         "profile": _rng_for("profile"),
         "permissions": _rng_for("permissions"),
         "headers": _rng_for("headers"),
-        "vpn": _rng_for("vpn"),
     }
 # ----------------------- RNG POOLS FOR FONT GENERATION -----------------------
 # main injects one rand_met-specific derivative, and rand_met derives
@@ -1595,9 +1592,7 @@ def main():
     seed_int = _build_rng_pools(global_seed)
     logger.info(f"Seed for the current session has been generated: {global_seed}")
 
-    vpn_rng = seed_int["vpn"]
-    vpn_utils_module.random = vpn_rng
-    client = VPNClient(config_dir=CONFIG_DIR, openvpn_path=OPENVPN_PATH)
+    client = Client()
     
     try:
         json_path = str(PROFILE_DATA_SRC/ "profile.json")
@@ -1605,15 +1600,11 @@ def main():
             os.remove(json_path)
             logger.info("Previous profile.json had been deleted")
 
-        # client.verify()
-        # client.prepare()
-        # logger.info("preparation completed")
-        # client.connect()
         client._kill_old_processes()
         client._clean_directories()
         client.post()
         
-        # -------- Getting country_data from VPN module -------------------
+        # -------- Getting country_data from network module -------------------
         data = client.get_details()
         country_data = data["country_data"]
        

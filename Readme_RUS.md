@@ -1,5 +1,5 @@
 **Коротко (TL;DR)**: исследовательский anti-fingerprinting pipeline на Python + JavaScript, который через CDP внедряет детерминированные seed-based патчи для Canvas/WebGL/WebGPU/Fonts/Headers.
-**Работает на Windows с VPN** (ProtonVPN/OpenVPN) + опциональный proxy.
+**Работает на Windows** + опциональный proxy.
 
 Browser Anti-Fingerprinting: Python + JavaScript
 
@@ -71,7 +71,7 @@ Python (Selenium + undetected_chromedriver) + инъекция JavaScript-пат
 Исследовательский и некоммерческий проект; публикуется "as is". Гарантий стабильности нет.
 Проект разрабатывается одним автором, поэтому охват сценариев и окружений ограничен. Forks и contributions приветствуются.
 Границы применимости см. в Issues/TODO.
-Проверялось только на Windows + ProtonVPN (OpenVPN CLI). Другие OS/VPN не тестировались.
+Проверялось только на Windows. Другие OS не тестировались.
 В целом pipeline инициализируется, скрипт запускается и выполняет назначенные задачи; пропатчена только часть surfaces.
 
 ## Лицензия
@@ -80,11 +80,10 @@ to the extent possible. Разрешено копировать, изменят�
 и распространять проект, с attribution или без неё. Software is provided "AS IS".
 
 ## Требования
-OS: Windows 10/11 (путь OpenVPN рассчитан на Windows).
+OS: Windows 10/11.
 Python: 3.12 (рекомендуется 3.11+).
 
 ## Сторонние компоненты
-OpenVPN установлен локально (дефолтный путь задан в [vpn_utils.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/vpn_utils.py), может быть изменён).
 `mitmproxy` (есть в [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt), нужен только когда переключатель mitmproxy включён).
 Chrome/Chromium - локальная копия Chrome for Testing; путь настроен в [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py).
 Все Python-зависимости закреплены в [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt).
@@ -113,7 +112,7 @@ MITMPROXY_OFF = True
 
 Активной должна быть только одна строка. Если активны обе или обе закомментированы, запуск сразу завершится понятной ошибкой.
 
-### С mitmproxy
+### Использование mitmproxy
 
 ✔ Проще ходить по сайтам без немедленных CORS/header challenges.
 ✔ Есть прямой доступ к CORS/headers/`Client Hints`.
@@ -126,29 +125,16 @@ MITMPROXY_OFF = True
 ✔ Нет локальной proxy-прослойки.
 ✖ Ограничения CORS могут снижать эффективность для реального browsing; этот режим лучше подходит как прямой browser/CDP/JS pipeline.
 
-Примечание: VPN используется в обоих режимах, если отдельно не отключить VPN calls.
-
 ### Использование без встроенного VPN-клиента
-Скрипт можно запускать без управления OpenVPN изнутри. В этом случае можно:
-✔ Использовать любой другой VPN-клиент, включая управляемый через GUI.
-✔ Или работать вообще без VPN.
-Для этого достаточно закомментировать в `def main():` вызовы методов `VPNClient`, отвечающие за VPN authentication, setup и connection:
 
-```python
-# client.verify()
-# client.prepare()
-# logger.info("Preparation completed")
-# client.connect()
-client.post()
-```
+Можно использовать любой другой VPN-клиент, включая управляемый через GUI.
+Или работать вообще без VPN.
 
-В этом режиме скрипт работает как раньше: все последующие шаги выполняются, но VPN-процессы не останавливаются и не запускаются.
-Если VPN уже поднят любым другим способом, скрипт просто использует текущее сетевое окружение.
 
 ## Структура репозитория
 
 - [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) - runtime entrypoint и orchestration layer.
-- [assets/scripts/window/core](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/core) - window bootstrap, Core, context, PRNG, logging и probes.
+- [assets/scripts/window/core](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/core) - window bootstrap, Core, context, PRNG, логирование и дебаг.
 - [assets/scripts/window/patches](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/patches) - window-side graphics, media, navigator и stealth patches.
 - [assets/scripts/workerscope](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/workerscope) - bootstrap и patching для Dedicated, Shared и Service Worker.
 - [assets/generated_fonts](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/generated_fonts) - bundled generated font assets и indexes.
@@ -156,8 +142,8 @@ client.post()
 - [profile_data_source](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/profile_data_source) - profile dictionaries и platform/browser data.
 - [tools/generators](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/generators) - font generation и CDP worker/service-worker helpers.
 - [tools/tools_runtime](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/tools_runtime) - runtime helper modules и header/CORS support.
-- [tools/tools_infra](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/tools_infra) - VPN и Python-side diagnostic helpers.
-- [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt) - pinned Python dependency list.
+- [tools/tools_infra](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/tools_infra) - Python-утилиты логиования и настройки сети.
+- [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt) - список зависимостей Python.
 
 ## Обзор модулей (кратко)
 
@@ -171,7 +157,7 @@ client.post()
 - [handle_cors_addon.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/handle_cors_addon.py) - mitmproxy runtime addon для CORS/preflight handling, service-domain filtering и request/response-side header coordination.
 - [headers_adapter.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/headers_adapter.py) - realistic Accept/header shaping по browser brand/version.
 - [helpers.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/helpers.py) - общие runtime/profile helpers, используемые [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) и injection pipeline.
-- [vpn_utils.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/vpn_utils.py) - VPN lifecycle и region-aligned setup с `.ovpn` файлами из [cfg_vpn](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/cfg_vpn).
+- [network_utils.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/network_utils.py) -  региональные сетевые настройки.
 - [overseer.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/overseer.py) - Python-side logging/diagnostic helper.
 
 ### JavaScript ([assets/scripts/window/core](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/core))
@@ -273,8 +259,6 @@ venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
-
-Положите `.ovpn` files в [cfg_vpn](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/cfg_vpn).
 
 Шрифты уже подготовлены в [assets/generated_fonts](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/generated_fonts); для обычного запуска ничего делать не нужно. Если хотите добавить свои шрифты, положите `.woff2` files в [assets/fonts_raw](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/fonts_raw), и startup font pipeline сам их обработает.
 

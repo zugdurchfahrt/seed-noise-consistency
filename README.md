@@ -1,5 +1,5 @@
 **TL;DR**: Research-grade anti-fingerprinting pipeline (Python + JavaScript) injecting deterministic, seed-based patches for Canvas/WebGL/WebGPU/Fonts/Headers via CDP.  
-**Runs on Windows with VPN** (ProtonVPN/OpenVPN) + optional proxy  
+**Runs on Windows** + optional proxy  
 
 Browser Anti-Fingerprinting: Python + JavaScript
 
@@ -71,7 +71,7 @@ MDN/Chromium compatibility: hooks stay within native API boundaries, with closur
 Research / non-commercial; released “as is”. No stability guarantees.  
 Built by a single author — scenario/OS coverage is limited. Forks and contributions are welcome.  
 See Issues/TODO for applicability limitations.  
-Executed only on Windows + ProtonVPN (OpenVPN CLI). Other OS/VPNs not tested.  
+Executed only on Windows.  
 In sum, the pipeline is being initialised and the script is being executed. The designated tasks are being carried out, just several surfaces have been patched.
 
 ## License
@@ -80,11 +80,10 @@ to the extent possible. You may copy, modify, publish, use, compile, sell,
 and distribute, with or without attribution. Software is provided “AS IS”.
 
 ## Requirements
-OS: Windows 10/11 (OpenVPN path assumes Windows).  
+OS: Windows 10/11.  
 Python: 3.12 (3.11+ recommended).
 
 ## 3rd-party
-OpenVPN installed locally (default path is set in [vpn_utils.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/vpn_utils.py), can be changed).
 `mitmproxy` (in [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt), only needed when the mitmproxy switch is ON).
 Chrome/Chromium — local copy of Chrome for Testing path configured in [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py).
 All Python deps are pinned in [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt).
@@ -126,20 +125,12 @@ Only one line must be active. If both are active or both are commented, startup 
 ✔ No local proxy layer.  
 ✖ CORS limitations may reduce effectiveness for real browsing; this mode is better as a direct browser/CDP/JS pipeline.
 
-Note: VPN usage is enforced in both modes unless you disable the VPN calls separately.
 
 ### Using without a built-in VPN client
-The script can be run without controlling OpenVPN. In this case, you can:  
-✔ Use any other VPN client (including one controlled via a graphical interface).  
-✔ Or work without VPN at all.  
-To accomplish this, just comment calls to the VPNClient instance methods responsible for VPN authentication, setup, and connection in def main():  
-        # client.verify()  
-        # client.prepare()  
-        # logger.info("Preparation completed")  
-        # client.connect()  
-        client.post()  
-In this mode, the script works exactly as before, performing all subsequent steps without stopping or starting OpenVPN processes.  
-If you already have a VPN set up in any other way, the script will simply use the current network environment.
+The script runs without controlling VPN.   
+Use any other VPN client (including one controlled via a graphical interface).  
+Or work without VPN at all.  
+Script performing all subsequent steps without stopping or starting VPN processes. If you already have a VPN set up in any other way, the script will simply use the current network environment.
 
 ## Repository structure
 
@@ -152,7 +143,7 @@ If you already have a VPN set up in any other way, the script will simply use th
 - [profile_data_source](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/profile_data_source) - profile dictionaries and platform/browser data.
 - [tools/generators](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/generators) - font generation and CDP worker/service-worker helpers.
 - [tools/tools_runtime](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/tools_runtime) - runtime helper modules and header/CORS support.
-- [tools/tools_infra](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/tools_infra) - VPN and Python-side diagnostic helpers.
+- [tools/tools_infra](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/tools/tools_infra) - Python-side diagnostic helpers.
 - [requirements.txt](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/requirements.txt) - pinned Python dependency list.
 
 ## Modules overview (short)
@@ -167,7 +158,7 @@ If you already have a VPN set up in any other way, the script will simply use th
 - [handle_cors_addon.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/handle_cors_addon.py) - mitmproxy runtime addon for CORS/preflight handling, service-domain filtering, and request/response-side header coordination.
 - [headers_adapter.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/headers_adapter.py) - realistic Accept/header shaping by browser brand/version.
 - [helpers.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_runtime/helpers.py) - shared runtime/profile helpers used by [main.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/main.py) and the injection pipeline.
-- [vpn_utils.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/vpn_utils.py) - VPN lifecycle and region-aligned setup using `.ovpn` files from [cfg_vpn](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/cfg_vpn).
+- [network_utils.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/network_utils.py) - region-aligned setup.
 - [overseer.py](https://github.com/zugdurchfahrt/seed-noise-consistency/blob/borderline/tools/tools_infra/overseer.py) - Python-side logging/diagnostic helper.
 
 ### JavaScript ([assets/scripts/window/core](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/scripts/window/core))
@@ -269,8 +260,6 @@ venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
-
-Put `.ovpn` files into [cfg_vpn](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/cfg_vpn).
 
 Fonts are already prepared in [assets/generated_fonts](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/generated_fonts); no font setup is required for a normal run. To add your own fonts, put `.woff2` files into [assets/fonts_raw](https://github.com/zugdurchfahrt/seed-noise-consistency/tree/borderline/assets/fonts_raw) and let the startup font pipeline process them.
 
