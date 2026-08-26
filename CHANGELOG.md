@@ -1,6 +1,19 @@
 # Changelog
 
-30.07.2026
+
+### 27.08.2026
+
+Enhance error handling and logging across various modules
+
+- Added detailed error logging for swallowed exceptions in WebgpuWL.js, webgpu.js, and sw_prelude.js to improve debugging capabilities.
+- Updated BrowserSessionPolicy in main.py to differentiate between window closure and other exceptions, enhancing error reporting.
+- Refactored CORS handling in handle_cors_addon.py to streamline request processing.
+- Removed unused functions related to Accept-Language header processing in headers_adapter.py to clean up the codebase.
+- Adjusted paths and constants in rand_met.py and network_utils.py for better organization and clarity.
+
+
+
+### 30.07.2026
 
 Since VPN technology has made significant developments over the past two years, i decided to remove the feature for configuring a custom VPN, and the script now runs without managing the VPN internally. This means that VPN processes are not stopped or started.If a VPN is already running via any other method, the script simply uses the current network environment.
 
@@ -10,7 +23,7 @@ Rects layout influence may affect visible glyph/layout nodes on arbitrary pages;
 
 
 
-16.04.2026
+### 16.04.2026
 
 - `deviceMemory`: aligned the public behavior across `window`, `WorkerNavigator`, and `ServiceWorkerGlobalScope` with  `navigator.deviceMemory` variable nativet regime.
 - As dedicated dynamic native overrid  for `navigator.deviceMemory` does not exist,  project-side accessor mutation on the active path switched to `ReduceDeviceMemory` privded by Chromium developers,  so constant native value 8 flows natively without replacing the public getter, regadlesss the exact RAM anount you posess.
@@ -25,7 +38,7 @@ Rects layout influence may affect visible glyph/layout nodes on arbitrary pages;
 - `clientCode`: [] on `ServiceWorkerGlobalScope`
 - `Function.prototype.toString` improvements
 
-26.03.2026
+### 26.03.2026
 ### `context.js`  
 
 
@@ -41,7 +54,7 @@ Rects layout influence may affect visible glyph/layout nodes on arbitrary pages;
 
 - `clientWidth` and `clientHeight` patch were removed from `Element.prototype`. It is now applied only to `document.documentElement` and `document.body`, so the native prototype getter is no longer replaced.
 
-24.03.2026
+### 24.03.2026
 
 - `clientCode`: [] on .window, `DedicatedWorkerGlobalScope`/`SharedWorkerGlobalScope`
 - Aligned Screen.* `accessor` path
@@ -50,7 +63,7 @@ Rects layout influence may affect visible glyph/layout nodes on arbitrary pages;
 - Aligned `plugins`/`mimeTypes` object-return `accessor`
 
 
-23.03.2026
+### 23.03.2026
 **[2026-01-09 - 2026-03-23]**
 
 ### Major Milestones
@@ -65,7 +78,7 @@ Rects layout influence may affect visible glyph/layout nodes on arbitrary pages;
 -   By the end of the range, the work had shifted from adding isolated patches to closing the consistency gap between window core, workerscope, navigator surfaces, graphics surfaces, so that the  stack behaves more like one coordinated pipeline.
 
 
-21.09.2025
+### 21.09.2025
 ## \[Unreleased\]
 
 ### Added
