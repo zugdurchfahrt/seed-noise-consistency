@@ -11,9 +11,39 @@
   function __serializeRelayErr(err) {
     if (!err) return null;
     const out = {};
-    try { if (typeof err.name === 'string' && err.name) out.name = err.name; } catch (e) {}
-    try { if (typeof err.message === 'string' && err.message) out.message = err.message; } catch (e) {}
-    try { if (typeof err.stack === 'string' && err.stack) out.stack = err.stack; } catch (e) {}
+    try { if (typeof err.name === 'string' && err.name) out.name = err.name; } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
+    try { if (typeof err.message === 'string' && err.message) out.message = err.message; } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
+    try { if (typeof err.stack === 'string' && err.stack) out.stack = err.stack; } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     if (!Object.keys(out).length) {
       try { out.message = String(err); } catch (e) { out.message = 'service worker relay error'; }
     }
@@ -193,7 +223,17 @@
     try {
       const desc = G ? Object.getOwnPropertyDescriptor(G, key) : null;
       if (desc && desc.configurable === true) delete G[key];
-    } catch (e) {}
+    } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
   }
 
   __dropBridgeExport('__ensureMarkAsNative');
@@ -247,7 +287,17 @@
   function __isServiceWorkerScope() {
     try {
       return typeof ServiceWorkerGlobalScope === 'function' && G instanceof ServiceWorkerGlobalScope;
-    } catch (e) {}
+    } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     return false;
   }
 

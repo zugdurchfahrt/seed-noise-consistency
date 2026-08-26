@@ -350,7 +350,17 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       }, null);
     }
     __wlState.featuresWhitelist = __store.featuresWhitelist;
-    try { delete window.__WEBGPU_FEATURES_WHITELIST__; } catch (e) {}
+    try { delete window.__WEBGPU_FEATURES_WHITELIST__; } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
     // === LIMITS WHITELIST (use only YOR device specification) ===
     const __hasLimitsWL = Object.prototype.hasOwnProperty.call(window, '__WEBGPU_LIMITS_WHITELIST__')
@@ -393,7 +403,17 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       }, null);
     }
     __wlState.limitsWhitelist = __store.limitsWhitelist;
-    try { delete window.__WEBGPU_LIMITS_WHITELIST__; } catch (e) {}
+    try { delete window.__WEBGPU_LIMITS_WHITELIST__; } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
     // === TEXTURE FORMATS WHITELIST (as is, without guessing) ===
     if (!window.__WEBGPU_FORMATS_WHITELIST__) {
@@ -439,7 +459,17 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
       });
     }
     __wlState.formatsWhitelist = __store.formatsWhitelist;
-    try { delete window.__WEBGPU_FORMATS_WHITELIST__; } catch (e) {}
+    try { delete window.__WEBGPU_FORMATS_WHITELIST__; } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
     // === Snapshot helper ===
     if (!Object.prototype.hasOwnProperty.call(__store, 'collectSnapshot')) {
@@ -542,7 +572,17 @@ const WebgpuWLBootstrap = function WebgpuWLBootstrap(window) {
         enumerable: false
       });
     }
-    try { delete window.__collectWebGPUSnapshot__; } catch (e) {}
+    try { delete window.__collectWebGPUSnapshot__; } catch (e) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, e);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", e, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
     __moduleDiag('info', __module + ':ready', {
       stage: 'apply',

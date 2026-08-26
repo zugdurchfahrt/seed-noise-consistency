@@ -24,10 +24,7 @@ logger.info("Модуль logs/proxy_full.log")
 
 
 # ===== OUTBOUND HEADERS-REQUESTS HANDLING =====
-# Minimum base set: other CORS headers are set only on preflight
-BASE_CORS = {
-    "Access-Control-Allow-Credentials": "true",
-}
+
 IGNORED_KEYWORDS = ["copilot", "github", "vscode", "visualstudio"]
 
 COMMON_TWO_LEVEL_TLDS = {
@@ -191,7 +188,7 @@ class CORSBypass:
             self.profile = {}
             self.expected_client_hints = {}
         self.ch_per_host = {}
-        self.passthrough_suffixes = data.get("passthrough_suffixes", [])
+
 
     def log_request(self, flow: http.HTTPFlow, phase: str) -> None:
         if is_ignored(flow):

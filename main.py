@@ -10,6 +10,7 @@ import hashlib
 import random
 import logging
 import pathlib
+import shutil
 from pathlib import Path
 from datetime import datetime
 import sys
@@ -23,9 +24,7 @@ import undetected_chromedriver as uc
 # ----------------------- FOLDERS -----------------------
 PROJECT_ROOT             = pathlib.Path(__file__).resolve().parent
 TOOLS                    = PROJECT_ROOT / 'tools'
-GENERATORS               = TOOLS / 'generators'
 TOOLS_RUNTIME            = TOOLS / 'tools_runtime'
-TOOLS_INFRA              = TOOLS / 'tools_infra'
 PROFILE_DATA_SRC         = PROJECT_ROOT / 'profile_data_source'
 CORS_ADDON               = TOOLS_RUNTIME / 'handle_cors_addon.py'
 USER_DATA_DIR            = PROJECT_ROOT / 'user_data'
@@ -46,10 +45,10 @@ CHROMEDRIVER_PATH        = os.getenv("CHROMEDRIVER_PATH", r"C:\\55555\\switch\\p
 
 # ----------------------- MITMPROXY SWITCH -----------------------
 # Active profile: with mitmproxy.
-# MITMPROXY_ON = True
+MITMPROXY_ON = True
 
 # Active profile: without mitmproxy.
-MITMPROXY_OFF = True
+# MITMPROXY_OFF = True
 
 _mitmproxy_on = globals().get("MITMPROXY_ON", False) is True
 _mitmproxy_off = globals().get("MITMPROXY_OFF", False) is True
@@ -83,9 +82,7 @@ import tools.generators.cdp_catapult as cdp
 import tools.generators.cdp_worker_env as cdp_worker_env
 import tools.tools_runtime.helpers as helpers_module
 import tools.tools_runtime.headers_adapter as headers_adapter_module
-import tools.tools_infra.network_utils as network_utils_module
 import tools.generators.rand_met as rand_met_module
-import profile_data_source.plugins_dict as plugins_dict_module
 import profile_data_source.permissions_dict as permissions_dict_module
 from profile_data_source.plugins_dict import build_plugins_profile
 from tools.tools_runtime.helpers import (
@@ -585,13 +582,12 @@ class BrowserSessionPolicy:
                 raise
             _policy_event(
                 self.driver,
-                "warn",
+                "info",
                 "session_policy_current_window_closed",
                 "runtime",
                 "current window handle disappeared; restoring managed window",
                 "pipeline telemetry",
                 {"outcome": "return", "reason": "current_window_closed"},
-                err=exc,
             )
             self._restore_active_managed()
             return
@@ -625,16 +621,27 @@ class BrowserSessionPolicy:
         try:
             return self.driver.current_window_handle
         except Exception as exc:
-            _policy_event(
-                self.driver,
-                "warn",
-                "session_policy_current_handle_failed",
-                "runtime",
-                "failed to read current window handle",
-                "pipeline missing data",
-                {"outcome": "throw", "reason": "preflight_failed"},
-                err=exc,
-            )
+            if _is_window_gone_exception(exc):
+                _policy_event(
+                    self.driver,
+                    "info",
+                    "session_policy_current_handle_failed",
+                    "runtime",
+                    "failed to read current window handle (window closed)",
+                    "pipeline missing data",
+                    {"outcome": "throw", "reason": "preflight_failed"},
+                )
+            else:
+                _policy_event(
+                    self.driver,
+                    "warn",
+                    "session_policy_current_handle_failed",
+                    "runtime",
+                    "failed to read current window handle",
+                    "pipeline missing data",
+                    {"outcome": "throw", "reason": "preflight_failed"},
+                    err=exc,
+                )
             raise
 
     def _restore_active_managed(self):
@@ -1904,11 +1911,15 @@ def main():
 
         # # --- mitmproxy start ---
         if MITMPROXY_ENABLED:
+            mitmdump_path = shutil.which("mitmdump") or shutil.which("mitmdump.exe")
+            if not mitmdump_path:
+                candidate = os.path.join(os.path.dirname(sys.executable), "mitmdump.exe")
+                mitmdump_path = candidate if os.path.exists(candidate) else "mitmdump"
             mitmproxy_proc = subprocess.Popen(
-                ["mitmdump", "--mode", f"regular@{MITMPROXY_PORT}", "-s", str(CORS_ADDON), "-v"],
+                [mitmdump_path, "--mode", f"regular@{MITMPROXY_PORT}", "-s", str(CORS_ADDON), "-v"],
                 cwd=str(PROJECT_ROOT)
             )
-            logger.info("MITMPROXY: mitmdump started")
+            logger.info("MITMPROXY: mitmdump started using %s", mitmdump_path)
         else:
             logger.info("MITMPROXY: mitmdump skipped")
 

@@ -48,7 +48,17 @@ const __probeRun = async function(){
       if (typeof __probeDegrade === 'function') {
         __probeDegrade(String(code || 'probe'), err || null, Object.assign({ level: String(level || 'info') }, ctx));
       }
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
   }
 
   function __probeConsoleCall(method) {
@@ -59,7 +69,17 @@ const __probeRun = async function(){
       if (typeof fn !== "function") return;
       const args = Array.prototype.slice.call(arguments, 1);
       fn.apply(__probeRawConsole, args);
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
   }
 
   function __probeCountWhere(list, predicate) {
@@ -234,7 +254,17 @@ const __probeRun = async function(){
         type: "probe telemetry",
         data: __probeNormalizeReportData(data)
       }, err || null);
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
   }
 
   const __PROBE_DEFAULT_FLAGS__ = {
@@ -376,20 +406,50 @@ const __probeRun = async function(){
   function __probeCleanupAudioObjects(audioCtx, analyser) {
     try {
       if (analyser && typeof analyser.disconnect === "function") analyser.disconnect();
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     try {
       if (audioCtx && typeof audioCtx.close === "function") {
         const closeResult = audioCtx.close();
         if (closeResult && typeof closeResult.catch === "function") closeResult.catch(function() {});
         return;
       }
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     try {
       if (audioCtx && typeof audioCtx.suspend === "function") {
         const suspendResult = audioCtx.suspend();
         if (suspendResult && typeof suspendResult.catch === "function") suspendResult.catch(function() {});
       }
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
   }
 
 
@@ -1064,7 +1124,17 @@ const __probeRun = async function(){
       const ctor = node && node.constructor;
       const ctorName = (typeof ctor === "function" && ctor.name) ? String(ctor.name) : "";
       if (ctorName) return `${ctorName}.prototype`;
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     try {
       return Object.prototype.toString.call(node);
     } catch (_) {
@@ -1128,7 +1198,17 @@ const __probeRun = async function(){
     try {
       const target = proxyTargetMap.get(fn);
       if (typeof target === "function" && target !== fn) return "proxy_carrier";
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     return "native_or_untracked";
   }
 
@@ -1148,7 +1228,17 @@ const __probeRun = async function(){
     } finally {
       try {
         if (typeof finalizer === "function") finalizer();
-      } catch (_) {}
+      } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     }
   }
 
@@ -1186,7 +1276,17 @@ const __probeRun = async function(){
             () => {
               try {
                 if (nativeProto) Object.setPrototypeOf(callable, nativeProto);
-              } catch (_) {}
+              } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
             }
           )
         : { ok: false, error: new Error(mode === "method" ? "method missing" : "getter missing") };
@@ -1351,7 +1451,17 @@ const __probeRun = async function(){
           const ctor = node && node.constructor;
           const ctorName = (typeof ctor === "function" && ctor.name) ? String(ctor.name) : "";
           if (ctorName) return ctorName + ".prototype";
-        } catch (_) {}
+        } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         try {
           return Object.prototype.toString.call(node);
         } catch (_) {
@@ -1540,7 +1650,17 @@ const __probeRun = async function(){
     try {
       const dedicatedWait = await __probeAwaitWithTimeout((async () => {
         const worker = new Worker(dedicatedURL);
-        cleanup.push(() => { try { worker.terminate(); } catch (_) {} });
+        cleanup.push(() => { try { worker.terminate(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+} });
         return await new Promise((resolve, reject) => {
           const onMessage = (ev) => {
             cleanupListeners();
@@ -1578,7 +1698,17 @@ const __probeRun = async function(){
         const shared = new SharedWorker(sharedURL, { name: sharedName });
         const port = shared.port;
         cleanup.push(() => {
-          try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
+          try { if (port && typeof port.close === "function") port.close(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         });
         return await new Promise((resolve, reject) => {
           const onMessage = (ev) => {
@@ -1616,10 +1746,40 @@ const __probeRun = async function(){
     } finally {
       while (cleanup.length) {
         const fn = cleanup.pop();
-        try { fn(); } catch (_) {}
+        try { fn(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
       }
-      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {}
-      try { URL.revokeObjectURL(sharedURL); } catch (_) {}
+    }
+  } catch (_err) {}
+}
+      }
+      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
+      try { URL.revokeObjectURL(sharedURL); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     }
     return rows;
   }
@@ -1835,7 +1995,17 @@ const __probeRun = async function(){
           requiresAction: data.requiresAction === true
         };
       }
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     return null;
   }
 
@@ -2106,7 +2276,17 @@ const __probeRun = async function(){
     try {
       const dedicatedWait = await __probeAwaitWithinBudget((async () => {
         const worker = new Worker(dedicatedURL);
-        cleanup.push(() => { try { worker.terminate(); } catch (_) {} });
+        cleanup.push(() => { try { worker.terminate(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+} });
         return await new Promise((resolve, reject) => {
           const onMessage = (ev) => {
             cleanupListeners();
@@ -2139,7 +2319,17 @@ const __probeRun = async function(){
         const shared = new SharedWorker(sharedURL, { name: sharedName });
         const port = shared.port;
         cleanup.push(() => {
-          try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
+          try { if (port && typeof port.close === "function") port.close(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         });
         return await new Promise((resolve, reject) => {
           const onMessage = (ev) => {
@@ -2416,10 +2606,40 @@ const __probeRun = async function(){
     } finally {
       while (cleanup.length) {
         const fn = cleanup.pop();
-        try { fn(); } catch (_) {}
+        try { fn(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
       }
-      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {}
-      try { URL.revokeObjectURL(sharedURL); } catch (_) {}
+    }
+  } catch (_err) {}
+}
+      }
+      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
+      try { URL.revokeObjectURL(sharedURL); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     }
   }
 
@@ -2446,7 +2666,17 @@ const __probeRun = async function(){
           const ctor = node && node.constructor;
           const ctorName = (typeof ctor === "function" && ctor.name) ? String(ctor.name) : "";
           if (ctorName) return ctorName + ".prototype";
-        } catch (_) {}
+        } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         try {
           return Object.prototype.toString.call(node);
         } catch (_) {
@@ -2483,7 +2713,17 @@ const __probeRun = async function(){
         try {
           const target = proxyTargetMap.get(fn);
           if (typeof target === "function" && target !== fn) return "proxy_carrier";
-        } catch (_) {}
+        } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         return "native_or_untracked";
       }
       function __probeWorkerSafeCall__(fn, finalizer) {
@@ -2494,7 +2734,17 @@ const __probeRun = async function(){
         } finally {
           try {
             if (typeof finalizer === "function") finalizer();
-          } catch (_) {}
+          } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         }
       }
       function __probeWorkerResolveProxyTargetMap__() {
@@ -2549,7 +2799,17 @@ const __probeRun = async function(){
                 function() {
                   try {
                     if (nativeProto) Object.setPrototypeOf(callable, nativeProto);
-                  } catch (_) {}
+                  } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
                 }
               )
             : { ok: false, error: new Error("getter missing") };
@@ -2621,7 +2881,17 @@ const __probeRun = async function(){
     try {
       const collectDedicated = await __probeAwaitWithinBudget((async () => {
         const worker = new Worker(dedicatedURL);
-        cleanup.push(() => { try { worker.terminate(); } catch (_) {} });
+        cleanup.push(() => { try { worker.terminate(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+} });
         return await new Promise((resolve, reject) => {
           const onMessage = (ev) => {
             cleanupListeners();
@@ -2645,7 +2915,17 @@ const __probeRun = async function(){
         const shared = new SharedWorker(sharedURL, { name: sharedName });
         const port = shared.port;
         cleanup.push(() => {
-          try { if (port && typeof port.close === "function") port.close(); } catch (_) {}
+          try { if (port && typeof port.close === "function") port.close(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         });
         return await new Promise((resolve, reject) => {
           const onMessage = (ev) => {
@@ -2766,10 +3046,40 @@ const __probeRun = async function(){
     } finally {
       while (cleanup.length) {
         const fn = cleanup.pop();
-        try { fn(); } catch (_) {}
+        try { fn(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
       }
-      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {}
-      try { URL.revokeObjectURL(sharedURL); } catch (_) {}
+    }
+  } catch (_err) {}
+}
+      }
+      try { URL.revokeObjectURL(dedicatedURL); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
+      try { URL.revokeObjectURL(sharedURL); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     }
   }
 
@@ -2935,7 +3245,17 @@ const __probeRun = async function(){
           oracleSetProto
         };
       } catch (e) {
-        try { iframe.remove(); } catch (_) {}
+        try { iframe.remove(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         return { ok: false, error: e };
       }
     }
@@ -3064,13 +3384,43 @@ const __probeRun = async function(){
       } finally {
         try {
           if (program && typeof ctx.deleteProgram === "function") ctx.deleteProgram(program);
-        } catch (_) {}
+        } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         try {
           if (vertexShader && typeof ctx.deleteShader === "function") ctx.deleteShader(vertexShader);
-        } catch (_) {}
+        } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
         try {
           if (fragmentShader && typeof ctx.deleteShader === "function") ctx.deleteShader(fragmentShader);
-        } catch (_) {}
+        } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
       }
     }
 
@@ -3196,7 +3546,17 @@ const __probeRun = async function(){
 
     try {
       if (sandboxOracle && sandboxOracle.iframe) sandboxOracle.iframe.remove();
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
     return { paths: METHOD_PATHS.slice(), rows };
   }
@@ -4085,13 +4445,33 @@ function printToStringCrossRealmChecks() {
     w = iframe.contentWindow;
   } catch (e) {
     pushRow("iframe.contentWindow", "available", "read failed", false, null, e);
-    try { iframe.remove(); } catch (_) {}
+    try { iframe.remove(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     return { ok: false, rows };
   }
 
   if (!w) {
     pushRow("iframe.contentWindow", "non-null", "null", false);
-    try { iframe.remove(); } catch (_) {}
+    try { iframe.remove(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     return { ok: false, rows };
   }
 
@@ -4099,7 +4479,17 @@ function printToStringCrossRealmChecks() {
   const oracleToString = w.Function && w.Function.prototype && w.Function.prototype.toString;
   if (typeof oracleToString !== "function") {
     pushRow("iframe Function.prototype.toString", "function", String(typeof oracleToString), false);
-    try { iframe.remove(); } catch (_) {}
+    try { iframe.remove(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     return { ok: false, rows };
   }
 
@@ -4205,7 +4595,17 @@ function printToStringCrossRealmChecks() {
     pushRow("accessor.get: Navigator.prototype.userAgent", "resolved", "resolve failed", false, null, e);
   }
 
-  try { iframe.remove(); } catch (_) {}
+  try { iframe.remove(); } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
   const ok = rows.every((r) => r.match === true || r.match === null);
   __probeConsoleCall("group", "[probe] toString cross-realm checks (hard invariants + informational)");
@@ -5022,7 +5422,17 @@ function printToStringCrossRealmChecks() {
       (result.degradeOk !== false) &&
       (result.moduleCheckOk !== false)
     );
-  } catch (_) {}
+  } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
   try {
     const observabilityRows = (result.workerAccessorObservability && Array.isArray(result.workerAccessorObservability.rows))
@@ -5037,7 +5447,17 @@ function printToStringCrossRealmChecks() {
         bad: observabilityBad
       }
     });
-  } catch (_) {}
+  } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
   try {
     const collectionRows = (result.navigatorCollections && Array.isArray(result.navigatorCollections.rows))
@@ -5052,7 +5472,17 @@ function printToStringCrossRealmChecks() {
         bad: collectionBad
       }
     });
-  } catch (_) {}
+  } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
   try {
     const moduleRows = Array.isArray(result.moduleCheck) ? result.moduleCheck : [];
@@ -5068,7 +5498,17 @@ function printToStringCrossRealmChecks() {
         bad: moduleBad
       }
     });
-  } catch (_) {}
+  } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 
   Object.defineProperty(globalThis, "__PROBE_OUTPUT__", {
     value: result,
@@ -5322,5 +5762,15 @@ try {
       enumerable: false
     });
   }
-} catch (_) {}
+} catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
 })();

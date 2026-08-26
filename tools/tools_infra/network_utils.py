@@ -15,9 +15,7 @@ logger = logger.getChild("network_utils")
 # === Constants and Settings ====
 PROJECT_ROOT        = pathlib.Path(__file__).resolve().parents[2]
 USER_DATA_DIR       = PROJECT_ROOT / 'user_data'
-POLL_INTERVAL       = 0.25          # poll Interval in seconds
 MAX_ATTEMPTS        = 6             # Connecting attempts
-TIMEOUT_SECONDS     = 120           # VPN  initialization Timesout 
 API_TIMEOUT_SECONDS = 5
 
 
@@ -25,17 +23,6 @@ class Client:
     """connection orchestrator"""
     def __init__(self, timeout: int = 60):
         self.timeout = timeout
-    
-    def prepare(self):
-        """Step 1: Cleaning processes, directories"""
-        logger.info("Step 2: environment preparation(cleanup + DNS flush)")
-
-  
-        subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
-
-        self._kill_old_processes()
-        
-        self._clean_directories()
 
     def post(self):
         """Step 4: Obtaining post-VPN IP"""

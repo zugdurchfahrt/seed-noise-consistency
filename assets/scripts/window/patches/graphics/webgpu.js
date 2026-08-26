@@ -67,7 +67,17 @@ const WebGPUPatchModule = function WebGPUPatchModule(window) {
           extra: p
         }
       });
-    } catch (_) {}
+    } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
   }
 
 

@@ -22,7 +22,17 @@
           const extra = (ctx && typeof ctx === 'object') ? Object.assign({ level }, ctx) : (ctx || { level });
           return __D(code, _err, extra || null);
         }
-      } catch (_) {}
+      } catch (_) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     };
 
     const __core = window && window.Core;
@@ -328,7 +338,17 @@
       if (typeof __outerDegrade === 'function') {
         return __outerDegrade(code, err || null, Object.assign({ level: level || 'warn' }, ctx || null));
       }
-    } catch (_emitErr) {}
+    } catch (_emitErr) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _emitErr);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _emitErr, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
     return undefined;
   }
   if (!__rngHasOwnExport || __rngCanFillPlaceholder) {
@@ -353,7 +373,17 @@
           data: { outcome: 'rollback', action: 'fallback_assign' }
         };
         __emitOuter('warn', 'rng_set:export_define_failed', ctx, e);
-      } catch (_reportErr) {}
+      } catch (_reportErr) {  try {
+    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
+    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
+      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
+        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _reportErr);
+      } else {
+        _root.__loggerRoot.__DEGRADE__("silent_swallow", _reportErr, {message: "caught swallowed exception"});
+      }
+    }
+  } catch (_err) {}
+}
       G.RNGsetModule = RNGsetModule;
     }
   } else {
