@@ -219,13 +219,13 @@ const RectsPatchModule = function RectsPatchModule(window) {
   const __glyphTextPattern = /[\u00A9\u00AE\u203C-\u3299]|[\uD83C-\uDBFF][\uDC00-\uDFFF]/;
 
   function __buildLayoutInfluence(fontFamily) {
-    const htmlLayoutWidthDelta = __roundCssPx((1 + Math.floor(__unit(__measurementSeedKeys.htmlLayoutGeometryWidth) * 4)) / __screenDpr);
+    const htmlLayoutWidthDelta = __roundCssPx((0.1 + __unit(__measurementSeedKeys.htmlLayoutGeometryWidth) * 0.4) / __screenDpr);
     const textGlyphFontSizeDelta = __roundCssPx((1 + Math.floor(__unit(__measurementSeedKeys.textGlyphMetricsFontSize) * 3)) / __screenDpr);
     const textGlyphLetterSpacingDelta = __roundCssPx((Math.floor(__unit(__measurementSeedKeys.textGlyphMetricsLetterSpacing) * 3) - 1) / (__screenDpr * 10));
     return {
       fontFamily: __quoteCssString(fontFamily),
-      htmlLayoutGeometryWidth: 'calc(1000.099% + ' + htmlLayoutWidthDelta + 'px)',
-      textGlyphMetricsFontSize: 'calc(200px + ' + textGlyphFontSizeDelta + 'px)',
+      htmlLayoutGeometryWidth: 'calc(100% + ' + htmlLayoutWidthDelta + 'px)',
+      textGlyphMetricsFontSize: 'calc(1em + ' + textGlyphFontSizeDelta + 'px)',
       textGlyphMetricsLetterSpacing: String(textGlyphLetterSpacingDelta) + 'px'
     };
   }

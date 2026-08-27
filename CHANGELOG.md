@@ -1,6 +1,12 @@
 # Changelog
 
 
+## 28.08.2026
+
+Fixed layout distortion issues by replacing aggressive CSS overrides (1000% width, 200px font-size) with relative base values (100%, 1em) and sub-pixel deltas. This ensures `getClientRects()` spoofing remains effective without breaking the visual appearance of the target pages.
+
+
+
 ## 27.08.2026
 
 Enhance error handling and logging across various modules
