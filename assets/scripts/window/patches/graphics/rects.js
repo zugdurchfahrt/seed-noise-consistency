@@ -112,12 +112,26 @@ const RectsPatchModule = function RectsPatchModule(window) {
     __fatal('rects:screen_metrics_invalid', 'FernwehContext.state.__SCREEN__.width/height/dpr', 'screen metrics invalid');
   }
 
-  const __prngRoot = (Core && Core.__internal && Core.__internal.prng && typeof Core.__internal.prng === 'object')
+  const __prngState = (Core && Core.__internal && Core.__internal.prng && typeof Core.__internal.prng === 'object')
     ? Core.__internal.prng
     : null;
-  if (!__prngRoot || typeof __prngRoot.seed !== 'string' || !__prngRoot.seed ||
-      typeof __prngRoot.strToSeed !== 'function' || typeof __prngRoot.mulberry32 !== 'function') {
-    __fatal('rects:prng_missing', 'Core.__internal.prng', 'Core PRNG state missing');
+  const __randSource = (__prngState && __prngState.rand && typeof __prngState.rand.use === 'function')
+    ? __prngState.rand
+    : null;
+  if (!__randSource || typeof __randSource.use !== 'function') {
+    __fatal('rects:prng_missing', 'Core.__internal.prng.rand', 'Core PRNG rand source missing');
+  }
+  function __unit(label) {
+    let rng = null;
+    try {
+      rng = __randSource.use('rects-' + String(label));
+    } catch (e) {
+      __fatal('rects:prng_use_failed', 'Core.__internal.prng.rand.use', 'Core PRNG rand.use threw error for label ' + label, e);
+    }
+    if (typeof rng !== 'function') {
+      __fatal('rects:prng_invalid', 'Core.__internal.prng.rand.use', 'Core PRNG rand.use returned non-function for label ' + label);
+    }
+    return rng();
   }
 
   const __stateRoot = C.state;
@@ -144,14 +158,6 @@ const RectsPatchModule = function RectsPatchModule(window) {
     ? __envPlatformState.domPlatform
     : null;
 
-  function __unit(label) {
-    const seed = __prngRoot.strToSeed('rects-layout|' + String(label) + '|' + __prngRoot.seed) >>> 0;
-    const rng = __prngRoot.mulberry32(seed);
-    if (typeof rng !== 'function') {
-      throw new Error('[RectsPatchModule] Core.__internal.prng.mulberry32 returned non-function');
-    }
-    return rng();
-  }
 
   function __roundCssPx(value) {
     return Math.round(Number(value) * 10000) / 10000;
@@ -211,17 +217,12 @@ const RectsPatchModule = function RectsPatchModule(window) {
   if (!Number.isFinite(__measurementScanLimit) || __measurementScanLimit <= 0) {
     __fatal('rects:measurement_scan_limit_invalid', 'FernwehContext.state.__RECTS__.__CONFIG__.maxMeasurementScan', 'measurement scan limit invalid');
   }
-  const __measurementSeedKeys = {
-    htmlLayoutGeometryWidth: 'html-layout-geometry-width',
-    textGlyphMetricsFontSize: 'text-glyph-metrics-font-size',
-    textGlyphMetricsLetterSpacing: 'text-glyph-metrics-letter-spacing'
-  };
   const __glyphTextPattern = /[\u00A9\u00AE\u203C-\u3299]|[\uD83C-\uDBFF][\uDC00-\uDFFF]/;
-
+  
   function __buildLayoutInfluence(fontFamily) {
-    const htmlLayoutWidthDelta = __roundCssPx((0.1 + __unit(__measurementSeedKeys.htmlLayoutGeometryWidth) * 0.4) / __screenDpr);
-    const textGlyphFontSizeDelta = __roundCssPx((1 + Math.floor(__unit(__measurementSeedKeys.textGlyphMetricsFontSize) * 3)) / __screenDpr);
-    const textGlyphLetterSpacingDelta = __roundCssPx((Math.floor(__unit(__measurementSeedKeys.textGlyphMetricsLetterSpacing) * 3) - 1) / (__screenDpr * 10));
+    const htmlLayoutWidthDelta = __roundCssPx((0.1 + __unit('html-layout-geometry-width') * 0.4) / __screenDpr);
+    const textGlyphFontSizeDelta = __roundCssPx((1 + Math.floor(__unit('text-glyph-metrics-font-size') * 3)) / __screenDpr);
+    const textGlyphLetterSpacingDelta = __roundCssPx((Math.floor(__unit('text-glyph-metrics-letter-spacing') * 3) - 1) / (__screenDpr * 10));
     return {
       fontFamily: __quoteCssString(fontFamily),
       htmlLayoutGeometryWidth: 'calc(100% + ' + htmlLayoutWidthDelta + 'px)',

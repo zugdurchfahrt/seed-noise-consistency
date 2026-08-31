@@ -1,6 +1,10 @@
 # Changelog
 
 
+## 31.08.2026
+
+- `rects.js`: Standardized PRNG initialization to use the official `Core.__internal.prng.rand.use` API while preserving strict deterministic property isolation. Replaced the monolithic stateful generator with independent property-based pools (`__randSource.use('rects-' + label)`). This resolves a determinism gap where conditionally evaluated layout noise (e.g., font family choice) would incorrectly shift the pseudo-random sequence of downstream geometry metrics, violating the exact seed-based determinism contract.
+
 ## 28.08.2026
 
 Fixed layout distortion issues by replacing aggressive CSS overrides (1000% width, 200px font-size) with relative base values (100%, 1em) and sub-pixel deltas. This ensures `getClientRects()` spoofing remains effective without breaking the visual appearance of the target pages.
