@@ -226,11 +226,18 @@ const RectsPatchModule = function RectsPatchModule(window) {
     const htmlLayoutWidthDelta = __roundCssPx((0.1 + __unit('html-layout-geometry-width') * 0.4) / __screenDpr);
     const textGlyphFontSizeDelta = __roundCssPx((1 + Math.floor(__unit('text-glyph-metrics-font-size') * 3)) / __screenDpr);
     const textGlyphLetterSpacingDelta = __roundCssPx((Math.floor(__unit('text-glyph-metrics-letter-spacing') * 3) - 1) / (__screenDpr * 10));
+    
+    const shadowX = __roundCssPx((__unit('pixel-glyph-rendering-shadow-x') * 0.05 + 0.01) / __screenDpr);
+    const shadowY = __roundCssPx((__unit('pixel-glyph-rendering-shadow-y') * 0.05 + 0.01) / __screenDpr);
+    const shadowAlpha = (Math.floor(__unit('pixel-glyph-rendering-shadow-alpha') * 5) + 1) / 100;
+    const pixelGlyphTextShadow = shadowX + 'px ' + shadowY + 'px 0.01px rgba(0,0,0,' + shadowAlpha + ')';
+
     return {
       fontFamily: __quoteCssString(fontFamily),
       htmlLayoutGeometryWidth: 'calc(100% + ' + htmlLayoutWidthDelta + 'px)',
       textGlyphMetricsFontSize: 'calc(1em + ' + textGlyphFontSizeDelta + 'px)',
-      textGlyphMetricsLetterSpacing: String(textGlyphLetterSpacingDelta) + 'px'
+      textGlyphMetricsLetterSpacing: String(textGlyphLetterSpacingDelta) + 'px',
+      pixelGlyphTextShadow: pixelGlyphTextShadow
     };
   }
 
@@ -243,6 +250,9 @@ const RectsPatchModule = function RectsPatchModule(window) {
       { key: 'font-family', value: __layoutInfluence.fontFamily },
       { key: 'font-size', value: __layoutInfluence.textGlyphMetricsFontSize },
       { key: 'letter-spacing', value: __layoutInfluence.textGlyphMetricsLetterSpacing }
+    ],
+    pixelGlyphRendering: [
+      { key: 'text-shadow', value: __layoutInfluence.pixelGlyphTextShadow }
     ],
     svgLayoutGeometry: [
       { key: 'overflow', value: 'visible' }
@@ -370,12 +380,63 @@ const RectsPatchModule = function RectsPatchModule(window) {
     return candidates;
   }
 
-  function __applyLayoutInfluence(styles) {
-    const candidates = __collectMeasurementFixtureCandidates();
+  function __collectMeasurementFixtureCandidatesFromNodes(nodes) {
+    const candidates = {
+      htmlLayoutGeometry: [],
+      textGlyphMetrics: [],
+      pixelGlyphRendering: [],
+      svgLayoutGeometry: [],
+      scanned: 0,
+      svgScanned: 0,
+      elementScanned: 0
+    };
+    if (!nodes || !nodes.length) return candidates;
+    for (let n = 0; n < nodes.length; n++) {
+      const root = nodes[n];
+      if (!root || root.nodeType !== 1) continue;
+      
+      if (root.tagName && root.tagName.toLowerCase() === 'svg') {
+        if (__hasVisibleLayoutRect(root)) {
+          __pushUnique(candidates.svgLayoutGeometry, root);
+          __pushUnique(candidates.htmlLayoutGeometry, __nearestLayoutContainer(root));
+        }
+      } else if (__isDeepestGlyphElement(root) && __hasVisibleLayoutRect(root)) {
+        __pushUnique(candidates.textGlyphMetrics, root);
+        __pushUnique(candidates.pixelGlyphRendering, root);
+        __pushUnique(candidates.htmlLayoutGeometry, __nearestLayoutContainer(root));
+      }
+
+      const svgNodes = root.getElementsByTagName ? root.getElementsByTagName('svg') : [];
+      for (let i = 0; svgNodes && i < svgNodes.length; i++) {
+        candidates.scanned++;
+        candidates.svgScanned++;
+        const svgNode = svgNodes[i];
+        if (__hasVisibleLayoutRect(svgNode)) {
+          __pushUnique(candidates.svgLayoutGeometry, svgNode);
+          __pushUnique(candidates.htmlLayoutGeometry, __nearestLayoutContainer(svgNode));
+        }
+      }
+
+      const elements = root.getElementsByTagName ? root.getElementsByTagName('*') : [];
+      for (let i = 0; elements && i < elements.length; i++) {
+        candidates.scanned++;
+        candidates.elementScanned++;
+        const el = elements[i];
+        if (!__isDeepestGlyphElement(el) || !__hasVisibleLayoutRect(el)) continue;
+        __pushUnique(candidates.textGlyphMetrics, el);
+        __pushUnique(candidates.pixelGlyphRendering, el);
+        __pushUnique(candidates.htmlLayoutGeometry, __nearestLayoutContainer(el));
+      }
+    }
+    return candidates;
+  }
+
+  function __applyLayoutInfluence(styles, providedCandidates) {
+    const candidates = providedCandidates || __collectMeasurementFixtureCandidates();
     let applied = 0;
     applied += __applyStyleRulesToElements(candidates.htmlLayoutGeometry, styles.htmlLayoutGeometry);
     applied += __applyStyleRulesToElements(candidates.textGlyphMetrics, styles.textGlyphMetrics);
-    applied += __applyStyleRulesToElements(candidates.pixelGlyphRendering, styles.textGlyphMetrics);
+    applied += __applyStyleRulesToElements(candidates.pixelGlyphRendering, styles.pixelGlyphRendering);
     applied += __applyStyleRulesToElements(candidates.svgLayoutGeometry, styles.svgLayoutGeometry);
     const channels = ['htmlLayoutGeometry', 'textGlyphMetrics', 'pixelGlyphRendering', 'svgLayoutGeometry'];
     const channelCounts = {
@@ -411,8 +472,8 @@ const RectsPatchModule = function RectsPatchModule(window) {
     return applied;
   }
 
-  function __applyLayoutInfluenceToCandidates() {
-    return __applyLayoutInfluence(__layoutStyleRules);
+  function __applyLayoutInfluenceToCandidates(providedCandidates) {
+    return __applyLayoutInfluence(__layoutStyleRules, providedCandidates);
   }
 
   function __installLayoutObserver() {
@@ -421,9 +482,19 @@ const RectsPatchModule = function RectsPatchModule(window) {
       __fatal('rects:mutation_observer_missing', 'MutationObserver', 'MutationObserver missing');
     }
     let appliedTotal = __applyLayoutInfluenceToCandidates();
-    const observer = new window.MutationObserver(function rectsLayoutMutationObserver() {
+    const observer = new window.MutationObserver(function rectsLayoutMutationObserver(mutations) {
       try {
-        appliedTotal += __applyLayoutInfluenceToCandidates();
+        const addedNodes = [];
+        for (let i = 0; mutations && i < mutations.length; i++) {
+          const added = mutations[i].addedNodes;
+          for (let j = 0; added && j < added.length; j++) {
+            addedNodes.push(added[j]);
+          }
+        }
+        if (addedNodes.length > 0) {
+          const candidates = __collectMeasurementFixtureCandidatesFromNodes(addedNodes);
+          appliedTotal += __applyLayoutInfluenceToCandidates(candidates);
+        }
       } catch (e) {
         __emit('error', 'rects:layout_influence_apply_failed', {
           stage: 'runtime',

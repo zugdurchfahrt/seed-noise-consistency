@@ -4,6 +4,8 @@
 ## 31.08.2026
 
 - `rects.js`: Standardized PRNG initialization to use the official `Core.__internal.prng.rand.use` API while preserving strict deterministic property isolation. Replaced the monolithic stateful generator with independent property-based pools (`__randSource.use('rects-' + label)`). This resolves a determinism gap where conditionally evaluated layout noise (e.g., font family choice) would incorrectly shift the pseudo-random sequence of downstream geometry metrics, violating the exact seed-based determinism contract.
+- `rects.js`: Refactored `MutationObserver` layout application to process only `mutations.addedNodes` rather than rescanning the full DOM tree on every mutation. This resolves a critical race condition where dynamically appended test elements on heavy pages (e.g., BrowserLeaks, CreepJS) were falling outside the hardcoded `__measurementScanLimit` (2048 elements) and freezing the Unicode Glyphs hash.
+- `rects.js`: Completed the `pixelGlyphRendering` spoofing vector by computing independent PRNG seeds for `shadowX`, `shadowY`, and `shadowAlpha`, applying a micro `text-shadow` property to perturb sub-pixel anti-aliasing rendering. Fixed a typo in `__applyLayoutInfluence` mapping that incorrectly routed `textGlyphMetrics` styles to pixel glyph candidates.
 
 ## 28.08.2026
 
