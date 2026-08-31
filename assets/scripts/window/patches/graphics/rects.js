@@ -121,15 +121,18 @@ const RectsPatchModule = function RectsPatchModule(window) {
   if (!__randSource || typeof __randSource.use !== 'function') {
     __fatal('rects:prng_missing', 'Core.__internal.prng.rand', 'Core PRNG rand source missing');
   }
+  const __MODULE_KEY = 'rects';
+  
   function __unit(label) {
     let rng = null;
+    const key = __MODULE_KEY + '-' + String(label);
     try {
-      rng = __randSource.use('rects-' + String(label));
+      rng = __randSource.use(key);
     } catch (e) {
-      __fatal('rects:prng_use_failed', 'Core.__internal.prng.rand.use', 'Core PRNG rand.use threw error for label ' + label, e);
+      __fatal('rects:prng_use_failed', 'Core.__internal.prng.rand.use', 'Core PRNG rand.use threw error for key ' + key, e);
     }
     if (typeof rng !== 'function') {
-      __fatal('rects:prng_invalid', 'Core.__internal.prng.rand.use', 'Core PRNG rand.use returned non-function for label ' + label);
+      __fatal('rects:prng_invalid', 'Core.__internal.prng.rand.use', 'Core PRNG rand.use returned non-function for key ' + key);
     }
     return rng();
   }
