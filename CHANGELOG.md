@@ -1,6 +1,12 @@
 # Changelog
 
 
+## 02.09.2026
+
+- `set_log.js`: Refactored the core logger to strictly conform to `Policy_implement_reg`, `Hidden_State_FernwehContext_Contract`, and `DEGRADE_Contract`. Removed hardcoded module keys (WebGL, Canvas, Navigator, Fonts) in favor of the generic `isAccess: true` contract flag. Implemented `_silent_swallow` to remove massive inline try-catch bloat and fix soft-fail swallowing. Optimized `diagDupSignature` and object allocations inside `diag` hot paths to reduce GC pressure. Rewrote `moduleAuditEvaluate` to use an optimized reverse scan loop. Replaced fragile error string parsing in `isExpectedReceiverThrow` with proper `__EXPECTED_RECEIVER_THROW__` brand-checking. Eliminated `instanceof ServiceWorkerGlobalScope` environment guessing in `resolveDiagScopeIdentity` by strictly relying on `window.FernwehContext.state.__WRK__.runtime`.
+- `nav_total_set.js`: Added the `isAccess: true` contract flag to `nav_total_set:nav_access` and `nav_total_set:permission_state_updated` diagnostic events, ensuring proper routing to the logger's access buffer without breaking module isolation.
+- `font_module.js`: Added the `isAccess: true` contract flag to `fonts:fontface:local_only_replaced_with_managed_src` and `fonts:fontface:local_only_passthrough_not_proven` to align with the generic logger contract.
+
 ## 31.08.2026
 
 - `rects.js`: Standardized PRNG initialization to use the official `Core.__internal.prng.rand.use` API while preserving strict deterministic property isolation. Replaced the monolithic stateful generator with independent property-based pools (`__randSource.use('rects-' + label)`). This resolves a determinism gap where conditionally evaluated layout noise (e.g., font family choice) would incorrectly shift the pseudo-random sequence of downstream geometry metrics, violating the exact seed-based determinism contract.

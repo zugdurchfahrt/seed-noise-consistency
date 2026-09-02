@@ -1002,6 +1002,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
               diagTag: 'fonts:fontface',
               key: 'FontFace',
               message: 'FontFace local-only source replaced with managed data src',
+              isAccess: true,
               data: {
                 outcome: 'return',
                 reason: 'local_only_replaced_with_managed_src',
@@ -1016,6 +1017,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
               diagTag: 'fonts:fontface',
               key: 'FontFace',
               message: 'FontFace local-only source kept as native (not proven)',
+              isAccess: true,
               data: {
                 outcome: 'return',
                 reason: 'local_only_passthrough_not_proven',

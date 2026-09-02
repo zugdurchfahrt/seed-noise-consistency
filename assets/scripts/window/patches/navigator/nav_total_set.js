@@ -529,6 +529,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         diagTag: 'nav_total_set:permissions.state',
         key: `permissions.${name}`,
         message: 'hidden permission state updated',
+        isAccess: true,
         data: {
           outcome: 'return',
           reason: 'permission_state_updated',
@@ -636,6 +637,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         diagTag: 'nav_total_set',
         key: k || null,
         message: 'nav access',
+        isAccess: true,
         data: { outcome: 'return', reason: 'nav_access', extra: extra || null }
       });
     }
