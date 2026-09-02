@@ -1847,3 +1847,4 @@ const LOGGingModule = function LOGGingModule() {
       rebindWindowLoggerShell();
     }
 }
+

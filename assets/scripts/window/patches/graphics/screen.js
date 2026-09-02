@@ -1,46 +1,29 @@
 const ScreenPatchModule = function ScreenPatchModule(window) {
+  const __MODULE = 'screen';
+  const __SURFACE = 'screen';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
+  const G = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+
   const __screenTypePipeline = 'pipeline missing data';
   const __screenTypeBrowser = 'browser structure missing data';
   const __screenModule = 'screen';
-  const __screenSurface = 'screen';
   const __core = window.Core;
   const __flagKey = '__PATCH_SCREEN__';
-  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
-    ? window.FernwehContext.__logger
-    : null;
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
-  const __emit = (level, code, ctx, err) => {
-    try {
-      if (__diag) return __diag(level, code, ctx, err);
-      if (typeof __D === 'function') {
-        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-        const safeLevel = (level === undefined || level === null) ? 'info' : level;
-        const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
-      }
-    } catch (emitErr) {
-      return undefined;
-    }
-    return undefined;
-  };
-  function __screenDiag(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const ctx = {
-      module: __screenModule,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __screenModule,
-      surface: __screenSurface,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: x.stage,
-      message: x.message,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: x.type
-    };
-    return __emit(level, code, ctx, err);
-  }
+  ;
+  
   let __guardToken = null;
   if (!__core || typeof __core.guardFlag !== 'function') {
-    __screenDiag('warn', 'screen:guard_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:guard_missing', { module: __MODULE, surface: __SURFACE,
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -50,13 +33,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         outcome: 'skip',
         reason: 'missing_dep_core_guard'
       }
-    }, null);
+    }, null) : undefined);
     return;
   }
   try {
     __guardToken = __core.guardFlag(__flagKey, __screenModule);
   } catch (e) {
-    __screenDiag('warn', 'screen:guard_failed', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:guard_failed', { module: __MODULE, surface: __SURFACE,
       stage: 'guard',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -66,7 +49,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         outcome: 'skip',
         reason: 'guard_failed'
       }
-    }, e);
+    }, e) : undefined);
     return;
   }
   if (!__guardToken) return; // already_patched: Core emits screen:already_patched
@@ -75,7 +58,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const C = window.FernwehContext;
   if (!C) {
     const contextMissingErr = new Error('[FernwehContext] FernwehContext is undefined - module registration is not available');
-    __screenDiag('warn', 'screen:fernweh_context_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:fernweh_context_missing', { module: __MODULE, surface: __SURFACE,
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -86,13 +69,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         reason: 'fernweh_context_missing',
         missing: 'FernwehContext'
       }
-    }, contextMissingErr);
+    }, contextMissingErr) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
       }
     } catch (releaseErr) {
-      __screenDiag('warn', 'screen:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:guard_release_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
@@ -103,7 +86,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           reason: 'guard_release_failed',
           substage: 'FernwehContext'
         }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
@@ -111,7 +94,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__screenStateRoot) {
     const stateMissingErr = new Error('[FernwehContext] FernwehContext.state is undefined - module registration is not available');
-    __screenDiag('warn', 'screen:fernweh_context_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:fernweh_context_state_missing', { module: __MODULE, surface: __SURFACE,
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -122,13 +105,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         reason: 'fernweh_context_state_missing',
         missing: 'FernwehContext.state'
       }
-    }, stateMissingErr);
+    }, stateMissingErr) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
       }
     } catch (releaseErr) {
-      __screenDiag('warn', 'screen:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:guard_release_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
@@ -139,7 +122,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           reason: 'guard_release_failed',
           substage: 'FernwehContext.state'
         }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
@@ -149,7 +132,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     : null;
 
   if (!__screenState) {
-    __screenDiag('warn', 'screen:screen_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:screen_state_missing', { module: __MODULE, surface: __SURFACE,
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -160,13 +143,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         reason: 'screen_state_missing',
         missing: 'FernwehContext.state.__SCREEN__'
       }
-    }, new Error('[ScreenPatch] FernwehContext.state.__SCREEN__ unavailable'));
+    }, new Error('[ScreenPatch] FernwehContext.state.__SCREEN__ unavailable')) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __screenModule);
       }
     } catch (releaseErr) {
-      __screenDiag('warn', 'screen:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:guard_release_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: 'screen',
@@ -177,7 +160,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           reason: 'guard_release_failed',
           substage: 'FernwehContext.state.__SCREEN__'
         }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
@@ -302,14 +285,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     } catch (e) {
       if (!__screenReceiverCheckDiagSent) {
         __screenReceiverCheckDiagSent = true;
-        __screenDiag('warn', 'screen:receiver_matches_target_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:receiver_matches_target_failed', { module: __MODULE, surface: __SURFACE,
           stage: 'apply',
           type: __screenTypeBrowser,
           diagTag: 'screen',
           key: 'receiverMatchesTarget',
           message: 'receiverMatchesTarget failed',
           data: { outcome: 'skip', reason: 'exception', substage: 'receiverMatchesTarget' }
-        }, e);
+        }, e) : undefined);
       }
       return false;
     }
@@ -325,7 +308,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     try {
       registered = !!coreIsTargetRegistered(owner, key);
     } catch (e) {
-      __screenDiag('error', groupTag + ':registry_check_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':registry_check_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'rollback',
         type: __screenTypePipeline,
         diagTag: groupTag,
@@ -337,7 +320,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           substage: substage || 'rollback(registry_check)',
           rollbackReason: rollbackReason || 'rollback'
         }
-      }, e);
+      }, e) : undefined);
       return false;
     }
     if (!registered) {
@@ -347,7 +330,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       ? __core.__targetRegistry
       : null;
     if (!registry) {
-      __screenDiag('error', groupTag + ':registry_cleanup_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':registry_cleanup_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'rollback',
         type: __screenTypePipeline,
         diagTag: groupTag,
@@ -359,13 +342,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           substage: substage || 'rollback(registry_cleanup)',
           rollbackReason: rollbackReason || 'rollback'
         }
-      }, null);
+      }, null) : undefined);
       return false;
     }
     try {
       const bucket = registry.get(owner);
       if (!bucket || typeof bucket.delete !== 'function') {
-        __screenDiag('error', groupTag + ':registry_cleanup_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':registry_cleanup_failed', { module: __MODULE, surface: __SURFACE,
           stage: 'rollback',
           type: __screenTypePipeline,
           diagTag: groupTag,
@@ -377,7 +360,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             substage: substage || 'rollback(registry_cleanup)',
             rollbackReason: rollbackReason || 'rollback'
           }
-        }, null);
+        }, null) : undefined);
         return false;
       }
       bucket.delete(String(key));
@@ -385,7 +368,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         registry.delete(owner);
       }
     } catch (e) {
-      __screenDiag('error', groupTag + ':registry_cleanup_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':registry_cleanup_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'rollback',
         type: __screenTypePipeline,
         diagTag: groupTag,
@@ -397,12 +380,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           substage: substage || 'rollback(registry_cleanup)',
           rollbackReason: rollbackReason || 'rollback'
         }
-      }, e);
+      }, e) : undefined);
       return false;
     }
     try {
       if (coreIsTargetRegistered(owner, key)) {
-        __screenDiag('error', groupTag + ':registry_cleanup_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':registry_cleanup_failed', { module: __MODULE, surface: __SURFACE,
           stage: 'rollback',
           type: __screenTypePipeline,
           diagTag: groupTag,
@@ -414,11 +397,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             substage: substage || 'rollback(registry_cleanup)',
             rollbackReason: rollbackReason || 'rollback'
           }
-        }, null);
+        }, null) : undefined);
         return false;
       }
     } catch (e) {
-      __screenDiag('error', groupTag + ':registry_check_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':registry_check_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'rollback',
         type: __screenTypePipeline,
         diagTag: groupTag,
@@ -430,7 +413,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           substage: substage || 'rollback(registry_check)',
           rollbackReason: rollbackReason || 'rollback'
         }
-      }, e);
+      }, e) : undefined);
       return false;
     }
     return true;
@@ -451,7 +434,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     try {
       plans = __coreApplyTargets(targets);
     } catch (e) {
-      __screenDiag('error', groupTag + ':preflight_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':preflight_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: groupTag,
@@ -462,13 +445,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           reason: 'exception',
           substage: 'Core.applyTargets(preflight)'
         }
-      }, e);
+      }, e) : undefined);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
     if (!Array.isArray(plans) || !plans.length) {
       const reason = plans && plans.reason ? plans.reason : 'group_skipped';
-      __screenDiag('warn', groupTag + ':' + reason, {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':' + reason, { module: __MODULE, surface: __SURFACE,
         stage: 'preflight',
         type: __screenTypePipeline,
         diagTag: groupTag,
@@ -479,7 +462,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           reason: String(reason),
           substage: 'Core.applyTargets(plan)'
         }
-      }, null);
+      }, null) : undefined);
       if (groupPolicy === 'throw') {
         throw new Error('core plan skipped');
       }
@@ -505,7 +488,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           try {
             coreRegisterPatchedTarget(p.owner, p.key);
           } catch (registerErr) {
-            __screenDiag('error', groupTag + ':register_failed', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':register_failed', { module: __MODULE, surface: __SURFACE,
               stage: 'apply',
               type: __screenTypePipeline,
               diagTag: groupTag,
@@ -517,12 +500,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
                 substage: 'Core.registerPatchedTarget',
                 policy: groupPolicy
               }
-            }, registerErr);
+            }, registerErr) : undefined);
             if (groupPolicy === 'throw') throw registerErr;
           }
         }
       } else {
-        __screenDiag('warn', groupTag + ':missing_core_registerPatchedTarget', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':missing_core_registerPatchedTarget', { module: __MODULE, surface: __SURFACE,
           stage: 'preflight',
           type: __screenTypePipeline,
           diagTag: groupTag,
@@ -534,7 +517,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             substage: 'Core.registerPatchedTarget',
             policy: groupPolicy
           }
-        }, null);
+        }, null) : undefined);
       }
     } catch (e) {
       let rollbackErr = null;
@@ -548,7 +531,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           }
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
-          __screenDiag('error', groupTag + ':rollback_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':rollback_failed', { module: __MODULE, surface: __SURFACE,
             stage: 'rollback',
             type: __screenTypeBrowser,
             diagTag: groupTag,
@@ -559,13 +542,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
               reason: 'rollback_failed',
               substage: 'Core.applyTargets.rollback'
             }
-          }, re);
+          }, re) : undefined);
         }
       }
       if (rollbackErr) {
         throw rollbackErr;
       }
-      __screenDiag('error', groupTag + ':apply_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':apply_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'apply',
         type: __screenTypeBrowser,
         diagTag: groupTag,
@@ -576,7 +559,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           reason: (e && e.message) ? String(e.message) : 'apply_failed',
           substage: 'Core.applyTargets.apply'
         }
-      }, e);
+      }, e) : undefined);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
@@ -611,7 +594,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         }
       } catch (re) {
         if (!rollbackErr) rollbackErr = re;
-        __screenDiag('error', groupTag + ':rollback_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':rollback_failed', { module: __MODULE, surface: __SURFACE,
           stage: 'rollback',
           type: __screenTypeBrowser,
           diagTag: groupTag,
@@ -623,7 +606,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             substage: 'postcheck',
             rollbackReason: reason || 'postcheck_failed'
           }
-        }, re);
+        }, re) : undefined);
       }
     }
     delete __screenAppliedGroups[groupTag];
@@ -657,14 +640,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const mqlOrigMatchesGet = (mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function') ? mqlMatchesDesc.get : null;
   if (mqlProto) {
     if (!(mqlMatchesDesc && typeof mqlMatchesDesc.get === 'function')) {
-      __screenDiag('warn', 'screen:mql_matches_descriptor_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:mql_matches_descriptor_missing', { module: __MODULE, surface: __SURFACE,
         stage: 'preflight',
         type: __screenTypeBrowser,
         diagTag: 'screen:mql_matches',
         key: 'matches',
         message: 'MediaQueryList.matches descriptor missing',
         data: { outcome: 'skip', reason: 'descriptor_missing' }
-      });
+      }, null) : undefined);
     }
   }
   
@@ -693,14 +676,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     } catch (e) {
       if (!__screenMatchMediaThisCheckDiagSent) {
         __screenMatchMediaThisCheckDiagSent = true;
-        __screenDiag('warn', 'screen:matchMedia_window_this_check_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:matchMedia_window_this_check_failed', { module: __MODULE, surface: __SURFACE,
           stage: 'apply',
           type: __screenTypeBrowser,
           diagTag: 'screen:matchMedia',
           key: 'matchMedia',
           message: 'Window receiver check failed',
           data: { outcome: 'skip', reason: 'exception', substage: 'isWindowThis' }
-        }, e);
+        }, e) : undefined);
       }
       return false;
     }
@@ -720,28 +703,28 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     } catch (e) {
       if (!__screenMqlMediaReadDiagSent) {
         __screenMqlMediaReadDiagSent = true;
-        __screenDiag('warn', 'screen:mql_media_read_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:mql_media_read_failed', { module: __MODULE, surface: __SURFACE,
           stage: 'runtime',
           type: __screenTypeBrowser,
           diagTag: 'screen:mql_media',
           key: 'media',
           message: 'MediaQueryList.media read failed',
           data: { outcome: 'skip', reason: 'exception', substage: 'mql.media' }
-        }, e);
+        }, e) : undefined);
       }
       return mql;
     }
     if (typeof query !== 'string') {
       if (!__screenMqlMediaReadDiagSent) {
         __screenMqlMediaReadDiagSent = true;
-        __screenDiag('warn', 'screen:mql_media_invalid', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:mql_media_invalid', { module: __MODULE, surface: __SURFACE,
           stage: 'runtime',
           type: __screenTypeBrowser,
           diagTag: 'screen:mql_media',
           key: 'media',
           message: 'MediaQueryList.media is not string',
           data: { outcome: 'skip', reason: 'invalid_media', substage: 'mql.media' }
-        }, null);
+        }, null) : undefined);
       }
       return mql;
     }
@@ -823,14 +806,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     try {
       if (touched) mqlMatches.set(mql, matches);
     } catch (e) {
-      __screenDiag('warn', 'screen:mql_matches_cache_set_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:mql_matches_cache_set_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'runtime',
         type: __screenTypeBrowser,
         diagTag: 'screen:mql_matches',
         key: 'matches',
         message: 'MediaQueryList cache set failed',
         data: { outcome: 'skip', reason: 'exception', substage: 'mqlMatches.set' }
-      }, e);
+      }, e) : undefined);
     }
     return mql;
   };
@@ -1377,25 +1360,25 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (displayReasons.length === ZERO) {
     __screenSetGroupEvidence('display', 'apply', [], displayPostcheck ? displayPostcheck.mismatches : []);
     __screenSetGroupOutcome('display', 'native_observed', 'native_coherent');
-    __screenDiag('info', 'screen:display_group_ready', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'screen:display_group_ready', { module: __MODULE, surface: __SURFACE,
       stage: 'apply',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: 'display_group',
       message: 'display group already coherent',
       data: __screenAugmentData('display', { outcome: 'return', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', details: [], mismatches: displayPostcheck ? displayPostcheck.mismatches : [], applied: ZERO, snapshot: displayPostcheck ? displayPostcheck.snapshot : null })
-    }, null);
+    }, null) : undefined);
   } else {
     __screenSetGroupEvidence('display', 'apply', displayReasons, displayPostcheck ? displayPostcheck.mismatches : []);
     __screenSetGroupOutcome('display', 'skip', displayReasons[ZERO] || 'display_skipped');
-    __screenDiag('warn', 'screen:display_group_skipped', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:display_group_skipped', { module: __MODULE, surface: __SURFACE,
       stage: 'preflight',
       type: __screenTypeBrowser,
       diagTag: 'screen',
       key: 'display_group',
       message: 'display group skipped',
       data: __screenAugmentData('display', { outcome: 'skip', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', observed: displayObserved, details: displayReasons, mismatches: displayPostcheck ? displayPostcheck.mismatches : [] })
-    }, null);
+    }, null) : undefined);
   }
   let viewportPostcheck = null;
   if (viewportReasons.length === ZERO) {
@@ -1407,25 +1390,25 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (viewportReasons.length === ZERO) {
     __screenSetGroupEvidence('viewport', 'apply', [], viewportPostcheck ? viewportPostcheck.mismatches : []);
     __screenSetGroupOutcome('viewport', 'native_observed', 'native_coherent');
-    __screenDiag('info', 'screen:viewport_group_ready', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'screen:viewport_group_ready', { module: __MODULE, surface: __SURFACE,
       stage: 'apply',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: 'viewport_group',
       message: 'viewport group already coherent',
       data: __screenAugmentData('viewport', { outcome: 'return', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: 'apply', details: [], mismatches: viewportPostcheck ? viewportPostcheck.mismatches : [], applied: ZERO, snapshot: viewportPostcheck ? viewportPostcheck.snapshot : null })
-    }, null);
+    }, null) : undefined);
   } else {
     __screenSetGroupEvidence('viewport', 'apply', viewportReasons, viewportPostcheck ? viewportPostcheck.mismatches : []);
     __screenSetGroupOutcome('viewport', 'skip', viewportReasons[ZERO] || 'viewport_skipped');
-    __screenDiag('warn', 'screen:viewport_group_skipped', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:viewport_group_skipped', { module: __MODULE, surface: __SURFACE,
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: 'viewport_group',
       message: 'viewport group skipped',
       data: __screenAugmentData('viewport', { outcome: 'skip', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: 'apply', observed: viewportObserved, details: viewportReasons, mismatches: viewportPostcheck ? viewportPostcheck.mismatches : [] })
-    }, null);
+    }, null) : undefined);
   }
   if (hostWindowTargets.length && hostWindowReasons.length === ZERO) {
     hostWindowAppliedCount = applyCoreTargetsGroup('screen:host_window_group', hostWindowTargets, 'strict');
@@ -1437,14 +1420,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     hostWindowPostcheck = __screenCheckHostWindowCoherence();
     if (!hostWindowPostcheck.ok) {
       if (hostWindowAppliedCount > ZERO) {
-        __screenDiag('error', 'screen:coordination_postcheck_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'screen:coordination_postcheck_failed', { module: __MODULE, surface: __SURFACE,
           stage: 'apply',
           type: __screenTypeBrowser,
           diagTag: 'screen',
           key: 'host_window_group',
           message: 'host-window coordination post-check failed',
           data: __screenAugmentData('hostWindow', { outcome: 'rollback', reason: 'host_window_postcheck_failed', substage: 'apply', details: ['host_window_postcheck_failed'], mismatches: hostWindowPostcheck.mismatches })
-        }, null);
+        }, null) : undefined);
         rollbackAppliedCoreGroup('screen:host_window_group', 'host_window_postcheck_failed');
         hostWindowAppliedCount = ZERO;
       }
@@ -1454,25 +1437,25 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   if (hostWindowReasons.length === ZERO) {
     __screenSetGroupEvidence('hostWindow', 'apply', [], hostWindowPostcheck ? hostWindowPostcheck.mismatches : []);
     __screenSetGroupOutcome('hostWindow', hostWindowAppliedCount > ZERO ? 'patched' : 'native_observed', hostWindowAppliedCount > ZERO ? 'coordinated_apply' : 'native_coherent');
-    __screenDiag('info', hostWindowAppliedCount > ZERO ? 'screen:host_window_group_applied' : 'screen:host_window_group_ready', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', hostWindowAppliedCount > ZERO ? 'screen:host_window_group_applied' : 'screen:host_window_group_ready', { module: __MODULE, surface: __SURFACE,
       stage: 'apply',
       type: hostWindowAppliedCount > ZERO ? 'ok' : __screenTypePipeline,
       diagTag: 'screen',
       key: 'host_window_group',
       message: hostWindowAppliedCount > ZERO ? 'host-window group coordinated' : 'host-window group already coherent',
       data: __screenAugmentData('hostWindow', { outcome: 'return', mode: __screenGroupModes.hostWindowMode, reason: __screenGroupModes.hostWindowReason, substage: 'apply', details: [], mismatches: hostWindowPostcheck ? hostWindowPostcheck.mismatches : [], applied: hostWindowAppliedCount, snapshot: hostWindowPostcheck ? hostWindowPostcheck.snapshot : null })
-    }, null);
+    }, null) : undefined);
   } else {
     __screenSetGroupEvidence('hostWindow', 'apply', hostWindowReasons, hostWindowPostcheck ? hostWindowPostcheck.mismatches : []);
     __screenSetGroupOutcome('hostWindow', 'skip', hostWindowReasons[ZERO] || 'host_window_skipped');
-    __screenDiag('warn', 'screen:host_window_group_skipped', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:host_window_group_skipped', { module: __MODULE, surface: __SURFACE,
       stage: 'preflight',
       type: __screenTypePipeline,
       diagTag: 'screen',
       key: 'host_window_group',
       message: 'host-window group skipped',
       data: __screenAugmentData('hostWindow', { outcome: 'skip', mode: __screenGroupModes.hostWindowMode, reason: __screenGroupModes.hostWindowReason, substage: 'apply', observed: hostWindowObserved, details: hostWindowReasons, mismatches: hostWindowPostcheck ? hostWindowPostcheck.mismatches : [] })
-    }, null);
+    }, null) : undefined);
   }
 
   function __screenReconcileViewportRootClients(substage) {
@@ -1588,14 +1571,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       postcheck = __screenCheckViewportCoherence();
       if (!postcheck.ok) {
         if (applied > ZERO) {
-          __screenDiag('error', 'screen:coordination_postcheck_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'screen:coordination_postcheck_failed', { module: __MODULE, surface: __SURFACE,
             stage: 'apply',
             type: __screenTypeBrowser,
             diagTag: 'screen',
             key: 'viewport_group',
             message: 'viewport coordination post-check failed',
             data: __screenAugmentData('viewport', { outcome: 'rollback', reason: 'viewport_postcheck_failed', substage: substage, details: ['viewport_postcheck_failed'], mismatches: postcheck.mismatches })
-          }, null);
+          }, null) : undefined);
           rollbackAppliedCoreGroup('screen:viewport_group:dom_ready', 'viewport_postcheck_failed');
           applied = ZERO;
         }
@@ -1605,7 +1588,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (localReasons.length === ZERO) {
       __screenSetGroupEvidence('viewport', substage, [], postcheck ? postcheck.mismatches : []);
       __screenSetGroupOutcome('viewport', applied > ZERO ? 'patched' : 'native_observed', applied > ZERO ? (substage === 'deferred_late_surface_reconcile' ? 'deferred_late_surface_reconcile' : 'dom_ready_reconcile') : 'native_coherent');
-      __screenDiag('info', applied > ZERO ? 'screen:viewport_group_applied' : 'screen:viewport_group_ready', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', applied > ZERO ? 'screen:viewport_group_applied' : 'screen:viewport_group_ready', { module: __MODULE, surface: __SURFACE,
         stage: 'runtime',
         type: applied > ZERO ? 'ok' : __screenTypePipeline,
         diagTag: 'screen',
@@ -1614,18 +1597,18 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           ? (substage === 'deferred_late_surface_reconcile' ? 'viewport group reconciled after deferred late-surface retry' : 'viewport group reconciled after DOM ready')
           : 'viewport group coherent after DOM ready',
         data: __screenAugmentData('viewport', { outcome: 'return', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, details: [], mismatches: postcheck ? postcheck.mismatches : [], applied: applied, snapshot: postcheck ? postcheck.snapshot : null })
-      }, null);
+      }, null) : undefined);
     } else {
       __screenSetGroupEvidence('viewport', substage, localReasons, postcheck ? postcheck.mismatches : []);
       __screenSetGroupOutcome('viewport', 'skip', localReasons[ZERO] || 'viewport_skipped');
-      __screenDiag('warn', 'screen:viewport_group_skipped', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'screen:viewport_group_skipped', { module: __MODULE, surface: __SURFACE,
         stage: 'runtime',
         type: __screenTypePipeline,
         diagTag: 'screen',
         key: 'viewport_group',
         message: 'viewport group skipped after DOM ready',
         data: __screenAugmentData('viewport', { outcome: 'skip', mode: __screenGroupModes.viewportMode, reason: __screenGroupModes.viewportReason, substage: substage, details: localReasons, mismatches: postcheck ? postcheck.mismatches : [] })
-      }, null);
+      }, null) : undefined);
     }
     return { applied: applied, postcheck: postcheck, reasons: localReasons };
   }
@@ -1636,7 +1619,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       reconcileResult.postcheck.snapshot &&
       (!reconcileResult.reasons || reconcileResult.reasons.length === ZERO)
     ) ? reconcileResult.postcheck.snapshot : null;
-    __screenDiag('info', 'screen:patched_viewport', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'screen:patched_viewport', { module: __MODULE, surface: __SURFACE,
       stage: 'runtime',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -1667,7 +1650,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           height: window.screen.height
         }
       })
-    });
+    }, null) : undefined);
     const __screenCoordinationComplete = (
       __screenGroupModes.displayMode !== 'skip' &&
       __screenGroupModes.viewportMode !== 'skip' &&
@@ -1684,7 +1667,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       .concat(__screenCloneList(__screenGroupModes.displayMismatches))
       .concat(__screenCloneList(__screenGroupModes.viewportMismatches))
       .concat(__screenCloneList(__screenGroupModes.hostWindowMismatches));
-    __screenDiag(__screenCoordinationComplete ? 'info' : 'warn', __screenSummaryCode, {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(__screenCoordinationComplete ? 'info' : 'warn', __screenSummaryCode, { module: __MODULE, surface: __SURFACE,
       stage: 'runtime',
       type: __screenCoordinationComplete
         ? (__screenGroupModes.coordinationPatched ? 'ok' : __screenTypePipeline)
@@ -1713,7 +1696,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         hostWindowGroupSubstage: __screenGroupModes.hostWindowSubstage,
         hostWindowObserved: hostWindowObserved
       })
-    });
+    }, null) : undefined);
     return __screenCoordinationComplete;
   }
   function __screenScheduleDeferredViewportReconcile(triggerReason) {
@@ -1721,7 +1704,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       return false;
     }
     __screenGroupModes.deferredViewportRetryScheduled = true;
-    __screenDiag('info', 'screen:deferred_viewport_reconcile_scheduled', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'screen:deferred_viewport_reconcile_scheduled', { module: __MODULE, surface: __SURFACE,
       stage: 'runtime',
       type: __screenTypePipeline,
       diagTag: 'screen',
@@ -1733,7 +1716,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         substage: 'DOMContentLoaded',
         details: [triggerReason || 'viewport_incomplete_after_domcontentloaded']
       })
-    }, null);
+    }, null) : undefined);
     window.setTimeout(function runDeferredViewportReconcile() {
       __screenGroupModes.deferredViewportRetryScheduled = false;
       __screenGroupModes.deferredViewportRetryUsed = true;
@@ -1768,7 +1751,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         __moduleRollbackStack[i]();
       } catch (re) {
         if (!rollbackErr) rollbackErr = re;
-        __screenDiag('error', 'screen:rollback_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'screen:rollback_failed', { module: __MODULE, surface: __SURFACE,
           stage: 'rollback',
           type: __screenTypeBrowser,
           diagTag: 'screen',
@@ -1779,11 +1762,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
             reason: 'rollback_failed',
             substage: 'module_catch'
           }
-        }, re);
+        }, re) : undefined);
       }
     }
     const rollbackOk = !rollbackErr;
-    __screenDiag('fatal', 'screen:fatal', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'screen:fatal', { module: __MODULE, surface: __SURFACE,
       stage: 'apply',
       type: __screenTypeBrowser,
       diagTag: 'screen',
@@ -1795,13 +1778,13 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         substage: 'module_try',
         rollbackOk
       }
-    }, rollbackErr || e);
+    }, rollbackErr || e) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __screenModule);
       }
     } catch (releaseErr) {
-      __screenDiag('error', 'screen:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'screen:guard_release_failed', { module: __MODULE, surface: __SURFACE,
         stage: 'rollback',
         type: __screenTypePipeline,
         diagTag: 'screen',
@@ -1812,7 +1795,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           reason: 'guard_release_failed',
           substage: 'module_catch'
         }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     throw (rollbackErr || e);
   }

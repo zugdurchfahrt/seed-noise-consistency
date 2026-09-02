@@ -8,12 +8,17 @@
           || (typeof global     !== 'undefined' && global)
           || {};
 
-    const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
-      ? window.FernwehContext.__logger
-      : ((G && G.FernwehContext && G.FernwehContext.__logger && typeof G.FernwehContext.__logger === 'object') ? G.FernwehContext.__logger : null);
-    // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
-    const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-    const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+    const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+  try {
+    const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+    if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+      G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+    } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+      G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+    }
+  } catch (_) {}
+};
+
     const __emit = (level, code, ctx, err) => {
       try {
         const _err = (typeof err === 'undefined') ? null : err;

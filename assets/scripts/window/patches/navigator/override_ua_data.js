@@ -1,57 +1,38 @@
 (function(){
-  'use strict';
-  const g = window;
   const __MODULE = 'override_ua_data';
   const __SURFACE = 'navigator';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
+  const G = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+
+  'use strict';
+  const g = window;
   const __TYPE_PIPELINE = 'pipeline missing data';
   const __TYPE_BROWSER = 'browser structure missing data';
   const Core = g && g.Core;
   const __uaSnapshot = (typeof g.__USER_AGENT === 'string' && g.__USER_AGENT) ? g.__USER_AGENT : null;
 
   // ---- NORMATIVE: local diag adapter (single gateway; no local normalization) ----
-  const __loggerRoot = (g && g.FernwehContext && g.FernwehContext.__logger && typeof g.FernwehContext.__logger === 'object')
-    ? g.FernwehContext.__logger
-    : null;
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
-  function __emit(level, code, ctx, err) {
-    try {
-      if (__diag) return __diag(level, code, ctx, err);
-      if (typeof __D === 'function') {
-        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-        const safeLevel = (level === undefined || level === null) ? 'info' : level;
-        const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
-      }
-    } catch (emitErr) {
-      return undefined;
-    }
-  }
-  function __moduleDiag(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const ctx = {
-      module: __MODULE,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
-      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : __SURFACE,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: x.stage,
-      message: x.message,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: x.type
-    };
-    return __emit(level, String(code || (__MODULE + ':diag')), ctx, (err === undefined ? null : err));
-  }
   function __diagPipeline(level, code, extra, err) {
     const x = (extra && typeof extra === 'object') ? extra : {};
     const y = Object.assign({}, x);
     if (typeof y.type !== 'string' || !y.type) y.type = __TYPE_PIPELINE;
-    return __moduleDiag(level, code, y, err);
+    return (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(level, code, Object.assign({ module: __MODULE, surface: __SURFACE }, y), err) : undefined);
   }
   function __diagBrowser(level, code, extra, err) {
     const x = (extra && typeof extra === 'object') ? extra : {};
     const y = Object.assign({}, x);
     if (typeof y.type !== 'string' || !y.type) y.type = __TYPE_BROWSER;
-    return __moduleDiag(level, code, y, err);
+    return (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(level, code, Object.assign({ module: __MODULE, surface: __SURFACE }, y), err) : undefined);
   }
 
   // ---- TEMPORARY: module is present but disabled by default (opt-in via profile) ----
@@ -368,14 +349,14 @@
 
       const applied = applyTargetGroup(__tag + ':navigator', targets, 'skip');
       if (applied > 0) {
-        __moduleDiag('info', __tag + ':applied', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', __tag + ':applied', { module: __MODULE, surface: __SURFACE, 
           diagTag: __tag,
           surface: __surface,
           key: 'navigator.userAgent',
           stage: 'apply',
           message: 'override applied',
           data: { outcome: 'return', reason: 'applied', applied: applied }
-        }, null);
+        }, null) : undefined);
         return;
       }
 
@@ -383,14 +364,14 @@
       const outcome = (__groupOutcome === 'rollback') ? 'rollback' : 'skip';
       const rollbackOk = (__groupOutcome === 'rollback') ? !!__groupRollbackOk : true;
       if (!__groupEmitted) {
-        __moduleDiag((outcome === 'rollback') ? 'error' : 'warn', __tag + ':not_applied', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__((outcome === 'rollback') ? 'error' : 'warn', __tag + ':not_applied', { module: __MODULE, surface: __SURFACE, 
           diagTag: __tag,
           surface: __surface,
           key: 'navigator.userAgent',
           stage: __groupStage || 'apply',
           message: 'override not applied',
           data: { outcome: outcome, reason: (__groupReason || 'not_applied'), rollbackOk: rollbackOk }
-        }, null);
+        }, null) : undefined);
       }
       try {
         if (__core && typeof __core.releaseGuardFlag === 'function') {

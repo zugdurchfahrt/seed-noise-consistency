@@ -1,9 +1,22 @@
 const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
+  const __MODULE = 'nav_total_set';
+  const __SURFACE = 'navigator';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
+
     const G = (typeof globalThis !== 'undefined' && globalThis)
       || (typeof self !== 'undefined' && self)
       || {};
     const __tag = 'nav_total_set';
-    const __surface = 'navigator';
     const __flagKey = '__PATCH_NAVTOTALSET__';
     const W = (window && (typeof window === 'object' || typeof window === 'function'))
       ? window
@@ -18,61 +31,10 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const __navTypeBrowser = 'browser structure missing data';
 
     // [NORMATIVE] local adapter for __DEGRADE__ (no console.*, safe-noop on failure)
-    const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object')
-      ? C.__logger
-      : null;
-    const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-    const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
-    const __emit = (level, code, ctx, err) => {
-      try {
-        const safeErr = (typeof err === 'undefined' || err === null) ? null : err;
-        if (__diag) return __diag(level, code, ctx || null, safeErr);
-        if (typeof __D === 'function') {
-          const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-          const safeLevel = (level === undefined || level === null) ? 'info' : level;
-          return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
-        }
-      } catch (emitErr) {
-        return undefined;
-      }
-    };
-    function __navDiag(level, code, extra, err) {
-      try {
-        const x = (extra && typeof extra === 'object') ? extra : {};
-        const key = Object.prototype.hasOwnProperty.call(x, 'key')
-          ? ((typeof x.key === 'string' || x.key === null)
-            ? x.key
-            : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey))
-          : ((typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __flagKey);
-        const ctx = {
-          module: __tag,
-          diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag,
-          surface: __surface,
-          key: key,
-          stage: x.stage,
-          message: x.message,
-          type: (typeof x.type === 'string' && x.type) ? x.type : __navTypePipeline,
-          data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null
-        };
-        return __emit(level, code, ctx, err);
-      } catch (diagErr) {
-        return undefined;
-      }
-    }
-    function __navDiagPipeline(level, code, extra, err) {
-      const x = (extra && typeof extra === 'object') ? extra : {};
-      return __navDiag(level, code, Object.assign({}, x, {
-        type: (typeof x.type === 'string' && x.type) ? x.type : __navTypePipeline,
-        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag
-      }), err);
-    }
-    function __navDiagBrowser(level, code, extra, err) {
-      const x = (extra && typeof extra === 'object') ? extra : {};
-      return __navDiag(level, code, Object.assign({}, x, {
-        type: (typeof x.type === 'string' && x.type) ? x.type : __navTypeBrowser,
-        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __tag
-      }), err);
-    }
+    ;
+    
+    
+    
     let __navGuardToken = null;
     function __navReleaseEntryGuard(rollbackOk, stage, substage) {
       try {
@@ -80,7 +42,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           __core.releaseGuardFlag(__flagKey, __navGuardToken, rollbackOk === true, __tag);
         }
       } catch (e) {
-        __navDiagPipeline('warn', __tag + ':guard_release_exception', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_exception', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'guard',
           key: __flagKey,
           message: 'releaseGuardFlag threw',
@@ -91,7 +53,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             releaseStage: (typeof stage === 'string' && stage) ? stage : null,
             substage: (typeof substage === 'string' && substage) ? substage : null
           }
-        }, e);
+        }, e) : undefined);
       }
     }
     const __navResolveDescriptor = (__core && typeof __core.resolveDescriptor === 'function')
@@ -100,53 +62,53 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
     // ===== MODULE: canonical guard client =====
     if (!__core || typeof __core.guardFlag !== 'function') {
-      __navDiagPipeline('warn', __tag + ':guard_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'guard',
         key: __flagKey,
         message: 'Core.guardFlag missing',
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
-      }, null);
+      }, null) : undefined);
       return;
     }
     try {
       __navGuardToken = __core.guardFlag(__flagKey, __tag);
     } catch (e) {
-      __navDiagPipeline('warn', __tag + ':guard_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'guard',
         key: __flagKey,
         message: 'guardFlag threw',
         data: { outcome: 'skip', reason: 'guard_failed' }
-      }, e);
+      }, e) : undefined);
       return;
     }
     if (!__navGuardToken) return; // already_patched: Core emits nav_total_set:already_patched
     // Must run in Window realm (not Worker)
     if (typeof document === 'undefined' || !W || W.document !== document) {
-      __navDiagBrowser('warn', 'nav_total_set:not_window_realm', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:not_window_realm', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
         stage: 'preflight',
         message: 'not in Window realm',
         data: { outcome: 'skip', reason: 'not_window_realm' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'not_window_realm');
       return;
     }
 
     if (!C) {
-      __navDiagPipeline('warn', 'nav_total_set:fernweh_context_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:fernweh_context_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         message: 'FernwehContext missing',
         data: { outcome: 'skip', reason: 'fernweh_context_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'fernweh_context_missing');
       return;
     }
     const __stateRoot = (C && C.state && typeof C.state === 'object') ? C.state : null;
     if (!__stateRoot) {
-      __navDiagPipeline('warn', 'nav_total_set:fernweh_context_state_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:fernweh_context_state_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         message: 'FernwehContext.state missing',
         data: { outcome: 'skip', reason: 'fernweh_context_state_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'fernweh_context_state_missing');
       return;
     }
@@ -154,12 +116,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ? __stateRoot.__NAV_TOTAL_SET__
       : null;
     if (!__navModuleState) {
-      __navDiagPipeline('warn', 'nav_total_set:module_state_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:module_state_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'FernwehContext.state.__NAV_TOTAL_SET__',
         message: 'FernwehContext.state.__NAV_TOTAL_SET__ missing',
         data: { outcome: 'skip', reason: 'module_state_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'module_state_missing');
       return;
     }
@@ -181,21 +143,21 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const prev = Object.getOwnPropertyDescriptor(target, key);
       if (prev && prev.configurable === false) {
         if (Object.prototype.hasOwnProperty.call(prev, 'value')) {
-          __navDiagPipeline('error', 'nav_total_set:hidden_state_non_configurable_data', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:hidden_state_non_configurable_data', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
             stage: 'apply',
             key: String(key),
             message: 'hidden state slot is non-configurable data property',
             data: { outcome: 'return', reason: 'hidden_state_non_configurable_data' }
-          });
+          }, null) : undefined);
           return prev.value;
         }
         const err = new TypeError('hidden state slot is non-configurable accessor: ' + String(key));
-        __navDiagPipeline('error', 'nav_total_set:hidden_state_non_configurable_accessor', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:hidden_state_non_configurable_accessor', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'apply',
           key: String(key),
           message: err.message,
           data: { outcome: 'throw', reason: 'hidden_state_non_configurable_accessor' }
-        }, err);
+        }, err) : undefined);
         throw err;
       }
       Object.defineProperty(target, key, {
@@ -226,12 +188,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ? __navModuleState.__DATA_STORE_STATE__
       : null;
     if (!__navDataStoreState) {
-      __navDiagPipeline('warn', 'nav_total_set:data_store_state_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:data_store_state_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__',
         message: 'FernwehContext.state.__NAV_TOTAL_SET__.__DATA_STORE_STATE__ missing',
         data: { outcome: 'skip', reason: 'data_store_state_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'data_store_state_missing');
       return;
     }
@@ -239,12 +201,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ? __navModuleState.__SCALAR_STATE__
       : null;
     if (!__navScalarState) {
-      __navDiagPipeline('warn', 'nav_total_set:scalar_state_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:scalar_state_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__',
         message: 'FernwehContext.state.__NAV_TOTAL_SET__.__SCALAR_STATE__ missing',
         data: { outcome: 'skip', reason: 'scalar_state_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'scalar_state_missing');
       return;
     }
@@ -252,12 +214,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ? __navModuleState.__OBJECT_STATE__
       : null;
     if (!__navObjectState) {
-      __navDiagPipeline('warn', 'nav_total_set:object_state_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:object_state_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__',
         message: 'FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ missing',
         data: { outcome: 'skip', reason: 'object_state_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'object_state_missing');
       return;
     }
@@ -307,12 +269,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       !__navObjectMimeTypesProtoMethodsState ||
       !__navObjectMimeTypesMimeRecordsState
     ) {
-      __navDiagPipeline('warn', 'nav_total_set:object_state_nested_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:object_state_nested_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__',
         message: 'FernwehContext.state.__NAV_TOTAL_SET__.__OBJECT_STATE__ nested slot missing',
         data: { outcome: 'skip', reason: 'object_state_nested_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'object_state_nested_missing');
       return;
     }
@@ -329,12 +291,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       : null;
     const R = (__randSource && typeof __randSource.use === 'function') ? __randSource.use('nav') : null;
     if (typeof R !== 'function') {
-      __navDiagPipeline('error', 'nav_total_set:rand_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:rand_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'Core.__internal.prng.rand',
         message: 'Core.__internal.prng.rand missing',
         data: { outcome: 'skip', reason: 'core_internal_prng_rand_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'rand_missing');
       return;
     }
@@ -342,12 +304,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ? __stateRoot.__ENV_PROFILE__
       : null;
     if (!__envProfileState) {
-      __navDiagPipeline('error', 'nav_total_set:env_profile_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:env_profile_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'FernwehContext.state.__ENV_PROFILE__',
         message: 'FernwehContext.state.__ENV_PROFILE__ missing',
         data: { outcome: 'skip', reason: 'env_profile_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'env_profile_missing');
       return;
     }
@@ -357,12 +319,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       : null;
 
     if (!__screenState) {
-      __navDiagPipeline('error', 'nav_total_set:screen_state_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:screen_state_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'FernwehContext.state.__SCREEN__',
         message: 'FernwehContext.state.__SCREEN__ missing',
         data: { outcome: 'skip', reason: 'screen_state_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'screen_state_missing');
       return;
     }
@@ -371,12 +333,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ? __envProfileState.__PLATFORM__
       : null;
     if (!__envPlatformState) {
-      __navDiagPipeline('error', 'nav_total_set:env_platform_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:env_platform_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__',
         message: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__ missing',
         data: { outcome: 'skip', reason: 'env_platform_missing' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'env_platform_missing');
       return;
     }
@@ -399,12 +361,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       try {
         Object.freeze(__navNormalizedLanguages);
       } catch (e) {
-        __navDiagPipeline('warn', 'nav_total_set:languages_snapshot_freeze_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:languages_snapshot_freeze_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'preflight',
           key: 'languages',
           message: 'language snapshot freeze failed',
           data: { outcome: 'skip', reason: 'languages_snapshot_freeze_failed' }
-        }, e);
+        }, e) : undefined);
       }
     }
     function registerPatchedTarget(owner, key, tag) {
@@ -415,13 +377,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       try {
         coreRegisterPatchedTarget(owner, key);
       } catch (e) {
-        __navDiagBrowser('warn', (tag || 'nav_total_set') + ':register_target_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', (tag || 'nav_total_set') + ':register_target_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'apply',
           diagTag: (tag || 'nav_total_set'),
           key: key || null,
           message: 'registerPatchedTarget failed',
           data: { outcome: STRICT ? 'throw' : 'skip', reason: 'register_target_failed' }
-        }, e);
+        }, e) : undefined);
         if (STRICT) throw e;
       }
     }
@@ -429,12 +391,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       let resetErr = null;
       function rememberResetError(code, key, err) {
         if (!resetErr) resetErr = err;
-        __navDiagPipeline('error', code, {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', code, { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'rollback',
           key: key,
           message: 'object hidden-state reset failed',
           data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceReason: sourceReason || null, sourceError: 'object_state_reset_failed' }
-        }, err);
+        }, err) : undefined);
       }
       try {
         if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__GET_HIGH_ENTROPY_VALUES_PRODUCER__', null) !== null) throw new TypeError('highEntropy producer reset failed');
@@ -495,19 +457,19 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     function __navSetPermissionState(name, state, source) {
       if (typeof name !== 'string' || !name) {
-        __navDiag('error', 'nav_total_set:permission_state_name_invalid', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:permission_state_name_invalid', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:permissions.state',
           key: 'permissions',
           message: 'permission state name invalid',
           data: { outcome: 'return', reason: 'permission_state_name_invalid' }
-        });
+        }, null) : undefined);
         return false;
       }
       const normalizedState = __navNormalizePermissionState(state);
       if ((state !== 'prompt' && state !== 'denied') || (normalizedState !== 'prompt' && normalizedState !== 'denied')) {
-        __navDiag('error', 'nav_total_set:permission_state_forbidden', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:permission_state_forbidden', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:permissions.state',
@@ -519,11 +481,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             permission: name,
             state: state
           }
-        });
+        }, null) : undefined);
         return false;
       }
       __navObjectPermissionsState[name] = normalizedState;
-      __navDiag('info', 'nav_total_set:permission_state_updated', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:permission_state_updated', { module: __MODULE, surface: __SURFACE, 
         stage: 'runtime',
         type: __navTypePipeline,
         diagTag: 'nav_total_set:permissions.state',
@@ -537,7 +499,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           state: __navObjectPermissionsState[name],
           source: (typeof source === 'string' && source) ? source : 'internal'
         }
-      });
+      }, null) : undefined);
       return true;
     }
     function __navApplyPermissionGateState(source) {
@@ -558,35 +520,35 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       try {
         out = Reflect.apply(__navNativePermissionsQuery, __navNativePermissionsThis, [{ name }]);
       } catch (e) {
-        __navDiag('warn', 'nav_total_set:permissions_query_native_probe_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:permissions_query_native_probe_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:permissions.query',
           key: 'permissions.query',
           message: 'native permissions.query probe failed',
           data: { outcome: 'return', reason: 'native_probe_failed', permission: name }
-        }, e);
+        }, e) : undefined);
         return;
       }
       Promise.resolve(out).then(function onNativePermissionResolved(status) {
         const state = (status && typeof status === 'object' && typeof status.state === 'string') ? status.state : null;
         if (typeof onResolved === 'function') onResolved(state, status);
       }).catch(function onNativePermissionRejected(e) {
-        __navDiag('warn', 'nav_total_set:permissions_query_native_probe_rejected', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:permissions_query_native_probe_rejected', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:permissions.query',
           key: 'permissions.query',
           message: 'native permissions.query probe rejected',
           data: { outcome: 'return', reason: 'native_probe_rejected', permission: name }
-        }, e);
+        }, e) : undefined);
       });
     }
     function __navCheckPermissionSemanticMismatch(name, nativeState) {
       if (nativeState !== 'granted' && nativeState !== 'denied' && nativeState !== 'prompt') return;
       const internalState = __navGetPermissionState(name);
       if (nativeState === internalState) return;
-      __navDiag('warn', 'nav_total_set:permissions_semantic_mismatch', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:permissions_semantic_mismatch', { module: __MODULE, surface: __SURFACE, 
         stage: 'runtime',
         type: __navTypePipeline,
         diagTag: 'nav_total_set:permissions.query',
@@ -599,7 +561,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           nativeState: nativeState,
           internalState: internalState
         }
-      });
+      }, null) : undefined);
     }
     if (!__navApplyPermissionGateState('profile_state')) {
       __navReleaseEntryGuard(true, 'preflight', 'bad_permissions_profile');
@@ -608,12 +570,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (__navSetHiddenStateValue(__navObjectPermissionsState, '__GET_PERMISSION_STATE__', __navGetPermissionState) !== __navGetPermissionState) throw new TypeError('permissions get state hidden slot attach failed');
     if (__navSetHiddenStateValue(__navObjectPermissionsState, '__SET_PERMISSION_STATE__', __navSetPermissionState) !== __navSetPermissionState) throw new TypeError('permissions set state hidden slot attach failed');
     if (!Number.isFinite(dpr) || dpr <= 0) {
-      __navDiagPipeline('error', 'nav_total_set:bad_dpr', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:bad_dpr', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         key: 'devicePixelRatio',
         message: 'bad __DPR',
         data: { outcome: 'skip', reason: 'bad_dpr', dpr: dpr }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'bad_dpr');
       return;
     }
@@ -632,27 +594,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const keyOk = k && __navPatchedKeys.has(k);
       const fnOk = fn && __navPatchedFns && __navPatchedFns.has(fn);
       if (!keyOk && !fnOk) return;
-      __navDiag('info', 'nav_total_set:nav_access', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:nav_access', { module: __MODULE, surface: __SURFACE, 
         stage: 'runtime',
         diagTag: 'nav_total_set',
         key: k || null,
         message: 'nav access',
         isAccess: true,
         data: { outcome: 'return', reason: 'nav_access', extra: extra || null }
-      });
+      }, null) : undefined);
     }
     const __isNavigatorThis = (self) => {
       try {
         return self === navigator;
       } catch (e) {
-        __navDiag('warn', 'nav_total_set:navigator_this_check_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:navigator_this_check_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set',
           key: null,
           message: 'Navigator receiver check failed',
           data: { outcome: 'return', reason: 'navigator_this_check_failed', policy: 'skip', action: 'native' }
-        }, e);
+        }, e) : undefined);
         return false;
       }
     };
@@ -668,55 +630,55 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     }
     // guards
     if (!uaPlatform) {
-      __navDiag('error', 'nav_total_set:ua_platform_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:ua_platform_missing', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'platform',
         message: 'UA_PLATFORM missing',
         data: { outcome: 'skip', reason: 'missing_ua_platform' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'ua_platform_missing');
       return;
     }
     if (!navPlat) {
-      __navDiag('error', 'nav_total_set:nav_platform_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:nav_platform_missing', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'platform',
         message: 'NAV_PLATFORM__ missing',
         data: { outcome: 'skip', reason: 'missing_nav_platform' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'nav_platform_missing');
       return;
     }
     if (!__navLooksUaPlatform(uaPlatform)) {
-      __navDiag('error', 'nav_total_set:ua_platform_invalid', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:ua_platform_invalid', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'userAgentData.platform',
         message: 'PLATFORM.uaPlatform invalid; expected UA/OS platform string',
         data: { outcome: 'skip', reason: 'invalid_ua_platform', uaPlatform: uaPlatform }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'ua_platform_invalid');
       return;
     }
     if (!__navLooksDomPlatform(navPlat)) {
-      __navDiag('error', 'nav_total_set:nav_platform_invalid', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:nav_platform_invalid', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'platform',
         message: 'PLATFORM.domPlatform invalid; expected DOM platform string',
         data: { outcome: 'skip', reason: 'invalid_nav_platform', domPlatform: navPlat }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'nav_platform_invalid');
       return;
     }
     if (!__navPlatformPairMatches(navPlat, uaPlatform)) {
-      __navDiag('error', 'nav_total_set:platform_pair_invalid', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:platform_pair_invalid', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
@@ -728,31 +690,31 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           domPlatform: navPlat,
           uaPlatform: uaPlatform
         }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'platform_pair_invalid');
       return;
     }
     if (!(typeof platformVersion === 'string' && platformVersion)) {
-      __navDiag('error', 'nav_total_set:platform_version_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:platform_version_missing', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'userAgentData.platformVersion',
         message: 'PLATFORM.platformVersion missing',
         data: { outcome: 'skip', reason: 'missing_platform_version' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'platform_version_missing');
       return;
     }
     if (!(meta && typeof meta.uaFullVersion === 'string' && meta.uaFullVersion)) {
-      __navDiag('error', 'nav_total_set:ua_full_version_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:ua_full_version_missing', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'userAgentData.uaFullVersion',
         message: 'meta.uaFullVersion missing',
         data: { outcome: 'skip', reason: 'missing_ua_full_version' }
-      });
+      }, null) : undefined);
       __navReleaseEntryGuard(true, 'preflight', 'ua_full_version_missing');
       return;
     }
@@ -833,14 +795,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if (__navSetHiddenStateValue(__navObjectUserAgentDataHighEntropyState, '__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__', __navPostProcessUserAgentDataHighEntropyResult) !== __navPostProcessUserAgentDataHighEntropyResult) throw new TypeError('highEntropy postprocess hidden slot attach failed');
 
     if (!Number.isFinite(colorDepth) || colorDepth <= 0) {
-      __navDiag('warn', 'nav_total_set:color_depth_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:color_depth_missing', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
         key: 'colorDepth',
         message: 'colorDepth missing',
         data: { colorDepth: colorDepth }
-      });
+      }, null) : undefined);
     }
 
     function publishWorkerEnvSnapshot() {
@@ -931,23 +893,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             }
           }
         } catch (cleanupErr) {
-          __navDiag('error', 'nav_total_set:worker_env_snapshot_cleanup_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:worker_env_snapshot_cleanup_failed', { module: __MODULE, surface: __SURFACE, 
             stage: 'rollback',
             type: __navTypePipeline,
             diagTag: 'nav_total_set',
             key: '__WORKER_ENV_SNAPSHOT__',
             message: 'worker env snapshot cleanup failed',
             data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceError: 'worker_env_snapshot_cleanup_failed' }
-          }, cleanupErr);
+          }, cleanupErr) : undefined);
         }
-        __navDiag('error', 'nav_total_set:worker_env_snapshot_invalid', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:worker_env_snapshot_invalid', { module: __MODULE, surface: __SURFACE, 
           stage: 'apply',
           type: __navTypePipeline,
           diagTag: 'nav_total_set',
           key: '__WORKER_ENV_SNAPSHOT__',
           message: 'worker env snapshot invalid',
           data: { outcome: 'throw', reason: 'worker_env_snapshot_invalid' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
     }
@@ -957,13 +919,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     function safeDefineAcc(target, key, getter, { enumerable = false } = {}) {
       if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
         const err = new TypeError(`${key}: invalid target`);
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_invalid_target', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:safeDefineAcc_invalid_target', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'preflight',
           diagTag: 'nav_total_set:safeDefineAcc',
           key: key || null,
           message: err.message,
           data: { outcome: 'throw', reason: 'invalid_target' }
-        }, err);
+        }, err) : undefined);
         throw err;
       }
       const d = Object.getOwnPropertyDescriptor(target, key);
@@ -976,7 +938,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         } catch (e) {
           resolveErr = e;
         }
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_non_configurable', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:safeDefineAcc_non_configurable', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'preflight',
           diagTag: 'nav_total_set:safeDefineAcc',
           key: key || null,
@@ -1000,7 +962,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             protoChainDescConfigurable: (resolved && resolved.desc && Object.prototype.hasOwnProperty.call(resolved.desc, 'configurable')) ? !!resolved.desc.configurable : undefined,
             resolveDescriptorError: resolveErr ? String(resolveErr && (resolveErr.message || resolveErr)) : undefined
           }
-        }, err);
+        }, err) : undefined);
         throw err;
       }
       const isData = d && Object.prototype.hasOwnProperty.call(d, 'value') && !d.get && !d.set;
@@ -1021,37 +983,37 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }], 'throw');
         if (applied !== 1) {
           const err = new TypeError(`failed to define ${key}`);
-          __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_define_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:safeDefineAcc_define_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
             stage: 'apply',
             diagTag: 'nav_total_set:safeDefineAcc',
             key: key || null,
             message: err.message,
             data: { outcome: 'throw', reason: 'define_failed' }
-          }, err);
+          }, err) : undefined);
           throw err;
         }
         return true;
       }
       if (!d || typeof d.get !== 'function') {
         const err = new TypeError(`${key}: native getter missing`);
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_getter_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:safeDefineAcc_getter_missing', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'preflight',
           diagTag: 'nav_total_set:safeDefineAcc',
           key: key || null,
           message: err.message,
           data: { outcome: 'throw', reason: 'getter_missing' }
-        }, err);
+        }, err) : undefined);
         throw err;
       }
       if (typeof getter !== 'function') {
         const err = new TypeError(`${key}: getter missing`);
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_getter_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:safeDefineAcc_getter_missing', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'preflight',
           diagTag: 'nav_total_set:safeDefineAcc',
           key: key || null,
           message: err.message,
           data: { outcome: 'throw', reason: 'getter_missing' }
-        }, err);
+        }, err) : undefined);
         throw err;
       }
       __navRegisterKey(key);
@@ -1075,13 +1037,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }], 'strict');
       if (applied !== 1) {
         const err = new TypeError(`failed to define ${key}`);
-        __navDiagBrowser('error', 'nav_total_set:safeDefineAcc_define_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:safeDefineAcc_define_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'apply',
           diagTag: 'nav_total_set:safeDefineAcc',
           key: key || null,
           message: err.message,
           data: { outcome: 'throw', reason: 'define_failed' }
-        }, err);
+        }, err) : undefined);
         throw err;
       }
       return true;
@@ -1149,13 +1111,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           row.rollback();
         } catch (e) {
           if (!rollbackErr) rollbackErr = e;
-          __navDiagBrowser('error', 'nav_total_set:module_rollback_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:module_rollback_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
             stage: 'rollback',
             diagTag: 'nav_total_set',
             key: row.key,
             message: 'module rollback failed',
             data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false }
-          }, e);
+          }, e) : undefined);
         }
       }
       if (rollbackErr) throw rollbackErr;
@@ -1176,54 +1138,54 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const Core = __core;
       if (!Core || typeof Core.applyTargets !== 'function') {
         const err = new Error('Core.applyTargets missing');
-        __navDiag('error', groupTag + ':core_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':core_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: groupTag,
           key: groupKey,
           message: 'Core.applyTargets missing',
           data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'core_missing' }
-        }, err);
+        }, err) : undefined);
         if (groupPolicy === 'throw') throw err;
         return 0;
       }
       if (typeof Core.registerPatchedTarget !== 'function') {
         const err = new Error('Core.registerPatchedTarget missing');
-        __navDiag('warn', groupTag + ':core_registry_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':core_registry_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: groupTag,
           key: groupKey,
           message: 'Core.registerPatchedTarget missing',
           data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'core_registry_missing' }
-        }, err);
+        }, err) : undefined);
         if (groupPolicy === 'throw') throw err;
       }
       let plans = [];
       try {
         plans = Core.applyTargets(targets, null, []);
       } catch (e) {
-        __navDiag('error', groupTag + ':preflight_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':preflight_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: groupTag,
           key: groupKey,
           message: 'Core.applyTargets preflight failed',
           data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'preflight_exception' }
-        }, e);
+        }, e) : undefined);
         if (groupPolicy === 'throw') throw e;
         return 0;
       }
       if (!Array.isArray(plans) || !plans.length) {
         const reason = plans && plans.reason ? plans.reason : 'group_skipped';
-        __navDiag('warn', groupTag + ':' + reason, {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':' + reason, { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: groupTag,
           key: groupKey,
           message: 'Core.applyTargets returned no apply plan',
           data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: String(reason) }
-        }, null);
+        }, null) : undefined);
         if (groupPolicy === 'throw') {
           throw new Error('target group skipped');
         }
@@ -1263,27 +1225,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             p.rollback();
           } catch (re) {
             if (!rollbackErr) rollbackErr = re;
-            __navDiag('error', groupTag + ':rollback_failed', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':rollback_failed', { module: __MODULE, surface: __SURFACE, 
               stage: 'rollback',
               type: __navTypeBrowser,
               diagTag: groupTag,
               key: p.key || null,
               message: 'apply failed and group rollback failed',
               data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceReason: 'apply_failed' }
-            }, re);
+            }, re) : undefined);
           }
         }
         if (rollbackErr) {
           throw rollbackErr;
         }
-        __navDiag('error', groupTag + ':apply_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':apply_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'rollback',
           type: __navTypeBrowser,
           diagTag: groupTag,
           key: activeKey,
           message: 'apply failed; group rolled back to native path',
           data: { outcome: 'rollback', reason: 'apply_failed', rollbackOk: true, policy: groupPolicy }
-        }, e);
+        }, e) : undefined);
         if (groupPolicy === 'throw') throw e;
         return 0;
       }
@@ -1297,17 +1259,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       try {
         ownDesc = Object.getOwnPropertyDescriptor(navInstance, key) || null;
       } catch (e) {
-        __navDiag('error', 'nav_total_set:own_shadow_check_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:own_shadow_check_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: diagTag || 'nav_total_set',
           key: key,
           message: key + ' own-shadow check failed'
-        }, e);
+        }, e) : undefined);
         return false;
       }
       if (!ownDesc) return true;
-      __navDiag('error', 'nav_total_set:own_shadow_detected', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:own_shadow_detected', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypeBrowser,
         diagTag: diagTag || 'nav_total_set',
@@ -1322,7 +1284,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           hasSetter: typeof ownDesc.set === 'function',
           hasValue: Object.prototype.hasOwnProperty.call(ownDesc, 'value')
         }
-      });
+      }, null) : undefined);
       return false;
     }
 
@@ -1349,34 +1311,34 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const desc = resolved ? resolved.desc : null;
       const owner = (resolved && resolved.owner) ? resolved.owner : navProto;
       if (!desc) {
-        __navDiag('error', descriptorCode, {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', descriptorCode, { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: diagTag,
           key: key,
           message: `${key} descriptor missing`
-        });
+        }, null) : undefined);
         return null;
       }
       if (owner === navigator) {
-        __navDiag('error', ownerMismatchCode, {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', ownerMismatchCode, { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: diagTag,
           key: key,
           message: `${key} resolved to instance owner`,
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-        });
+        }, null) : undefined);
         return null;
       }
       if (!Object.prototype.hasOwnProperty.call(desc, 'get') && !Object.prototype.hasOwnProperty.call(desc, 'set')) {
-        __navDiag('error', accessorKindCode, {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', accessorKindCode, { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: diagTag,
           key: key,
           message: `${key} is not accessor-shaped on prototype`
-        });
+        }, null) : undefined);
         return null;
       }
       return { owner, desc };
@@ -1427,14 +1389,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           throw new TypeError('nav_total_set: strict accessor apply failed for ' + key);
         }
       } catch (e) {
-        __navDiag('error', 'nav_total_set:strict_accessor_define_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:strict_accessor_define_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'apply',
           type: __navTypeBrowser,
           diagTag: diagTag,
           key: key,
           message: key + ' strict accessor define failed',
           data: { outcome: 'throw', reason: 'apply_failed' }
-        }, e);
+        }, e) : undefined);
         return false;
       }
       return true;
@@ -1445,13 +1407,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (desc && typeof desc.get === 'function') return Reflect.apply(desc.get, receiver, []);
         if (desc && Object.prototype.hasOwnProperty.call(desc, 'value')) return desc.value;
       } catch (e) {
-        __navDiagBrowser('warn', (diagTag || 'nav_total_set') + '_native_fallback_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', (diagTag || 'nav_total_set') + '_native_fallback_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'runtime',
           diagTag: diagTag || 'nav_total_set',
           key: key || null,
           message: 'native scalar fallback failed',
           data: { outcome: 'return', reason: 'native_fallback_failed' }
-        }, e);
+        }, e) : undefined);
       }
       return undefined;
     }
@@ -1482,14 +1444,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
         return { ok: true, value: undefined };
       } catch (e) {
-        __navDiagBrowser('warn', code, {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', code, { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: diagTag,
           key: key,
           message: message,
           data: { outcome: 'skip', reason: 'native_read_failed', action: 'native' }
-        }, e);
+        }, e) : undefined);
         return { ok: false, value: undefined };
       }
     }
@@ -1525,18 +1487,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const nativeValue = __navReadNativeScalarFallback(nativeDesc, navigator, spec.key, diagTag);
         const matchesNative = (typeof spec.matchesNative === 'function') ? spec.matchesNative(nativeValue) : false;
         if (matchesNative) {
-          __navDiag('info', diagTag + '_getter_value_match', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', diagTag + '_getter_value_match', { module: __MODULE, surface: __SURFACE, 
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: diagTag,
             key: spec.key,
             message: (typeof spec.skipMessage === 'string' && spec.skipMessage) ? spec.skipMessage : (spec.key + ' already matches native getter'),
             data: { outcome: 'return', reason: 'getter_value_match' }
-          });
+          }, null) : undefined);
           continue;
         }
         if (spec && spec.mismatchAction === 'skip') {
-          __navDiag('info', diagTag + '_getter_value_mismatch', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', diagTag + '_getter_value_mismatch', { module: __MODULE, surface: __SURFACE, 
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: diagTag,
@@ -1551,7 +1513,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               nativeValue: nativeValue,
               profileValue: Object.prototype.hasOwnProperty.call(spec, 'profileValue') ? spec.profileValue : null
             }
-          });
+          }, null) : undefined);
           continue;
         }
         const getter = (typeof spec.getter === 'function') ? spec.getter : null;
@@ -1640,16 +1602,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           );
           if (nativeAppVersionRead.ok) {
             if (typeof nativeAppVersionRead.value === 'string' && nativeAppVersionRead.value === appVersionTarget) {
-              __navDiag('info', 'nav_total_set:appVersion_getter_value_match', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:appVersion_getter_value_match', { module: __MODULE, surface: __SURFACE, 
                 stage: 'preflight',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:appVersion',
                 key: 'appVersion',
                 message: 'appVersion already matches native getter',
                 data: { outcome: 'return', reason: 'getter_value_match' }
-              });
+              }, null) : undefined);
             } else {
-              __navDiag('info', 'nav_total_set:appVersion_getter_value_mismatch', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:appVersion_getter_value_mismatch', { module: __MODULE, surface: __SURFACE, 
                 stage: 'preflight',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:appVersion',
@@ -1663,17 +1625,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   nativeValue: nativeAppVersionRead.value,
                   profileValue: appVersionTarget
                 }
-              });
+              }, null) : undefined);
             }
           }
         } else {
           patchStrictScalarAccessor('appVersion', function navAppVersionValue() {
-            __navDiagPipeline('warn', 'nav_total_set:appVersion_invalid_profile', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:appVersion_invalid_profile', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
               stage: 'runtime',
               key: 'appVersion',
               message: 'invalid appVersion profile value',
               data: { outcome: 'return', reason: 'invalid_profile_value', value: appVersionTarget }
-            });
+            }, null) : undefined);
             return __navReadNativeScalarFallback(nativeAppVersionDesc, this, 'appVersion', 'nav_total_set:appVersion');
           }, 'nav_total_set:appVersion');
         }
@@ -1695,25 +1657,25 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     (function () {
       const windowProto = (window.Window && Window.prototype) ? Window.prototype : null;
       if (!windowProto) {
-        __navDiag('warn', 'nav_total_set:devicePixelRatio_window_proto_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:devicePixelRatio_window_proto_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:devicePixelRatio',
           key: 'devicePixelRatio',
           message: 'Window.prototype missing',
           data: { outcome: 'skip', reason: 'window_proto_missing', policy: 'skip', action: 'native' }
-        });
+        }, null) : undefined);
         return;
       }
       if (!__navResolveDescriptor) {
-        __navDiag('warn', 'nav_total_set:devicePixelRatio_resolve_descriptor_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:devicePixelRatio_resolve_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:devicePixelRatio',
           key: 'devicePixelRatio',
           message: 'Core.resolveDescriptor missing',
           data: { outcome: 'skip', reason: 'missing_dep_core_resolve_descriptor', policy: 'skip', action: 'native' }
-        });
+        }, null) : undefined);
         return;
       }
       const dprOwnDesc = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
@@ -1742,14 +1704,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       }
 
       if (dprDesc && dprDesc.configurable === false) {
-        __navDiag('warn', 'nav_total_set:devicePixelRatio_non_configurable', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:devicePixelRatio_non_configurable', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:devicePixelRatio',
           key: 'devicePixelRatio',
           message: 'devicePixelRatio is non-configurable',
           data: { outcome: 'skip', reason: 'non_configurable', policy: 'skip', action: 'native' }
-        });
+        }, null) : undefined);
         return;
       }
 
@@ -1759,14 +1721,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         && !dprDesc.set;
 
       if (dprDesc && !dprIsData && typeof dprDesc.get !== 'function') {
-        __navDiag('warn', 'nav_total_set:devicePixelRatio_descriptor_kind_mismatch', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:devicePixelRatio_descriptor_kind_mismatch', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:devicePixelRatio',
           key: 'devicePixelRatio',
           message: 'devicePixelRatio is not accessor-shaped on prototype',
           data: { outcome: 'skip', reason: 'descriptor_kind_mismatch', policy: 'skip', action: 'native' }
-        });
+        }, null) : undefined);
         return;
       }
       let __navDprThisCheckDiagSent = false;
@@ -1776,14 +1738,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         } catch (e) {
           if (!__navDprThisCheckDiagSent) {
             __navDprThisCheckDiagSent = true;
-            __navDiag('warn', 'nav_total_set:devicePixelRatio_this_check_failed', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:devicePixelRatio_this_check_failed', { module: __MODULE, surface: __SURFACE, 
               stage: 'runtime',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:devicePixelRatio',
               key: 'devicePixelRatio',
               message: 'Window receiver check failed',
               data: { outcome: 'return', reason: 'window_this_check_failed', policy: 'skip', action: 'native' }
-            }, e);
+            }, e) : undefined);
           }
           return false;
         }
@@ -1817,7 +1779,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           : 'native';
 
         if (dprUseOwnerFirstGateway && !__coreOwnerFirstAccessorCapable) {
-          __navDiag('error', 'nav_total_set:devicePixelRatio_stale_core_bundle', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:devicePixelRatio_stale_core_bundle', { module: __MODULE, surface: __SURFACE, 
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: 'nav_total_set:devicePixelRatio',
@@ -1830,11 +1792,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               wrapLayer: dprWrapLayer,
               resolve: dprResolveMode
             }
-          });
+          }, null) : undefined);
           return;
         }
 
-        __navDiag('info', 'nav_total_set:devicePixelRatio_apply_plan', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:devicePixelRatio_apply_plan', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:devicePixelRatio',
@@ -1847,7 +1809,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             resolve: dprResolveMode,
             needsMaterialize: dprNeedsMaterialize
           }
-        });
+        }, null) : undefined);
 
         applied = applyCoreTargetsGroup('nav_total_set:devicePixelRatio', [{
           owner: dprOwner,
@@ -1868,7 +1830,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }], 'strict');
       }
       if (applied !== 1) {
-        __navDiag('warn', 'nav_total_set:devicePixelRatio_define_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:devicePixelRatio_define_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'apply',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:devicePixelRatio',
@@ -1881,7 +1843,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             action: 'native',
             ownerFact: dprOwnerFact
           }
-        });
+        }, null) : undefined);
         return;
       }
       // Post-apply invariant: devicePixelRatio must match profile DPR
@@ -1890,34 +1852,34 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         if (!Number.isFinite(actual) || actual !== __navScalarState.devicePixelRatio) {
           const msg = `devicePixelRatio mismatch (actual=${actual}, expected=${__navScalarState.devicePixelRatio})`;
           if (STRICT) {
-            __navDiag('error', 'nav_total_set:dpr_mismatch', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:dpr_mismatch', { module: __MODULE, surface: __SURFACE, 
               stage: 'contract',
               type: __navTypePipeline,
               diagTag: 'nav_total_set',
               key: 'devicePixelRatio',
               message: msg,
               data: { outcome: 'throw', reason: 'dpr_mismatch', actual: actual, expected: __navScalarState.devicePixelRatio }
-            });
+            }, null) : undefined);
             throw new TypeError(msg);
           }
-          __navDiag('warn', 'nav_total_set:dpr_mismatch', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:dpr_mismatch', { module: __MODULE, surface: __SURFACE, 
             stage: 'contract',
             type: __navTypePipeline,
             diagTag: 'nav_total_set',
             key: 'devicePixelRatio',
             message: msg,
             data: { outcome: 'return', reason: 'dpr_mismatch', actual: actual, expected: __navScalarState.devicePixelRatio }
-          });
+          }, null) : undefined);
         }
       } catch (e) {
-        __navDiag(STRICT ? 'error' : 'warn', 'nav_total_set:dpr_check_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(STRICT ? 'error' : 'warn', 'nav_total_set:dpr_check_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'contract',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set',
           key: 'devicePixelRatio',
           message: 'devicePixelRatio check failed',
           data: { outcome: STRICT ? 'throw' : 'return', reason: 'dpr_check_failed' }
-        }, e);
+        }, e) : undefined);
         if (STRICT) throw e;
       }
     })();
@@ -1930,23 +1892,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     if ('userAgentData' in navigator) {
       const nativeUAD = navigator.userAgentData;
       if (!nativeUAD) {
-        __navDiag('error', 'nav_total_set:userAgentData_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:userAgentData',
           key: 'userAgentData',
           message: 'window navigator.userAgentData missing'
-        });
+        }, null) : undefined);
       } else {
         const uadProto = Object.getPrototypeOf(nativeUAD);
         if (!uadProto) {
-          __navDiag('error', 'nav_total_set:userAgentData_proto_missing', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_proto_missing', { module: __MODULE, surface: __SURFACE, 
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:userAgentData',
             key: 'userAgentData',
             message: 'window navigator.userAgentData proto missing'
-          });
+          }, null) : undefined);
         } else {
           const isUadThis = (self) => {
             if (!self || (typeof self !== 'object' && typeof self !== 'function')) return false;
@@ -1965,7 +1927,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           const dMobileResolved = __navResolveDescriptor ? __navResolveDescriptor(uadProto, 'mobile', { mode: 'proto_chain' }) : null;
           const dPlatformResolved = __navResolveDescriptor ? __navResolveDescriptor(uadProto, 'platform', { mode: 'proto_chain' }) : null;
           if (!dBrands || !dMobile || !dPlatform) {
-            __navDiag('error', 'nav_total_set:userAgentData_descriptor_missing', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
               stage: 'preflight',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:userAgentData',
@@ -1980,7 +1942,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   platform: !!(dPlatformResolved && dPlatformResolved.desc)
                 }
               }
-            });
+            }, null) : undefined);
           } else {
             const uadOwner = uadProto;
             const uadPolicy = 'throw';
@@ -2024,13 +1986,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
               if (isData) {
                 if (!spec.hasValue()) {
-                  __navDiag('error', spec.missingPreflightCode, {
+                  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', spec.missingPreflightCode, { module: __MODULE, surface: __SURFACE, 
                     stage: 'preflight',
                     type: __navTypePipeline,
                     diagTag: 'nav_total_set:' + fullKey,
                     key: fullKey,
                     message: spec.missingMessage
-                  });
+                  }, null) : undefined);
                 } else {
                   applyCoreTargetsGroup('nav_total_set:' + fullKey, [{
                     owner: uadOwner,
@@ -2061,13 +2023,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   invalidThis: uadInvalidThis,
                   getImpl: function userAgentDataPrimitiveGetImpl() {
                     if (spec.hasValue()) return spec.readValue();
-                    __navDiag('error', spec.missingRuntimeCode, {
+                    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', spec.missingRuntimeCode, { module: __MODULE, surface: __SURFACE, 
                       stage: 'runtime',
                       type: __navTypePipeline,
                       diagTag: 'nav_total_set:' + fullKey,
                       key: fullKey,
                       message: spec.missingMessage
-                    });
+                    }, null) : undefined);
                     if (typeof origGet === 'function') return Reflect.apply(origGet, this, []);
                     return undefined;
                   }
@@ -2093,7 +2055,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   if (typeof meta.uaFullVersion !== 'string' || !meta.uaFullVersion) {
                     throw new Error('THW: uaData.uaFullVersion missing');
                   }
-                  __navDiag('info', 'nav_total_set:userAgentData_uaFullVersion_resolved', {
+                  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:userAgentData_uaFullVersion_resolved', { module: __MODULE, surface: __SURFACE, 
                     stage: 'runtime',
                     type: __navTypePipeline,
                     diagTag: 'nav_total_set:userAgentData.uaFullVersion',
@@ -2104,7 +2066,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                       reason: 'high_entropy_resolved',
                       value: meta.uaFullVersion
                     }
-                  });
+                  }, null) : undefined);
                   return meta.uaFullVersion;
                 }
               }], 'throw');
@@ -2117,14 +2079,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
            try {
              delete obj[key];
           } catch (e) {
-            __navDiag('error', 'nav_total_set:userAgentData_dropOwn_failed', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_dropOwn_failed', { module: __MODULE, surface: __SURFACE, 
               stage: 'apply',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:userAgentData',
               key: key || null,
               message: 'dropOwn failed',
               data: { outcome: 'throw', reason: 'drop_own_failed' }
-            }, e);
+            }, e) : undefined);
           }
         }
       }
@@ -2141,30 +2103,30 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const ghevOwner = (ghevResolved && ghevResolved.owner) ? ghevResolved.owner : uadProto;
       const origGHEV = ghevDesc ? ghevDesc.value : null;
       if (!ghevDesc) {
-        __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
           key: 'userAgentData.getHighEntropyValues',
           message: 'uaData.getHighEntropyValues missing'
-        });
+        }, null) : undefined);
       } else if (ghevOwner === nativeUAD) {
-        __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_owner_mismatch', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
           key: 'userAgentData.getHighEntropyValues',
           message: 'uaData.getHighEntropyValues resolved to instance owner',
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-        });
+        }, null) : undefined);
       } else if (typeof origGHEV !== 'function') {
-        __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_original_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_original_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
           key: 'userAgentData.getHighEntropyValues',
           message: 'uaData.getHighEntropyValues original missing'
-        });
+        }, null) : undefined);
       } else {
 
         __navRegisterKey('userAgentData.getHighEntropyValues');
@@ -2186,27 +2148,27 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             __navLogAccess('userAgentData.getHighEntropyValues', currentDesc && typeof currentDesc.value === 'function' ? currentDesc.value : null);
             const keys = (args && args.length) ? args[0] : undefined;
             if (!Array.isArray(keys)) {
-              __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_keys', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_keys', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                 key: 'userAgentData.getHighEntropyValues',
                 message: 'bad highEntropy keys',
                 data: { outcome: 'return', reason: 'bad_keys' }
-              });
+              }, null) : undefined);
               return Reflect.apply(orig, this, args || []);
              }
              const nativeOut = Reflect.apply(orig, this, args || []);
              if (!nativeOut || typeof nativeOut.then !== 'function') {
                const err = new TypeError('promise_contract_failed');
-               __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_promise_contract_failed', {
+               (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_promise_contract_failed', { module: __MODULE, surface: __SURFACE, 
                  stage: 'runtime',
                  type: __navTypePipeline,
                  diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                  key: 'userAgentData.getHighEntropyValues',
                  message: 'promise_contract_failed',
                  data: { outcome: 'return', reason: 'promise_contract_failed' }
-               }, err);
+               }, err) : undefined);
                // Public API path must not leak service errors; pass-through native behavior.
                return Reflect.apply(orig, this, args || []);
              }
@@ -2214,36 +2176,36 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 ? __navObjectUserAgentDataHighEntropyState.__GET_HIGH_ENTROPY_VALUES_PATCH_BUILDER__
                 : null;
               if (typeof patchBuilder !== 'function') {
-                __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_patch_builder_missing', {
+                (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_patch_builder_missing', { module: __MODULE, surface: __SURFACE, 
                   stage: 'runtime',
                   type: __navTypePipeline,
                   diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                   key: 'userAgentData.getHighEntropyValues',
                   message: 'highEntropy patch builder missing',
                   data: { outcome: 'return', reason: 'patch_builder_missing' }
-                });
+                }, null) : undefined);
                 return nativeOut;
               }
               const patchBuild = patchBuilder(keys);
               if (!patchBuild || patchBuild.ok !== true) {
                 if (patchBuild && patchBuild.reason === 'bad_hint') {
-                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_hint', {
+                  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_bad_hint', { module: __MODULE, surface: __SURFACE, 
                     stage: 'runtime',
                     type: __navTypePipeline,
                     diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                     key: 'userAgentData.getHighEntropyValues',
                     message: 'bad highEntropy key item',
                     data: { outcome: 'return', reason: 'bad_hint' }
-                  });
+                  }, null) : undefined);
                 } else {
-                  __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_producer_missing', {
+                  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_producer_missing', { module: __MODULE, surface: __SURFACE, 
                     stage: 'runtime',
                     type: __navTypePipeline,
                     diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                     key: 'userAgentData.getHighEntropyValues',
                     message: 'highEntropy producer missing',
                     data: { outcome: 'return', reason: 'producer_missing' }
-                  });
+                  }, null) : undefined);
                 }
                 return nativeOut;
               }
@@ -2252,14 +2214,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 ? __navObjectUserAgentDataHighEntropyState.__POSTPROCESS_HIGH_ENTROPY_VALUES_RESULT__
                 : null;
               if (typeof postProcessor !== 'function') {
-                __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_postprocessor_missing', {
+                (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_postprocessor_missing', { module: __MODULE, surface: __SURFACE, 
                   stage: 'runtime',
                   type: __navTypePipeline,
                   diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                   key: 'userAgentData.getHighEntropyValues',
                   message: 'highEntropy postprocessor missing',
                   data: { outcome: 'return', reason: 'postprocessor_missing' }
-                });
+                }, null) : undefined);
                 return nativeOut;
               }
               return nativeOut.then(function userAgentDataGetHighEntropyValuesPost(nativeResolved) {
@@ -2268,7 +2230,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                   const requestedKeySig = keys.map(function navHighEntropyKeySigItem(k) {
                     return String(k).replace(/[^A-Za-z0-9_.-]/g, '_');
                   }).join('+') || 'empty';
-                  __navDiag('info', 'nav_total_set:getHighEntropyValues_resolved', {
+                  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:getHighEntropyValues_resolved', { module: __MODULE, surface: __SURFACE, 
                     stage: 'runtime',
                     type: __navTypePipeline,
                     diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
@@ -2283,17 +2245,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                       uaFullVersion: (typeof result.uaFullVersion === 'string' && result.uaFullVersion) ? result.uaFullVersion : null,
                       returnedKeys: (merged && typeof merged === 'object') ? Object.keys(merged) : null
                     }
-                  });
+                  }, null) : undefined);
                   return merged;
                 } catch (e) {
-                   __navDiag('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', {
+                   (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getHighEntropyValues_hooksPost_failed', { module: __MODULE, surface: __SURFACE, 
                     stage: 'runtime',
                    type: __navTypePipeline,
                    diagTag: 'nav_total_set:userAgentData.getHighEntropyValues',
                    key: 'userAgentData.getHighEntropyValues',
                    message: 'hooksPost_failed',
                    data: { outcome: 'return', reason: 'hooksPost_failed' }
-                 }, e);
+                 }, e) : undefined);
                  return nativeResolved;
                }
              });
@@ -2314,30 +2276,30 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const toJsonOwner = (toJsonResolved && toJsonResolved.owner) ? toJsonResolved.owner : uadProto;
       const origToJSON = toJsonDesc ? toJsonDesc.value : null;
       if (!toJsonDesc) {
-        __navDiag('error', 'nav_total_set:userAgentData_toJSON_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_toJSON_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:userAgentData.toJSON',
           key: 'userAgentData.toJSON',
           message: 'uaData.toJSON missing'
-        });
+        }, null) : undefined);
       } else if (toJsonOwner === nativeUAD) {
-        __navDiag('error', 'nav_total_set:userAgentData_toJSON_owner_mismatch', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_toJSON_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:userAgentData.toJSON',
           key: 'userAgentData.toJSON',
           message: 'uaData.toJSON resolved to instance owner',
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-        });
+        }, null) : undefined);
       } else if (typeof origToJSON !== 'function') {
-        __navDiag('error', 'nav_total_set:userAgentData_toJSON_original_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_toJSON_original_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:userAgentData.toJSON',
           key: 'userAgentData.toJSON',
           message: 'uaData.toJSON original missing'
-        });
+        }, null) : undefined);
       } else {
         __navRegisterKey('userAgentData.toJSON');
         dropOwnIfConfigurable(nativeUAD, 'toJSON');
@@ -2360,13 +2322,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             try {
               nativeOut = Reflect.apply(orig, this, args || []);
             } catch (e) {
-              __navDiag('error', 'nav_total_set:userAgentData_toJSON_runtime_failed', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_toJSON_runtime_failed', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __navTypeBrowser,
                 diagTag: 'nav_total_set:userAgentData.toJSON',
                 key: 'userAgentData.toJSON',
                 message: 'uaData.toJSON runtime failed'
-              }, e);
+              }, e) : undefined);
               throw e;
             }
             try {
@@ -2376,13 +2338,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               if (out.mobile == null) out.mobile = this.mobile;
               return out;
             } catch (e) {
-              __navDiag('error', 'nav_total_set:userAgentData_toJSON_post_failed', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_toJSON_post_failed', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __navTypePipeline,
                 diagTag: 'nav_total_set:userAgentData.toJSON',
                 key: 'userAgentData.toJSON',
                 message: 'uaData.toJSON post failed'
-              }, e);
+              }, e) : undefined);
               return nativeOut;
             }
           }
@@ -2393,7 +2355,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const dUaData = Object.getOwnPropertyDescriptor(navProto, 'userAgentData');
     const dUaDataResolved = __navResolveDescriptor ? __navResolveDescriptor(navProto, 'userAgentData', { mode: 'proto_chain' }) : null;
     if (!dUaData) {
-      __navDiag('error', 'nav_total_set:userAgentData_getter_descriptor_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:userAgentData_getter_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypeBrowser,
         diagTag: 'nav_total_set:userAgentData',
@@ -2405,7 +2367,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           protoChainFound: !!(dUaDataResolved && dUaDataResolved.desc),
           protoChainOnExpectedOwner: !!(dUaDataResolved && dUaDataResolved.owner === navProto)
         }
-      });
+      }, null) : undefined);
     } else {
       const nativeUadRead = __navTryReadNativeValue(
         dUaData,
@@ -2430,16 +2392,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           nativeUadValue.platform === chPlatform
         );
         if (nativeUadMatches) {
-          __navDiag('info', 'nav_total_set:userAgentData_getter_value_match', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:userAgentData_getter_value_match', { module: __MODULE, surface: __SURFACE, 
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: 'nav_total_set:userAgentData',
             key: 'userAgentData',
             message: 'userAgentData already matches native getter',
             data: { outcome: 'return', reason: 'getter_value_match' }
-          });
+          }, null) : undefined);
         } else {
-          __navDiag('info', 'nav_total_set:userAgentData_native_getter_kept', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:userAgentData_native_getter_kept', { module: __MODULE, surface: __SURFACE, 
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: 'nav_total_set:userAgentData',
@@ -2460,7 +2422,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               },
               profileValue: nativeUadProfile
             }
-          });
+          }, null) : undefined);
         }
       }
     }
@@ -2475,23 +2437,23 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
     const nativeLanguagesDesc = __navResolveNativeAccessorDesc('languages');
 
     if ('deviceMemory' in navProto) {
-      __navDiag('info', 'nav_total_set:deviceMemory_native_getter_kept', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:deviceMemory_native_getter_kept', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set:deviceMemory',
         key: 'deviceMemory',
         message: 'deviceMemory patch disabled; native getter kept',
         data: { outcome: 'skip', reason: 'native_getter_kept', action: 'keep_native_getter' }
-      });
+      }, null) : undefined);
       // LEGACY synthetic rollback for window scope:
       // patchStrictScalarAccessor('deviceMemory', function navDeviceMemoryValue() {
       //   if (!__navIsValidDeviceMemoryValue(mem)) {
-      //     __navDiagPipeline('warn', 'nav_total_set:deviceMemory_invalid_profile', {
+      //     (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:deviceMemory_invalid_profile', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       //       stage: 'runtime',
       //       key: 'deviceMemory',
       //       message: 'invalid deviceMemory profile value',
       //       data: { outcome: 'return', reason: 'invalid_profile_value', value: mem }
-      //     });
+      //     }, null) : undefined);
       //     return __navReadNativeScalarFallback(nativeDeviceMemoryDesc, this, 'deviceMemory', 'nav_total_set:deviceMemory');
       //   }
       //   return Number(mem);
@@ -2509,16 +2471,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         );
         if (nativeHardwareConcurrencyRead.ok) {
           if (Number(nativeHardwareConcurrencyRead.value) === Number(__navScalarState.hardwareConcurrency)) {
-            __navDiag('info', 'nav_total_set:hardwareConcurrency_getter_value_match', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:hardwareConcurrency_getter_value_match', { module: __MODULE, surface: __SURFACE, 
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:hardwareConcurrency',
               key: 'hardwareConcurrency',
               message: 'hardwareConcurrency already matches native getter',
               data: { outcome: 'return', reason: 'getter_value_match' }
-            });
+            }, null) : undefined);
           } else {
-            __navDiag('info', 'nav_total_set:hardwareConcurrency_getter_value_mismatch', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:hardwareConcurrency_getter_value_mismatch', { module: __MODULE, surface: __SURFACE, 
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:hardwareConcurrency',
@@ -2532,17 +2494,17 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 nativeValue: nativeHardwareConcurrencyRead.value,
                 profileValue: __navScalarState.hardwareConcurrency
               }
-            });
+            }, null) : undefined);
           }
         }
       } else {
         patchStrictScalarAccessor('hardwareConcurrency', function navHardwareConcurrencyValue() {
-          __navDiagPipeline('warn', 'nav_total_set:hardwareConcurrency_invalid_profile', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:hardwareConcurrency_invalid_profile', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
             stage: 'runtime',
             key: 'hardwareConcurrency',
             message: 'invalid hardwareConcurrency profile value',
             data: { outcome: 'return', reason: 'invalid_profile_value', value: __navScalarState.hardwareConcurrency }
-          });
+          }, null) : undefined);
           return __navReadNativeScalarFallback(nativeHardwareConcurrencyDesc, this, 'hardwareConcurrency', 'nav_total_set:hardwareConcurrency');
         }, 'nav_total_set:hardwareConcurrency');
       }
@@ -2562,16 +2524,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         );
         if (nativeLanguageRead.ok) {
           if (typeof nativeLanguageRead.value === 'string' && nativeLanguageRead.value === primaryLanguage) {
-            __navDiag('info', 'nav_total_set:language_getter_value_match', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:language_getter_value_match', { module: __MODULE, surface: __SURFACE, 
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:language',
               key: 'language',
               message: 'language already matches native getter',
                 data: { outcome: 'return', reason: 'getter_value_match' }
-              });
+              }, null) : undefined);
           } else {
-            __navDiag('info', 'nav_total_set:language_getter_value_mismatch', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:language_getter_value_mismatch', { module: __MODULE, surface: __SURFACE, 
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:language',
@@ -2585,12 +2547,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 nativeValue: nativeLanguageRead.value,
                 profileValue: primaryLanguage
               }
-            });
+            }, null) : undefined);
           }
         }
       } else {
         patchStrictScalarAccessor('language', function navLanguageValue() {
-          __navDiagPipeline('warn', 'nav_total_set:language_invalid_profile', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:language_invalid_profile', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
             stage: 'runtime',
             key: 'language',
             message: 'invalid language profile value',
@@ -2600,7 +2562,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
               normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
             }
-          });
+          }, null) : undefined);
           return __navReadNativeScalarFallback(nativeLanguageDesc, this, 'language', 'nav_total_set:language');
         }, 'nav_total_set:language');
       }
@@ -2620,16 +2582,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         );
         if (nativeLanguagesRead.ok) {
           if (__navStringArrayEquals(nativeLanguagesRead.value, normalizedLanguages)) {
-            __navDiag('info', 'nav_total_set:languages_getter_value_match', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:languages_getter_value_match', { module: __MODULE, surface: __SURFACE, 
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:languages',
               key: 'languages',
               message: 'languages already matches native getter',
                 data: { outcome: 'return', reason: 'getter_value_match' }
-              });
+              }, null) : undefined);
           } else {
-            __navDiag('info', 'nav_total_set:languages_getter_value_mismatch', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:languages_getter_value_mismatch', { module: __MODULE, surface: __SURFACE, 
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:languages',
@@ -2643,12 +2605,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 nativeValue: Array.isArray(nativeLanguagesRead.value) ? nativeLanguagesRead.value.slice(0, 8) : nativeLanguagesRead.value,
                 profileValue: normalizedLanguages.slice(0, 8)
               }
-            });
+            }, null) : undefined);
           }
         }
       } else {
         patchStrictScalarAccessor('languages', function navLanguagesValue() {
-          __navDiagPipeline('warn', 'nav_total_set:languages_invalid_profile', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:languages_invalid_profile', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
             stage: 'runtime',
             key: 'languages',
             message: 'invalid languages profile value',
@@ -2658,7 +2620,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               primaryLanguage: primaryLanguage == null ? null : primaryLanguage,
               normalizedLanguages: Array.isArray(normalizedLanguages) ? normalizedLanguages.slice(0, 8) : normalizedLanguages
             }
-          });
+          }, null) : undefined);
           return __navReadNativeScalarFallback(nativeLanguagesDesc, this, 'languages', 'nav_total_set:languages');
         }, 'nav_total_set:languages');
       }
@@ -2678,40 +2640,40 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const permDesc = permResolved ? permResolved.desc : null;
       const permOwner = (permResolved && permResolved.owner) ? permResolved.owner : permProto;
       if (!permDesc) {
-        __navDiag('error', 'nav_total_set:permissions_query_descriptor_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:permissions_query_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:permissions.query',
           key: 'permissions.query',
           message: 'permissions.query descriptor missing'
-        });
+        }, null) : undefined);
       } else if (!Object.prototype.hasOwnProperty.call(permDesc, 'value') || typeof permDesc.value !== 'function') {
-        __navDiag('error', 'nav_total_set:permissions_query_descriptor_kind_mismatch', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:permissions_query_descriptor_kind_mismatch', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:permissions.query',
           key: 'permissions.query',
           message: 'permissions.query is not method-shaped on prototype'
-        });
+        }, null) : undefined);
       } else if (permOwner === navigator.permissions) {
-        __navDiag('error', 'nav_total_set:permissions_query_owner_mismatch', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:permissions_query_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:permissions.query',
           key: 'permissions.query',
           message: 'permissions.query resolved to instance owner',
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-        });
+        }, null) : undefined);
       } else {
         const origQuery = permDesc.value;
         if (typeof origQuery !== 'function') {
-          __navDiag('error', 'nav_total_set:permissions_query_original_missing', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:permissions_query_original_missing', { module: __MODULE, surface: __SURFACE, 
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:permissions.query',
             key: 'permissions.query',
             message: 'permissions.query original missing'
-          });
+          }, null) : undefined);
         } else {
           __navNativePermissionsQuery = origQuery;
           __navNativePermissionsThis = navigator.permissions;
@@ -2722,7 +2684,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               });
             });
           }
-          __navDiag('info', 'nav_total_set:permissions_query_native_passthrough', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:permissions_query_native_passthrough', { module: __MODULE, surface: __SURFACE, 
             stage: 'apply',
             type: __navTypePipeline,
             diagTag: 'nav_total_set:permissions.query',
@@ -2733,7 +2695,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               reason: 'native_passthrough',
               ownerIsPrototype: permOwner !== navigator.permissions
             }
-          });
+          }, null) : undefined);
         }
       }
     }
@@ -2753,33 +2715,33 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const storageDesc = storageResolved ? storageResolved.desc : null;
       const storageOwner = (storageResolved && storageResolved.owner) ? storageResolved.owner : storageProto;
          if (!storageDesc) {
-           __navDiag('error', 'nav_total_set:storage_estimate_descriptor_missing', {
-             surface: 'navigator',
+           (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:storage_estimate_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
+             surface: __SURFACE,
              stage: 'preflight',
              type: __navTypeBrowser,
              diagTag: 'nav_total_set:storage.estimate',
            key: 'storage.estimate',
            message: 'storage.estimate descriptor missing'
-         });
+         }, null) : undefined);
        } else if (!Object.prototype.hasOwnProperty.call(storageDesc, 'value') || typeof storageDesc.value !== 'function') {
-         __navDiag('error', 'nav_total_set:storage_estimate_descriptor_kind_mismatch', {
-           surface: 'navigator',
+         (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:storage_estimate_descriptor_kind_mismatch', { module: __MODULE, surface: __SURFACE, 
+           surface: __SURFACE,
            stage: 'preflight',
            type: __navTypeBrowser,
            diagTag: 'nav_total_set:storage.estimate',
            key: 'storage.estimate',
            message: 'storage.estimate is not method-shaped on prototype'
-         });
+         }, null) : undefined);
        } else if (storageOwner === navigator.storage) {
-         __navDiag('error', 'nav_total_set:storage_estimate_owner_mismatch', {
-           surface: 'navigator',
+         (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:storage_estimate_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
+           surface: __SURFACE,
            stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:storage.estimate',
           key: 'storage.estimate',
           message: 'storage.estimate resolved to instance owner',
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-        });
+        }, null) : undefined);
       } else {
       const QUOTA_MB   = Number(storageQuotaMb ?? 120);
       const USED_PCT   = Math.max(0, Math.min(100, Number(storageUsedPct ?? 3))); // ~3% занято
@@ -2795,14 +2757,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
 
         const origEstimate = storageDesc.value;
         if (typeof origEstimate !== 'function') {
-          __navDiag('error', 'nav_total_set:storage_estimate_original_missing', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:storage_estimate_original_missing', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:storage.estimate',
           key: 'storage.estimate',
           message: 'storage.estimate original missing'
-         });
+         }, null) : undefined);
        } else {
          __navRegisterKey('storage.estimate');
          const buildStorageEstimateSnapshot = function buildStorageEstimateSnapshot(sourceTag) {
@@ -2821,8 +2783,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
              return Promise.resolve(buildStorageEstimateSnapshot('snapshot_gate'));
            };
            if (__navSetHiddenStateValue(__navObjectStorageEstimateState, '__STORAGE_ESTIMATE_SNAPSHOT_GATE__', storageEstimateSnapshotGate) !== storageEstimateSnapshotGate) throw new TypeError('storage estimate snapshot gate hidden slot attach failed');
-         __navDiag('info', 'nav_total_set:storage_estimate_native_passthrough', {
-           surface: 'navigator',
+         (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:storage_estimate_native_passthrough', { module: __MODULE, surface: __SURFACE, 
+           surface: __SURFACE,
            stage: 'apply',
            type: __navTypePipeline,
            diagTag: 'nav_total_set:storage.estimate',
@@ -2833,7 +2795,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
              reason: 'native_passthrough',
              ownerIsPrototype: storageOwner !== navigator.storage
            }
-         });
+         }, null) : undefined);
        }
        if (navigator.webkitTemporaryStorage) {
         const tmpProto = Object.getPrototypeOf(navigator.webkitTemporaryStorage) || navigator.webkitTemporaryStorage;
@@ -2848,24 +2810,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const tmpDesc = tmpResolved ? tmpResolved.desc : null;
         const tmpOwner = (tmpResolved && tmpResolved.owner) ? tmpResolved.owner : tmpProto;
         if (!tmpDesc) {
-          __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota_descriptor_missing', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
             key: 'webkitTemporaryStorage.queryUsageAndQuota',
             message: 'webkitTemporaryStorage.queryUsageAndQuota descriptor missing'
-          });
+          }, null) : undefined);
         } else if (tmpOwner === navigator.webkitTemporaryStorage) {
-          __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota_owner_mismatch', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
             key: 'webkitTemporaryStorage.queryUsageAndQuota',
             message: 'webkitTemporaryStorage.queryUsageAndQuota resolved to instance owner',
             data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-          });
+          }, null) : undefined);
         } else {
           __navRegisterKey('webkitTemporaryStorage.queryUsageAndQuota');
           applyCoreTargetsGroup('nav_total_set:webkitTemporaryStorage.queryUsageAndQuota', [{
@@ -2890,14 +2852,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             try {
               tickUsage();
             } catch (e) {
-              __navDiag('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota', {
-                surface: 'navigator',
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:webkitTemporaryStorage_queryUsageAndQuota', { module: __MODULE, surface: __SURFACE, 
+                surface: __SURFACE,
                 stage: 'runtime',
                 type: __navTypeBrowser,
                 diagTag: 'nav_total_set:webkitTemporaryStorage.queryUsageAndQuota',
                 key: 'webkitTemporaryStorage.queryUsageAndQuota',
                 message: 'webkitTemporaryStorage.queryUsageAndQuota failed'
-              }, e);
+              }, e) : undefined);
               if (typeof _orig === 'function') return Reflect.apply(_orig, this, args || []);
               if (typeof error === 'function') error(e);
               return undefined;
@@ -2922,24 +2884,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const persistDesc = persistResolved ? persistResolved.desc : null;
         const persistOwner = (persistResolved && persistResolved.owner) ? persistResolved.owner : storageProto;
         if (!persistDesc) {
-          __navDiag('error', 'nav_total_set:storage_persist_descriptor_missing', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:storage_persist_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:storage.persist',
             key: 'storage.persist',
             message: 'storage.persist descriptor missing'
-          });
+          }, null) : undefined);
         } else if (persistOwner === navigator.storage) {
-          __navDiag('error', 'nav_total_set:storage_persist_owner_mismatch', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:storage_persist_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:storage.persist',
             key: 'storage.persist',
             message: 'storage.persist resolved to instance owner',
             data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-          });
+          }, null) : undefined);
         } else {
           __navRegisterKey('storage.persist');
           applyCoreTargetsGroup('nav_total_set:storage.persist', [{
@@ -2977,24 +2939,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         const persistedDesc = persistedResolved ? persistedResolved.desc : null;
         const persistedOwner = (persistedResolved && persistedResolved.owner) ? persistedResolved.owner : storageProto;
         if (!persistedDesc) {
-          __navDiag('error', 'nav_total_set:storage_persisted_descriptor_missing', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:storage_persisted_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:storage.persisted',
             key: 'storage.persisted',
             message: 'storage.persisted descriptor missing'
-          });
+          }, null) : undefined);
         } else if (persistedOwner === navigator.storage) {
-          __navDiag('error', 'nav_total_set:storage_persisted_owner_mismatch', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:storage_persisted_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:storage.persisted',
             key: 'storage.persisted',
             message: 'storage.persisted resolved to instance owner',
             data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-          });
+          }, null) : undefined);
         } else {
           __navRegisterKey('storage.persisted');
           applyCoreTargetsGroup('nav_total_set:storage.persisted', [{
@@ -3033,15 +2995,15 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const dm0 = Number(navigator.deviceMemory);
       if (typeof dm0 === 'number' && isFinite(dm0)) {
         if (!__navResolveDescriptor) {
-          __navDiag('warn', 'nav_total_set:performance_memory_resolve_descriptor_missing', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:performance_memory_resolve_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:performance.memory',
             key: 'performance.memory',
             message: 'Core.resolveDescriptor missing',
             data: { outcome: 'skip', reason: 'missing_dep_core_resolve_descriptor', policy: 'skip', action: 'native' }
-          });
+          }, null) : undefined);
           return;
         }
         const perfMemoryResolved = __navResolveDescriptor(perfProto, 'memory', { mode: 'proto_chain' });
@@ -3095,20 +3057,20 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           }
 
           if (perfMemoryDesc && perfMemoryDesc.configurable === false) {
-            __navDiag('warn', 'nav_total_set:performance_memory_non_configurable', {
-              surface: 'navigator',
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:performance_memory_non_configurable', { module: __MODULE, surface: __SURFACE, 
+              surface: __SURFACE,
               stage: 'preflight',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:performance.memory',
               key: 'performance.memory',
               message: 'performance.memory is non-configurable',
               data: { outcome: 'skip', reason: 'non_configurable', policy: 'skip', action: 'native' }
-            });
+            }, null) : undefined);
             return;
           }
           if (perfMemoryDesc && typeof perfMemoryDesc.get !== 'function') {
-            __navDiag('warn', 'nav_total_set:performance_memory_descriptor_kind_mismatch', {
-              surface: 'navigator',
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:performance_memory_descriptor_kind_mismatch', { module: __MODULE, surface: __SURFACE, 
+              surface: __SURFACE,
               stage: 'preflight',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:performance.memory',
@@ -3121,7 +3083,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 action: 'native',
                 ownerFact: perfMemoryOwnerFact
               }
-            });
+            }, null) : undefined);
             return;
           }
           let __navPerformanceThisCheckDiagSent = false;
@@ -3131,14 +3093,14 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             } catch (e) {
               if (!__navPerformanceThisCheckDiagSent) {
                 __navPerformanceThisCheckDiagSent = true;
-                __navDiag('warn', 'nav_total_set:performance_memory_this_check_failed', {
+                (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:performance_memory_this_check_failed', { module: __MODULE, surface: __SURFACE, 
                   stage: 'runtime',
                   type: __navTypeBrowser,
                   diagTag: 'nav_total_set:performance.memory',
                   key: 'performance.memory',
                   message: 'Performance receiver check failed',
                   data: { outcome: 'return', reason: 'performance_this_check_failed', policy: 'skip', action: 'native' }
-                }, e);
+                }, e) : undefined);
               }
               return false;
             }
@@ -3155,8 +3117,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             : 'native';
 
           if (perfUseOwnerFirstGateway && !__coreOwnerFirstAccessorCapable) {
-            __navDiag('error', 'nav_total_set:performance_memory_stale_core_bundle', {
-              surface: 'navigator',
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:performance_memory_stale_core_bundle', { module: __MODULE, surface: __SURFACE, 
+              surface: __SURFACE,
               stage: 'preflight',
               type: __navTypePipeline,
               diagTag: 'nav_total_set:performance.memory',
@@ -3169,12 +3131,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 wrapLayer: perfWrapLayer,
                 resolve: perfResolveMode
               }
-            });
+            }, null) : undefined);
             return;
           }
 
-          __navDiag('info', 'nav_total_set:performance_memory_apply_plan', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:performance_memory_apply_plan', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'preflight',
             type: __navTypePipeline,
             diagTag: 'nav_total_set:performance.memory',
@@ -3187,7 +3149,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
               resolve: perfResolveMode,
               needsMaterialize: perfMemoryNeedsMaterialize
             }
-          });
+          }, null) : undefined);
 
           const applied = applyCoreTargetsGroup('nav_total_set:performance.memory', [{
             owner: perfMemoryOwner,
@@ -3207,8 +3169,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             }
           }], 'strict');
           if (applied !== 1) {
-            __navDiag('warn', 'nav_total_set:performance_memory_define_failed', {
-              surface: 'navigator',
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:performance_memory_define_failed', { module: __MODULE, surface: __SURFACE, 
+              surface: __SURFACE,
               stage: 'apply',
               type: __navTypeBrowser,
               diagTag: 'nav_total_set:performance.memory',
@@ -3221,18 +3183,18 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
                 action: 'native',
                 ownerFact: perfMemoryOwnerFact
               }
-            });
+            }, null) : undefined);
           }
         } catch (e) {
-          __navDiag('warn', 'nav_total_set:performance_memory_proto', {
-            surface: 'navigator',
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:performance_memory_proto', { module: __MODULE, surface: __SURFACE, 
+            surface: __SURFACE,
             stage: 'apply',
             type: __navTypeBrowser,
             diagTag: 'nav_total_set:performance.memory',
             key: 'performance.memory',
             message: 'performance.memory proto define failed',
             data: { outcome: 'skip', reason: 'proto_define_failed', policy: 'skip', action: 'native' }
-          }, e);
+          }, e) : undefined);
         }
       }
     }
@@ -3272,24 +3234,24 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       const createOwner = (createResolved && createResolved.owner) ? createResolved.owner : credProto;
       const getOwner = (getResolved && getResolved.owner) ? getResolved.owner : credProto;
       if (!createDesc || !getDesc) {
-        __navDiag('error', 'nav_total_set:credentials_descriptor_missing', {
-          surface: 'navigator',
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:credentials_descriptor_missing', { module: __MODULE, surface: __SURFACE, 
+          surface: __SURFACE,
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:credentials',
           key: !createDesc ? 'credentials.create' : 'credentials.get',
           message: 'credentials descriptor missing'
-        });
+        }, null) : undefined);
       } else if (createOwner === navigator.credentials || getOwner === navigator.credentials) {
-        __navDiag('error', 'nav_total_set:credentials_owner_mismatch', {
-          surface: 'navigator',
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:credentials_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
+          surface: __SURFACE,
           stage: 'preflight',
           type: __navTypeBrowser,
           diagTag: 'nav_total_set:credentials',
           key: (createOwner === navigator.credentials) ? 'credentials.create' : 'credentials.get',
           message: 'credentials resolved to instance owner',
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-        });
+        }, null) : undefined);
       } else {
         __navRegisterKey('credentials.create');
         __navRegisterKey('credentials.get');
@@ -3349,13 +3311,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
       ], 'throw');
       }
     }
-    __navDiag('info', 'nav_total_set:webauthn_mock_applied', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:webauthn_mock_applied', { module: __MODULE, surface: __SURFACE, 
       stage: 'apply',
       type: __navTypePipeline,
       diagTag: 'nav_total_set',
       message: 'webauthn mock applied',
       data: { outcome: 'return', reason: 'webauthn_mock_applied' }
-    });
+    }, null) : undefined);
 
     // ——— L. Plugins & MimeTypes ———
     (function applyPluginsAndMimeTypesSubgraph() {
@@ -3374,7 +3336,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         !('plugins' in navigator) ||
         !('mimeTypes' in navigator)
       ) {
-        __navDiag('warn', 'nav_total_set:plugins_skipped', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'nav_total_set:plugins_skipped', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:plugins',
@@ -3390,7 +3352,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             hasNavigatorPlugins: ('plugins' in navigator),
             hasNavigatorMimeTypes: ('mimeTypes' in navigator)
           }
-        });
+        }, null) : undefined);
         return;
       }
 
@@ -3471,26 +3433,26 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         ? __navPluginsTopLevelParity(nativePluginsRead.value, nativeMimeTypesRead.value)
         : false;
       if (nativePluginsRead.ok && nativeMimeTypesRead.ok && nativePluginsParity) {
-        __navDiag('info', 'nav_total_set:plugins_getter_value_match', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:plugins_getter_value_match', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:plugins',
           key: 'plugins',
           message: 'plugins already matches native getter',
           data: { outcome: 'return', reason: 'getter_value_match' }
-        });
-        __navDiag('info', 'nav_total_set:mimeTypes_getter_value_match', {
+        }, null) : undefined);
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:mimeTypes_getter_value_match', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:mimeTypes',
           key: 'mimeTypes',
           message: 'mimeTypes already matches native getter',
           data: { outcome: 'return', reason: 'getter_value_match' }
-        });
+        }, null) : undefined);
         return;
       }
       if (nativePluginsRead.ok && nativeMimeTypesRead.ok && !nativePluginsParity) {
-        __navDiag('info', 'nav_total_set:plugins_native_getter_kept', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:plugins_native_getter_kept', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:plugins',
@@ -3505,8 +3467,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             nativeLength: nativePluginsRead.value && nativePluginsRead.value.length,
             profileLength: fakePlugins.length
           }
-        });
-        __navDiag('info', 'nav_total_set:mimeTypes_native_getter_kept', {
+        }, null) : undefined);
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:mimeTypes_native_getter_kept', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __navTypePipeline,
           diagTag: 'nav_total_set:mimeTypes',
@@ -3521,11 +3483,11 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
             nativeLength: nativeMimeTypesRead.value && nativeMimeTypesRead.value.length,
             profileLength: normalizedMimeCount
           }
-        });
+        }, null) : undefined);
         return;
       }
 
-      __navDiag('info', 'nav_total_set:plugins_native_getter_kept', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:plugins_native_getter_kept', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set:plugins',
@@ -3540,8 +3502,8 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           nativeReadOk: !!nativePluginsRead.ok,
           profileLength: fakePlugins.length
         }
-      });
-      __navDiag('info', 'nav_total_set:mimeTypes_native_getter_kept', {
+      }, null) : undefined);
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:mimeTypes_native_getter_kept', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __navTypePipeline,
         diagTag: 'nav_total_set:mimeTypes',
@@ -3556,13 +3518,13 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           nativeReadOk: !!nativeMimeTypesRead.ok,
           profileLength: normalizedMimeCount
         }
-      });
+      }, null) : undefined);
     })();
 
     //  ——— Debug information (unified log) ———
     if (DEBUG) {
       const hasUAD = ('userAgentData' in navigator);
-      __navDiag('debug', 'nav_total_set:debug', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('debug', 'nav_total_set:debug', { module: __MODULE, surface: __SURFACE, 
         stage: 'runtime',
         type: __navTypePipeline,
         diagTag: 'nav_total_set',
@@ -3572,16 +3534,16 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           hasUAD: hasUAD,
           secureContext: G.isSecureContext
         }
-      });
+      }, null) : undefined);
     }
     publishWorkerEnvSnapshot();
-    __navDiag('info', 'nav_total_set:applied', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'nav_total_set:applied', { module: __MODULE, surface: __SURFACE, 
       stage: 'apply',
       type: __navTypePipeline,
       diagTag: 'nav_total_set',
       message: 'nav_total_set applied',
       data: { outcome: 'return', reason: 'patched' }
-    });
+    }, null) : undefined);
 
     }
     } catch (e) {
@@ -3599,12 +3561,12 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         }
       } catch (sre) {
         scalarRollbackErr = sre;
-        __navDiagPipeline('error', 'nav_total_set:scalar_state_reset_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'nav_total_set:scalar_state_reset_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'rollback',
           key: null,
           message: 'scalar hidden-state reset failed',
           data: { outcome: 'throw', reason: 'rollback_failed', rollbackOk: false, sourceReason: 'module_catch', sourceError: 'scalar_state_reset_failed' }
-        }, sre);
+        }, sre) : undefined);
       }
       let hiddenRollbackErr = null;
       try {
@@ -3619,7 +3581,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
         rollbackErr = re;
       }
       const finalRollbackErr = rollbackErr || hiddenRollbackErr || scalarRollbackErr;
-      __navDiagBrowser('fatal', 'nav_total_set:fatal', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'nav_total_set:fatal', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
         stage: 'apply',
         diagTag: 'nav_total_set',
         key: null,
@@ -3633,7 +3595,7 @@ const NavTotalSetPatchModule = function NavTotalSetPatchModule(window) {
           objectStateRollbackOk: !hiddenRollbackErr,
           action: 'native'
         }
-      }, finalRollbackErr || e);
+      }, finalRollbackErr || e) : undefined);
       __navReleaseEntryGuard(!finalRollbackErr, 'rollback', 'module_catch');
       throw (finalRollbackErr || e);
     }

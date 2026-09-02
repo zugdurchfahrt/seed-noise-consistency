@@ -1,4 +1,19 @@
 const FontPatchModule = function FontPatchModule(window) {
+  const __MODULE = 'fonts';
+  const __SURFACE = 'fonts';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
+  const G = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+
 const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       || (typeof self       !== 'undefined' && self)
       || (typeof window     !== 'undefined' && window)
@@ -9,48 +24,6 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     : __fontRealmBootstrap;
 
   const __fontTypePipeline = 'pipeline missing data';
-  const __fontTypeBrowser = 'browser structure missing data';
-  const __MODULE = 'fonts';
-  const __SURFACE = 'fonts';
-  const __loggerRoot = (__fontRealmRoot && __fontRealmRoot.FernwehContext && __fontRealmRoot.FernwehContext.__logger && typeof __fontRealmRoot.FernwehContext.__logger === 'object')
-    ? __fontRealmRoot.FernwehContext.__logger
-    : null;
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
-  function __emit(level, code, ctx, err) {
-    try {
-      if (__diag) return __diag(level, code, ctx, err);
-      if (typeof __D === 'function') {
-        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-        const safeLevel = (level === undefined || level === null) ? 'info' : level;
-        const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
-      }
-    } catch (emitErr) {
-      return undefined;
-    }
-  }
-
-  function __fontDiag(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const ctx = {
-      module: __MODULE,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
-      surface: __SURFACE,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: x.stage,
-      message: x.message,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: x.type
-    };
-    return __emit(level, code, ctx, err);
-  }
-  function __fontDiagPipeline(level, code, extra, err) {
-    return __fontDiag(level, code, extra, err);
-  }
-  function __fontDiagBrowser(level, code, extra, err) {
-    return __fontDiag(level, code, extra, err);
-  }
   function __makeFontFamilySnapshot() {
     return {
       allowedFamilies: null,
@@ -91,11 +64,11 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
 
   const C = (__fontRealmRoot && __fontRealmRoot.FernwehContext) || null;
   if (!C) {
-    __fontDiagPipeline('warn', 'fonts:canvas_patch_context_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:canvas_patch_context_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       message: 'FernwehContext missing',
       data: { outcome: 'skip', reason: 'missing_canvas_patch_context' }
-    }, null);
+    }, null) : undefined);
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object')
@@ -111,12 +84,12 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     ? __envProfileState.profile
     : null;
   if (!__stateRoot) {
-    __fontDiagPipeline('warn', 'fonts:canvas_patch_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:canvas_patch_state_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       key: 'FernwehContext.state',
       message: 'FernwehContext.state missing',
       data: { outcome: 'skip', reason: 'missing_canvas_patch_state' }
-    }, null);
+    }, null) : undefined);
     return;
   }
 
@@ -125,12 +98,12 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       ? __stateRoot.__FONTS__
       : null;
     if (existing) return existing;
-    __fontDiagPipeline('warn', 'fonts:fonts_config_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fonts_config_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       key: 'FernwehContext.state.__FONTS__',
       message: 'FernwehContext.state.__FONTS__ missing',
       data: { outcome: 'skip', reason: 'fonts_module_slot_missing' }
-    }, null);
+    }, null) : undefined);
     return null;
   }
 
@@ -142,12 +115,12 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       ? __fontsModuleState.__CONFIG__
       : null;
     if (existing) return existing;
-    __fontDiagPipeline('warn', 'fonts:fonts_config_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fonts_config_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       key: 'FernwehContext.state.__FONTS__.__CONFIG__',
       message: 'FernwehContext.state.__FONTS__.__CONFIG__ missing',
       data: { outcome: 'skip', reason: 'fonts_config_missing' }
-    }, null);
+    }, null) : undefined);
     return null;
   }
 
@@ -163,13 +136,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       ? __fontsModuleState.__STATE__
       : null;
     if (existing) return existing;
-    __fontDiagPipeline('warn', 'fonts:fonts_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fonts_state_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       surface: 'FernwehContext.state.__FONTS__',
       key: 'FernwehContext.state.__FONTS__.__STATE__',
       message: 'FernwehContext.state.__FONTS__.__STATE__ missing',
       data: { outcome: 'skip', reason: 'missing_fonts_state_slot' }
-    }, null);
+    }, null) : undefined);
     return null;
   }
 
@@ -208,48 +181,48 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     ? __envPlatformState.domPlatform
     : null;
   if (__fontDocument && __fontFallbackFontFaceSet && __fontDocument.fonts && __fontDocument.fonts !== __fontFallbackFontFaceSet) {
-    __fontDiagPipeline('warn', 'fonts:document_fontfaceset_anchor_mismatch', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:document_fontfaceset_anchor_mismatch', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts',
       key: 'document.fonts',
       message: 'document.fonts and realm fonts fallback resolved to different anchors',
       data: { outcome: 'skip', reason: 'document_fontfaceset_anchor_mismatch' }
-    }, null);
+    }, null) : undefined);
   }
   if (!Core) {
-    __fontDiagPipeline('warn', 'fonts:core_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:core_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       key: 'Core',
       message: 'Core missing',
       data: { outcome: 'skip', reason: 'missing_core' }
-    }, null);
+    }, null) : undefined);
     return;
   }
   if (typeof Core.applyTargets !== 'function') {
-    __fontDiagPipeline('warn', 'fonts:core_apply_targets_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:core_apply_targets_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       key: 'Core.applyTargets',
       message: 'Core.applyTargets missing',
       data: { outcome: 'skip', reason: 'missing_core_apply_targets' }
-    }, null);
+    }, null) : undefined);
     return;
   }
   if (typeof Core.registerPatchedTarget !== 'function') {
-    __fontDiagPipeline('warn', 'fonts:core_register_patched_target_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:core_register_patched_target_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       key: 'Core.registerPatchedTarget',
       message: 'Core.registerPatchedTarget missing',
       data: { outcome: 'skip', reason: 'missing_core_register_patched_target' }
-    }, null);
+    }, null) : undefined);
     return;
   }
   if (typeof Core.resolveDescriptor !== 'function') {
-    __fontDiagPipeline('warn', 'fonts:core_resolve_descriptor_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:core_resolve_descriptor_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       key: 'Core.resolveDescriptor',
       message: 'Core.resolveDescriptor missing',
       data: { outcome: 'skip', reason: 'missing_core_resolve_descriptor' }
-    }, null);
+    }, null) : undefined);
     return;
   }
 
@@ -273,7 +246,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         if (!pre || pre.ok !== true) {
           const err = (pre && pre.error instanceof Error) ? pre.error : new Error('target preflight failed');
           const reason = pre && pre.reason ? pre.reason : 'preflight_failed';
-          __fontDiagPipeline(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':target_preflight_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':target_preflight_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
             stage: 'preflight',
             diagTag: groupTag,
             key: target && target.key ? target.key : null,
@@ -284,7 +257,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
               reason: reason,
               kind: target && target.kind ? target.kind : null
             }
-          }, err);
+          }, err) : undefined);
           if (groupPolicy === 'throw') throw err;
           return 0;
         }
@@ -294,13 +267,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     try {
       plans = Core.applyTargets(targets, __profile, []);
     } catch (e) {
-      __fontDiagPipeline(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':preflight_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':preflight_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         diagTag: groupTag,
         key: groupKey,
         message: 'Core.applyTargets preflight failed',
         data: { outcome: (groupPolicy === 'throw') ? 'throw' : 'skip', reason: 'core_apply_targets_preflight_failed' }
-      }, e);
+      }, e) : undefined);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
@@ -308,21 +281,21 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     if (!Array.isArray(plans) || !plans.length) {
       if (plans && plans.ok === false) {
         const e = new Error('target group skipped');
-        __fontDiagPipeline(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':group_skipped', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':group_skipped', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'preflight',
           diagTag: groupTag,
           key: groupKey,
           message: 'target group skipped',
           data: { outcome: 'skip', reason: plans.reason || 'group_skipped' }
-        }, e);
+        }, e) : undefined);
       } else {
-        __fontDiagPipeline('warn', groupTag + ':group_skipped', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':group_skipped', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'preflight',
           diagTag: groupTag,
           key: groupKey,
           message: 'target group skipped',
           data: { outcome: 'skip', reason: 'empty_plan' }
-        }, null);
+        }, null) : undefined);
       }
       return 0;
     }
@@ -334,25 +307,25 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         if (!p || p.skipApply) continue;
         if (!p.nextDesc || !p.owner || typeof p.key !== 'string' || typeof p.apply !== 'function') {
           const e = new Error('invalid execution plan item');
-          __fontDiagBrowser('error', groupTag + ':contract_violation', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':contract_violation', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
             stage: 'contract',
             diagTag: groupTag,
             key: p && typeof p.key === 'string' ? p.key : groupKey,
             message: 'invalid execution plan item',
             data: { outcome: 'throw', reason: 'invalid_execution_plan_item' }
-          }, e);
+          }, e) : undefined);
           throw e;
         }
         p.apply();
         done.push(p);
       }
-      __fontDiagPipeline('info', groupTag + ':group_applied', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', groupTag + ':group_applied', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'apply',
         diagTag: groupTag,
         key: groupKey,
         message: 'target group applied',
         data: { outcome: 'return', applied: done.length }
-      }, null);
+      }, null) : undefined);
       return done.length;
     } catch (e) {
       let rollbackErr = null;
@@ -363,16 +336,16 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           p.rollback();
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
-          __fontDiagBrowser('error', groupTag + ':rollback_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':rollback_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
             stage: 'rollback',
             diagTag: groupTag,
             key: p && p.key ? p.key : groupKey,
             message: 'rollback failed',
             data: { outcome: 'rollback', reason: 'rollback_failed' }
-          }, re);
+          }, re) : undefined);
         }
       }
-      __fontDiagBrowser(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':apply_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(groupPolicy === 'throw' ? 'error' : 'warn', groupTag + ':apply_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
         stage: 'apply',
         diagTag: groupTag,
         key: groupKey,
@@ -382,7 +355,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           reason: 'apply_failed',
           rollbackFailed: !!rollbackErr
         }
-      }, e);
+      }, e) : undefined);
       if (groupPolicy === 'throw') throw (rollbackErr || e);
       return 0;
     }
@@ -451,26 +424,26 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
   let __guardToken = null;
   try {
     if (!__core || typeof __core.guardFlag !== 'function') {
-      __fontDiagPipeline('warn', 'fonts:guard_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:guard_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'guard',
         diagTag: __tag,
         surface: __surface,
         key: 'guard',
         message: 'Core.guardFlag missing',
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
-      }, null);
+      }, null) : undefined);
       return;
     }
     __guardToken = __core.guardFlag(__flagKey, __tag);
   } catch (e) {
-    __fontDiagPipeline('warn', 'fonts:guard_failed', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:guard_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'guard',
       diagTag: __tag,
       surface: __surface,
       key: 'guard',
       message: 'guardFlag threw',
       data: { outcome: 'skip', reason: 'guard_failed' }
-    }, e);
+    }, e) : undefined);
     return;
   }
   if (!__guardToken) return; // already_patched: Core emits fonts:already_patched
@@ -481,14 +454,14 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
       }
     } catch (eRelease) {
-      __fontDiagPipeline('warn', 'fonts:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:guard_release_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: stage || 'preflight',
         diagTag: __tag,
         surface: __surface,
         key: 'guard',
         message: message,
         data: { outcome: 'skip', reason: reason || 'guard_release_failed' }
-      }, eRelease);
+      }, eRelease) : undefined);
     }
   }
 
@@ -498,13 +471,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
   let __applyStarted = false;
   try {
     if (!Array.isArray(__fontsConfigState.configs)) {
-      __fontDiagPipeline('warn', 'fonts:configs_missing_or_invalid', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:configs_missing_or_invalid', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         diagTag: 'fonts',
         key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
         message: 'FernwehContext.state.__FONTS__.__CONFIG__.configs missing/invalid (skip font patch)',
         data: { outcome: 'skip', reason: 'configs_missing_or_invalid', typeof: typeof __fontsConfigState.configs }
-      }, null);
+      }, null) : undefined);
       __releaseGuardOnSkip('preflight', 'guard release failed after preflight skip', 'guard_release_failed');
       return;
     }
@@ -562,25 +535,25 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
   // FontFaceSet в текущем окружении (window/worker)
   const FFS = __fontFontFaceSet;
   if (!FFS) {
-    __fontDiagPipeline('warn', 'fonts:ffs_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:ffs_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts',
       key: 'FontFaceSet',
       message: 'FontFaceSet missing (skip patch)',
       data: { outcome: 'skip', reason: 'missing_fontfaceset' }
-    }, null);
+    }, null) : undefined);
     return;
   }
 
   const proto = Object.getPrototypeOf(FFS);
   if (!proto) {
-    __fontDiagPipeline('warn', 'fonts:proto_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:proto_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts',
       key: 'FontFaceSet.prototype',
       message: 'FontFaceSet prototype missing (skip patch)',
       data: { outcome: 'skip', reason: 'missing_prototype' }
-    }, null);
+    }, null) : undefined);
     return;
   }
 
@@ -706,13 +679,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     } catch (e) {
       if (FONTFACE_RUNTIME_SYNC_FAILED) return;
       FONTFACE_RUNTIME_SYNC_FAILED = true;
-      __fontDiagBrowser('warn', 'fonts:runtime_families_sync_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:runtime_families_sync_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
         stage: 'runtime',
         diagTag: 'fonts:fontface',
         key: 'FontFaceSet',
         message: 'runtime FontFaceSet family sync failed',
         data: { outcome: 'return', reason: 'runtime_families_sync_failed' }
-      }, e);
+      }, e) : undefined);
     }
   }
 
@@ -944,21 +917,21 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
 
   const NativeFontFace = (__fontRuntimeRoot && typeof __fontRuntimeRoot.FontFace === 'function') ? __fontRuntimeRoot.FontFace : null;
   if (!NativeFontFace) {
-    __fontDiagPipeline('warn', 'fonts:fontface_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontface_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts:fontface',
       key: 'FontFace',
       message: 'FontFace missing (skip constructor patch)',
       data: { outcome: 'skip', reason: 'missing_fontface' }
-    }, null);
+    }, null) : undefined);
   } else if (typeof __wrapNativeCtor !== 'function') {
-    __fontDiagPipeline('warn', 'fonts:wrap_native_ctor_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:wrap_native_ctor_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts:fontface',
       key: 'Core.__wrapNativeCtor',
       message: 'Core.__wrapNativeCtor missing (skip constructor patch)',
       data: { outcome: 'skip', reason: 'missing_wrap_native_ctor' }
-    }, null);
+    }, null) : undefined);
   } else {
     let WrappedFontFace = null;
     try {
@@ -969,7 +942,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           const sanitized = sanitizeFontFaceSource(nextArgs[1], nextArgs[0], nextArgs[2]);
           nextArgs[1] = sanitized.source;
           if (sanitized.sanitizeFailed) {
-            __fontDiagBrowser('warn', 'fonts:fontface:sanitize_parser_failed', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontface:sanitize_parser_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
               stage: 'runtime',
               diagTag: 'fonts:fontface',
               key: 'FontFace',
@@ -979,11 +952,11 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
                 reason: sanitized.sanitizeReason || 'sanitize_parser_failed',
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null
               }
-            }, null);
+            }, null) : undefined);
             return nextArgs;
           }
           if (sanitized.unexpectedSourceType) {
-            __fontDiagPipeline('warn', 'fonts:fontface:unexpected_source_type', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontface:unexpected_source_type', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
               stage: 'runtime',
               diagTag: 'fonts:fontface',
               key: 'FontFace',
@@ -994,10 +967,10 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
                 runtimeConfigMatched: !!sanitized.runtimeConfigMatched
               }
-            }, null);
+            }, null) : undefined);
           }
           if (sanitized.localOnlyManaged) {
-            __fontDiagPipeline('info', 'fonts:fontface:local_only_replaced_with_managed_src', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'fonts:fontface:local_only_replaced_with_managed_src', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
               stage: 'runtime',
               diagTag: 'fonts:fontface',
               key: 'FontFace',
@@ -1009,10 +982,10 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
                 runtimeConfigMatched: !!sanitized.runtimeConfigMatched
               }
-            }, null);
+            }, null) : undefined);
           }
           if (sanitized.localOnlyPassthrough) {
-            __fontDiagPipeline('warn', 'fonts:fontface:local_only_passthrough_not_proven', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontface:local_only_passthrough_not_proven', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
               stage: 'runtime',
               diagTag: 'fonts:fontface',
               key: 'FontFace',
@@ -1024,40 +997,40 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
                 family: (typeof nextArgs[0] === 'string') ? nextArgs[0] : null,
                 runtimeConfigMatched: !!sanitized.runtimeConfigMatched
               }
-            }, null);
+            }, null) : undefined);
           }
           return nextArgs;
         } catch (e) {
-          __fontDiagBrowser('warn', 'fonts:fontface:sanitize_unexpected_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontface:sanitize_unexpected_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
             stage: 'runtime',
             diagTag: 'fonts:fontface',
             key: 'FontFace',
             message: 'FontFace source sanitization failed unexpectedly',
             data: { outcome: 'return', reason: 'sanitize_unexpected_failed' }
-          }, e);
+          }, e) : undefined);
           return nextArgs;
         }
       });
       const ctorProtoMismatch = Object.prototype.hasOwnProperty.call(NativeFontFace, 'prototype') && WrappedFontFace.prototype !== NativeFontFace.prototype;
       const ctorChainMismatch = Object.getPrototypeOf(WrappedFontFace) !== Object.getPrototypeOf(NativeFontFace);
       if (typeof WrappedFontFace !== 'function' || ctorProtoMismatch || ctorChainMismatch) {
-        __fontDiagPipeline('warn', 'fonts:wrap_native_ctor_contract_violation', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:wrap_native_ctor_contract_violation', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'contract',
           diagTag: 'fonts:fontface',
           key: 'FontFace',
           message: 'Core.__wrapNativeCtor returned invalid constructor surface',
           data: { outcome: 'skip', reason: 'invalid_wrap_native_ctor_surface' }
-        }, new Error('invalid wrap native ctor surface'));
+        }, new Error('invalid wrap native ctor surface')) : undefined);
         WrappedFontFace = null;
       }
     } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:fontface:wrap_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontface:wrap_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
         stage: 'apply',
         diagTag: 'fonts:fontface',
         key: 'FontFace',
         message: 'FontFace wrap failed',
         data: { outcome: 'skip', reason: 'wrap_failed' }
-      }, e);
+      }, e) : undefined);
     }
     if (WrappedFontFace) {
       let __fontFaceOwner = null;
@@ -1065,22 +1038,22 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         const __fontFaceResolved = Core.resolveDescriptor(__fontRuntimeRoot, 'FontFace', { mode: 'own' });
         __fontFaceOwner = (__fontFaceResolved && __fontFaceResolved.owner) ? __fontFaceResolved.owner : null;
       } catch (e) {
-        __fontDiagBrowser('warn', 'fonts:fontface:resolve_owner_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontface:resolve_owner_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'preflight',
           diagTag: 'fonts:fontface',
           key: 'FontFace',
           message: 'FontFace owner resolution failed',
           data: { outcome: 'skip', reason: 'resolve_owner_failed' }
-        }, e);
+        }, e) : undefined);
       }
       if (!__fontFaceOwner) {
-        __fontDiagPipeline('warn', 'fonts:fontface:owner_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontface:owner_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'preflight',
           diagTag: 'fonts:fontface',
           key: 'FontFace',
           message: 'FontFace resolved owner missing',
           data: { outcome: 'skip', reason: 'resolved_owner_missing' }
-        }, null);
+        }, null) : undefined);
       } else {
       applyTargetGroup('fonts:data:fontface', [{
         owner: __fontFaceOwner,
@@ -1102,13 +1075,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       if (self === FFS) return true;
       return !!(proto && typeof proto.isPrototypeOf === 'function' && proto.isPrototypeOf(self));
     } catch (e) {
-      __fontDiagBrowser('warn', 'fonts:fontfaceset:this_check_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontfaceset:this_check_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
         stage: 'guard',
         diagTag: 'fonts:fontfaceset',
         key: 'FontFaceSet',
         message: 'FontFaceSet receiver check failed',
         data: { outcome: 'return', reason: 'this_check_failed' }
-      }, e);
+      }, e) : undefined);
       return false;
     }
   }
@@ -1125,13 +1098,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       try {
         return Reflect.apply(origGet, this, []);
       } catch (e) {
-        __fontDiagBrowser('warn', 'fonts:accessor:ready:native_throw', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:accessor:ready:native_throw', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'runtime',
           diagTag: 'fonts:accessor:ready',
           key: 'ready',
           message: 'FontFaceSet.ready getter threw',
           data: { outcome: 'throw', reason: 'native_throw' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
     }
@@ -1198,7 +1171,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
     return true;
   };
 
-  __fontDiagBrowser('info', 'fonts:method:check_native_passthrough', {
+  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'fonts:method:check_native_passthrough', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
     stage: 'preflight',
     type: __fontTypePipeline,
     diagTag: 'fonts:method:check',
@@ -1209,9 +1182,9 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       reason: 'native_passthrough',
       carrierReason: 'no_admissible_public_method_carrier'
     }
-  }, null);
+  }, null) : undefined);
 
-  __fontDiagBrowser('info', 'fonts:method:forEach_native_passthrough', {
+  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'fonts:method:forEach_native_passthrough', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
     stage: 'preflight',
     type: __fontTypePipeline,
     diagTag: 'fonts:method:forEach',
@@ -1222,9 +1195,9 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       reason: 'native_passthrough',
       carrierReason: 'no_admissible_public_method_carrier'
     }
-  }, null);
+  }, null) : undefined);
 
-  __fontDiagBrowser('info', 'fonts:promise:load_native_passthrough', {
+  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'fonts:promise:load_native_passthrough', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
     stage: 'preflight',
     type: __fontTypePipeline,
     diagTag: 'fonts:promise:load',
@@ -1235,31 +1208,31 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       reason: 'native_passthrough',
       carrierReason: 'no_admissible_public_method_carrier'
     }
-  }, null);
+  }, null) : undefined);
 })();
 
   const domPlat = __fontDomPlatform;
   if (!domPlat) {
     // preflight soft-skip: keep awaitFontsReady as native document.fonts.ready where possible
-    __fontDiagPipeline('warn', 'fonts:nav_platform_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:nav_platform_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts',
       key: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform',
       message: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform missing (skip font patch)',
       data: { outcome: 'skip', reason: 'missing_nav_platform' }
-    }, null);
+    }, null) : undefined);
     try {
       if (__fontFontFaceSet && __fontFontFaceSet.ready && typeof __fontFontFaceSet.ready.then === 'function') {
         __setFontsAwaitState(__fontFontFaceSet.ready, 'native', null, null);
       }
     } catch (eRestore) {
-      __fontDiagPipeline('warn', 'fonts:await_ready_restore_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:await_ready_restore_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'runtime',
         key: 'document.fonts.ready',
         message: 'awaitReady restore failed',
         type: __fontTypePipeline,
         data: { outcome: 'skip', reason: 'await_ready_restore_failed' }
-      }, eRestore);
+      }, eRestore) : undefined);
     }
     __releaseGuardOnSkip('preflight', 'guard release failed after nav_platform skip', 'guard_release_failed');
     return;
@@ -1270,21 +1243,21 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
   const fonts = (hasPlatformDom && domPlat) ? allFonts.filter(f => f.platform_dom === domPlat) : allFonts;
   __refreshFontsEpochState();
   if (!fonts.length) {
-    __fontDiagPipeline('warn', 'fonts:filtered_empty', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:filtered_empty', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts',
       key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
       message: 'filtered fonts list is empty',
       data: { platform: domPlat }
-    }, null);
+    }, null) : undefined);
   } else {
-    __fontDiagPipeline('info', 'fonts:filtered_count', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'fonts:filtered_count', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts',
       key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
       message: 'filtered fonts list prepared',
       data: { platform: domPlat, count: fonts.length }
-    }, null);
+    }, null) : undefined);
   }
 
 
@@ -1297,13 +1270,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
 
     const domPlat = __fontDomPlatform;
     if (!domPlat) {
-      __fontDiagPipeline('warn', 'fonts:dom_override_nav_platform_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:dom_override_nav_platform_missing', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'preflight',
         diagTag: 'fonts',
         key: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform',
         message: 'FernwehContext.state.__ENV_PROFILE__.__PLATFORM__.domPlatform missing (skip dom override)',
         data: { outcome: 'skip', reason: 'missing_nav_platform' }
-      }, null);
+      }, null) : undefined);
       return;
     }
 
@@ -1315,13 +1288,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
       const hasPlatformDom = allFonts.some(f => f && typeof f.platform_dom === 'string');
       const fonts = (hasPlatformDom && domPlat) ? allFonts.filter(f => f.platform_dom === domPlat) : allFonts;
       if (!fonts.length) {
-        __fontDiagPipeline('warn', 'fonts:dom_override_filtered_empty', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:dom_override_filtered_empty', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'preflight',
           diagTag: 'fonts',
           key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
           message: 'dom override skipped: no filtered fonts',
           data: { platform: domPlat }
-        }, null);
+        }, null) : undefined);
         return;
       }
 
@@ -1353,13 +1326,13 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           font-family: ${testFamCss}, Helvetica, Arial, sans-serif !important;
           font-synthesis: none !important;
         }`;
-      __fontDiagPipeline('info', 'fonts:dom_override_applied', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'fonts:dom_override_applied', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'apply',
         diagTag: 'fonts',
         key: 'force-font-override',
         message: 'dom override style applied',
         data: { platform: domPlat, family: testFam }
-      }, null);
+      }, null) : undefined);
     }
 
     // дождаться готовности DOM, чтобы не ловить appendChild на null
@@ -1434,25 +1407,25 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
             try {
               __fontFontFaceSet.add(loaded);
             } catch (eAdd) {
-              __fontDiagBrowser('warn', 'fonts:document_fonts_add_failed', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:document_fonts_add_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
                 stage: 'runtime',
                 diagTag: 'fonts',
                 key: 'document.fonts',
                 message: 'document.fonts.add failed',
                 data: { outcome: 'throw', reason: 'document_fonts_add_failed', family: fam }
-              }, eAdd);
+              }, eAdd) : undefined);
               throw eAdd;
             }
             return fam;
           });
         } catch (e) {
-          __fontDiagBrowser('warn', 'fonts:load_item_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:load_item_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
             stage: 'runtime',
             diagTag: 'fonts',
             key: 'FernwehContext.state.__FONTS__.__CONFIG__.configs',
             message: 'font item build failed',
             data: { outcome: 'skip', reason: 'font_item_build_failed' }
-          }, e);
+          }, e) : undefined);
           return Promise.reject(e);
         }
       })
@@ -1469,23 +1442,23 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           __fontsState.error = String((err && (err.stack || err.message)) || err);
           __refreshFontsEpochState();
         } catch (eSet) {
-          __fontDiagPipeline('warn', 'fonts:data:set_error_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:data:set_error_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
             stage: 'runtime',
             key: 'FernwehContext.state.__FONTS__.error',
             message: 'font error state write failed',
             type: __fontTypePipeline,
             data: { outcome: 'skip', reason: 'set_error_failed' }
-          }, eSet);
+          }, eSet) : undefined);
         }
 
         __settleAwaitFontsReady('rejected', err);
-        __fontDiagBrowser('warn', 'fonts:load_settled_with_failures', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:load_settled_with_failures', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'runtime',
           diagTag: 'fonts',
           key: 'document.fonts',
           message: 'font load settled with failures',
           data: { outcome: 'skip', reason: 'load_settled_with_failures', loaded: loaded, failed: failed }
-        }, err);
+        }, err) : undefined);
         return;
       }
 
@@ -1499,21 +1472,21 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
           try {
             if (__fontEventTarget) __fontEventTarget.dispatchEvent(new Event('fontsready'));
           } catch (eEvt) {
-            __fontDiagPipeline('warn', 'fonts:event:dispatch_failed', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:event:dispatch_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
               stage: 'runtime',
               key: 'dispatchEvent',
               message: 'fontsready dispatch failed',
               type: __fontTypePipeline,
               data: { outcome: 'skip', reason: 'dispatch_failed' }
-            }, eEvt);
+            }, eEvt) : undefined);
           }
-           __fontDiagPipeline('info', 'fonts:load_settled', {
+           (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'fonts:load_settled', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
              stage: 'runtime',
              diagTag: 'fonts',
              key: 'document.fonts',
              message: 'font load settled',
              data: { outcome: 'return', loaded: loaded, failed: failed }
-            }, null);
+            }, null) : undefined);
           });
     }).catch((e) => {
       // no "наружу": перехватываем неожиданные промис-ошибки и оставляем нативное состояние
@@ -1522,35 +1495,35 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         __fontsState.error = String((e && (e.stack || e.message)) || e);
         __refreshFontsEpochState();
       } catch (eSet) {
-        __fontDiagPipeline('warn', 'fonts:data:set_error_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:data:set_error_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'runtime',
           key: 'FernwehContext.state.__FONTS__.error',
           message: 'font error state write failed',
           type: __fontTypePipeline,
           data: { outcome: 'skip', reason: 'set_error_failed' }
-        }, eSet);
+        }, eSet) : undefined);
       }
       try {
         __settleAwaitFontsReady('rejected', e);
       } catch (eRej) {
-        __fontDiagPipeline('warn', 'fonts:await_ready_reject_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:await_ready_reject_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
           stage: 'runtime',
           key: 'document.fonts.ready',
           message: 'awaitReady reject failed',
           type: __fontTypePipeline,
           data: { outcome: 'skip', reason: 'await_ready_reject_failed' }
-        }, eRej);
+        }, eRej) : undefined);
       }
-      __fontDiagBrowser('error', 'fonts:load_unexpected_rejection', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'fonts:load_unexpected_rejection', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
         stage: 'runtime',
         diagTag: 'fonts',
         key: 'document.fonts',
         message: 'unexpected rejection in font load pipeline',
         data: { outcome: 'skip', reason: 'unexpected_rejection' }
-      }, e);
+      }, e) : undefined);
     });
   } else {
-    __fontDiagPipeline('warn', 'fonts:fontfaceset_add_unavailable', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:fontfaceset_add_unavailable', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
       stage: 'preflight',
       diagTag: 'fonts',
       key: 'document.fonts.add',
@@ -1562,7 +1535,7 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         hasFontFaceSet: !!__fontFontFaceSet,
         hasAdd: !!(__fontFontFaceSet && typeof __fontFontFaceSet.add === 'function')
       }
-    }, null);
+    }, null) : undefined);
   }
   } catch (e) {
     let rollbackErr = null;
@@ -1571,39 +1544,39 @@ const __fontRealmBootstrap = (typeof globalThis !== 'undefined' && globalThis)
         __restoreFontsStateValue(__rollbackSnapshot.fontsStateValue);
       } catch (re) {
         rollbackErr = re;
-        __fontDiagBrowser('error', 'fonts:rollback_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'fonts:rollback_failed', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
           stage: 'rollback',
           diagTag: __tag,
           surface: __surface,
           key: null,
           message: 'rollback failed',
           data: { outcome: 'rollback', reason: 'rollback_failed' }
-        }, re);
+        }, re) : undefined);
       }
     }
 
     const rollbackOk = __applyStarted ? !rollbackErr : true;
-    __fontDiagBrowser('error', 'fonts:fatal', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'fonts:fatal', { module: __MODULE, surface: __SURFACE, type: 'browser structure missing data', 
       stage: 'apply',
       diagTag: __tag,
       surface: __surface,
       key: null,
       message: 'fatal module error',
       data: { outcome: 'throw', reason: 'fatal', rollbackOk: rollbackOk }
-    }, rollbackErr || e);
+    }, rollbackErr || e) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __tag);
       }
     } catch (eRelease) {
-      __fontDiagPipeline('warn', 'fonts:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'fonts:guard_release_failed', { module: __MODULE, surface: __SURFACE, type: 'pipeline missing data', 
         stage: 'rollback',
         diagTag: __tag,
         surface: __surface,
         key: 'guard',
         message: 'releaseGuardFlag threw after apply failure',
         data: { outcome: rollbackOk ? 'rollback' : 'skip', reason: 'guard_release_failed' }
-      }, eRelease);
+      }, eRelease) : undefined);
     }
     throw (rollbackErr || e);
   }

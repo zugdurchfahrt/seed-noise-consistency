@@ -20,7 +20,18 @@ if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
 const C  = G.FernwehContext;
 if (!C) throw new Error('[FernwehContext] FernwehContext is undefined — registratio not available');
 
-const loggerRoot = (C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
+const __MODULE = 'canvas';
+const __SURFACE = 'canvas';
+const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+  try {
+    const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+    if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+      G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+    } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+      G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+    }
+  } catch (_) {}
+};
 
 const stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
 if (!stateRoot) {
@@ -49,14 +60,12 @@ if (!__canvasState) {
 }
 
 function emitDiag(level, code, err, extra) {
-  const d = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
-  if (typeof d !== 'function') return;
   const eventCode = (typeof code === 'string' && code) ? code : 'canvas:diag';
   const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
   const ctx = Object.assign({
-    module: 'canvas',
+    module: __MODULE,
     diagTag: 'canvas',
-    surface: 'canvas',
+    surface: __SURFACE,
     key: 'canvas',
     stage: 'runtime',
     message: eventCode,
@@ -66,13 +75,8 @@ function emitDiag(level, code, err, extra) {
   if (ctx.key === null || typeof ctx.key === 'undefined' || ctx.key === '') {
     ctx.key = (typeof ctx.diagTag === 'string' && ctx.diagTag) ? ctx.diagTag : 'canvas';
   }
-  if (typeof d.diag === 'function') {
-    d.diag(level, eventCode, ctx, e);
-    return;
-  }
-  d(eventCode, e, ctx);
+  return (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(level, eventCode, ctx, e) : undefined);
 }
-
 if (
   !Number.isFinite(__canvasScreenWidth) ||
   !Number.isFinite(__canvasScreenHeight) ||

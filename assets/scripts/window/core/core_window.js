@@ -2,27 +2,17 @@ const CoreWindowModule = function CoreWindowModule(window) {
   'use strict';
 
   const C = window.FernwehContext;
-  const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
-  const G = (typeof globalThis !== 'undefined' && globalThis)
-        || (typeof self       !== 'undefined' && self)
-        || (typeof window     !== 'undefined' && window)
-        || (typeof global     !== 'undefined' && global)
-        || {};
-     
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+  try {
+    const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+    if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+      G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+    } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+      G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+    }
+  } catch (_) {}
+};
 
-  if (!window || (typeof window !== 'object' && typeof window !== 'function')) {
-    throw new Error('[CoreWindow] window missing');
-  }
-  if (window.Core
-      && window.Core.__internal
-      && typeof window.Core.__internal === 'object'
-      && window.Core.__internal.coreWindowLoaded === true) {
-    return;
-  }
-
-  // [MANDATORY MODULE PRELUDE] [NORMATIVE] unified adapter to C.__logger.__DEGRADE__ (module_NORMATIVE_align.md)
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const __emit = (level, code, ctx, err) => {
     try {
       const _err = (typeof err === 'undefined') ? null : err;

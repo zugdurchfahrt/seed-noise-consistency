@@ -10,6 +10,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
     || (typeof window     !== 'undefined' && window)
     || (typeof global     !== 'undefined' && global)
     || {};
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
     
   const global = window;
   if (global.FernwehContext && global.FernwehContext.__READY__) {
@@ -138,39 +149,6 @@ const ContextPatchModule = function ContextPatchModule(window) {
   let issuedOffscreenFactoryPatched = false;
 
   // === 0. Utilities ===
-  function emitContextDiag(level, code, err, extra) {
-    try {
-      const x = (extra && typeof extra === "object") ? extra : {};
-      const __MODULE  = (typeof x.module === "string" && x.module) ? x.module : "context";
-      const __SURFACE = "canvas"; // дефолт для ctx2d веток; webgl приходит из extra.surface
-
-      const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-      const __diag = (__D && typeof __D.diag === "function") ? __D.diag.bind(__D) : null;
-
-      const ctx = {
-        module: __MODULE,
-        diagTag: (typeof x.diagTag === "string" && x.diagTag) ? x.diagTag : __MODULE,
-        surface: (typeof x.surface === "string" && x.surface) ? x.surface : __SURFACE,
-        key: (typeof x.key === "string" || x.key === null) ? x.key : null,
-        stage: x.stage,      // no local normalization
-        message: x.message,  // no local normalization
-        data: Object.prototype.hasOwnProperty.call(x, "data") ? x.data : null,
-        type: x.type         // no local normalization
-      };
-
-      if (__diag) return __diag(level, code, ctx, (err === undefined) ? null : err);
-
-      if (typeof __D === "function") {
-        const safeLevel = (level === undefined || level === null) ? "info" : level;
-        const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, ctx, { level: safeLevel }));
-      }
-
-      return undefined;
-    } catch (_emitErr) {
-      return undefined;
-    }
-  }
 
   function shouldLogWebGLAccess(method) {
     const methods = Array.isArray(GATEWAY_METHODS.webgl) ? GATEWAY_METHODS.webgl : [];
@@ -196,7 +174,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
       result: result
     };
 
-    emitContextDiag('info', 'context:webgl:access', null, {
+    if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'context:webgl:access', { module: 'context', surface: 'canvas', 
       module: 'webgl',
       stage: 'runtime',
       surface: 'webgl',
@@ -207,7 +185,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         reason: 'webgl_access',
         extra: access
       }
-    });
+    }, null);
   }
 
   function emitCanvasAccess(method, args, result, source, phase, hook, count) {
@@ -224,7 +202,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           resultMeta = { kind: typeof result };
         }
       }
-      emitContextDiag('info', 'context:canvas:access', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'context:canvas:access', { module: 'context', surface: 'canvas', 
         module: 'context',
         stage: 'runtime',
         surface: 'canvas',
@@ -246,18 +224,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
             resultMeta: resultMeta
           }
         }
-      });
-    } catch (_) {  try {
-    const _root = typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this);
-    if (_root && _root.__loggerRoot && typeof _root.__loggerRoot.__DEGRADE__ === "function") {
-      if (typeof _root.__loggerRoot.__DEGRADE__.diag === "function") {
-        _root.__loggerRoot.__DEGRADE__.diag("error", "silent_swallow", {message: "caught swallowed exception"}, _);
-      } else {
-        _root.__loggerRoot.__DEGRADE__("silent_swallow", _, {message: "caught swallowed exception"});
+      }, null);
+    } catch (_) {
+      if (__FERNWEH_DIAG__) {
+        __FERNWEH_DIAG__("error", "silent_swallow", { message: "caught swallowed exception" }, _);
       }
     }
-  } catch (_err) {}
-}
   }
 
 
@@ -283,13 +255,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const rawOptions = out.length > 1 ? out[1] : undefined;
 
     if (rawOptions != null && (typeof rawOptions !== 'object' && typeof rawOptions !== 'function')) {
-      emitContextDiag('warn', 'context:getContext:willReadFrequently_options_invalid', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:getContext:willReadFrequently_options_invalid', { module: 'context', surface: 'canvas', 
         stage: 'preflight',
         key: diagKey || 'getContext',
         type: 'browser structure missing data',
         message: '2d context options is not object; willReadFrequently not injected',
         data: { outcome: 'skip', reason: 'options_not_object' }
-      });
+      }, null);
       return input;
     }
 
@@ -297,13 +269,13 @@ const ContextPatchModule = function ContextPatchModule(window) {
     try {
       nextOptions = rawOptions ? Object.assign({}, rawOptions) : {};
     } catch (e) {
-      emitContextDiag('warn', 'context:getContext:willReadFrequently_options_clone_failed', e, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:getContext:willReadFrequently_options_clone_failed', { module: 'context', surface: 'canvas', 
         stage: 'preflight',
         key: diagKey || 'getContext',
         type: 'browser structure missing data',
         message: '2d context options clone failed; willReadFrequently not injected',
         data: { outcome: 'skip', reason: 'options_clone_failed' }
-      });
+      }, e);
       return input;
     }
 
@@ -330,11 +302,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
   function guardInstance(proto, self){
     try { return self && (self instanceof proto.constructor || self instanceof proto.constructor.prototype.constructor); }
     catch (e) {
-      emitContextDiag('warn', 'context:guard_instance:runtime:failed', e, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:guard_instance:runtime:failed', { module: 'context', surface: 'canvas', 
         key: 'guardInstance',
         stage: 'runtime',
         type: 'browser structure missing data'
-      });
+      }, e);
       return false;
     }
   }
@@ -365,24 +337,24 @@ const ContextPatchModule = function ContextPatchModule(window) {
   function __storeSharedDefaultCtx2dFont__(ctx) {
     const fernwehState = __resolveCanvasStateForFont__();
     if (!fernwehState) {
-      emitContextDiag('error', 'context:ctx2d:guard:default_font_state_missing', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:ctx2d:guard:default_font_state_missing', { module: 'context', surface: 'canvas', 
         stage: 'guard',
         key: 'FernwehContext.state.__CANVAS__.__STATE__.defaultCtx2dFont',
         type: 'pipeline missing data',
         message: 'shared default ctx2d font state missing'
-      });
+      }, null);
       return false;
     }
     const existing = (typeof fernwehState.defaultCtx2dFont === 'string') ? fernwehState.defaultCtx2dFont.trim() : '';
     if (existing) return true;
     const font = (ctx && typeof ctx.font === 'string') ? ctx.font.trim() : '';
     if (!font) {
-      emitContextDiag('error', 'context:ctx2d:guard:default_font_capture_failed', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:ctx2d:guard:default_font_capture_failed', { module: 'context', surface: 'canvas', 
         stage: 'guard',
         key: 'ctx.font',
         type: 'browser structure missing data',
         message: 'default ctx2d font capture failed'
-      });
+      }, null);
       return false;
     }
     fernwehState.defaultCtx2dFont = font;
@@ -397,11 +369,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
       if (sharedFont) return sharedFont;
       throw new Error('[FernwehContext] shared default ctx2d font missing');
     } catch (e) {
-      emitContextDiag('warn', 'context:ctx2d:runtime:font_read_failed', e, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:ctx2d:runtime:font_read_failed', { module: 'context', surface: 'canvas', 
         stage: 'runtime',
         key: 'font',
         type: 'browser structure missing data'
-      });
+      }, e);
       throw e;
     }
   }
@@ -506,12 +478,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
     const cfg = (contract && typeof contract === 'object') ? contract : {};
     const wrapLayer = (typeof cfg.wrapLayer === 'string' && cfg.wrapLayer) ? cfg.wrapLayer : '';
     if (!wrapLayer) {
-      emitContextDiag('error', 'context:definePatchedMethod:contract_missing_wrapLayer', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:definePatchedMethod:contract_missing_wrapLayer', { module: 'context', surface: 'canvas', 
         stage: 'guard',
         key: method,
         type: 'pipeline missing data',
         data: { outcome: 'throw', reason: 'missing_wrapLayer' }
-      });
+      }, null);
       throw new Error(`[FernwehContext] definePatchedMethod missing wrapLayer for ${method}`);
     }
     const preflightContract = {
@@ -644,11 +616,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
             const out = (r && typeof r.then === 'function') ? await r : r;
             if (out instanceof Blob) b = out;
           } catch (e) {
-          emitContextDiag('error', 'context:issued_serialization:hook:post_failed', e, {
+          if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:issued_serialization:hook:post_failed', { module: 'context', surface: 'canvas', 
             key: method,
             stage: 'hook',
             data: { hook: hook && (hook.name || null) }
-          });
+          }, e);
           }
         }
         return b;
@@ -674,11 +646,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 const r = hook.call(this, res, ...patchedArgs);
                 if (typeof r === 'string') res = r;
               } catch (e) {
-                emitContextDiag('error', 'context:issued_serialization:hook:post_failed', e, {
+                if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:issued_serialization:hook:post_failed', { module: 'context', surface: 'canvas', 
                   key: method,
                   stage: 'hook',
                   data: { hook: hook && (hook.name || null) }
-                });
+                }, e);
                 throw e;
               }
             }
@@ -702,10 +674,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
               try {
                 out = applyHooksAsync(self, blob, args);
               } catch (e) {
-                emitContextDiag('warn', 'context:issued_serialization:hook_failed', e, {
+                if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:issued_serialization:hook_failed', { module: 'context', surface: 'canvas', 
                   stage: 'hook',
                   key: method
-                });
+                }, e);
                 callback(blob);
                 return;
               }
@@ -720,10 +692,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
                     callback(b2);
                   },
                   (e)  => {
-                    emitContextDiag('warn', 'context:issued_serialization:hook_failed', e, {
+                    if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:issued_serialization:hook_failed', { module: 'context', surface: 'canvas', 
                       stage: 'hook',
                       key: method
-                    });
+                    }, e);
                     callback(blob);
                   }
                 );
@@ -792,7 +764,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
   function installIssuedWebGLMethods(ctx) {
     if (!ctx || (typeof ctx !== 'object' && typeof ctx !== 'function')) {
-      emitContextDiag('warn', 'context:issued_webgl:preflight:ctx_missing', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:issued_webgl:preflight:ctx_missing', { module: 'context', surface: 'canvas', 
         module: 'webgl',
         stage: 'preflight',
         surface: 'webgl',
@@ -800,11 +772,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
         type: 'browser structure missing data',
         message: 'issued webgl ctx is not defined',
         data: { reason: 'ctx_missing', path: 'issued' }
-      });
+      }, null);
       return 0;
     }
     if (issuedWebGLPatchedContexts && issuedWebGLPatchedContexts.has(ctx)) {
-      emitContextDiag('info', 'context:issued_webgl:apply:already_patched', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'context:issued_webgl:apply:already_patched', { module: 'context', surface: 'canvas', 
         module: 'webgl',
         stage: 'apply',
         surface: 'webgl',
@@ -812,7 +784,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         type: 'pipeline missing data',
         message: 'issued webgl context already patched',
         data: { reason: 'context_already_patched', path: 'issued' }
-      });
+      }, null);
       return 0;
     }
     const proto =
@@ -822,7 +794,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
             ? WebGL2RenderingContext.prototype
             : null);
     if (!proto) {
-      emitContextDiag('warn', 'context:issued_webgl:preflight:proto_rejected', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:issued_webgl:preflight:proto_rejected', { module: 'context', surface: 'canvas', 
         module: 'webgl',
         stage: 'preflight',
         surface: 'webgl',
@@ -830,7 +802,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         type: 'browser structure missing data',
         message: 'issued webgl proto rejected',
         data: { reason: 'proto_rejected', path: 'issued' }
-      });
+      }, null);
       return 0;
     }
 
@@ -847,7 +819,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
 
     for (const [method, hooks] of methodPlan) {
       if (Object.prototype.hasOwnProperty.call(ctx, method)) {
-        emitContextDiag('info', 'context:issued_webgl:apply:already_patched', null, {
+        if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'context:issued_webgl:apply:already_patched', { module: 'context', surface: 'canvas', 
           module: 'webgl',
           stage: 'apply',
           surface: 'webgl',
@@ -855,11 +827,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
           type: 'pipeline missing data',
           message: 'issued webgl method already patched',
           data: { reason: 'issued_own_method_present', path: 'issued' }
-        });
+        }, null);
         continue;
       }
       if (!hooks?.length) {
-        emitContextDiag('warn', 'context:issued_webgl:preflight:hooks_missing', null, {
+        if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:issued_webgl:preflight:hooks_missing', { module: 'context', surface: 'canvas', 
           module: 'webgl',
           stage: 'preflight',
           surface: 'webgl',
@@ -867,12 +839,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           type: 'pipeline missing data',
           message: 'issued webgl hooks missing',
           data: { reason: 'hooks_missing', path: 'issued' }
-        });
+        }, null);
         continue;
       }
       const orig = resolveKeptNative(proto, method) || proto[method];
       if (typeof orig !== 'function') {
-        emitContextDiag('warn', 'context:issued_webgl:preflight:proto_missing', null, {
+        if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:issued_webgl:preflight:proto_missing', { module: 'context', surface: 'canvas', 
           module: 'webgl',
           stage: 'preflight',
           surface: 'webgl',
@@ -880,7 +852,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           type: 'browser structure missing data',
           message: 'issued webgl proto method is not defined',
           data: { reason: 'proto_missing', path: 'issued' }
-        });
+        }, null);
         continue;
       }
       const guard = (typeof WeakSet === 'function') ? new WeakSet() : null;
@@ -909,7 +881,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
               try {
                 hook.apply(self, [forbidOrigCall, ...args, out]);
               } catch (e) {
-                emitContextDiag('error', 'context:issued_webgl:hook:post_failed', e, {
+                if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:issued_webgl:hook:post_failed', { module: 'context', surface: 'canvas', 
                   module: 'webgl',
                   stage: 'hook',
                   surface: 'webgl',
@@ -922,7 +894,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
                     args: args,
                     result: out
                   }
-                });
+                }, e);
               }
             }
             emitWebGLAccess(method, args, out, {
@@ -961,7 +933,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 patched = res;
               }
             } catch (e) {
-              emitContextDiag('error', 'context:issued_webgl:hook:failed', e, {
+              if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:issued_webgl:hook:failed', { module: 'context', surface: 'canvas', 
                 module: 'webgl',
                 stage: 'hook',
                 surface: 'webgl',
@@ -973,7 +945,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
                   path: 'issued',
                   args: patched
                 }
-              });
+              }, e);
             }
           }
           const out = Reflect.apply(orig, self, patched);
@@ -1044,11 +1016,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
           issuedHookCount += (ctx2dHooks && ctx2dHooks.length) || 0;
           for (const hook of (ctx2dHooks || [])) {
             try { ctx = hook.call(self, ctx, type, ...rest) || ctx; } catch (e) {
-              emitContextDiag('warn', 'context:getContext:ctx2d_hook_failed', e, {
+              if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:getContext:ctx2d_hook_failed', { module: 'context', surface: 'canvas', 
                 stage: 'hook',
                 key: 'getContext',
                 data: { hook: hook && (hook.name || null), type: type || null }
-              });
+              }, e);
             }
           }
         }
@@ -1059,33 +1031,33 @@ const ContextPatchModule = function ContextPatchModule(window) {
           issuedHookCount += (webglHooks && webglHooks.length) || 0;
           for (const hook of (webglHooks || [])) {
             try { hook.call(self, ctx, type, ...rest); } catch (e) {
-              emitContextDiag('warn', 'context:getContext:webgl_hook_failed', e, {
+              if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:getContext:webgl_hook_failed', { module: 'context', surface: 'canvas', 
                 stage: 'hook',
                 key: 'getContext',
                 data: { hook: hook && (hook.name || null), type: type || null }
-              });
+              }, e);
             }
           }
         }
         issuedHookCount += (htmlHooks && htmlHooks.length) || 0;
         for (const hook of (htmlHooks || [])) {
           try { hook.call(self, ctx, type, ...rest); } catch (e) {
-            emitContextDiag('warn', 'context:getContext:html_hook_failed', e, {
+            if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:getContext:html_hook_failed', { module: 'context', surface: 'canvas', 
               stage: 'hook',
               key: 'getContext',
               data: { hook: hook && (hook.name || null), type: type || null }
-            });
+            }, e);
           }
         }
         if (ctx && issuedHookCount) {
           emitCanvasAccess('getContext', args, ctx, 'issued_factory', 'post', null, issuedHookCount);
         }
       } catch (e) {
-        emitContextDiag('error', 'context:getContext:chain_failed', e, {
+        if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:getContext:chain_failed', { module: 'context', surface: 'canvas', 
           stage: 'hook',
           key: 'getContext',
           data: { type: type || null }
-        });
+        }, e);
       }
       return ctx;
     };
@@ -1139,7 +1111,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
         const fernwehState = __resolveCanvasStateForFont__();
         if (fernwehState && !(fernwehState.domReady === true && fernwehState.domCanvas)) {
           if (fernwehState.domCanvas || fernwehState.domCanvasHost || fernwehState.domReady === true) {
-            emitContextDiag('error', 'canvas:dom_state:apply_failed', null, {
+            if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'canvas:dom_state:apply_failed', { module: 'context', surface: 'canvas', 
               module: 'canvas',
               diagTag: 'canvas',
               surface: 'canvas',
@@ -1148,7 +1120,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
               type: 'pipeline missing data',
               message: 'canvas DOM state sync failed',
               data: { outcome: 'skip', reason: 'apply_failed', detail: 'state_inconsistent' }
-            });
+            }, null);
             return;
           }
           try {
@@ -1162,7 +1134,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
             __defineHiddenValue__(fernwehState, 'domCanvasHost', canvas.parentNode || null);
             __defineHiddenValue__(fernwehState, 'domCanvas', canvas);
             __defineHiddenValue__(fernwehState, 'domReady', true);
-            emitContextDiag('info', 'canvas:dom_state:exists', null, {
+            if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'canvas:dom_state:exists', { module: 'context', surface: 'canvas', 
               module: 'canvas',
               diagTag: 'canvas',
               surface: 'canvas',
@@ -1179,9 +1151,9 @@ const ContextPatchModule = function ContextPatchModule(window) {
                 ownToDataURL: Object.prototype.hasOwnProperty.call(canvas, 'toDataURL'),
                 ownToBlob: Object.prototype.hasOwnProperty.call(canvas, 'toBlob')
               }
-            });
+            }, null);
           } catch (e) {
-            emitContextDiag('error', 'canvas:dom_state:apply_failed', e, {
+            if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'canvas:dom_state:apply_failed', { module: 'context', surface: 'canvas', 
               module: 'canvas',
               diagTag: 'canvas',
               surface: 'canvas',
@@ -1190,7 +1162,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
               type: 'pipeline missing data',
               message: 'canvas DOM state sync failed',
               data: { outcome: 'skip', reason: 'apply_failed' }
-            });
+            }, e);
           }
         }
       }
@@ -1204,11 +1176,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
         try {
           if (el && String(localName).toLowerCase() === 'canvas') installCanvasOwner(el);
         } catch (e) {
-          emitContextDiag('warn', 'context:factory:createElement:decorate_failed', e, {
+          if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:factory:createElement:decorate_failed', { module: 'context', surface: 'canvas', 
             stage: 'apply',
             key: 'createElement',
             data: { localName: localName == null ? null : String(localName) }
-          });
+          }, e);
         }
         return el;
       };
@@ -1233,11 +1205,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
         try {
           if (el && String(qualifiedName).toLowerCase() === 'canvas') installCanvasOwner(el);
         } catch (e) {
-          emitContextDiag('warn', 'context:factory:createElementNS:decorate_failed', e, {
+          if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:factory:createElementNS:decorate_failed', { module: 'context', surface: 'canvas', 
             stage: 'apply',
             key: 'createElementNS',
             data: { qualifiedName: qualifiedName == null ? null : String(qualifiedName) }
-          });
+          }, e);
         }
         return el;
       };
@@ -1262,17 +1234,17 @@ const ContextPatchModule = function ContextPatchModule(window) {
           installCanvasOwner(existing[i]);
         }
       } catch (e) {
-        emitContextDiag('warn', 'context:factory:existing_canvas_scan_failed', e, {
+        if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:factory:existing_canvas_scan_failed', { module: 'context', surface: 'canvas', 
           stage: 'apply',
           key: 'canvas',
           data: { outcome: 'skip', reason: 'exception' }
-        });
+        }, e);
       }
     }
 
     if (applied > 0 && issuedDocumentFactoryPatchedDocs) {
       issuedDocumentFactoryPatchedDocs.add(doc);
-      emitContextDiag('info', 'canvas:dom_factory:ready', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'canvas:dom_factory:ready', { module: 'context', surface: 'canvas', 
         module: 'canvas',
         diagTag: 'canvas',
         surface: 'canvas',
@@ -1287,7 +1259,7 @@ const ContextPatchModule = function ContextPatchModule(window) {
           createElementNSWrapped: createElementNSWrapped,
           existingCanvasCount: existingCanvasCount
         }
-      });
+      }, null);
     }
     return applied;
   }
@@ -1308,11 +1280,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
         installIssuedSerializationMethods(instance);
         installIssuedGetContextMethod(instance, htmlHooks, ctx2dHooks, webglHooks);
       } catch (e) {
-        emitContextDiag('warn', 'context:factory:offscreen:decorate_failed', e, {
+        if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:factory:offscreen:decorate_failed', { module: 'context', surface: 'canvas', 
           stage: 'apply',
           key: 'OffscreenCanvas',
           data: { outcome: 'skip', reason: 'exception' }
-        });
+        }, e);
       }
       return instance;
     };
@@ -1359,12 +1331,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
       ? core.__wrapNativeApply
       : null;
     if (typeof wrapApply !== 'function') {
-      emitContextDiag('error', 'context:ctx2d:guard:wrap_native_apply_missing', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('error', 'context:ctx2d:guard:wrap_native_apply_missing', { module: 'context', surface: 'canvas', 
         stage: 'guard',
         key: 'ctx2dGateway',
         type: 'pipeline missing data',
         data: { need: 'Core.__wrapNativeApply', outcome: 'skip', reason: 'wrap_native_apply_missing' }
-      });
+      }, null);
       return ctx;
     }
 
@@ -1417,10 +1389,10 @@ const ContextPatchModule = function ContextPatchModule(window) {
           H.measureTextNoiseHook.call(thisArg, m, txt, fontStr);
         }
       } catch (e) {
-        emitContextDiag('warn', 'context:ctx2d:hook:measureText_failed', e, {
+        if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:ctx2d:hook:measureText_failed', { module: 'context', surface: 'canvas', 
           stage: 'hook',
           key: 'measureText'
-        });
+        }, e);
       }
 
       return m;
@@ -1441,11 +1413,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
           const a = H.fillTextNoiseHook.apply(thisArg, callArgs);
           if (Array.isArray(a)) callArgs = a;
         } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:fillText_failed', e, {
+          if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:ctx2d:hook:fillText_failed', { module: 'context', surface: 'canvas', 
             stage: 'hook',
             key: 'fillText',
             data: { outcome: 'skip', reason: 'hook_exception' }
-          });
+          }, e);
         }
       }
 
@@ -1467,11 +1439,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
           const a = H.strokeTextNoiseHook.apply(thisArg, callArgs);
           if (Array.isArray(a)) callArgs = a;
         } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:strokeText_failed', e, {
+          if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:ctx2d:hook:strokeText_failed', { module: 'context', surface: 'canvas', 
             stage: 'hook',
             key: 'strokeText',
             data: { outcome: 'skip', reason: 'hook_exception' }
-          });
+          }, e);
         }
       }
 
@@ -1491,11 +1463,11 @@ const ContextPatchModule = function ContextPatchModule(window) {
           const a = H.fillRectNoiseHook.call(thisArg, x, y, w, h);
           if (Array.isArray(a)) callArgs = a;
         } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:fillRect_failed', e, {
+          if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:ctx2d:hook:fillRect_failed', { module: 'context', surface: 'canvas', 
             stage: 'hook',
             key: 'fillRect',
             data: { outcome: 'skip', reason: 'hook_exception' }
-          });
+          }, e);
         }
       }
       return Reflect.apply(target, thisArg, callArgs);
@@ -1510,12 +1482,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
           const callOrig = (...a) => Reflect.apply(target, thisArg, a);
           return H.applyDrawImageHook.call(thisArg, callOrig, ...args);
         } catch (e) {
-          emitContextDiag('warn', 'context:ctx2d:hook:drawImage_failed', e, {
+          if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('warn', 'context:ctx2d:hook:drawImage_failed', { module: 'context', surface: 'canvas', 
             stage: 'hook',
             key: 'drawImage',
             type: 'browser structure missing data',
             data: { outcome: 'throw', reason: 'hook_apply_failed' }
-          });
+          }, e);
           throw e;
         }
       }
@@ -1547,12 +1519,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
     }
     state.canvas = applied > 0;
     if (__loggerRoot && __loggerRoot.__DEBUG__) {
-      emitContextDiag('info', 'context:canvas:apply:patches_applied', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'context:canvas:apply:patches_applied', { module: 'context', surface: 'canvas', 
         stage: 'apply',
         key: 'HTMLCanvasElement.getContext',
         message: 'canvas issued patches applied',
         data: { applied: applied, total: total }
-      });
+      }, null);
     }
     return applied;
   };
@@ -1579,12 +1551,12 @@ const ContextPatchModule = function ContextPatchModule(window) {
       state.offscreen = applied > 0;
     }
     if (__loggerRoot && __loggerRoot.__DEBUG__) {
-      emitContextDiag('info', 'context:offscreen:apply:patches_applied', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'context:offscreen:apply:patches_applied', { module: 'context', surface: 'canvas', 
         stage: 'apply',
         key: 'OffscreenCanvas.getContext',
         message: 'offscreen issued patches applied',
         data: { applied: applied, total: total }
-      });
+      }, null);
     }
     return applied;
   };
@@ -1596,14 +1568,14 @@ const ContextPatchModule = function ContextPatchModule(window) {
       let applied = 0, total = 2;
       let already = 0;
       state.webgl = applied > 0;
-      emitContextDiag('info', 'context:webgl:apply:patches_applied', null, {
+      if (__FERNWEH_DIAG__) __FERNWEH_DIAG__('info', 'context:webgl:apply:patches_applied', { module: 'context', surface: 'canvas', 
         stage: 'apply',
         surface: 'webgl',
         key: 'WebGLRenderingContext',
         message: 'webgl prototype patches deferred to issued-context install',
         type: 'pipeline missing data',
         data: { applied, total, already }
-      });
+      }, null);
       return applied;
     };
 

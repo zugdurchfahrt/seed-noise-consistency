@@ -5,9 +5,17 @@ const RectsPatchModule = function RectsPatchModule(window) {
   const __TYPE_PIPELINE = 'pipeline missing data';
   const C = window && window.FernwehContext;
   const Core = window && window.Core;
-  const __loggerRoot = (C && C.__logger && typeof C.__logger === 'object') ? C.__logger : null;
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+  try {
+    const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+    if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+      G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+    } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+      G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+    }
+  } catch (_) {}
+};
+
 
   function __emit(level, code, extra, err) {
     try {

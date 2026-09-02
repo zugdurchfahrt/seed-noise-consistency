@@ -1,48 +1,30 @@
 (() => {
   const __MODULE = 'GeoOverride';
   const __SURFACE = 'geolocation';
-  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
-    ? window.FernwehContext.__logger
-    : null;
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
-
-  const __emit = (level, code, ctx, err) => {
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
     try {
-      if (__diag) return __diag(level, code, ctx, err);
-      if (typeof __D === 'function') {
-        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-        const safeLevel = (level === undefined || level === null) ? 'info' : level;
-        const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
       }
-    } catch (emitErr) {
-      return undefined;
-    }
+    } catch (_) {}
   };
+
+  const G = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+
+  ;
 
   const __tag = __MODULE;
   const __flagKey = '__PATCH_GEOLOCATION__';
   const C = window && window.FernwehContext;
   const Core = window && window.Core;
-  function __moduleDiag(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const ctx = {
-      module: __MODULE,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
-      surface: __SURFACE,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: x.stage,
-      message: x.message,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: x.type
-    };
-    return __emit(level, code, ctx, err);
-  }
+  
   function degrade(code, err, extra) {
     const x = (extra && typeof extra === 'object') ? extra : {};
     const level = (typeof x.level === 'string' && x.level) ? x.level : 'warn';
-    return __moduleDiag(level, code, x, err);
+    return (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(level, code, Object.assign({ module: __MODULE, surface: __SURFACE }, x), err) : undefined);
   }
 
   function cloneDesc(d) {

@@ -2,6 +2,16 @@
   const g = window;
   const __MODULE = 'headers_bridge';
   const __SURFACE = 'network';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+  try {
+    const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+    if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+      G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+    } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+      G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+    }
+  } catch (_) {}
+};
   function defineHiddenValue(owner, key, value) {
     Object.defineProperty(owner, key, {
       value: value,
@@ -12,19 +22,7 @@
     return owner[key];
   }
   function __emit(level, code, ctx, err) {
-    const __loggerRoot = (g && g.FernwehContext && g.FernwehContext.__logger && typeof g.FernwehContext.__logger === 'object')
-      ? g.FernwehContext.__logger
-      : null;
-    const d = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-    if (typeof d !== 'function') return;
-    const e = err instanceof Error
-      ? err
-      : (err == null ? null : new Error(String(err)));
-    if (typeof d.diag === 'function') {
-      d.diag(level, code, ctx, e);
-      return;
-    }
-    d(code, e, Object.assign({}, ctx, { level: level || 'info' }));
+    return (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(level, code, ctx, err) : undefined);
   }
   function emitDegrade(level, code, err, extra) {
     const x = (extra && typeof extra === 'object') ? extra : {};

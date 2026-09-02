@@ -10,59 +10,41 @@
  */
 
 const HeadersInterceptor = function HeadersInterceptor(window) {
-  'use strict';
   const __MODULE = 'headers_interceptor';
   const __SURFACE = 'network';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
+  const G = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+
+  'use strict';
   const __typePipeline = 'pipeline missing data';
   const __typeBrowser = 'browser structure missing data';
   const __flagKey = '__PATCH_HEADERS_INTERCEPTOR__';
   const __core = window && window.Core;
-  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
-    ? window.FernwehContext.__logger
-    : null;
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
   const DEBUG = !!window.__HEADERS_DEBUG__;
 
   // --------------------------- У Т И Л И Т Ы -----------------------------
   const ORIGIN = window.location.origin;
 
-  function __emit(level, code, ctx, err) {
-    try {
-      if (__diag) return __diag(level, code, ctx || null, err || null);
-      if (typeof __D === 'function') {
-        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-        const safeLevel = (level === undefined || level === null) ? 'info' : level;
-        const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(String(code), safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
-      }
-    } catch (_) {
-      return undefined;
-    }
-    return undefined;
-  }
+  
 
-  function __moduleDiag(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const ctx = {
-      module: __MODULE,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
-      surface: (typeof x.surface === 'string' && x.surface) ? x.surface : __SURFACE,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: x.stage,
-      message: x.message,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: x.type
-    };
-    return __emit(level, code, ctx, err || null);
-  }
+  
 
   function dlog(message, host, key) {
     if (!DEBUG) return;
     emitDegrade('info', 'headers_interceptor:cors:blocked_non_safelisted_debug', null, {
       type: 'pipeline telemetry',
       stage: 'runtime',
-      surface: 'network',
+      surface: __SURFACE,
       key: (typeof key === 'string' && key) ? key : null,
       message: (typeof message === 'string' && message) ? message : 'headers_interceptor debug event',
       data: {
@@ -76,13 +58,13 @@ const HeadersInterceptor = function HeadersInterceptor(window) {
   function emitDegrade(level, code, err, extra) {
     const x = (extra && typeof extra === 'object') ? extra : {};
     const e = err instanceof Error ? err : (err == null ? null : new Error(String(err)));
-    return __moduleDiag(level, code, Object.assign({
+    return (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(level, code, Object.assign({ module: __MODULE, surface: __SURFACE }, Object.assign({
       type: __typeBrowser,
       stage: 'apply',
       key: null,
       policy: 'skip',
       action: 'native'
-    }, x), e);
+    }, x)), e) : undefined);
   }
 
   /** Безопасный разбор URL c базой location.href */

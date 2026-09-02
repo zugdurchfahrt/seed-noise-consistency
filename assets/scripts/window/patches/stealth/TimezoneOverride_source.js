@@ -7,26 +7,22 @@ const TimezonePatchModule = function TimezonePatchModule(window) {
     const __tzTypeBrowser = "browser structure missing data";
     const __flagKey = '__PATCH_TIMEZONE__';
     const __core = window && window.Core;
-    const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
-      ? window.FernwehContext.__logger
-      : null;
-    const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-    const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+    const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+  try {
+    const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+    if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+      G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+    } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+      G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+    }
+  } catch (_) {}
+};
+
 
    
    
     function __emit(level, code, ctx, err) {
-      try {
-        if (__diag) return __diag(level, code, ctx, err);
-        if (typeof __D === "function") {
-          const safeCtx = (ctx && typeof ctx === "object") ? ctx : {};
-          const safeLevel = (level === undefined || level === null) ? "info" : level;
-          const safeErr = (err === undefined || err === null) ? null : err;
-          return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
-        }
-      } catch (emitErr) {
-        return undefined;
-      }
+      return (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(level, code, ctx, err) : undefined);
     }
 
     function diag(level, code, extra, err) {

@@ -1,61 +1,40 @@
 const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   const __MODULE = 'hide_webdriver';
   const __SURFACE = 'navigator';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
+  const G = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+
   const __typePipeline = 'pipeline missing data';
   const __typeBrowser = 'browser structure missing data';
 
-  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
-    ? window.FernwehContext.__logger
-    : null;
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
-  function __emit(level, code, ctx, err) {
-    try {
-      if (__diag) return __diag(level, code, ctx, err);
-      if (typeof __D === 'function') {
-        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-        const safeLevel = (level === undefined || level === null) ? 'info' : level;
-        const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
-      }
-    } catch (emitErr) {
-      return undefined;
-    }
-  }
-
-  function __moduleDiag(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const ctx = {
-      module: __MODULE,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
-      surface: __SURFACE,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: x.stage,
-      message: x.message,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: x.type
-    };
-    return __emit(level, code, ctx, err);
-  }
-
   const C = window.FernwehContext;
   if (!C) {
-    __moduleDiag('warn', 'hide_webdriver:fernweh_context_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'hide_webdriver:fernweh_context_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       message: 'FernwehContext missing',
       type: __typePipeline,
       data: { outcome: 'skip', reason: 'fernweh_context_missing', missing: 'FernwehContext' }
-    }, new Error('[HideWebdriverPatchModule] FernwehContext missing'));
+    }, new Error('[HideWebdriverPatchModule] FernwehContext missing')) : undefined);
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    __moduleDiag('warn', 'hide_webdriver:fernweh_context_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'hide_webdriver:fernweh_context_state_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       message: 'FernwehContext.state missing',
       type: __typePipeline,
       data: { outcome: 'skip', reason: 'fernweh_context_state_missing', missing: 'FernwehContext.state' }
-    }, new Error('[HideWebdriverPatchModule] FernwehContext.state missing'));
+    }, new Error('[HideWebdriverPatchModule] FernwehContext.state missing')) : undefined);
     return;
   }
   const __envProfileState = (__stateRoot.__ENV_PROFILE__ && typeof __stateRoot.__ENV_PROFILE__ === 'object')
@@ -68,26 +47,26 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     ? __stateRoot.__HIDE_WEBDRIVER__
     : null;
   if (!__hideWebdriverRoot) {
-    __moduleDiag('warn', 'hide_webdriver:module_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'hide_webdriver:module_state_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'FernwehContext.state.__HIDE_WEBDRIVER__',
       message: 'FernwehContext.state.__HIDE_WEBDRIVER__ missing',
       type: __typePipeline,
       data: { outcome: 'skip', reason: 'module_state_missing', missing: 'FernwehContext.state.__HIDE_WEBDRIVER__' }
-    }, new Error('[HideWebdriverPatchModule] FernwehContext.state.__HIDE_WEBDRIVER__ missing'));
+    }, new Error('[HideWebdriverPatchModule] FernwehContext.state.__HIDE_WEBDRIVER__ missing')) : undefined);
     return;
   }
   const __hideWebdriverState = (__hideWebdriverRoot.__STATE__ && typeof __hideWebdriverRoot.__STATE__ === 'object')
     ? __hideWebdriverRoot.__STATE__
     : null;
   if (!__hideWebdriverState) {
-    __moduleDiag('warn', 'hide_webdriver:module_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'hide_webdriver:module_state_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__',
       message: 'FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__ missing',
       type: __typePipeline,
       data: { outcome: 'skip', reason: 'module_state_missing', missing: 'FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__' }
-    }, new Error('[HideWebdriverPatchModule] FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__ missing'));
+    }, new Error('[HideWebdriverPatchModule] FernwehContext.state.__HIDE_WEBDRIVER__.__STATE__ missing')) : undefined);
     return;
   }
   if (__hideWebdriverState.ready !== true) __hideWebdriverState.ready = false;
@@ -96,7 +75,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
 
   const Core = window && window.Core;
   if (!Core || typeof Core.applyTargets !== 'function' || typeof Core.registerPatchedTarget !== 'function') {
-    __moduleDiag('fatal', 'hide_webdriver:core_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'hide_webdriver:core_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       message: 'Core.applyTargets/registerPatchedTarget missing',
       type: __typePipeline,
@@ -107,20 +86,20 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         hasApplyTargets: !!(Core && typeof Core.applyTargets === 'function'),
         hasRegisterPatchedTarget: !!(Core && typeof Core.registerPatchedTarget === 'function')
       }
-    }, new Error('[HideWebdriverPatchModule] Core.applyTargets/registerPatchedTarget missing'));
+    }, new Error('[HideWebdriverPatchModule] Core.applyTargets/registerPatchedTarget missing')) : undefined);
     return;
   }
 
   const safeDefine = (function() {
     const sd = (Core && typeof Core.__safeDefine === 'function') ? Core.__safeDefine : null;
     if (typeof sd !== 'function') {
-      __moduleDiag('fatal', 'hide_webdriver:safe_define_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'hide_webdriver:safe_define_missing', { module: __MODULE, surface: __SURFACE, 
         key: 'Core.__safeDefine',
         stage: 'preflight',
         message: 'Core.__safeDefine missing',
         type: __typePipeline,
         data: { outcome: 'skip', reason: 'safe_define_missing', missing: 'Core.__safeDefine' }
-      }, new Error('[HideWebdriverPatchModule] safeDefine missing'));
+      }, new Error('[HideWebdriverPatchModule] safeDefine missing')) : undefined);
       return null;
     }
     return sd;
@@ -136,26 +115,26 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
   let __guardToken = null;
   try {
     if (!__core || typeof __core.guardFlag !== 'function') {
-      __moduleDiag('warn', __tag + ':guard_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_missing', { module: __MODULE, surface: __SURFACE, 
         diagTag: __tag,
         key: __flagKey,
         stage: 'guard',
         message: 'Core.guardFlag missing',
         type: __typePipeline,
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
-      }, null);
+      }, null) : undefined);
       return;
     }
     __guardToken = __core.guardFlag(__flagKey, __tag);
   } catch (e) {
-    __moduleDiag('warn', __tag + ':guard_failed', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_failed', { module: __MODULE, surface: __SURFACE, 
       diagTag: __tag,
       key: __flagKey,
       stage: 'guard',
       message: 'guardFlag threw',
       type: __typePipeline,
       data: { outcome: 'skip', reason: 'guard_failed' }
-    }, e);
+    }, e) : undefined);
     return;
   }
   if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
@@ -203,14 +182,14 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     try {
       plans = Core.applyTargets(targets, __profile, []);
     } catch (e) {
-      __moduleDiag('error', groupTag + ':preflight_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':preflight_failed', { module: __MODULE, surface: __SURFACE, 
         diagTag: groupTag,
         key: null,
         stage: 'preflight',
         message: 'Core.applyTargets threw',
         type: __typePipeline,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'preflight_failed', policy: groupPolicy }
-      }, e);
+      }, e) : undefined);
       if (groupPolicy === 'throw') {
         if (e && typeof e === 'object') { e.__rollbackOk = true; e.__stage = 'preflight'; }
         throw e;
@@ -221,14 +200,14 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     if (!Array.isArray(plans) || !plans.length) {
       const reason = (plans && plans.reason) ? plans.reason : 'group_skipped';
       const e = new Error('[HideWebdriverPatchModule] group skipped');
-      __moduleDiag('warn', groupTag + ':group_skipped', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':group_skipped', { module: __MODULE, surface: __SURFACE, 
         diagTag: groupTag,
         key: null,
         stage: 'preflight',
         message: 'target group skipped',
         type: __typeBrowser,
         data: { outcome: 'skip', reason: reason, policy: groupPolicy }
-      }, e);
+      }, e) : undefined);
       return 0;
     }
 
@@ -254,14 +233,14 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         try {
           Core.registerPatchedTarget(p.owner, p.key);
         } catch (e) {
-          __moduleDiag('warn', groupTag + ':registry_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':registry_failed', { module: __MODULE, surface: __SURFACE, 
             diagTag: groupTag,
             key: p && p.key ? p.key : null,
             stage: 'apply',
             message: 'Core.registerPatchedTarget failed',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'registry_failed' }
-          }, e);
+          }, e) : undefined);
         }
       }
 
@@ -278,23 +257,23 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
         }
       }
       if (rollbackErr) {
-        __moduleDiag('error', groupTag + ':rollback_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':rollback_failed', { module: __MODULE, surface: __SURFACE, 
           diagTag: groupTag,
           key: null,
           stage: 'rollback',
           message: 'rollback failed',
           type: __typeBrowser,
           data: { outcome: 'skip', reason: 'rollback_failed', policy: groupPolicy }
-        }, rollbackErr);
+        }, rollbackErr) : undefined);
       }
-      __moduleDiag('error', groupTag + ':apply_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':apply_failed', { module: __MODULE, surface: __SURFACE, 
         diagTag: groupTag,
         key: null,
         stage: 'apply',
         message: 'apply failed',
         type: __typeBrowser,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'apply_failed', policy: groupPolicy, rollbackOk: !rollbackErr }
-      }, e);
+      }, e) : undefined);
       if (groupPolicy === 'throw') {
         if (e && typeof e === 'object') { e.__rollbackOk = !rollbackErr; e.__stage = 'apply'; }
         throw e;
@@ -311,27 +290,27 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
     };
     const wdResolved = resolveDescriptor(nav, 'webdriver', { mode: 'proto_chain' });
     if (!wdResolved || !wdResolved.desc) {
-      __moduleDiag('warn', 'hide_webdriver:webdriver_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'hide_webdriver:webdriver_missing', { module: __MODULE, surface: __SURFACE, 
         diagTag: 'hide_webdriver:webdriver',
         key: 'webdriver',
         stage: 'preflight',
         message: 'webdriver descriptor missing',
         type: __typeBrowser,
         data: { outcome: 'skip', reason: 'webdriver_missing', resolve: 'proto_chain' }
-      }, null);
+      }, null) : undefined);
       try {
         if (__core && typeof __core.releaseGuardFlag === 'function') {
           __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
         }
       } catch (eRelease) {
-        __moduleDiag('warn', __tag + ':guard_release_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
           diagTag: __tag,
           key: __flagKey,
           stage: 'rollback',
           message: 'releaseGuardFlag threw on preflight skip',
           type: __typePipeline,
           data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, eRelease);
+        }, eRelease) : undefined);
       }
       return;
     } else {
@@ -339,52 +318,52 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       const wdOwner = (wdResolved && wdResolved.owner) ? wdResolved.owner : navProto;
       if (wdDesc && wdDesc.configurable === false) {
         const e = new TypeError('[HideWebdriverPatchModule] webdriver non-configurable');
-        __moduleDiag('fatal', 'hide_webdriver:webdriver_non_configurable', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'hide_webdriver:webdriver_non_configurable', { module: __MODULE, surface: __SURFACE, 
           diagTag: 'hide_webdriver:webdriver',
           key: 'webdriver',
           stage: 'preflight',
           message: 'webdriver non-configurable',
           type: __typeBrowser,
           data: { outcome: 'skip', reason: 'webdriver_non_configurable', configurable: false }
-        }, e);
+        }, e) : undefined);
         try {
           if (__core && typeof __core.releaseGuardFlag === 'function') {
             __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
           }
         } catch (eRelease) {
-          __moduleDiag('warn', __tag + ':guard_release_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
             diagTag: __tag,
             key: __flagKey,
             stage: 'rollback',
             message: 'releaseGuardFlag threw on preflight skip',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'guard_release_failed' }
-          }, eRelease);
+          }, eRelease) : undefined);
         }
         return;
       }
       if (!wdOwner || wdOwner === nav) {
-        __moduleDiag('error', 'hide_webdriver:webdriver_owner_mismatch', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'hide_webdriver:webdriver_owner_mismatch', { module: __MODULE, surface: __SURFACE, 
           diagTag: 'hide_webdriver:webdriver',
           key: 'webdriver',
           stage: 'preflight',
           message: 'webdriver resolved to instance owner',
           type: __typeBrowser,
           data: { outcome: 'skip', reason: 'instance_owner_resolved' }
-        }, null);
+        }, null) : undefined);
         try {
           if (__core && typeof __core.releaseGuardFlag === 'function') {
             __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
           }
         } catch (eRelease) {
-          __moduleDiag('warn', __tag + ':guard_release_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
             diagTag: __tag,
             key: __flagKey,
             stage: 'rollback',
             message: 'releaseGuardFlag threw on preflight skip',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'guard_release_failed' }
-          }, eRelease);
+          }, eRelease) : undefined);
         }
         return;
       }
@@ -403,7 +382,7 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       };
       if (wdHasValue || !wdHasGetter || wdHasSetter) {
         const e = new TypeError('[HideWebdriverPatchModule] webdriver descriptor shape mismatch');
-        __moduleDiag('fatal', 'hide_webdriver:webdriver_descriptor_shape_mismatch', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'hide_webdriver:webdriver_descriptor_shape_mismatch', { module: __MODULE, surface: __SURFACE, 
           diagTag: 'hide_webdriver:webdriver',
           key: 'webdriver',
           stage: 'preflight',
@@ -416,20 +395,20 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
             hasGetter: wdHasGetter,
             hasSetter: wdHasSetter
           }
-        }, e);
+        }, e) : undefined);
         try {
           if (__core && typeof __core.releaseGuardFlag === 'function') {
             __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
           }
         } catch (eRelease) {
-          __moduleDiag('warn', __tag + ':guard_release_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
             diagTag: __tag,
             key: __flagKey,
             stage: 'rollback',
             message: 'releaseGuardFlag threw on preflight skip',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'guard_release_failed' }
-          }, eRelease);
+          }, eRelease) : undefined);
         }
         return;
       }
@@ -437,57 +416,57 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
       try {
         nativeWebdriverValue = Reflect.apply(wdDesc.get, nav, []);
       } catch (eNativeRead) {
-        __moduleDiag('fatal', 'hide_webdriver:webdriver_native_read_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'hide_webdriver:webdriver_native_read_failed', { module: __MODULE, surface: __SURFACE, 
           diagTag: 'hide_webdriver:webdriver',
           key: 'webdriver',
           stage: 'preflight',
           message: 'webdriver native getter read failed on navigator receiver',
           type: __typeBrowser,
           data: { outcome: 'skip', reason: 'native_read_failed' }
-        }, eNativeRead);
+        }, eNativeRead) : undefined);
         try {
           if (__core && typeof __core.releaseGuardFlag === 'function') {
             __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
           }
         } catch (eRelease) {
-          __moduleDiag('warn', __tag + ':guard_release_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
             diagTag: __tag,
             key: __flagKey,
             stage: 'rollback',
             message: 'releaseGuardFlag threw on preflight skip',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'guard_release_failed' }
-          }, eRelease);
+          }, eRelease) : undefined);
         }
         return;
       }
       if (nativeWebdriverValue === false) {
         __hideWebdriverState.ready = true;
-        __moduleDiag('info', 'hide_webdriver:webdriver_native_skip', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'hide_webdriver:webdriver_native_skip', { module: __MODULE, surface: __SURFACE, 
           diagTag: 'hide_webdriver:webdriver',
           key: 'webdriver',
           stage: 'preflight',
           message: 'webdriver already matches native getter',
           type: __typeBrowser,
           data: { outcome: 'return', reason: 'native_skip' }
-        }, null);
+        }, null) : undefined);
         try {
           if (__core && typeof __core.releaseGuardFlag === 'function') {
             __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
           }
         } catch (eRelease) {
-          __moduleDiag('warn', __tag + ':guard_release_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
             diagTag: __tag,
             key: __flagKey,
             stage: 'rollback',
             message: 'releaseGuardFlag threw on preflight skip',
             type: __typePipeline,
             data: { outcome: 'skip', reason: 'guard_release_failed' }
-          }, eRelease);
+          }, eRelease) : undefined);
         }
         return;
       }
-      __moduleDiag('fatal', 'hide_webdriver:webdriver_no_admissible_carrier', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'hide_webdriver:webdriver_no_admissible_carrier', { module: __MODULE, surface: __SURFACE, 
         diagTag: 'hide_webdriver:webdriver',
         key: 'webdriver',
         stage: 'preflight',
@@ -498,91 +477,91 @@ const HideWebdriverPatchModule = function HideWebdriverPatchModule(window) {
           reason: 'no_admissible_carrier',
           nativeValue: nativeWebdriverValue
         }
-      }, null);
+      }, null) : undefined);
       try {
         if (__core && typeof __core.releaseGuardFlag === 'function') {
           __core.releaseGuardFlag(__flagKey, __guardToken, true, __tag);
         }
       } catch (eRelease) {
-        __moduleDiag('warn', __tag + ':guard_release_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
           diagTag: __tag,
           key: __flagKey,
           stage: 'rollback',
           message: 'releaseGuardFlag threw on preflight skip',
           type: __typePipeline,
           data: { outcome: 'skip', reason: 'guard_release_failed' }
-        }, eRelease);
+        }, eRelease) : undefined);
       }
       return;
     }
   } catch (e) {
     const stage = (e && typeof e === 'object' && typeof e.__stage === 'string') ? e.__stage : 'apply';
     const rollbackOk = !!(e && typeof e === 'object' && e.__rollbackOk === true);
-    __moduleDiag('fatal', 'hide_webdriver:fatal', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'hide_webdriver:fatal', { module: __MODULE, surface: __SURFACE, 
       diagTag: __tag,
       key: null,
       stage: stage === 'preflight' ? 'preflight' : 'apply',
       message: stage === 'preflight' ? 'preflight exception' : 'fatal error',
       type: stage === 'preflight' ? __typePipeline : __typeBrowser,
       data: { outcome: 'skip', reason: stage === 'preflight' ? 'preflight_exception' : 'fatal', rollbackOk }
-    }, e);
+    }, e) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk, __tag);
       }
     } catch (eRelease) {
-      __moduleDiag('warn', __tag + ':guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         diagTag: __tag,
         key: __flagKey,
         stage: 'rollback',
         message: 'releaseGuardFlag threw after fatal error',
         type: __typePipeline,
         data: { outcome: 'skip', reason: 'guard_release_failed' }
-      }, eRelease);
+      }, eRelease) : undefined);
     }
     return;
   }
 
   // Success: per GuardFlag policy, do not release guard on success.
-  __moduleDiag('info', 'hide_webdriver:ready', {
+  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'hide_webdriver:ready', { module: __MODULE, surface: __SURFACE, 
     diagTag: __tag,
     key: 'webdriver',
     stage: 'apply',
     message: 'hide_webdriver ready',
     type: 'ok',
     data: { outcome: 'return', reason: 'ready' }
-  }, null);
+  }, null) : undefined);
 
   } catch (e) {
-    __moduleDiag('fatal', 'hide_webdriver:fatal_unhandled', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'hide_webdriver:fatal_unhandled', { module: __MODULE, surface: __SURFACE, 
       diagTag: __tag,
       key: null,
       stage: 'apply',
       message: 'fatal unhandled error',
       type: __typeBrowser,
       data: { outcome: 'skip', reason: 'fatal_unhandled', rollbackOk: false }
-    }, e);
-    __moduleDiag('warn', __tag + ':guard_release_skipped', {
+    }, e) : undefined);
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_skipped', { module: __MODULE, surface: __SURFACE, 
       diagTag: __tag,
       key: 'guard',
       stage: 'rollback',
       message: 'guard release skipped because rollback failed',
       type: __typePipeline,
       data: { outcome: 'skip', reason: 'rollback_failed', rollbackOk: false }
-    }, null);
+    }, null) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__flagKey, __guardToken, false, __tag);
       }
     } catch (eRelease) {
-      __moduleDiag('warn', __tag + ':guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         diagTag: __tag,
         key: 'guard',
         stage: 'rollback',
         message: 'releaseGuardFlag threw after fatal_unhandled',
         type: __typePipeline,
         data: { outcome: 'skip', reason: 'guard_release_failed' }
-      }, eRelease);
+      }, eRelease) : undefined);
     }
     return;
   }

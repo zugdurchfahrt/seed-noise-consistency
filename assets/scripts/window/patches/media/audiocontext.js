@@ -1,85 +1,64 @@
 const AudioContextModule = function AudioContextModule(window) {
   const __MODULE = 'audiocontext';
   const __SURFACE = 'audio';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
+  const G = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+
   const __audioTypePipeline = 'pipeline missing data';
   const __audioTypeBrowser = 'browser structure missing data';
 
-  const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
-    ? window.FernwehContext.__logger
-    : null;
-  const __D = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
-  function __emit(level, code, ctx, err) {
-    try {
-      if (__diag) return __diag(level, code, ctx, err);
-      if (typeof __D === 'function') {
-        const safeCtx = (ctx && typeof ctx === 'object') ? ctx : {};
-        const safeLevel = (level === undefined || level === null) ? 'info' : level;
-        const safeErr = (err === undefined || err === null) ? null : err;
-        return __D(code, safeErr, Object.assign({}, safeCtx, { level: safeLevel }));
-      }
-    } catch (emitErr) {
-      return undefined;
-    }
-  }
-
-  function __moduleDiag(level, code, extra, err) {
-    const x = (extra && typeof extra === 'object') ? extra : {};
-    const ctx = {
-      module: __MODULE,
-      diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
-      surface: __SURFACE,
-      key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-      stage: x.stage, // no local normalization/re-classification
-      message: x.message,
-      data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-      type: x.type // no local normalization/re-classification
-    };
-    return __emit(level, code, ctx, err);
-  }
-
   const C = window.FernwehContext;
   if (!C) {
-    __moduleDiag('fatal', 'audiocontext:pipeline_context_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:pipeline_context_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'FernwehContext',
       data: { outcome: 'skip', reason: 'pipeline_context_missing' }
-    }, new Error('[FernwehContext] FernwehContext is undefined — module registration is not available'));
+    }, new Error('[FernwehContext] FernwehContext is undefined — module registration is not available')) : undefined);
     return;
   }
   const __stateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__stateRoot) {
-    __moduleDiag('fatal', 'audiocontext:pipeline_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:pipeline_state_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'FernwehContext.state',
       data: { outcome: 'skip', reason: 'pipeline_state_missing' }
-    }, new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available'));
+    }, new Error('[FernwehContext] FernwehContext.state is undefined — module registration is not available')) : undefined);
     return;
   }
   const __audioContextRoot = (__stateRoot.__AUDIOCONTEXT__ && typeof __stateRoot.__AUDIOCONTEXT__ === 'object')
     ? __stateRoot.__AUDIOCONTEXT__
     : null;
   if (!__audioContextRoot) {
-    __moduleDiag('fatal', 'audiocontext:module_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:module_state_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'FernwehContext.state.__AUDIOCONTEXT__',
       data: { outcome: 'skip', reason: 'module_state_missing', missing: 'FernwehContext.state.__AUDIOCONTEXT__' }
-    }, new Error('[AudioContextPatch] FernwehContext.state.__AUDIOCONTEXT__ missing'));
+    }, new Error('[AudioContextPatch] FernwehContext.state.__AUDIOCONTEXT__ missing')) : undefined);
     return;
   }
   const __audioContextState = (__audioContextRoot.__STATE__ && typeof __audioContextRoot.__STATE__ === 'object')
     ? __audioContextRoot.__STATE__
     : null;
   if (!__audioContextState) {
-    __moduleDiag('fatal', 'audiocontext:module_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:module_state_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'FernwehContext.state.__AUDIOCONTEXT__.__STATE__',
       data: { outcome: 'skip', reason: 'module_state_missing', missing: 'FernwehContext.state.__AUDIOCONTEXT__.__STATE__' }
-    }, new Error('[AudioContextPatch] FernwehContext.state.__AUDIOCONTEXT__.__STATE__ missing'));
+    }, new Error('[AudioContextPatch] FernwehContext.state.__AUDIOCONTEXT__.__STATE__ missing')) : undefined);
     return;
   }
   const __core = window.Core;
@@ -93,33 +72,33 @@ const AudioContextModule = function AudioContextModule(window) {
     ? __prngState.rand
     : null;
   if (!__randSource || typeof __randSource.use !== 'function') {
-    __moduleDiag('fatal', 'audiocontext:rand_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:rand_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'rand.use',
       data: { outcome: 'skip', reason: 'rand_missing' }
-    }, new Error('[AudioContextPatch] rand.use missing'));
+    }, new Error('[AudioContextPatch] rand.use missing')) : undefined);
     return;
   }
   let R = null;
   try {
     R = __randSource.use('audio');
   } catch (e) {
-    __moduleDiag('fatal', 'audiocontext:rand_use_failed', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:rand_use_failed', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'rand.use(audio)',
       data: { outcome: 'skip', reason: 'rand_use_failed' }
-    }, e);
+    }, e) : undefined);
     return;
   }
   if (typeof R !== 'function') {
-    __moduleDiag('fatal', 'audiocontext:rand_use_not_function', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:rand_use_not_function', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'rand.use(audio)',
       data: { outcome: 'skip', reason: 'rand_use_not_function' }
-    }, new Error('[AudioContextPatch] rand.use("audio") is not a function'));
+    }, new Error('[AudioContextPatch] rand.use("audio") is not a function')) : undefined);
     return;
   }
 
@@ -127,42 +106,41 @@ const AudioContextModule = function AudioContextModule(window) {
     ? __core.applyTargets
     : null;
   if (typeof __coreApplyTargets !== 'function') {
-    __moduleDiag('fatal', 'audiocontext:core_apply_targets_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:core_apply_targets_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'Core.applyTargets',
       data: { outcome: 'skip', reason: 'core_apply_targets_missing' }
-    }, new Error('[AudioContextPatch] Core.applyTargets is required'));
+    }, new Error('[AudioContextPatch] Core.applyTargets is required')) : undefined);
     return;
   }
 
   // ===== MODULE: canonical guard client =====
   const __flagKey = '__PATCH_AUDIOCONTEXT__';
   const __tag = 'audiocontext';
-  const __surface = 'audio';
   let __guardToken = null;
   try {
     if (!__core || typeof __core.guardFlag !== 'function') {
-      __moduleDiag('warn', __tag + ':guard_missing', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_missing', { module: __MODULE, surface: __SURFACE, 
         diagTag: __tag,
         key: 'guard',
         stage: 'guard',
         message: 'Core.guardFlag missing',
         type: __audioTypePipeline,
         data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
-      }, null);
+      }, null) : undefined);
       return;
     }
     __guardToken = __core.guardFlag(__flagKey, __tag);
   } catch (e) {
-    __moduleDiag('warn', __tag + ':guard_failed', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_failed', { module: __MODULE, surface: __SURFACE, 
       diagTag: __tag,
       key: 'guard',
       stage: 'guard',
       message: 'guardFlag threw',
       type: __audioTypePipeline,
       data: { outcome: 'skip', reason: 'guard_failed' }
-    }, e);
+    }, e) : undefined);
     return;
   }
   if (!__guardToken) return; // already_patched: Core emits <tag>:already_patched
@@ -177,14 +155,14 @@ const AudioContextModule = function AudioContextModule(window) {
         return __core.releaseGuardFlag(__flagKey, __guardToken, rollbackOk === true, __tag);
       }
     } catch (eRelease) {
-      __moduleDiag('warn', __tag + ':guard_release_exception', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', __tag + ':guard_release_exception', { module: __MODULE, surface: __SURFACE, 
         diagTag: __tag,
         key: 'guard',
         stage: 'rollback',
         message: 'releaseGuardFlag threw',
         type: __audioTypePipeline,
         data: { outcome: 'skip', reason: 'guard_release_exception', sourceReason: reason || null }
-      }, eRelease);
+      }, eRelease) : undefined);
     }
     return false;
   }
@@ -204,13 +182,13 @@ const AudioContextModule = function AudioContextModule(window) {
     try {
       plans = __coreApplyTargets(targets, null, []);
     } catch (e) {
-      __moduleDiag('error', groupTag + ':preflight_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':preflight_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __audioTypePipeline,
         diagTag: groupTag,
         key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
-      }, e);
+      }, e) : undefined);
       if (groupPolicy === 'throw') throw e;
       return 0;
     }
@@ -218,13 +196,13 @@ const AudioContextModule = function AudioContextModule(window) {
     if (!Array.isArray(plans) || !plans.length) {
       const reason = plans && plans.reason ? plans.reason : 'group_skipped';
       const err = new Error('[AudioContextPatch] target group skipped: ' + reason);
-      __moduleDiag('warn', groupTag + ':' + reason, {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':' + reason, { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __audioTypeBrowser,
         diagTag: groupTag,
         key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: reason, policy: groupPolicy }
-      }, err);
+      }, err) : undefined);
       if (groupPolicy === 'throw') throw err;
       return 0;
     }
@@ -251,33 +229,33 @@ const AudioContextModule = function AudioContextModule(window) {
           try {
             coreRegisterPatchedTarget(p.owner, p.key);
           } catch (e) {
-            __moduleDiag('error', groupTag + ':register_failed', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':register_failed', { module: __MODULE, surface: __SURFACE, 
               stage: 'apply',
               type: __audioTypePipeline,
               diagTag: groupTag,
               key: p.key,
               data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'register_failed', policy: groupPolicy }
-            }, e);
+            }, e) : undefined);
             if (groupPolicy === 'throw') throw e;
           }
         }
       } else {
-        __moduleDiag('warn', groupTag + ':missing_core_registerPatchedTarget', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':missing_core_registerPatchedTarget', { module: __MODULE, surface: __SURFACE, 
           stage: 'preflight',
           type: __audioTypePipeline,
           diagTag: groupTag,
           key: groupTag,
           data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', reason: 'missing_core_registerPatchedTarget', policy: groupPolicy }
-        }, null);
+        }, null) : undefined);
       }
     } catch (e) {
-      __moduleDiag('warn', groupTag + ':rollback', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', groupTag + ':rollback', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         type: __audioTypeBrowser,
         diagTag: groupTag,
         key: groupTag,
         data: { outcome: 'rollback', policy: groupPolicy }
-      }, null);
+      }, null) : undefined);
       let rollbackErr = null;
       for (let i = applied.length - 1; i >= 0; i--) {
         const p = applied[i];
@@ -286,22 +264,22 @@ const AudioContextModule = function AudioContextModule(window) {
           p.rollback();
         } catch (re) {
           if (!rollbackErr) rollbackErr = re;
-          __moduleDiag('error', groupTag + ':rollback_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':rollback_failed', { module: __MODULE, surface: __SURFACE, 
             stage: 'rollback',
             type: __audioTypeBrowser,
             diagTag: groupTag,
             key: p.key,
             data: { outcome: 'throw', policy: groupPolicy, reason: 'rollback_failed' }
-          }, re);
+          }, re) : undefined);
         }
       }
-      __moduleDiag('error', groupTag + ':apply_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', groupTag + ':apply_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'apply',
         type: __audioTypeBrowser,
         diagTag: groupTag,
         key: groupTag,
         data: { outcome: groupPolicy === 'throw' ? 'throw' : 'skip', policy: groupPolicy }
-      }, e);
+      }, e) : undefined);
       if (rollbackErr) throw rollbackErr;
       if (groupPolicy === 'throw') throw e;
       return 0;
@@ -345,13 +323,13 @@ const AudioContextModule = function AudioContextModule(window) {
     if (!(safeSampleRate > 0)) {
       if (!sampleRateMissingNoted) {
         sampleRateMissingNoted = true;
-        __moduleDiag('warn', 'audiocontext:oscillator:sample_rate_missing', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:oscillator:sample_rate_missing', { module: __MODULE, surface: __SURFACE, 
           stage: 'hook',
           type: __audioTypeBrowser,
           diagTag: 'audio:OfflineAudioContext:createOscillator',
           key: 'OfflineAudioContext.sampleRate',
           data: { outcome: 'skip', reason: 'sample_rate_missing' }
-        }, new Error('[AudioContextPatch] sampleRate unavailable for offline oscillator adjustment'));
+        }, new Error('[AudioContextPatch] sampleRate unavailable for offline oscillator adjustment')) : undefined);
       }
       return false;
     }
@@ -375,12 +353,12 @@ const AudioContextModule = function AudioContextModule(window) {
     __audioContextState.ready = false;
     __audioContextState.status = 'failed';
     __audioContextState.reason = 'weakset_missing';
-    __moduleDiag('fatal', 'audiocontext:offline_oscillator_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'audiocontext:offline_oscillator_state_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       type: __audioTypePipeline,
       key: 'WeakSet',
       data: { outcome: 'skip', reason: 'weakset_missing' }
-    }, new Error('[AudioContextPatch] WeakSet state is required'));
+    }, new Error('[AudioContextPatch] WeakSet state is required')) : undefined);
     __releaseAudioGuard(true, 'weakset_missing');
     return;
   }
@@ -415,13 +393,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               v = Reflect.apply(origGet, this, []);
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:sampleRate:native_throw', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:sampleRate:native_throw', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:sampleRate`,
                 key: 'sampleRate',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              }, e);
+              }, e) : undefined);
               throw e;
             }
             return v;
@@ -447,13 +425,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               v = Reflect.apply(origGet, this, []);
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:baseLatency:native_throw', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:baseLatency:native_throw', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:baseLatency`,
                 key: 'baseLatency',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              }, e);
+              }, e) : undefined);
               throw e;
             }
             return v;
@@ -481,13 +459,13 @@ const AudioContextModule = function AudioContextModule(window) {
           try {
             return Reflect.apply(orig, this, input);
           } catch (e) {
-            __moduleDiag('warn', 'audiocontext:createBuffer:native_throw', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:createBuffer:native_throw', { module: __MODULE, surface: __SURFACE, 
               stage: 'runtime',
               type: __audioTypeBrowser,
               diagTag: `audio:${CTX_NAME}:createBuffer`,
               key: 'createBuffer',
               data: { outcome: 'throw', reason: 'native_throw' }
-            }, e);
+            }, e) : undefined);
             throw e;
           }
         }
@@ -514,13 +492,13 @@ const AudioContextModule = function AudioContextModule(window) {
         try {
           analyser = Reflect.apply(orig, this, input);
         } catch (e) {
-          __moduleDiag('warn', 'audiocontext:createAnalyser:native_throw', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:createAnalyser:native_throw', { module: __MODULE, surface: __SURFACE, 
             stage: 'runtime',
             type: __audioTypeBrowser,
             diagTag: `audio:${CTX_NAME}:createAnalyser`,
             key: 'createAnalyser',
             data: { outcome: 'throw', reason: 'native_throw' }
-          }, e);
+          }, e) : undefined);
           throw e;
         }
         if (!analyser || (typeof analyser !== 'object' && typeof analyser !== 'function')) return analyser;
@@ -559,13 +537,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               result = Reflect.apply(orig, this, input);
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:analyser:byte_freq_native_throw', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:analyser:byte_freq_native_throw', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getByteFrequencyData',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              }, e);
+              }, e) : undefined);
               throw e;
             }
             try {
@@ -586,13 +564,13 @@ const AudioContextModule = function AudioContextModule(window) {
                 }
               }
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:analyser:byte_freq_noise_failed', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:analyser:byte_freq_noise_failed', { module: __MODULE, surface: __SURFACE, 
                 stage: 'hook',
                 type: __audioTypePipeline,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getByteFrequencyData',
                 data: { outcome: 'skip', reason: 'byte_freq_noise_failed' }
-              }, e);
+              }, e) : undefined);
             }
             return result;
           }
@@ -624,13 +602,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               result = Reflect.apply(orig, this, input);
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:analyser:float_freq_native_throw', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:analyser:float_freq_native_throw', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getFloatFrequencyData',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              }, e);
+              }, e) : undefined);
               throw e;
             }
             try {
@@ -659,13 +637,13 @@ const AudioContextModule = function AudioContextModule(window) {
                 if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
               }
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:analyser:float_freq_noise_failed', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:analyser:float_freq_noise_failed', { module: __MODULE, surface: __SURFACE, 
                 stage: 'hook',
                 type: __audioTypePipeline,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getFloatFrequencyData',
                 data: { outcome: 'skip', reason: 'float_freq_noise_failed' }
-              }, e);
+              }, e) : undefined);
             }
             return result;
           }
@@ -697,13 +675,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               result = Reflect.apply(orig, this, input);
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:analyser:byte_time_native_throw', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:analyser:byte_time_native_throw', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getByteTimeDomainData',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              }, e);
+              }, e) : undefined);
               throw e;
             }
             try {
@@ -727,13 +705,13 @@ const AudioContextModule = function AudioContextModule(window) {
                 }
               }
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:analyser:byte_time_noise_failed', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:analyser:byte_time_noise_failed', { module: __MODULE, surface: __SURFACE, 
                 stage: 'hook',
                 type: __audioTypePipeline,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getByteTimeDomainData',
                 data: { outcome: 'skip', reason: 'byte_time_noise_failed' }
-              }, e);
+              }, e) : undefined);
             }
             return result;
           }
@@ -765,13 +743,13 @@ const AudioContextModule = function AudioContextModule(window) {
             try {
               result = Reflect.apply(orig, this, input);
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:analyser:float_time_native_throw', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:analyser:float_time_native_throw', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 type: __audioTypeBrowser,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getFloatTimeDomainData',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              }, e);
+              }, e) : undefined);
               throw e;
             }
             const n = array.length | 0;
@@ -801,13 +779,13 @@ const AudioContextModule = function AudioContextModule(window) {
                 if (array[j] < lo) array[j] = lo; else if (array[j] > hi) array[j] = hi;
               }
             } catch (e) {
-              __moduleDiag('warn', 'audiocontext:analyser:float_time_noise_failed', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:analyser:float_time_noise_failed', { module: __MODULE, surface: __SURFACE, 
                 stage: 'hook',
                 type: __audioTypePipeline,
                 diagTag: `audio:${CTX_NAME}:analyser`,
                 key: 'AnalyserNode.getFloatTimeDomainData',
                 data: { outcome: 'skip', reason: 'float_time_noise_failed' }
-              }, e);
+              }, e) : undefined);
             }
             return result;
           }
@@ -853,13 +831,13 @@ const AudioContextModule = function AudioContextModule(window) {
           try {
             oscillator = Reflect.apply(orig, this, input);
           } catch (e) {
-            __moduleDiag('warn', 'audiocontext:createOscillator:native_throw', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:createOscillator:native_throw', { module: __MODULE, surface: __SURFACE, 
               stage: 'runtime',
               type: __audioTypeBrowser,
               diagTag: `audio:${CTX_NAME}:createOscillator`,
               key: 'createOscillator',
               data: { outcome: 'throw', reason: 'native_throw' }
-            }, e);
+            }, e) : undefined);
             throw e;
           }
           if (oscillator && (typeof oscillator === 'object' || typeof oscillator === 'function')) {
@@ -899,24 +877,24 @@ const AudioContextModule = function AudioContextModule(window) {
         try {
           adjustOfflineOscillatorBeforeStart(this);
         } catch (e) {
-          __moduleDiag('warn', 'audiocontext:oscillator:pre_start_adjust_failed', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:oscillator:pre_start_adjust_failed', { module: __MODULE, surface: __SURFACE, 
             stage: 'hook',
             type: __audioTypePipeline,
             diagTag: 'audio:AudioScheduledSourceNode:start',
             key: 'AudioScheduledSourceNode.start',
             data: { outcome: 'skip', reason: 'pre_start_adjust_failed' }
-          }, e);
+          }, e) : undefined);
         }
         try {
           return Reflect.apply(orig, this, input);
         } catch (e) {
-          __moduleDiag('warn', 'audiocontext:scheduled_source:start_native_throw', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'audiocontext:scheduled_source:start_native_throw', { module: __MODULE, surface: __SURFACE, 
             stage: 'runtime',
             type: __audioTypeBrowser,
             diagTag: 'audio:AudioScheduledSourceNode:start',
             key: 'AudioScheduledSourceNode.start',
             data: { outcome: 'throw', reason: 'native_throw' }
-          }, e);
+          }, e) : undefined);
           throw e;
         }
       }
@@ -929,12 +907,12 @@ const AudioContextModule = function AudioContextModule(window) {
       __audioContextState.ready = false;
       __audioContextState.status = 'failed';
       __audioContextState.reason = 'no_targets_applied';
-      __moduleDiag('fatal', __tag + ':no_targets_applied', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', __tag + ':no_targets_applied', { module: __MODULE, surface: __SURFACE, 
         stage: 'preflight',
         type: __audioTypeBrowser,
         key: __tag,
         data: { outcome: 'skip', reason: 'no_targets_applied', targets: __totalTargets, applied: __totalApplied }
-      }, new Error('[AudioContextPatch] no targets applied'));
+      }, new Error('[AudioContextPatch] no targets applied')) : undefined);
       __releaseAudioGuard(true, 'no_targets_applied');
       return;
     }
@@ -952,26 +930,26 @@ const AudioContextModule = function AudioContextModule(window) {
     __audioContextState.offlineCtxClasses = readyStateData.offlineCtxClasses;
     __audioContextState.targets = readyStateData.targets;
     __audioContextState.applied = readyStateData.applied;
-    __moduleDiag('info', __tag + ':ready', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', __tag + ':ready', { module: __MODULE, surface: __SURFACE, 
       stage: 'apply',
       key: __tag,
       message: 'ok',
       type: 'ok',
       data: Object.assign({ outcome: 'return' }, readyStateData)
-    }, null);
+    }, null) : undefined);
   } catch (e) {
     const rollbackErr = e;
     __audioContextState.ready = false;
     __audioContextState.status = 'failed';
     __audioContextState.reason = 'fatal';
-    __moduleDiag('error', __tag + ':fatal', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', __tag + ':fatal', { module: __MODULE, surface: __SURFACE, 
       diagTag: __tag,
       key: __tag,
       stage: 'apply',
       message: 'fatal module error',
       type: __audioTypeBrowser,
       data: { outcome: 'throw', reason: 'fatal', rollbackOk: false }
-    }, rollbackErr);
+    }, rollbackErr) : undefined);
     __releaseAudioGuard(false, 'fatal');
     throw rollbackErr;
   }

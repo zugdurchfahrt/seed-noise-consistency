@@ -545,8 +545,16 @@ if (typeof prngRoot.version !== 'string' || !prngRoot.version) prngRoot.version 
 
 const __MODULE = 'bootstrap_hide';
 const __SURFACE = 'bootstrap_hide';
-const __D = (loggerRoot && typeof loggerRoot.__DEGRADE__ === 'function') ? loggerRoot.__DEGRADE__ : null;
-const __diag = (__D && typeof __D.diag === 'function') ? __D.diag.bind(__D) : null;
+const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+  try {
+    const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+    if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+      G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+    } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+      G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+    }
+  } catch (_) {}
+};
 
 // Transit helper functions.
 function __bootstrapHideEmit__(level, code, extra, err) {
@@ -561,14 +569,7 @@ function __bootstrapHideEmit__(level, code, extra, err) {
     data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
     type: x.type
   };
-  try {
-    if (__diag) return __diag(level, code, ctx, err || null);
-    if (typeof __D === 'function') {
-      return __D(code, err || null, Object.assign({}, ctx, { level: level || 'info' }));
-    }
-  } catch (_emitErr) {
-    return undefined;
-  }
+  return (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__(level, code, ctx, err || null) : undefined);
 }
 
 function __isFiniteNumber__(value) {

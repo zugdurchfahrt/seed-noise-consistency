@@ -1,4 +1,18 @@
 const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(window) {
+  const __MODULE = 'rtc';
+  const __SURFACE = 'rtcp';
+  const __FERNWEH_DIAG__ = function(level, code, extra, err) {
+    try {
+      const G_ = (typeof globalThis !== 'undefined' && globalThis) || (typeof self !== 'undefined' && self) || (typeof window !== 'undefined' && window) || {};
+      if (G_.FernwehContext && G_.FernwehContext.__logger && G_.FernwehContext.__logger.__DEGRADE__ && typeof G_.FernwehContext.__logger.__DEGRADE__.diag === 'function') {
+        G_.FernwehContext.__logger.__DEGRADE__.diag(level, code, extra, err);
+      } else if (G_.__loggerRoot && G_.__loggerRoot.__DEGRADE__ && typeof G_.__loggerRoot.__DEGRADE__.diag === 'function') {
+        G_.__loggerRoot.__DEGRADE__.diag(level, code, extra, err);
+      }
+    } catch (_) {}
+  };
+
+
 
   const C = window.FernwehContext;
   const G = (typeof globalThis !== 'undefined' && globalThis)
@@ -6,148 +20,103 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         || (typeof window     !== 'undefined' && window)
         || (typeof global     !== 'undefined' && global)
         || {};
-  const __MODULE = 'rtc';
-  const __SURFACE = 'rtcp';
   const __FLAG_KEY = '__PATCH_RTCPEERCONNECTION__';
   const __loggerRoot = (window && window.FernwehContext && window.FernwehContext.__logger && typeof window.FernwehContext.__logger === 'object')
     ? window.FernwehContext.__logger
     : null;
-  const __rtcDegrade = (__loggerRoot && typeof __loggerRoot.__DEGRADE__ === 'function') ? __loggerRoot.__DEGRADE__ : null;
-  function __rtcDiag(level, code, extra, err) {
-    try {
-      const x = (extra && typeof extra === 'object') ? extra : {};
-      const ctx = {
-        module: __MODULE,
-        diagTag: (typeof x.diagTag === 'string' && x.diagTag) ? x.diagTag : __MODULE,
-        surface: __SURFACE,
-        key: (typeof x.key === 'string' || x.key === null) ? x.key : null,
-        stage: x.stage,
-        message: x.message,
-        data: Object.prototype.hasOwnProperty.call(x, 'data') ? x.data : null,
-        type: x.type
-      };
-      if (__rtcDegrade && typeof __rtcDegrade.diag === 'function') {
-        __rtcDegrade.diag(String(level || 'info'), String(code || 'rtc'), ctx, err || null);
-        return;
-      }
-      if (typeof __rtcDegrade === 'function') {
-        __rtcDegrade(String(code || 'rtc'), err || null, Object.assign({ level: String(level || 'info') }, ctx));
-      }
-    } catch (emitErr) {
-      if (typeof __rtcDegrade === 'function') {
-        try {
-          __rtcDegrade('rtc:diag_emit_failed', emitErr || null, {
-            level: 'warn',
-            module: __MODULE,
-            diagTag: __MODULE,
-            surface: __SURFACE,
-            key: '__DEGRADE__',
-            stage: 'runtime',
-            message: 'rtc diag emit failed',
-            type: 'browser structure missing data',
-            data: { outcome: 'skip', reason: 'diag_emit_failed' }
-          });
-        } catch (fallbackErr) {
-          return fallbackErr;
-        }
-      }
-      return undefined;
-    }
-  }
-
   if (!(window.Core
         && window.Core.__internal
         && typeof window.Core.__internal === 'object'
         && window.Core.__internal.coreWindowLoaded === true)) {
-    __rtcDiag('fatal', 'rtc:core_window_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'rtc:core_window_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'core_window',
       message: 'core_window.js not loaded - must load BEFORE RTCPeerConnection.js',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_core_window' }
-    }, new Error('[RTC] core_window.js not loaded'));
+    }, new Error('[RTC] core_window.js not loaded')) : undefined);
     return;
   }
 
   const __core = window.Core;
   let __guardToken = null;
   if (!__core || typeof __core.guardFlag !== 'function') {
-    __rtcDiag('warn', 'rtc:guard_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'guard',
       key: __FLAG_KEY,
       message: 'Core.guardFlag missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_core_guard' }
-    }, null);
+    }, null) : undefined);
     return;
   }
   try {
     __guardToken = __core.guardFlag(__FLAG_KEY, __MODULE);
   } catch (e) {
-    __rtcDiag('warn', 'rtc:guard_failed', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_failed', { module: __MODULE, surface: __SURFACE, 
       stage: 'guard',
       key: __FLAG_KEY,
       message: 'guardFlag threw',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'guard_failed' }
-    }, e);
+    }, e) : undefined);
     return;
   }
   if (!__guardToken) {
-    __rtcDiag('info', 'rtc:already_patched', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'rtc:already_patched', { module: __MODULE, surface: __SURFACE, 
       stage: 'guard',
       key: __FLAG_KEY,
       message: 'already patched (guard)',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'already_patched' }
-    }, null);
+    }, null) : undefined);
     return;
   }
 
   if (!C) {
-    __rtcDiag('fatal', 'rtc:fernweh_context_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'rtc:fernweh_context_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'FernwehContext',
       message: 'FernwehContext missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'fernweh_context_missing' }
-    }, new Error('[RTC] FernwehContext missing'));
+    }, new Error('[RTC] FernwehContext missing')) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
       }
     } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'guard',
         key: __FLAG_KEY,
         message: 'releaseGuardFlag threw on FernwehContext preflight skip',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
   const __rtcStateRoot = (C.state && typeof C.state === 'object') ? C.state : null;
   if (!__rtcStateRoot) {
-    __rtcDiag('fatal', 'rtc:fernweh_context_state_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'rtc:fernweh_context_state_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'FernwehContext.state',
       message: 'FernwehContext.state missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'fernweh_context_state_missing' }
-    }, new Error('[RTC] FernwehContext.state missing'));
+    }, new Error('[RTC] FernwehContext.state missing')) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
       }
     } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'guard',
         key: __FLAG_KEY,
         message: 'releaseGuardFlag threw on FernwehContext.state preflight skip',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
@@ -166,25 +135,25 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return sd;
   })();
   if (typeof safeDefine !== 'function') {
-    __rtcDiag('fatal', 'rtc:safe_define_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'rtc:safe_define_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'Core.__safeDefine',
       message: 'Core.__safeDefine missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_safe_define' }
-    }, new Error('[RTC] safeDefine missing'));
+    }, new Error('[RTC] safeDefine missing')) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
       }
     } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'guard',
         key: __FLAG_KEY,
         message: 'releaseGuardFlag threw on safeDefine preflight skip',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
@@ -195,25 +164,25 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return wrap;
   })();
   if (typeof wrapApply !== 'function') {
-    __rtcDiag('fatal', 'rtc:wrap_native_apply_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'rtc:wrap_native_apply_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'Core.__wrapNativeApply',
       message: 'Core.__wrapNativeApply missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_wrap_native_apply' }
-    }, new Error('[RTC] Core.__wrapNativeApply missing'));
+    }, new Error('[RTC] Core.__wrapNativeApply missing')) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
       }
     } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'guard',
         key: __FLAG_KEY,
         message: 'releaseGuardFlag threw on wrapApply preflight skip',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
@@ -224,50 +193,50 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
     return wrap;
   })();
   if (typeof wrapAcc !== 'function') {
-    __rtcDiag('fatal', 'rtc:wrap_native_accessor_missing', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'rtc:wrap_native_accessor_missing', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'Core.__wrapNativeAccessor',
       message: 'Core.__wrapNativeAccessor missing',
       type: 'pipeline missing data',
       data: { outcome: 'skip', reason: 'missing_dep_wrap_native_accessor' }
-    }, new Error('[RTC] Core.__wrapNativeAccessor missing'));
+    }, new Error('[RTC] Core.__wrapNativeAccessor missing')) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
       }
     } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'guard',
         key: __FLAG_KEY,
         message: 'releaseGuardFlag threw on wrapAcc preflight skip',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
 
   const Orig = window.RTCPeerConnection;
   if (!Orig) {
-    __rtcDiag('info', 'rtc:skip_no_api', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'rtc:skip_no_api', { module: __MODULE, surface: __SURFACE, 
       stage: 'preflight',
       key: 'RTCPeerConnection',
       message: 'RTCPeerConnection not available',
       type: 'browser structure missing data',
       data: { outcome: 'skip', reason: 'missing_api' }
-    }, null);
+    }, null) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, true, __MODULE);
       }
     } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'guard',
         key: __FLAG_KEY,
         message: 'releaseGuardFlag threw on missing API skip',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: true }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
@@ -336,13 +305,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       try {
         p = Reflect.apply(nativeFn, thisArg, args);
       } catch (e) {
-        __rtcDiag('warn', 'rtc:createOffer:native_throw', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:createOffer:native_throw', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           key: 'createOffer',
           message: 'native createOffer threw',
           type: 'browser structure missing data',
           data: { outcome: 'throw', reason: 'native_throw' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
       if (!p || typeof p.then !== 'function') return p;
@@ -361,13 +330,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       try {
         p = Reflect.apply(nativeFn, thisArg, args);
       } catch (e) {
-        __rtcDiag('warn', 'rtc:createAnswer:native_throw', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:createAnswer:native_throw', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           key: 'createAnswer',
           message: 'native createAnswer threw',
           type: 'browser structure missing data',
           data: { outcome: 'throw', reason: 'native_throw' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
       if (!p || typeof p.then !== 'function') return p;
@@ -387,13 +356,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       try {
         return Reflect.apply(nativeFn, thisArg, args);
       } catch (e) {
-        __rtcDiag('warn', 'rtc:setLocalDescription:native_throw', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:setLocalDescription:native_throw', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           key: 'setLocalDescription',
           message: 'native setLocalDescription threw',
           type: 'browser structure missing data',
           data: { outcome: 'throw', reason: 'native_throw' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
     });
@@ -410,13 +379,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       try {
         return Reflect.apply(nativeFn, thisArg, args);
       } catch (e) {
-        __rtcDiag('warn', 'rtc:addIceCandidate:native_throw', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:addIceCandidate:native_throw', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           key: 'addIceCandidate',
           message: 'native addIceCandidate threw',
           type: 'browser structure missing data',
           data: { outcome: 'throw', reason: 'native_throw' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
     });
@@ -434,13 +403,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       try {
         return Reflect.apply(nativeFn, thisArg, args);
       } catch (e) {
-        __rtcDiag('warn', 'rtc:setConfiguration:native_throw', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:setConfiguration:native_throw', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           key: 'setConfiguration',
           message: 'native setConfiguration threw',
           type: 'browser structure missing data',
           data: { outcome: 'throw', reason: 'native_throw' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
     });
@@ -467,13 +436,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
             try {
               return Reflect.apply(nativeGet, thisArg, args);
             } catch (e) {
-              __rtcDiag('warn', 'rtc:onicecandidate_get:native_throw', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:onicecandidate_get:native_throw', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 key: 'onicecandidate',
                 message: 'native getter onicecandidate threw',
                 type: 'browser structure missing data',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              }, e);
+              }, e) : undefined);
               throw e;
             }
           })
@@ -488,13 +457,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
               try {
                 return Reflect.apply(nativeSet, thisArg, args);
               } catch (e) {
-                __rtcDiag('warn', 'rtc:onicecandidate_set:native_throw', {
+                (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:onicecandidate_set:native_throw', { module: __MODULE, surface: __SURFACE, 
                   stage: 'runtime',
                   key: 'onicecandidate',
                   message: 'native setter onicecandidate threw',
                   type: 'browser structure missing data',
                   data: { outcome: 'throw', reason: 'native_throw' }
-                }, e);
+                }, e) : undefined);
                 throw e;
               }
             }
@@ -507,13 +476,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
             try {
               return Reflect.apply(nativeSet, thisArg, [wrapped]);
             } catch (e) {
-              __rtcDiag('warn', 'rtc:onicecandidate_set:native_throw', {
+              (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:onicecandidate_set:native_throw', { module: __MODULE, surface: __SURFACE, 
                 stage: 'runtime',
                 key: 'onicecandidate',
                 message: 'native setter onicecandidate threw',
                 type: 'browser structure missing data',
                 data: { outcome: 'throw', reason: 'native_throw' }
-              }, e);
+              }, e) : undefined);
               throw e;
             }
           })
@@ -582,26 +551,26 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
         try {
           return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
         } catch (e) {
-          __rtcDiag('warn', 'rtc:addEventListener:native_throw', {
+          (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:addEventListener:native_throw', { module: __MODULE, surface: __SURFACE, 
             stage: 'runtime',
             key: 'addEventListener',
             message: 'native addEventListener threw',
             type: 'browser structure missing data',
             data: { outcome: 'throw', reason: 'native_throw' }
-          }, e);
+          }, e) : undefined);
           throw e;
         }
       }
       try {
         return Reflect.apply(nativeFn, thisArg, args);
       } catch (e) {
-        __rtcDiag('warn', 'rtc:addEventListener:native_throw', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:addEventListener:native_throw', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           key: 'addEventListener',
           message: 'native addEventListener threw',
           type: 'browser structure missing data',
           data: { outcome: 'throw', reason: 'native_throw' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
     });
@@ -623,13 +592,13 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
           try {
             return Reflect.apply(nativeFn, thisArg, [type, wrapped, options]);
           } catch (e) {
-            __rtcDiag('warn', 'rtc:removeEventListener:native_throw', {
+            (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:removeEventListener:native_throw', { module: __MODULE, surface: __SURFACE, 
               stage: 'runtime',
               key: 'removeEventListener',
               message: 'native removeEventListener threw',
               type: 'browser structure missing data',
               data: { outcome: 'throw', reason: 'native_throw' }
-            }, e);
+            }, e) : undefined);
             throw e;
           }
         }
@@ -637,159 +606,159 @@ const RtcpeerconnectionPatchModule = function RtcpeerconnectionPatchModule(windo
       try {
         return Reflect.apply(nativeFn, thisArg, args);
       } catch (e) {
-        __rtcDiag('warn', 'rtc:removeEventListener:native_throw', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:removeEventListener:native_throw', { module: __MODULE, surface: __SURFACE, 
           stage: 'runtime',
           key: 'removeEventListener',
           message: 'native removeEventListener threw',
           type: 'browser structure missing data',
           data: { outcome: 'throw', reason: 'native_throw' }
-        }, e);
+        }, e) : undefined);
         throw e;
       }
     });
     __rtcMarkNative(wrappedRemoveEventListener, 'removeEventListener', 'removeEventListener');
     Orig.prototype.removeEventListener = wrappedRemoveEventListener;
   }
-  __rtcDiag('info', 'rtc:patched', {
+  (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'rtc:patched', { module: __MODULE, surface: __SURFACE, 
     stage: 'apply',
     key: 'RTCPeerConnection',
     message: 'RTC patch applied',
     type: 'ok',
     data: { outcome: 'return', reason: 'patched' }
-  }, null);
+  }, null) : undefined);
   } catch (e) {
     let rollbackErr = null;
     try {
       if (typeof origCreateOffer === 'function') Orig.prototype.createOffer = origCreateOffer;
     } catch (re) {
       if (!rollbackErr) rollbackErr = re;
-      __rtcDiag('error', 'rtc:rollback_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         key: 'createOffer',
         message: 'rollback restore failed for createOffer',
         type: 'browser structure missing data',
         data: { outcome: 'rollback', reason: 'restore_createOffer_failed' }
-      }, re);
+      }, re) : undefined);
     }
     try {
       if (typeof origCreateAnswer === 'function') Orig.prototype.createAnswer = origCreateAnswer;
     } catch (re) {
       if (!rollbackErr) rollbackErr = re;
-      __rtcDiag('error', 'rtc:rollback_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         key: 'createAnswer',
         message: 'rollback restore failed for createAnswer',
         type: 'browser structure missing data',
         data: { outcome: 'rollback', reason: 'restore_createAnswer_failed' }
-      }, re);
+      }, re) : undefined);
     }
     try {
       if (typeof origSetLocalDescription === 'function') Orig.prototype.setLocalDescription = origSetLocalDescription;
     } catch (re) {
       if (!rollbackErr) rollbackErr = re;
-      __rtcDiag('error', 'rtc:rollback_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         key: 'setLocalDescription',
         message: 'rollback restore failed for setLocalDescription',
         type: 'browser structure missing data',
         data: { outcome: 'rollback', reason: 'restore_setLocalDescription_failed' }
-      }, re);
+      }, re) : undefined);
     }
     try {
       if (typeof origAddIceCandidate === 'function') Orig.prototype.addIceCandidate = origAddIceCandidate;
     } catch (re) {
       if (!rollbackErr) rollbackErr = re;
-      __rtcDiag('error', 'rtc:rollback_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         key: 'addIceCandidate',
         message: 'rollback restore failed for addIceCandidate',
         type: 'browser structure missing data',
         data: { outcome: 'rollback', reason: 'restore_addIceCandidate_failed' }
-      }, re);
+      }, re) : undefined);
     }
     try {
       if (typeof origSetConfiguration === 'function') Orig.prototype.setConfiguration = origSetConfiguration;
     } catch (re) {
       if (!rollbackErr) rollbackErr = re;
-      __rtcDiag('error', 'rtc:rollback_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         key: 'setConfiguration',
         message: 'rollback restore failed for setConfiguration',
         type: 'browser structure missing data',
         data: { outcome: 'rollback', reason: 'restore_setConfiguration_failed' }
-      }, re);
+      }, re) : undefined);
     }
     try {
       if (typeof origAddEventListener === 'function') Orig.prototype.addEventListener = origAddEventListener;
     } catch (re) {
       if (!rollbackErr) rollbackErr = re;
-      __rtcDiag('error', 'rtc:rollback_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         key: 'addEventListener',
         message: 'rollback restore failed for addEventListener',
         type: 'browser structure missing data',
         data: { outcome: 'rollback', reason: 'restore_addEventListener_failed' }
-      }, re);
+      }, re) : undefined);
     }
     try {
       if (typeof origRemoveEventListener === 'function') Orig.prototype.removeEventListener = origRemoveEventListener;
     } catch (re) {
       if (!rollbackErr) rollbackErr = re;
-      __rtcDiag('error', 'rtc:rollback_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         key: 'removeEventListener',
         message: 'rollback restore failed for removeEventListener',
         type: 'browser structure missing data',
         data: { outcome: 'rollback', reason: 'restore_removeEventListener_failed' }
-      }, re);
+      }, re) : undefined);
     }
     try {
       if (origOnIceDesc) Object.defineProperty(Orig.prototype, 'onicecandidate', origOnIceDesc);
       else delete Orig.prototype.onicecandidate;
     } catch (re) {
       if (!rollbackErr) rollbackErr = re;
-      __rtcDiag('error', 'rtc:rollback_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'rollback',
         key: 'onicecandidate',
         message: 'rollback restore failed for onicecandidate',
         type: 'browser structure missing data',
         data: { outcome: 'rollback', reason: 'restore_onicecandidate_failed' }
-      }, re);
+      }, re) : undefined);
     }
     if (!rollbackErr) {
       try {
         delete Orig.__PATCH_RTCPEERCONNECTION__;
       } catch (re) {
         rollbackErr = re;
-        __rtcDiag('error', 'rtc:rollback_failed', {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'rtc:rollback_failed', { module: __MODULE, surface: __SURFACE, 
           stage: 'rollback',
           key: '__PATCH_RTCPEERCONNECTION__',
           message: 'rollback restore failed for marker',
           type: 'browser structure missing data',
           data: { outcome: 'rollback', reason: 'restore_patch_marker_failed' }
-        }, re);
+        }, re) : undefined);
       }
     }
     const rollbackOk = !rollbackErr;
-    __rtcDiag('fatal', 'rtc:apply_failed', {
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('fatal', 'rtc:apply_failed', { module: __MODULE, surface: __SURFACE, 
       stage: 'apply',
       key: 'RTCPeerConnection',
       message: 'RTC patch apply failed (rolled back)',
       type: 'browser structure missing data',
       data: { outcome: rollbackOk ? 'rollback' : 'throw', reason: 'apply_failed', rollbackOk }
-    }, e);
+    }, e) : undefined);
     try {
       if (__core && typeof __core.releaseGuardFlag === 'function') {
         __core.releaseGuardFlag(__FLAG_KEY, __guardToken, rollbackOk, __MODULE);
       }
     } catch (releaseErr) {
-      __rtcDiag('warn', 'rtc:guard_release_failed', {
+      (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('warn', 'rtc:guard_release_failed', { module: __MODULE, surface: __SURFACE, 
         stage: 'guard',
         key: __FLAG_KEY,
         message: 'releaseGuardFlag threw after apply failure',
         type: 'pipeline missing data',
         data: { outcome: 'skip', reason: 'guard_release_failed', rollbackOk: !!rollbackOk }
-      }, releaseErr);
+      }, releaseErr) : undefined);
     }
     return;
   }
