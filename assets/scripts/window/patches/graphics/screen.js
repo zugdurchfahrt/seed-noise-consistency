@@ -19,7 +19,6 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const __screenModule = 'screen';
   const __core = window.Core;
   const __flagKey = '__PATCH_SCREEN__';
-  ;
   
   let __guardToken = null;
   if (!__core || typeof __core.guardFlag !== 'function') {
@@ -220,8 +219,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     });
   }
 
+  // `__screenState` is verified in preflight.
   const SCREEN_WIDTH  = Number(__screenState.width);
   const SCREEN_HEIGHT = Number(__screenState.height);
+  const SCREEN_AVAIL_HEIGHT = Number(__screenState.availHeight ?? SCREEN_HEIGHT);
   const COLOR_DEPTH   = Number(__screenState.colorDepth);
   const DPR           = Number(__screenState.dpr);
   const ORIENTATION_DOM = (typeof __screenState.orientationDom === 'string' && __screenState.orientationDom)
@@ -735,7 +736,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (deviceW) { touched = true; matches = matches && SCREEN_WIDTH === parseInt(deviceW[1], 10); }
     const deviceH = q.match(/\(device-height:\s*(\d+)px\)/);
     if (deviceH) { touched = true; matches = matches && SCREEN_HEIGHT === parseInt(deviceH[1], 10); }
-    const deviceAspectRatio = q.match(/\(device-aspect-ratio:\s*(\d+)\/(\d+)\)/);
+    const deviceAspectRatio = q.match(/\(device-aspect-ratio:\s*(\d+)\s*\/\s*(\d+)\)/);
     if (deviceAspectRatio && typeof SCREEN_WIDTH === 'number' && typeof SCREEN_HEIGHT === 'number') {
       touched = true;
       const wInt = parseInt(deviceAspectRatio[1], 10);
@@ -757,7 +758,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (maxH) { touched = true; matches = matches && viewportExpected.innerHeight <= parseInt(maxH[1], 10); }
     const minH = q.match(/\(min-height:\s*(\d+)px\)/);
     if (minH) { touched = true; matches = matches && viewportExpected.innerHeight >= parseInt(minH[1], 10); }
-    const aspectRatio = q.match(/\(aspect-ratio:\s*(\d+)\/(\d+)\)/);
+    const aspectRatio = q.match(/\(aspect-ratio:\s*(\d+)\s*\/\s*(\d+)\)/);
     if (aspectRatio && typeof viewportExpected.innerWidth === 'number' && typeof viewportExpected.innerHeight === 'number') {
       touched = true;
       const wInt = parseInt(aspectRatio[1], 10);
@@ -767,14 +768,14 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       touched = true;
       matches = false;
     }
-    const maxAspectRatio = q.match(/\(max-aspect-ratio:\s*(\d+)\/(\d+)\)/);
+    const maxAspectRatio = q.match(/\(max-aspect-ratio:\s*(\d+)\s*\/\s*(\d+)\)/);
     if (maxAspectRatio) {
       touched = true;
       const wInt = parseInt(maxAspectRatio[1], 10);
       const hInt = parseInt(maxAspectRatio[2], 10);
       matches = matches && (viewportExpected.innerWidth * hInt <= viewportExpected.innerHeight * wInt);
     }
-    const minAspectRatio = q.match(/\(min-aspect-ratio:\s*(\d+)\/(\d+)\)/);
+    const minAspectRatio = q.match(/\(min-aspect-ratio:\s*(\d+)\s*\/\s*(\d+)\)/);
     if (minAspectRatio) {
       touched = true;
       const wInt = parseInt(minAspectRatio[1], 10);
@@ -839,7 +840,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
     availWidth: SCREEN_WIDTH,
-    availHeight: SCREEN_HEIGHT,
+    availHeight: SCREEN_AVAIL_HEIGHT,
     colorDepth: COLOR_DEPTH,
     pixelDepth: COLOR_DEPTH,
     availLeft: ZERO,
@@ -847,7 +848,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   };
   const orientationExpected = { type: expectedOrientationType, angle: ZERO };
   const cssViewportWidth = SCREEN_WIDTH;
-  const cssViewportHeight = SCREEN_HEIGHT;
+  const nativeInnerH = __screenReadAccessorValue(window, windowProto, 'innerHeight', window);
+  const idealCssViewportHeight = (typeof nativeInnerH === 'number' && nativeInnerH > 0) ? nativeInnerH : (SCREEN_AVAIL_HEIGHT - 132);
+  const cssViewportHeight = (typeof DPR === 'number' && DPR > ZERO) 
+    ? Math.round(Math.ceil(idealCssViewportHeight * DPR) / DPR) 
+    : idealCssViewportHeight;
   const cssVisualViewportWidth = (visualViewportObj && Number.isFinite(Number(visualViewportObj.width)) && Number(visualViewportObj.width) > ZERO)
     ? Number(visualViewportObj.width)
     : cssViewportWidth;
@@ -1211,11 +1216,11 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       outerHeight: __screenReadAccessorValue(window, windowProto, 'outerHeight', window)
     };
     const mismatches = [];
-    if (!Object.is(snapshot.outerWidth, viewportExpected.innerWidth)) {
-      mismatches.push({ key: 'window.outerWidth', expected: viewportExpected.innerWidth, actual: snapshot.outerWidth });
+    if (!Object.is(snapshot.outerWidth, SCREEN_WIDTH)) {
+      mismatches.push({ key: 'window.outerWidth', expected: SCREEN_WIDTH, actual: snapshot.outerWidth });
     }
-    if (!Object.is(snapshot.outerHeight, viewportExpected.innerHeight)) {
-      mismatches.push({ key: 'window.outerHeight', expected: viewportExpected.innerHeight, actual: snapshot.outerHeight });
+    if (!Object.is(snapshot.outerHeight, SCREEN_AVAIL_HEIGHT)) {
+      mismatches.push({ key: 'window.outerHeight', expected: SCREEN_AVAIL_HEIGHT, actual: snapshot.outerHeight });
     }
     return { ok: mismatches.length === ZERO, snapshot: snapshot, mismatches: mismatches };
   }
@@ -1229,8 +1234,10 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const hostWindowObserved = [];
   const hostWindowTargets = [];
   const displayReasons = [];
+  const displayTargets = [];
   const viewportReasons = [];
   const hostWindowReasons = [];
+  let displayAppliedCount = ZERO;
   let hostWindowAppliedCount = ZERO;
   if (!(mmDesc && Object.prototype.hasOwnProperty.call(mmDesc, 'value') && typeof mmDesc.value === 'function')) {
     displayReasons.push('matchMedia:descriptor_invalid');
@@ -1250,7 +1257,22 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = screenExpected[key];
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      displayReasons.push('screen.' + key + ':native_profile_mismatch_keep_native_getter');
+      if (key === 'availHeight') {
+        const targetPlanWrapper = __screenBuildAccessorTarget(
+          screenObj,
+          screenProto,
+          key,
+          fact.expected,
+          'screen:display_group'
+        );
+        if (targetPlanWrapper.ok) {
+          displayTargets.push(targetPlanWrapper.target);
+        } else {
+          displayReasons.push('screen.' + key + ':' + targetPlanWrapper.reason);
+        }
+      } else {
+        displayReasons.push('screen.' + key + ':native_profile_mismatch_keep_native_getter');
+      }
     }
   }
   const orientationKeys = Object.keys(orientationExpected);
@@ -1292,12 +1314,12 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     fact.expected = viewportExpected[key];
     fact.matchesExpected = !fact.readFailed && Object.is(fact.actual, fact.expected);
     if (!fact.readFailed && !fact.matchesExpected) {
-      viewportReasons.push('window.' + key + ':native_profile_mismatch_keep_native_getter');
+      viewportReasons.push('window.' + key + ':' + fact.actual + '!==' + fact.expected + ':native_profile_mismatch_keep_native_getter');
     }
   }
   const hostWindowMap = [
-    { key: 'outerWidth', expected: viewportExpected.innerWidth },
-    { key: 'outerHeight', expected: viewportExpected.innerHeight }
+    { key: 'outerWidth', expected: SCREEN_WIDTH },
+    { key: 'outerHeight', expected: SCREEN_AVAIL_HEIGHT }
   ];
   for (let i = ZERO; i < hostWindowMap.length; i++) {
     const item = hostWindowMap[i];
@@ -1316,7 +1338,9 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
     if (!fact.readFailed && !fact.matchesExpected) {
       const targetPlan = __screenBuildAccessorTarget(window, windowProto, key, item.expected, 'screen:host_window_group');
       if (!targetPlan.ok) hostWindowReasons.push('window.' + key + ':' + targetPlan.reason);
-      else hostWindowTargets.push(targetPlan.target);
+      else {
+        hostWindowTargets.push(targetPlan.target);
+      }
     }
   }
   const elementProto = (typeof Element !== 'undefined' && Element && Element.prototype) ? Element.prototype : null;
@@ -1350,23 +1374,40 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
       }
     }
   }
+  if (displayTargets.length && displayReasons.length === ZERO) {
+    displayAppliedCount = applyCoreTargetsGroup('screen:display_group:avail_height', displayTargets, 'strict');
+    __screenGroupModes.coordinationPatched = __screenGroupModes.coordinationPatched || (displayAppliedCount > ZERO);
+    __screenGroupModes.appliedTargets += displayAppliedCount;
+  }
   let displayPostcheck = null;
   if (displayReasons.length === ZERO) {
     displayPostcheck = __screenCheckDisplayCoherence();
     if (!displayPostcheck.ok) {
-      displayReasons.push('display_postcheck_failed');
+      if (displayAppliedCount > ZERO) {
+        (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('error', 'screen:coordination_postcheck_failed', { module: __MODULE, surface: __SURFACE,
+          stage: 'apply',
+          type: __screenTypeBrowser,
+          diagTag: 'screen',
+          key: 'display_group',
+          message: 'display coordination post-check failed',
+          data: __screenAugmentData('display', { outcome: 'rollback', reason: 'display_postcheck_failed', substage: 'apply', details: ['display_postcheck_failed'], mismatches: displayPostcheck.mismatches })
+        }, null) : undefined);
+        rollbackAppliedCoreGroup('screen:display_group:avail_height', 'display_postcheck_failed');
+        displayAppliedCount = ZERO;
+      }
+      displayReasons.push('display_postcheck_failed:' + displayPostcheck.mismatches.map(function(m) { return m.key + '=' + m.actual + '!=' + m.expected; }).join(','));
     }
   }
   if (displayReasons.length === ZERO) {
     __screenSetGroupEvidence('display', 'apply', [], displayPostcheck ? displayPostcheck.mismatches : []);
-    __screenSetGroupOutcome('display', 'native_observed', 'native_coherent');
-    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', 'screen:display_group_ready', { module: __MODULE, surface: __SURFACE,
+    __screenSetGroupOutcome('display', displayAppliedCount > ZERO ? 'patched' : 'native_observed', displayAppliedCount > ZERO ? 'coordinated_apply' : 'native_coherent');
+    (__FERNWEH_DIAG__ ? __FERNWEH_DIAG__('info', displayAppliedCount > ZERO ? 'screen:display_group_applied' : 'screen:display_group_ready', { module: __MODULE, surface: __SURFACE,
       stage: 'apply',
-      type: __screenTypePipeline,
+      type: displayAppliedCount > ZERO ? 'ok' : __screenTypePipeline,
       diagTag: 'screen',
       key: 'display_group',
-      message: 'display group already coherent',
-      data: __screenAugmentData('display', { outcome: 'return', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', details: [], mismatches: displayPostcheck ? displayPostcheck.mismatches : [], applied: ZERO, snapshot: displayPostcheck ? displayPostcheck.snapshot : null })
+      message: displayAppliedCount > ZERO ? 'display group coordinated' : 'display group already coherent',
+      data: __screenAugmentData('display', { outcome: 'return', mode: __screenGroupModes.displayMode, reason: __screenGroupModes.displayReason, substage: 'apply', details: [], mismatches: displayPostcheck ? displayPostcheck.mismatches : [], applied: displayAppliedCount, snapshot: displayPostcheck ? displayPostcheck.snapshot : null })
     }, null) : undefined);
   } else {
     __screenSetGroupEvidence('display', 'apply', displayReasons, displayPostcheck ? displayPostcheck.mismatches : []);
@@ -1431,7 +1472,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
         rollbackAppliedCoreGroup('screen:host_window_group', 'host_window_postcheck_failed');
         hostWindowAppliedCount = ZERO;
       }
-      hostWindowReasons.push('host_window_postcheck_failed');
+      hostWindowReasons.push('host_window_postcheck_failed:' + hostWindowPostcheck.mismatches.map(function(m) { return m.key + '=' + m.actual + '!=' + m.expected; }).join(','));
     }
   }
   if (hostWindowReasons.length === ZERO) {
@@ -1582,7 +1623,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
           rollbackAppliedCoreGroup('screen:viewport_group:dom_ready', 'viewport_postcheck_failed');
           applied = ZERO;
         }
-        localReasons.push('viewport_postcheck_failed');
+        localReasons.push('viewport_postcheck_failed:' + postcheck.mismatches.map(function(m) { return m.key + '=' + m.actual + '!=' + m.expected; }).join(','));
       }
     }
     if (localReasons.length === ZERO) {

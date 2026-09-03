@@ -1,5 +1,10 @@
 # Changelog
 
+## 03.09.2026
+
+- `screen.js`: Completed the implementation of the `screen` module, which was previously unfinished. The `availHeight` parameter and screen properties were not fully implemented before, but now they are written natively in strict accordance with the rules of the V8 engine and Chromium. They now function correctly and natively.
+- `core_window.js`: Implemented a lexically isolated V8 Stack Trace Spoofing mechanism within the Proxy factories to perfectly replicate V8 internal `TypeError` stack traces, supporting the native behavior of the completed screen accessors.
+
 ## 02.09.2026
 
 ### Logging Architecture & Stealth Mode (Global Refactoring)

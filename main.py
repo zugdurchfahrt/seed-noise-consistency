@@ -916,6 +916,7 @@ def init_driver(
     offset_minutes = country_data["offset_minutes"]
     latitude = country_data["latitude"]
     longitude = country_data["longitude"]
+    screen_avail_height = screen_height - round(screen_height * 0.04)
     chrome_options = Options()
     if MITMPROXY_ENABLED:
         proxy = Proxy()
@@ -1340,6 +1341,12 @@ def init_driver(
         }},
         __HEIGHT: {{
             value: {json.dumps(screen_height)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __AVAIL_HEIGHT: {{
+            value: {json.dumps(screen_avail_height)},
             writable: true,
             configurable: true,
             enumerable: false

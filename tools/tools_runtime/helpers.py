@@ -14,12 +14,16 @@ def build_device_metrics(profile: dict) -> dict:
     h   = int(profile["screen_height"])
     dpr = float(profile.get("device_dpr_value", 1))
 
+    # Calculate expected inner height
+    avail_h = h - round(h * 0.04)
+    inner_h = avail_h - 132
+
     # OS/CDP (camelCase)
     otype = "portraitPrimary" if h >= w else "landscapePrimary"
 
     return {
         "width": w,
-        "height": h,
+        "height": inner_h,
         "windowBoundsWidth": w,
         "windowBoundsHeight": h,
         "deviceScaleFactor": dpr,

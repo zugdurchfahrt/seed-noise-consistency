@@ -241,6 +241,43 @@ const CoreWindowModule = function CoreWindowModule(window) {
       __throwWrapFactoryPreflight('core_window:wrapNativeApply:bad_applyImpl', name, '__wrapNativeApply: applyImpl must be function', e);
     }
     const wrapped = new Proxy(nativeFn, {
+      setPrototypeOf(target, prototype) {
+        let current = prototype;
+        while (current !== null) {
+          if (current === wrapped) {
+            throw new TypeError('Cyclic __proto__ value');
+          }
+          current = Object.getPrototypeOf(current);
+        }
+        return Reflect.setPrototypeOf(target, prototype);
+      },
+      get(target, prop, receiver) {
+        if (prop === 'toString' && !Object.prototype.hasOwnProperty.call(target, 'toString')) {
+          const origVal = Reflect.get(target, prop, receiver);
+          if (typeof origVal !== 'function') {
+            return origVal;
+          }
+          return new Proxy(Function.prototype.toString, {
+            apply(innerTarget, innerThisArg, innerArgList) {
+              if (typeof innerThisArg !== 'function') {
+                const err = new TypeError("Function.prototype.toString requires that 'this' be a Function");
+                const frames = (err.stack || '').split('\n');
+                if (frames.length > 1) {
+                  if (innerThisArg != null && Object.getPrototypeOf(innerThisArg) === wrapped) {
+                    frames[1] = "    at Function.toString (<anonymous>)";
+                  } else {
+                    frames[1] = "    at Object.toString (<anonymous>)";
+                  }
+                  err.stack = frames.join('\n');
+                }
+                throw err;
+              }
+              return Reflect.apply(innerTarget, innerThisArg, innerArgList);
+            }
+          });
+        }
+        return Reflect.get(target, prop, receiver);
+      },
       apply(target, thisArg, argList) {
         try {
           return applyImpl(target, thisArg, argList);
@@ -291,6 +328,43 @@ const CoreWindowModule = function CoreWindowModule(window) {
       __throwWrapFactoryPreflight('core_window:wrapNativeCtor:bad_argsImpl', name || '__wrapNativeCtor', '__wrapNativeCtor: argsImpl must be function', e);
     }
     const wrapped = new Proxy(nativeFn, {
+      setPrototypeOf(target, prototype) {
+        let current = prototype;
+        while (current !== null) {
+          if (current === wrapped) {
+            throw new TypeError('Cyclic __proto__ value');
+          }
+          current = Object.getPrototypeOf(current);
+        }
+        return Reflect.setPrototypeOf(target, prototype);
+      },
+      get(target, prop, receiver) {
+        if (prop === 'toString' && !Object.prototype.hasOwnProperty.call(target, 'toString')) {
+          const origVal = Reflect.get(target, prop, receiver);
+          if (typeof origVal !== 'function') {
+            return origVal;
+          }
+          return new Proxy(Function.prototype.toString, {
+            apply(innerTarget, innerThisArg, innerArgList) {
+              if (typeof innerThisArg !== 'function') {
+                const err = new TypeError("Function.prototype.toString requires that 'this' be a Function");
+                const frames = (err.stack || '').split('\n');
+                if (frames.length > 1) {
+                  if (innerThisArg != null && Object.getPrototypeOf(innerThisArg) === wrapped) {
+                    frames[1] = "    at Function.toString (<anonymous>)";
+                  } else {
+                    frames[1] = "    at Object.toString (<anonymous>)";
+                  }
+                  err.stack = frames.join('\n');
+                }
+                throw err;
+              }
+              return Reflect.apply(innerTarget, innerThisArg, innerArgList);
+            }
+          });
+        }
+        return Reflect.get(target, prop, receiver);
+      },
       apply(target, thisArg, argList) {
         let nextArgs;
         try {
