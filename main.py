@@ -93,6 +93,8 @@ from tools.tools_runtime.helpers import (
     build_expected_client_hints,
     apply_ua_overrides,
     inject_uach_strip_window,
+    TASKBAR_RATIO,
+    BROWSER_UI_RATIO,
 )
 from tools.tools_infra.network_utils import Client
 from tools.tools_infra.overseer import logger, setup_logger
@@ -916,7 +918,8 @@ def init_driver(
     offset_minutes = country_data["offset_minutes"]
     latitude = country_data["latitude"]
     longitude = country_data["longitude"]
-    screen_avail_height = screen_height - round(screen_height * 0.04)
+    screen_avail_height = screen_height - round(screen_height * TASKBAR_RATIO)
+    browser_ui_height = round(screen_height * BROWSER_UI_RATIO)
     chrome_options = Options()
     if MITMPROXY_ENABLED:
         proxy = Proxy()
@@ -1347,6 +1350,12 @@ def init_driver(
         }},
         __AVAIL_HEIGHT: {{
             value: {json.dumps(screen_avail_height)},
+            writable: true,
+            configurable: true,
+            enumerable: false
+        }},
+        __BROWSER_UI_HEIGHT: {{
+            value: {json.dumps(browser_ui_height)},
             writable: true,
             configurable: true,
             enumerable: false

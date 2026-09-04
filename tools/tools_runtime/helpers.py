@@ -6,6 +6,12 @@ from tools.tools_runtime.headers_adapter import generate_accept_header
 from tools.tools_infra.overseer import logger
 logger = logger.getChild("helpers_runtime")
 
+# Screen geometry proportional coefficients (single source of truth).
+# Taskbar: fraction of screen_height occupied by OS taskbar (Windows).
+# Browser UI: fraction of screen_height occupied by Chrome tab strip + omnibox + bookmarks bar.
+TASKBAR_RATIO = 0.04
+BROWSER_UI_RATIO = 0.122
+
 def build_device_metrics(profile: dict) -> dict:
     """
     Preparing metrics for Emulation.setDeviceMetricsOverride.
@@ -14,9 +20,8 @@ def build_device_metrics(profile: dict) -> dict:
     h   = int(profile["screen_height"])
     dpr = float(profile.get("device_dpr_value", 1))
 
-    # Calculate expected inner height
-    avail_h = h - round(h * 0.04)
-    inner_h = avail_h - 132
+    avail_h = h - round(h * TASKBAR_RATIO)
+    inner_h = avail_h - round(h * BROWSER_UI_RATIO)
 
     # OS/CDP (camelCase)
     otype = "portraitPrimary" if h >= w else "landscapePrimary"

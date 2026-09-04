@@ -1,5 +1,10 @@
 # Changelog
 
+## 04.09.2026
+
+- `main.py` / `helpers.py` / `screen.js`: Eliminated hardcoded browser UI height (132px) and taskbar ratio (0.04) by extracting proportional coefficients into a single source of truth (`helpers.py`) and passing them strictly through the normalized data flow.
+
+
 ## 03.09.2026
 
 - `screen.js`: Completed the implementation of the `screen` module, which was previously unfinished. The `availHeight` parameter and screen properties were not fully implemented before, but now they are written natively in strict accordance with the rules of the V8 engine and Chromium. They now function correctly and natively.

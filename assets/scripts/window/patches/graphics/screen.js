@@ -223,6 +223,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const SCREEN_WIDTH  = Number(__screenState.width);
   const SCREEN_HEIGHT = Number(__screenState.height);
   const SCREEN_AVAIL_HEIGHT = Number(__screenState.availHeight ?? SCREEN_HEIGHT);
+  const BROWSER_UI_HEIGHT = Number(__screenState.browserUiHeight ?? 0);
   const COLOR_DEPTH   = Number(__screenState.colorDepth);
   const DPR           = Number(__screenState.dpr);
   const ORIENTATION_DOM = (typeof __screenState.orientationDom === 'string' && __screenState.orientationDom)
@@ -849,7 +850,7 @@ const ScreenPatchModule = function ScreenPatchModule(window) {
   const orientationExpected = { type: expectedOrientationType, angle: ZERO };
   const cssViewportWidth = SCREEN_WIDTH;
   const nativeInnerH = __screenReadAccessorValue(window, windowProto, 'innerHeight', window);
-  const idealCssViewportHeight = (typeof nativeInnerH === 'number' && nativeInnerH > 0) ? nativeInnerH : (SCREEN_AVAIL_HEIGHT - 132);
+  const idealCssViewportHeight = (typeof nativeInnerH === 'number' && nativeInnerH > 0) ? nativeInnerH : (SCREEN_AVAIL_HEIGHT - BROWSER_UI_HEIGHT);
   const cssViewportHeight = (typeof DPR === 'number' && DPR > ZERO) 
     ? Math.round(Math.ceil(idealCssViewportHeight * DPR) / DPR) 
     : idealCssViewportHeight;

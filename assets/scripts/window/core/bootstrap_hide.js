@@ -31,6 +31,7 @@ const __bootstrapSeedKeys__ = [
   '__WIDTH',
   '__HEIGHT',
   '__AVAIL_HEIGHT',
+  '__BROWSER_UI_HEIGHT',
   '__COLOR_DEPTH',
   '__DPR',
   '__primaryLanguage',
@@ -685,6 +686,7 @@ function __ensureScreenTransitState__() {
   if (!Object.prototype.hasOwnProperty.call(state, 'width')) state.width = null;
   if (!Object.prototype.hasOwnProperty.call(state, 'height')) state.height = null;
   if (!Object.prototype.hasOwnProperty.call(state, 'availHeight')) state.availHeight = null;
+  if (!Object.prototype.hasOwnProperty.call(state, 'browserUiHeight')) state.browserUiHeight = null;
   if (!Object.prototype.hasOwnProperty.call(state, 'dpr')) state.dpr = null;
   if (!Object.prototype.hasOwnProperty.call(state, 'colorDepth')) state.colorDepth = null;
   if (!Object.prototype.hasOwnProperty.call(state, 'orientationDom')) state.orientationDom = null;
@@ -756,6 +758,7 @@ const __bootstrapPlatformVersion__ = __bootstrapInputs__.__UA_PLATFORM_VERSION;
 const __bootstrapScreenWidth__ = Number(__bootstrapInputs__.__WIDTH ?? (W.screen && W.screen.width));
 const __bootstrapScreenHeight__ = Number(__bootstrapInputs__.__HEIGHT ?? (W.screen && W.screen.height));
 const __bootstrapScreenAvailHeight__ = Number(__bootstrapInputs__.__AVAIL_HEIGHT ?? __bootstrapScreenHeight__);
+const __bootstrapScreenBrowserUiHeight__ = Number(__bootstrapInputs__.__BROWSER_UI_HEIGHT ?? 0);
 const __bootstrapScreenDpr__ = Number(__bootstrapInputs__.__DPR);
 const __bootstrapScreenColorDepth__ = Number(__bootstrapInputs__.__COLOR_DEPTH);
 const __geoMissingKeys__ = [];
@@ -846,6 +849,7 @@ if (__screenMissingKeys__.length === 0) {
   __screenTransitState__.width = __bootstrapScreenWidth__;
   __screenTransitState__.height = __bootstrapScreenHeight__;
   __screenTransitState__.availHeight = __bootstrapScreenAvailHeight__;
+  __screenTransitState__.browserUiHeight = __bootstrapScreenBrowserUiHeight__;
   __screenTransitState__.dpr = __bootstrapScreenDpr__;
   __screenTransitState__.colorDepth = __bootstrapScreenColorDepth__;
   __screenTransitState__.orientationDom = ((__screenTransitState__.height >= __screenTransitState__.width))
